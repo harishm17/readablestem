@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3.1 Complex Numbers | Precalculus (OpenStax)</title>
+
+  <!-- MathJax 3 configuration: must appear before the MathJax loader script -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        processEscapes: true
+      },
+      options: {
+        enableMenu: true,
+        enableAssistiveMml: true,
+        renderActions: {
+          addMenu: [0, '', '']
+        }
+      },
+      startup: {
+        typeset: true
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root {
+      --text: #1a1a1a;
+      --bg: #ffffff;
+      --link: #0b4f8a;
+      --border: #5c5c5c;
+      --focus: #0b4f8a;
+      --box-bg: #ffffff;
+    }
+    html { font-size: 100%; }
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+    h1, h2, h3, h4 {
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.25;
+    }
+    a { color: var(--link); }
+    a:focus, button:focus, [tabindex]:focus {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      background: #ffffff;
+      color: var(--link);
+      padding: 0.5rem 1rem;
+      border: 2px solid var(--focus);
+      z-index: 100;
+    }
+    .skip-link:focus { left: 0.5rem; top: 0.5rem; }
+    .boxed {
+      border: 1px solid var(--border);
+      background: var(--box-bg);
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+    }
+    .boxed > h3:first-child, .boxed > h4:first-child { margin-top: 0.25rem; }
+    .example-inner {
+      border: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+      margin: 0.75rem 0;
+    }
+    figure {
+      margin: 1.5rem 0;
+      text-align: center;
+    }
+    figure img {
+      max-width: 100%;
+      height: auto;
+    }
+    figcaption {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 0.95rem;
+      text-align: left;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 1rem 0;
+      width: 100%;
+    }
+    caption {
+      text-align: left;
+      font-style: italic;
+      padding-bottom: 0.5rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.5rem;
+      text-align: center;
+      vertical-align: middle;
+    }
+    th[scope="row"] { text-align: left; }
+    .math-display { overflow-x: auto; padding: 0.25rem 0; }
+    .step-list { list-style: none; padding-left: 0; }
+    .step-list li { margin: 0.5rem 0; }
+    .step-note { font-family: Arial, Helvetica, sans-serif; font-size: 0.95rem; }
+    footer {
+      margin-top: 2rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+      font-size: 0.95rem;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { scroll-behavior: auto !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<main id="main-content">
+
+<h1>3.1 Complex Numbers</h1>
+
+<section aria-labelledby="learning-objectives">
+  <h2 id="learning-objectives">Learning Objectives</h2>
+  <p>In this section, you will:</p>
+  <ul>
+    <li>Express square roots of negative numbers as multiples of \(i\).</li>
+    <li>Plot complex numbers on the complex plane.</li>
+    <li>Add and subtract complex numbers.</li>
+    <li>Multiply and divide complex numbers.</li>
+  </ul>
+
+  <p>
+    The study of mathematics continuously builds upon itself. Negative integers, for example, fill a void left by the set of positive integers.
+    The set of rational numbers, in turn, fills a void left by the set of integers. The set of real numbers fills a void left by the set of rational numbers.
+    Not surprisingly, the set of real numbers has voids as well. For example, we still have no solution to equations such as
+  </p>
+  <p class="math-display">\[x^2 + 4 = 0\]</p>
+  <p>
+    Our best guesses might be \(+2\) or \(-2\). But if we test \(+2\) in this equation, it does not work. If we test \(-2\), it does not work.
+    If we want to have a solution for this equation, we will have to go farther than we have so far. After all, to this point we have described
+    the square root of a negative number as undefined. Fortunately, there is another system of numbers that provides solutions to problems such as these.
+    In this section, we will explore this number system and how to work within it.
+  </p>
+</section>
+
+<section aria-labelledby="sec-sqrt-i">
+  <h2 id="sec-sqrt-i">Expressing Square Roots of Negative Numbers as Multiples of \(i\)</h2>
+
+  <p>
+    We know how to find the square root of any positive real number. In a similar way, we can find the square root of a negative number.
+    The difference is that the root is not real. If the value in the radicand is negative, the root is said to be an <strong>imaginary number</strong>.
+    The imaginary number \(i\) is defined as the square root of negative 1.
+  </p>
+  <p class="math-display">\[\sqrt{-1} = i\]</p>
+  <p>So, using properties of radicals,</p>
+  <p class="math-display">\[i^2 = \left(\sqrt{-1}\right)^2 = -1\]</p>
+  <p>We can write the square root of any negative number as a multiple of \(i\). Consider the square root of \(-25\).</p>
+  <div class="math-display">
+    \[
+    \begin{aligned}
+    \sqrt{-25} &= \sqrt{25 \cdot (-1)} \\
+    &= \sqrt{25}\,\sqrt{-1} \\
+    &= 5i
+    \end{aligned}
+    \]
+  </div>
+  <p>
+    We use \(5i\) and not \(-5i\) because the principal root of \(25\) is the positive root.
+  </p>
+
+  <p>
+    A <strong>complex number</strong> is the sum of a real number and an imaginary number. A complex number is expressed in standard form when written
+    \(a + bi\), where \(a\) is the real part and \(bi\) is the imaginary part. For example, \(5 + 2i\) is a complex number. So, too, is \(3 + 4\sqrt{3}\,i\).
+  </p>
+
+  <figure>
+    <img src="images/section-3-1-real-imaginary-parts.png"
+         alt="The expression 5 + 2i. An arrow points from the label Real part to the 5. A second arrow points from the label Imaginary part to the 2i.">
+    <figcaption>The expression \(5 + 2i\), with 5 identified as the real part and \(2i\) identified as the imaginary part.</figcaption>
+  </figure>
+
+  <p>
+    Imaginary numbers are distinguished from real numbers because a squared imaginary number produces a negative real number.
+    Recall, when a positive real number is squared, the result is a positive real number and when a negative real number is squared,
+    again, the result is a positive real number. Complex numbers are a combination of real and imaginary numbers.
+  </p>
+</section>
+
+<section aria-labelledby="sec-imag-complex">
+  <h2 id="sec-imag-complex">Imaginary and Complex Numbers</h2>
+
+  <aside class="boxed" aria-labelledby="def-box">
+    <h3 id="def-box">Imaginary and Complex Numbers</h3>
+    <p>A complex number is a number of the form \(a + bi\), where</p>
+    <ul>
+      <li>\(a\) is the real part of the complex number.</li>
+      <li>\(bi\) is the imaginary part of the complex number.</li>
+    </ul>
+    <p>
+      If \(b = 0\), then \(a + bi\) is a real number. If \(a = 0\) and \(b \neq 0\), the complex number is called an <strong>imaginary number</strong>.
+      An imaginary number is an even root of a negative number.
+    </p>
+  </aside>
+
+  <aside class="boxed" aria-labelledby="howto-std">
+    <h3 id="howto-std">How To</h3>
+    <p><strong>Given an imaginary number, express it in standard form.</strong></p>
+    <ol>
+      <li>Write \(\sqrt{-a}\) as \(\sqrt{a}\sqrt{-1}\).</li>
+      <li>Express \(\sqrt{-1}\) as \(i\).</li>
+      <li>Write \(\sqrt{a} \cdot i\) in simplest form.</li>
+    </ol>
+  </aside>
+
+  <section class="boxed" aria-labelledby="ex1">
+    <h3 id="ex1">Example 1</h3>
+    <div class="example-inner">
+      <h4>Expressing an Imaginary Number in Standard Form</h4>
+      <p>Express \(\sqrt{-9}\) in standard form.</p>
+    </div>
+    <div class="example-inner">
+      <h4>Solution</h4>
+      <p class="math-display">\[\sqrt{-9} = \sqrt{9}\sqrt{-1} = 3i\]</p>
+      <p>In standard form, this is \(0 + 3i\).</p>
+    </div>
+  </section>
+
+  <aside class="boxed" aria-labelledby="try1">
+    <h3 id="try1">Try It #1</h3>
+    <p>Express \(\sqrt{-24}\) in standard form.</p>
+  </aside>
+</section>
+
+<section aria-labelledby="sec-plot">
+  <h2 id="sec-plot">Plotting a Complex Number on the Complex Plane</h2>
+
+  <p>
+    We cannot plot complex numbers on a number line as we might real numbers. However, we can still represent them graphically.
+    To represent a complex number we need to address the two components of the number. We use the <strong>complex plane</strong>, which is a
+    coordinate system in which the horizontal axis represents the real component and the vertical axis represents the imaginary component.
+    Complex numbers are the points on the plane, expressed as ordered pairs \((a, b)\), where \(a\) represents the coordinate for the horizontal axis
+    and \(b\) represents the coordinate for the vertical axis.
+  </p>
+
+  <p>
+    Let’s consider the number \(-2 + 3i\). The real part of the complex number is \(-2\) and the imaginary part is \(3i\).
+    We plot the ordered pair \((-2, 3)\) to represent the complex number \(-2 + 3i\) as shown in Figure 1.
+  </p>
+
+  <figure>
+    <img src="images/figure-1-point-minus-2-plus-3i.png"
+         alt="Coordinate plane with a horizontal x-axis labeled from negative 5 to 5 and a vertical y-axis labeled from negative 5 to 5. A black dot is at the point (negative 2, 3), labeled −2 + 3i. A blue arrow runs horizontally from the origin to the left, ending at x = −2. A red arrow runs vertically upward from x = −2 to y = 3, showing the imaginary component.">
+    <figcaption>Figure 1. The complex number \(-2 + 3i\) plotted as the point \((-2, 3)\) on the complex plane.</figcaption>
+  </figure>
+
+  <figure>
+    <img src="images/figure-2-complex-plane-axes.png"
+         alt="Diagram of the complex plane. A horizontal double-headed arrow is labeled real. A vertical double-headed arrow is labeled imaginary. The axes cross at the origin.">
+    <figcaption>Figure 2. The complex plane. The horizontal axis is the real axis, and the vertical axis is the imaginary axis.</figcaption>
+  </figure>
+
+  <aside class="boxed" aria-labelledby="howto-plot">
+    <h3 id="howto-plot">How To</h3>
+    <p><strong>Given a complex number, represent its components on the complex plane.</strong></p>
+    <ol>
+      <li>Determine the real part and the imaginary part of the complex number.</li>
+      <li>Move along the horizontal axis to show the real part of the number.</li>
+      <li>Move parallel to the vertical axis to show the imaginary part of the number.</li>
+      <li>Plot the point.</li>
+    </ol>
+  </aside>
+
+  <section class="boxed" aria-labelledby="ex2">
+    <h3 id="ex2">Example 2</h3>
+    <div class="example-inner">
+      <h4>Plotting a Complex Number on the Complex Plane</h4>
+      <p>Plot the complex number \(3 - 4i\) on the complex plane.</p>
+    </div>
+    <div class="example-inner">
+      <h4>Solution</h4>
+      <p>
+        The real part of the complex number is \(3\), and the imaginary part is \(-4i\). We plot the ordered pair \((3, -4)\) as shown in Figure 3.
+      </p>
+      <figure>
+        <img src="images/figure-3-point-3-minus-4i.png"
+             alt="Coordinate plane with x-axis and y-axis labeled from negative 5 to 5. A blue arrow runs horizontally from the origin to the right, ending at x = 3. A red arrow runs vertically downward from x = 3 to y = −4. A black dot marks the point (3, −4).">
+        <figcaption>Figure 3. The complex number \(3 - 4i\) plotted as the point \((3, -4)\).</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <aside class="boxed" aria-labelledby="try2">
+    <h3 id="try2">Try It #2</h3>
+    <p>Plot the complex number \(-4 - i\) on the complex plane.</p>
+  </aside>
+</section>
+
+<section aria-labelledby="sec-addsub">
+  <h2 id="sec-addsub">Adding and Subtracting Complex Numbers</h2>
+  <p>
+    Just as with real numbers, we can perform arithmetic operations on complex numbers. To add or subtract complex numbers,
+    we combine the real parts and combine the imaginary parts.
+  </p>
+
+  <aside class="boxed" aria-labelledby="addsub-box">
+    <h3 id="addsub-box">Complex Numbers: Addition and Subtraction</h3>
+    <p>Adding complex numbers:</p>
+    <div class="math-display">\[(a + bi) + (c + di) = (a + c) + (b + d)i\]</div>
+    <p>Subtracting complex numbers:</p>
+    <div class="math-display">\[(a + bi) - (c + di) = (a - c) + (b - d)i\]</div>
+  </aside>
+
+  <aside class="boxed" aria-labelledby="howto-addsub">
+    <h3 id="howto-addsub">How To</h3>
+    <p><strong>Given two complex numbers, find the sum or difference.</strong></p>
+    <ol>
+      <li>Identify the real and imaginary parts of each number.</li>
+      <li>Add or subtract the real parts.</li>
+      <li>Add or subtract the imaginary parts.</li>
+    </ol>
+  </aside>
+
+  <section class="boxed" aria-labelledby="ex3">
+    <h3 id="ex3">Example 3</h3>
+    <div class="example-inner">
+      <h4>Adding Complex Numbers</h4>
+      <p>Add \(3 - 4i\) and \(2 + 5i\).</p>
+    </div>
+    <div class="example-inner">
+      <h4>Solution</h4>
+      <p>We add the real parts and add the imaginary parts.</p>
+      <div class="math-display">
+        \[
+        \begin{aligned}
+        (a + bi) + (c + di) &= (a + c) + (b + d)i \\
+        (3 - 4i) + (2 + 5i) &= (3 + 2) + (-4 + 5)i \\
+        &= 5 + i
+        \end{aligned}
+        \]
+      </div>
+    </div>
+  </section>
+
+  <aside class="boxed" aria-labelledby="try3">
+    <h3 id="try3">Try It #3</h3>
+    <p>Subtract \(2 + 5i\) from \(3 - 4i\).</p>
+  </aside>
+</section>
+
+<section aria-labelledby="sec-mult">
+  <h2 id="sec-mult">Multiplying Complex Numbers</h2>
+  <p>
+    Multiplying complex numbers is much like multiplying binomials. The major difference is that we work with the real and imaginary parts separately.
+  </p>
+
+  <h3>Multiplying a Complex Number by a Real Number</h3>
+  <p>
+    Let’s begin by multiplying a complex number by a real number. We distribute the real number just as we would with a binomial. So, for example,
+  </p>
+  <div class="math-display">
+    \[
+    \begin{aligned}
+    3(6 + 2i) &= (3 \cdot 6) + (3 \cdot 2i) \\
+    &= 18 + 6i
+    \end{aligned}
+    \]
+  </div>
+  <p class="step-note">The first line uses the distributive property. The second line simplifies.</p>
+
+  <aside class="boxed" aria-labelledby="howto-mult-real">
+    <h3 id="howto-mult-real">How To</h3>
+    <p><strong>Given a complex number and a real number, multiply to find the product.</strong></p>
+    <ol>
+      <li>Use the distributive property.</li>
+      <li>Simplify.</li>
+    </ol>
+  </aside>
+
+  <section class="boxed" aria-labelledby="ex4">
+    <h3 id="ex4">Example 4</h3>
+    <div class="example-inner">
+      <h4>Multiplying a Complex Number by a Real Number</h4>
+      <p>Find the product \(4(2 + 5i)\).</p>
+    </div>
+    <div class="example-inner">
+      <h4>Solution</h4>
+      <p>Distribute the 4.</p>
+      <div class="math-display">
+        \[
+        \begin{aligned}
+        4(2 + 5i) &= (4 \cdot 2) + (4 \cdot 5i) \\
+        &= 8 + 20i
+        \end{aligned}
+        \]
+      </div>
+    </div>
+  </section>
+
+  <aside class="boxed" aria-labelledby="try4">
+    <h3 id="try4">Try It #4</h3>
+    <p>Find the product \(-4(2 + 6i)\).</p>
+  </aside>
+
+  <h3>Multiplying Complex Numbers Together</h3>
+  <p>
+    Now, let’s multiply two complex numbers. We can use either the distributive property or the FOIL method. Recall that FOIL is an acronym for
+    multiplying First, Outer, Inner, and Last terms together. Using either the distributive property or the FOIL method, we get
+  </p>
+  <div class="math-display">\[(a + bi)(c + di) = ac + adi + bci + bdi^2\]</div>
+  <p>Because \(i^2 = -1\), we have</p>
+  <div class="math-display">\[(a + bi)(c + di) = ac + adi + bci - bd\]</div>
+  <p>To simplify, we combine the real parts, and we combine the imaginary parts.</p>
+  <div class="math-display">\[(a + bi)(c + di) = (ac - bd) + (ad + bc)i\]</div>
+
+  <aside class="boxed" aria-labelledby="howto-mult">
+    <h3 id="howto-mult">How To</h3>
+    <p><strong>Given two complex numbers, multiply to find the product.</strong></p>
+    <ol>
+      <li>Use the distributive property or the FOIL method.</li>
+      <li>Simplify.</li>
+    </ol>
+  </aside>
+
+  <section class="boxed" aria-labelledby="ex5">
+    <h3 id="ex5">Example 5</h3>
+    <div class="example-inner">
+      <h4>Multiplying a Complex Number by a Complex Number</h4>
+      <p>Multiply \((4 + 3i)(2 - 5i)\).</p>
+    </div>
+    <div class="example-inner">
+      <h4>Solution</h4>
+      <p>Use \((a + bi)(c + di) = (ac - bd) + (ad + bc)i\).</p>
+      <div class="math-display">
+        \[
+        \begin{aligned}
+        (4 + 3i)(2 - 5i) &= (4 \cdot 2 - 3 \cdot (-5)) + (4 \cdot (-5) + 3 \cdot 2)i \\
+        &= (8 + 15) + (-20 + 6)i \\
+        &= 23 - 14i
+        \end{aligned}
+        \]
+      </div>
+    </div>
+  </section>
+
+  <aside class="boxed" aria-labelledby="try5">
+    <h3 id="try5">Try It #5</h3>
+    <p>Multiply \((3 - 4i)(2 + 3i)\).</p>
+  </aside>
+</section>
+
+<section aria-labelledby="sec-div">
+  <h2 id="sec-div">Dividing Complex Numbers</h2>
+  <p>
+    Division of two complex numbers is more complicated than addition, subtraction, and multiplication because we cannot divide by an imaginary number,
+    meaning that any fraction must have a real-number denominator. We need to find a term by which we can multiply the numerator and the denominator
+    that will eliminate the imaginary portion of the denominator so that we end up with a real number as the denominator. This term is called the
+    <strong>complex conjugate</strong> of the denominator, which is found by changing the sign of the imaginary part of the complex number.
+    In other words, the complex conjugate of \(a + bi\) is \(a - bi\).
+  </p>
+  <p>
+    Note that complex conjugates have a reciprocal relationship: The complex conjugate of \(a + bi\) is \(a - bi\), and the complex conjugate of
+    \(a - bi\) is \(a + bi\). Further, when a quadratic equation with real coefficients has complex solutions, the solutions are always complex
+    conjugates of one another.
+  </p>
+  <p>
+    Suppose we want to divide \(c + di\) by \(a + bi\), where neither \(a\) nor \(b\) equals zero. We first write the division as a fraction, then find
+    the complex conjugate of the denominator, and multiply.
+  </p>
+  <div class="math-display">
+    \[
+    \frac{c + di}{a + bi}, \quad \text{where } a \neq 0 \text{ and } b \neq 0
+    \]
+  </div>
+  <p>Multiply the numerator and denominator by the complex conjugate of the denominator.</p>
+  <div class="math-display">
+    \[
+    \frac{(c + di)}{(a + bi)} \cdot \frac{(a - bi)}{(a - bi)} = \frac{(c + di)(a - bi)}{(a + bi)(a - bi)}
+    \]
+  </div>
+  <p>Apply the distributive property.</p>
+  <div class="math-display">
+    \[
+    = \frac{ca - cbi + adi - bdi^2}{a^2 - abi + abi - b^2 i^2}
+    \]
+  </div>
+  <p>Simplify, remembering that \(i^2 = -1\).</p>
+  <div class="math-display">
+    \[
+    \begin{aligned}
+    &= \frac{ca - cbi + adi - bd(-1)}{a^2 - abi + abi - b^2(-1)} \\
+    &= \frac{(ca + bd) + (ad - cb)i}{a^2 + b^2}
+    \end{aligned}
+    \]
+  </div>
+
+  <aside class="boxed" aria-labelledby="conj-box">
+    <h3 id="conj-box">The Complex Conjugate</h3>
+    <p>
+      The complex conjugate of a complex number \(a + bi\) is \(a - bi\). It is found by changing the sign of the imaginary part of the complex number.
+      The real part of the number is left unchanged.
+    </p>
+    <ul>
+      <li>When a complex number is multiplied by its complex conjugate, the result is a real number.</li>
+      <li>When a complex number is added to its complex conjugate, the result is a real number.</li>
+    </ul>
+  </aside>
+
+  <section class="boxed" aria-labelledby="ex6">
+    <h3 id="ex6">Example 6</h3>
+    <div class="example-inner">
+      <h4>Finding Complex Conjugates</h4>
+      <p>Find the complex conjugate of each number.</p>
+      <ol type="a">
+        <li>\(2 + i\sqrt{5}\)</li>
+        <li>\(-\frac{1}{2}i\)</li>
+      </ol>
+    </div>
+    <div class="example-inner">
+      <h4>Solution</h4>
+      <ol type="a">
+        <li>The number is already in the form \(a + bi\). The complex conjugate is \(a - bi\), or \(2 - i\sqrt{5}\).</li>
+        <li>
+          We can rewrite this number in the form \(a + bi\) as \(0 - \frac{1}{2}i\). The complex conjugate is \(a - bi\), or \(0 + \frac{1}{2}i\).
+          This can be written simply as \(\frac{1}{2}i\).
+        </li>
+      </ol>
+    </div>
+    <aside class="example-inner" aria-labelledby="ex6-analysis">
+      <h4 id="ex6-analysis">Analysis</h4>
+      <p>
+        Although we have seen that we can find the complex conjugate of an imaginary number, in practice we generally find the complex conjugates of
+        only complex numbers with both a real and an imaginary component. To obtain a real number from an imaginary number, we can simply multiply by \(i\).
+      </p>
+    </aside>
+  </section>
+
+  <aside class="boxed" aria-labelledby="howto-div">
+    <h3 id="howto-div">How To</h3>
+    <p><strong>Given two complex numbers, divide one by the other.</strong></p>
+    <ol>
+      <li>Write the division problem as a fraction.</li>
+      <li>Determine the complex conjugate of the denominator.</li>
+      <li>Multiply the numerator and denominator of the fraction by the complex conjugate of the denominator.</li>
+      <li>Simplify.</li>
+    </ol>
+  </aside>
+
+  <section class="boxed" aria-labelledby="ex7">
+    <h3 id="ex7">Example 7</h3>
+    <div class="example-inner">
+      <h4>Dividing Complex Numbers</h4>
+      <p>Divide \((2 + 5i)\) by \((4 - i)\).</p>
+    </div>
+    <div class="example-inner">
+      <h4>Solution</h4>
+      <p>We begin by writing the problem as a fraction.</p>
+      <div class="math-display">\[\frac{2 + 5i}{4 - i}\]</div>
+      <p>Then we multiply the numerator and denominator by the complex conjugate of the denominator.</p>
+      <div class="math-display">\[\frac{2 + 5i}{4 - i} \cdot \frac{4 + i}{4 + i}\]</div>
+      <p>
+        To multiply two complex numbers, we expand the product as we would with polynomials (the process commonly called FOIL).
+      </p>
+      <div class="math-display">
+        \[
+        \begin{aligned}
+        \frac{2 + 5i}{4 - i} \cdot \frac{4 + i}{4 + i} &= \frac{8 + 2i + 20i + 5i^2}{16 + 4i - 4i - i^2} \\
+        &= \frac{8 + 2i + 20i + 5(-1)}{16 + 4i - 4i - (-1)} \quad \text{Because } i^2 = -1 \\
+        &= \frac{3 + 22i}{17} \\
+        &= \frac{3}{17} + \frac{22}{17}i \quad \text{Separate real and imaginary parts.}
+        \end{aligned}
+        \]
+      </div>
+      <p>Note that this expresses the quotient in standard form.</p>
+    </div>
+  </section>
+
+  <section class="boxed" aria-labelledby="ex8">
+    <h3 id="ex8">Example 8</h3>
+    <div class="example-inner">
+      <h4>Substituting a Complex Number into a Polynomial Function</h4>
+      <p>Let \(f(x) = x^2 - 5x + 2\). Evaluate \(f(3 + i)\).</p>
+    </div>
+    <div class="example-inner">
+      <h4>Solution</h4>
+      <p>Substitute \(x = 3 + i\) into the function \(f(x) = x^2 - 5x + 2\) and simplify.</p>
+      <ul class="step-list">
+        <li>\[f(3 + i) = (3 + i)^2 - 5(3 + i) + 2 \qquad \text{Substitute } 3 + i \text{ for } x.\]</li>
+        <li>\[= (3 + 6i + i^2) - (15 + 5i) + 2 \qquad \text{Multiply.}\]</li>
+        <li>\[= 9 + 6i + (-1) - 15 - 5i + 2 \qquad \text{Substitute } -1 \text{ for } i^2.\]</li>
+        <li>\[= -5 + i \qquad \text{Combine like terms.}\]</li>
+      </ul>
+    </div>
+    <aside class="example-inner" aria-labelledby="ex8-analysis">
+      <h4 id="ex8-analysis">Analysis</h4>
+      <p>
+        We write \(f(3 + i) = -5 + i\). Notice that the input is \(3 + i\) and the output is \(-5 + i\).
+      </p>
+    </aside>
+  </section>
+
+  <aside class="boxed" aria-labelledby="try6">
+    <h3 id="try6">Try It #6</h3>
+    <p>Let \(f(x) = 2x^2 - 3x\). Evaluate \(f(8 - i)\).</p>
+  </aside>
+
+  <section class="boxed" aria-labelledby="ex9">
+    <h3 id="ex9">Example 9</h3>
+    <div class="example-inner">
+      <h4>Substituting an Imaginary Number in a Rational Function</h4>
+      <p>Let \(f(x) = \frac{2 + x}{x + 3}\). Evaluate \(f(10i)\).</p>
+    </div>
+    <div class="example-inner">
+      <h4>Solution</h4>
+      <p>Substitute \(x = 10i\) and simplify.</p>
+      <ul class="step-list">
+        <li>\[\frac{2 + 10i}{10i + 3} \qquad \text{Substitute } 10i \text{ for } x.\]</li>
+        <li>\[\frac{2 + 10i}{3 + 10i} \qquad \text{Rewrite the denominator in standard form.}\]</li>
+        <li>\[\frac{2 + 10i}{3 + 10i} \cdot \frac{3 - 10i}{3 - 10i} \qquad \text{Prepare to multiply the numerator and denominator by the complex conjugate of the denominator.}\]</li>
+        <li>\[\frac{6 - 20i + 30i - 100i^2}{9 - 30i + 30i - 100i^2} \qquad \text{Multiply using the distributive property or the FOIL method.}\]</li>
+        <li>\[\frac{6 - 20i + 30i - 100(-1)}{9 - 30i + 30i - 100(-1)} \qquad \text{Substitute } -1 \text{ for } i^2.\]</li>
+        <li>\[\frac{106 + 10i}{109} \qquad \text{Simplify.}\]</li>
+        <li>\[\frac{106}{109} + \frac{10}{109}i \qquad \text{Separate the real and imaginary parts.}\]</li>
+      </ul>
+    </div>
+  </section>
+
+  <aside class="boxed" aria-labelledby="try7">
+    <h3 id="try7">Try It #7</h3>
+    <p>Let \(f(x) = \frac{x + 1}{x - 4}\). Evaluate \(f(-i)\).</p>
+  </aside>
+</section>
+
+<section aria-labelledby="sec-powers">
+  <h2 id="sec-powers">Simplifying Powers of \(i\)</h2>
+  <p>The powers of \(i\) are cyclic. Let’s look at what happens when we raise \(i\) to increasing powers.</p>
+  <div class="math-display">
+    \[
+    \begin{aligned}
+    i^1 &= i \\
+    i^2 &= -1 \\
+    i^3 &= i^2 \cdot i = -1 \cdot i = -i \\
+    i^4 &= i^3 \cdot i = -i \cdot i = -i^2 = -(-1) = 1 \\
+    i^5 &= i^4 \cdot i = 1 \cdot i = i
+    \end{aligned}
+    \]
+  </div>
+  <p>
+    We can see that when we get to the fifth power of \(i\), it is equal to the first power. As we continue to multiply \(i\) by itself for increasing
+    powers, we will see a cycle of 4. Let’s examine the next 4 powers of \(i\).
+  </p>
+  <div class="math-display">
+    \[
+    \begin{aligned}
+    i^6 &= i^5 \cdot i = i \cdot i = i^2 = -1 \\
+    i^7 &= i^6 \cdot i = i^2 \cdot i = i^3 = -i \\
+    i^8 &= i^7 \cdot i = i^3 \cdot i = i^4 = 1 \\
+    i^9 &= i^8 \cdot i = i^4 \cdot i = i^5 = i
+    \end{aligned}
+    \]
+  </div>
+
+  <section class="boxed" aria-labelledby="ex10">
+    <h3 id="ex10">Example 10</h3>
+    <div class="example-inner">
+      <h4>Simplifying Powers of \(i\)</h4>
+      <p>Evaluate \(i^{35}\).</p>
+    </div>
+    <div class="example-inner">
+      <h4>Solution</h4>
+      <p>
+        Since \(i^4 = 1\), we can simplify the problem by factoring out as many factors of \(i^4\) as possible. To do so, first determine how many times
+        4 goes into 35: \(35 = 4 \cdot 8 + 3\).
+      </p>
+      <div class="math-display">
+        \[
+        i^{35} = i^{4 \cdot 8 + 3} = i^{4 \cdot 8} \cdot i^3 = \left(i^4\right)^8 \cdot i^3 = 1^8 \cdot i^3 = i^3 = -i
+        \]
+      </div>
+    </div>
+  </section>
+
+  <aside class="boxed" aria-labelledby="qa">
+    <h3 id="qa">Q&amp;A: Can we write \(i^{35}\) in other helpful ways?</h3>
+    <p>
+      As we saw in Example 10, we reduced \(i^{35}\) to \(i^3\) by dividing the exponent by 4 and using the remainder to find the simplified form.
+      But perhaps another factorization of \(i^{35}\) may be more useful. Table 1 shows some other possible factorizations.
+    </p>
+    <table>
+      <caption>Table 1. Other factorizations of \(i^{35}\)</caption>
+      <thead>
+        <tr>
+          <th scope="col"><span class="visually-hidden">Stage</span>Stage</th>
+          <th scope="col">Factorization 1</th>
+          <th scope="col">Factorization 2</th>
+          <th scope="col">Factorization 3</th>
+          <th scope="col">Factorization 4</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Factorization of \(i^{35}\)</th>
+          <td>\(i^{34} \cdot i\)</td>
+          <td>\(i^{33} \cdot i^2\)</td>
+          <td>\(i^{31} \cdot i^4\)</td>
+          <td>\(i^{19} \cdot i^{16}\)</td>
+        </tr>
+        <tr>
+          <th scope="row">Reduced form</th>
+          <td>\((i^2)^{17} \cdot i\)</td>
+          <td>\(i^{33} \cdot (-1)\)</td>
+          <td>\(i^{31} \cdot 1\)</td>
+          <td>\(i^{19} \cdot (i^4)^4\)</td>
+        </tr>
+        <tr>
+          <th scope="row">Simplified form</th>
+          <td>\((-1)^{17} \cdot i\)</td>
+          <td>\(-i^{33}\)</td>
+          <td>\(i^{31}\)</td>
+          <td>\(i^{19}\)</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      Each of these will eventually result in the answer we obtained above but may require several more steps than our earlier method.
+    </p>
+  </aside>
+
+  <aside class="boxed" aria-labelledby="media">
+    <h3 id="media">Media</h3>
+    <p>Access these online resources for additional instruction and practice with complex numbers.</p>
+    <ul>
+      <li>Adding and Subtracting Complex Numbers</li>
+      <li>Multiply Complex Numbers</li>
+      <li>Multiplying Complex Conjugates</li>
+      <li>Raising \(i\) to Powers</li>
+    </ul>
+  </aside>
+</section>
+
+<section aria-labelledby="exercises">
+  <h2 id="exercises">3.1 Section Exercises</h2>
+
+  <h3>Verbal</h3>
+  <ol start="1">
+    <li>Explain how to add complex numbers.</li>
+    <li>What is the basic principle in multiplication of complex numbers?</li>
+    <li>Give an example to show the product of two imaginary numbers is not always imaginary.</li>
+    <li>What is a characteristic of the plot of a real number in the complex plane?</li>
+  </ol>
+
+  <h3>Algebraic</h3>
+  <p>For the following exercises, evaluate the algebraic expressions.</p>
+  <ol start="5">
+    <li>If \(f(x) = x^2 + x - 4\), evaluate \(f(2i)\).</li>
+    <li>If \(f(x) = x^3 - 2\), evaluate \(f(i)\).</li>
+    <li>If \(f(x) = x^2 + 3x + 5\), evaluate \(f(2 + i)\).</li>
+    <li>If \(f(x) = 2x^2 + x - 3\), evaluate \(f(2 - 3i)\).</li>
+    <li>If \(f(x) = \frac{x + 1}{2 - x}\), evaluate \(f(5i)\).</li>
+    <li>If \(f(x) = \frac{1 + 2x}{x + 3}\), evaluate \(f(4i)\).</li>
+  </ol>
+
+  <h3>Graphical</h3>
+  <p>For the following exercises, determine the number of real and nonreal solutions for each quadratic function shown.</p>
+
+  <figure>
+    <img src="images/exercise-11-parabola.png"
+         alt="Graph of a parabola opening upward with its vertex below the x-axis. The curve crosses the x-axis at two points.">
+    <figcaption>Exercise 11. Graph of a quadratic function.</figcaption>
+  </figure>
+
+  <figure>
+    <img src="images/exercise-12-parabola.png"
+         alt="Graph of a parabola opening upward with its vertex above the x-axis. The curve does not cross the x-axis.">
+    <figcaption>Exercise 12. Graph of a quadratic function.</figcaption>
+  </figure>
+
+  <p>For the following exercises, plot the complex numbers on the complex plane.</p>
+  <ol start="13">
+    <li>\(1 - 2i\)</li>
+    <li>\(-2 + 3i\)</li>
+    <li>\(i\)</li>
+    <li>\(-3 - 4i\)</li>
+  </ol>
+
+  <h3>Numeric</h3>
+  <p>For the following exercises, perform the indicated operation and express the result as a simplified complex number.</p>
+  <ol start="17">
+    <li>\((3 + 2i) + (5 - 3i)\)</li>
+    <li>\((-2 - 4i) + (1 + 6i)\)</li>
+    <li>\((-5 + 3i) - (6 - i)\)</li>
+    <li>\((2 - 3i) - (3 + 2i)\)</li>
+    <li>\((-4 + 4i) - (-6 + 9i)\)</li>
+    <li>\((2 + 3i)(4i)\)</li>
+    <li>\((5 - 2i)(3i)\)</li>
+    <li>\((6 - 2i)(5)\)</li>
+    <li>\((-2 + 4i)(8)\)</li>
+    <li>\((2 + 3i)(4 - i)\)</li>
+    <li>\((-1 + 2i)(-2 + 3i)\)</li>
+    <li>\((4 - 2i)(4 + 2i)\)</li>
+    <li>\((3 + 4i)(3 - 4i)\)</li>
+    <li>\(\dfrac{3 + 4i}{2}\)</li>
+    <li>\(\dfrac{6 - 2i}{3}\)</li>
+    <li>\(\dfrac{-5 + 3i}{2i}\)</li>
+    <li>\(\dfrac{6 + 4i}{i}\)</li>
+    <li>\(\dfrac{2 - 3i}{4 + 3i}\)</li>
+    <li>\(\dfrac{3 + 4i}{2 - i}\)</li>
+    <li>\(\dfrac{2 + 3i}{2 - 3i}\)</li>
+    <li>\(\sqrt{-9} + 3\sqrt{-16}\)</li>
+    <li>\(-\sqrt{-4} - 4\sqrt{-25}\)</li>
+    <li>\(\dfrac{2 + \sqrt{-12}}{2}\)</li>
+    <li>\(\dfrac{4 + \sqrt{-20}}{2}\)</li>
+    <li>\(i^8\)</li>
+    <li>\(i^{15}\)</li>
+    <li>\(i^{22}\)</li>
+  </ol>
+
+  <h3>Technology</h3>
+  <p>For the following exercises, use a calculator to help answer the questions.</p>
+  <ol start="44">
+    <li>Evaluate \((1 + i)^k\) for \(k = 4, 8,\) and \(12\). Predict the value if \(k = 16\).</li>
+    <li>Evaluate \((1 - i)^k\) for \(k = 2, 6,\) and \(10\). Predict the value if \(k = 14\).</li>
+    <li>Evaluate \((1 + i)^k - (1 - i)^k\) for \(k = 4, 8,\) and \(12\). Predict the value for \(k = 16\).</li>
+    <li>Show that a solution of \(x^6 + 1 = 0\) is \(\dfrac{\sqrt{3}}{2} + \dfrac{1}{2}i\).</li>
+    <li>Show that a solution of \(x^8 - 1 = 0\) is \(\dfrac{\sqrt{2}}{2} + \dfrac{\sqrt{2}}{2}i\).</li>
+  </ol>
+
+  <h3>Extensions</h3>
+  <p>For the following exercises, evaluate the expressions, writing the result as a simplified complex number.</p>
+  <ol start="49">
+    <li>\(\dfrac{1}{i} + \dfrac{4}{i^3}\)</li>
+    <li>\(\dfrac{1}{i^{11}} - \dfrac{1}{i^{21}}\)</li>
+    <li>\(i^7\left(1 + i^2\right)\)</li>
+    <li>\(i^{-3} + 5i^7\)</li>
+    <li>\(\dfrac{(2 + i)(4 - 2i)}{(1 + i)}\)</li>
+    <li>\(\dfrac{(1 + 3i)(2 - 4i)}{(1 + 2i)}\)</li>
+    <li>\(\dfrac{(3 + i)^2}{(1 + 2i)^2}\)</li>
+    <li>\(\dfrac{3 + 2i}{2 + i} + (4 + 3i)\)</li>
+    <li>\(\dfrac{4 + i}{i} + \dfrac{3 - 4i}{1 - i}\)</li>
+    <li>\(\dfrac{3 + 2i}{1 + 2i} - \dfrac{2 - 3i}{3 + i}\)</li>
+  </ol>
+</section>
+
+<footer>
+  <p>
+    “3.1 Complex Numbers” from Precalculus by Jay Abramson, OpenStax.
+  </p>
+  <p>
+    Licensed under Creative Commons Attribution License (CC BY 4.0).
+    <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a>
+  </p>
+  <p>
+    Original page:
+    <a href="https://openstax.org/books/precalculus/pages/3-1-complex-numbers">https://openstax.org/books/precalculus/pages/3-1-complex-numbers</a>
+  </p>
+  <p>Access for free at openstax.org.</p>
+  <p>Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.</p>
+  <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+</footer>
+
+</main>
+</body>
+</html>

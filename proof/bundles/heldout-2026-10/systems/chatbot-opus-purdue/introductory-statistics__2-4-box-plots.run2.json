@@ -1,0 +1,99 @@
+{
+  "arm": "chatbot-opus-purdue",
+  "attempts": [],
+  "cost_usd": 0.447796,
+  "counted_input_tokens": 42234,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0026274000000000002,
+      "factual_error": false,
+      "figure_id": "openstax/introductory-statistics/2-4-box-plots/fig-000",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0052914,
+      "factual_error": false,
+      "figure_id": "openstax/introductory-statistics/2-4-box-plots/fig-001",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0022754,
+      "factual_error": false,
+      "figure_id": "openstax/introductory-statistics/2-4-box-plots/fig-002",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.0026994000000000002,
+      "factual_error": false,
+      "figure_id": "openstax/introductory-statistics/2-4-box-plots/fig-003",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 2,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0026314,
+      "factual_error": false,
+      "figure_id": "openstax/introductory-statistics/2-4-box-plots/fig-004",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.015525,
+  "output": {
+    "file": "introductory-statistics__2-4-box-plots.run2.html",
+    "format": "html"
+  },
+  "output_chars": 26221,
+  "pdf_pages": 9,
+  "response_status": "end_turn",
+  "run": 2,
+  "seconds": 108.4,
+  "section": "introductory-statistics/2-4-box-plots",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 42234,
+    "output_tokens": 13943,
+    "reasoning_tokens": 2645
+  },
+  "versions": {
+    "model_requested": "claude-opus-5-5",
+    "model_served": "claude-opus-5-5"
+  }
+}

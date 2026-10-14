@@ -1,0 +1,310 @@
+{
+  "schema_version": 1,
+  "generated_by": "a11y-stem gold fetch",
+  "source": "OpenStax (https://openstax.org), CC BY books only",
+  "books": {
+    "chemistry": {
+      "archive_path": "/apps/archive/20260604.144757",
+      "archive_version": "20260604.144757",
+      "authors": [
+        "Paul Flowers",
+        "William R. Robinson, PhD",
+        "Richard Langley",
+        "Klaus Theopold"
+      ],
+      "cms_license_name": "Creative Commons Attribution License",
+      "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "details_url": "https://openstax.org/details/books/chemistry",
+      "license_name": "Creative Commons Attribution License",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "retrieved_at": "2026-10-13",
+      "slug": "chemistry",
+      "state": "retired",
+      "title": "Chemistry",
+      "uuid": "85abf193-2bd2-4908-8563-90b8a7ac8df6",
+      "version": "741a7af"
+    },
+    "college-physics": {
+      "archive_path": "/apps/archive/20260604.144757",
+      "archive_version": "20260604.144757",
+      "authors": [
+        "Paul Peter Urone",
+        "Roger Hinrichs"
+      ],
+      "cms_license_name": "Creative Commons Attribution License",
+      "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "details_url": "https://openstax.org/details/books/college-physics",
+      "license_name": "Creative Commons Attribution License",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "retrieved_at": "2026-10-13",
+      "slug": "college-physics",
+      "state": "retired",
+      "title": "College Physics",
+      "uuid": "031da8d3-b525-429c-80cf-6c8ed997733a",
+      "version": "1aa3e7a"
+    },
+    "intermediate-algebra": {
+      "archive_path": "/apps/archive/20260604.144757",
+      "archive_version": "20260604.144757",
+      "authors": [
+        "Lynn Marecek"
+      ],
+      "cms_license_name": "Creative Commons Attribution License",
+      "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "details_url": "https://openstax.org/details/books/intermediate-algebra",
+      "license_name": "Creative Commons Attribution License",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "retrieved_at": "2026-10-13",
+      "slug": "intermediate-algebra",
+      "state": "retired",
+      "title": "Intermediate Algebra",
+      "uuid": "02776133-d49d-49cb-bfaa-67c7f61b25a1",
+      "version": "eb2e29d"
+    },
+    "introductory-statistics": {
+      "archive_path": "/apps/archive/20260604.144757",
+      "archive_version": "20260604.144757",
+      "authors": [
+        "Barbara Illowsky",
+        "Susan Dean"
+      ],
+      "cms_license_name": "Creative Commons Attribution License",
+      "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "details_url": "https://openstax.org/details/books/introductory-statistics",
+      "license_name": "Creative Commons Attribution License",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "retrieved_at": "2026-10-13",
+      "slug": "introductory-statistics",
+      "state": "retired",
+      "title": "Introductory Statistics",
+      "uuid": "30189442-6998-4686-ac05-ed152b91b9de",
+      "version": "1d23970"
+    },
+    "precalculus": {
+      "archive_path": "/apps/archive/20260604.144757",
+      "archive_version": "20260604.144757",
+      "authors": [
+        "Jay Abramson"
+      ],
+      "cms_license_name": "Creative Commons Attribution License",
+      "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "details_url": "https://openstax.org/details/books/precalculus",
+      "license_name": "Creative Commons Attribution License",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "retrieved_at": "2026-10-13",
+      "slug": "precalculus",
+      "state": "retired",
+      "title": "Precalculus",
+      "uuid": "fd53eae1-fa23-47c7-bb1b-972349835c3c",
+      "version": "ebc5beb"
+    }
+  },
+  "files": [
+    {
+      "path": "openstax/chemistry/14-7-acid-base-titrations.jsonl",
+      "sha256": "4f147c83666ae70c12bf60a91d6d6d4ac1677acbfb5c5f9516a2837dd88f69b5",
+      "records": 81,
+      "counts": {
+        "equation": 63,
+        "figure": 3,
+        "heading": 14,
+        "table": 1
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.jsonl",
+      "sha256": "f7378d24fe8e3b05acde023bc2b34cec70afb8dfc17eed1894f488ee657d88fc",
+      "records": 38,
+      "counts": {
+        "equation": 9,
+        "figure": 8,
+        "heading": 21
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/chemistry/7-3-lewis-symbols-and-structures.jsonl",
+      "sha256": "aff3da30565c4b32c46959e36ea30469a3e225df831bb725dc509e7e757ccc6b",
+      "records": 52,
+      "counts": {
+        "equation": 25,
+        "figure": 4,
+        "heading": 23
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/college-physics/28-4-relativistic-addition-of-velocities.jsonl",
+      "sha256": "86198c1eef84afe0668355d859969b76e8b6ca98fb119119b2077baf90ad3575",
+      "records": 99,
+      "counts": {
+        "equation": 68,
+        "figure": 5,
+        "heading": 26
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum.jsonl",
+      "sha256": "8b5c9fa6b865fccc825415cfd28e3ec8355bb43377a38ee40c5c8b4568daa1bc",
+      "records": 77,
+      "counts": {
+        "equation": 47,
+        "figure": 6,
+        "heading": 23,
+        "table": 1
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/college-physics/5-3-elasticity-stress-and-strain.jsonl",
+      "sha256": "c808939fc6736ba951cb77277a00c17a0c46d5048c3e7316e2957e8fb65a71ee",
+      "records": 161,
+      "counts": {
+        "equation": 121,
+        "figure": 8,
+        "heading": 31,
+        "table": 1
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/intermediate-algebra/1-5-properties-of-real-numbers.jsonl",
+      "sha256": "19235caefa9c5a496ed13b456e35a95656dc2950ed49460278100178f9f24dda",
+      "records": 248,
+      "counts": {
+        "equation": 180,
+        "heading": 64,
+        "table": 4
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations.jsonl",
+      "sha256": "838ececd5ad8a35ced3557860f75238a8a86932b4e039d2d7a2d825b23692231",
+      "records": 111,
+      "counts": {
+        "equation": 65,
+        "heading": 40,
+        "table": 6
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants.jsonl",
+      "sha256": "80fbbac890ef971d7333a08ee8c0abeb9a98195158a04b37066407aeed1e88c9",
+      "records": 247,
+      "counts": {
+        "equation": 183,
+        "heading": 55,
+        "table": 9
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/introductory-statistics/2-4-box-plots.jsonl",
+      "sha256": "e0e1f63c5b6f9d613b012e30f5559784ca668ce5a55f12609fc94b8c2ff9bee8",
+      "records": 18,
+      "counts": {
+        "figure": 5,
+        "heading": 13
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/introductory-statistics/3-1-terminology.jsonl",
+      "sha256": "01be9ec7d71e7c93dac7ba7d564338b8536267e44b3301c9009b972b6e384a9c",
+      "records": 43,
+      "counts": {
+        "equation": 31,
+        "heading": 11,
+        "table": 1
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/introductory-statistics/4-5-hypergeometric-distribution.jsonl",
+      "sha256": "4f9b5adc3f990816f7dec32d3b9745dd456fa2e4a78e0e35f99bb7f673a46acd",
+      "records": 22,
+      "counts": {
+        "equation": 4,
+        "figure": 1,
+        "heading": 17
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/precalculus/1-6-absolute-value-functions.jsonl",
+      "sha256": "6e894af136a1aa703c698aafa6929de34887f6193eecccf588821fbd0b04c677",
+      "records": 274,
+      "counts": {
+        "equation": 205,
+        "figure": 12,
+        "heading": 55,
+        "table": 2
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/precalculus/3-1-complex-numbers.jsonl",
+      "sha256": "b83420ba314019a30a8243aa5330ec2b06e303dfbd931f931bb24043efa37690",
+      "records": 278,
+      "counts": {
+        "equation": 206,
+        "figure": 3,
+        "heading": 68,
+        "table": 1
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    },
+    {
+      "path": "openstax/precalculus/5-4-right-triangle-trigonometry.jsonl",
+      "sha256": "f47bfa0524d6691d3eb42fde7f00e8bb3457854bddc567ac3e61377260e40821",
+      "records": 226,
+      "counts": {
+        "equation": 162,
+        "figure": 15,
+        "heading": 48,
+        "table": 1
+      },
+      "retrieved_at": [
+        "2026-10-13"
+      ]
+    }
+  ],
+  "totals": {
+    "equation": 1369,
+    "figure": 70,
+    "heading": 509,
+    "table": 27
+  }
+}

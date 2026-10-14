@@ -1,0 +1,81 @@
+{
+  "spend_usd": 3.347982675000009,
+  "timing": [
+    {
+      "latency_ms": 52143,
+      "pdf_pages": 11,
+      "section": "chemistry/14-7-acid-base-titrations"
+    },
+    {
+      "latency_ms": 48996,
+      "pdf_pages": 8,
+      "section": "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds"
+    },
+    {
+      "latency_ms": 42825,
+      "pdf_pages": 9,
+      "section": "chemistry/7-3-lewis-symbols-and-structures"
+    },
+    {
+      "latency_ms": 38445,
+      "pdf_pages": 9,
+      "section": "college-physics/28-4-relativistic-addition-of-velocities"
+    },
+    {
+      "latency_ms": 35720,
+      "pdf_pages": 10,
+      "section": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum"
+    },
+    {
+      "latency_ms": 60061,
+      "pdf_pages": 14,
+      "section": "college-physics/5-3-elasticity-stress-and-strain"
+    },
+    {
+      "latency_ms": 108626,
+      "pdf_pages": 26,
+      "section": "intermediate-algebra/1-5-properties-of-real-numbers"
+    },
+    {
+      "latency_ms": 53284,
+      "pdf_pages": 28,
+      "section": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations"
+    },
+    {
+      "latency_ms": 136481,
+      "pdf_pages": 27,
+      "section": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants"
+    },
+    {
+      "latency_ms": 11466,
+      "pdf_pages": 9,
+      "section": "introductory-statistics/2-4-box-plots"
+    },
+    {
+      "latency_ms": 31181,
+      "pdf_pages": 8,
+      "section": "introductory-statistics/3-1-terminology"
+    },
+    {
+      "latency_ms": 12450,
+      "pdf_pages": 6,
+      "section": "introductory-statistics/4-5-hypergeometric-distribution"
+    },
+    {
+      "latency_ms": 105488,
+      "pdf_pages": 28,
+      "section": "precalculus/1-6-absolute-value-functions"
+    },
+    {
+      "latency_ms": 86351,
+      "pdf_pages": 20,
+      "section": "precalculus/3-1-complex-numbers"
+    },
+    {
+      "latency_ms": 163084,
+      "pdf_pages": 29,
+      "section": "precalculus/5-4-right-triangle-trigonometry"
+    }
+  ],
+  "wall_seconds": 1019.5
+}

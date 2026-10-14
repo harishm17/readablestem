@@ -1,0 +1,683 @@
+{
+  "client": "anthropic",
+  "code": {
+    "git": {
+      "commit": "297126f341375e8433065614297e9f7d73778b75",
+      "dirty": false
+    },
+    "pipeline_version": "0.4.0",
+    "prompts": {
+      "equation": "equation-df0e12f1",
+      "figure": "figure-ac51f42d",
+      "judge": "judge_figure-137e2607",
+      "table": "table-b3769ce7"
+    },
+    "second_check": {
+      "equation": "equation_match-45fc775c",
+      "figure": "figure_alt-16a00e69"
+    },
+    "settings": {
+      "abstain_confidence": 0.4,
+      "anthropic_effort_cheap": "low",
+      "anthropic_effort_main": "medium",
+      "anthropic_refusal_fallback": true,
+      "auto_accept_confidence": 0.85,
+      "cheap_model": "claude-haiku-5-5",
+      "decisions_equation_flag_at": 0.2,
+      "decisions_equation_shadow": true,
+      "decisions_figure_flag_below": 0.5,
+      "decisions_figure_verify": true,
+      "decisions_model": "gpt-6-luna",
+      "feature_colour": false,
+      "feature_long_descriptions": false,
+      "feature_notation_memory": false,
+      "feature_tables": false,
+      "main_model": "claude-opus-5-5",
+      "max_pages_per_job": 30,
+      "model_max_retries": 2,
+      "model_provider": "anthropic"
+    }
+  },
+  "environment": {
+    "cpus": 16,
+    "platform": "Linux x86_64",
+    "pymupdf": "1.28.2",
+    "python": "3.12.15"
+  },
+  "files": {
+    "answers/document.run1.jsonl": "e9ff67d5d03861e3a34182ca2eee8120affce8e87e495c4ee002b25d01b6dee6",
+    "answers/document.run2.jsonl": "867989024d92125a44bf2ca4b192c51ac67b8a492e79dc2a1d40f44316f08c13",
+    "answers/equations.run1.jsonl": "21f3b248f3c2d5c8b5e8fe005fc85a22808e030324ff07bce6390548e04e28ef",
+    "answers/equations.run2.jsonl": "a3ab40775b0a8e00eff74332ae3c33ca8c122fc47ba25d7d8a7c45140a700f37",
+    "answers/figures.run1.jsonl": "8ade8746b4a4c96cc5df525f6c9e30763c228b2dc004c4ec7299cfea264dd534",
+    "answers/figures.run2.jsonl": "df4b7f415a6fcc2da04dc687c76bb9f615371dab92a36b83214d959b7e3cf986",
+    "answers/headings.run1.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gold/ATTRIBUTION.md": "f65b0306d954a23d3c7cdf6f1afe223f8e4f3f65a52e70734c421b4c53b65df5",
+    "gold/manifest.json": "e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb",
+    "gold/openstax/chemistry/14-7-acid-base-titrations.jsonl": "4f147c83666ae70c12bf60a91d6d6d4ac1677acbfb5c5f9516a2837dd88f69b5",
+    "gold/openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.jsonl": "f7378d24fe8e3b05acde023bc2b34cec70afb8dfc17eed1894f488ee657d88fc",
+    "gold/openstax/chemistry/7-3-lewis-symbols-and-structures.jsonl": "aff3da30565c4b32c46959e36ea30469a3e225df831bb725dc509e7e757ccc6b",
+    "gold/openstax/chemistry/_book.json": "3b0cf209bdb871916b311e12d20179090c7375505028adfde73fe3b7ccf3abcd",
+    "gold/openstax/college-physics/28-4-relativistic-addition-of-velocities.jsonl": "86198c1eef84afe0668355d859969b76e8b6ca98fb119119b2077baf90ad3575",
+    "gold/openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum.jsonl": "8b5c9fa6b865fccc825415cfd28e3ec8355bb43377a38ee40c5c8b4568daa1bc",
+    "gold/openstax/college-physics/5-3-elasticity-stress-and-strain.jsonl": "c808939fc6736ba951cb77277a00c17a0c46d5048c3e7316e2957e8fb65a71ee",
+    "gold/openstax/college-physics/_book.json": "62d71f900fdac961fed8809211fd1a67e28defb4d49cae03e0597b1d2cec184e",
+    "gold/openstax/intermediate-algebra/1-5-properties-of-real-numbers.jsonl": "19235caefa9c5a496ed13b456e35a95656dc2950ed49460278100178f9f24dda",
+    "gold/openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations.jsonl": "838ececd5ad8a35ced3557860f75238a8a86932b4e039d2d7a2d825b23692231",
+    "gold/openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants.jsonl": "80fbbac890ef971d7333a08ee8c0abeb9a98195158a04b37066407aeed1e88c9",
+    "gold/openstax/intermediate-algebra/_book.json": "c0bebc86cbacf3cfe35e60d0fd8bd0351702751436b0f2f79ee5bf81c80887a7",
+    "gold/openstax/introductory-statistics/2-4-box-plots.jsonl": "e0e1f63c5b6f9d613b012e30f5559784ca668ce5a55f12609fc94b8c2ff9bee8",
+    "gold/openstax/introductory-statistics/3-1-terminology.jsonl": "01be9ec7d71e7c93dac7ba7d564338b8536267e44b3301c9009b972b6e384a9c",
+    "gold/openstax/introductory-statistics/4-5-hypergeometric-distribution.jsonl": "4f9b5adc3f990816f7dec32d3b9745dd456fa2e4a78e0e35f99bb7f673a46acd",
+    "gold/openstax/introductory-statistics/_book.json": "79b0e80345c25e6e6dc61e91aaa09685e414fe3c91280d5bb60d00ef9d344505",
+    "gold/openstax/precalculus/1-6-absolute-value-functions.jsonl": "6e894af136a1aa703c698aafa6929de34887f6193eecccf588821fbd0b04c677",
+    "gold/openstax/precalculus/3-1-complex-numbers.jsonl": "b83420ba314019a30a8243aa5330ec2b06e303dfbd931f931bb24043efa37690",
+    "gold/openstax/precalculus/5-4-right-triangle-trigonometry.jsonl": "f47bfa0524d6691d3eb42fde7f00e8bb3457854bddc567ac3e61377260e40821",
+    "gold/openstax/precalculus/_book.json": "495da74cb5372f82dd28cbf05c69c4ad1f554ff6c1884bc44dedba94b6e009b5",
+    "media/equations.jsonl": "d9a230b273b49189a299aa9484a8b29b8c682975d493bf8674d14fc70419f7af",
+    "media/figures.jsonl": "c623fa698405fa9e5f77819fe8b03768805ddac3c53dcd9481d2e4daa6957e77",
+    "media/pdfs/chemistry__14-7-acid-base-titrations.pdf": "bae853afb066380ce767b7a29ed25824394d2a3de171e2a51d844cf36ebe560f",
+    "media/pdfs/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.pdf": "7809c1758041bbb39140b724dd4ce037433788d2e8b3ea455e47fbec2f30cf31",
+    "media/pdfs/chemistry__7-3-lewis-symbols-and-structures.pdf": "08ee533f3e6b708254be4276fc83881f4e86d8b8f05dee5be1b0c9a462153dbb",
+    "media/pdfs/college-physics__28-4-relativistic-addition-of-velocities.pdf": "657a9f3a8e970a5f88780a5ede2ee7debe4b52568d9a3bdb375db15daec01f80",
+    "media/pdfs/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.pdf": "a150c2c0a643420623148367c4c5ef5c31a47791b905ebf06bb5b32a1c7133b9",
+    "media/pdfs/college-physics__5-3-elasticity-stress-and-strain.pdf": "84cf20ef786ba51389dd7037d42e6cc65fe5796fb7d6947f9640402736ef7417",
+    "media/pdfs/intermediate-algebra__1-5-properties-of-real-numbers.pdf": "9fb4330b556386bd49443fa4939ba67d8a530bf2074edce17bbe8cbb03c5ca91",
+    "media/pdfs/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.pdf": "8cb8fcd4dc26b5758a0729e197e005d6e27fb686e5d3f5322a2000765d3a0f98",
+    "media/pdfs/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.pdf": "4cc8457f76095812893c27e3b8b248db4142ef47502c852832324ad80bbfaea5",
+    "media/pdfs/introductory-statistics__2-4-box-plots.pdf": "792ba6362f87020b3f0625c781ef535ffcf860fca7bbb99a3742850f957a3268",
+    "media/pdfs/introductory-statistics__3-1-terminology.pdf": "ea51bd3362b2303c8f010e4d0e464f035adf183a543494363f93493b52d05181",
+    "media/pdfs/introductory-statistics__4-5-hypergeometric-distribution.pdf": "96b79c680b69c236e76281b0f995807cd25d3da410f351882dc377f3304a21e4",
+    "media/pdfs/precalculus__1-6-absolute-value-functions.pdf": "34f9466cd9d0be5e09d6b1e384980a81c39552b082d44b2d42688a98151c49c4",
+    "media/pdfs/precalculus__3-1-complex-numbers.pdf": "ae89112656cc4147d13c6553b47d8b2989bd11019c910e41d55a1e5c77240641",
+    "media/pdfs/precalculus__5-4-right-triangle-trigonometry.pdf": "92d90a5ea6c05bd344ed6bbcc4203b77994a6fe8beb35058240e10a350ebab5b",
+    "reports/document.run1.json": "8a1820266b24486b636c2633163affae22c246054eb8018aea6a583055a3138b",
+    "reports/document.run2.json": "b28e313d543e428b5d47fa8b57616169225770fecbaa4d5a9ab784ea5f69cbfe",
+    "reports/equations.run1.json": "94b5d935ad5177d789f8f25849182babbaf7e345a618c6a60b5a9f085ba8d1fb",
+    "reports/equations.run2.json": "6ecf6fc6a0796342e4a3d21091e1b632885f5ddee8a2c2260d7361e3501ea61d",
+    "reports/figures.run1.json": "33a40aed374abf62c17e91c0a7285e768c0695d44713bf27c1ae2ae629273172",
+    "reports/figures.run2.json": "f9174f7d13306c3cfebe92fa9aad076749fb820a8a0e1e2a5bbc9c52c355eb9c",
+    "reports/headings.run1.json": "7d20b295eb926463f84731b34bc1e92b9e0ecdb7a886a36abc2cc94073f5ef86",
+    "runs/document.run1.json": "11119b6dfc2b4661a6d2e0ae53375d8066984057af4d393d6c28a9cbb89f1657",
+    "runs/document.run2.json": "3ff03d493a381c5b5f288c3ef317bff73994c0226905f610826481fa91d706ab",
+    "runs/equations.run1.json": "261ba8249fda84d0b76c48f6063c1b2b8d1ad223abb5a5b427e398678c35bf56",
+    "runs/equations.run2.json": "9ac90639d252e5503232ca5d6e74fb58d7e8d1a8ebc22388dc9f87480f349681",
+    "runs/figures.run1.json": "31b2cb96e221b20744504712e2f98d34bbe0bb9d8a209758811d08a2b987bd32",
+    "runs/figures.run2.json": "2029653c698ab62d8c6cbdd7fd47679b37e7771299889c5c5bd7573d8fcddab6",
+    "runs/headings.run1.json": "782468c4f9349c2f805700566cd15b41de01ea54dd5ae2922a18e4da17d40d18",
+    "systems/chatbot-haiku-purdue/chemistry__14-7-acid-base-titrations.run1.html": "501a97efe2a7c134175c0aea0ca3e9021b18677faa61642cac23e99327f30c33",
+    "systems/chatbot-haiku-purdue/chemistry__14-7-acid-base-titrations.run1.json": "a81921bca19af8b597b206e00c8ddc43860b875493d00badac1be7645bd67073",
+    "systems/chatbot-haiku-purdue/chemistry__14-7-acid-base-titrations.run2.html": "e9383d945603ec23b8b3a4ba41a917065068fbe2ce8b6b5830251fcca488e119",
+    "systems/chatbot-haiku-purdue/chemistry__14-7-acid-base-titrations.run2.json": "15b4b24d6bf39454d9c0de147545642bd30610064a0d524ad0874d5953bc5b11",
+    "systems/chatbot-haiku-purdue/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.run1.html": "f7b05c371f9e7d5239a67a766d34f920ed95035e0b7ad2bcfcb2e9ad93c8e93c",
+    "systems/chatbot-haiku-purdue/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.run1.json": "1fae88cc837e162200c4c8c85691df19d0662f996aaf3c9fe345fc343588259d",
+    "systems/chatbot-haiku-purdue/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.run2.html": "0307eca2635ab0c4edd6a2b7c8d71b49a73c98c0b1704f3ab75e06dabb9e72df",
+    "systems/chatbot-haiku-purdue/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.run2.json": "797f5ce7b6914db1a741e74fa1e5f9d73b9504a8a225b1860550aaefedb43fd7",
+    "systems/chatbot-haiku-purdue/chemistry__7-3-lewis-symbols-and-structures.run1.html": "bf870c34fdfe4fcf2f32db2155069ea7afb522ce2beb182601dc1df0a69c5d39",
+    "systems/chatbot-haiku-purdue/chemistry__7-3-lewis-symbols-and-structures.run1.json": "60475e5c9a9940f1bc11c86833e5e939cc5901d2680263dcb8588a39687ea876",
+    "systems/chatbot-haiku-purdue/chemistry__7-3-lewis-symbols-and-structures.run2.html": "27ec560df6d557d2d2f852b955ffbec665cd273d121c5c6ba400645428572392",
+    "systems/chatbot-haiku-purdue/chemistry__7-3-lewis-symbols-and-structures.run2.json": "5a550eaaed33333e52a4869e17b25e2c07eacb8d24b26d635ef114b7e78e2870",
+    "systems/chatbot-haiku-purdue/college-physics__28-4-relativistic-addition-of-velocities.run1.html": "a81c0b8d482345af687061f8fa153cf61ca28ee16a4514e7ac8d2689924e25c8",
+    "systems/chatbot-haiku-purdue/college-physics__28-4-relativistic-addition-of-velocities.run1.json": "be3629fed0383bbf214f020b6f92b6c8d25263337353cc20b3053f10af23a076",
+    "systems/chatbot-haiku-purdue/college-physics__28-4-relativistic-addition-of-velocities.run2.html": "23ad7eea2c4dcff36817d9309a59a372f9bf90b8fcd81a61f016670fe0087cb7",
+    "systems/chatbot-haiku-purdue/college-physics__28-4-relativistic-addition-of-velocities.run2.json": "40163ff232a77f5fb2dae81e6ffae39f3c863460dcd5c8d3dafb4901e13870d6",
+    "systems/chatbot-haiku-purdue/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.run1.html": "ad08db273d071fd54e8121b3228b67683a89b9b736d75206703c2650664ba717",
+    "systems/chatbot-haiku-purdue/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.run1.json": "af8b3f346c28d41628d082c0a3d0671849d765413e4b2e9dfac1590231e2899d",
+    "systems/chatbot-haiku-purdue/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.run2.html": "fe07c782c7d988f84da1c4c7b573044923994e3ea0c44a1695f8ee49ce275804",
+    "systems/chatbot-haiku-purdue/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.run2.json": "df19d64f706ca680f872375fde46bfe8775547fb60397df08830aac2dafabf91",
+    "systems/chatbot-haiku-purdue/college-physics__5-3-elasticity-stress-and-strain.run1.html": "53042aae9e85a2215c3c1cb7726dece6706cfc4763dc0992804f0af12ca01c1a",
+    "systems/chatbot-haiku-purdue/college-physics__5-3-elasticity-stress-and-strain.run1.json": "5a2d1e2804577248c32a94f98c74086b25b5d29842a4e5cef7f85a6f3ce41f67",
+    "systems/chatbot-haiku-purdue/college-physics__5-3-elasticity-stress-and-strain.run2.html": "215192fd5b70a22e3484d6ab1e3b2505793bd64ba8ea8551a2a477edab5979b5",
+    "systems/chatbot-haiku-purdue/college-physics__5-3-elasticity-stress-and-strain.run2.json": "5f48b4045efcb3e74a3bbf09e1990db2f0c8c089a26be2f437a0c802e5c5aabc",
+    "systems/chatbot-haiku-purdue/intermediate-algebra__1-5-properties-of-real-numbers.run1.html": "9d9e85df03d207a0fb3d5dda2f0a8cee70c64ab591409e4628938d7ebabaf5b1",
+    "systems/chatbot-haiku-purdue/intermediate-algebra__1-5-properties-of-real-numbers.run1.json": "caf9904a412aee656e70e6de92429340f49e290b36971b55c11516b519fa46fd",
+    "systems/chatbot-haiku-purdue/intermediate-algebra__1-5-properties-of-real-numbers.run2.html": "1a1db6ec4f8a8a16dd3d7fd2fa1fc7debe9069c7830a98592b777a9bb68903b6",
+    "systems/chatbot-haiku-purdue/intermediate-algebra__1-5-properties-of-real-numbers.run2.json": "1c946e1f3b7de61fb0ccb067d2821dda1a615490bf6fcad035f7310c9eeb49dc",
+    "systems/chatbot-haiku-purdue/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.run1.html": "0492634b5515107d5bae3c9e1b4f0d0e53a5f54e1d455f0c7d6a66460cdbd552",
+    "systems/chatbot-haiku-purdue/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.run1.json": "57aec1d5ec15c14dc483bfc0436e3a35a8e54f96f8e168fbf3440379c00fa353",
+    "systems/chatbot-haiku-purdue/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.run2.html": "505226fed2a3bf812c9cc24ef97f677374f353025828d2e5c92898fdca3e1801",
+    "systems/chatbot-haiku-purdue/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.run2.json": "ef01fe22af68bbdab262370399076cf512efa34221e48417be1450105da43f2d",
+    "systems/chatbot-haiku-purdue/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.run1.html": "5f2b78da3e2fa292425891007e7eb84108f4507e9b8732279ebacd70c585cd15",
+    "systems/chatbot-haiku-purdue/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.run1.json": "a404c2c87afa49e9e7f22b770e4924081329ba0f21c2d154b1c96d3cd6c75670",
+    "systems/chatbot-haiku-purdue/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.run2.html": "d97558f8625b3f4bf76c289a86610b602dafada98409118c55750ae664c72adb",
+    "systems/chatbot-haiku-purdue/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.run2.json": "9955aa1445a6b96ae61a25ccf55999af0a4a39e194fa8fe75d7ebe55fab9ccb1",
+    "systems/chatbot-haiku-purdue/introductory-statistics__2-4-box-plots.run1.html": "6bfcc8fecbf1e08269262ca5f9e44517ed67e6fd203673b389e5d936106822f0",
+    "systems/chatbot-haiku-purdue/introductory-statistics__2-4-box-plots.run1.json": "eb3480e584410e72d6a9ed4085e29e54312745d7bf381f491332bc3eb5a44bc4",
+    "systems/chatbot-haiku-purdue/introductory-statistics__2-4-box-plots.run2.html": "4508af594f40589d093e2e772a3d79c664d90f5c48d996e93ccc58b64e9f5b58",
+    "systems/chatbot-haiku-purdue/introductory-statistics__2-4-box-plots.run2.json": "bbeb71a2d4dcbb7312fd1635ec4be1230dcaba14d0e618a787542358ff7b0a60",
+    "systems/chatbot-haiku-purdue/introductory-statistics__3-1-terminology.run1.html": "bd387d2ebdbf82398fe3bc7cf824fe22d97484aba394a7ba30f3e9277844aabc",
+    "systems/chatbot-haiku-purdue/introductory-statistics__3-1-terminology.run1.json": "63ff08d7b40f23f37718cfe233a301b79b60ff36f3ba3539071cc5f85df582be",
+    "systems/chatbot-haiku-purdue/introductory-statistics__3-1-terminology.run2.html": "5ae6010c7dcaf751b5b39c948515758f08f5cc0ccb434977d3177ec9b9c9d685",
+    "systems/chatbot-haiku-purdue/introductory-statistics__3-1-terminology.run2.json": "401e191a819daf292d2f24af45a659924793eab7dda6d8459644b93941b0401e",
+    "systems/chatbot-haiku-purdue/introductory-statistics__4-5-hypergeometric-distribution.run1.html": "f76a3be3ebe7f6bff315ec5ed00987d9825a51e1c3371ea77651e6db57a9bf44",
+    "systems/chatbot-haiku-purdue/introductory-statistics__4-5-hypergeometric-distribution.run1.json": "03edee4f93b890146b9a9be991d71ad53d7af66a5d68e05c75b704fcb776b31e",
+    "systems/chatbot-haiku-purdue/introductory-statistics__4-5-hypergeometric-distribution.run2.html": "fd42eff875b87de962941c73a46e2095e7d646142ba8237fc97c85287c3751cc",
+    "systems/chatbot-haiku-purdue/introductory-statistics__4-5-hypergeometric-distribution.run2.json": "10ac9c12264a0a777bae74db56ee03cde0d514e6f8e6220c3937d779a6159eaf",
+    "systems/chatbot-haiku-purdue/precalculus__1-6-absolute-value-functions.run1.html": "695a82d1ae42db83cc1912307578ebc28fa8cd131a186fa3bb7cea2fd784d9f6",
+    "systems/chatbot-haiku-purdue/precalculus__1-6-absolute-value-functions.run1.json": "c2a635026a277d81a23e142996850182ed0fe44f4123c01af77316aa919f6176",
+    "systems/chatbot-haiku-purdue/precalculus__1-6-absolute-value-functions.run2.html": "97be8ba4803e548c71c826f3257516595cdf5ac0929b6cac47d700eb3d5e3797",
+    "systems/chatbot-haiku-purdue/precalculus__1-6-absolute-value-functions.run2.json": "7ded3c70e439ae7d83b5d6103694c5264b455cb7c9c67b574bd9fa88c8eac701",
+    "systems/chatbot-haiku-purdue/precalculus__3-1-complex-numbers.run1.html": "8c884a19ba029b38ff3e305b289e5d7c9bc7261899d13bfa09ddc938c87eadd8",
+    "systems/chatbot-haiku-purdue/precalculus__3-1-complex-numbers.run1.json": "f6290c3945fd2602aa42b4ff5fac3309747a9f477bd29fd1d4ea3f35cc3e5ad5",
+    "systems/chatbot-haiku-purdue/precalculus__3-1-complex-numbers.run2.html": "034d50800120955542778006c3fdcf9fa4bdb708fec069ddb8bbaa3d97e0d968",
+    "systems/chatbot-haiku-purdue/precalculus__3-1-complex-numbers.run2.json": "0e1b7de06e558be174dc36aaa5e32e2fb1a6769dd4de1bf057deba3759a4216b",
+    "systems/chatbot-haiku-purdue/precalculus__5-4-right-triangle-trigonometry.run1.html": "c4ca7e715ed5e311dd64437df77db751076aba7b0b8318bfdc814cc861dd861e",
+    "systems/chatbot-haiku-purdue/precalculus__5-4-right-triangle-trigonometry.run1.json": "f0f823fdd1f67f056270ae887285b41d370b68c9b9c6918d17a5842ce86cc38c",
+    "systems/chatbot-haiku-purdue/precalculus__5-4-right-triangle-trigonometry.run2.html": "8c510758a21a16ae403c39cfb23c855ae90049d99505ceedb96107f214dffefb",
+    "systems/chatbot-haiku-purdue/precalculus__5-4-right-triangle-trigonometry.run2.json": "67eacbf652c4ff69f7d4b03e259e99458c1aa83bc5ead68dcaff1df3be9dbda2",
+    "systems/chatbot-opus-purdue/chemistry__14-7-acid-base-titrations.run1.html": "f6220329731f64398cda55f97e84cdd60361f18555b8c312d37b65723c346cff",
+    "systems/chatbot-opus-purdue/chemistry__14-7-acid-base-titrations.run1.json": "7ac07a5de5d322485e350d1d803e5f6f7a0d11201c348d1184694250a81f3bd3",
+    "systems/chatbot-opus-purdue/chemistry__14-7-acid-base-titrations.run2.html": "39436a25b389dfa50b75fcbc5a19b10caf09317d1b3b10fc0f1f8bc2927f61ad",
+    "systems/chatbot-opus-purdue/chemistry__14-7-acid-base-titrations.run2.json": "18b3c8b74ac1b6fa223d227b5c2f5fb1c90a4c394623528d3eb63e966067162b",
+    "systems/chatbot-opus-purdue/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.run1.html": "eccd2fa1f6136c04bfabdec107c25a6c61c9aedb83f304f70f414b9ca5bfbe0a",
+    "systems/chatbot-opus-purdue/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.run1.json": "f5e2e6cfa25e967c53e38aff08a40703b6ca1708e361ca82aeeb1baf81a024e8",
+    "systems/chatbot-opus-purdue/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.run2.html": "b528d7f43ae005ce85dd85dd2437428a323a8db57a49b796ba8cf6dd022c96ab",
+    "systems/chatbot-opus-purdue/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.run2.json": "0dc4d1b73850af29ae8985d2ac5472d57f54fdb5f8028e0af15658a5625f6ba4",
+    "systems/chatbot-opus-purdue/chemistry__7-3-lewis-symbols-and-structures.run1.html": "a20f5297747a3a92c45cacf483d09df412d763bf530fb5435a70eebe1718c314",
+    "systems/chatbot-opus-purdue/chemistry__7-3-lewis-symbols-and-structures.run1.json": "7d571340fcd82723fd1216c5b7604dedb7b91316b8b39f62487abdec8ba4cf2a",
+    "systems/chatbot-opus-purdue/chemistry__7-3-lewis-symbols-and-structures.run2.html": "583291cd2b62e2824a49d37a2e8717aac4df11859f571db5227be58444651414",
+    "systems/chatbot-opus-purdue/chemistry__7-3-lewis-symbols-and-structures.run2.json": "773f62089fa2465a90a1b414728bdef3f3c72fea8901948c50140e4a9c9bf71f",
+    "systems/chatbot-opus-purdue/college-physics__28-4-relativistic-addition-of-velocities.run1.html": "b11cab04a695ab0fd739014d8ad32df07a125a9ad30ada765c81feb84f3d68f1",
+    "systems/chatbot-opus-purdue/college-physics__28-4-relativistic-addition-of-velocities.run1.json": "6451fdfd4ea2bd2c89bd7b9675adf0e30e53d130ee0ce32cadf9b4a6b915787a",
+    "systems/chatbot-opus-purdue/college-physics__28-4-relativistic-addition-of-velocities.run2.html": "97b99fcbb164e059ce08d2294b7e682632c2ea7832eb67b5d62b7428765fc8ea",
+    "systems/chatbot-opus-purdue/college-physics__28-4-relativistic-addition-of-velocities.run2.json": "46919cb76c57e9fb33c47719ce6bdacad28bb895c9675cae2a6777eb964baf2c",
+    "systems/chatbot-opus-purdue/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.run1.html": "94be8c7b356ac8b0d506c191eeea90a4e277d8b9e05f116fb1c44adac7fa27ca",
+    "systems/chatbot-opus-purdue/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.run1.json": "ea004372c51abbba92783ea012040d7ccabea10488e84b923e0e5f191a4baf14",
+    "systems/chatbot-opus-purdue/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.run2.html": "9b3395067f5863d2495843d37da9c2f3cdb4894ba836522ea5045eb8095e47e5",
+    "systems/chatbot-opus-purdue/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.run2.json": "bd200fdfab3cefa7711e3b553d9edc09eae3b1b8cb9614dfe3bb63de42488e62",
+    "systems/chatbot-opus-purdue/college-physics__5-3-elasticity-stress-and-strain.run1.html": "59511cc96aafefdb09e82e9232ad3012a68baf537568cb4f1683ca1060d7e844",
+    "systems/chatbot-opus-purdue/college-physics__5-3-elasticity-stress-and-strain.run1.json": "46081550c71df5f7b238d25f033059e4d1a8dc3cfb6fd2470b6a06e9aa485bfe",
+    "systems/chatbot-opus-purdue/college-physics__5-3-elasticity-stress-and-strain.run2.html": "3f1d192093917c73a51e3633f19ad92a170c619449fe19c9166d2a6c24063d00",
+    "systems/chatbot-opus-purdue/college-physics__5-3-elasticity-stress-and-strain.run2.json": "0071055e370a7b6957c0bc3c04dcb37ecc2d99c29a5e79947e1e8751e293b826",
+    "systems/chatbot-opus-purdue/intermediate-algebra__1-5-properties-of-real-numbers.run1.html": "be2f35d472d80fc6deab23f8bf5c012363085f083e4df1348ff96aea7ed39740",
+    "systems/chatbot-opus-purdue/intermediate-algebra__1-5-properties-of-real-numbers.run1.json": "40451c071652178849d8fba8b13b0f05c938db9974028cf2b5c8efd50ddcc173",
+    "systems/chatbot-opus-purdue/intermediate-algebra__1-5-properties-of-real-numbers.run2.html": "99b313af3be79ba63056d27e3a9deed500c59156f22560b32d742972432ec02a",
+    "systems/chatbot-opus-purdue/intermediate-algebra__1-5-properties-of-real-numbers.run2.json": "2b6df35a86ea12b4589e97727adb6182713f56bf3ce5a65daa99bcaf04194887",
+    "systems/chatbot-opus-purdue/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.run1.html": "132bb16758696f2cf16653a38b1eb5e5356b1d897a0dbda24fb0e8b7bf57a12c",
+    "systems/chatbot-opus-purdue/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.run1.json": "4a525a3a949e9bdc8f9fd02a3a0c9a27c0bd5500116470308cbf1ce19c082c9d",
+    "systems/chatbot-opus-purdue/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.run2.html": "84d097277a89123c5cb3181654a681cef2ce508eade66efb3c2392f8390aecff",
+    "systems/chatbot-opus-purdue/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.run2.json": "0c741da0aed8553eb881c8979691f82f1b50e6d831aaa8b646312692328f9dc2",
+    "systems/chatbot-opus-purdue/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.run1.html": "a61bae5d57f5797814e821e6de64e21971e4a085dba452f00bea289803a66355",
+    "systems/chatbot-opus-purdue/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.run1.json": "82ec34fdbb88cc6f961e306da64cec7404a070440f9a90ec1d25b1398451b61d",
+    "systems/chatbot-opus-purdue/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.run2.html": "9e010959019fddac7db42a36effb3e6e5dca2c3afa62f9e32245bdf4e7654160",
+    "systems/chatbot-opus-purdue/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.run2.json": "6115cba9a98a168cf5b24d6a3fd8ea9af5f0ac8545c01c76a1da244cce48cea2",
+    "systems/chatbot-opus-purdue/introductory-statistics__2-4-box-plots.run1.html": "d67d91ed31c1d0244f898ac2348a336721859f1c1f77703eb33e055f7faf55f4",
+    "systems/chatbot-opus-purdue/introductory-statistics__2-4-box-plots.run1.json": "9ef4b2ddcea42238dad2d1e1853dbe5404c39f906a05193b7de4d60a004cb11c",
+    "systems/chatbot-opus-purdue/introductory-statistics__2-4-box-plots.run2.html": "6e978824355da14cfa1e7e442a96d7e237fadfe282d65cbe6d46c91595319e47",
+    "systems/chatbot-opus-purdue/introductory-statistics__2-4-box-plots.run2.json": "f469ef1695233fa4c393a345b7ecc669dae251d3fbba14a57ab1913a6aa937b8",
+    "systems/chatbot-opus-purdue/introductory-statistics__3-1-terminology.run1.html": "6a3ea24f93887a8ab4c572fade2ff0bdba1bcf9fedefd70b8994a6fbe54d5e30",
+    "systems/chatbot-opus-purdue/introductory-statistics__3-1-terminology.run1.json": "da1d33ec495d4ba9031c3506e81fcc562bdf375cf569b8225dade09b679fb265",
+    "systems/chatbot-opus-purdue/introductory-statistics__3-1-terminology.run2.html": "2c8579b486c08d4ad97b71012d82c7a80a71e69d9e3ffde4661f21675319ff9b",
+    "systems/chatbot-opus-purdue/introductory-statistics__3-1-terminology.run2.json": "41ce5106985dd69ba5bc7180b8a3703beaed15e6eaf7718d35b6eacb5c947f7b",
+    "systems/chatbot-opus-purdue/introductory-statistics__4-5-hypergeometric-distribution.run1.html": "d0a86933ec25cb185b614a9abebd4e5fbabf3ba800caf18addd1b23c43f6bcf7",
+    "systems/chatbot-opus-purdue/introductory-statistics__4-5-hypergeometric-distribution.run1.json": "c02245a330c5322a3c5ff298e542c36968485c4c7db2d98f446c17d5dc774830",
+    "systems/chatbot-opus-purdue/introductory-statistics__4-5-hypergeometric-distribution.run2.html": "f0c91fa6a0cd693bd0ac0549ee2cdc2fd783a1541a94552fa3a9b49af8995206",
+    "systems/chatbot-opus-purdue/introductory-statistics__4-5-hypergeometric-distribution.run2.json": "a14655aacc3f0ce016c2ad5158b11b2664d83f3eadf2f3d4c7c321e236eb2d48",
+    "systems/chatbot-opus-purdue/precalculus__1-6-absolute-value-functions.run1.html": "e74224facde384b4be36ccbe28417330b9533ebab6db3bd6af3cbcd4af2564a6",
+    "systems/chatbot-opus-purdue/precalculus__1-6-absolute-value-functions.run1.json": "5b0ceb731b56d76ff5c217d7f1681d5218da6c6ab70dd806be65b06879cd5585",
+    "systems/chatbot-opus-purdue/precalculus__1-6-absolute-value-functions.run2.html": "7d57785def68c214ba45c0bff874a68e4541c9dd01c74b16008d7f2db25d44b7",
+    "systems/chatbot-opus-purdue/precalculus__1-6-absolute-value-functions.run2.json": "7ef1edbf4de0baa48bec756a18d024b7db1a1e1520893cb67ae4e37f5c20c42f",
+    "systems/chatbot-opus-purdue/precalculus__3-1-complex-numbers.run1.html": "af5377971d14cefeaf93735577b5e365b636646b6f3d89ade3512fef25e7fb62",
+    "systems/chatbot-opus-purdue/precalculus__3-1-complex-numbers.run1.json": "03695afb1ee9881919388d4f843fb5780dcd9d270d678f650b6c2db10a73c78d",
+    "systems/chatbot-opus-purdue/precalculus__3-1-complex-numbers.run2.html": "d80e8a478e2550484bbd3309077a808fcfc75a2ca9f4e79bc5ae72f19b6b2951",
+    "systems/chatbot-opus-purdue/precalculus__3-1-complex-numbers.run2.json": "2f95c7b5f3da6ebfe3aa088feb7808ff7e7bf04b95e9b38d40c84d4682bcac95",
+    "systems/chatbot-opus-purdue/precalculus__5-4-right-triangle-trigonometry.run1.html": "7a2173e45e2bec424ac9962546042914255b8c247cd5290e45790a28f84e68ee",
+    "systems/chatbot-opus-purdue/precalculus__5-4-right-triangle-trigonometry.run1.json": "566074baae3ad4f61f7c268379c5642eb3eac784d6f501db4506d44b0c3a1bdc",
+    "systems/chatbot-opus-purdue/precalculus__5-4-right-triangle-trigonometry.run2.html": "ca210256bccb927755d4ac2346c03f5b1eb2c929895b5fd5763c03d99f14e89b",
+    "systems/chatbot-opus-purdue/precalculus__5-4-right-triangle-trigonometry.run2.json": "145f51c8462f11f26e37f3079365847acf73203aa4b5a2b0897589952650ea5b",
+    "systems/docling/chemistry__14-7-acid-base-titrations.json": "f50fb19d0b7dd50a483bce33d720749483627782ec76309b3f31b8f892f250ab",
+    "systems/docling/chemistry__14-7-acid-base-titrations.md": "03e3d3f453e78f3c3b1eaa790b41557a0b0dd04c21ddddc7e991d22c0e2d46b0",
+    "systems/docling/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.json": "0bb831e3ac6495d56a3c90defb9d718a5985bd477805695eccbdcbc8da468c23",
+    "systems/docling/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.md": "e5581ddd41508ecd448301d3787fd74c3cfe71795009444995ee9042b36878f2",
+    "systems/docling/chemistry__7-3-lewis-symbols-and-structures.json": "37399eb8136603accf7ea43f241a7c6d6eaac3a58a6b7a84e108ebd4b4e2f563",
+    "systems/docling/chemistry__7-3-lewis-symbols-and-structures.md": "a5634313e4dcf1e7cc47fea645dd508d606162f1356774c59105f1c48a466367",
+    "systems/docling/college-physics__28-4-relativistic-addition-of-velocities.json": "b5f18a09f48579e0afa7c6c2b39f77000ec69664f3d9257ae4fb5351225510ef",
+    "systems/docling/college-physics__28-4-relativistic-addition-of-velocities.md": "2b9c1b7c041654b0795d66052ad5dedb9872434fe3e7a7b82d903bdf814b0cb3",
+    "systems/docling/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.json": "5cc6639d10b3d35bc1941b46134794676caac1af7ef4ff0be44f48ebab856ad5",
+    "systems/docling/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.md": "88b1c115f9651991a20c4ebbd52f21ae33510cdeda2c3958f9040286094ba500",
+    "systems/docling/college-physics__5-3-elasticity-stress-and-strain.json": "a319c4211b7a26b50ee673b85a27ec474a294a1549a827a84e7156c7e50f8e44",
+    "systems/docling/college-physics__5-3-elasticity-stress-and-strain.md": "8564ec1c1fa5604a18486a8e6a66a9ecf9d638b02b1bc8bd26b15f2589a43f67",
+    "systems/docling/intermediate-algebra__1-5-properties-of-real-numbers.json": "0f2605c0c984181e5dcfc373e67b932f35b6c712abb54c91a67f55f41cb9afbe",
+    "systems/docling/intermediate-algebra__1-5-properties-of-real-numbers.md": "a2803f32a894bd9c43345bbce3273f7feb56b346b7bec15ba2a7780a73eefda7",
+    "systems/docling/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.json": "2556b45e92e735d389a5d05622ba748ebd510db4268627c0616a44e62780b456",
+    "systems/docling/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.md": "7b5fb4e79a8118789c46a020b798b77a852524192ba550132047a5b9eea48d81",
+    "systems/docling/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.json": "e55bfd5cd3310e39686f1bf0a69abe02ed94785b61a8c015b921204466d2358d",
+    "systems/docling/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.md": "cda71bd8240953a2cb6afd14190acd30c13ede2f85319aa98a6ac8091785cd55",
+    "systems/docling/introductory-statistics__2-4-box-plots.json": "0fbd4c9e26e5e86aaaae248c188cd8755682874e90203a5b0efeb9ef3c433906",
+    "systems/docling/introductory-statistics__2-4-box-plots.md": "a4e067734101c3847b61facdc6312a907dc60afd91313156a414135fed9713aa",
+    "systems/docling/introductory-statistics__3-1-terminology.json": "2e8b9fcd89e1dd77fb87d859602ec71800fff7c1755aa9ad99b1d3509c7130b0",
+    "systems/docling/introductory-statistics__3-1-terminology.md": "f160259c0a07b5bd3b7ff33eed0b7635995ba38f606d66a94e6a0c2de5c57dab",
+    "systems/docling/introductory-statistics__4-5-hypergeometric-distribution.json": "941ecb4a41f2443e789ca88e844acfa6a042e2584141a21ea652dc96fc76637e",
+    "systems/docling/introductory-statistics__4-5-hypergeometric-distribution.md": "8658939c162b17c079304a8c9b0074cdf533e9f2521e887d87b7566ae5442407",
+    "systems/docling/precalculus__1-6-absolute-value-functions.json": "06e8ff8d05707a539751c4adc0131663db19e3f440ec93498c8375eaa96a0c7e",
+    "systems/docling/precalculus__1-6-absolute-value-functions.md": "bfe1eeefef8458677225bd669738d4d18326fed4d826e198335d7c389e6de245",
+    "systems/docling/precalculus__3-1-complex-numbers.json": "c7c00f946a7389d95ddf4b85bfc7b1a1d3b2d17d3385af9aafd561079432e4f3",
+    "systems/docling/precalculus__3-1-complex-numbers.md": "ce2020360fee6a03ac4eca990976231f65539ff7eafc3dda359935b492adaec6",
+    "systems/docling/precalculus__5-4-right-triangle-trigonometry.json": "728bae860f11c8a4016aafb6058d70f97d13bfb862230d2f549b2c2fc7b681ed",
+    "systems/docling/precalculus__5-4-right-triangle-trigonometry.md": "ef0258b8aa7fd2a03fcb02c3732f007846f8b6e0c5502db28cb9d6f31337e799",
+    "systems/mineru-basic/chemistry__14-7-acid-base-titrations.json": "bc06d6aefa66f730c3d913889221008e9101c0679b534b96fd127ce396a9c270",
+    "systems/mineru-basic/chemistry__14-7-acid-base-titrations.md": "e3bb02382d58f0e8a875d56046f7722f22b235615218e44ab4eb835203ef39b8",
+    "systems/mineru-basic/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.json": "0672555aa0c3df5c21b6b543abe037db59b6f9264d1e17829ebf2d1c258b6f1c",
+    "systems/mineru-basic/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.md": "61b76f3cac61306723e48c20562c33d53cc500f5fbbab80c4eef47837b2132a8",
+    "systems/mineru-basic/chemistry__7-3-lewis-symbols-and-structures.json": "f85a8bafed849e3141e86804dcadae821177955668dc01c1cbffc1ec3a430d4a",
+    "systems/mineru-basic/chemistry__7-3-lewis-symbols-and-structures.md": "c5027f28de57ac04311ffa8cc9ab8d5d27af707487d2b4f633775c7606842c89",
+    "systems/mineru-basic/college-physics__28-4-relativistic-addition-of-velocities.json": "aed3746112d43b18c1b292373a9b5b35d02c28d936033748f86aff8c855d78b8",
+    "systems/mineru-basic/college-physics__28-4-relativistic-addition-of-velocities.md": "181beb324d56dee6368a7ed9bfb9c11b4e6a9d6603efea655a43ee5af536e315",
+    "systems/mineru-basic/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.json": "a640393d582f9f020ccc5f01b0c9728f527597ad6851ab25907bdd27bb9535a9",
+    "systems/mineru-basic/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.md": "2fb07acc44cae8d29dc3397c02ddf8d882ce81ad1621ef14fcaa260f674fa4f0",
+    "systems/mineru-basic/college-physics__5-3-elasticity-stress-and-strain.json": "8c5c2daf30b26651193bf3b2f59799bccd2e22c5d9b7dbaaa7b6f679fd69b671",
+    "systems/mineru-basic/college-physics__5-3-elasticity-stress-and-strain.md": "53ead7a70410d11bbe11c1bfd782ae8c3ebb2a74e7065d55bd7b86a4a5ce40d6",
+    "systems/mineru-basic/intermediate-algebra__1-5-properties-of-real-numbers.json": "fd5eed411440b147a1c4979d04b8f1a9968072b43e6fc187213258b15be54bdc",
+    "systems/mineru-basic/intermediate-algebra__1-5-properties-of-real-numbers.md": "81998f4dccaaedfd6376bab1b31438df893c0b8000ad0fe8d39bedd71f2d2c63",
+    "systems/mineru-basic/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.json": "b319fca7e28e45fe42bdc785e088119a68df7f278a0302b65dd83171533eabfe",
+    "systems/mineru-basic/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.md": "6a4c3dc8a690d7ccb02f8cb84695afa3a3040464c07e828dcafb38cdea284336",
+    "systems/mineru-basic/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.json": "8537edeaf7ec1278a5b4da21c2dac4b87c96541607a5014700962be907e7d6f0",
+    "systems/mineru-basic/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.md": "7c949bdc522bab7de73d9cbe5c9930852bb2804b1bd0c11926f55d319b33d0e8",
+    "systems/mineru-basic/introductory-statistics__2-4-box-plots.json": "9011510ab6b0e0da0493d7ab5bb34eb1936a3d8170a2a75625310448e492d22a",
+    "systems/mineru-basic/introductory-statistics__2-4-box-plots.md": "5d9670967ab99650aa04baa5b08ea168e20da9fd946dd818db099f21259710b5",
+    "systems/mineru-basic/introductory-statistics__3-1-terminology.json": "94d5e34a3719523f58175edec4004f8ec60ab7a0381b9825923da9788ce23c64",
+    "systems/mineru-basic/introductory-statistics__3-1-terminology.md": "2b1e06707837f3e8531a9c48e8c0f1494bc8149c54e74c2c6b1f16e0c4b9f742",
+    "systems/mineru-basic/introductory-statistics__4-5-hypergeometric-distribution.json": "52e41b2239e4fb993531b7197f987351ca8689d8de5435835af59e621bed680a",
+    "systems/mineru-basic/introductory-statistics__4-5-hypergeometric-distribution.md": "4aab700a9c698c7232a80c27c5329c9842218ba27c657f60427788148fe7a611",
+    "systems/mineru-basic/precalculus__1-6-absolute-value-functions.json": "4e1b5f24f44ce8b14c70387979916b272cebfd30b4a7be519de60813dd533191",
+    "systems/mineru-basic/precalculus__1-6-absolute-value-functions.md": "cc3feb7e7eedad602d821e4ac0defeee8713f693143ebcf54b5db1ed34de5a54",
+    "systems/mineru-basic/precalculus__3-1-complex-numbers.json": "3d08e47b6da76c755f6511937cbdc54d43ff9897a5fdf6000e14b38dd8f53107",
+    "systems/mineru-basic/precalculus__3-1-complex-numbers.md": "2d10b2a8920522b1e561a79c75b9de3ac281ca9451ca4f3b1a8e7122654a1d94",
+    "systems/mineru-basic/precalculus__5-4-right-triangle-trigonometry.json": "c9dff7c3b428727bf3a7208de3bc835f13f2bf63069df2551b97c81d3b3d691c",
+    "systems/mineru-basic/precalculus__5-4-right-triangle-trigonometry.md": "7647c2f2ce7e7394a791845d3461b2d7df5f5a4fddb02a6137749ccf0775a92e",
+    "systems/pymupdf4llm/chemistry__14-7-acid-base-titrations.json": "4cfc3e63d27d2c09948909e33288c9f6f6f74bb01436943e949b022cf343ae6f",
+    "systems/pymupdf4llm/chemistry__14-7-acid-base-titrations.md": "44d0240f3c2c21cac7cf1cad228b78d5f03f7fbf07451536c5c7bcf6d294e77d",
+    "systems/pymupdf4llm/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.json": "c1cac71849b4ac3199a10903e98eccfcd4a3a75fbd4deab0471dcfe41af4a5c6",
+    "systems/pymupdf4llm/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.md": "8be5d3e7cb82b19c6cfcdf48f109d61263b6390a26d80ae465f27c88be95fac7",
+    "systems/pymupdf4llm/chemistry__7-3-lewis-symbols-and-structures.json": "195ad26d8b8834b993eda0b231e32a195af6f3240bab9b709392cce39b7ee663",
+    "systems/pymupdf4llm/chemistry__7-3-lewis-symbols-and-structures.md": "eea21045dfb8eb07f652c332e1f305f0bb89ddd3b4e2f043ecf0c3b46e553dd5",
+    "systems/pymupdf4llm/college-physics__28-4-relativistic-addition-of-velocities.json": "d7214eaa80c5ad4fd09bf146f72279bfc846c35d6ac788a959f7e33cec1f73b3",
+    "systems/pymupdf4llm/college-physics__28-4-relativistic-addition-of-velocities.md": "6d8866e0c9d339c5d6de9a60610dda68260a435f7b6d05fbebf8529c4d2a5bcc",
+    "systems/pymupdf4llm/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.json": "592150fc543e61de4801f2bb7a41cab9c07feb9ff21bcb6d205613324fba3c6c",
+    "systems/pymupdf4llm/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.md": "af95d97fdcec7f7d34fa11a356cad8e8668ed138782a125e13b451840d0679b8",
+    "systems/pymupdf4llm/college-physics__5-3-elasticity-stress-and-strain.json": "acec3a2cf87344324a5fc0b635c19437e1e4ef52578c9b63030d212ab6e3d70d",
+    "systems/pymupdf4llm/college-physics__5-3-elasticity-stress-and-strain.md": "3d1d6e57542ba7691376f3dc3d1542a55a5c06c78f0745e22fe1681d456a881f",
+    "systems/pymupdf4llm/intermediate-algebra__1-5-properties-of-real-numbers.json": "0a4c4ccbbc8d7d520e3b80e1445542c864097b476a15f76f9652c4d65f4db1c4",
+    "systems/pymupdf4llm/intermediate-algebra__1-5-properties-of-real-numbers.md": "f5ed75c58e283686d16bd536b44b2403031f6f7722749f77abf7365a53477761",
+    "systems/pymupdf4llm/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.json": "77189f78c727fd083a8c94b690589da535f06f46ddc0c12b37096d3b5cbb536b",
+    "systems/pymupdf4llm/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.md": "f4e42e012a5e7eac862d0bcccd435fc77e6af2a01b47d996eaef6b3c96e16083",
+    "systems/pymupdf4llm/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.json": "10ddd8fdcbb1e751cf6f0171afad5fb82e3d5680981e0c2863a8b0978c8b9c93",
+    "systems/pymupdf4llm/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.md": "47ad895f83bf8b4b0f63fe306fbc32b89e44890e2d576b393dec5a8c2a1aac36",
+    "systems/pymupdf4llm/introductory-statistics__2-4-box-plots.json": "8c798194efb5f97034478ed692d53698d5d66301d5ccd8aacf77752cc17a23b6",
+    "systems/pymupdf4llm/introductory-statistics__2-4-box-plots.md": "34a1041462732f48123721dc4dd74adb6f18c4049760654c88f0729baef52785",
+    "systems/pymupdf4llm/introductory-statistics__3-1-terminology.json": "a40eb6507a7eec2d14997df62cd6a95d46148a55c29b6940e554caf34c9b283f",
+    "systems/pymupdf4llm/introductory-statistics__3-1-terminology.md": "7fb7d35cdcb2aba944e7942a5af98c04d0fc62720747addb3360be2c4864defc",
+    "systems/pymupdf4llm/introductory-statistics__4-5-hypergeometric-distribution.json": "cc28c248f178854657e6c3a585848c22427100f4072ffea869cf28ebe57b76c4",
+    "systems/pymupdf4llm/introductory-statistics__4-5-hypergeometric-distribution.md": "9e7e98ecb77e9ca976d38011a115b48be80c8daf40ea6ea83f951be29dd5d32f",
+    "systems/pymupdf4llm/precalculus__1-6-absolute-value-functions.json": "91e6458a120973e5cd2eac7aa1b118555f9de959d3485e0b1faea2c9dbdc8edf",
+    "systems/pymupdf4llm/precalculus__1-6-absolute-value-functions.md": "00b4491644a0d9d766545855955b13e76200e80d01d9c52a035687ac0e5cf507",
+    "systems/pymupdf4llm/precalculus__3-1-complex-numbers.json": "d957f4d6297faa729009a87279ed045c1043ec706fb0f65acdd06d8dc8331739",
+    "systems/pymupdf4llm/precalculus__3-1-complex-numbers.md": "dd140af107b8ac6aa9ef7f9ce098941ca5da059e06f2fd42feade11ddbaafecc",
+    "systems/pymupdf4llm/precalculus__5-4-right-triangle-trigonometry.json": "8a9cdf5fa31e1c0fe8ecf7e3fc78bb310521cb4e3b56ade78fa758e7b59fa81e",
+    "systems/pymupdf4llm/precalculus__5-4-right-triangle-trigonometry.md": "5c14535c26fbeff3c410eba2f251342daeb727bcf8341862133fe4b0e00fe5aa"
+  },
+  "mode": "live",
+  "pdfs": [
+    {
+      "file": "media/pdfs/college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.pdf",
+      "pages": 10,
+      "section": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+      "sha256": "a150c2c0a643420623148367c4c5ef5c31a47791b905ebf06bb5b32a1c7133b9"
+    },
+    {
+      "file": "media/pdfs/college-physics__5-3-elasticity-stress-and-strain.pdf",
+      "pages": 14,
+      "section": "college-physics/5-3-elasticity-stress-and-strain",
+      "sha256": "84cf20ef786ba51389dd7037d42e6cc65fe5796fb7d6947f9640402736ef7417"
+    },
+    {
+      "file": "media/pdfs/college-physics__28-4-relativistic-addition-of-velocities.pdf",
+      "pages": 9,
+      "section": "college-physics/28-4-relativistic-addition-of-velocities",
+      "sha256": "657a9f3a8e970a5f88780a5ede2ee7debe4b52568d9a3bdb375db15daec01f80"
+    },
+    {
+      "file": "media/pdfs/chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.pdf",
+      "pages": 8,
+      "section": "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds",
+      "sha256": "7809c1758041bbb39140b724dd4ce037433788d2e8b3ea455e47fbec2f30cf31"
+    },
+    {
+      "file": "media/pdfs/chemistry__7-3-lewis-symbols-and-structures.pdf",
+      "pages": 9,
+      "section": "chemistry/7-3-lewis-symbols-and-structures",
+      "sha256": "08ee533f3e6b708254be4276fc83881f4e86d8b8f05dee5be1b0c9a462153dbb"
+    },
+    {
+      "file": "media/pdfs/chemistry__14-7-acid-base-titrations.pdf",
+      "pages": 11,
+      "section": "chemistry/14-7-acid-base-titrations",
+      "sha256": "bae853afb066380ce767b7a29ed25824394d2a3de171e2a51d844cf36ebe560f"
+    },
+    {
+      "file": "media/pdfs/precalculus__5-4-right-triangle-trigonometry.pdf",
+      "pages": 29,
+      "section": "precalculus/5-4-right-triangle-trigonometry",
+      "sha256": "92d90a5ea6c05bd344ed6bbcc4203b77994a6fe8beb35058240e10a350ebab5b"
+    },
+    {
+      "file": "media/pdfs/precalculus__1-6-absolute-value-functions.pdf",
+      "pages": 28,
+      "section": "precalculus/1-6-absolute-value-functions",
+      "sha256": "34f9466cd9d0be5e09d6b1e384980a81c39552b082d44b2d42688a98151c49c4"
+    },
+    {
+      "file": "media/pdfs/precalculus__3-1-complex-numbers.pdf",
+      "pages": 20,
+      "section": "precalculus/3-1-complex-numbers",
+      "sha256": "ae89112656cc4147d13c6553b47d8b2989bd11019c910e41d55a1e5c77240641"
+    },
+    {
+      "file": "media/pdfs/introductory-statistics__2-4-box-plots.pdf",
+      "pages": 9,
+      "section": "introductory-statistics/2-4-box-plots",
+      "sha256": "792ba6362f87020b3f0625c781ef535ffcf860fca7bbb99a3742850f957a3268"
+    },
+    {
+      "file": "media/pdfs/introductory-statistics__4-5-hypergeometric-distribution.pdf",
+      "pages": 6,
+      "section": "introductory-statistics/4-5-hypergeometric-distribution",
+      "sha256": "96b79c680b69c236e76281b0f995807cd25d3da410f351882dc377f3304a21e4"
+    },
+    {
+      "file": "media/pdfs/introductory-statistics__3-1-terminology.pdf",
+      "pages": 8,
+      "section": "introductory-statistics/3-1-terminology",
+      "sha256": "ea51bd3362b2303c8f010e4d0e464f035adf183a543494363f93493b52d05181"
+    },
+    {
+      "file": "media/pdfs/intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.pdf",
+      "pages": 28,
+      "section": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+      "sha256": "8cb8fcd4dc26b5758a0729e197e005d6e27fb686e5d3f5322a2000765d3a0f98"
+    },
+    {
+      "file": "media/pdfs/intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.pdf",
+      "pages": 27,
+      "section": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+      "sha256": "4cc8457f76095812893c27e3b8b248db4142ef47502c852832324ad80bbfaea5"
+    },
+    {
+      "file": "media/pdfs/intermediate-algebra__1-5-properties-of-real-numbers.pdf",
+      "pages": 26,
+      "section": "intermediate-algebra/1-5-properties-of-real-numbers",
+      "sha256": "9fb4330b556386bd49443fa4939ba67d8a530bf2074edce17bbe8cbb03c5ca91"
+    }
+  ],
+  "recorded_on": "2026-10-14",
+  "resumed_runs": [
+    "document.run1",
+    "document.run2",
+    "headings.run1",
+    "figures.run1",
+    "figures.run2",
+    "equations.run1"
+  ],
+  "runs": [
+    {
+      "answers": "answers/document.run1.jsonl",
+      "complete": true,
+      "model_calls": 2267,
+      "n": 15,
+      "repeat": 1,
+      "report": "reports/document.run1.json",
+      "spend_usd": 3.347982675000009,
+      "stopped_reason": null,
+      "task": "document",
+      "timing": [
+        {
+          "latency_ms": 52143,
+          "pdf_pages": 11,
+          "section": "chemistry/14-7-acid-base-titrations"
+        },
+        {
+          "latency_ms": 48996,
+          "pdf_pages": 8,
+          "section": "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds"
+        },
+        {
+          "latency_ms": 42825,
+          "pdf_pages": 9,
+          "section": "chemistry/7-3-lewis-symbols-and-structures"
+        },
+        {
+          "latency_ms": 38445,
+          "pdf_pages": 9,
+          "section": "college-physics/28-4-relativistic-addition-of-velocities"
+        },
+        {
+          "latency_ms": 35720,
+          "pdf_pages": 10,
+          "section": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum"
+        },
+        {
+          "latency_ms": 60061,
+          "pdf_pages": 14,
+          "section": "college-physics/5-3-elasticity-stress-and-strain"
+        },
+        {
+          "latency_ms": 108626,
+          "pdf_pages": 26,
+          "section": "intermediate-algebra/1-5-properties-of-real-numbers"
+        },
+        {
+          "latency_ms": 53284,
+          "pdf_pages": 28,
+          "section": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations"
+        },
+        {
+          "latency_ms": 136481,
+          "pdf_pages": 27,
+          "section": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants"
+        },
+        {
+          "latency_ms": 11466,
+          "pdf_pages": 9,
+          "section": "introductory-statistics/2-4-box-plots"
+        },
+        {
+          "latency_ms": 31181,
+          "pdf_pages": 8,
+          "section": "introductory-statistics/3-1-terminology"
+        },
+        {
+          "latency_ms": 12450,
+          "pdf_pages": 6,
+          "section": "introductory-statistics/4-5-hypergeometric-distribution"
+        },
+        {
+          "latency_ms": 105488,
+          "pdf_pages": 28,
+          "section": "precalculus/1-6-absolute-value-functions"
+        },
+        {
+          "latency_ms": 86351,
+          "pdf_pages": 20,
+          "section": "precalculus/3-1-complex-numbers"
+        },
+        {
+          "latency_ms": 163084,
+          "pdf_pages": 29,
+          "section": "precalculus/5-4-right-triangle-trigonometry"
+        }
+      ],
+      "wall_seconds": 1019.5
+    },
+    {
+      "answers": "answers/document.run2.jsonl",
+      "complete": true,
+      "model_calls": 2268,
+      "n": 15,
+      "repeat": 2,
+      "report": "reports/document.run2.json",
+      "spend_usd": 3.2760484000000103,
+      "stopped_reason": null,
+      "task": "document",
+      "timing": [
+        {
+          "latency_ms": 51146,
+          "pdf_pages": 11,
+          "section": "chemistry/14-7-acid-base-titrations"
+        },
+        {
+          "latency_ms": 49495,
+          "pdf_pages": 8,
+          "section": "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds"
+        },
+        {
+          "latency_ms": 39016,
+          "pdf_pages": 9,
+          "section": "chemistry/7-3-lewis-symbols-and-structures"
+        },
+        {
+          "latency_ms": 40778,
+          "pdf_pages": 9,
+          "section": "college-physics/28-4-relativistic-addition-of-velocities"
+        },
+        {
+          "latency_ms": 35819,
+          "pdf_pages": 10,
+          "section": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum"
+        },
+        {
+          "latency_ms": 63446,
+          "pdf_pages": 14,
+          "section": "college-physics/5-3-elasticity-stress-and-strain"
+        },
+        {
+          "latency_ms": 105311,
+          "pdf_pages": 26,
+          "section": "intermediate-algebra/1-5-properties-of-real-numbers"
+        },
+        {
+          "latency_ms": 55335,
+          "pdf_pages": 28,
+          "section": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations"
+        },
+        {
+          "latency_ms": 137671,
+          "pdf_pages": 27,
+          "section": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants"
+        },
+        {
+          "latency_ms": 10710,
+          "pdf_pages": 9,
+          "section": "introductory-statistics/2-4-box-plots"
+        },
+        {
+          "latency_ms": 30876,
+          "pdf_pages": 8,
+          "section": "introductory-statistics/3-1-terminology"
+        },
+        {
+          "latency_ms": 12132,
+          "pdf_pages": 6,
+          "section": "introductory-statistics/4-5-hypergeometric-distribution"
+        },
+        {
+          "latency_ms": 105885,
+          "pdf_pages": 28,
+          "section": "precalculus/1-6-absolute-value-functions"
+        },
+        {
+          "latency_ms": 96537,
+          "pdf_pages": 20,
+          "section": "precalculus/3-1-complex-numbers"
+        },
+        {
+          "latency_ms": 165740,
+          "pdf_pages": 29,
+          "section": "precalculus/5-4-right-triangle-trigonometry"
+        }
+      ],
+      "wall_seconds": 1032.8
+    },
+    {
+      "answers": "answers/headings.run1.jsonl",
+      "complete": true,
+      "model_calls": 0,
+      "n": 15,
+      "repeat": 1,
+      "report": "reports/headings.run1.json",
+      "spend_usd": 0.0,
+      "stopped_reason": null,
+      "task": "headings",
+      "timing": [],
+      "wall_seconds": 46.0
+    },
+    {
+      "answers": "answers/figures.run1.jsonl",
+      "complete": true,
+      "model_calls": 138,
+      "n": 69,
+      "repeat": 1,
+      "report": "reports/figures.run1.json",
+      "spend_usd": 0.6440311999999998,
+      "stopped_reason": null,
+      "task": "figures",
+      "timing": [],
+      "wall_seconds": 303.4
+    },
+    {
+      "answers": "answers/figures.run2.jsonl",
+      "complete": true,
+      "model_calls": 138,
+      "n": 69,
+      "repeat": 2,
+      "report": "reports/figures.run2.json",
+      "spend_usd": 0.6478496000000001,
+      "stopped_reason": null,
+      "task": "figures",
+      "timing": [],
+      "wall_seconds": 320.6
+    },
+    {
+      "answers": "answers/equations.run1.jsonl",
+      "complete": true,
+      "model_calls": 1579,
+      "n": 1369,
+      "repeat": 1,
+      "report": "reports/equations.run1.json",
+      "spend_usd": 1.4796514000000005,
+      "stopped_reason": null,
+      "task": "equations",
+      "timing": [],
+      "wall_seconds": 2349.1
+    },
+    {
+      "answers": "answers/equations.run2.jsonl",
+      "complete": true,
+      "model_calls": 1563,
+      "n": 1369,
+      "repeat": 2,
+      "report": "reports/equations.run2.json",
+      "spend_usd": 1.4819184000000023,
+      "stopped_reason": null,
+      "task": "equations",
+      "timing": [],
+      "wall_seconds": 2347.0
+    }
+  ],
+  "schema_version": 1,
+  "set_id": "heldout-2026-10",
+  "signoff_confirmed": true,
+  "spend": {
+    "cap_usd": 26.0,
+    "total_usd": 10.877482
+  },
+  "systems_judge": {
+    "model": "claude-opus-5-5",
+    "provider": "anthropic"
+  },
+  "systems_parsers": "recorded",
+  "systems_spend": {
+    "cap_usd": 29.0,
+    "chatbot_usd": 23.828473,
+    "judge_usd": 1.503645
+  }
+}

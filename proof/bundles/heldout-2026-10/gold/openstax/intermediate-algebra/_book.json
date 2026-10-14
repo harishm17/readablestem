@@ -1,0 +1,18 @@
+{
+  "archive_path": "/apps/archive/20260604.144757",
+  "archive_version": "20260604.144757",
+  "authors": [
+    "Lynn Marecek"
+  ],
+  "cms_license_name": "Creative Commons Attribution License",
+  "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "details_url": "https://openstax.org/details/books/intermediate-algebra",
+  "license_name": "Creative Commons Attribution License",
+  "license_url": "http://creativecommons.org/licenses/by/4.0/",
+  "retrieved_at": "2026-10-13",
+  "slug": "intermediate-algebra",
+  "state": "retired",
+  "title": "Intermediate Algebra",
+  "uuid": "02776133-d49d-49cb-bfaa-67c7f61b25a1",
+  "version": "eb2e29d"
+}

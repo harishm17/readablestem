@@ -1,0 +1,38 @@
+{
+  "arm": "chatbot-haiku-purdue",
+  "attempts": [],
+  "cost_usd": 0.009595,
+  "counted_input_tokens": 39125,
+  "error": null,
+  "figure_judgements": [],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.0,
+  "output": {
+    "file": "introductory-statistics__3-1-terminology.run2.html",
+    "format": "html"
+  },
+  "output_chars": 23344,
+  "pdf_pages": 8,
+  "response_status": "end_turn",
+  "run": 2,
+  "seconds": 38.2,
+  "section": "introductory-statistics/3-1-terminology",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 39125,
+    "output_tokens": 11364,
+    "reasoning_tokens": 1268
+  },
+  "versions": {
+    "model_requested": "claude-haiku-5-5",
+    "model_served": "claude-haiku-5-5"
+  }
+}

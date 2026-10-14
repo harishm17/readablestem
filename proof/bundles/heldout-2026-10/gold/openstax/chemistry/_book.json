@@ -1,0 +1,21 @@
+{
+  "archive_path": "/apps/archive/20260604.144757",
+  "archive_version": "20260604.144757",
+  "authors": [
+    "Paul Flowers",
+    "William R. Robinson, PhD",
+    "Richard Langley",
+    "Klaus Theopold"
+  ],
+  "cms_license_name": "Creative Commons Attribution License",
+  "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "details_url": "https://openstax.org/details/books/chemistry",
+  "license_name": "Creative Commons Attribution License",
+  "license_url": "http://creativecommons.org/licenses/by/4.0/",
+  "retrieved_at": "2026-10-13",
+  "slug": "chemistry",
+  "state": "retired",
+  "title": "Chemistry",
+  "uuid": "85abf193-2bd2-4908-8563-90b8a7ac8df6",
+  "version": "741a7af"
+}

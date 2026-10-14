@@ -1,0 +1,2330 @@
+{
+  "client": "anthropic",
+  "complete": true,
+  "cost": {
+    "budget_calls": 1563,
+    "budget_spent_usd": 1.4819184000000023,
+    "dropped_usd": 2.220446049250313e-15,
+    "model_calls": 1563,
+    "per_item_unit": "equation",
+    "per_item_usd": 0.001082482395909423,
+    "pipeline_usd": 1.4819184,
+    "total_usd": 1.4819184,
+    "verifier_per_item_usd": 0.0,
+    "verifier_requests": 0,
+    "verifier_usd": 0
+  },
+  "dataset": {
+    "gold_dir": "proof set heldout-2026-10",
+    "limit": null,
+    "manifest_sha256": "e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb",
+    "selection_sha256": "8fd89b82e288ee1a8e5127fca4776488fff3556f53d0e6b411ab743dbb52e6f1",
+    "unit": "equation"
+  },
+  "date": "2026-10-14",
+  "latency_ms": {
+    "basis": "sum of model-call latencies per item (excludes rendering)",
+    "n": 1369,
+    "p50": 1421.0,
+    "p95": 3290.9999999999986
+  },
+  "metrics": {
+    "by_display": {
+      "block": {
+        "exact_lenient": 0.2822085889570552,
+        "mean_teds": 0.7706358976885627,
+        "n": 163,
+        "share": 0.11906501095690285
+      },
+      "inline": {
+        "exact_lenient": 0.7379767827529021,
+        "mean_teds": 0.8124837984704187,
+        "n": 1206,
+        "share": 0.8809349890430972
+      }
+    },
+    "by_route": {
+      "cheap": {
+        "exact_lenient": 0.7976318622174381,
+        "mean_teds": 0.8515998410722339,
+        "n": 929,
+        "share": 0.6785975164353543
+      },
+      "escalated": {
+        "exact_lenient": 0.7319587628865979,
+        "mean_teds": 0.7655479802387019,
+        "n": 194,
+        "share": 0.14170927684441198
+      },
+      "main": {
+        "exact_lenient": 0.21544715447154472,
+        "mean_teds": 0.6740510233989728,
+        "n": 246,
+        "share": 0.17969320672023376
+      }
+    },
+    "by_status": {
+      "abstained": {
+        "exact_lenient": 0.0,
+        "mean_teds": 0.0,
+        "n": 4,
+        "share": 0.0029218407596785976
+      },
+      "accepted": {
+        "exact_lenient": 0.7329635499207607,
+        "mean_teds": 0.840863928969794,
+        "n": 1262,
+        "share": 0.9218407596785975
+      },
+      "failed": {
+        "exact_lenient": 0.0,
+        "mean_teds": 0.0,
+        "n": 38,
+        "share": 0.027757487216946677
+      },
+      "needs_review": {
+        "exact_lenient": 0.16923076923076924,
+        "mean_teds": 0.681520521825858,
+        "n": 65,
+        "share": 0.04747991234477721
+      }
+    },
+    "exact_lenient": 0.6837107377647919,
+    "exact_lenient_ci95": [
+      0.6585923750353226,
+      0.7078009887037691
+    ],
+    "exact_strict": 0.44996347699050404,
+    "mean_teds": 0.8075011777053036,
+    "proposal_rate": 0.9693206720233747,
+    "review_load": {
+      "flags": {
+        "flag_precision": 0.897196261682243,
+        "flag_recall": 0.22170900692840648,
+        "required_units": 107,
+        "required_units_wrong": 96,
+        "units": 1369,
+        "wrong": 433,
+        "wrong_required": 96
+      },
+      "flags_excluding_scorer_gaps": {
+        "flag_precision": 0.8854166666666666,
+        "flag_recall": 0.21794871794871795,
+        "required_units": 96,
+        "required_units_wrong": 85,
+        "units": 1321,
+        "wrong": 390,
+        "wrong_required": 85
+      },
+      "optional": 0,
+      "optional_by_reason": {},
+      "optional_per_item": 0.0,
+      "optional_per_section": 0.0,
+      "required": 107,
+      "required_by_reason": {
+        "below_accept": 53,
+        "conversion_failed": 35,
+        "invalid_latex": 38,
+        "low_confidence": 3,
+        "not_equation": 1,
+        "sign_mismatch": 2,
+        "style_cosmetic": 2,
+        "style_mismatch": 4,
+        "symbol_mismatch": 12,
+        "unknown_command": 3
+      },
+      "required_per_item": 0.0782,
+      "required_per_section": 7.6429,
+      "scorer_gaps": [
+        "openstax/chemistry/14-7-acid-base-titrations/eq-006",
+        "openstax/chemistry/14-7-acid-base-titrations/eq-009",
+        "openstax/chemistry/14-7-acid-base-titrations/eq-010",
+        "openstax/chemistry/14-7-acid-base-titrations/eq-026",
+        "openstax/chemistry/14-7-acid-base-titrations/eq-037",
+        "openstax/chemistry/14-7-acid-base-titrations/eq-044",
+        "openstax/chemistry/14-7-acid-base-titrations/eq-046",
+        "openstax/chemistry/14-7-acid-base-titrations/eq-049",
+        "openstax/chemistry/14-7-acid-base-titrations/eq-058",
+        "openstax/chemistry/14-7-acid-base-titrations/eq-059",
+        "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-007",
+        "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-008",
+        "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-001",
+        "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-003",
+        "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-004",
+        "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-005",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-003",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-006",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-007",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-010",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-025",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-037",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-040",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-041",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-053",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-058",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-061",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-064",
+        "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-067",
+        "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-003",
+        "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-011",
+        "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-042",
+        "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-043",
+        "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-042",
+        "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-043",
+        "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-044",
+        "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-053",
+        "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-054",
+        "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-058",
+        "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-062",
+        "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-099",
+        "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-103",
+        "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-120",
+        "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-047",
+        "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-051",
+        "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-046",
+        "openstax/precalculus/1-6-absolute-value-functions/eq-012",
+        "openstax/precalculus/5-4-right-triangle-trigonometry/eq-109"
+      ],
+      "sections": 14,
+      "wrong_not_required": [
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-000",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-001",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-002",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-003",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-004",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-006",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-007",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-008",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-009",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-010",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-011",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-012",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-013",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-015",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-016",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-017",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-018",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-019",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-020",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-021",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-022",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-024",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-025",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-026",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-027",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-028",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-029",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-030",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-031",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-032",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-033",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-034",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-036",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-037",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-039",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-040",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-042",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-043",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-044",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-045",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-046",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-048",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-049",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-053",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-054",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-055",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-056",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-057",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-058",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/chemistry/14-7-acid-base-titrations/eq-059",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-000",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-002",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-004",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-006",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-008",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-000",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-002",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-006",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-007",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-008",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-009",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-010",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-024",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-002",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-003",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-004",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-006",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-007",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-008",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-009",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-010",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-018",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-021",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-022",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-023",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-025",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-026",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-028",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-034",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-037",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-038",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-040",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-041",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-043",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-045",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-050",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-058",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-060",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-061",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-062",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-064",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-066",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-003",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-006",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-007",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-011",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-012",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-021",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-022",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-023",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-024",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-027",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-028",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-029",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-030",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-033",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-034",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-035",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-036",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-039",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-041",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-042",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-043",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-044",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-045",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-046",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-007",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-049",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-050",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-051",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-053",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-055",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-058",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-065",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-066",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-087",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-089",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-101",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-103",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-105",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-106",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-114",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-120",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-014",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-028",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-030",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-036",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-040",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-041",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-046",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-048",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-049",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-052",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-053",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-055",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-061",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-068",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-070",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-079",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-080",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-082",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-083",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-084",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-085",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-086",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-087",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-089",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-093",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-098",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-101",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-102",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-103",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-106",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-107",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-108",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-109",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-154",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-155",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-156",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-157",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-158",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-159",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-168",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-169",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-000",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-005",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-018",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-019",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-024",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-031",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-032",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-037",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-045",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-046",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-047",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-002",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-003",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-004",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-006",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-007",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-008",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-009",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-010",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-011",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-012",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-013",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-014",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-015",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-038",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-042",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-052",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-056",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-058",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-079",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-105",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-106",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-107",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-108",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-109",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-110",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-111",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-112",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-113",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-114",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-115",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-116",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-117",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-118",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-119",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-120",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-121",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-122",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-134",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-141",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-142",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-143",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-144",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-172",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-173",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-174",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-175",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-176",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-177",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-178",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-179",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-180",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-181",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/introductory-statistics/3-1-terminology/eq-009",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-001",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-008",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-012",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-013",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-014",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-017",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-020",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-024",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-038",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-044",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-045",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-046",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-052",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-059",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-086",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-093",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-115",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-127",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-136",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/1-6-absolute-value-functions/eq-193",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-006",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-026",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-034",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-035",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-037",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-038",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-041",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-042",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-043",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-048",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-050",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-052",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-060",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-073",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-075",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-076",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-093",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-094",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-099",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-101",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-112",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-116",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-121",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-122",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-128",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-129",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-130",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-131",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-132",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-133",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-134",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-135",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-136",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-183",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-184",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-186",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-187",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-190",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-199",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/3-1-complex-numbers/eq-202",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-000",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-001",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-002",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-003",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-019",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-021",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-029",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-036",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-037",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-038",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-039",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-040",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-043",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-047",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-057",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-095",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-097",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-098",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-100",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-102",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-103",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-104",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-108",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-110",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-147",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-148",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-149",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-150",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-151",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-152",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-153",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-154",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-155",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-156",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-157",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-158",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-159",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-160",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-161",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        }
+      ]
+    },
+    "second_check": {
+      "cheap_stage": {
+        "answered": 0,
+        "mean_p_meaning": null,
+        "ran": 0,
+        "would_flag": 0
+      },
+      "cost_usd": 0,
+      "final": {
+        "answered": 0,
+        "auroc_vs_wrong": null,
+        "auroc_vs_wrong_excluding_scorer_gaps": null,
+        "would_flag": 0,
+        "would_flag_precision": null,
+        "would_flag_recall": null,
+        "would_flag_wrong_excluding_scorer_gaps": 0,
+        "wrong": 0
+      },
+      "mode": "shadow",
+      "outcomes": {},
+      "p_meaning": {},
+      "per_equation_usd": 0.0,
+      "ran": 0,
+      "requests": 0,
+      "versions": []
+    },
+    "selective": [
+      {
+        "accuracy": 0.7069486404833837,
+        "coverage": 0.9671292914536158,
+        "kept": 1324,
+        "mean_teds": 0.8333125837707255,
+        "threshold": 0.5
+      },
+      {
+        "accuracy": 0.7069486404833837,
+        "coverage": 0.9671292914536158,
+        "kept": 1324,
+        "mean_teds": 0.8333125837707255,
+        "threshold": 0.55
+      },
+      {
+        "accuracy": 0.7074829931972789,
+        "coverage": 0.9663988312636961,
+        "kept": 1323,
+        "mean_teds": 0.8334025511701851,
+        "threshold": 0.6
+      },
+      {
+        "accuracy": 0.7098248286367098,
+        "coverage": 0.9590942293644996,
+        "kept": 1313,
+        "mean_teds": 0.833597470130512,
+        "threshold": 0.65
+      },
+      {
+        "accuracy": 0.7098248286367098,
+        "coverage": 0.9590942293644996,
+        "kept": 1313,
+        "mean_teds": 0.833597470130512,
+        "threshold": 0.7
+      },
+      {
+        "accuracy": 0.7147239263803681,
+        "coverage": 0.9525200876552228,
+        "kept": 1304,
+        "mean_teds": 0.8356575519342939,
+        "threshold": 0.75
+      },
+      {
+        "accuracy": 0.7172573189522342,
+        "coverage": 0.9481373265157049,
+        "kept": 1298,
+        "mean_teds": 0.836359711112313,
+        "threshold": 0.8
+      },
+      {
+        "accuracy": 0.7318037974683544,
+        "coverage": 0.9233016800584368,
+        "kept": 1264,
+        "mean_teds": 0.8406165732346587,
+        "threshold": 0.85
+      },
+      {
+        "accuracy": 0.7668789808917198,
+        "coverage": 0.5734112490869248,
+        "kept": 785,
+        "mean_teds": 0.8735722878710659,
+        "threshold": 0.9
+      },
+      {
+        "accuracy": 0.8348214285714286,
+        "coverage": 0.16362308254200147,
+        "kept": 224,
+        "mean_teds": 0.9256902068259327,
+        "threshold": 0.95
+      }
+    ]
+  },
+  "models": {
+    "cheap": "claude-haiku-5-5",
+    "main": "claude-opus-5-5"
+  },
+  "models_used": [
+    "claude-haiku-5-5",
+    "claude-opus-5-5"
+  ],
+  "n": 1369,
+  "n_planned": 1369,
+  "pipeline_version": "0.4.0",
+  "prompt_versions": {
+    "equation": "equation-df0e12f1"
+  },
+  "schema_version": 1,
+  "stopped_reason": null,
+  "task": "equations"
+}

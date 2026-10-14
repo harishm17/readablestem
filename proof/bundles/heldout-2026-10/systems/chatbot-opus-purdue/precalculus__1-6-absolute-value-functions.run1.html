@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>1.6 Absolute Value Functions | Precalculus (OpenStax)</title>
+  <meta name="description" content="Accessible version of OpenStax Precalculus Section 1.6: Absolute Value Functions. Graphing absolute value functions, solving absolute value equations, and solving absolute value inequalities.">
+
+  <!-- ========== MathJax 3 configuration (with accessibility extensions) ========== -->
+  <script>
+    window.MathJax = {
+      loader: {
+        load: ['[tex]/ams', 'a11y/semantic-enrich', 'a11y/assistive-mml', 'a11y/explorer']
+      },
+      tex: {
+        packages: {'[+]': ['ams']},
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        processEscapes: true,
+        tags: 'none'
+      },
+      options: {
+        enableMenu: true,
+        enableAssistiveMml: true,
+        enableExplorer: true,
+        enableEnrichment: true,
+        sre: { speech: 'deep', domain: 'clearspeak', locale: 'en' },
+        a11y: { speech: true, braille: true, subtitles: false },
+        menuOptions: {
+          settings: { assistiveMml: true, explorer: true, collapsible: false }
+        }
+      },
+      chtml: {
+        scale: 1,
+        matchFontHeight: true
+      }
+    };
+  </script>
+  <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root {
+      --text: #1a1a1a;
+      --bg: #ffffff;
+      --muted-bg: #f4f6f8;
+      --border: #555555;
+      --link: #0b4f8a;
+      --focus: #b35900;
+    }
+    * { box-sizing: border-box; }
+    html { font-size: 100%; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .skip-link {
+      position: absolute; left: -9999px; top: 0;
+      background: #000; color: #fff; padding: .5rem 1rem; z-index: 100;
+    }
+    .skip-link:focus { left: 1rem; top: 1rem; }
+    main { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    h1, h2, h3, h4, h5 { font-family: Arial, Helvetica, sans-serif; line-height: 1.25; }
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.6rem; margin-top: 2.5rem; }
+    h3 { font-size: 1.3rem; margin-top: 2rem; }
+    h4 { font-size: 1.1rem; }
+    h5 { font-size: 1rem; }
+    a { color: var(--link); text-decoration: underline; }
+    a:focus, summary:focus, button:focus, [tabindex]:focus {
+      outline: 3px solid var(--focus); outline-offset: 2px;
+    }
+    .callout {
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      padding: .5rem 1.25rem 1rem;
+      margin: 1.5rem 0;
+      background: var(--bg);
+    }
+    .callout .part {
+      border: 1px solid var(--border);
+      padding: .25rem 1rem .75rem;
+      margin: 1rem 0;
+    }
+    .qa-answer { font-style: italic; }
+    figure { margin: 1.5rem 0; }
+    figure img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+    figcaption { font-size: .95rem; margin-top: .5rem; }
+    details {
+      background: var(--muted-bg);
+      border: 1px solid #8a8a8a;
+      padding: .5rem .75rem;
+      margin-top: .5rem;
+    }
+    summary { cursor: pointer; font-weight: bold; }
+    table { border-collapse: collapse; margin: 1rem 0; }
+    th, td { border: 1px solid var(--border); padding: .4rem .75rem; text-align: left; vertical-align: top; }
+    th { background: var(--muted-bg); }
+    caption { caption-side: bottom; text-align: left; padding-top: .4rem; font-size: .95rem; }
+    .math-display { overflow-x: auto; }
+    ol.exercises { padding-left: 2.5rem; }
+    ol.exercises > li { margin: .75rem 0; padding: .5rem .75rem; border: 1px solid #8a8a8a; }
+    .visually-hidden {
+      position: absolute !important; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0);
+      white-space: nowrap; border: 0;
+    }
+    footer { max-width: 52rem; margin: 0 auto; padding: 1rem; border-top: 2px solid var(--border); font-size: .95rem; }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<!-- NOTE: Image file paths below are placeholders. Replace each src with the
+     actual figure file from the OpenStax source. Alt text and long descriptions
+     are provided because the source print omitted image alt text. -->
+
+<main id="main-content">
+<article>
+
+<h1>1.6 Absolute Value Functions</h1>
+
+<section aria-labelledby="objectives-heading">
+  <h2 id="objectives-heading">Learning Objectives</h2>
+  <p>In this section you will:</p>
+  <ul>
+    <li>Graph an absolute value function.</li>
+    <li>Solve an absolute value equation.</li>
+    <li>Solve an absolute value inequality.</li>
+  </ul>
+</section>
+
+<figure>
+  <img src="images/figure-01-galaxy.jpg"
+       alt="Photograph of a large spiral galaxy, seen at an angle, glowing white at its bright core against a black sky filled with stars. A smaller elliptical galaxy appears in the upper left.">
+  <figcaption>Figure 1 Distances in deep space can be measured in all directions. As such, it is useful to consider distance in terms of absolute values. (credit: "s58y"/Flickr)</figcaption>
+</figure>
+
+<p>Until the 1920s, the so-called spiral nebulae were believed to be clouds of dust and gas in our own galaxy, some tens of thousands of light years away. Then, astronomer Edwin Hubble proved that these objects are galaxies in their own right, at distances of millions of light years. Today, astronomers can detect galaxies that are billions of light years away. Distances in the universe can be measured in all directions. As such, it is useful to consider distance as an absolute value function. In this section, we will investigate absolute value functions.</p>
+
+<!-- ================================================================== -->
+<section aria-labelledby="understanding-heading">
+<h2 id="understanding-heading">Understanding Absolute Value</h2>
+
+<p>Recall that in its basic form \(f(x)=|x|,\) the absolute value function, is one of our toolkit functions. The absolute value function is commonly thought of as providing the distance the number is from zero on a number line. Algebraically, for whatever the input value is, the output is the value without regard to sign.</p>
+
+<aside class="callout" aria-labelledby="def-avf">
+  <h3 id="def-avf">Absolute Value Function</h3>
+  <p>The absolute value function can be defined as a piecewise function</p>
+  <div class="math-display">\[
+    f(x)=|x|=\begin{cases} x & \text{if } x\ge 0\\ -x & \text{if } x\lt 0 \end{cases}
+  \]</div>
+</aside>
+
+<section class="callout" aria-labelledby="ex1-heading">
+  <h3 id="ex1-heading">Example 1</h3>
+  <div class="part">
+    <h4>Determine a Number within a Prescribed Distance</h4>
+    <p>Describe all values \(x\) within or including a distance of 4 from the number 5.</p>
+  </div>
+  <div class="part">
+    <h4>Solution</h4>
+    <p>We want the distance between \(x\) and 5 to be less than or equal to 4. We can draw a number line, such as the one in Figure 2, to represent the condition to be satisfied.</p>
+    <figure>
+      <img src="images/figure-02-number-line.png"
+           alt="Number line with 5 marked in the center. A shaded band extends 4 units to the left of 5 and 4 units to the right of 5, covering the numbers from 1 to 9. Arrows above the band, each labeled 4, show the distance of 4 in each direction.">
+      <figcaption>Figure 2</figcaption>
+    </figure>
+    <p>The distance from \(x\) to 5 can be represented using the absolute value as \(|x-5|.\) We want the values of \(x\) that satisfy the condition \(|x-5|\le 4.\)</p>
+  </div>
+  <div class="part">
+    <h4>Analysis</h4>
+    <p>Note that</p>
+    <div class="math-display">\[
+      \begin{aligned}
+        -4 &\le x-5 &\qquad x-5 &\le 4\\
+        1 &\le x & x &\le 9
+      \end{aligned}
+    \]</div>
+    <p>So \(|x-5|\le 4\) is equivalent to \(1\le x\le 9.\)</p>
+    <p>However, mathematicians generally prefer absolute value notation.</p>
+  </div>
+</section>
+
+<section class="callout" aria-labelledby="try1-heading">
+  <h3 id="try1-heading">Try It #1</h3>
+  <p>Describe all values \(x\) within a distance of 3 from the number 2.</p>
+</section>
+
+<section class="callout" aria-labelledby="ex2-heading">
+  <h3 id="ex2-heading">Example 2</h3>
+  <div class="part">
+    <h4>Resistance of a Resistor</h4>
+    <p>Electrical parts, such as resistors and capacitors, come with specified values of their operating parameters: resistance, capacitance, etc. However, due to imprecision in manufacturing, the actual values of these parameters vary somewhat from piece to piece, even when they are supposed to be the same. The best that manufacturers can do is to try to guarantee that the variations will stay within a specified range, often \(\pm 1\%,\ \pm 5\%,\) or \(\pm 10\%.\)</p>
+    <p>Suppose we have a resistor rated at 680 ohms, \(\pm 5\%.\) Use the absolute value function to express the range of possible values of the actual resistance.</p>
+  </div>
+  <div class="part">
+    <h4>Solution</h4>
+    <p>5% of 680 ohms is 34 ohms. The absolute value of the difference between the actual and nominal resistance should not exceed the stated variability, so, with the resistance \(R\) in ohms,</p>
+    <div class="math-display">\[ |R-680|\le 34 \]</div>
+  </div>
+</section>
+
+<section class="callout" aria-labelledby="try2-heading">
+  <h3 id="try2-heading">Try It #2</h3>
+  <p>Students who score within 20 points of 80 will pass a test. Write this as a distance from 80 using absolute value notation.</p>
+</section>
+</section>
+
+<!-- ================================================================== -->
+<section aria-labelledby="graphing-heading">
+<h2 id="graphing-heading">Graphing an Absolute Value Function</h2>
+
+<p>The most significant feature of the absolute value graph is the corner point at which the graph changes direction. This point is shown at the origin in Figure 3.</p>
+
+<figure>
+  <img src="images/figure-03-abs-x.png"
+       alt="Graph of y equals the absolute value of x on a coordinate grid from negative 5 to 5. The graph is a V shape with its corner at the origin, rising through the points (negative 4, 4) and (4, 4).">
+  <figcaption>Figure 3</figcaption>
+</figure>
+
+<p>Figure 4 shows the graph of \(y=2|x-3|+4.\) The graph of \(y=|x|\) has been shifted right 3 units, vertically stretched by a factor of 2, and shifted up 4 units. This means that the corner point is located at \((3,4)\) for this transformed function.</p>
+
+<figure>
+  <img src="images/figure-04-transformations.png"
+       alt="Four V-shaped graphs showing step-by-step transformations of y equals the absolute value of x, ending with y equals 2 times the absolute value of x minus 3, plus 4. Full description follows.">
+  <figcaption>Figure 4</figcaption>
+  <details>
+    <summary>Description of Figure 4</summary>
+    <p>The coordinate grid runs from negative 6 to 6 on the x-axis and negative 1 to 10 on the y-axis. Four graphs are shown:</p>
+    <ul>
+      <li>\(y=|x|\) (solid line): a V with its corner at the origin.</li>
+      <li>\(y=|x-3|\), labeled "Right 3" (dashed line): the same V moved so its corner is at \((3,0)\); it crosses the y-axis at 3.</li>
+      <li>\(y=2|x-3|\), labeled "Vertical stretch" (dashed line): a narrower, steeper V with its corner at \((3,0)\); it crosses the y-axis at 6.</li>
+      <li>\(y=2|x-3|+4\), labeled "Up 4" (solid line): the steeper V raised 4 units so its corner is at \((3,4)\); it crosses the y-axis at 10.</li>
+    </ul>
+  </details>
+</figure>
+
+<section class="callout" aria-labelledby="ex3-heading">
+  <h3 id="ex3-heading">Example 3</h3>
+  <div class="part">
+    <h4>Writing an Equation for an Absolute Value Function</h4>
+    <p>Write an equation for the function graphed in Figure 5.</p>
+    <figure>
+      <img src="images/figure-05.png"
+           alt="Graph of a V-shaped absolute value function on a grid from negative 5 to 5. The corner is at (3, negative 2). The graph starts at (0, 4), falls through the x-intercept (2, 0) to the corner, then rises through the x-intercept (4, 0) to (5, 2).">
+      <figcaption>Figure 5</figcaption>
+    </figure>
+  </div>
+  <div class="part">
+    <h4>Solution</h4>
+    <p>The basic absolute value function changes direction at the origin, so this graph has been shifted to the right 3 units and down 2 units from the basic toolkit function. See Figure 6.</p>
+    <figure>
+      <img src="images/figure-06.png"
+           alt="The graph from Figure 5 shown with two dashed reference graphs. Full description follows.">
+      <figcaption>Figure 6</figcaption>
+      <details>
+        <summary>Description of Figure 6</summary>
+        <p>The graph from Figure 5 is shown on a grid from negative 5 to 5. Its corner is at \((3,-2)\), and that point is marked and labeled. Two dashed reference graphs are also shown:</p>
+        <ul>
+          <li>The basic function \(y=|x|\), with its corner at the origin.</li>
+          <li>The same V shifted right 3 and down 2, with its corner at \((3,-2)\); it passes through \((0,1)\).</li>
+        </ul>
+        <p>The given graph shares the corner \((3,-2)\) with the shifted V but is steeper.</p>
+      </details>
+    </figure>
+    <p>We also notice that the graph appears vertically stretched, because the width of the final graph on a horizontal line is not equal to 2 times the vertical distance from the corner to this line, as it would be for an unstretched absolute value function. Instead, the width is equal to 1 times the vertical distance as shown in Figure 7.</p>
+    <figure>
+      <img src="images/figure-07.png"
+           alt="The graphs from Figure 6 with dotted measurement lines comparing width to height. Full description follows.">
+      <figcaption>Figure 7</figcaption>
+      <details>
+        <summary>Description of Figure 7</summary>
+        <p>The graphs from Figure 6 are shown with dotted measurement lines.</p>
+        <ul>
+          <li>For the unstretched function \(y=|x|\), labeled "Ratio 2/1": a horizontal dotted line at \(y=4\) runs from \(x=-4\) to \(x=4\). The width of 8 is 2 times the height of 4 above the corner.</li>
+          <li>For the given function, labeled "Ratio 1/1": a horizontal dotted line at \(y=2\) runs from \(x=1\) to \(x=5\). The width of 4 equals the vertical distance of 4 from the corner at \((3,-2)\), shown by a vertical dotted line at \(x=3\).</li>
+        </ul>
+      </details>
+    </figure>
+    <p>From this information we can write the equation</p>
+    <div class="math-display">\[
+      \begin{aligned}
+        f(x) &= 2|x-3|-2, && \text{treating the stretch as a vertical stretch, or}\\
+        f(x) &= |2(x-3)|-2, && \text{treating the stretch as a horizontal compression.}
+      \end{aligned}
+    \]</div>
+  </div>
+  <div class="part">
+    <h4>Analysis</h4>
+    <p>Note that these equations are algebraically equivalent—the stretch for an absolute value function can be written interchangeably as a vertical or horizontal stretch or compression. Note also that if the vertical stretch factor is negative, there is also a reflection about the x-axis.</p>
+  </div>
+</section>
+
+<aside class="callout" aria-labelledby="qa1-heading">
+  <h3 id="qa1-heading">Q&amp;A</h3>
+  <p><strong>If we couldn’t observe the stretch of the function from the graphs, could we algebraically determine it?</strong></p>
+  <p class="qa-answer">Yes. If we are unable to determine the stretch based on the width of the graph, we can solve for the stretch factor by putting in a known pair of values for \(x\) and \(f(x).\)</p>
+  <div class="math-display">\[ f(x)=a|x-3|-2 \]</div>
+  <p class="qa-answer">Now substituting in the point \((1,2)\)</p>
+  <div class="math-display">\[
+    \begin{aligned}
+      2 &= a|1-3|-2\\
+      4 &= 2a\\
+      a &= 2
+    \end{aligned}
+  \]</div>
+</aside>
+
+<section class="callout" aria-labelledby="try3-heading">
+  <h3 id="try3-heading">Try It #3</h3>
+  <p>Write the equation for the absolute value function that is horizontally shifted left 2 units, is vertically flipped, and vertically shifted up 3 units.</p>
+</section>
+
+<aside class="callout" aria-labelledby="qa2-heading">
+  <h3 id="qa2-heading">Q&amp;A</h3>
+  <p><strong>Do the graphs of absolute value functions always intersect the vertical axis? The horizontal axis?</strong></p>
+  <p class="qa-answer">Yes, they always intersect the vertical axis. The graph of an absolute value function will intersect the vertical axis when the input is zero.</p>
+  <p class="qa-answer">No, they do not always intersect the horizontal axis. The graph may or may not intersect the horizontal axis, depending on how the graph has been shifted and reflected. It is possible for the absolute value function to intersect the horizontal axis at zero, one, or two points (see Figure 8).</p>
+</aside>
+
+<figure>
+  <img src="images/figure-08.png"
+       alt="Three side-by-side absolute value graphs labeled (a), (b), and (c), showing zero, one, and two horizontal intercepts. Full description follows.">
+  <figcaption>Figure 8 (a) The absolute value function does not intersect the horizontal axis. (b) The absolute value function intersects the horizontal axis at one point. (c) The absolute value function intersects the horizontal axis at two points.</figcaption>
+  <details>
+    <summary>Description of Figure 8</summary>
+    <ul>
+      <li><strong>(a)</strong> A V opening upward with its corner at \((-1,2)\). It crosses the y-axis at 3 and lies entirely above the x-axis.</li>
+      <li><strong>(b)</strong> A V opening upward with its corner at \((2,0)\) on the x-axis. It crosses the y-axis at 2.</li>
+      <li><strong>(c)</strong> An inverted V opening downward with its corner at \((1,3)\). It crosses the y-axis at 2 and the x-axis at \(x=-2\) and \(x=4\).</li>
+    </ul>
+  </details>
+</figure>
+</section>
+
+<!-- ================================================================== -->
+<section aria-labelledby="solving-eq-heading">
+<h2 id="solving-eq-heading">Solving an Absolute Value Equation</h2>
+
+<p>Now that we can graph an absolute value function, we will learn how to solve an absolute value equation. To solve an equation such as \(8=|2x-6|,\) we notice that the absolute value will be equal to 8 if the quantity inside the absolute value is 8 or -8. This leads to two different equations we can solve independently.</p>
+
+<div class="math-display">\[
+  \begin{aligned}
+    2x-6 &= 8 &\quad\text{or}\quad 2x-6 &= -8\\
+    2x &= 14 & 2x &= -2\\
+    x &= 7 & x &= -1
+  \end{aligned}
+\]</div>
+
+<p>Knowing how to solve problems involving absolute value functions is useful. For example, we may need to identify numbers or points on a line that are at a specified distance from a given reference point.</p>
+
+<p>An absolute value equation is an equation in which the unknown variable appears in absolute value bars. For example,</p>
+<div class="math-display">\[
+  \begin{gathered}
+    |x| = 4,\\
+    |2x-1| = 3\\
+    |5x+2|-4 = 9
+  \end{gathered}
+\]</div>
+
+<aside class="callout" aria-labelledby="sol-ave-heading">
+  <h3 id="sol-ave-heading">Solutions to Absolute Value Equations</h3>
+  <p>For real numbers \(A\) and \(B,\) an equation of the form \(|A|=B,\) with \(B\ge 0,\) will have solutions when \(A=B\) or \(A=-B.\) If \(B\lt 0,\) the equation \(|A|=B\) has no solution.</p>
+</aside>
+
+<aside class="callout" aria-labelledby="howto1-heading">
+  <h3 id="howto1-heading">How To</h3>
+  <p><strong>Given the formula for an absolute value function, find the horizontal intercepts of its graph.</strong></p>
+  <ol>
+    <li>Isolate the absolute value term.</li>
+    <li>Use \(|A|=B\) to write \(A=B\) or \(-A=B,\) assuming \(B\gt 0.\)</li>
+    <li>Solve for \(x.\)</li>
+  </ol>
+</aside>
+
+<section class="callout" aria-labelledby="ex4-heading">
+  <h3 id="ex4-heading">Example 4</h3>
+  <div class="part">
+    <h4>Finding the Zeros of an Absolute Value Function</h4>
+    <p>For the function \(f(x)=|4x+1|-7,\) find the values of \(x\) such that \(f(x)=0.\)</p>
+  </div>
+  <div class="part">
+    <h4>Solution</h4>
+    <table>
+      <caption class="visually-hidden">Steps to solve |4x + 1| − 7 = 0</caption>
+      <thead>
+        <tr>
+          <th scope="col">Step</th>
+          <th scope="col">Explanation</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>\(0=|4x+1|-7\)</td>
+          <td>Substitute 0 for \(f(x)\).</td>
+        </tr>
+        <tr>
+          <td>\(7=|4x+1|\)</td>
+          <td>Isolate the absolute value on one side of the equation.</td>
+        </tr>
+        <tr>
+          <td>\(\begin{aligned}
+                7 &= 4x+1 &\quad\text{or}\quad -7 &= 4x+1\\
+                6 &= 4x & -8 &= 4x\\
+                x &= \tfrac{6}{4}=1.5 & x &= \tfrac{-8}{4}=-2
+              \end{aligned}\)</td>
+          <td>Break into two separate equations and solve.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>The function outputs 0 when \(x=1.5\) or \(x=-2.\) See Figure 9.</p>
+    <figure>
+      <img src="images/figure-09.png"
+           alt="Graph of f of x equals the absolute value of 4x plus 1, minus 7. Full description follows.">
+      <figcaption>Figure 9</figcaption>
+      <details>
+        <summary>Description of Figure 9</summary>
+        <p>The graph is a V opening upward with its corner at \((-0.25,-7)\). It crosses the y-axis at \(-6\). The two x-intercepts, \((-2,0)\) and \((1.5,0)\), are marked with dots and each is labeled "\(x\) where \(f(x)=0\)".</p>
+      </details>
+    </figure>
+  </div>
+</section>
+
+<section class="callout" aria-labelledby="try4-heading">
+  <h3 id="try4-heading">Try It #4</h3>
+  <p>For the function \(f(x)=|2x-1|-3,\) find the values of \(x\) such that \(f(x)=0.\)</p>
+</section>
+
+<aside class="callout" aria-labelledby="qa3-heading">
+  <h3 id="qa3-heading">Q&amp;A</h3>
+  <p><strong>Should we always expect two answers when solving \(|A|=B\)?</strong></p>
+  <p class="qa-answer">No. We may find one, two, or even no answers. For example, there is no solution to \(2+|3x-5|=1.\)</p>
+</aside>
+
+<aside class="callout" aria-labelledby="howto2-heading">
+  <h3 id="howto2-heading">How To</h3>
+  <p><strong>Given an absolute value equation, solve it.</strong></p>
+  <ol>
+    <li>Isolate the absolute value term.</li>
+    <li>Use \(|A|=B\) to write \(A=B\) or \(A=-B.\)</li>
+    <li>Solve for \(x.\)</li>
+  </ol>
+</aside>
+
+<section class="callout" aria-labelledby="ex5-heading">
+  <h3 id="ex5-heading">Example 5</h3>
+  <div class="part">
+    <h4>Solving an Absolute Value Equation</h4>
+    <p>Solve \(1=4|x-2|+2.\)</p>
+  </div>
+  <div class="part">
+    <h4>Solution</h4>
+    <p>Isolating the absolute value on one side of the equation gives the following.</p>
+    <div class="math-display">\[
+      \begin{aligned}
+        1 &= 4|x-2|+2\\
+        -1 &= 4|x-2|\\
+        -\tfrac{1}{4} &= |x-2|
+      \end{aligned}
+    \]</div>
+    <p>The absolute value always returns a positive value, so it is impossible for the absolute value to equal a negative value. At this point, we notice that this equation has no solutions.</p>
+  </div>
+</section>
+
+<aside class="callout" aria-labelledby="qa4-heading">
+  <h3 id="qa4-heading">Q&amp;A</h3>
+  <p><strong>In Example 5, if \(f(x)=1\) and \(g(x)=4|x-2|+2\) were graphed on the same set of axes, would the graphs intersect?</strong></p>
+  <p class="qa-answer">No. The graphs of \(f\) and \(g\) would not intersect, as shown in Figure 10. This confirms, graphically, that the equation \(1=4|x-2|+2\) has no solution.</p>
+</aside>
+
+<figure>
+  <img src="images/figure-10.png"
+       alt="Graph showing that a V-shaped function and a horizontal line never meet. Full description follows.">
+  <figcaption>Figure 10</figcaption>
+  <details>
+    <summary>Description of Figure 10</summary>
+    <p>Two graphs are shown on a grid with x from negative 1 to 5 and y from negative 1 to 10:</p>
+    <ul>
+      <li>\(g(x)=4|x-2|+2\): a steep V opening upward with its corner at \((2,2)\), passing through \((0,10)\) and \((4,10)\).</li>
+      <li>\(f(x)=1\): a horizontal line at \(y=1\).</li>
+    </ul>
+    <p>The line lies entirely below the lowest point of the V, so the graphs do not intersect.</p>
+  </details>
+</figure>
+
+<section class="callout" aria-labelledby="try5-heading">
+  <h3 id="try5-heading">Try It #5</h3>
+  <p>Find where the graph of the function \(f(x)=-|x+2|+3\) intersects the horizontal and vertical axes.</p>
+</section>
+</section>
+
+<!-- ================================================================== -->
+<section aria-labelledby="solving-ineq-heading">
+<h2 id="solving-ineq-heading">Solving an Absolute Value Inequality</h2>
+
+<p>Absolute value equations may not always involve equalities. Instead, we may need to solve an equation within a range of values. We would use an absolute value inequality to solve such an equation. An absolute value inequality is an equation of the form</p>
+<div class="math-display">\[ |A|\lt B,\quad |A|\le B,\quad |A|\gt B,\quad\text{or}\quad |A|\ge B, \]</div>
+<p>where an expression \(A\) (and possibly but not usually \(B\)) depends on a variable \(x.\) Solving the inequality means finding the set of all \(x\) that satisfy the inequality. Usually this set will be an interval or the union of two intervals.</p>
+
+<p>There are two basic approaches to solving absolute value inequalities: graphical and algebraic. The advantage of the graphical approach is we can read the solution by interpreting the graphs of two functions. The advantage of the algebraic approach is it yields solutions that may be difficult to read from the graph.</p>
+
+<p>For example, we know that all numbers within 200 units of 0 may be expressed as</p>
+<div class="math-display">\[ |x|\lt 200 \quad\text{or}\quad -200\lt x\lt 200 \]</div>
+
+<p>Suppose we want to know all possible returns on an investment if we could earn some amount of money within $200 of $600. We can solve algebraically for the set of values \(x\) such that the distance between \(x\) and 600 is less than 200. We represent the distance between \(x\) and 600 as \(|x-600|.\)</p>
+<div class="math-display">\[
+  \begin{gathered}
+    |x-600|\lt 200 \quad\text{or}\quad -200\lt x-600\lt 200\\
+    -200+600\lt x-600+600\lt 200+600\\
+    400\lt x\lt 800
+  \end{gathered}
+\]</div>
+<p>This means our returns would be between $400 and $800.</p>
+
+<p>Sometimes an absolute value inequality problem will be presented to us in terms of a shifted and/or stretched or compressed absolute value function, where we must determine for which values of the input the function’s output will be negative or positive.</p>
+
+<aside class="callout" aria-labelledby="howto3-heading">
+  <h3 id="howto3-heading">How To</h3>
+  <p><strong>Given an absolute value inequality of the form \(|x-A|\le B\) for real numbers \(a\) and \(b\) where \(b\) is positive, solve the absolute value inequality algebraically.</strong></p>
+  <ol>
+    <li>Find boundary points by solving \(|x-A|=B.\)</li>
+    <li>Test intervals created by the boundary points to determine where \(|x-A|\le B.\)</li>
+    <li>Write the interval or union of intervals satisfying the inequality in interval, inequality, or set-builder notation.</li>
+  </ol>
+</aside>
+
+<section class="callout" aria-labelledby="ex6-heading">
+  <h3 id="ex6-heading">Example 6</h3>
+  <div class="part">
+    <h4>Solving an Absolute Value Inequality</h4>
+    <p>Solve \(|x-5|\lt 4.\)</p>
+  </div>
+  <div class="part">
+    <h4>Solution</h4>
+    <p>With both approaches, we will need to know first where the corresponding equality is true. In this case we first will find where \(|x-5|=4.\) We do this because the absolute value is a function with no breaks, so the only way the function values can switch from being less than 4 to being greater than 4 is by passing through where the values equal 4. Solve \(|x-5|=4.\)</p>
+    <div class="math-display">\[
+      \begin{aligned}
+        x-5 &= 4 &\quad\text{or}\quad x-5 &= -4\\
+        x &= 9 & x &= 1
+      \end{aligned}
+    \]</div>
+    <p>After determining that the absolute value is equal to 4 at \(x=1\) and \(x=9,\) we know the graph can change only from being less than 4 to greater than 4 at these values. This divides the number line up into three intervals:</p>
+    <div class="math-display">\[ x\lt 1,\quad 1\lt x\lt 9,\quad\text{and}\quad x\gt 9. \]</div>
+    <p>To determine when the function is less than 4, we could choose a value in each interval and see if the output is less than or greater than 4, as shown in Table 1.</p>
+
+    <table>
+      <caption>Table 1</caption>
+      <thead>
+        <tr>
+          <th scope="col">Interval</th>
+          <th scope="col">Test \(x\)</th>
+          <th scope="col">\(f(x)\)</th>
+          <th scope="col">\(\lt 4\) or \(\gt 4\)?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">\(x\lt 1\)</th>
+          <td>0</td>
+          <td>\(|0-5|=5\)</td>
+          <td>Greater than</td>
+        </tr>
+        <tr>
+          <th scope="row">\(1\lt x\lt 9\)</th>
+          <td>6</td>
+          <td>\(|6-5|=1\)</td>
+          <td>Less than</td>
+        </tr>
+        <tr>
+          <th scope="row">\(x\gt 9\)</th>
+          <td>11</td>
+          <td>\(|11-5|=6\)</td>
+          <td>Greater than</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>Because \(1\lt x\lt 9\) is the only interval in which the output at the test value is less than 4, we can conclude that the solution to \(|x-5|\lt 4\) is \(1\lt x\lt 9,\) or \((1,9).\)</p>
+    <p>To use a graph, we can sketch the function \(f(x)=|x-5|.\) To help us see where the outputs are 4, the line \(g(x)=4\) could also be sketched as in Figure 11.</p>
+    <figure>
+      <img src="images/figure-11.png"
+           alt="Graph of f of x equals the absolute value of x minus 5 and the horizontal line g of x equals 4. Full description follows.">
+      <figcaption>Figure 11 Graph to find the points satisfying an absolute value inequality.</figcaption>
+      <details>
+        <summary>Description of Figure 11</summary>
+        <p>Two graphs are shown on a grid with x from negative 1 to 10:</p>
+        <ul>
+          <li>\(f(x)=|x-5|\): a V with its corner at \((5,0)\).</li>
+          <li>\(g(x)=4\): a dashed horizontal line at \(y=4\).</li>
+        </ul>
+        <p>The graphs intersect at \((1,4)\) and \((9,4)\), and both points are marked with dots. The x-axis is shaded from \(x=1\) to \(x=9\). A label states: "The graph of \(f\) is below or on the graph of \(g\)."</p>
+      </details>
+    </figure>
+    <p>We can see the following:</p>
+    <ul>
+      <li>The output values of the absolute value are equal to 4 at \(x=1\) and \(x=9.\)</li>
+      <li>The graph of \(f\) is below the graph of \(g\) on \(1\lt x\lt 9.\) This means the output values of \(f(x)\) are less than the output values of \(g(x).\)</li>
+      <li>The absolute value is less than or equal to 4 between these two points, when \(1\lt x\lt 9.\) In interval notation, this would be the interval \((1,9).\)</li>
+    </ul>
+  </div>
+  <div class="part">
+    <h4>Analysis</h4>
+    <p>For absolute value inequalities,</p>
+    <div class="math-display">\[
+      \begin{aligned}
+        |x-A| &\lt C, &\qquad |x-A| &\gt C,\\
+        -C\lt x-A &\lt C, & x-A\lt -C \ \text{or}\ x-A &\gt C.
+      \end{aligned}
+    \]</div>
+    <p>The \(\lt\) or \(\gt\) symbol may be replaced by \(\le\) or \(\ge.\)</p>
+    <p>So, for this example, we could use this alternative approach.</p>
+    <div class="math-display">\[
+      \begin{aligned}
+        |x-5| &\lt 4\\
+        -4\lt x-5 &\lt 4 && \text{Rewrite by removing the absolute value bars.}\\
+        -4+5\lt x-5+5 &\lt 4+5 && \text{Isolate the } x.\\
+        1\lt x &\lt 9
+      \end{aligned}
+    \]</div>
+  </div>
+</section>
+
+<section class="callout" aria-labelledby="try6-heading">
+  <h3 id="try6-heading">Try It #6</h3>
+  <p>Solve \(|x+2|\le 6.\)</p>
+</section>
+
+<aside class="callout" aria-labelledby="howto4-heading">
+  <h3 id="howto4-heading">How To</h3>
+  <p><strong>Given an absolute value function, solve for the set of inputs where the output is positive (or negative).</strong></p>
+  <ol>
+    <li>Set the function equal to zero, and solve for the boundary points of the solution set.</li>
+    <li>Use test points or a graph to determine where the function’s output is positive or negative.</li>
+  </ol>
+</aside>
+
+<section class="callout" aria-labelledby="ex7-heading">
+  <h3 id="ex7-heading">Example 7</h3>
+  <div class="part">
+    <h4>Using a Graphical Approach to Solve Absolute Value Inequalities</h4>
+    <p>Given the function \(f(x)=-\tfrac{1}{2}|4x-5|+3,\) determine the \(x\)-values for which the function values are negative.</p>
+  </div>
+  <div class="part">
+    <h4>Solution</h4>
+    <p>We are trying to determine where \(f(x)\lt 0,\) which is when \(-\tfrac{1}{2}|4x-5|+3\lt 0.\) We begin by isolating the absolute value.</p>
+    <div class="math-display">\[
+      \begin{aligned}
+        -\tfrac{1}{2}|4x-5| &\lt -3 && \text{Multiply both sides by } -2\text{, and reverse the inequality.}\\
+        |4x-5| &\gt 6
+      \end{aligned}
+    \]</div>
+    <p>Next we solve for the equality \(|4x-5|=6.\)</p>
+    <div class="math-display">\[
+      \begin{aligned}
+        4x-5 &= 6 &\quad\text{or}\quad 4x-5 &= -6\\
+        4x-5 &= 6 & 4x &= -1\\
+        x &= \tfrac{11}{4} & x &= -\tfrac{1}{4}
+      \end{aligned}
+    \]</div>
+    <p>Now, we can examine the graph of \(f\) to observe where the output is negative. We will observe where the branches are below the x-axis. Notice that it is not even important exactly what the graph looks like, as long as we know that it crosses the horizontal axis at \(x=-\tfrac{1}{4}\) and \(x=\tfrac{11}{4}\) and that the graph has been reflected vertically. See Figure 12.</p>
+    <figure>
+      <img src="images/figure-12.png"
+           alt="Graph of f of x equals negative one half times the absolute value of 4x minus 5, plus 3. Full description follows.">
+      <figcaption>Figure 12</figcaption>
+      <details>
+        <summary>Description of Figure 12</summary>
+        <p>The graph is an inverted V opening downward with its highest point at \((1.25,3)\). It crosses the x-axis at \(x=-0.25\) and \(x=2.75\), and both points are marked with open circles. The x-axis is shaded to the left of \(x=-0.25\) and to the right of \(x=2.75\); both shaded regions are labeled "Below x-axis." On those regions, the graph lies below the x-axis.</p>
+      </details>
+    </figure>
+    <p>We observe that the graph of the function is below the x-axis left of \(x=-\tfrac{1}{4}\) and right of \(x=\tfrac{11}{4}.\) This means the function values are negative to the left of the first horizontal intercept at \(x=-\tfrac{1}{4},\) and negative to the right of the second intercept at \(x=\tfrac{11}{4}.\) This gives us the solution to the inequality.</p>
+    <div class="math-display">\[ x\lt -\frac{1}{4}\quad\text{or}\quad x\gt \frac{11}{4} \]</div>
+    <p>In interval notation, this would be \((-\infty,-0.25)\cup(2.75,\infty).\)</p>
+  </div>
+</section>
+
+<section class="callout" aria-labelledby="try7-heading">
+  <h3 id="try7-heading">Try It #7</h3>
+  <p>Solve \(-2|k-4|\le -6.\)</p>
+</section>
+
+<aside class="callout" aria-labelledby="media-heading">
+  <h3 id="media-heading">Media</h3>
+  <p>Access these online resources for additional instruction and practice with absolute value.</p>
+  <ul>
+    <li>Graphing Absolute Value Functions</li>
+    <li>Graphing Absolute Value Functions 2</li>
+    <li>Equations of Absolute Value Function</li>
+    <li>Equations of Absolute Value Function 2</li>
+    <li>Solving Absolute Value Equations</li>
+  </ul>
+</aside>
+</section>
+
+<!-- ================================================================== -->
+<section aria-labelledby="exercises-heading">
+<h2 id="exercises-heading">1.6 Section Exercises</h2>
+
+<section aria-labelledby="verbal-heading">
+  <h3 id="verbal-heading">Verbal</h3>
+  <ol class="exercises" start="1">
+    <li>How do you solve an absolute value equation?</li>
+    <li>How can you tell whether an absolute value function has two \(x\)-intercepts without graphing the function?</li>
+    <li>When solving an absolute value function, the isolated absolute value term is equal to a negative number. What does that tell you about the graph of the absolute value function?</li>
+    <li>How can you use the graph of an absolute value function to determine the \(x\)-values for which the function values are negative?</li>
+    <li>How do you solve an absolute value inequality algebraically?</li>
+  </ol>
+</section>
+
+<section aria-labelledby="algebraic-heading">
+  <h3 id="algebraic-heading">Algebraic</h3>
+  <ol class="exercises" start="6">
+    <li>Describe all numbers \(x\) that are at a distance of 4 from the number 8. Express this using absolute value notation.</li>
+    <li>Describe all numbers \(x\) that are at a distance of \(\tfrac{1}{2}\) from the number \(-4.\) Express this using absolute value notation.</li>
+    <li>Describe the situation in which the distance that point \(x\) is from 10 is at least 15 units. Express this using absolute value notation.</li>
+    <li>Find all function values \(f(x)\) such that the distance from \(f(x)\) to the value 8 is less than 0.03 units. Express this using absolute value notation.</li>
+  </ol>
+
+  <p>For the following exercises, solve the equations below and express the answer using set notation.</p>
+  <ol class="exercises" start="10">
+    <li>\(|x+3|=9\)</li>
+    <li>\(|6-x|=5\)</li>
+    <li>\(|5x-2|=11\)</li>
+    <li>\(|4x-2|=11\)</li>
+    <li>\(2|4-x|=7\)</li>
+    <li>\(3|5-x|=5\)</li>
+    <li>\(3|x+1|-4=5\)</li>
+    <li>\(5|x-4|-7=2\)</li>
+    <li>\(0=-|x-3|+2\)</li>
+    <li>\(2|x-3|+1=2\)</li>
+    <li>\(|3x-2|=7\)</li>
+    <li>\(|3x-2|=-7\)</li>
+    <li>\(\left|\tfrac{1}{2}x-5\right|=11\)</li>
+    <li>\(\left|\tfrac{1}{3}x+5\right|=14\)</li>
+    <li>\(-\left|\tfrac{1}{3}x+5\right|+14=0\)</li>
+  </ol>
+
+  <p>For the following exercises, find the \(x\)- and \(y\)-intercepts of the graphs of each function.</p>
+  <ol class="exercises" start="25">
+    <li>\(f(x)=2|x+1|-10\)</li>
+    <li>\(f(x)=4|x-3|+4\)</li>
+    <li>\(f(x)=-3|x-2|-1\)</li>
+    <li>\(f(x)=-2|x+1|+6\)</li>
+  </ol>
+
+  <p>For the following exercises, solve each inequality and write the solution in interval notation.</p>
+  <ol class="exercises" start="29">
+    <li>\(|x-2|\gt 10\)</li>
+    <li>\(2|v-7|-4\ge 42\)</li>
+    <li>\(|3x-4|\le 8\)</li>
+    <li>\(|x-4|\ge 8\)</li>
+    <li>\(|3x-5|\ge 13\)</li>
+    <li>\(|3x-5|\ge -13\)</li>
+    <li>\(\left|\tfrac{3}{4}x-5\right|\ge 7\)</li>
+    <li>\(\left|\tfrac{3}{4}x-5\right|+1\le 16\)</li>
+  </ol>
+</section>
+
+<section aria-labelledby="graphical-heading">
+  <h3 id="graphical-heading">Graphical</h3>
+  <p>For the following exercises, graph the absolute value function. Plot at least five points by hand for each graph.</p>
+  <ol class="exercises" start="37">
+    <li>\(y=|x-1|\)</li>
+    <li>\(y=|x+1|\)</li>
+    <li>\(y=|x|+1\)</li>
+  </ol>
+
+  <p>For the following exercises, graph the given functions by hand.</p>
+  <ol class="exercises" start="40">
+    <li>\(y=|x|-2\)</li>
+    <li>\(y=-|x|\)</li>
+    <li>\(y=-|x|-2\)</li>
+    <li>\(y=-|x-3|-2\)</li>
+    <li>\(f(x)=-|x-1|-2\)</li>
+    <li>\(f(x)=-|x+3|+4\)</li>
+    <li>\(f(x)=2|x+3|+1\)</li>
+    <li>\(f(x)=3|x-2|+3\)</li>
+    <li>\(f(x)=|2x-4|-3\)</li>
+    <li>\(f(x)=|3x+9|+2\)</li>
+    <li>\(f(x)=-|x-1|-3\)</li>
+    <li>\(f(x)=-|x+4|-3\)</li>
+    <li>\(f(x)=\tfrac{1}{2}|x+4|-3\)</li>
+  </ol>
+</section>
+
+<section aria-labelledby="technology-heading">
+  <h3 id="technology-heading">Technology</h3>
+  <ol class="exercises" start="53">
+    <li>Use a graphing utility to graph \(f(x)=10|x-2|\) on the viewing window \([0,4].\) Identify the corresponding range. Show the graph.</li>
+    <li>Use a graphing utility to graph \(f(x)=-100|x|+100\) on the viewing window \([-5,5].\) Identify the corresponding range. Show the graph.</li>
+  </ol>
+
+  <p>For the following exercises, graph each function using a graphing utility. Specify the viewing window.</p>
+  <ol class="exercises" start="55">
+    <li>\(f(x)=-0.1|0.1(0.2-x)|+0.3\)</li>
+    <li>\(f(x)=4\times 10^{9}\,\left|x-(5\times 10^{9})\right|+2\times 10^{9}\)</li>
+  </ol>
+</section>
+
+<section aria-labelledby="extensions-heading">
+  <h3 id="extensions-heading">Extensions</h3>
+  <p>For the following exercises, solve the inequality.</p>
+  <ol class="exercises" start="57">
+    <li>\(\left|-2x-\tfrac{2}{3}(x+1)\right|+3\gt -1\)</li>
+    <li>If possible, find all values of \(a\) such that there are no \(x\)-intercepts for \(f(x)=2|x+1|+a.\)</li>
+    <li>If possible, find all values of \(a\) such that there are no \(y\)-intercepts for \(f(x)=2|x+1|+a.\)</li>
+  </ol>
+</section>
+
+<section aria-labelledby="realworld-heading">
+  <h3 id="realworld-heading">Real-World Applications</h3>
+  <ol class="exercises" start="60">
+    <li>Cities A and B are on the same east-west line. Assume that city A is located at the origin. If the distance from city A to city B is at least 100 miles and \(x\) represents the distance from city B to city A, express this using absolute value notation.</li>
+    <li>The true proportion \(p\) of people who give a favorable rating to Congress is 8% with a margin of error of 1.5%. Describe this statement using an absolute value equation.</li>
+    <li>Students who score within 18 points of the number 82 will pass a particular test. Write this statement using absolute value notation and use the variable \(x\) for the score.</li>
+    <li>A machinist must produce a bearing that is within 0.01 inches of the correct diameter of 5.0 inches. Using \(x\) as the diameter of the bearing, write this statement using absolute value notation.</li>
+    <li>The tolerance for a ball bearing is 0.01. If the true diameter of the bearing is to be 2.0 inches and the measured value of the diameter is \(x\) inches, express the tolerance using absolute value notation.</li>
+  </ol>
+</section>
+</section>
+
+</article>
+</main>
+
+<footer>
+  <p>“1.6 Absolute Value Functions” from <cite>Precalculus</cite> by Jay Abramson, OpenStax.</p>
+  <p>Licensed under Creative Commons Attribution License (CC BY 4.0). <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a></p>
+  <p>Original page: <a href="https://openstax.org/books/precalculus/pages/1-6-absolute-value-functions">https://openstax.org/books/precalculus/pages/1-6-absolute-value-functions</a></p>
+  <p>Access for free at openstax.org.</p>
+  <p>Changes: reformatted as accessible HTML; image alt text and long descriptions added; math converted to MathJax; no instructional wording edited.</p>
+  <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+</footer>
+</body>
+</html>

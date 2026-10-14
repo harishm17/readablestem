@@ -1,0 +1,41 @@
+{
+  "arm": "pymupdf4llm",
+  "cost_usd": 0.0,
+  "input_sha256": "84cf20ef786ba51389dd7037d42e6cc65fe5796fb7d6947f9640402736ef7417",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 1.85,
+    "load_before": 2.01,
+    "offline": false,
+    "peak_rss_mb": 379.0,
+    "quiet_box": null,
+    "system_seconds": 1.81,
+    "timeout_seconds": 1800,
+    "user_seconds": 44.871,
+    "wall_seconds_per_page": 0.35
+  },
+  "output": {
+    "file": "college-physics__5-3-elasticity-stress-and-strain.md",
+    "format": "md"
+  },
+  "pdf_pages": 14,
+  "seconds": 4.899,
+  "section": "college-physics/5-3-elasticity-stress-and-strain",
+  "settings": {
+    "call": "pymupdf4llm.to_markdown(path)",
+    "layout_model": "on (pymupdf-layout installed)",
+    "write_images": "off (the default)"
+  },
+  "status": "ok",
+  "versions": {
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0",
+    "pymupdf": "1.28.2",
+    "pymupdf-layout": "1.28.2",
+    "pymupdf4llm": "1.28.2"
+  }
+}

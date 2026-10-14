@@ -1,0 +1,99 @@
+{
+  "arm": "chatbot-haiku-purdue",
+  "attempts": [],
+  "cost_usd": 0.013416,
+  "counted_input_tokens": 50205,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0116034,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/fig-000",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 4,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0079354,
+      "factual_error": true,
+      "figure_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/fig-001",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 3,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.005031399999999999,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/fig-002",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0048994,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/fig-003",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0096554,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/fig-004",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 4,
+      "source": "alt"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.039125,
+  "output": {
+    "file": "college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.run1.html",
+    "format": "html"
+  },
+  "output_chars": 32843,
+  "pdf_pages": 10,
+  "response_status": "end_turn",
+  "run": 1,
+  "seconds": 60.5,
+  "section": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 50205,
+    "output_tokens": 16792,
+    "reasoning_tokens": 4141
+  },
+  "versions": {
+    "model_requested": "claude-haiku-5-5",
+    "model_served": "claude-haiku-5-5"
+  }
+}

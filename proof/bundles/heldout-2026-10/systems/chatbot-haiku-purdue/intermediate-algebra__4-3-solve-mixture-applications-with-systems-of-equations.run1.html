@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>4.3 Solve Mixture Applications with Systems of Equations</title>
+
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        processEscapes: true
+      },
+      options: {
+        enableMenu: true
+      }
+    };
+  </script>
+  <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+
+  <style>
+    :root {
+      --text: #1a1a1a;
+      --heading: #0d0d0d;
+      --link: #0b4f8a;
+      --border: #4a4a4a;
+      --header-bg: #dfe9ee;
+      --focus: #005fcc;
+    }
+    html { font-size: 100%; }
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.05rem;
+      line-height: 1.6;
+      color: var(--text);
+      background: #ffffff;
+      margin: 0 auto;
+      padding: 1.5rem;
+      max-width: 52rem;
+    }
+    h1, h2, h3, h4 {
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--heading);
+      line-height: 1.25;
+    }
+    h1 { font-size: 1.9rem; margin-top: 0.5rem; }
+    h2 { font-size: 1.5rem; margin-top: 2.2rem; }
+    h3 { font-size: 1.2rem; margin-top: 1.6rem; }
+    h4 { font-size: 1.05rem; margin-top: 1.2rem; }
+    a { color: var(--link); text-decoration: underline; }
+    a:focus, button:focus, [tabindex]:focus {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      background: #ffffff;
+      color: var(--link);
+      padding: 0.5rem 1rem;
+      z-index: 100;
+    }
+    .skip-link:focus { left: 0.5rem; top: 0.5rem; }
+    .visually-hidden {
+      position: absolute !important;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0);
+      white-space: nowrap; border: 0;
+    }
+    .box {
+      border: 2px solid var(--border);
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+    }
+    .example, .tryit, .exercise-group {
+      border: 2px solid var(--border);
+      padding: 1rem 1.25rem;
+      margin: 1.75rem 0;
+    }
+    .problem {
+      border: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+      margin: 0.75rem 0;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+      font-size: 0.98rem;
+    }
+    caption {
+      caption-side: top;
+      text-align: left;
+      font-weight: bold;
+      padding-bottom: 0.4rem;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.7rem;
+      vertical-align: top;
+      text-align: left;
+    }
+    th { background: var(--header-bg); }
+    .solution-table td:first-child { width: 36%; }
+    .math-display { overflow-x: auto; padding: 0.25rem 0; }
+    ol.exercises li { margin-bottom: 1rem; }
+    ol.exercises li p { margin: 0.25rem 0 0; }
+    footer { font-size: 0.85rem; margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+    @media (max-width: 40rem) {
+      body { padding: 1rem; font-size: 1rem; }
+      .solution-table td:first-child { width: auto; }
+    }
+  </style>
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<header>
+  <h1>4.3 Solve Mixture Applications with Systems of Equations</h1>
+</header>
+
+<main id="main-content">
+
+<section aria-labelledby="objectives-heading">
+  <h2 id="objectives-heading">Learning Objectives</h2>
+  <p>By the end of this section, you will be able to:</p>
+  <ul>
+    <li>Solve mixture applications</li>
+    <li>Solve interest applications</li>
+    <li>Solve applications of cost and revenue functions</li>
+  </ul>
+</section>
+
+<section class="box" aria-labelledby="prepared-heading">
+  <h2 id="prepared-heading">Be Prepared 4.3</h2>
+  <p>Before you get started, take this readiness quiz.</p>
+  <ol>
+    <li>
+      <p>Multiply: \(4.025(1{,}562)\).</p>
+      <p>If you missed this problem, review Example 1.36.</p>
+    </li>
+    <li>
+      <p>Write 8.2% as a decimal.</p>
+      <p>If you missed this problem, review Example 1.40.</p>
+    </li>
+    <li>
+      <p>Earl’s dinner bill came to $32.50 and he wanted to leave an 18% tip. How much should the tip be?</p>
+      <p>If you missed this problem, review Example 2.20.</p>
+    </li>
+  </ol>
+</section>
+
+<section aria-labelledby="mixture-heading">
+  <h2 id="mixture-heading">Solve Mixture Applications</h2>
+  <p>Mixture application involve combining two or more quantities. When we solved mixture applications with coins and tickets earlier, we started by creating a table so we could organize the information. For a coin example with nickels and dimes, the table looked like this:</p>
+
+  <table>
+    <caption>Table for a coin mixture problem (blank)</caption>
+    <thead>
+      <tr>
+        <th scope="col"><span class="visually-hidden">Type</span></th>
+        <th scope="col">Number • Value = Total Value</th>
+        <th scope="col">Value</th>
+        <th scope="col">Total Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">nickels</th><td></td><td></td><td></td></tr>
+      <tr><th scope="row">dimes</th><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <p>Using one variable meant that we had to relate the number of nickels and the number of dimes. We had to decide if we were going to let \(n\) be the number of nickels and then write the number of dimes in terms of \(n\), or if we would let \(d\) be the number of dimes and write the number of nickels in terms of \(d\).</p>
+  <p>Now that we know how to solve systems of equations with two variables, we’ll just let \(n\) be the number of nickels and \(d\) be the number of dimes. We’ll write one equation based on the total value column, like we did before, and the other equation will come from the number column.</p>
+  <p>For the first example, we’ll do a ticket problem where the ticket prices are in whole dollars, so we won’t need to use decimals just yet.</p>
+
+  <!-- Example 4.24 -->
+  <section class="example" aria-labelledby="ex424">
+    <h3 id="ex424">Example 4.24</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>A science center sold 1,363 tickets on a busy weekend. The receipts totaled $12,146. How many $12 adult tickets and how many $7 child tickets were sold?</p>
+    </div>
+
+    <h4>Solution</h4>
+    <table class="solution-table">
+      <caption>Solution steps for Example 4.24</caption>
+      <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">Step 1. Read the problem.</th>
+          <td>We will create a table to organize the information.</td>
+        </tr>
+        <tr>
+          <th scope="row">Step 2. Identify what we are looking for.</th>
+          <td>We are looking for the number of adult tickets and the number of child tickets sold.</td>
+        </tr>
+        <tr>
+          <th scope="row">Step 3. Name what we are looking for.</th>
+          <td>
+            Let \(a\) = the number of adult tickets.<br>
+            \(c\) = the number of child tickets.
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">A table will help us organize the data. We have two types of tickets, adult and child.</th>
+          <td>Write in \(a\) and \(c\) for the number of tickets.</td>
+        </tr>
+        <tr>
+          <th scope="row">Write the total number of tickets sold at the bottom of the Number column.</th>
+          <td>Altogether 1,363 were sold.</td>
+        </tr>
+        <tr>
+          <th scope="row">Write the value of each type of ticket in the Value column.</th>
+          <td>The value of each adult ticket is $12. The value of each child ticket is $7.</td>
+        </tr>
+        <tr>
+          <th scope="row">The number times the value gives the total value.</th>
+          <td>
+            The total value of adult tickets is \(a \cdot 12 = 12a\), and the total value of child tickets is \(c \cdot 7 = 7c\).
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Altogether the total value of the tickets was $12,146.</th>
+          <td>
+            <table>
+              <caption>Ticket mixture table</caption>
+              <thead>
+                <tr><th scope="col">Type</th><th scope="col">Number</th><th scope="col">Value</th><th scope="col">Total Value</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">adult</th><td>\(a\)</td><td>12</td><td>\(12a\)</td></tr>
+                <tr><th scope="row">child</th><td>\(c\)</td><td>7</td><td>\(7c\)</td></tr>
+                <tr><th scope="row">Total</th><td>1,363</td><td></td><td>12,146</td></tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Step 4. Translate into a system of equations.</th>
+          <td>
+            The Number column and the Total Value column give us the system of equations.
+            \[
+            \begin{cases}
+            a + c = 1{,}363 \\
+            12a + 7c = 12{,}146
+            \end{cases}
+            \]
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Step 5. Solve. We will use the elimination method. Multiply the first equation by \(-7\).</th>
+          <td>
+            \[
+            \begin{cases}
+            -7(a + c) = -7(1{,}363) \\
+            12a + 7c = 12{,}146
+            \end{cases}
+            \]
+            Simplify and add, then solve for \(a\):
+            \[
+            \begin{aligned}
+            -7a - 7c &= -9{,}541 \\
+            12a + 7c &= 12{,}146 \\
+            5a &= 2{,}605 \\
+            a &= 521
+            \end{aligned}
+            \]
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Substitute \(a = 521\) into the first equation, then solve for \(c\).</th>
+          <td>\[ 521 + c = 1{,}363 \quad\Rightarrow\quad c = 842 \]</td>
+        </tr>
+        <tr>
+          <th scope="row">Step 6. Check the answer in the problem.</th>
+          <td>
+            521 adult tickets at $12 per ticket makes $6,252.<br>
+            842 child tickets at $7 per ticket makes $5,894.<br>
+            The total receipts are $6,252 + $5,894 = $12,146. ✓
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Step 7. Answer the question.</th>
+          <td>The science center sold 521 adult tickets and 842 child tickets.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="tryit" aria-labelledby="try447">
+    <h3 id="try447">Try It 4.47</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>The ticket office at the zoo sold 553 tickets one day. The receipts totaled $3,936. How many $9 adult tickets and how many $6 child tickets were sold?</p>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try448">
+    <h3 id="try448">Try It 4.48</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>The box office at a movie theater sold 147 tickets for the evening show, and receipts totaled $1,302. How many $11 adult and how many $8 child tickets were sold?</p>
+    </div>
+  </section>
+
+  <p>In the next example, we’ll solve a coin problem. Now that we know how to work with systems of two variables, naming the variables in the ‘number’ column will be easy.</p>
+
+  <!-- Example 4.25 -->
+  <section class="example" aria-labelledby="ex425">
+    <h3 id="ex425">Example 4.25</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Juan has a pocketful of nickels and dimes. The total value of the coins is $8.10. The number of dimes is 9 less than twice the number of nickels. How many nickels and how many dimes does Juan have?</p>
+    </div>
+
+    <h4>Solution</h4>
+    <table class="solution-table">
+      <caption>Solution steps for Example 4.25</caption>
+      <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Step 1. Read the problem.</th><td>We will create a table to organize the information.</td></tr>
+        <tr><th scope="row">Step 2. Identify what we are looking for.</th><td>We are looking for the number of nickels and the number of dimes.</td></tr>
+        <tr><th scope="row">Step 3. Name what we are looking for.</th><td>Let \(n\) = the number of nickels. \(d\) = the number of dimes.</td></tr>
+        <tr><th scope="row">A table will help us organize the data. We have two types of coins, nickels and dimes.</th><td>Write \(n\) and \(d\) for the number of each type of coin.</td></tr>
+        <tr><th scope="row">Fill in the Value column with the value of each type of coin.</th><td>The value of each nickel is $0.05. The value of each dime is $0.10.</td></tr>
+        <tr>
+          <th scope="row">The number times the value gives the total value. Altogether the total value of the coins is $8.10.</th>
+          <td>
+            The total value of the nickels is \(n(0.05) = 0.05n\), and the total value of the dimes is \(d(0.10) = 0.10d\).
+            <table>
+              <caption>Coin mixture table</caption>
+              <thead><tr><th scope="col">Type</th><th scope="col">Number</th><th scope="col">Value</th><th scope="col">Total Value</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">nickels</th><td>\(n\)</td><td>0.05</td><td>\(0.05n\)</td></tr>
+                <tr><th scope="row">dimes</th><td>\(d\)</td><td>0.10</td><td>\(0.10d\)</td></tr>
+                <tr><th scope="row">Total</th><td></td><td></td><td>8.10</td></tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+        <tr><th scope="row">Step 4. Translate into a system of equations.</th><td>The Total Value column gives one equation: \(0.05n + 0.10d = 8.10\). We also know the number of dimes is 9 less than twice the number of nickels, so \(d = 2n - 9\). The system is \[ \begin{cases} 0.05n + 0.10d = 8.10 \\ d = 2n - 9 \end{cases} \]</td></tr>
+        <tr>
+          <th scope="row">Step 5. Solve the system of equations. We will use the substitution method. Substitute \(d = 2n - 9\) into the first equation.</th>
+          <td>
+            \[ 0.05n + 0.10(2n - 9) = 8.10 \]
+            Simplify and solve for \(n\):
+            \[
+            \begin{aligned}
+            0.05n + 0.2n - 0.90 &= 8.10 \\
+            0.25n - 0.90 &= 8.10 \\
+            0.25n &= 9.00 \\
+            n &= 36
+            \end{aligned}
+            \]
+          </td>
+        </tr>
+        <tr><th scope="row">To find the number of dimes, substitute \(n = 36\) into the second equation.</th><td>\[ d = 2(36) - 9 = 63 \]</td></tr>
+        <tr><th scope="row">Step 6. Check the answer in the problem.</th><td>63 dimes at $0.10 = $6.30. 36 nickels at $0.05 = $1.80. Total = $8.10 ✓</td></tr>
+        <tr><th scope="row">Step 7. Answer the question.</th><td>Juan has 36 nickels and 63 dimes.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="tryit" aria-labelledby="try449">
+    <h3 id="try449">Try It 4.49</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Matilda has a handful of quarters and dimes, with a total value of $8.55. The number of quarters is 3 more than twice the number of dimes. How many dimes and how many quarters does she have?</p>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try450">
+    <h3 id="try450">Try It 4.50</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Priam has a collection of nickels and quarters, with a total value of $7.30. The number of nickels is six less than three times the number of quarters. How many nickels and how many quarters does he have?</p>
+    </div>
+  </section>
+
+  <p>Some mixture applications involve combining foods or drinks. Example situations might include combining raisins and nuts to make a trail mix or using two types of coffee beans to make a blend.</p>
+
+  <!-- Example 4.26 -->
+  <section class="example" aria-labelledby="ex426">
+    <h3 id="ex426">Example 4.26</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Carson wants to make 20 pounds of trail mix using nuts and chocolate chips. His budget requires that the trail mix costs him $7.60 per pound. Nuts cost $9.00 per pound and chocolate chips cost $2.00 per pound. How many pounds of nuts and how many pounds of chocolate chips should he use?</p>
+    </div>
+
+    <h4>Solution</h4>
+    <table class="solution-table">
+      <caption>Solution steps for Example 4.26</caption>
+      <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Step 1. Read the problem.</th><td>We will create a table to organize the information.</td></tr>
+        <tr><th scope="row">Step 2. Identify what we are looking for.</th><td>We are looking for the number of pounds of nuts and the number of pounds of chocolate chips.</td></tr>
+        <tr><th scope="row">Step 3. Name what we are looking for.</th><td>Let \(n\) = the number of pounds of nuts. \(c\) = the number of pounds of chips.</td></tr>
+        <tr>
+          <th scope="row">Carson will mix nuts and chocolate chips to get trail mix. Write in \(n\) and \(c\) for the number of pounds. Put the price per pound of each item in the Value column. Fill in the last column using Number • Value = Total Value.</th>
+          <td>
+            <table>
+              <caption>Trail mix table</caption>
+              <thead><tr><th scope="col">Type</th><th scope="col">Number of pounds</th><th scope="col">Value</th><th scope="col">Total Value</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Nuts</th><td>\(n\)</td><td>9.00</td><td>\(9n\)</td></tr>
+                <tr><th scope="row">Chocolate chips</th><td>\(c\)</td><td>2.00</td><td>\(2c\)</td></tr>
+                <tr><th scope="row">Trail mix</th><td>20</td><td>7.60</td><td>\(7.60(20) = 152\)</td></tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+        <tr><th scope="row">Step 4. Translate into a system of equations. We get the equations from the Number and Total Value columns.</th><td>\[ \begin{cases} n + c = 20 \\ 9n + 2c = 152 \end{cases} \]</td></tr>
+        <tr>
+          <th scope="row">Step 5. Solve the system of equations. We will use elimination. Multiply the first equation by \(-2\) to eliminate \(c\).</th>
+          <td>
+            \[ \begin{cases} -2(n + c) = -2(20) \\ 9n + 2c = 152 \end{cases} \]
+            Simplify and add. Solve for \(n\):
+            \[
+            \begin{aligned}
+            -2n - 2c &= -40 \\
+            9n + 2c &= 152 \\
+            7n &= 112 \\
+            n &= 16
+            \end{aligned}
+            \]
+          </td>
+        </tr>
+        <tr><th scope="row">To find the number of pounds of chocolate chips, substitute \(n = 16\) into the first equation, then solve for \(c\).</th><td>\[ 16 + c = 20 \quad\Rightarrow\quad c = 4 \]</td></tr>
+        <tr><th scope="row">Step 6. Check the answer in the problem.</th><td>\(16 + 4 = 20\) ✓ and \(9(16) + 2(4) = 152\) ✓</td></tr>
+        <tr><th scope="row">Step 7. Answer the question.</th><td>Carson should mix 16 pounds of nuts with 4 pounds of chocolate chips to create the trail mix.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="tryit" aria-labelledby="try451">
+    <h3 id="try451">Try It 4.51</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Greta wants to make 5 pounds of a nut mix using peanuts and cashews. Her budget requires the mixture to cost her $6 per pound. Peanuts are $4 per pound and cashews are $9 per pound. How many pounds of peanuts and how many pounds of cashews should she use?</p>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try452">
+    <h3 id="try452">Try It 4.52</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Sammy has most of the ingredients he needs to make a large batch of chili. The only items he lacks are beans and ground beef. He needs a total of 20 pounds combined of beans and ground beef and has a budget of $3 per pound. The price of beans is $1 per pound and the price of ground beef is $5 per pound. How many pounds of beans and how many pounds of ground beef should he purchase?</p>
+    </div>
+  </section>
+
+  <p>Another application of mixture problems relates to concentrated cleaning supplies, other chemicals, and mixed drinks. The concentration is given as a percent. For example, a 20% concentrated household cleanser means that 20% of the total amount is cleanser, and the rest is water. To make 35 ounces of a 20% concentration, you mix 7 ounces (20% of 35) of the cleanser with 28 ounces of water.</p>
+  <p>For these kinds of mixture problems, we’ll use “percent” instead of “value” for one of the columns in our table.</p>
+
+  <!-- Example 4.27 -->
+  <section class="example" aria-labelledby="ex427">
+    <h3 id="ex427">Example 4.27</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Sasheena is lab assistant at her community college. She needs to make 200 milliliters of a 40% solution of sulfuric acid for a lab experiment. The lab has only 25% and 50% solutions in the storeroom. How much should she mix of the 25% and the 50% solutions to make the 40% solution?</p>
+    </div>
+
+    <h4>Solution</h4>
+    <table class="solution-table">
+      <caption>Solution steps for Example 4.27</caption>
+      <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">Step 1. Read the problem. A figure may help us visualize the situation, then we will create a table to organize the information.</th>
+          <td>
+            Sasheena must mix some of the 25% solution and some of the 50% solution together to get 200 ml of the 40% solution.
+            <figure>
+              <p>Diagram: Two containers feed into one. The first container, labeled x, holds 25% solution. The second, labeled y, holds 50% solution. Arrows point from both into a third container labeled 40%, 200 ml.</p>
+              <figcaption>Figure: mixing x ml of 25% solution and y ml of 50% solution to make 200 ml of 40% solution.</figcaption>
+            </figure>
+          </td>
+        </tr>
+        <tr><th scope="row">Step 2. Identify what we are looking for.</th><td>We are looking for how much of each solution she needs.</td></tr>
+        <tr><th scope="row">Step 3. Name what we are looking for.</th><td>Let \(x\) = number of ml of 25% solution. \(y\) = number of ml of 50% solution.</td></tr>
+        <tr>
+          <th scope="row">A table will help us organize the data. We write the percents as decimals in the chart. We multiply the number of units times the concentration to get the total amount of sulfuric acid in each solution.</th>
+          <td>
+            <table>
+              <caption>Sulfuric acid mixture table</caption>
+              <thead><tr><th scope="col">Type</th><th scope="col">Number of units</th><th scope="col">Concentration %</th><th scope="col">Amount</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">25%</th><td>\(x\)</td><td>0.25</td><td>\(0.25x\)</td></tr>
+                <tr><th scope="row">50%</th><td>\(y\)</td><td>0.50</td><td>\(0.50y\)</td></tr>
+                <tr><th scope="row">40%</th><td>200</td><td>0.40</td><td>\(0.40(200)\)</td></tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+        <tr><th scope="row">Step 4. Translate into a system of equations. We get the equations from the Number column and the Amount column.</th><td>\[ \begin{cases} x + y = 200 \\ 0.25x + 0.50y = 0.40(200) \end{cases} \]</td></tr>
+        <tr>
+          <th scope="row">Step 5. Solve the system of equations. We will solve by elimination. Multiply the first equation by \(-0.5\) to eliminate \(y\).</th>
+          <td>
+            \[ \begin{cases} -0.5(x + y) = -0.5(200) \\ 0.25x + 0.50y = 80 \end{cases} \]
+            Simplify and add to solve for \(x\):
+            \[
+            \begin{aligned}
+            -0.5x - 0.5y &= -100 \\
+            0.25x + 0.5y &= 80 \\
+            -0.25x &= -20 \\
+            x &= 80
+            \end{aligned}
+            \]
+          </td>
+        </tr>
+        <tr><th scope="row">To solve for \(y\), substitute \(x = 80\) into the first equation.</th><td>\[ 80 + y = 200 \quad\Rightarrow\quad y = 120 \]</td></tr>
+        <tr><th scope="row">Step 6. Check the answer in the problem.</th><td>\(80 + 120 = 200\) ✓ and \(0.25(80) + 0.50(120) = 200\) ✓. Yes!</td></tr>
+        <tr><th scope="row">Step 7. Answer the question.</th><td>Sasheena should mix 80 ml of the 25% solution with 120 ml of the 50% solution to get the 200 ml of the 40% solution.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="tryit" aria-labelledby="try453">
+    <h3 id="try453">Try It 4.53</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>LeBron needs 150 milliliters of a 30% solution of sulfuric acid for a lab experiment but only has access to a 25% and a 50% solution. How much of the 25% and how much of the 50% solution should he mix to make the 30% solution?</p>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try454">
+    <h3 id="try454">Try It 4.54</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Anatole needs to make 250 milliliters of a 25% solution of hydrochloric acid for a lab experiment. The lab only has a 10% solution and a 40% solution in the storeroom. How much of the 10% and how much of the 40% solutions should he mix to make the 25% solution?</p>
+    </div>
+  </section>
+</section>
+
+<section aria-labelledby="interest-heading">
+  <h2 id="interest-heading">Solve Interest Applications</h2>
+  <p>The formula to model simple interest applications is \(I = Prt\). Interest, \(I\), is the product of the principal, \(P\), the rate, \(r\), and the time, \(t\). In our work here, we will calculate the interest earned in one year, so \(t\) will be 1.</p>
+  <p>We modify the column titles in the mixture table to show the formula for interest, as you’ll see in the next example.</p>
+
+  <!-- Example 4.28 -->
+  <section class="example" aria-labelledby="ex428">
+    <h3 id="ex428">Example 4.28</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Adnan has $40,000 to invest and hopes to earn 7.1% interest per year. He will put some of the money into a stock fund that earns 8% per year and the rest into bonds that earns 3% per year. How much money should he put into each fund?</p>
+    </div>
+
+    <h4>Solution</h4>
+    <table class="solution-table">
+      <caption>Solution steps for Example 4.28</caption>
+      <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Step 1. Read the problem.</th><td>A chart will help us organize the information.</td></tr>
+        <tr><th scope="row">Step 2. Identify what we are looking for.</th><td>We are looking for the amount to invest in each fund.</td></tr>
+        <tr><th scope="row">Step 3. Name what we are looking for.</th><td>Let \(s\) = the amount invested in stocks. \(b\) = the amount invested in bonds.</td></tr>
+        <tr>
+          <th scope="row">Write the interest rate as a decimal for each fund. Multiply: Principal · Rate · Time.</th>
+          <td>
+            <table>
+              <caption>Investment table</caption>
+              <thead><tr><th scope="col">Account</th><th scope="col">Principal</th><th scope="col">Rate</th><th scope="col">Time</th><th scope="col">Interest</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Stock fund</th><td>\(s\)</td><td>0.08</td><td>1</td><td>\(0.08s\)</td></tr>
+                <tr><th scope="row">Bonds</th><td>\(b\)</td><td>0.03</td><td>1</td><td>\(0.03b\)</td></tr>
+                <tr><th scope="row">Total</th><td>40,000</td><td>0.071</td><td></td><td>\(0.071(40{,}000)\)</td></tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+        <tr><th scope="row">Step 4. Translate into a system of equations. We get our system from the Principal and Interest columns.</th><td>\[ \begin{cases} s + b = 40{,}000 \\ 0.08s + 0.03b = 0.071(40{,}000) \end{cases} \]</td></tr>
+        <tr>
+          <th scope="row">Step 5. Solve the system of equations by elimination. Multiply the top equation by \(-0.03\).</th>
+          <td>
+            \[ \begin{cases} -0.03(s + b) = -0.03(40{,}000) \\ 0.08s + 0.03b = 2{,}840 \end{cases} \]
+            Simplify and add to solve for \(s\):
+            \[
+            \begin{aligned}
+            -0.03s - 0.03b &= -1{,}200 \\
+            0.08s + 0.03b &= 2{,}840 \\
+            0.05s &= 1{,}640 \\
+            s &= 32{,}800
+            \end{aligned}
+            \]
+          </td>
+        </tr>
+        <tr><th scope="row">To find \(b\), substitute \(s = 32{,}800\) into the first equation.</th><td>\[ 32{,}800 + b = 40{,}000 \quad\Rightarrow\quad b = 7{,}200 \]</td></tr>
+        <tr><th scope="row">Step 6. Check the answer in the problem.</th><td>We leave the check to you.</td></tr>
+        <tr><th scope="row">Step 7. Answer the question.</th><td>Adnan should invest $32,800 in stock and $7,200 in bonds.</td></tr>
+      </tbody>
+    </table>
+    <p>Did you notice that the Principal column represents the total amount of money invested while the Interest column represents only the interest earned? Likewise, the first equation in our system, \(s + b = 40{,}000\), represents the total amount of money invested and the second equation, \(0.08s + 0.03b = 0.071(40{,}000)\), represents the interest earned.</p>
+  </section>
+
+  <section class="tryit" aria-labelledby="try455">
+    <h3 id="try455">Try It 4.55</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Leon had $50,000 to invest and hopes to earn 6.2% interest per year. He will put some of the money into a stock fund that earns 7% per year and the rest in to a savings account that earns 2% per year. How much money should he put into each fund?</p>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try456">
+    <h3 id="try456">Try It 4.56</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Julius invested $7000 into two stock investments. One stock paid 11% interest and the other stock paid 13% interest. He earned 12.5% interest on the total investment. How much money did he put in each stock?</p>
+    </div>
+  </section>
+
+  <p>The next example requires that we find the principal given the amount of interest earned.</p>
+
+  <!-- Example 4.29 -->
+  <section class="example" aria-labelledby="ex429">
+    <h3 id="ex429">Example 4.29</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Rosie owes $21,540 on her two student loans. The interest rate on her bank loan is 10.5% and the interest rate on the federal loan is 5.9%. The total amount of interest she paid last year was $1,669.68. What was the principal for each loan?</p>
+    </div>
+
+    <h4>Solution</h4>
+    <table class="solution-table">
+      <caption>Solution steps for Example 4.29</caption>
+      <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Step 1. Read the problem.</th><td>A chart will help us organize the information.</td></tr>
+        <tr><th scope="row">Step 2. Identify what we are looking for.</th><td>We are looking for the principal of each loan.</td></tr>
+        <tr><th scope="row">Step 3. Name what we are looking for.</th><td>Let \(b\) = the principal for the bank loan. \(f\) = the principal on the federal loan.</td></tr>
+        <tr><th scope="row">The total loans are $21,540.</th><td></td></tr>
+        <tr>
+          <th scope="row">Record the interest rates as decimals in the chart. Multiply using the formula \(I = Prt\) to get the Interest.</th>
+          <td>
+            <table>
+              <caption>Loan table</caption>
+              <thead><tr><th scope="col">Account</th><th scope="col">Principal</th><th scope="col">Rate</th><th scope="col">Time</th><th scope="col">Interest</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Bank</th><td>\(b\)</td><td>0.105</td><td>1</td><td>\(0.105b\)</td></tr>
+                <tr><th scope="row">Federal</th><td>\(f\)</td><td>0.059</td><td>1</td><td>\(0.059f\)</td></tr>
+                <tr><th scope="row">Total</th><td>21,540</td><td></td><td></td><td>1669.68</td></tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+        <tr><th scope="row">Step 4. Translate into a system of equations. The system comes from the Principal and Interest columns.</th><td>\[ \begin{cases} b + f = 21{,}540 \\ 0.105b + 0.059f = 1669.68 \end{cases} \]</td></tr>
+        <tr>
+          <th scope="row">Step 5. Solve the system of equations. We will use substitution. Solve the first equation for \(b\).</th>
+          <td>\[ b = -f + 21{,}540 \]</td>
+        </tr>
+        <tr>
+          <th scope="row">Substitute \(b = -f + 21{,}540\) into the second equation. Simplify and solve for \(f\).</th>
+          <td>
+            \[
+            \begin{aligned}
+            0.105(-f + 21{,}540) + 0.059f &= 1669.68 \\
+            -0.105f + 2261.70 + 0.059f &= 1669.68 \\
+            -0.046f + 2261.70 &= 1669.68 \\
+            -0.046f &= -592.02 \\
+            f &= 12{,}870
+            \end{aligned}
+            \]
+          </td>
+        </tr>
+        <tr><th scope="row">To find \(b\), substitute \(f = 12{,}870\) into the first equation.</th><td>\[ b + 12{,}870 = 21{,}540 \quad\Rightarrow\quad b = 8{,}670 \]</td></tr>
+        <tr><th scope="row">Step 6. Check the answer in the problem.</th><td>We leave the check to you.</td></tr>
+        <tr><th scope="row">Step 7. Answer the question.</th><td>The principal of the federal loan was $12,870 and the principal for the bank loan was $8,670.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="tryit" aria-labelledby="try457">
+    <h3 id="try457">Try It 4.57</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Laura owes $18,000 on her student loans. The interest rate on the bank loan is 2.5% and the interest rate on the federal loan is 6.9%. The total amount of interest she paid last year was $1,066. What was the principal for each loan?</p>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try458">
+    <h3 id="try458">Try It 4.58</h3>
+    <div class="problem">
+      <p>Translate to a system of equations and solve:</p>
+      <p>Jill’s Sandwich Shoppe owes $65,200 on two business loans, one at 4.5% interest and the other at 7.2% interest. The total amount of interest owed last year was $3,582. What was the principal for each loan?</p>
+    </div>
+  </section>
+</section>
+
+<section aria-labelledby="cost-heading">
+  <h2 id="cost-heading">Solve Applications of Cost and Revenue Functions</h2>
+  <p>Suppose a company makes and sells \(x\) units of a product. The cost to the company is the total costs to produce \(x\) units. This is the cost to manufacture for each unit times \(x\), the number of units manufactured, plus the fixed costs.</p>
+  <p>The revenue is the money the company brings in as a result of selling \(x\) units. This is the selling price of each unit times the number of units sold.</p>
+  <p>When the costs equal the revenue we say the business has reached the break-even point.</p>
+
+  <section class="box" aria-labelledby="costrev-heading">
+    <h3 id="costrev-heading">Cost and Revenue Functions</h3>
+    <p>The cost function is the cost to manufacture each unit times \(x\), the number of units manufactured, plus the fixed costs.</p>
+    <p class="math-display">\[ C(x) = (\text{cost per unit}) \cdot x + \text{fixed costs} \]</p>
+    <p>The <strong>revenue</strong> function is the selling price of each unit times \(x\), the number of units sold.</p>
+    <p class="math-display">\[ R(x) = (\text{selling price per unit}) \cdot x \]</p>
+    <p>The <strong>break-even point</strong> is when the revenue equals the costs.</p>
+    <p class="math-display">\[ C(x) = R(x) \]</p>
+  </section>
+
+  <!-- Example 4.30 -->
+  <section class="example" aria-labelledby="ex430">
+    <h3 id="ex430">Example 4.30</h3>
+    <div class="problem">
+      <p>The manufacturer of a weight training bench spends $105 to build each bench and sells them for $245. The manufacturer also has fixed costs each month of $7,000.</p>
+      <ol type="a">
+        <li>Find the cost function \(C\) when \(x\) benches are manufactured.</li>
+        <li>Find the revenue function \(R\) when \(x\) benches are sold.</li>
+        <li>Show the break-even point by graphing both the Revenue and Cost functions on the same grid.</li>
+        <li>Find the break-even point. Interpret what the break-even point means.</li>
+      </ol>
+    </div>
+
+    <h4>Solution</h4>
+    <p><strong>(a)</strong> The manufacturer has $7,000 of fixed costs no matter how many weight training benches it produces. In addition to the fixed costs, the manufacturer also spends $105 to produce each bench. Suppose \(x\) benches are sold.</p>
+    <p>Write the general cost function formula: \(C(x) = (\text{cost per unit}) \cdot x + \text{fixed costs}\).<br>
+    Substitute in the cost values: \(C(x) = 105x + 7000\).</p>
+
+    <p><strong>(b)</strong> The manufacturer sells each weight training bench for $245. We get the total revenue by multiplying the revenue per unit times the number of units sold.</p>
+    <p>Write the general revenue function: \(R(x) = (\text{selling price per unit}) \cdot x\).<br>
+    Substitute in the revenue per unit: \(R(x) = 245x\).</p>
+
+    <p><strong>(c)</strong> Essentially we have a system of linear equations. We will show the graph of the system as this helps make the idea of a break-even point more visual.</p>
+    <p class="math-display">\[
+    \begin{cases} C(x) = 105x + 7000 \\ R(x) = 245x \end{cases}
+    \quad\text{or}\quad
+    \begin{cases} y = 105x + 7000 \\ y = 245x \end{cases}
+    \]</p>
+
+    <figure>
+      <p>Graph: The horizontal axis is x, with marks from −20 to 100 in steps of 20. The vertical axis is y, with marks from −2000 to 16000 in steps of 2000. Two straight lines are drawn. The cost line, y = 105x + 7000, starts at 7000 on the vertical axis and rises gently. The revenue line, y = 245x, starts at the origin and rises more steeply. The two lines cross at the point (50, 12250), which is marked on the graph.</p>
+      <figcaption>Figure: Cost and revenue functions graphed on the same grid. The lines intersect at the break-even point (50, 12,250).</figcaption>
+    </figure>
+
+    <p>Values from the graph, shown as a table for readers who cannot view the figure:</p>
+    <table>
+      <caption>Values of cost and revenue for selected numbers of benches</caption>
+      <thead>
+        <tr><th scope="col">Benches \(x\)</th><th scope="col">Cost \(C(x)\)</th><th scope="col">Revenue \(R(x)\)</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">0</th><td>7,000</td><td>0</td></tr>
+        <tr><th scope="row">50</th><td>12,250</td><td>12,250</td></tr>
+        <tr><th scope="row">80</th><td>15,400</td><td>19,600</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>(d)</strong> To find the actual value, we remember the break-even point occurs when costs equal revenue.</p>
+    <p class="math-display">\[
+    \begin{aligned}
+    105x + 7000 &= 245x \\
+    7000 &= 140x \\
+    50 &= x
+    \end{aligned}
+    \]</p>
+    <p>When 50 benches are sold, the costs equal the revenue.</p>
+    <p class="math-display">\[
+    \begin{aligned}
+    C(x) &= 105x + 7000 & R(x) &= 245x \\
+    C(50) &= 105(50) + 7000 & R(50) &= 245 \cdot 50 \\
+    C(50) &= 12{,}250 & R(50) &= 12{,}250
+    \end{aligned}
+    \]</p>
+    <p>When 50 benches are sold, the revenue and costs are both $12,250. Notice this corresponds to the ordered pair \((50, 12{,}250)\).</p>
+  </section>
+
+  <section class="tryit" aria-labelledby="try459">
+    <h3 id="try459">Try It 4.59</h3>
+    <div class="problem">
+      <p>The manufacturer of a weight training bench spends $15 to build each bench and sells them for $32. The manufacturer also has fixed costs each month of $25,500.</p>
+      <ol type="a">
+        <li>Find the cost function \(C\) when \(x\) benches are manufactured.</li>
+        <li>Find the revenue function \(R\) when \(x\) benches are sold.</li>
+        <li>Show the break-even point by graphing both the Revenue and Cost functions on the same grid.</li>
+        <li>Find the break-even point. Interpret what the break-even point means.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try460">
+    <h3 id="try460">Try It 4.60</h3>
+    <div class="problem">
+      <p>The manufacturer of a weight training bench spends $120 to build each bench and sells them for $170. The manufacturer also has fixed costs each month of $150,000.</p>
+      <ol type="a">
+        <li>Find the cost function \(C\) when \(x\) benches are manufactured.</li>
+        <li>Find the revenue function \(R\) when \(x\) benches are sold.</li>
+        <li>Show the break-even point by graphing both the Revenue and Cost functions on the same grid.</li>
+        <li>Find the break-even point. Interpret what the break-even point means.</li>
+      </ol>
+    </div>
+  </section>
+</section>
+
+<section aria-labelledby="media-heading">
+  <h2 id="media-heading">Media</h2>
+  <p>Access this online resource for additional instruction and practice with interest and mixtures:</p>
+  <ul>
+    <li>Interest and Mixtures</li>
+  </ul>
+</section>
+
+<section aria-labelledby="exercises-heading">
+  <h2 id="exercises-heading">Section 4.3 Exercises</h2>
+  <h3>Practice Makes Perfect</h3>
+  <h4>Solve Mixture Applications</h4>
+  <p>In the following exercises, translate to a system of equations and solve.</p>
+
+  <ol class="exercises" start="126">
+    <li><p>Tickets to a Broadway show cost $35 for adults and $15 for children. The total receipts for 1650 tickets at one performance were $47,150. How many adult and how many child tickets were sold?</p></li>
+    <li><p>Tickets for the Cirque du Soleil show are $70 for adults and $50 for children. One evening performance had a total of 300 tickets sold and the receipts totaled $17,200. How many adult and how many child tickets were sold?</p></li>
+    <li><p>Tickets for an Amtrak train cost $10 for children and $22 for adults. Josie paid $1200 for a total of 72 tickets. How many children tickets and how many adult tickets did Josie buy?</p></li>
+    <li><p>Tickets for a Minnesota Twins baseball game are $69 for Main Level seats and $39 for Terrace Level seats. A group of sixteen friends went to the game and spent a total of $804 for the tickets. How many of Main Level and how many Terrace Level tickets did they buy?</p></li>
+    <li><p>Tickets for a dance recital cost $15 for adults and $7 dollars for children. The dance company sold 253 tickets and the total receipts were $2771. How many adult tickets and how many child tickets were sold?</p></li>
+    <li><p>Tickets for the community fair cost $12 for adults and $5 dollars for children. On the first day of the fair, 312 tickets were sold for a total of $2204. How many adult tickets and how many child tickets were sold?</p></li>
+    <li><p>Brandon has a cup of quarters and dimes with a total value of $3.80. The number of quarters is four less than twice the number of quarters. How many quarters and how many dimes does Brandon have?</p></li>
+  </ol>
+
+  <ol class="exercises" start="133">
+    <li><p>Sherri saves nickels and dimes in a coin purse for her daughter. The total value of the coins in the purse is $0.95. The number of nickels is two less than five times the number of dimes. How many nickels and how many dimes are in the coin purse?</p></li>
+    <li><p>Peter has been saving his loose change for several days. When he counted his quarters and nickels, he found they had a total value $13.10. The number of quarters was fifteen more than three times the number of dimes. How many quarters and how many dimes did Peter have?</p></li>
+    <li><p>Lucinda had a pocketful of dimes and quarters with a value of $6.20. The number of dimes is eighteen more than three times the number of quarters. How many dimes and how many quarters does Lucinda have?</p></li>
+    <li><p>A cashier has 30 bills, all of which are $10 or $20 bills. The total value of the money is $460. How many of each type of bill does the cashier have?</p></li>
+    <li><p>A cashier has 54 bills, all of which are $10 or $20 bills. The total value of the money is $910. How many of each type of bill does the cashier have?</p></li>
+    <li><p>Marissa wants to blend candy selling for $1.80 per pound with candy costing $1.20 per pound to get a mixture that costs her $1.40 per pound to make. She wants to make 90 pounds of the candy blend. How many pounds of each type of candy should she use?</p></li>
+    <li><p>How many pounds of nuts selling for $6 per pound and raisins selling for $3 per pound should Kurt combine to obtain 120 pounds of trail mix that cost him $5 per pound?</p></li>
+  </ol>
+
+  <ol class="exercises" start="140">
+    <li><p>Hannah has to make twenty-five gallons of punch for a potluck. The punch is made of soda and fruit drink. The cost of the soda is $1.79 per gallon and the cost of the fruit drink is $2.49 per gallon. Hannah’s budget requires that the punch cost $2.21 per gallon. How many gallons of soda and how many gallons of fruit drink does she need?</p></li>
+    <li><p>Joseph would like to make twelve pounds of a coffee blend at a cost of $6 per pound. He blends Ground Chicory at $5 a pound with Jamaican Blue Mountain at $9 per pound. How much of each type of coffee should he use?</p></li>
+    <li><p>Julia and her husband own a coffee shop. They experimented with mixing a City Roast Columbian coffee that cost $7.80 per pound with French Roast Columbian coffee that cost $8.10 per pound to make a twenty-pound blend. Their blend should cost them $7.92 per pound. How much of each type of coffee should they buy?</p></li>
+    <li><p>Twelve-year old Melody wants to sell bags of mixed candy at her lemonade stand. She will mix M&amp;M’s that cost $4.89 per bag and Reese’s Pieces that cost $3.79 per bag to get a total of twenty-five bags of mixed candy. Melody wants the bags of mixed candy to cost her $4.23 a bag to make. How many bags of M&amp;M’s and how many bags of Reese’s Pieces should she use?</p></li>
+    <li><p>Jotham needs 70 liters of a 50% solution of an alcohol solution. He has a 30% and an 80% solution available. How many liters of the 30% and how many liters of the 80% solutions should he mix to make the 50% solution?</p></li>
+    <li><p>Joy is preparing 15 liters of a 25% saline solution. She only has 40% and 10% solution in her lab. How many liters of the 40% and how many liters of the 10% should she mix to make the 25% solution?</p></li>
+    <li><p>A scientist needs 65 liters of a 15% alcohol solution. She has available a 25% and a 12% solution. How many liters of the 25% and how many liters of the 12% solutions should she mix to make the 15% solution?</p></li>
+  </ol>
+
+  <ol class="exercises" start="147">
+    <li><p>A scientist needs 120 milliliters of a 20% acid solution for an experiment. The lab has available a 25% and a 10% solution. How many liters of the 25% and how many liters of the 10% solutions should the scientist mix to make the 20% solution?</p></li>
+    <li><p>A 40% antifreeze solution is to be mixed with a 70% antifreeze solution to get 240 liters of a 50% solution. How many liters of the 40% and how many liters of the 70% solutions will be used?</p></li>
+    <li><p>A 90% antifreeze solution is to be mixed with a 75% antifreeze solution to get 360 liters of an 85% solution. How many liters of the 90% and how many liters of the 75% solutions will be used?</p></li>
+  </ol>
+
+  <h4>Solve Interest Applications</h4>
+  <p>In the following exercises, translate to a system of equations and solve.</p>
+
+  <ol class="exercises" start="150">
+    <li><p>Hattie had $3000 to invest and wants to earn 10.6% interest per year. She will put some of the money into an account that earns 12% per year and the rest into an account that earns 10% per year. How much money should she put into each account?</p></li>
+    <li><p>Carol invested $2560 into two accounts. One account paid 8% interest and the other paid 6% interest. She earned 7.25% interest on the total investment. How much money did she put in each account?</p></li>
+    <li><p>Sam invested $48,000, some at 6% interest and the rest at 10%. How much did he invest at each rate if he received $4000 in interest in one year?</p></li>
+    <li><p>Arnold invested $64,000, some at 5.5% interest and the rest at 9%. How much did he invest at each rate if he received $4500 in interest in one year?</p></li>
+    <li><p>After four years in college, Josie owes $65,800 in student loans. The interest rate on the federal loans is 4.5% and the rate on the private bank loans is 2%. The total interest she owes for one year was $2878.50. What is the amount of each loan?</p></li>
+    <li><p>Mark wants to invest $10,000 to pay for his daughter’s wedding next year. He will invest some of the money in a short term CD that pays 12% interest and the rest in a money market savings account that pays 5% interest. How much should he invest at each rate if he wants to earn $1095 in interest in one year?</p></li>
+    <li><p>A trust fund worth $25,000 is invested in two different portfolios. This year, one portfolio is expected to earn 5.25% interest and the other is expected to earn 4%. Plans are for the total interest on the fund to be $1150 in one year. How much money should be invested at each rate?</p></li>
+    <li><p>A business has two loans totaling $85,000. One loan has a rate of 6% and the other has a rate of 4.5%. This year, the business expects to pay $4,650 in interest on the two loans. How much is each loan?</p></li>
+  </ol>
+
+  <h4>Solve Applications of Cost and Revenue Functions</h4>
+  <ol class="exercises" start="158">
+    <li>
+      <p>The manufacturer of an energy drink spends $1.20 to make each drink and sells them for $2. The manufacturer also has fixed costs each month of $8,000.</p>
+      <ol type="a">
+        <li>Find the cost function \(C\) when \(x\) energy drinks are manufactured.</li>
+        <li>Find the revenue function \(R\) when \(x\) drinks are sold.</li>
+        <li>Show the break-even point by graphing both the Revenue and Cost functions on the same grid.</li>
+        <li>Find the break-even point. Interpret what the break-even point means.</li>
+      </ol>
+    </li>
+    <li>
+      <p>The manufacturer of a water bottle spends $5 to build each bottle and sells them for $10. The manufacturer also has fixed costs each month of $6500.</p>
+      <ol type="a">
+        <li>Find the cost function \(C\) when \(x\) bottles are manufactured.</li>
+        <li>Find the revenue function \(R\) when \(x\) bottles are sold.</li>
+        <li>Show the break-even point by graphing both the Revenue and Cost functions on the same grid.</li>
+        <li>Find the break-even point. Interpret what the break-even point means.</li>
+      </ol>
+    </li>
+  </ol>
+</section>
+
+<section aria-labelledby="writing-heading">
+  <h2 id="writing-heading">Writing Exercises</h2>
+  <ol class="exercises" start="160">
+    <li><p>Take a handful of two types of coins, and write a problem similar to Example 4.25 relating the total number of coins and their total value. Set up a system of equations to describe your situation and then solve it.</p></li>
+    <li>
+      <p>In Example 4.28, we used elimination to solve the system of equations</p>
+      <p class="math-display">\[ \begin{cases} s + b = 40{,}000 \\ 0.08s + 0.03b = 0.071(40{,}000) \end{cases} \]</p>
+      <p>Could you have used substitution or elimination to solve this system? Why?</p>
+    </li>
+  </ol>
+</section>
+
+<section aria-labelledby="selfcheck-heading">
+  <h2 id="selfcheck-heading">Self Check</h2>
+  <p>(a) After completing the exercises, use this checklist to evaluate your mastery of the objectives of this section.</p>
+  <table>
+    <caption>Self-check checklist</caption>
+    <thead>
+      <tr>
+        <th scope="col">I can…</th>
+        <th scope="col">Confidently</th>
+        <th scope="col">With some help</th>
+        <th scope="col">No—I don’t get it!</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">solve mixture applications.</th><td></td><td></td><td></td></tr>
+      <tr><th scope="row">solve interest applications.</th><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+  <p>(b) What does this checklist tell you about your mastery of this section? What steps will you take to improve?</p>
+</section>
+
+</main>
+
+<footer>
+  <p>“4.3 Solve Mixture Applications with Systems of Equations” from Intermediate Algebra by Lynn Marecek, OpenStax.</p>
+  <p>Licensed under Creative Commons Attribution License (CC BY 4.0). <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a></p>
+  <p>Original page: <a href="https://openstax.org/books/intermediate-algebra/pages/4-3-solve-mixture-applications-with-systems-of-equations">https://openstax.org/books/intermediate-algebra/pages/4-3-solve-mixture-applications-with-systems-of-equations</a></p>
+  <p>Access for free at openstax.org.</p>
+  <p>Changes: reformatted as an accessible HTML page for evaluating a11y-stem; image content converted to text, tables, and figure descriptions; no wording edited except corrections noted in the conversion.</p>
+  <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,40 @@
+{
+  "arm": "mineru-basic",
+  "cost_usd": 0.0,
+  "input_sha256": "657a9f3a8e970a5f88780a5ede2ee7debe4b52568d9a3bdb375db15daec01f80",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 8.52,
+    "load_before": 11.35,
+    "offline": false,
+    "peak_rss_mb": 3129.3,
+    "quiet_box": null,
+    "system_seconds": 3.105,
+    "timeout_seconds": 1800,
+    "user_seconds": 115.192,
+    "wall_seconds_per_page": 4.342
+  },
+  "output": {
+    "file": "college-physics__28-4-relativistic-addition-of-velocities.md",
+    "format": "md"
+  },
+  "pdf_pages": 9,
+  "seconds": 39.076,
+  "section": "college-physics/28-4-relativistic-addition-of-velocities",
+  "settings": {
+    "command": "mineru-kit parse --tier basic --format zip",
+    "ocr_mode": "auto (the default)",
+    "tier": "basic (MinerU's own recommendation for a machine without an accelerator)"
+  },
+  "status": "ok",
+  "versions": {
+    "docvortex": "0.5.16",
+    "mineru": "4.0.12",
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0"
+  }
+}

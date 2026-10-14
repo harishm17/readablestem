@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>2.4 Box Plots | Introductory Statistics (OpenStax)</title>
+
+  <!-- MathJax configuration: must be defined before the MathJax script loads -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        processEscapes: true,
+        processEnvironments: true
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+        enableMenu: true,
+        enableAssistiveMml: true
+      },
+      chtml: {
+        fontURL: 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2'
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    /* Base typography and colors: black text on white, contrast well above 4.5:1 */
+    html {
+      font-size: 100%;
+    }
+    body {
+      font-family: Georgia, "Times New Roman", Times, serif;
+      font-size: 1.125rem;
+      line-height: 1.6;
+      color: #1a1a1a;
+      background: #ffffff;
+      margin: 0;
+    }
+    h1, h2, h3 {
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.25;
+      color: #000000;
+    }
+    h1 { font-size: 2.25rem; margin: 1.5rem 0 1rem; }
+    h2 { font-size: 1.5rem; margin: 0 0 1rem; }
+    h3 { font-size: 1.25rem; margin: 1.25rem 0 0.5rem; }
+    p { margin: 0 0 1rem; }
+
+    .wrapper {
+      max-width: 48rem;
+      margin: 0 auto;
+      padding: 1.5rem 1.25rem 3rem;
+    }
+
+    /* Skip link: hidden until focused, then visible */
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0.5rem;
+      background: #ffffff;
+      color: #000000;
+      padding: 0.5rem 1rem;
+      border: 2px solid #000000;
+      z-index: 100;
+    }
+    .skip-link:focus {
+      left: 0.5rem;
+    }
+
+    /* Visible focus indicators for keyboard users */
+    a:focus,
+    button:focus,
+    [tabindex]:focus {
+      outline: 3px solid #0b57d0;
+      outline-offset: 2px;
+    }
+
+    a {
+      color: #0b4aa2;
+      text-decoration: underline;
+    }
+    a:visited {
+      color: #5a2a82;
+    }
+
+    /* Notes and examples as bordered boxes; border is not the only cue (label text is also present) */
+    .note,
+    .example,
+    .try-it,
+    .problem {
+      border: 2px solid #333333;
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+    }
+    .try-it .inner,
+    .problem .inner {
+      border: 1px solid #555555;
+      padding: 0.75rem 1rem;
+      margin-top: 0.5rem;
+    }
+
+    .note h3,
+    .try-it h2,
+    .example h2,
+    .problem h2 {
+      margin-top: 0;
+    }
+
+    .note-label {
+      font-weight: bold;
+    }
+
+    figure {
+      margin: 1.5rem 0;
+    }
+    figcaption {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 0.95rem;
+      margin-top: 0.5rem;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 36rem;
+      margin: 0.75rem 0 1.25rem;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 1rem;
+    }
+    caption {
+      text-align: left;
+      font-weight: bold;
+      padding-bottom: 0.4rem;
+    }
+    th, td {
+      border: 1px solid #333333;
+      padding: 0.45rem 0.7rem;
+      text-align: left;
+    }
+    th {
+      background: #eeeeee;
+    }
+
+    .data-set {
+      font-family: "Courier New", Courier, monospace;
+      word-spacing: 0.1em;
+    }
+
+    .footer-info {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 0.9rem;
+      border-top: 2px solid #333333;
+      margin-top: 2.5rem;
+      padding-top: 1rem;
+    }
+
+    @media (max-width: 600px) {
+      body { font-size: 1rem; }
+      h1 { font-size: 1.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div class="wrapper">
+
+    <main id="main-content">
+
+      <h1>2.4 Box Plots</h1>
+
+      <p>
+        Box plots (also called box-and-whisker plots or box-whisker plots) give a good graphical image of the
+        concentration of the data. They also show how far the extreme values are from most of the data. A box plot is
+        constructed from five values: the minimum value, the first quartile, the median, the third quartile, and the
+        maximum value. We use these values to compare how close other data values are to them.
+      </p>
+
+      <p>
+        To construct a box plot, use a horizontal or vertical number line and a rectangular box. The smallest and largest data
+        values label the endpoints of the axis. The first quartile marks one end of the box and the third quartile marks the
+        other end of the box. Approximately <strong>the middle 50 percent of the data fall inside the box.</strong> The
+        "whiskers" extend from the ends of the box to the smallest and largest data values. The median or second quartile can
+        be between the first and third quartiles, or it can be one, or the other, or both. The box plot gives a good, quick
+        picture of the data.
+      </p>
+
+      <aside class="note" role="note" aria-labelledby="note1-title">
+        <h3 id="note1-title">NOTE</h3>
+        <p>
+          You may encounter box-and-whisker plots that have dots marking outlier values. In those cases, the whiskers
+          are not extending to the minimum and maximum values.
+        </p>
+      </aside>
+
+      <p>Consider, again, this dataset.</p>
+
+      <p class="data-set">1; 1; 2; 2; 4; 6; 6.8; 7.2; 8; 8.3; 9; 10; 10; 11.5</p>
+
+      <p>
+        The first quartile is two, the median is seven, and the third quartile is nine. The smallest value is one, and the largest
+        value is 11.5. The following image shows the constructed box plot.
+      </p>
+
+      <aside class="note" role="note" aria-labelledby="note2-title">
+        <h3 id="note2-title">NOTE</h3>
+        <p>See the calculator instructions on the TI web site or in the appendix.</p>
+      </aside>
+
+      <figure role="group" aria-labelledby="fig211-caption">
+        <p>
+          Box plot with a number line from 1 to 11.5. The box spans from 2 to 9. The median line is at 7.
+          The left whisker extends from 2 to 1, and the right whisker extends from 9 to 11.5.
+        </p>
+        <table>
+          <caption>Five-number summary for Figure 2.11</caption>
+          <thead>
+            <tr><th scope="col">Statistic</th><th scope="col">Value</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Minimum</th><td>1</td></tr>
+            <tr><th scope="row">First quartile (\(Q_1\))</th><td>2</td></tr>
+            <tr><th scope="row">Median (\(Q_2\))</th><td>7</td></tr>
+            <tr><th scope="row">Third quartile (\(Q_3\))</th><td>9</td></tr>
+            <tr><th scope="row">Maximum</th><td>11.5</td></tr>
+          </tbody>
+        </table>
+        <figcaption id="fig211-caption">Figure 2.11</figcaption>
+      </figure>
+
+      <p>
+        The two whiskers extend from the first quartile to the smallest value and from the third quartile to the largest value.
+        The median is shown with a dashed line.
+      </p>
+
+      <aside class="note" role="note" aria-labelledby="note3-title">
+        <h3 id="note3-title">NOTE</h3>
+        <p>
+          It is important to start a box plot with a <strong>scaled number line</strong>. Otherwise the box plot may not be useful.
+        </p>
+      </aside>
+
+      <!-- Example 2.23 -->
+      <section class="example" aria-labelledby="ex223-title">
+        <h2 id="ex223-title">Example 2.23</h2>
+
+        <p>The following data are the heights of 40 students in a statistics class.</p>
+
+        <p class="data-set">
+          59; 60; 61; 62; 62; 63; 63; 64; 64; 64; 65; 65; 65; 65; 65; 65; 65; 65; 65; 66; 66; 67; 67; 68; 68; 69; 70; 70; 70;
+          70; 70; 71; 71; 72; 72; 73; 74; 74; 75; 77
+        </p>
+
+        <p>
+          Construct a box plot with the following properties; the calculator instructions for the minimum and maximum
+          values as well as the quartiles follow the example.
+        </p>
+
+        <ul>
+          <li>Minimum value = 59</li>
+          <li>Maximum value = 77</li>
+          <li>\(Q_1\): First quartile = 64.5</li>
+          <li>\(Q_2\): Second quartile or median = 66</li>
+          <li>\(Q_3\): Third quartile = 70</li>
+        </ul>
+
+        <figure role="group" aria-labelledby="fig212-caption">
+          <p>
+            Box plot with a number line from 59 to 77. The box spans from 64.5 to 70. The median line is at 66.
+            The left whisker extends from 64.5 to 59, and the right whisker extends from 70 to 77.
+          </p>
+          <table>
+            <caption>Five-number summary for Figure 2.12</caption>
+            <thead>
+              <tr><th scope="col">Statistic</th><th scope="col">Value</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Minimum</th><td>59</td></tr>
+              <tr><th scope="row">\(Q_1\)</th><td>64.5</td></tr>
+              <tr><th scope="row">Median (\(Q_2\))</th><td>66</td></tr>
+              <tr><th scope="row">\(Q_3\)</th><td>70</td></tr>
+              <tr><th scope="row">Maximum</th><td>77</td></tr>
+            </tbody>
+          </table>
+          <figcaption id="fig212-caption">Figure 2.12</figcaption>
+        </figure>
+
+        <ol type="a">
+          <li>Each quarter has approximately 25% of the data.</li>
+          <li>
+            The spreads of the four quarters are \(64.5 - 59 = 5.5\) (first quarter), \(66 - 64.5 = 1.5\) (second quarter),
+            \(70 - 66 = 4\) (third quarter), and \(77 - 70 = 7\) (fourth quarter). So, the second quarter has the smallest spread
+            and the fourth quarter has the largest spread.
+          </li>
+          <li>Range = maximum value \(-\) the minimum value = \(77 - 59 = 18\)</li>
+          <li>Interquartile Range: \(IQR = Q_3 - Q_1 = 70 - 64.5 = 5.5\).</li>
+          <li>
+            The interval 59–65 has more than 25% of the data so it has more data in it than the interval 66 through
+            70 which has 25% of the data.
+          </li>
+          <li>The middle 50% (middle half) of the data has a range of 5.5 inches.</li>
+        </ol>
+      </section>
+
+      <!-- Calculator instructions -->
+      <section class="note" aria-labelledby="calc-title">
+        <h2 id="calc-title">Using the TI-83, 83+, 84, 84+ Calculator</h2>
+
+        <h3>To find the minimum, maximum, and quartiles:</h3>
+        <ol>
+          <li>Enter data into the list editor (Press STAT, then 1:EDIT). If you need to clear the list, arrow up to the name L1, press CLEAR, and then arrow down.</li>
+          <li>Put the data values into the list L1.</li>
+          <li>Press STAT and arrow to CALC. Press 1:1-VarStats. Enter L1.</li>
+          <li>Press ENTER.</li>
+          <li>Use the down and up arrow keys to scroll.</li>
+        </ol>
+        <ul>
+          <li>Smallest value = 59.</li>
+          <li>Largest value = 77.</li>
+          <li>\(Q_1\): First quartile = 64.5.</li>
+          <li>\(Q_2\): Second quartile or median = 66.</li>
+          <li>\(Q_3\): Third quartile = 70.</li>
+        </ul>
+
+        <h3>To construct the box plot:</h3>
+        <ol>
+          <li>Press 4:Plotsoff. Press ENTER.</li>
+          <li>Arrow down and then use the right arrow key to go to the fifth picture, which is the box plot. Press ENTER.</li>
+          <li>Arrow down to Xlist: Press 2nd 1 for L1.</li>
+          <li>Arrow down to Freq: Press ALPHA. Press 1.</li>
+          <li>Press ZOOM. Press 9: ZoomStat.</li>
+          <li>Press TRACE, and use the arrow keys to examine the box plot.</li>
+        </ol>
+      </section>
+
+      <!-- Try It 2.23 -->
+      <section class="try-it" aria-labelledby="tryit223-title">
+        <h2 id="tryit223-title">Try It 2.23</h2>
+        <div class="inner">
+          <p>
+            The following data are the number of pages in 40 books on a shelf. Construct a box plot using a
+            graphing calculator, and state the interquartile range.
+          </p>
+          <p class="data-set">
+            136; 140; 178; 190; 205; 215; 217; 218; 232; 234; 240; 255; 270; 275; 290; 301; 303; 315; 317; 318;
+            326; 333; 343; 349; 360; 369; 377; 388; 391; 392; 398; 400; 402; 405; 408; 422; 429; 450; 475; 512
+          </p>
+        </div>
+      </section>
+
+      <p>
+        For some sets of data, some of the largest value, smallest value, first quartile, median, and third quartile may be the
+        same. For instance, you might have a data set in which the median and the third quartile are the same. In this case,
+        the diagram would not have a dotted line inside the box displaying the median. The right side of the box would
+        display both the third quartile and the median. For example, if the smallest value and the first quartile were both
+        one, the median and the third quartile were both five, and the largest value was seven, the box plot would look like:
+      </p>
+
+      <figure role="group" aria-labelledby="fig213-caption">
+        <p>
+          Box plot with a number line from 1 to 7. The box spans from 1 to 5, with no dashed median line visible
+          separately because the median equals the third quartile at 5. The right whisker extends from 5 to 7.
+        </p>
+        <table>
+          <caption>Five-number summary for Figure 2.13</caption>
+          <thead>
+            <tr><th scope="col">Statistic</th><th scope="col">Value</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Minimum</th><td>1</td></tr>
+            <tr><th scope="row">\(Q_1\)</th><td>1</td></tr>
+            <tr><th scope="row">Median (\(Q_2\))</th><td>5</td></tr>
+            <tr><th scope="row">\(Q_3\)</th><td>5</td></tr>
+            <tr><th scope="row">Maximum</th><td>7</td></tr>
+          </tbody>
+        </table>
+        <figcaption id="fig213-caption">Figure 2.13</figcaption>
+      </figure>
+
+      <p>
+        In this case, at least 25% of the values are equal to one. Twenty-five percent of the values are between one and five,
+        inclusive. At least 25% of the values are equal to five. The top 25% of the values fall between five and seven,
+        inclusive.
+      </p>
+
+      <!-- Example 2.24 -->
+      <section class="example" aria-labelledby="ex224-title">
+        <h2 id="ex224-title">Example 2.24</h2>
+
+        <p>Test scores for a college statistics class held during the day are:</p>
+        <p class="data-set">99; 56; 78; 55.5; 32; 90; 80; 81; 56; 59; 45; 77; 84.5; 84; 70; 72; 68; 32; 79; 90</p>
+
+        <p>Test scores for a college statistics class held during the evening are:</p>
+        <p class="data-set">98; 78; 68; 83; 81; 89; 88; 76; 65; 45; 98; 90; 80; 84.5; 85; 79; 78; 98; 90; 79; 81; 25.5</p>
+
+        <section class="problem" aria-labelledby="problem224-title">
+          <div class="inner">
+            <h2 id="problem224-title">Problem</h2>
+            <ol type="a">
+              <li>Find the smallest and largest values, the median, and the first and third quartile for the day class.</li>
+              <li>Find the smallest and largest values, the median, and the first and third quartile for the night class.</li>
+              <li>
+                For each data set, what percentage of the data is between the smallest value and the first
+                quartile? the first quartile and the median? the median and the third quartile? the third quartile
+                and the largest value? What percentage of the data is between the first quartile and the largest
+                value?
+              </li>
+              <li>Create a box plot for each set of data. Use one number line for both box plots.</li>
+              <li>
+                Which box plot has the widest spread for the middle 50% of the data (the data between the first
+                and third quartiles)? What does this mean for that set of data in comparison to the other set of
+                data?
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <section aria-labelledby="solution224-title">
+          <h2 id="solution224-title">Solution</h2>
+
+          <ol type="a">
+            <li>
+              <p>Day class:</p>
+              <ul>
+                <li>Min = 32</li>
+                <li>\(Q_1\) = 56</li>
+                <li>\(M\) = 74.5</li>
+                <li>\(Q_3\) = 82.5</li>
+                <li>Max = 99</li>
+              </ul>
+            </li>
+            <li>
+              <p>Night class:</p>
+              <ul>
+                <li>Min = 25.5</li>
+                <li>\(Q_1\) = 78</li>
+                <li>\(M\) = 81</li>
+                <li>\(Q_3\) = 89</li>
+                <li>Max = 98</li>
+              </ul>
+            </li>
+            <li>
+              <p>
+                Day class: There are six data values ranging from 32 to 56: 30%. There are six data values
+                ranging from 56 to 74.5: 30%. There are five data values ranging from 74.5 to 82.5: 25%. There
+                are five data values ranging from 82.5 to 99: 25%. There are 16 data values between the first
+                quartile, 56, and the largest value, 99: 75%.
+              </p>
+              <p>Night class:</p>
+              <table>
+                <caption>Percentage of data in each interval, day class and night class</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Interval</th>
+                    <th scope="col">Day class</th>
+                    <th scope="col">Night class</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">Smallest value to \(Q_1\)</th><td>30%</td><td>25%</td></tr>
+                  <tr><th scope="row">\(Q_1\) to median</th><td>30%</td><td>25%</td></tr>
+                  <tr><th scope="row">Median to \(Q_3\)</th><td>25%</td><td>25%</td></tr>
+                  <tr><th scope="row">\(Q_3\) to largest value</th><td>25%</td><td>25%</td></tr>
+                </tbody>
+              </table>
+              <p>
+                Note: The night class percentages are 25% in each interval because each quarter of the data contains
+                approximately 25% of the values. The day class percentages are the counts of data values in each interval
+                as stated in the solution text above.
+              </p>
+            </li>
+            <li>
+              <figure role="group" aria-labelledby="fig214-caption">
+                <p>
+                  Two box plots share one number line from 20 to 100. The day class box plot has its box from about
+                  56 to 82.5, a median line at 74.5, and whiskers from 32 to 56 and from 82.5 to 99. The night class
+                  box plot has its box from 78 to 89, a median line at 81, and whiskers from 25.5 to 78 and from 89 to 98.
+                </p>
+                <table>
+                  <caption>Five-number summaries for Figure 2.14</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Statistic</th>
+                      <th scope="col">Day class</th>
+                      <th scope="col">Night class</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><th scope="row">Minimum</th><td>32</td><td>25.5</td></tr>
+                    <tr><th scope="row">\(Q_1\)</th><td>56</td><td>78</td></tr>
+                    <tr><th scope="row">Median</th><td>74.5</td><td>81</td></tr>
+                    <tr><th scope="row">\(Q_3\)</th><td>82.5</td><td>89</td></tr>
+                    <tr><th scope="row">Maximum</th><td>99</td><td>98</td></tr>
+                  </tbody>
+                </table>
+                <figcaption id="fig214-caption">Figure 2.14</figcaption>
+              </figure>
+            </li>
+            <li>
+              <p>
+                The first data set has the wider spread for the middle 50% of the data. The \(IQR\) for the first data
+                set is greater than the \(IQR\) for the second set. This means that there is more variability in the
+                middle 50% of the first data set.
+              </p>
+            </li>
+          </ol>
+        </section>
+      </section>
+
+      <!-- Try It 2.24 -->
+      <section class="try-it" aria-labelledby="tryit224-title">
+        <h2 id="tryit224-title">Try It 2.24</h2>
+        <div class="inner">
+          <p>The following data set shows the heights in inches for the boys in a class of 40 students.</p>
+          <p class="data-set">66; 66; 67; 67; 68; 68; 68; 68; 68; 69; 69; 69; 70; 71; 72; 72; 72; 73; 73; 74</p>
+          <p>The following data set shows the heights in inches for the girls in a class of 40 students.</p>
+          <p class="data-set">61; 61; 62; 62; 63; 63; 63; 65; 65; 65; 66; 66; 66; 67; 68; 68; 68; 69; 69; 69</p>
+          <p>
+            Construct a box plot using a graphing calculator for each data set, and state which box plot has the
+            wider spread for the middle 50% of the data.
+          </p>
+        </div>
+      </section>
+
+      <!-- Example 2.25 -->
+      <section class="example" aria-labelledby="ex225-title">
+        <h2 id="ex225-title">Example 2.25</h2>
+
+        <p>Graph a box-and-whisker plot for the data values shown.</p>
+        <p class="data-set">10; 10; 10; 15; 35; 75; 90; 95; 100; 175; 420; 490; 515; 515; 790</p>
+
+        <p>The five numbers used to create a box-and-whisker plot are:</p>
+        <ul>
+          <li>Min: 10</li>
+          <li>\(Q_1\): 15</li>
+          <li>Med: 95</li>
+          <li>\(Q_3\): 490</li>
+          <li>Max: 790</li>
+        </ul>
+
+        <p>The following graph shows the box-and-whisker plot.</p>
+
+        <figure role="group" aria-labelledby="fig215-caption">
+          <p>
+            Box plot with a number line from 10 to 790. The box spans from 15 to 490, with a dashed median line at 95.
+            The left whisker extends from 15 to 10, and the right whisker extends from 490 to 790.
+          </p>
+          <table>
+            <caption>Five-number summary for Figure 2.15</caption>
+            <thead>
+              <tr><th scope="col">Statistic</th><th scope="col">Value</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Minimum</th><td>10</td></tr>
+              <tr><th scope="row">\(Q_1\)</th><td>15</td></tr>
+              <tr><th scope="row">Median</th><td>95</td></tr>
+              <tr><th scope="row">\(Q_3\)</th><td>490</td></tr>
+              <tr><th scope="row">Maximum</th><td>790</td></tr>
+            </tbody>
+          </table>
+          <figcaption id="fig215-caption">Figure 2.15</figcaption>
+        </figure>
+      </section>
+
+      <!-- Try It 2.25 -->
+      <section class="try-it" aria-labelledby="tryit225-title">
+        <h2 id="tryit225-title">Try It 2.25</h2>
+        <div class="inner">
+          <p>Follow the steps you used to graph a box-and-whisker plot for the data values shown.</p>
+          <p class="data-set">0; 5; 5; 15; 30; 30; 45; 50; 50; 60; 75; 110; 140; 240; 330</p>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="footer-info">
+      <p>
+        "2.4 Box Plots" from Introductory Statistics by Barbara Illowsky, Susan Dean, OpenStax.
+      </p>
+      <p>
+        Licensed under Creative Commons Attribution License (CC BY 4.0).
+        <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a>
+      </p>
+      <p>
+        Original page:
+        <a href="https://openstax.org/books/introductory-statistics/pages/2-4-box-plots">https://openstax.org/books/introductory-statistics/pages/2-4-box-plots</a>
+      </p>
+      <p>Access for free at openstax.org.</p>
+      <p>
+        Changes: reformatted as an accessible HTML page for evaluating a11y-stem; no wording edited.
+        Figures are represented by text descriptions and five-number summary tables.
+      </p>
+      <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+    </footer>
+
+  </div>
+</body>
+</html>

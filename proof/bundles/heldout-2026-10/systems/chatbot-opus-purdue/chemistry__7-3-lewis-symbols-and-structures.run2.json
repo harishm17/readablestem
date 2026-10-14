@@ -1,0 +1,71 @@
+{
+  "arm": "chatbot-opus-purdue",
+  "attempts": [],
+  "cost_usd": 0.664192,
+  "counted_input_tokens": 45603,
+  "error": null,
+  "figure_judgements": [
+    {
+      "figure_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/fig-000",
+      "outcome": "no_description"
+    },
+    {
+      "figure_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/fig-001",
+      "outcome": "no_description"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0037994,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/fig-002",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "figure"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0027674,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/fig-003",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "figure"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.006567,
+  "output": {
+    "file": "chemistry__7-3-lewis-symbols-and-structures.run2.html",
+    "format": "html"
+  },
+  "output_chars": 45659,
+  "pdf_pages": 9,
+  "response_status": "end_turn",
+  "run": 2,
+  "seconds": 180.7,
+  "section": "chemistry/7-3-lewis-symbols-and-structures",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 45603,
+    "output_tokens": 24089,
+    "reasoning_tokens": 4840
+  },
+  "versions": {
+    "model_requested": "claude-opus-5-5",
+    "model_served": "claude-opus-5-5"
+  }
+}

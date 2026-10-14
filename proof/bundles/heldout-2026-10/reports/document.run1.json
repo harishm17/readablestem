@@ -1,0 +1,3618 @@
+{
+  "client": "anthropic",
+  "complete": true,
+  "cost": {
+    "budget_calls": 2267,
+    "budget_spent_usd": 3.347982675000009,
+    "dropped_usd": 8.881784197001252e-15,
+    "model_calls": 2267,
+    "pdf_pages": 242,
+    "per_item_unit": "section",
+    "per_item_usd": 0.223198845,
+    "per_pdf_page_usd": 0.013834639152892562,
+    "pipeline_usd": 3.347982675,
+    "total_usd": 3.347982675,
+    "verifier_per_item_usd": 0.0,
+    "verifier_per_pdf_page_usd": 0.0,
+    "verifier_requests": 0,
+    "verifier_usd": 0
+  },
+  "dataset": {
+    "gold_dir": "proof set heldout-2026-10",
+    "limit": null,
+    "manifest_sha256": "e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb",
+    "selection_sha256": "f047476e913566970214c6fe5bdeb713e7a0eea7baad1f77876746453f64c002",
+    "unit": "page"
+  },
+  "date": "2026-10-13",
+  "latency_ms": {
+    "basis": "wall-clock conversion of each section's PDF (layout, crops, model calls and assembly; DocumentStats.latency_ms)",
+    "n": 15,
+    "p50": 52143.0,
+    "p95": 144461.90000000002
+  },
+  "metrics": {
+    "axe_checked_pages": 15,
+    "axe_error_pages": 0,
+    "axe_skipped_pages": 0,
+    "axe_violation_codes": {},
+    "axe_violations": 0,
+    "detection_precision": 0.7349033816425121,
+    "detection_precision_excluding_prose_math": 0.8222972972972973,
+    "detection_recall": 0.8889700511322133,
+    "detection_recall_by_display": {
+      "block": {
+        "n_gold": 163,
+        "recall": 0.9754601226993865
+      },
+      "inline": {
+        "n_gold": 1206,
+        "recall": 0.8772802653399668
+      }
+    },
+    "end_to_end_exact_lenient": 0.5003652300949598,
+    "gold_equations": 1369,
+    "matched": 1217,
+    "matched_exact_lenient": 0.5628594905505341,
+    "matched_mean_teds": 0.760936385947953,
+    "page_errors": {},
+    "predicted_equations": 1656,
+    "review_load": {
+      "equation_flags": {
+        "flag_precision": 0.8109243697478992,
+        "flag_recall": 0.36278195488721804,
+        "required_units": 238,
+        "required_units_wrong": 193,
+        "units": 1217,
+        "wrong": 532,
+        "wrong_required": 193
+      },
+      "equation_flags_excluding_scorer_gaps": {
+        "flag_precision": 0.7982062780269058,
+        "flag_recall": 0.3625254582484725,
+        "required_units": 223,
+        "required_units_wrong": 178,
+        "units": 1174,
+        "wrong": 491,
+        "wrong_required": 178
+      },
+      "flags": {
+        "flag_precision": 0.7228464419475655,
+        "flag_recall": 0.34464285714285714,
+        "required_units": 267,
+        "required_units_wrong": 193,
+        "units": 1656,
+        "wrong": 560,
+        "wrong_required": 193
+      },
+      "flags_excluding_scorer_gaps": {
+        "flag_precision": 0.7063492063492064,
+        "flag_recall": 0.34296724470134876,
+        "required_units": 252,
+        "required_units_wrong": 178,
+        "units": 1613,
+        "wrong": 519,
+        "wrong_required": 178
+      },
+      "heading_flags": {
+        "flag_precision": 0.0,
+        "flag_recall": 0.0,
+        "required_units": 29,
+        "required_units_wrong": 0,
+        "units": 439,
+        "wrong": 28,
+        "wrong_required": 0
+      },
+      "none": 1767,
+      "optional": 130,
+      "optional_by_kind": {
+        "figure": 16,
+        "heading": 114
+      },
+      "optional_by_reason": {
+        "heading.all_caps": 1,
+        "heading.level_repaired": 3,
+        "heading.very_short": 1,
+        "heading.weak_evidence": 112,
+        "too_long": 16
+      },
+      "optional_per_pdf_page": 0.5372,
+      "pdf_pages": 242,
+      "required_by_kind": {
+        "equation": 372,
+        "figure": 14,
+        "heading": 29,
+        "table": 18
+      },
+      "required_by_reason": {
+        "below_accept": 187,
+        "conversion_failed": 1,
+        "heading.all_caps": 3,
+        "heading.repeated_label": 115,
+        "heading.very_short": 4,
+        "heading.weak_evidence": 108,
+        "invalid_latex": 3,
+        "low_confidence": 50,
+        "not_equation": 23,
+        "sign_mismatch": 35,
+        "style_mismatch": 4,
+        "symbol_mismatch": 145,
+        "table_not_rebuilt": 18,
+        "too_long": 3,
+        "unknown_command": 2
+      },
+      "required_decisions": 433,
+      "required_fixes": 519,
+      "required_per_pdf_page": 1.7893,
+      "required_per_section": 28.8667,
+      "sections": 15,
+      "wrong_not_required": [
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-000",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "[\\text{H}_3\\text{O}^+]_0 = 0.100\\ M",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-001",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "n(\\text{H}^{+})_{0} = [\\text{H}_{3}\\text{O}^{+}]_{0} \\times 0.02500\\ \\text{L} = 0.002500\\ \\text{mol}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-004",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{n}(\\text{H}^{+}) = \\text{n}(\\text{H}^{+})_{0} - \\text{n}(\\text{OH}^{-})_{0} = 0.002500\\ \\text{mol} - 0.100\\ M \\times \\text{X}\\ \\text{mL} \\times \\left(\\frac{1\\ \\text{L}}{1000\\ \\text{mL}}\\right)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-006",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{pH} = -\\log([\\text{H}_3\\text{O}^+])",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-007",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "n(\\text{H}^{+})_{0}-n(\\text{OH}^{-})_{0}>0",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-008",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "n(\\text{H}^{+})_{0} = n(\\text{OH}^{-})_{0}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-009",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "[\\text{H}_3\\text{O}^+] = [\\text{OH}^-],\\ [\\text{H}_3\\text{O}^+] = K_\\text{w} = 1.0 \\times 10^{-14};\\ [\\text{H}_3\\text{O}^+] = 1.0 \\times 10^{-7}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-010",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{pH} = -\\log(1.0 \\times 10^{-7}) = 7.00",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-011",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "n(\\text{OH}^{-})_{0} > n(\\text{H}^{+})_{0}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-012",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "n(\\text{H}^{+}) = n(\\text{H}^{+})_{0} - n(\\text{OH}^{-})_{0}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-013",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{n}(\\text{OH}^{-}) = \\text{n}(\\text{OH}^{-})_{0} - \\text{n}(\\text{H}^{+})_{0}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-015",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{pH} = 14 - \\text{pOH} = 14 + \\log([\\text{OH}^-])",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-016",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "[\\text{H}_3\\text{O}^+] = \\frac{\\text{n}(\\text{H}^+)}{V} = \\frac{0.002500\\ \\text{mol} \\times \\left(\\frac{1000\\ \\text{mL}}{1\\ \\text{L}}\\right)}{25.00\\ \\text{mL}} = 0.1\\ M",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-017",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "[\\text{H}_3\\text{O}^+] = \\frac{\\text{n}(\\text{H}^+)}{V} = \\frac{0.002500\\ \\text{mol} \\times \\left(\\frac{1000\\ \\text{mL}}{1\\ \\text{L}}\\right) - 0.100\\ M \\times 12.50\\ \\text{mL}}{25.00\\ \\text{mL} + 12.50\\ \\text{mL}} = 0.0333\\ M",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-018",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "n(\\text{H}^{+})_{0} = n(\\text{OH}^{-})_{0}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-019",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "n(\\text{OH}^{-})_{0} > n(\\text{H}^{+})_{0}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-020",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "[\\text{OH}^{-}]=\\frac{\\text{n}(\\text{OH}^{-})}{V}=\\frac{0.100\\ M\\times 35.70\\ \\text{mL}-0.002500\\ \\text{mol}\\times\\left(\\frac{1000\\ \\text{mL}}{1\\ \\text{L}}\\right)}{25.00\\ \\text{mL}+37.50\\ \\text{mL}}=0.0200\\ M",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-021",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{CH}_3\\text{CO}_2{}^-(aq) + \\text{H}_2\\text{O}(l) \\rightleftharpoons \\text{CH}_3\\text{CO}_2\\text{H}(l) + \\text{OH}^-(aq)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-022",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{CH}_3\\text{CO}_2\\text{H} + \\text{OH}^- \\longrightarrow \\text{CH}_3\\text{CO}_2{}^- + \\text{H}_2\\text{O}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-025",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "[\\text{H}_3\\text{O}^+] = \\sqrt{K_a \\times [\\text{CH}_3\\text{CO}_2\\text{H}]} = \\sqrt{1.8 \\times 10^{-5} \\times 0.100} = 1.3 \\times 10^{-3}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-026",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{pH} = -\\log(1.3 \\times 10^{-3}) = 2.87",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-027",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{CH}_3\\text{CO}_2^-",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-028",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{CH}_3\\text{CO}_2^-",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-030",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{CH}_3\\text{CO}_2^{-}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-031",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{CH}_3\\text{CO}_2{}^{-}(aq)+\\text{H}_2\\text{O}(l)\\rightleftharpoons\\text{CH}_3\\text{CO}_2\\text{H}(aq)+\\text{OH}^{-}(aq)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-032",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "K_\\text{b} = \\frac{[\\text{CH}_3\\text{CO}_2\\text{H}][\\text{OH}^-]}{[\\text{CH}_3\\text{CO}_2{}^-]}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-033",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "K_\\text{a} = \\frac{[\\text{CH}_3\\text{CO}_2{}^-][\\text{H}^+]}{[\\text{CH}_3\\text{CO}_2\\text{H}]},\\ \\text{so } \\frac{[\\text{CH}_3\\text{CO}_2\\text{H}]}{[\\text{CH}_3\\text{CO}_2{}^-]} = \\frac{[\\text{H}^+]}{K_\\text{a}}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-034",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "K_\\text{b} = \\frac{[\\text{H}^{+}][\\text{OH}^{-}]}{K_\\text{a}} = \\frac{K_\\text{w}}{K_\\text{a}} = \\frac{1.0 \\times 10^{-14}}{1.8 \\times 10^{-5}} = 5.6 \\times 10^{-10}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-036",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "x = [\\text{OH}^{-}] = 5.3 \\times 10^{-6}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-037",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{pOH} = -\\log(5.3 \\times 10^{-6}) = 5.28",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-039",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{CH}_3\\text{CO}_2^-",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-040",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{CH}_3\\text{CO}_2^-",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-042",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{CH}_3\\text{CO}_2^-",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-043",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\frac{0.00250\\ \\text{mol}}{2} = 0.00125\\ \\text{mol}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-044",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{pH} = pK_\\text{a} + \\log \\frac{[\\text{Base}]}{[\\text{Acid}]} = -\\log(K_\\text{a}) + \\log \\frac{[\\text{CH}_3\\text{CO}_2{}^-]}{[\\text{CH}_3\\text{CO}_2\\text{H}]} = -\\log(1.8 \\times 10^{-5}) + \\log(1)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-045",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\mathrm{CH_3CO_2^-}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-046",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{pH} = -\\log(1.8 \\times 10^{-5}) = 4.74",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-048",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "[\\text{OH}^{-}] = \\frac{(0.003750\\ \\text{mol} - 0.00250\\ \\text{mol})}{0.06250\\ \\text{L}} = 2.00 \\times 10^{-2}\\ M",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-049",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\text{pOH} = -\\log(2.00 \\times 10^{-2}) = 1.70, \\text{ and pH} = 14.00 - 1.70 = 12.30",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-053",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "K_a = \\frac{[\\text{H}_3\\text{O}^+][\\text{In}^-]}{[\\text{HIn}]} = 4.0 \\times 10^{-4}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-054",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\frac{[\\text{In}^{-}]}{[\\text{HIn}]} = \\frac{[\\text{substance with yellow color}]}{[\\text{substance with red color}]} = \\frac{K_\\text{a}}{[\\text{H}_{3}\\text{O}^{+}]}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-055",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "[\\text{HIn}]",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-056",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\frac{[\\text{H}_3\\text{O}^+]}{K_\\text{a}} = \\frac{[\\text{HIn}]}{[\\text{In}^-]}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-057",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\log\\left(\\frac{[\\text{H}_3\\text{O}^+]}{K_\\text{a}}\\right) = \\log\\left(\\frac{[\\text{HIn}]}{[\\text{In}^-]}\\right)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-058",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "\\log([\\text{H}_3\\text{O}^+]) - \\log(K_\\text{a}) = -\\log\\left(\\frac{[\\text{In}^-]}{[\\text{HIn}]}\\right)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/chemistry/14-7-acid-base-titrations/eq-059",
+          "kind": "equation",
+          "page": "chemistry/14-7-acid-base-titrations",
+          "pred_latex": "-\\text{pH}+\\text{p}K_\\text{a}=-\\log\\left(\\frac{[\\text{In}^{-}]}{[\\text{HIn}]}\\right)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-002",
+          "kind": "equation",
+          "page": "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds",
+          "pred_latex": "d_{x^{2}-y^{2}}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-004",
+          "kind": "equation",
+          "page": "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds",
+          "pred_latex": "d_{x^{2}-y^{2}}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-006",
+          "kind": "equation",
+          "page": "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds",
+          "pred_latex": "\\Delta_{\\text{tet}} = \\frac{4}{9} \\Delta_{\\text{oct}}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-000",
+          "kind": "equation",
+          "page": "chemistry/7-3-lewis-symbols-and-structures",
+          "pred_latex": "\\text{CHO}_2^{-}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-002",
+          "kind": "equation",
+          "page": "chemistry/7-3-lewis-symbols-and-structures",
+          "pred_latex": "\\text{CHO}_2{}^{-}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-006",
+          "kind": "equation",
+          "page": "chemistry/7-3-lewis-symbols-and-structures",
+          "pred_latex": "\\text{CHO}_2{}^{-}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-007",
+          "kind": "equation",
+          "page": "chemistry/7-3-lewis-symbols-and-structures",
+          "pred_latex": "\\text{CHO}_{2}^{-}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-008",
+          "kind": "equation",
+          "page": "chemistry/7-3-lewis-symbols-and-structures",
+          "pred_latex": "\\text{ClO}_4{}^{-}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-010",
+          "kind": "equation",
+          "page": "chemistry/7-3-lewis-symbols-and-structures",
+          "pred_latex": "\\text{CHO}_2^-",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/eq-024",
+          "kind": "equation",
+          "page": "chemistry/7-3-lewis-symbols-and-structures",
+          "pred_latex": "\\text{ICl}_4^{\\ -}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-004",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u'",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-007",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u=v+u'",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-008",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u = 1.0\\ \\text{m/s} + 1.5\\ \\text{m/s} = 2.5\\ \\text{m/s}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-009",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u = 1.0\\ \\text{m/s} + (-1.5\\ \\text{m/s}) = -0.5\\ \\text{m/s}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-010",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u=v+c",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-018",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u'",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-021",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u'",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-022",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "vu'",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-025",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "v=0.500c",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-026",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u' = c",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-028",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u = \\frac{v+u'}{1 + \\frac{vu'}{c^2}}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-034",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u^{\\prime}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-037",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "v=0.500c",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-038",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u^{\\prime} = 0.750c",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-040",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u=\\frac{v+u'}{1+\\frac{vu'}{c^{2}}}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-043",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u^{\\prime} = -0.750c",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-045",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u=\\frac{v+u^{\\prime}}{1+\\frac{vu^{\\prime}}{c^{2}}}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-050",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "-0.250c",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-060",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "0.525\\ \\text{m}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-061",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "u=0.825c",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-062",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "\\lambda_{s} = 0.525\\ \\text{m}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-064",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "\\lambda_\\text{obs} = \\lambda_s \\sqrt{\\frac{1 + \\frac{u}{c}}{1 - \\frac{u}{c}}}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-066",
+          "kind": "equation",
+          "page": "college-physics/28-4-relativistic-addition-of-velocities",
+          "pred_latex": "0.350c",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-000",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "E = hf",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-003",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "E = hf = \\frac{hc}{\\lambda}\\ \\text{(energy of a photon)},",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-006",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "h=4.14\\times 10^{-15}\\ \\text{eV}\\cdot\\text{s}\\ .",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-007",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "hc = 1240\\ \\text{eV}\\cdot\\text{nm}\\ .",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-011",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "f = 10^{21}\\ \\text{Hz}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-021",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "hf=qV",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-022",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "qV",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-023",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "hf",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-024",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "hf=qV",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-027",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "hf = (1.60 \\times 10^{-19}\\ \\text{C})(50.0 \\times 10^{3}\\ \\text{V}).",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-029",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "1\\ \\text{J} = 1\\ \\text{C} \\cdot \\text{V}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-030",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "hf = (50.0 \\times 10^{3})(1.60 \\times 10^{-19}\\ \\text{C} \\cdot \\text{V})\\left(\\frac{1\\ \\text{eV}}{1.60 \\times 10^{-19}\\ \\text{C} \\cdot \\text{V}}\\right) = (50.0 \\times 10^{3})(1\\ \\text{eV}) = 50.0\\ \\text{keV}.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-033",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "E = hf",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-035",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "hc = 1240\\ \\text{eV} \\cdot \\text{nm}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-036",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "E = \\frac{\\text{hc}}{\\lambda} = \\frac{1240\\ \\text{eV}\\cdot\\text{nm}}{100\\ \\text{nm}} = 12.4\\ \\text{eV}.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-039",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "hf",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-041",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "E = \\frac{hc}{\\lambda} .",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-042",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "E = \\frac{(6.63 \\times 10^{-34}\\ \\text{J}\\cdot\\text{s})(3.00 \\times 10^{8}\\ \\text{m/s})}{580 \\times 10^{-9}\\ \\text{m}} = 3.43 \\times 10^{-19}\\ \\text{J}.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-043",
+          "kind": "equation",
+          "page": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+          "pred_latex": "\\text{photon/s} = \\frac{10.0\\ \\text{J/s}}{3.43 \\times 10^{-19}\\ \\text{J/photon}} = 2.92 \\times 10^{19}\\ \\text{photon/s}.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-007",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "F = \\text{k}\\Delta \\text{L},",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-029",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "(\\Delta L)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-049",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "3.0 \\times 10^{6}\\ \\text{N}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-050",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "F = 3.0 \\times 10^{6}\\ \\text{N}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-051",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "\\pi r^2 = 2.46 \\times 10^{-3}\\ \\text{m}^2",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-053",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "\\begin{array}{rcl} \\Delta L & = & \\frac{1}{210\\times 10^{9}\\ \\text{N/m}^{2}}\\frac{3.0\\times 10^{6}\\ \\text{N}}{2.46\\times 10^{-3}\\ \\text{m}^{2}}3020\\ \\text{m} \\\\ & = & 18\\ \\text{m}. \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-055",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "\\pi r^{2} = 1.257 \\times 10^{-3}\\ \\text{m}^{2}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-058",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "\\begin{array}{rcl} \\Delta L & = & \\frac{1}{9\\times 10^{9}\\ \\text{N/m}^{2}}\\frac{607.6\\ \\text{N}}{1.257\\times 10^{-3}\\ \\text{m}^{2}}(0.400\\ \\text{m}) \\\\ & = & 2\\times 10^{-5}\\ \\text{m}. \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-089",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "1.80\\ \\mu\\text{m}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-093",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "\\frac{W}{g}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-101",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "A = \\pi r^2 = 1.77 \\times 10^{-6}\\ \\text{m}^2 .",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-103",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "F = \\frac{(80 \\times 10^{9}\\ \\text{N/m}^{2})(1.77 \\times 10^{-6}\\ \\text{m}^{2})}{(5.00 \\times 10^{-3}\\ \\text{m})}(1.80 \\times 10^{-6}\\ \\text{m}) = 51\\ \\text{N}.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-105",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "m=\\frac{w}{g}=\\frac{F}{g}=5.2\\ \\text{kg}.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-106",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "1.80\\ \\mu\\text{m}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-114",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "5.00 \\times 10^{7}\\ \\text{N/m}^{2}\\ .",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-116",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "\\Delta V",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-120",
+          "kind": "equation",
+          "page": "college-physics/5-3-elasticity-stress-and-strain",
+          "pred_latex": "\\begin{array}{rcl} \\frac{\\Delta V}{V_0} & = & \\frac{5.00 \\times 10^{7}\\ \\text{N/m}^2}{2.2 \\times 10^{9}\\ \\text{N/m}^2} \\\\ & = & 0.023 = 2.3\\%. \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-003",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "9",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-004",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "9",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-005",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "8 = 8",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-025",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "1 = a",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-026",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "a = a",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-028",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-a",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-030",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "a, a + (-a) = 0",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-034",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "a, a \\neq 0, a",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-036",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "0 \\div 3",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-039",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "3 = 0",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-040",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "0",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-041",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "4",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-046",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-84n+(-73n)+84n",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-048",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-27a + (-48a) + 27a",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-049",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "39x + (-92x) + (-39x)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-055",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "n \\neq -5",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-061",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "m \\neq -7",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-068",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "\\text{If } a, b, \\text{ and } c \\text{ are real numbers, then} \\quad \\begin{array}{rcl} a(b+c) & = & ab+ac \\\\ (b+c)a & = & ba+ca \\\\ a(b-c) & = & ab-ac \\\\ (b-c)a & = & ba-ca \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-079",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-11(4-3a)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-080",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "\\begin{array}{c} -11(4-3a) \\\\ -11\\cdot 4-(-11)\\cdot 3a \\\\ -44-(-33a) \\\\ -44+33a \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-082",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-5(2 - 3a)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-083",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-7(8-15y)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-084",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-(y + 5)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-085",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "\\begin{array}{rc} & -(y+5) \\\\ \\text{Multiplying by } -1 \\text{ results in the opposite.} & -1(y+5) \\\\ \\text{Distribute.} & -1\\cdot y+(-1)\\cdot 5 \\\\ \\text{Simplify.} & -y+(-5) \\\\ \\text{Simplify.} & -y-5 \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-086",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-(z - 11)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-087",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-(x-4)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-105",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "316.\\quad \\frac{5}{6}a+\\frac{3}{10}b+\\frac{1}{6}a+\\frac{9}{10}b",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-106",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "6.8p+9.14q+(-4.37p)+(-0.88q)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-107",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "9.6m+7.22n+(-2.19m)+(-0.65n)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-111",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "322.\\ \\left(\\frac{11}{12}+\\frac{4}{9}\\right)+\\frac{5}{9}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-120",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "331.\\ \\frac{1}{2}+\\frac{7}{8}+\\left(-\\frac{1}{2}\\right)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-121",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "332.\\ \\frac{2}{5}+\\frac{5}{12}+\\left(-\\frac{2}{5}\\right)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-125",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "336.\\ \\frac{13}{18} \\cdot \\frac{25}{7} \\cdot \\frac{18}{13}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-144",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "349.\\ 9\\left(\\frac{5}{9}y-\\frac{1}{3}\\right)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-147",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "352.\\ 12\\left(\\frac{1}{6}+\\frac{3}{4}s\\right)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-154",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-7(4p + 1)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-155",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-9(9a + 4)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-156",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-3(x-6)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-157",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-4(q-7)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-158",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-(3x - 7)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-159",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "-(5p-4)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-168",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "9(8x - 3) - (-2)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-169",
+          "kind": "equation",
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "pred_latex": "4(6x - 1) - (-8)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-000",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "4.025(1,562)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-007",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "n",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-008",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "d",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-016",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "n",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-017",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "c",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-018",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "\\text{Number} \\cdot \\text{Value} = \\text{Total Value}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-019",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "-2",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-022",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "x",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-023",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "y",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-024",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "-0.5",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-029",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "s",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-030",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "b",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-031",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "s + b = 40,000",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-032",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "0.08s+0.03b=0.071(40{,}000)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-037",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "\\$1,669.68",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-038",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "b",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-039",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "f",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-045",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "\\left\\{\\begin{array}{rcl} C(x) & = & 105x+7000 \\\\ R(x) & = & 245x \\end{array}\\right. \\quad \\text{or} \\quad \\left\\{\\begin{array}{rcl} y & = & 105x+7000 \\\\ y & = & 245x \\end{array}\\right.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations/eq-047",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "pred_latex": "(50, 12,250)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-002",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "5(-2) - (-4)(1)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-003",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "-3(8-10)+(-2)(6-3)-4(-3-(-4))",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-009",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left| \\begin{array}{cc} a & b \\\\ c & d \\end{array} \\right| = ad - bc",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-057",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left| \\begin{array}{ccc} + & - & + \\\\ - & + & - \\\\ + & - & + \\end{array} \\right|",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-061",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "a_1 x + b_1 y = k_1",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-065",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "3x-2y=-6\\ .",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-066",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "2x+3y=6\\ .",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-067",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "2x+y=-4\\ .",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-091",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\begin{cases} x+3y=4 \\\\ -2x-6y=3 \\end{cases}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-096",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "8x-6y=14 .",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-097",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "2x+6y=8.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-099",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(x_{1},y_{1}),\\ (x_{2},y_{2})",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-101",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left| \\begin{array}{ccc} x_1 & y_1 & 1 \\\\ x_2 & y_2 & 1 \\\\ x_3 & y_3 & 1 \\end{array} \\right| = 0",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-103",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(x_1\\,, y_1\\,),\\ (x_2\\,, y_2\\,)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-105",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left| \\begin{array}{ccc} x_1 & y_1 & 1 \\\\ x_2 & y_2 & 1 \\\\ x_3 & y_3 & 1 \\end{array} \\right| = 0",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-107",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(5,-5),\\ (4,-3)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-108",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(3, -1)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-110",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(5, -5), \\ (4, -3)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-111",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(3, -1)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-113",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(3,-2),\\ (5,-3)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-114",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(1,-1)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-115",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(-4,-1),\\ (-6,2)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-117",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(-2,-4)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-119",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\begin{bmatrix} -4 & 8 \\\\ -3 & 5 \\end{bmatrix}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-121",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\begin{bmatrix} -2 & 0 \\\\ 7 & -5 \\end{bmatrix}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-126",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left| \\begin{array}{ccc} -1 & -3 & 2 \\\\ 4 & -2 & -1 \\\\ -2 & 0 & -3 \\end{array} \\right|",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-130",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left| \\begin{array}{ccc} 2 & -3 & -4 \\\\ -1 & 2 & -3 \\\\ 0 & -1 & -2 \\end{array} \\right|",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-134",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left| \\begin{array}{ccc} -2 & -2 & 3 \\\\ 1 & -3 & 0 \\\\ -2 & 3 & -2 \\end{array} \\right|",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-138",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left| \\begin{array}{ccc} -2 & 3 & -1 \\\\ -1 & 2 & -2 \\\\ 3 & 1 & -3 \\end{array} \\right|",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-147",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\begin{cases} x - 2y = -5 \\\\ 2x - 3y = -4 \\end{cases}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-148",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "2x+5y=4",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-149",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left\\{ \\begin{array}{rcl} 2x + y & = & -4 \\\\ 3x - 2y & = & -6 \\end{array} \\right.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-151",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "2x+5y=4",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-152",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "254. \\left\\{ \\begin{array}{rcl} 5x - 3y & = & -1 \\\\ 2x - y & = & 2 \\end{array} \\right.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-153",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\begin{cases} 3x+8y=-3 \\\\ 2x+5y=-3 \\end{cases}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-154",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\text{256.}\\quad \\begin{cases} 6x - 5y + 2z = 3 \\\\ 2x + y - 4z = 5 \\\\ 3x - 3y + z = -1 \\end{cases}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-155",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left\\{ \\begin{array}{rcl} 4x - 3y + z & = & 7 \\\\ 2x - 5y - 4z & = & 3 \\\\ 3x - 2y - 2z & = & -7 \\end{array} \\right.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-156",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left\\{ \\begin{array}{rcl} 2x - 5y + 3z & = & 8 \\\\ 3x - y + 4z & = & 7 \\\\ x + 3y + 2z & = & -3 \\end{array} \\right.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-159",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left\\{ \\begin{array}{c} 2x + 5y = 4 \\\\ 3y - z = 3 \\\\ 4x + 3z = -3 \\end{array} \\right.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-163",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left\\{ \\begin{array}{rcl} x - 4y & = & -1 \\\\ -3x + 12y & = & 3 \\end{array} \\right.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-164",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "6x+2y=-16",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-165",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "20x+15y=5",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-166",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "\\left\\{ \\begin{array}{rcl} y-z & = & 0 \\\\ -x+2y & = & 1 \\end{array} \\right.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-171",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(0, 1), \\ (2, 0)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-172",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(-2, 2)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-174",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(0,-5),\\ (-2,-2)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-175",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(2,-8)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-177",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(4,-3),\\ (6,-4)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-178",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(2, -2)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-180",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(-2, 1),\\ (-4, 4)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-181",
+          "kind": "equation",
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "pred_latex": "(0, -2)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/introductory-statistics/3-1-terminology/eq-008",
+          "kind": "equation",
+          "page": "introductory-statistics/3-1-terminology",
+          "pred_latex": "P(A|B) = \\frac{P(A \\text{AND} B)}{P(B)}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/introductory-statistics/3-1-terminology/eq-014",
+          "kind": "equation",
+          "page": "introductory-statistics/3-1-terminology",
+          "pred_latex": "B) = \\frac{12}{19}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/introductory-statistics/3-1-terminology/eq-016",
+          "kind": "equation",
+          "page": "introductory-statistics/3-1-terminology",
+          "pred_latex": "P(A') = \\frac{10}{19}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/introductory-statistics/3-1-terminology/eq-021",
+          "kind": "equation",
+          "page": "introductory-statistics/3-1-terminology",
+          "pred_latex": "B) = \\frac{1}{6}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/introductory-statistics/3-1-terminology/eq-028",
+          "kind": "equation",
+          "page": "introductory-statistics/3-1-terminology",
+          "pred_latex": "B) = \\frac{5}{6}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/introductory-statistics/3-1-terminology/eq-029",
+          "kind": "equation",
+          "page": "introductory-statistics/3-1-terminology",
+          "pred_latex": "B') = \\frac{2}{3}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/introductory-statistics/4-5-hypergeometric-distribution/eq-001",
+          "kind": "equation",
+          "page": "introductory-statistics/4-5-hypergeometric-distribution",
+          "pred_latex": "\\sqrt{23}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-008",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "-4 \\leq x - 5 \\qquad x - 5 \\leq 4",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-012",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "\\pm 1\\%,\\ \\pm 5\\%",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-013",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "\\pm 10\\%",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-014",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "\\pm 5\\%",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-020",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "f(x) = \\left| 2(x-3) \\right| - 2, \\quad \\text{treating the stretch as a horizontal compression.}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-024",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "2 = a|1 - 3| - 2",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-026",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "\\begin{array}{rclcrcl} 2x & = & 14 & \\qquad & 2x & = & -2 \\\\ x & = & 7 & \\qquad & x & = & -1 \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-027",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "\\left|5x+2\\right|-4=9",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-052",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "|A| = B",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-059",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "\\begin{array}{rcl} 1 & = & 4|x-2|+2 \\\\ -1 & = & 4|x-2| \\\\ -\\frac{1}{4} & = & |x-2| \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-076",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "\\begin{array}{c} |x-600| < 200 \\quad \\text{or} \\quad -200 < x-600 < 200 \\\\ -200+600 < x-600+600 < 200+600 \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-086",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "\\begin{array}{rcl} x-5 & = & 4 \\\\ x & = & 9 \\end{array} \\quad \\text{or} \\quad \\begin{array}{rcl} x-5 & = & -4 \\\\ x & = & 1 \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-115",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "\\begin{array}{cc} |x-A| < C, & |x-A| > C, \\\\ -C < x-A < C, & x-A < -C \\text{ or } x-A > C. \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-118",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "\\text{or } \\geq",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-125",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "-\\frac{1}{2}\\left| 4x-5 \\right| < -3 \\qquad \\text{Multiply both sides by } -2\\text{, and reverse the inequality.}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-127",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "4x-5=6 \\quad \\text{or} \\quad 4x-5=-6",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-136",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "(-\\infty, \\ -0.25) \\cup (2.75, \\infty)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-152",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "18.\\ 0 = -|x-3|+2",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-160",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "26.\\quad f(x) = 4\\left|x - 3\\right| + 4",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-162",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "28.\\ f(x) = -2|x+1| + 6",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-168",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "34.\\quad |3x-5| \\geq -13",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-169",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "35.\\ \\left|\\frac{3}{4}x-5\\right|\\geq 7",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-170",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "36.\\ \\left|\\frac{3}{4}x-5\\right|+1\\leq 16",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-172",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "38.\\ y = |x + 1|",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-178",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "44.\\ f(x)=-|x-1|-2",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-179",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "45.\\ f(x) = -\\left| x + 3 \\right| + 4",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-180",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "46.\\ f(x) = 2\\left| x + 3 \\right| + 1",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-183",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "49.\\ f(x) = |3x + 9| + 2",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-185",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "51.\\ f(x) = -|x+4| - 3",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-186",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "52.\\ f(x) = \\frac{1}{2}|x + 4| - 3",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/1-6-absolute-value-functions/eq-195",
+          "kind": "equation",
+          "page": "precalculus/1-6-absolute-value-functions",
+          "pred_latex": "x",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-006",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "\\begin{array}{rcl} \\sqrt{-25} & = & \\sqrt{25\\cdot(-1)} \\\\ & = & \\sqrt{25}\\sqrt{-1} \\\\ & = & 5i \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-026",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "\\sqrt{a} \\cdot i",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-034",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "-2 + 3i",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-035",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "-2",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-037",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "(-2, 3)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-038",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "-2 + 3i",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-041",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "-4i",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-042",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "(3, -4)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-043",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "-4 - i",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-048",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "\\begin{array}{rcl} (3-4i)+(2+5i) & = & (3+2)+(-4+5)i \\\\ & = & 5+i \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-050",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "4i",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-052",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "\\begin{array}{rcl} 4(2+5i) & = & (4\\cdot 2)+(4\\cdot 5i) \\\\ & = & 8+20i \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-060",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "\\begin{array}{rcl} (4+3i)(2-5i) & = & (4\\cdot 2-3\\cdot(-5))+(4\\cdot(-5)+3\\cdot 2)i \\\\ & = & (8+15)+(-20+6)i \\\\ & = & 23-14i \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-073",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "\\frac{(c+di)}{(a+bi)} \\cdot \\frac{(a-bi)}{(a-bi)} = \\frac{(c+di)(a-bi)}{(a+bi)(a-bi)}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-075",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "i^{2} = -1",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-076",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "\\begin{array}{rcl} & = & \\frac{ca - cbi + adi - bd(-1)}{a^{2} - abi + abi - b^{2}(-1)} \\\\ & = & \\frac{(ca + bd) + (ad - cb)i}{a^{2} + b^{2}} \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-093",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "\\frac{(2+5i)}{(4-i)} \\cdot \\frac{(4+i)}{(4+i)}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-094",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "\\begin{array}{rcl} \\frac{(2+5i)}{(4-i)} \\cdot \\frac{(4+i)}{(4+i)} & = & \\frac{8+2i+20i+5i^{2}}{16+4i-4i-i^{2}} \\\\ & = & \\frac{8+2i+20i+5(-1)}{16+4i-4i-(-1)} \\quad \\text{Because } i^{2} = -1 \\\\ & = & \\frac{3+22i}{17} \\\\ & = & \\frac{3}{17}+\\frac{22}{17}i \\quad \\text{Separate real and imaginary parts.} \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-099",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "f(3 + i) = -5 + i",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-101",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "-5 + i",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-112",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "i^4 = i^3 \\cdot i = -i \\cdot i = -i^2 = -(-1) = 1",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-116",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "\\begin{array}{rcl} i^6 & = & i^5 \\cdot i = i \\cdot i = i^2 = -1 \\\\ i^7 & = & i^6 \\cdot i = i^2 \\cdot i = i^3 = -i \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-121",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "35 = 4 \\cdot 8 + 3",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-122",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "i^{35} = i^{4 \\cdot 8 + 3} = i^{4 \\cdot 8} \\cdot i^{3} = \\left(i^{4}\\right)^{8} \\cdot i^{3} = 1^{8} \\cdot i^{3} = i^{3} = -i",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-170",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "31.\\ \\frac{6-2i}{3}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-171",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "32.\\ \\frac{-5+3i}{2i}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-172",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "33.\\ \\frac{6+4i}{i}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-173",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "34.\\ \\frac{2-3i}{4+3i}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-181",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "42.\\ i^{15}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-184",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "k = 4, 8, \\text{and } 12",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-186",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "(1 - i)^{k}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-187",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "k = 2, 6, \\text{and } 10",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-190",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "k = 4, 8, \\text{and } 12",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-197",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "50.\\ \\frac{1}{i^{11}}-\\frac{1}{i^{21}}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-198",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "51.\\ i^{7}(1+i^{2})",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-200",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "53.\\ \\frac{(2+i)(4-2i)}{(1+i)}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-201",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "54.\\ \\frac{(1+3i)(2-4i)}{(1+2i)}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-203",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "56.\\ \\frac{3+2i}{2+i}+(4+3i)",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/3-1-complex-numbers/eq-205",
+          "kind": "equation",
+          "page": "precalculus/3-1-complex-numbers",
+          "pred_latex": "58.\\ \\frac{3+2i}{1+2i}-\\frac{2-3i}{3+i}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-003",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\begin{array}{rcl} \\cos t & = & x \\\\ \\sin t & = & y \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-019",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\begin{array}{rcl} \\sin(t) & = & \\frac{\\text{opposite}}{\\text{hypotenuse}} \\\\ \\cos(t) & = & \\frac{\\text{adjacent}}{\\text{hypotenuse}} \\\\ \\tan(t) & = & \\frac{\\text{opposite}}{\\text{adjacent}} \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-021",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\begin{array}{rcl} \\cos(\\alpha) & = & \\frac{\\text{adjacent}}{\\text{hypotenuse}} \\\\ & = & \\frac{15}{17} \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-029",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\begin{array}{rcl} \\cos \\alpha & = & \\frac{\\text{adjacent to } \\alpha}{\\text{hypotenuse}} = \\frac{3}{5} \\\\ \\tan \\alpha & = & \\frac{\\text{opposite } \\alpha}{\\text{adjacent to } \\alpha} = \\frac{4}{3} \\\\ \\sec \\alpha & = & \\frac{\\text{hypotenuse}}{\\text{adjacent to } \\alpha} = \\frac{5}{3} \\\\ \\csc \\alpha & = & \\frac{\\text{hypotenuse}}{\\text{opposite } \\alpha} = \\frac{5}{4} \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-036",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "30^\\circ",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-038",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "45^\\circ",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-047",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\begin{array}{rcl} \\csc\\left(\\frac{\\pi}{3}\\right) & = & \\frac{\\text{hyp}}{\\text{opp}} = \\frac{2s}{\\sqrt{3}s} = \\frac{2}{\\sqrt{3}} = \\frac{2\\sqrt{3}}{3} \\\\ \\cot\\left(\\frac{\\pi}{3}\\right) & = & \\frac{\\text{adj}}{\\text{opp}} = \\frac{s}{\\sqrt{3}s} = \\frac{1}{\\sqrt{3}} = \\frac{\\sqrt{3}}{3} \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-050",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\pi",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-057",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\sin\\frac{\\pi}{3}=\\cos\\frac{\\pi}{6}=\\frac{\\sqrt{3}s}{2s}=\\frac{\\sqrt{3}}{2}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-058",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\pi",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-070",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\pi",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-071",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\pi",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-074",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\pi",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-078",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "5\\pi",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-095",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\tan(30^\\circ) = \\frac{7}{a}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-097",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\begin{array}{rcl} a & = & \\frac{7}{\\tan(30^\\circ)} \\\\ & \\approx & 12.1 \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-098",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\sin(30^\\circ) = \\frac{7}{c}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-100",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\begin{array}{rcl} c & = & \\frac{7}{\\sin(30^\\circ)} \\\\ & \\approx & 14 \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-102",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "57^\\circ",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-103",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "57^{\\circ}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-104",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "57^\\circ",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-106",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "\\begin{array}{rcl} \\tan\\theta & = & \\frac{\\text{opposite}}{\\text{adjacent}} \\\\ \\tan(57^\\circ) & = & \\frac{h}{30} \\qquad \\text{Solve for } h. \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-117",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "10.\\ \\cos B = \\frac{4}{5}, a = 10",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-119",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "12.\\ \\tan A = \\frac{5}{12}, b = 6",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-148",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "23^{\\circ}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-149",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "43^\\circ",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-153",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "18^{\\circ}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-155",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "40^{\\circ}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-156",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "43^\\circ",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-157",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "36^\\circ",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-158",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "38^\\circ",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-159",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "80^\\circ",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-160",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "80^\\circ",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-161",
+          "kind": "equation",
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "pred_latex": "60^\\circ",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": false
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Use the Properties of Identity, Inverse and Zero",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Simplify Expressions Using the Distributive Property",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Practice Makes Perfect Solve Mixture Applications",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Solve Interest Applications",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Solve Applications of Cost and Revenue Functions",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Practice Makes Perfect Evaluate the Determinant of a 2 × 2 Matrix",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Evaluate the Determinant of a 3 × 3 Matrix",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Use Cramer’s Rule to Solve Systems of Equations",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Solve Applications Using Determinants",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 2,
+          "page": "introductory-statistics/3-1-terminology",
+          "reasons": [
+            "heading.level_repaired",
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "\"OR\" Event:",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 2,
+          "page": "introductory-statistics/3-1-terminology",
+          "reasons": [
+            "heading.level_repaired",
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "\"AND\" Event:",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 2,
+          "page": "introductory-statistics/3-1-terminology",
+          "reasons": [
+            "heading.level_repaired",
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Understanding Terminology and Symbols",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/1-6-absolute-value-functions",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "If we couldn’t observe the stretch of the function from the graphs, could we algebraically determine it?",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/1-6-absolute-value-functions",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Do the graphs of absolute value functions always intersect the vertical axis? The horizontal axis?",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/1-6-absolute-value-functions",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given the formula for an absolute value function, find the horizontal intercepts of its graph.",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/1-6-absolute-value-functions",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given an absolute value equation, solve it.",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/1-6-absolute-value-functions",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given an absolute value function, solve for the set of inputs where the output is positive (or negative).",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/3-1-complex-numbers",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given an imaginary number, express it in standard form.",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/3-1-complex-numbers",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given a complex number, represent its components on the complex plane.",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/3-1-complex-numbers",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given two complex numbers, find the sum or difference.",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/3-1-complex-numbers",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given a complex number and a real number, multiply to find the product.",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/3-1-complex-numbers",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given two complex numbers, multiply to find the product.",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/3-1-complex-numbers",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given two complex numbers, divide one by the other.",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given the side lengths of a right triangle, evaluate the six trigonometric functions of one of the acute angles.",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given trigonometric functions of a special angle, evaluate using side lengths.",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given the sine and cosine of an angle, find the sine or cosine of its complement.",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given a right triangle, the length of one side, and the measure of one acute angle, find the remaining sides.",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Given a tall object, measure its height indirectly.",
+          "why_wrong": "not_a_gold_heading"
+        }
+      ]
+    },
+    "second_check": {
+      "cost_usd": 0,
+      "equation_checked": 0,
+      "equation_would_flag": 0,
+      "equations_matched": {
+        "answered": 0,
+        "auroc_vs_wrong": null,
+        "auroc_vs_wrong_excluding_scorer_gaps": null,
+        "would_flag": 0,
+        "would_flag_precision": null,
+        "would_flag_recall": null,
+        "would_flag_wrong_excluding_scorer_gaps": 0,
+        "wrong": 0
+      },
+      "figure_checked": 0,
+      "figure_flagged": 0,
+      "outcomes": {},
+      "per_pdf_page_usd": 0.0
+    },
+    "split_gold_equations": 46,
+    "static_violation_codes": {},
+    "static_violations": 0,
+    "unmatched_by_reason": {
+      "fragment": 91,
+      "other": 172,
+      "prose_math": 176
+    },
+    "unmatched_predicted": 439
+  },
+  "models": {
+    "cheap": "claude-haiku-5-5",
+    "main": "claude-opus-5-5"
+  },
+  "models_used": [
+    "claude-haiku-5-5",
+    "claude-opus-5-5"
+  ],
+  "n": 15,
+  "n_planned": 15,
+  "pipeline_version": "0.4.0",
+  "prompt_versions": {
+    "equation": "equation-df0e12f1",
+    "figure": "figure-ac51f42d",
+    "table": "table-b3769ce7"
+  },
+  "schema_version": 1,
+  "stopped_reason": null,
+  "task": "document"
+}

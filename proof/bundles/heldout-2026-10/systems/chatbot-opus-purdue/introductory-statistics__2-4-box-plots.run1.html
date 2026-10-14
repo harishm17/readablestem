@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2.4 Box Plots – Introductory Statistics (OpenStax)</title>
+
+<!-- MathJax configuration -->
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['\\(', '\\)']],
+      displayMath: [['\\[', '\\]']],
+      processEscapes: true
+    },
+    options: {
+      enableMenu: true,
+      menuOptions: {
+        settings: {
+          assistiveMml: true,
+          collapsible: false,
+          explorer: true
+        }
+      }
+    },
+    chtml: {
+      scale: 1,
+      displayAlign: 'left'
+    }
+  };
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+  :root {
+    --text: #1a1a1a;
+    --bg: #ffffff;
+    --border: #595959;
+    --link: #0645ad;
+    --focus: #b35c00;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.125rem;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+    margin: 0;
+    padding: 0;
+  }
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: #000;
+    color: #fff;
+    padding: 0.5rem 1rem;
+    z-index: 100;
+  }
+  .skip-link:focus { left: 0.5rem; top: 0.5rem; }
+  main, footer {
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 1rem 1.25rem;
+  }
+  h1, h2, h3 {
+    font-family: Arial, Helvetica, sans-serif;
+    line-height: 1.3;
+  }
+  h1 { font-size: 2rem; margin-top: 1.5rem; }
+  h2 { font-size: 1.5rem; margin: 0 0 0.75rem; }
+  h3 { font-size: 1.25rem; margin: 0 0 0.75rem; }
+  a { color: var(--link); }
+  a:focus, a:hover { text-decoration-thickness: 3px; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .box {
+    border: 1px solid var(--border);
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+  }
+  .box .box { margin: 1rem 0; }
+  .note h2 { font-size: 1.25rem; text-transform: uppercase; }
+  figure { margin: 1.5rem 0; }
+  figure svg {
+    width: 100%;
+    max-width: 40rem;
+    height: auto;
+    display: block;
+  }
+  figcaption { font-size: 1rem; margin-top: 0.5rem; }
+  ol.alpha { list-style-type: lower-alpha; }
+  ol.steps li, ol.alpha li { margin-bottom: 0.4rem; }
+  .data { overflow-wrap: anywhere; }
+  .visually-hidden {
+    position: absolute !important;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0);
+    white-space: nowrap; border: 0;
+  }
+  svg text {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    fill: #000;
+  }
+  footer { border-top: 2px solid var(--border); margin-top: 2rem; font-size: 1rem; }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<main id="main-content">
+  <h1>2.4 Box Plots</h1>
+
+  <p>Box plots (also called box-and-whisker plots or box-whisker plots) give a good graphical image of the concentration of the data. They also show how far the extreme values are from most of the data. A box plot is constructed from five values: the minimum value, the first quartile, the median, the third quartile, and the maximum value. We use these values to compare how close other data values are to them.</p>
+
+  <p>To construct a box plot, use a horizontal or vertical number line and a rectangular box. The smallest and largest data values label the endpoints of the axis. The first quartile marks one end of the box and the third quartile marks the other end of the box. Approximately <strong>the middle 50 percent of the data fall inside the box.</strong> The "whiskers" extend from the ends of the box to the smallest and largest data values. The median or second quartile can be between the first and third quartiles, or it can be one, or the other, or both. The box plot gives a good, quick picture of the data.</p>
+
+  <aside class="box note" aria-labelledby="note1">
+    <h2 id="note1">Note</h2>
+    <p>You may encounter box-and-whisker plots that have dots marking outlier values. In those cases, the whiskers are not extending to the minimum and maximum values.</p>
+  </aside>
+
+  <p>Consider, again, this dataset.</p>
+  <p class="data">1; 1; 2; 2; 4; 6; 6.8; 7.2; 8; 8.3; 9; 10; 10; 11.5</p>
+  <p>The first quartile is two, the median is seven, and the third quartile is nine. The smallest value is one, and the largest value is 11.5. The following image shows the constructed box plot.</p>
+
+  <aside class="box note" aria-labelledby="note2">
+    <h2 id="note2">Note</h2>
+    <p>See the calculator instructions on the TI web site or in the appendix.</p>
+  </aside>
+
+  <!-- Figure 2.11 -->
+  <figure aria-labelledby="fig211-cap">
+    <svg viewBox="0 0 600 140" role="img" aria-labelledby="fig211-title fig211-desc" focusable="false">
+      <title id="fig211-title">Box plot of the dataset 1 through 11.5</title>
+      <desc id="fig211-desc">Horizontal box plot above a number line marked 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, and 11.5. The left whisker extends from the minimum, 1, to the first quartile, 2. The box spans from 2 to the third quartile, 9, with a dashed vertical line at the median, 7. The right whisker extends from 9 to the maximum, 11.5.</desc>
+      <!-- whiskers -->
+      <line x1="62.5" y1="40" x2="107.5" y2="40" stroke="#000" stroke-width="2"/>
+      <line x1="62.5" y1="32" x2="62.5" y2="48" stroke="#000" stroke-width="2"/>
+      <line x1="422.5" y1="40" x2="535" y2="40" stroke="#000" stroke-width="2"/>
+      <line x1="535" y1="32" x2="535" y2="48" stroke="#000" stroke-width="2"/>
+      <!-- box -->
+      <rect x="107.5" y="20" width="315" height="40" fill="none" stroke="#000" stroke-width="2"/>
+      <line x1="332.5" y1="20" x2="332.5" y2="60" stroke="#000" stroke-width="2" stroke-dasharray="4 3"/>
+      <!-- axis -->
+      <line x1="30" y1="100" x2="570" y2="100" stroke="#000" stroke-width="2"/>
+      <polygon points="22,100 36,95 36,105" fill="#000"/>
+      <polygon points="578,100 564,95 564,105" fill="#000"/>
+      <g stroke="#000" stroke-width="2">
+        <line x1="62.5" y1="93" x2="62.5" y2="107"/>
+        <line x1="107.5" y1="93" x2="107.5" y2="107"/>
+        <line x1="152.5" y1="93" x2="152.5" y2="107"/>
+        <line x1="197.5" y1="93" x2="197.5" y2="107"/>
+        <line x1="242.5" y1="93" x2="242.5" y2="107"/>
+        <line x1="287.5" y1="93" x2="287.5" y2="107"/>
+        <line x1="332.5" y1="93" x2="332.5" y2="107"/>
+        <line x1="377.5" y1="93" x2="377.5" y2="107"/>
+        <line x1="422.5" y1="93" x2="422.5" y2="107"/>
+        <line x1="467.5" y1="93" x2="467.5" y2="107"/>
+        <line x1="512.5" y1="93" x2="512.5" y2="107"/>
+        <line x1="535" y1="93" x2="535" y2="107"/>
+      </g>
+      <g text-anchor="middle" aria-hidden="true">
+        <text x="62.5" y="125">1</text>
+        <text x="107.5" y="125">2</text>
+        <text x="152.5" y="125">3</text>
+        <text x="197.5" y="125">4</text>
+        <text x="242.5" y="125">5</text>
+        <text x="287.5" y="125">6</text>
+        <text x="332.5" y="125">7</text>
+        <text x="377.5" y="125">8</text>
+        <text x="422.5" y="125">9</text>
+        <text x="467.5" y="125">10</text>
+        <text x="510" y="125">11</text>
+        <text x="538" y="125">11.5</text>
+      </g>
+    </svg>
+    <figcaption id="fig211-cap">Figure 2.11</figcaption>
+  </figure>
+
+  <p>The two whiskers extend from the first quartile to the smallest value and from the third quartile to the largest value. The median is shown with a dashed line.</p>
+
+  <aside class="box note" aria-labelledby="note3">
+    <h2 id="note3">Note</h2>
+    <p>It is important to start a box plot with a <strong>scaled number line</strong>. Otherwise the box plot may not be useful.</p>
+  </aside>
+
+  <!-- Example 2.23 -->
+  <section class="box" aria-labelledby="ex223">
+    <h2 id="ex223">Example 2.23</h2>
+    <p>The following data are the heights of 40 students in a statistics class.</p>
+    <p class="data">59; 60; 61; 62; 62; 63; 63; 64; 64; 64; 65; 65; 65; 65; 65; 65; 65; 65; 65; 66; 66; 67; 67; 68; 68; 69; 70; 70; 70; 70; 70; 71; 71; 72; 72; 73; 74; 74; 75; 77</p>
+    <p>Construct a box plot with the following properties; the calculator intructions for the minimum and maximum values as well as the quartiles follow the example.</p>
+    <ul>
+      <li>Minimum value = 59</li>
+      <li>Maximum value = 77</li>
+      <li>\(Q1\): First quartile = 64.5</li>
+      <li>\(Q2\): Second quartile or median= 66</li>
+      <li>\(Q3\): Third quartile = 70</li>
+    </ul>
+
+    <figure aria-labelledby="fig212-cap">
+      <svg viewBox="0 0 600 140" role="img" aria-labelledby="fig212-title fig212-desc" focusable="false">
+        <title id="fig212-title">Box plot of the heights of 40 students</title>
+        <desc id="fig212-desc">Horizontal box plot above a number line marked 59, 64.5, 66, 70, and 77. The left whisker extends from the minimum, 59, to the first quartile, 64.5. The box spans from 64.5 to the third quartile, 70, with a dashed vertical line at the median, 66. The right whisker extends from 70 to the maximum, 77. The right whisker is the longest part of the plot and the section between 64.5 and 66 is the shortest.</desc>
+        <line x1="66" y1="40" x2="209" y2="40" stroke="#000" stroke-width="2"/>
+        <line x1="66" y1="32" x2="66" y2="48" stroke="#000" stroke-width="2"/>
+        <line x1="352" y1="40" x2="534" y2="40" stroke="#000" stroke-width="2"/>
+        <line x1="534" y1="32" x2="534" y2="48" stroke="#000" stroke-width="2"/>
+        <rect x="209" y="20" width="143" height="40" fill="none" stroke="#000" stroke-width="2"/>
+        <line x1="248" y1="20" x2="248" y2="60" stroke="#000" stroke-width="2" stroke-dasharray="4 3"/>
+        <line x1="30" y1="100" x2="570" y2="100" stroke="#000" stroke-width="2"/>
+        <polygon points="22,100 36,95 36,105" fill="#000"/>
+        <polygon points="578,100 564,95 564,105" fill="#000"/>
+        <g stroke="#000" stroke-width="2">
+          <line x1="66" y1="93" x2="66" y2="107"/>
+          <line x1="209" y1="93" x2="209" y2="107"/>
+          <line x1="248" y1="93" x2="248" y2="107"/>
+          <line x1="352" y1="93" x2="352" y2="107"/>
+          <line x1="534" y1="93" x2="534" y2="107"/>
+        </g>
+        <g text-anchor="middle" aria-hidden="true">
+          <text x="66" y="125">59</text>
+          <text x="209" y="125">64.5</text>
+          <text x="248" y="125">66</text>
+          <text x="352" y="125">70</text>
+          <text x="534" y="125">77</text>
+        </g>
+      </svg>
+      <figcaption id="fig212-cap">Figure 2.12</figcaption>
+    </figure>
+
+    <ol class="alpha" type="a">
+      <li>Each quarter has approximately 25% of the data.</li>
+      <li>The spreads of the four quarters are \(64.5 - 59 = 5.5\) (first quarter), \(66 - 64.5 = 1.5\) (second quarter), \(70 - 66 = 4\) (third quarter), and \(77 - 70 = 7\) (fourth quarter). So, the second quarter has the smallest spread and the fourth quarter has the largest spread.</li>
+      <li>Range = maximum value – the minimum value = \(77 - 59 = 18\)</li>
+      <li>Interquartile Range: \(\mathit{IQR} = Q3 - Q1 = 70 - 64.5 = 5.5\).</li>
+      <li>The interval 59–65 has more than 25% of the data so it has more data in it than the interval 66 through 70 which has 25% of the data.</li>
+      <li>The middle 50% (middle half) of the data has a range of 5.5 inches.</li>
+    </ol>
+  </section>
+
+  <!-- Calculator instructions -->
+  <section class="box" aria-labelledby="ti-calc">
+    <h2 id="ti-calc">Using the TI-83, 83+, 84, 84+ Calculator</h2>
+    <p>To find the minimum, maximum, and quartiles:</p>
+    <ol class="steps">
+      <li>Enter data into the list editor (Pres STAT 1:EDIT). If you need to clear the list, arrow up to the name L1, press CLEAR, and then arrow down.</li>
+      <li>Put the data values into the list L1.</li>
+      <li>Press STAT and arrow to CALC. Press 1:1-VarStats. Enter L1.</li>
+      <li>Press ENTER.</li>
+      <li>Use the down and up arrow keys to scroll.</li>
+    </ol>
+    <ul>
+      <li>Smallest value = 59.</li>
+      <li>Largest value = 77.</li>
+      <li>\(Q_1\): First quartile = 64.5.</li>
+      <li>\(Q_2\): Second quartile or median = 66.</li>
+      <li>\(Q_3\): Third quartile = 70.</li>
+    </ul>
+    <p>To construct the box plot:</p>
+    <ol class="steps">
+      <li>Press 4:Plotsoff. Press ENTER.</li>
+      <li>Arrow down and then use the right arrow key to go to the fifth picture, which is the box plot. Press ENTER.</li>
+      <li>Arrow down to Xlist: Press 2nd 1 for L1</li>
+      <li>Arrow down to Freq: Press ALPHA. Press 1.</li>
+      <li>Press Zoom. Press 9: ZoomStat.</li>
+      <li>Press TRACE, and use the arrow keys to examine the box plot.</li>
+    </ol>
+  </section>
+
+  <!-- Try It 2.23 -->
+  <section class="box" aria-labelledby="try223">
+    <h2 id="try223">Try It 2.23</h2>
+    <div class="box">
+      <p>The following data are the number of pages in 40 books on a shelf. Construct a box plot using a graphing calculator, and state the interquartile range.</p>
+      <p class="data">136; 140; 178; 190; 205; 215; 217; 218; 232; 234; 240; 255; 270; 275; 290; 301; 303; 315; 317; 318; 326; 333; 343; 349; 360; 369; 377; 388; 391; 392; 398; 400; 402; 405; 408; 422; 429; 450; 475; 512</p>
+    </div>
+  </section>
+
+  <p>For some sets of data, some of the largest value, smallest value, first quartile, median, and third quartile may be the same. For instance, you might have a data set in which the median and the third quartile are the same. In this case, the diagram would not have a dotted line inside the box displaying the median. The right side of the box would display both the third quartile and the median. For example, if the smallest value and the first quartile were both one, the median and the third quartile were both five, and the largest value was seven, the box plot would look like:</p>
+
+  <!-- Figure 2.13 -->
+  <figure aria-labelledby="fig213-cap">
+    <svg viewBox="0 0 600 140" role="img" aria-labelledby="fig213-title fig213-desc" focusable="false">
+      <title id="fig213-title">Box plot where the minimum equals the first quartile and the median equals the third quartile</title>
+      <desc id="fig213-desc">Horizontal box plot above a number line marked 1 through 7. There is no left whisker because the minimum and the first quartile are both 1. The box spans from 1 to 5; there is no dashed median line because the median and the third quartile are both 5, so the right edge of the box represents both. A single whisker extends from 5 to the maximum, 7.</desc>
+      <rect x="75" y="20" width="280" height="40" fill="none" stroke="#000" stroke-width="2"/>
+      <line x1="355" y1="40" x2="495" y2="40" stroke="#000" stroke-width="2"/>
+      <line x1="495" y1="32" x2="495" y2="48" stroke="#000" stroke-width="2"/>
+      <line x1="30" y1="100" x2="570" y2="100" stroke="#000" stroke-width="2"/>
+      <polygon points="22,100 36,95 36,105" fill="#000"/>
+      <polygon points="578,100 564,95 564,105" fill="#000"/>
+      <g stroke="#000" stroke-width="2">
+        <line x1="75" y1="93" x2="75" y2="107"/>
+        <line x1="145" y1="93" x2="145" y2="107"/>
+        <line x1="215" y1="93" x2="215" y2="107"/>
+        <line x1="285" y1="93" x2="285" y2="107"/>
+        <line x1="355" y1="93" x2="355" y2="107"/>
+        <line x1="425" y1="93" x2="425" y2="107"/>
+        <line x1="495" y1="93" x2="495" y2="107"/>
+      </g>
+      <g text-anchor="middle" aria-hidden="true">
+        <text x="75" y="125">1</text>
+        <text x="145" y="125">2</text>
+        <text x="215" y="125">3</text>
+        <text x="285" y="125">4</text>
+        <text x="355" y="125">5</text>
+        <text x="425" y="125">6</text>
+        <text x="495" y="125">7</text>
+      </g>
+    </svg>
+    <figcaption id="fig213-cap">Figure 2.13</figcaption>
+  </figure>
+
+  <p>In this case, at least 25% of the values are equal to one. Twenty-five percent of the values are between one and five, inclusive. At least 25% of the values are equal to five. The top 25% of the values fall between five and seven, inclusive.</p>
+
+  <!-- Example 2.24 -->
+  <section class="box" aria-labelledby="ex224">
+    <h2 id="ex224">Example 2.24</h2>
+    <p>Test scores for a college statistics class held during the day are:</p>
+    <p class="data">99; 56; 78; 55.5; 32; 90; 80; 81; 56; 59; 45; 77; 84.5; 84; 70; 72; 68; 32; 79; 90</p>
+    <p>Test scores for a college statistics class held during the evening are:</p>
+    <p class="data">98; 78; 68; 83; 81; 89; 88; 76; 65; 45; 98; 90; 80; 84.5; 85; 79; 78; 98; 90; 79; 81; 25.5</p>
+
+    <section class="box" aria-labelledby="ex224-problem">
+      <h3 id="ex224-problem">Problem</h3>
+      <ol class="alpha" type="a">
+        <li>Find the smallest and largest values, the median, and the first and third quartile for the day class.</li>
+        <li>Find the smallest and largest values, the median, and the first and third quartile for the night class.</li>
+        <li>For each data set, what percentage of the data is between the smallest value and the first quartile? the first quartile and the median? the median and the third quartile? the third quartile and the largest value? What percentage of the data is between the first quartile and the largest value?</li>
+        <li>Create a box plot for each set of data. Use one number line for both box plots.</li>
+        <li>Which box plot has the widest spread for the middle 50% of the data (the data between the first and third quartiles)? What does this mean for that set of data in comparison to the other set of data?</li>
+      </ol>
+    </section>
+
+    <section class="box" aria-labelledby="ex224-solution">
+      <h3 id="ex224-solution">Solution</h3>
+      <ol class="alpha" type="a">
+        <li>
+          <ul>
+            <li>Min = 32</li>
+            <li>\(Q_1 = 56\)</li>
+            <li>\(M = 74.5\)</li>
+            <li>\(Q_3 = 82.5\)</li>
+            <li>Max = 99</li>
+          </ul>
+        </li>
+        <li>
+          <ul>
+            <li>Min = 25.5</li>
+            <li>\(Q_1 = 78\)</li>
+            <li>\(M = 81\)</li>
+            <li>\(Q_3 = 89\)</li>
+            <li>Max = 98</li>
+          </ul>
+        </li>
+        <li>Day class: There are six data values ranging from 32 to 56: 30%. There are six data values ranging from 56 to 74.5: 30%. There are five data values ranging from 74.5 to 82.5: 25%. There are five data values ranging from 82.5 to 99: 25%. There are 16 data values between the first quartile, 56, and the largest value, 99: 75%. Night class:</li>
+        <li>
+          <figure aria-labelledby="fig214-cap">
+            <svg viewBox="0 0 600 185" role="img" aria-labelledby="fig214-title fig214-desc" focusable="false">
+              <title id="fig214-title">Two box plots on one number line comparing day and night class test scores</title>
+              <desc id="fig214-desc">Two horizontal box plots share one number line marked from 20 to 100 in steps of 10. Top box plot, day class: left whisker from 32 to the first quartile, 56; box from 56 to the third quartile, 82.5, with a dashed median line at 74.5; right whisker from 82.5 to 99. Bottom box plot, night class: a long left whisker from 25.5 to the first quartile, 78; a narrow box from 78 to the third quartile, 89, with a dashed median line at 81; right whisker from 89 to 98. The day class box is much wider than the night class box.</desc>
+              <g aria-hidden="true">
+                <text x="4" y="40">Day</text>
+                <text x="4" y="100">Night</text>
+              </g>
+              <!-- Day class -->
+              <line x1="135.2" y1="35" x2="269.6" y2="35" stroke="#000" stroke-width="2"/>
+              <line x1="135.2" y1="27" x2="135.2" y2="43" stroke="#000" stroke-width="2"/>
+              <line x1="418" y1="35" x2="510.4" y2="35" stroke="#000" stroke-width="2"/>
+              <line x1="510.4" y1="27" x2="510.4" y2="43" stroke="#000" stroke-width="2"/>
+              <rect x="269.6" y="15" width="148.4" height="40" fill="none" stroke="#000" stroke-width="2"/>
+              <line x1="373.2" y1="15" x2="373.2" y2="55" stroke="#000" stroke-width="2" stroke-dasharray="4 3"/>
+              <!-- Night class -->
+              <line x1="98.8" y1="95" x2="392.8" y2="95" stroke="#000" stroke-width="2"/>
+              <line x1="98.8" y1="87" x2="98.8" y2="103" stroke="#000" stroke-width="2"/>
+              <line x1="454.4" y1="95" x2="504.8" y2="95" stroke="#000" stroke-width="2"/>
+              <line x1="504.8" y1="87" x2="504.8" y2="103" stroke="#000" stroke-width="2"/>
+              <rect x="392.8" y="75" width="61.6" height="40" fill="none" stroke="#000" stroke-width="2"/>
+              <line x1="409.6" y1="75" x2="409.6" y2="115" stroke="#000" stroke-width="2" stroke-dasharray="4 3"/>
+              <!-- Axis -->
+              <line x1="40" y1="145" x2="570" y2="145" stroke="#000" stroke-width="2"/>
+              <polygon points="32,145 46,140 46,150" fill="#000"/>
+              <polygon points="578,145 564,140 564,150" fill="#000"/>
+              <g stroke="#000" stroke-width="2">
+                <line x1="68" y1="138" x2="68" y2="152"/>
+                <line x1="124" y1="138" x2="124" y2="152"/>
+                <line x1="180" y1="138" x2="180" y2="152"/>
+                <line x1="236" y1="138" x2="236" y2="152"/>
+                <line x1="292" y1="138" x2="292" y2="152"/>
+                <line x1="348" y1="138" x2="348" y2="152"/>
+                <line x1="404" y1="138" x2="404" y2="152"/>
+                <line x1="460" y1="138" x2="460" y2="152"/>
+                <line x1="516" y1="138" x2="516" y2="152"/>
+              </g>
+              <g text-anchor="middle" aria-hidden="true">
+                <text x="68" y="170">20</text>
+                <text x="124" y="170">30</text>
+                <text x="180" y="170">40</text>
+                <text x="236" y="170">50</text>
+                <text x="292" y="170">60</text>
+                <text x="348" y="170">70</text>
+                <text x="404" y="170">80</text>
+                <text x="460" y="170">90</text>
+                <text x="516" y="170">100</text>
+              </g>
+            </svg>
+            <figcaption id="fig214-cap">Figure 2.14</figcaption>
+          </figure>
+        </li>
+        <li>The first data set has the wider spread for the middle 50% of the data. The \(\mathit{IQR}\) for the first data set is greater than the \(\mathit{IQR}\) for the second set. This means that there is more variability in the middle 50% of the first data set.</li>
+      </ol>
+    </section>
+  </section>
+
+  <!-- Try It 2.24 -->
+  <section class="box" aria-labelledby="try224">
+    <h2 id="try224">Try It 2.24</h2>
+    <div class="box">
+      <p>The following data set shows the heights in inches for the boys in a class of 40 students.</p>
+      <p class="data">66; 66; 67; 67; 68; 68; 68; 68; 68; 69; 69; 69; 70; 71; 72; 72; 72; 73; 73; 74</p>
+      <p>The following data set shows the heights in inches for the girls in a class of 40 students.</p>
+      <p class="data">61; 61; 62; 62; 63; 63; 63; 65; 65; 65; 66; 66; 66; 67; 68; 68; 68; 69; 69; 69</p>
+      <p>Construct a box plot using a graphing calculator for each data set, and state which box plot has the wider spread for the middle 50% of the data.</p>
+    </div>
+  </section>
+
+  <!-- Example 2.25 -->
+  <section class="box" aria-labelledby="ex225">
+    <h2 id="ex225">Example 2.25</h2>
+    <p>Graph a box-and-whisker plot for the data values shown.</p>
+    <p class="data">10; 10; 10; 15; 35; 75; 90; 95; 100; 175; 420; 490; 515; 515; 790</p>
+    <p>The five numbers used to create a box-and-whisker plot are:</p>
+    <ul>
+      <li>Min: 10</li>
+      <li>\(Q_1\): 15</li>
+      <li>Med: 95</li>
+      <li>\(Q_3\): 490</li>
+      <li>Max: 790</li>
+    </ul>
+    <p>The following graph shows the box-and-whisker plot.</p>
+
+    <figure aria-labelledby="fig215-cap">
+      <svg viewBox="0 0 600 140" role="img" aria-labelledby="fig215-title fig215-desc" focusable="false">
+        <title id="fig215-title">Box-and-whisker plot with minimum 10, first quartile 15, median 95, third quartile 490, and maximum 790</title>
+        <desc id="fig215-desc">Horizontal box plot above a number line with tick marks labeled only at 10, 15, 95, 490, and 790; the spacing between these tick marks is not drawn to a uniform scale. A very short left whisker extends from the minimum, 10, to the first quartile, 15. The box spans from 15 to the third quartile, 490, with a dashed median line at 95. A long right whisker extends from 490 to the maximum, 790.</desc>
+        <line x1="60" y1="40" x2="83" y2="40" stroke="#000" stroke-width="2"/>
+        <line x1="60" y1="32" x2="60" y2="48" stroke="#000" stroke-width="2"/>
+        <line x1="380" y1="40" x2="540" y2="40" stroke="#000" stroke-width="2"/>
+        <line x1="540" y1="32" x2="540" y2="48" stroke="#000" stroke-width="2"/>
+        <rect x="83" y="20" width="297" height="40" fill="none" stroke="#000" stroke-width="2"/>
+        <line x1="197" y1="20" x2="197" y2="60" stroke="#000" stroke-width="2" stroke-dasharray="4 3"/>
+        <line x1="30" y1="100" x2="570" y2="100" stroke="#000" stroke-width="2"/>
+        <polygon points="22,100 36,95 36,105" fill="#000"/>
+        <polygon points="578,100 564,95 564,105" fill="#000"/>
+        <g stroke="#000" stroke-width="2">
+          <line x1="60" y1="93" x2="60" y2="107"/>
+          <line x1="83" y1="93" x2="83" y2="107"/>
+          <line x1="197" y1="93" x2="197" y2="107"/>
+          <line x1="380" y1="93" x2="380" y2="107"/>
+          <line x1="540" y1="93" x2="540" y2="107"/>
+        </g>
+        <g text-anchor="middle" aria-hidden="true">
+          <text x="57" y="125">10</text>
+          <text x="86" y="125">15</text>
+          <text x="197" y="125">95</text>
+          <text x="380" y="125">490</text>
+          <text x="540" y="125">790</text>
+        </g>
+      </svg>
+      <figcaption id="fig215-cap">Figure 2.15</figcaption>
+    </figure>
+  </section>
+
+  <!-- Try It 2.25 -->
+  <section class="box" aria-labelledby="try225">
+    <h2 id="try225">Try It 2.25</h2>
+    <div class="box">
+      <p>Follow the steps you used to graph a box-and-whisker plot for the data values shown.</p>
+      <p class="data">0; 5; 5; 15; 30; 30; 45; 50; 50; 60; 75; 110; 140; 240; 330</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <h2 class="visually-hidden">Attribution and license</h2>
+  <p>“2.4 Box Plots” from Introductory Statistics by Barbara Illowsky, Susan Dean, OpenStax.</p>
+  <p>Licensed under Creative Commons Attribution License (CC BY 4.0). <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a></p>
+  <p>Original page: <a href="https://openstax.org/books/introductory-statistics/pages/2-4-box-plots">https://openstax.org/books/introductory-statistics/pages/2-4-box-plots</a></p>
+  <p>Access for free at openstax.org.</p>
+  <p>Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.</p>
+  <p>HTML version: converted to accessible HTML; figures recreated as SVG with text descriptions; math rendered with MathJax.</p>
+  <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+</footer>
+</body>
+</html>

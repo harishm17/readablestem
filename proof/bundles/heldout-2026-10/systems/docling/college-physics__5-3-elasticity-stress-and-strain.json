@@ -1,0 +1,45 @@
+{
+  "arm": "docling",
+  "cost_usd": 0.0,
+  "input_sha256": "84cf20ef786ba51389dd7037d42e6cc65fe5796fb7d6947f9640402736ef7417",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 6.39,
+    "load_before": 6.28,
+    "offline": false,
+    "peak_rss_mb": 2316.7,
+    "quiet_box": null,
+    "system_seconds": 23.485,
+    "timeout_seconds": 1800,
+    "user_seconds": 112.976,
+    "wall_seconds_per_page": 2.2
+  },
+  "output": {
+    "file": "college-physics__5-3-elasticity-stress-and-strain.md",
+    "format": "md"
+  },
+  "pdf_pages": 14,
+  "seconds": 30.799,
+  "section": "college-physics/5-3-elasticity-stress-and-strain",
+  "settings": {
+    "command": "docling --to json --to html --to md",
+    "formula_enrichment": "off (the default)",
+    "image_export_mode": "embedded (the CLI default)",
+    "ocr": "on (RapidOCR)",
+    "tables": "TableFormer, accurate"
+  },
+  "status": "ok",
+  "versions": {
+    "docling": "2.138.0",
+    "docling-core": "2.101.1",
+    "docling-ibm-models": "4.0.3",
+    "docling-parse": "7.22.3",
+    "rapidocr": "3.10.0",
+    "torch": "2.14.1+cpu",
+    "transformers": "5.19.0"
+  }
+}

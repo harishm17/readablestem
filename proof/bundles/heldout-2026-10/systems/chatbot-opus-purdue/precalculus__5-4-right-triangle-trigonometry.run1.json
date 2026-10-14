@@ -1,0 +1,219 @@
+{
+  "arm": "chatbot-opus-purdue",
+  "attempts": [],
+  "cost_usd": 1.150636,
+  "counted_input_tokens": 133279,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0026234,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-000",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0023514,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-001",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0023794000000000003,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-002",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0023794000000000003,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-003",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0027114,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-004",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0022834,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-005",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0024234,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-006",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0044474,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-007",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0030674,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-008",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.0054034,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-009",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 3,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0026794,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-010",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0029074,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-011",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0025834,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-012",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0025714,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-013",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0024714,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/5-4-right-triangle-trigonometry/fig-014",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.043283,
+  "output": {
+    "file": "precalculus__5-4-right-triangle-trigonometry.run1.html",
+    "format": "html"
+  },
+  "output_chars": 63052,
+  "pdf_pages": 29,
+  "response_status": "end_turn",
+  "run": 1,
+  "seconds": 257.2,
+  "section": "precalculus/5-4-right-triangle-trigonometry",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 133279,
+    "output_tokens": 30876,
+    "reasoning_tokens": 4811
+  },
+  "versions": {
+    "model_requested": "claude-opus-5-5",
+    "model_served": "claude-opus-5-5"
+  }
+}

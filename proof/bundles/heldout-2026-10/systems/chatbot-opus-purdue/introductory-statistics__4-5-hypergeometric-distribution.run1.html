@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>4.5 Hypergeometric Distribution – Introductory Statistics (OpenStax)</title>
+
+  <!-- MathJax configuration -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        processEscapes: true,
+        tags: 'none'
+      },
+      options: {
+        enableMenu: true,
+        menuOptions: {
+          settings: {
+            assistiveMml: true,
+            explorer: true
+          }
+        },
+        renderActions: {
+          assistiveMml: [],
+        }
+      },
+      chtml: {
+        scale: 1,
+        matchFontHeight: true
+      },
+      loader: {
+        load: ['a11y/semantic-enrich', 'a11y/explorer', 'a11y/assistive-mml']
+      }
+    };
+  </script>
+  <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root {
+      --text: #1a1a1a;
+      --bg: #ffffff;
+      --border: #595959;
+      --link: #0645ad;
+      --link-visited: #5a2d91;
+      --focus: #b35900;
+      --note-bg: #f4f4f8;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.125rem;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      padding: 0.5rem 1rem;
+      background: #000;
+      color: #fff;
+      z-index: 100;
+    }
+    .skip-link:focus { left: 0.5rem; top: 0.5rem; }
+
+    main, footer {
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 1rem 1.25rem;
+    }
+
+    h1, h2, h3 {
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.3;
+    }
+    h1 { font-size: 2rem; margin-top: 1.5rem; }
+    h2 { font-size: 1.5rem; margin: 0 0 0.75rem; }
+    h3 { font-size: 1.2rem; margin: 0 0 0.5rem; }
+
+    section.box {
+      border: 1px solid var(--border);
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+    }
+    .box .part {
+      border: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+      margin: 0.75rem 0;
+    }
+
+    h2.section-heading { margin-top: 2rem; }
+
+    .note {
+      border: 1px solid var(--border);
+      background: var(--note-bg);
+      padding: 0.75rem 1rem;
+      margin: 1rem 0;
+    }
+
+    ol.characteristics li { margin-bottom: 0.4rem; }
+
+    ol.lettered {
+      list-style: none;
+      padding-left: 0;
+    }
+    ol.lettered li { margin-bottom: 0.6rem; }
+
+    figure { margin: 1.5rem 0; }
+    figure svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+    figcaption { margin-top: 0.5rem; }
+
+    table {
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+    caption {
+      text-align: left;
+      font-weight: bold;
+      padding-bottom: 0.4rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.35rem 0.9rem;
+      text-align: center;
+    }
+    th { background: #ececf4; }
+
+    a { color: var(--link); }
+    a:visited { color: var(--link-visited); }
+    a:focus, a:hover { text-decoration-thickness: 2px; }
+
+    :focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .visually-hidden {
+      position: absolute !important;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+      font-size: 1rem;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <main id="main-content">
+    <h1>4.5 Hypergeometric Distribution</h1>
+
+    <p>There are five characteristics of a hypergeometric experiment.</p>
+
+    <ol class="characteristics">
+      <li>You take samples from <strong>two</strong> groups.</li>
+      <li>You are concerned with a group of interest, called the first group.</li>
+      <li>You sample <strong>without replacement</strong> from the combined groups. For example, you want to choose a softball team from a combined group of 11 men and 13 women. The team consists of ten players.</li>
+      <li>Each pick is <strong>not</strong> independent, since sampling is without replacement. In the softball example, the probability of picking a woman first is \(\frac{13}{24}\). The probability of picking a man second is \(\frac{11}{23}\) if a woman was picked first. It is \(\frac{10}{23}\) if a man was picked first. The probability of the second pick depends on what happened in the first pick.</li>
+      <li>You are <strong>not</strong> dealing with Bernoulli Trials.</li>
+    </ol>
+
+    <p>The outcomes of a hypergeometric experiment fit a hypergeometric probability distribution. The random variable \(X\) = the number of items from the group of interest.</p>
+
+    <!-- Example 4.22 -->
+    <section class="box" aria-labelledby="ex-4-22">
+      <h2 id="ex-4-22">Example 4.22</h2>
+      <div class="part">
+        <h3>Problem</h3>
+        <p>A candy dish contains 100 jelly beans and 80 gumdrops. Fifty candies are picked at random. What is the probability that 35 of the 50 are gumdrops? The two groups are jelly beans and gumdrops. Since the probability question asks for the probability of picking gumdrops, the group of interest (first group) is gumdrops. The size of the group of interest (first group) is 80. The size of the second group is 100. The size of the sample is 50 (jelly beans or gumdrops). Let \(X\) = the number of gumdrops in the sample of 50. \(X\) takes on the values \(x = 0, 1, 2, \ldots, 50\). What is the probability statement written mathematically?</p>
+      </div>
+      <div class="part">
+        <h3>Solution</h3>
+        <p>\(P(x = 35)\)</p>
+      </div>
+    </section>
+
+    <!-- Try It 4.22 -->
+    <section class="box" aria-labelledby="try-4-22">
+      <h2 id="try-4-22">Try It 4.22</h2>
+      <div class="part">
+        <p>A bag contains letter tiles. Forty-four of the tiles are vowels, and 56 are consonants. Seven tiles are picked at random. You want to know the probability that four of the seven tiles are vowels. What is the group of interest, the size of the group of interest, and the size of the sample?</p>
+      </div>
+    </section>
+
+    <!-- Example 4.23 -->
+    <section class="box" aria-labelledby="ex-4-23">
+      <h2 id="ex-4-23">Example 4.23</h2>
+      <div class="part">
+        <h3>Problem</h3>
+        <p>Suppose a shipment of 100 DVD players is known to have ten defective players. An inspector randomly chooses 12 for inspection. He is interested in determining the probability that, among the 12 players, at most two are defective. The two groups are the 90 non-defective DVD players and the 10 defective DVD players. The group of interest (first group) is the defective group because the probability question asks for the probability of at most two defective DVD players. The size of the sample is 12 DVD players. (They may be non-defective or defective.) Let \(X\) = the number of defective DVD players in the sample of 12. \(X\) takes on the values \(0, 1, 2, \ldots, 10\). \(X\) may not take on the values 11 or 12. The sample size is 12, but there are only 10 defective DVD players. Write the probability statement mathematically.</p>
+      </div>
+      <div class="part">
+        <h3>Solution</h3>
+        <p>\(P(x \le 2)\)</p>
+      </div>
+    </section>
+
+    <!-- Try It 4.23 -->
+    <section class="box" aria-labelledby="try-4-23">
+      <h2 id="try-4-23">Try It 4.23</h2>
+      <div class="part">
+        <p>A gross of eggs contains 144 eggs. A particular gross is known to have 12 cracked eggs. An inspector randomly chooses 15 for inspection. She wants to know the probability that, among the 15, at most three are cracked. What is \(X\), and what values does it take on?</p>
+      </div>
+    </section>
+
+    <!-- Example 4.24 -->
+    <section class="box" aria-labelledby="ex-4-24">
+      <h2 id="ex-4-24">Example 4.24</h2>
+      <p>You are president of an on-campus special events organization. You need a committee of seven students to plan a special birthday party for the president of the college. Your organization consists of 18 women and 15 men. You are interested in the number of men on your committee. If the members of the committee are randomly selected, what is the probability that your committee has more than four men?</p>
+      <p>This is a hypergeometric problem because you are choosing your committee from two groups (men and women).</p>
+
+      <div class="part">
+        <h3>Problem</h3>
+        <ol class="lettered">
+          <li>a. Are you choosing with or without replacement?</li>
+          <li>b. What is the group of interest?</li>
+          <li>c. How many are in the group of interest?</li>
+          <li>d. How many are in the other group?</li>
+          <li>e. Let \(X\) = <span aria-hidden="true">_________</span><span class="visually-hidden">blank</span> on the committee. What values does \(X\) take on?</li>
+          <li>f. The probability question is <i>P</i>(<span aria-hidden="true">_______</span><span class="visually-hidden">blank</span>).</li>
+        </ol>
+      </div>
+      <div class="part">
+        <h3>Solution</h3>
+        <ol class="lettered">
+          <li>a. without</li>
+          <li>b. the men</li>
+          <li>c. 15 men</li>
+          <li>d. 18 women</li>
+          <li>e. Let \(X\) = <strong>the number of men</strong> on the committee. \(x = 0, 1, 2, \ldots, 7\).</li>
+          <li>f. \(P(x &gt; 4)\)</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Try It 4.24 -->
+    <section class="box" aria-labelledby="try-4-24">
+      <h2 id="try-4-24">Try It 4.24</h2>
+      <div class="part">
+        <p>A palette has 200 milk cartons. Of the 200 cartons, it is known that ten of them have leaked and cannot be sold. A stock clerk randomly chooses 18 for inspection. He wants to know the probability that among the 18, no more than two are leaking. Give five reasons why this is a hypergeometric problem.</p>
+      </div>
+    </section>
+
+    <!-- Notation -->
+    <section aria-labelledby="notation">
+      <h2 id="notation" class="section-heading">Notation for the Hypergeometric: H = Hypergeometric Probability Distribution Function</h2>
+      <p>\(X \sim H(r, b, n)\)</p>
+      <p>Read this as "\(X\) is a random variable with a hypergeometric distribution." The parameters are \(r\), \(b\), and \(n\); \(r\) = the size of the group of interest (first group), \(b\) = the size of the second group, \(n\) = the size of the chosen sample.</p>
+    </section>
+
+    <!-- Example 4.25 -->
+    <section class="box" aria-labelledby="ex-4-25">
+      <h2 id="ex-4-25">Example 4.25</h2>
+      <p>A school site committee is to be chosen randomly from six men and five women. If the committee consists of four members chosen randomly, what is the probability that two of them are men? How many men do you expect to be on the committee?</p>
+      <p>Let \(X\) = the number of men on the committee of four. The men are the group of interest (first group).</p>
+      <p>\(X\) takes on the values 0, 1, 2, 3, 4, where \(r = 6\), \(b = 5\), and \(n = 4\). \(X \sim H(6, 5, 4)\)</p>
+      <p>Find \(P(x = 2)\). \(P(x = 2) = 0.4545\) (calculator or computer)</p>
+
+      <aside class="note" aria-labelledby="note-ti">
+        <h3 id="note-ti">NOTE</h3>
+        <p>Currently, the TI-83+ and TI-84 do not have hypergeometric probability functions. There are a number of computer packages, including Microsoft Excel, that do.</p>
+      </aside>
+
+      <p>The probability that there are two men on the committee is about 0.45.</p>
+      <p>The graph of \(X \sim H(6, 5, 4)\) is:</p>
+
+      <figure aria-labelledby="fig-4-4-caption">
+        <svg viewBox="0 0 480 330" width="480" height="330"
+             role="img" aria-labelledby="fig-4-4-title fig-4-4-desc"
+             xmlns="http://www.w3.org/2000/svg">
+          <title id="fig-4-4-title">Histogram of the hypergeometric distribution X ~ H(6, 5, 4)</title>
+          <desc id="fig-4-4-desc">Bar graph with x (number of men on the committee, 0 to 4) on the horizontal axis and P(X = x) from 0 to 0.5 on the vertical axis. Approximate bar heights: x = 0, 0.015; x = 1, 0.18; x = 2, 0.45 (the tallest bar); x = 3, 0.30; x = 4, 0.045. The distribution peaks at 2 and is slightly skewed left. Exact values are in the table that follows the figure.</desc>
+
+          <!-- Gridlines -->
+          <g stroke="#c8c8c8" stroke-width="1">
+            <line x1="70" y1="20"  x2="440" y2="20"/>
+            <line x1="70" y1="68"  x2="440" y2="68"/>
+            <line x1="70" y1="116" x2="440" y2="116"/>
+            <line x1="70" y1="164" x2="440" y2="164"/>
+            <line x1="70" y1="212" x2="440" y2="212"/>
+          </g>
+
+          <!-- Bars -->
+          <g fill="#6a69b0" stroke="#3d3c80" stroke-width="1">
+            <rect x="80"  y="252.7" width="70" height="7.3"/>
+            <rect x="150" y="172.7" width="70" height="87.3"/>
+            <rect x="220" y="41.8"  width="70" height="218.2"/>
+            <rect x="290" y="114.6" width="70" height="145.4"/>
+            <rect x="360" y="238.2" width="70" height="21.8"/>
+          </g>
+
+          <!-- Axes -->
+          <g stroke="#000" stroke-width="2">
+            <line x1="70" y1="20" x2="70" y2="260"/>
+            <line x1="62" y1="260" x2="440" y2="260"/>
+          </g>
+
+          <!-- Y-axis ticks and labels -->
+          <g font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#000" text-anchor="end">
+            <text x="58" y="265">0</text>
+            <text x="58" y="217">0.1</text>
+            <text x="58" y="169">0.2</text>
+            <text x="58" y="121">0.3</text>
+            <text x="58" y="73">0.4</text>
+            <text x="58" y="25">0.5</text>
+          </g>
+
+          <!-- X-axis labels -->
+          <g font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#000" text-anchor="middle">
+            <text x="115" y="280">0</text>
+            <text x="185" y="280">1</text>
+            <text x="255" y="280">2</text>
+            <text x="325" y="280">3</text>
+            <text x="395" y="280">4</text>
+            <text x="255" y="310" font-weight="bold" font-style="italic">x</text>
+          </g>
+
+          <!-- Y-axis title -->
+          <text x="18" y="140" font-family="Arial, Helvetica, sans-serif" font-size="14"
+                font-weight="bold" fill="#000" text-anchor="middle"
+                transform="rotate(-90 18 140)">P(X=x)</text>
+        </svg>
+        <figcaption id="fig-4-4-caption">Figure 4.4</figcaption>
+      </figure>
+
+      <table>
+        <caption>Data for Figure 4.4: probabilities for \(X \sim H(6, 5, 4)\)</caption>
+        <thead>
+          <tr>
+            <th scope="col">\(x\) (number of men)</th>
+            <th scope="col">\(P(X = x)\), approximately</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">0</th><td>0.0152</td></tr>
+          <tr><th scope="row">1</th><td>0.1818</td></tr>
+          <tr><th scope="row">2</th><td>0.4545</td></tr>
+          <tr><th scope="row">3</th><td>0.3030</td></tr>
+          <tr><th scope="row">4</th><td>0.0455</td></tr>
+        </tbody>
+      </table>
+
+      <p>The \(y\)-axis contains the probability of \(X\), where \(X\) = the number of men on the committee.</p>
+      <p>You would expect \(m = 2.18\) (about two) men on the committee.</p>
+      <p>The formula for the mean is \(\mu = \frac{nr}{r + b} = \frac{(4)(6)}{6 + 5} = 2.18\)</p>
+    </section>
+
+    <!-- Try It 4.25 -->
+    <section class="box" aria-labelledby="try-4-25">
+      <h2 id="try-4-25">Try It 4.25</h2>
+      <div class="part">
+        <p>An intramural basketball team is to be chosen randomly from 15 boys and 12 girls. The team has ten slots. You want to know the probability that eight of the players will be boys. What is the group of interest and the sample?</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>“4.5 Hypergeometric Distribution” from <cite>Introductory Statistics</cite> by Barbara Illowsky, Susan Dean, OpenStax.</p>
+    <p>Licensed under Creative Commons Attribution License (CC BY 4.0). <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a></p>
+    <p>Original page: <a href="https://openstax.org/books/introductory-statistics/pages/4-5-hypergeometric-distribution">https://openstax.org/books/introductory-statistics/pages/4-5-hypergeometric-distribution</a></p>
+    <p>Access for free at openstax.org.</p>
+    <p>Changes: converted to accessible HTML with MathJax; added a text description and data table for Figure 4.4; no wording edited.</p>
+    <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+  </footer>
+</body>
+</html>

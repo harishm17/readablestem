@@ -1,0 +1,75 @@
+{
+  "arm": "chatbot-haiku-purdue",
+  "attempts": [],
+  "cost_usd": 0.016311,
+  "counted_input_tokens": 56133,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0135594,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/14-7-acid-base-titrations/fig-000",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 4,
+      "source": "svg"
+    },
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.022919400000000003,
+      "factual_error": true,
+      "figure_id": "openstax/chemistry/14-7-acid-base-titrations/fig-001",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 2,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0151194,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/14-7-acid-base-titrations/fig-002",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.051598,
+  "output": {
+    "file": "chemistry__14-7-acid-base-titrations.run2.html",
+    "format": "html"
+  },
+  "output_chars": 39490,
+  "pdf_pages": 11,
+  "response_status": "end_turn",
+  "run": 2,
+  "seconds": 72.1,
+  "section": "chemistry/14-7-acid-base-titrations",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 56133,
+    "output_tokens": 21395,
+    "reasoning_tokens": 2693
+  },
+  "versions": {
+    "model_requested": "claude-haiku-5-5",
+    "model_served": "claude-haiku-5-5"
+  }
+}

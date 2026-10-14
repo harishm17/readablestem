@@ -1,0 +1,51 @@
+{
+  "arm": "chatbot-opus-purdue",
+  "attempts": [],
+  "cost_usd": 0.30628,
+  "counted_input_tokens": 28250,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0086114,
+      "factual_error": false,
+      "figure_id": "openstax/introductory-statistics/4-5-hypergeometric-distribution/fig-000",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "svg"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.008611,
+  "output": {
+    "file": "introductory-statistics__4-5-hypergeometric-distribution.run2.html",
+    "format": "html"
+  },
+  "output_chars": 19261,
+  "pdf_pages": 6,
+  "response_status": "end_turn",
+  "run": 2,
+  "seconds": 74.9,
+  "section": "introductory-statistics/4-5-hypergeometric-distribution",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 28250,
+    "output_tokens": 9664,
+    "reasoning_tokens": 1749
+  },
+  "versions": {
+    "model_requested": "claude-opus-5-5",
+    "model_served": "claude-opus-5-5"
+  }
+}

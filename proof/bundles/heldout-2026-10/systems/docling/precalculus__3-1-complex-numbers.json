@@ -1,0 +1,45 @@
+{
+  "arm": "docling",
+  "cost_usd": 0.0,
+  "input_sha256": "ae89112656cc4147d13c6553b47d8b2989bd11019c910e41d55a1e5c77240641",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 6.67,
+    "load_before": 8.08,
+    "offline": false,
+    "peak_rss_mb": 2945.6,
+    "quiet_box": null,
+    "system_seconds": 74.036,
+    "timeout_seconds": 1800,
+    "user_seconds": 197.558,
+    "wall_seconds_per_page": 2.987
+  },
+  "output": {
+    "file": "precalculus__3-1-complex-numbers.md",
+    "format": "md"
+  },
+  "pdf_pages": 20,
+  "seconds": 59.731,
+  "section": "precalculus/3-1-complex-numbers",
+  "settings": {
+    "command": "docling --to json --to html --to md",
+    "formula_enrichment": "off (the default)",
+    "image_export_mode": "embedded (the CLI default)",
+    "ocr": "on (RapidOCR)",
+    "tables": "TableFormer, accurate"
+  },
+  "status": "ok",
+  "versions": {
+    "docling": "2.138.0",
+    "docling-core": "2.101.1",
+    "docling-ibm-models": "4.0.3",
+    "docling-parse": "7.22.3",
+    "rapidocr": "3.10.0",
+    "torch": "2.14.1+cpu",
+    "transformers": "5.19.0"
+  }
+}

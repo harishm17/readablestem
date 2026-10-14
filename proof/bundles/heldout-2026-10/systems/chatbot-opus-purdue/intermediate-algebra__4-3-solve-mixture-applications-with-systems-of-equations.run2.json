@@ -1,0 +1,38 @@
+{
+  "arm": "chatbot-opus-purdue",
+  "attempts": [],
+  "cost_usd": 1.109492,
+  "counted_input_tokens": 131733,
+  "error": null,
+  "figure_judgements": [],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.0,
+  "output": {
+    "file": "intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.run2.html",
+    "format": "html"
+  },
+  "output_chars": 66260,
+  "pdf_pages": 28,
+  "response_status": "end_turn",
+  "run": 2,
+  "seconds": 214.4,
+  "section": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 131733,
+    "output_tokens": 29128,
+    "reasoning_tokens": 1823
+  },
+  "versions": {
+    "model_requested": "claude-opus-5-5",
+    "model_served": "claude-opus-5-5"
+  }
+}
