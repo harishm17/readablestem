@@ -16,7 +16,8 @@
   with students' personal information in it.</p>
 
 <h2>What is stored, and for how long</h2>
-<p>For each upload we store: the PDF and its file name, images cut from it (equations and
+<p>For each upload we store: the PDF (for a Word or PowerPoint file, the PDF made from it;
+  the Word or PowerPoint file itself is not kept) and its file name, images cut from it (equations and
   figures), the conversion result (proposed LaTeX, MathML, alt text and headings), the
   converted HTML, and your review decisions.</p>
 <ul>
@@ -134,6 +135,18 @@
   <li>An uploaded PDF is first opened in a separate short-lived process with its own time
     and memory limits, and is kept only in the database, never as a file on the server's disk.</li>
   <li>Sign-in, uploads and daily page counts have limits that stop automated misuse.</li>
+  {% if office_on %}
+  {# TODO(Harish): final wording (T3-30). What the code does: a Word or PowerPoint file is
+     checked in a separate process (macros, linked content and oversized contents are refused),
+     written to a private temporary folder, turned into a PDF by LibreOffice running on the
+     server with no network access of its own, and the folder is removed at once. Nothing is
+     sent to a new company; LibreOffice runs inside the same service. #}
+  <li>A Word or PowerPoint file is checked in a separate process, then turned into a PDF on
+    the server itself (nothing is sent to another company for this). While that takes
+    place, for a few seconds, it is written to a private temporary folder that is removed
+    straight afterwards. Files with macros or with content linked from elsewhere are
+    refused.</li>
+  {% endif %}
 </ul>
 {# TODO(Harish): "Where it is processed". Recommended text: "The app and its database run
    in Google Cloud, region {REGION from deploy.env}. Images and nearby text of equations and

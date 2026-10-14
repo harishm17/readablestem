@@ -105,6 +105,43 @@ no byte) and that every picture keeps its alt text and an address Canvas keeps, 
 equation its MathML, and headings, tables (caption, `th`, `scope`, spans), links, ids,
 language and text are as in the source.
 
+The equations carry a maths font stack in the Canvas versions (T3-8,
+`export_canvas.MATH_FONT_STACK`): `font-family` on each `<math>`, written as a `style`
+attribute like every other carried rule. Canvas keeps `font-family` (it is in its list) but
+has no style block and no `@font-face`, so the stack can only name fonts the reader's
+computer has; native MathML in Chrome, Edge, Firefox and Safari needs a font with an
+OpenType MATH table, and the stack lists the families that have one, with the browser's own
+`math` family last. The default student file is unchanged (the golden files cover that), so
+it uses the browser's default maths font as before. If Canvas draws the equations with its
+MathJax instead, the stack is not used; `docs/canvas-sandbox-test.md` has the step that
+shows which happens.
+
+### The Common Cartridge export (`pipeline/export_cartridge.py`, T3-8)
+
+The job page also offers "Download as a Common Cartridge (.imscc)"
+(`GET /jobs/{id}/download/cartridge`, owner only): an IMS Common Cartridge 1.3 package that
+Canvas, Blackboard, Moodle and D2L import. It wraps the Canvas export's `index.html` and
+pictures; nothing in the text, MathML, alt text, headings, tables or links is changed.
+
+| File | What it is |
+|---|---|
+| `imsmanifest.xml` | Metadata (schema `IMS Common Cartridge`, version `1.3.0`, the document's title and language), one organization (a rooted hierarchy: an empty root item holding one item, titled as the document, that points at the page), and one resource of type `webcontent` listing the page and its pictures |
+| `web_resources/<folder>/index.html` | The Canvas version's page (styles written into the page, the maths font stack, pictures as relative files) |
+| `web_resources/<folder>/images/image-NN.png` | The pictures |
+
+The folder is the same `<ascii title>-<first 6 characters of the job id>` as the Canvas zip,
+so two documents imported into one course do not overwrite each other. The same document
+gives the same bytes. `check_cartridge` checks a package against the rules of the CC 1.3
+profile that apply to this content (the list is in its docstring: root element and namespace,
+schema and version, a titled LOM record, one rooted-hierarchy organization, items that point
+at resources, `webcontent` resources whose `href` is one of their files, every listed file
+present and every file listed, relative paths with plain characters, unique XML IDs), and
+`tests/test_export_cartridge.py` runs it on every document the Canvas export is tested on and
+breaks each rule once to show it is noticed. It is **not** the IMS validator: the official
+XML schemas are not in this repository and nothing here fetches them. Whether a particular
+LMS brings the page in as a file, a page or a module item is not settled by the format; the
+sandbox steps in `docs/canvas-sandbox-test.md` record what Canvas does.
+
 What Canvas still removes, and why that is accepted:
 
 - `tabindex` (not allowed on any element): the sideways-scroll boxes of wide tables and
@@ -114,7 +151,7 @@ What Canvas still removes, and why that is accepted:
 - `headers` on `td`/`th` (not allowed): an irregular table loses its explicit cell to
   header links in a pasted page; `scope`, `colspan`, `rowspan` and `caption` stay. The
   README names the count of such tables. `index.html` keeps it.
-- `font-weight` and `overflow-wrap`, `caption-side` (not in Canvas's CSS list): bold on the
+- `font-weight`, `overflow-wrap` and `caption-side` (not in Canvas's CSS list; the browser matrix test finds the one visible effect, a long unbroken web address in the source note running past a 375 px screen in the standalone `index.html`): bold on the
   "Not converted." label, table captions and figure-description summaries shows in normal
   weight, and a very long unbroken string may not wrap. The label's text and the border
   still carry the meaning ("never by colour alone").

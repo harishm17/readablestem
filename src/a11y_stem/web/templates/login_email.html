@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{% if error %}Error: {% endif %}{% if sent %}Check your email{% else %}Sign in by email{% endif %}{% endblock %}
+{% block content %}
+{% if sent %}
+<h1>Check your email</h1>
+<p>If that address is on the beta list, we have sent it a sign-in link. The link works once
+  and expires after {{ email_link_minutes }} minutes.</p>
+<p>Nothing arrived? Check your spam folder, or <a href="/login">go back and try again</a>.
+  The same message appears for every address, so this page does not tell anyone who is on
+  the list.</p>
+{% else %}
+<h1>Sign in by email</h1>
+{% if error %}
+{% with errors = [{"field_id": "signin-email", "message": error}] %}{% include "_error_summary.html" %}{% endwith %}
+{% endif %}
+<form method="post" action="/login/email" novalidate class="stack-form">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  <div class="field{% if error %} field-error{% endif %}">
+    <label for="signin-email">Email address</label>
+    {% if error %}<p class="error-message" id="signin-email-error"><span class="visually-hidden">Error: </span>{{ error }}</p>{% endif %}
+    <input type="email" id="signin-email" name="email" autocomplete="email" spellcheck="false"
+           value="{{ email }}"{% if error %} aria-invalid="true" aria-describedby="signin-email-error"{% endif %}>
+  </div>
+  <button type="submit" class="button">Email me a sign-in link</button>
+</form>
+{% endif %}
+{% endblock %}

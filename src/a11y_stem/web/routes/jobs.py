@@ -29,9 +29,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from a11y_stem.core.types import DocumentResult
-from a11y_stem.pipeline import export_canvas, text_pass
+from a11y_stem.pipeline import export_canvas, export_cartridge, text_pass
 from a11y_stem.pipeline import language as languages
-from a11y_stem.web import documents, events, notation, pending, retention, sample
+from a11y_stem.web import documents, events, notation, office_convert, pending, retention, sample
 from a11y_stem.web import feedback as feedback_questions
 from a11y_stem.web import job_page as page_rules
 from a11y_stem.web import retry as retry_rules
@@ -72,7 +72,9 @@ from a11y_stem.web.uploads import (
     MAX_FILES_PER_UPLOAD,
     UploadedFile,
     UploadRejected,
+    convert_office_isolated,
     inspect_pdf_isolated,
+    is_office_upload,
     max_upload_bytes,
     read_upload_form,
 )
@@ -106,22 +108,35 @@ def upload_error_message(
     filename: str = "",
     pages: int | None = None,
     left: int | None = None,
+    *,
+    office: bool = False,
 ) -> str:
     """What went wrong with an upload, naming the file (and its pages) when known. The
     file name is shown to its owner only, never logged. `left`: pages left today, for
-    "page_quota"."""
+    "page_quota". `office`: the file was a Word or PowerPoint file, made into a PDF first
+    (T3-30), so the advice about pages is about the document and not about a PDF."""
     s = ctx.settings
     name = filename or "This file"
     limit = s.source_page_limit
     too_many = f"{name} has {pages} pages" if pages else f"{name} has more than {limit} pages"
     if code == "page_quota":
         return _quota_message(name, pages, left, s.per_user_daily_page_quota)
+    accepted = office_convert.input_kinds(s)  # Word and PowerPoint files taken (T3-30)
+    word = bool(accepted)
+    kinds, endings = office_convert.accepted_phrases(accepted)
     return {
-        "missing_file": "Choose a PDF file to upload.",
+        "missing_file": f"Choose {kinds} to upload." if word else "Choose a PDF file to upload.",
         "bad_form": "The upload did not arrive complete. Please try again.",
-        "empty": f"{name} is empty. Choose a PDF that has content.",
-        "not_pdf": f"{name} is not a PDF. Choose a PDF file.",
+        "empty": f"{name} is empty. Choose a file that has content."
+        if word
+        else f"{name} is empty. Choose a PDF that has content.",
+        "not_pdf": f"{name} is not {kinds}. Choose {endings}."
+        if word
+        else f"{name} is not a PDF. Choose a PDF file.",
         "too_large": f"{name} is larger than {s.upload_limit_mb} MB. Split it into smaller "
+        "files and upload each one."
+        if word
+        else f"{name} is larger than {s.upload_limit_mb} MB. Split it into smaller "
         "PDFs and upload each one.",
         "too_many_files": f"You chose more than {MAX_FILES_PER_UPLOAD} files. Upload "
         f"{MAX_FILES_PER_UPLOAD} or fewer at a time.",
@@ -133,13 +148,35 @@ def upload_error_message(
         "too_many_pending": f"You already have {MAX_PENDING_PER_USER} large files waiting for "
         f"you to choose their pages. Choose or discard one, then upload {name} again. Nothing "
         "was uploaded.",
+        "office_unavailable": f"{name} is a Word or PowerPoint file, and this server cannot "
+        "read those yet. In Word or PowerPoint, save a copy as a PDF (File, Save As, PDF; "
+        f"keep the option for accessibility tags ticked) and upload that. {NOTHING_TAKEN}",
+        "office_unsupported": f"{name} is not {kinds}. Choose {endings}.",
+        "office_old_or_locked": f"{name} is in an older Word or PowerPoint format (.doc or "
+        ".ppt), or it is protected with a password. Save a copy as .docx or .pptx "
+        "without a password, or save it as a PDF, and upload that.",
+        "office_unsafe": f"{name} has something this tool will not open: macros, content "
+        "linked from another file or web address, or far more data inside it than a "
+        "document needs. Save a copy without them (put pictures in the file instead of "
+        "linking them), or save it as a PDF, and upload that.",
+        "office_failed": f"{name} could not be turned into a PDF. It may be damaged or too "
+        "complicated. Open it in Word or PowerPoint, save it as a PDF, and upload that.",
+        "office_busy": "Another Word or PowerPoint file is being converted at the moment. "
+        f"Wait a minute, then upload {name} again. Nothing was uploaded.",
+        "office_budget": f"{name} was not converted: Word and PowerPoint files take a while, "
+        "and this upload had used up its time. Upload it again on its own. Nothing was "
+        "uploaded.",
         "encrypted": f"{name} is password-protected. Save a copy without a password (for "
         "example with Print to PDF) and upload that.",
         "unreadable": f"{name} could not be opened. It may be damaged. {FRESH_COPY}",
         "damaged": f"{name} looks damaged or incomplete: it may not have finished "
         f"downloading. {FRESH_COPY}",
         "no_pages": f"{name} has no pages. Check that you chose the right file.",
-        "too_many_pages": f"{too_many}; the limit is {limit} per upload. Split it into parts "
+        "too_many_pages": f"{too_many} once it is made into a PDF (the count can differ from "
+        f"Word's or PowerPoint's); the limit is {limit} per upload. Split it into parts of "
+        f"up to {limit} pages and upload each part."
+        if office
+        else f"{too_many}; the limit is {limit} per upload. Split it into parts "
         f"of up to {limit} pages (in Acrobat: Organize Pages, then Split) and upload each "
         "part.",
         "page_too_large": f"{name} has a page larger than 1.7 metres on a side, which is too "
@@ -308,6 +345,8 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
             }
             for row in pending.live(session, user.id, now)
         ]
+    kinds = office_convert.input_kinds(ctx.settings)
+    phrases = office_convert.accepted_phrases(kinds)
     return {
         "documents": listing,
         "pages_left": left,
@@ -327,6 +366,10 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "ready_documents": sum(
             1 for row in listing.rows if row.status == JobStatus.DONE and not row.open_decisions
         ),
+        # Word (.docx) and PowerPoint (.pptx) files are taken (T3-30): the kinds installed.
+        "office_kinds": kinds,
+        "office_what": phrases[0],
+        "office_choose": phrases[1],
     }
 
 
@@ -405,10 +448,11 @@ def _upload_error_page(
     headers: dict[str, str] | None = None,
     course: str = "",
     revises: str = "",
+    office: bool = False,
 ) -> Response:
     ctx = get_ctx(request)
-    log_event(logger, "upload_rejected", code=code)
-    message = upload_error_message(code, ctx, filename, pages, left)
+    log_event(logger, "upload_rejected", code=code, office=office)
+    message = upload_error_message(code, ctx, filename, pages, left, office=office)
     context = app_context(ctx, user)
     # The course chosen stays chosen (the form marks it only among the user's courses),
     # so the file chosen again is read with the course's notation.
@@ -482,11 +526,16 @@ class Placed:
     status: int = 0
     left: int | None = None
     retry_after: str = ""
+    office: bool = False  # the file was Word or PowerPoint, made into a PDF first (T3-30)
 
 
 # How long the probes of one upload may take in all: each file has its own 30 s, but ten
 # files that hang must not hold the person's upload slot for five minutes.
 INSPECT_BUDGET_S = 120.0
+# Word and PowerPoint files of one upload are made into PDFs one after another, each in the
+# time `OFFICE_TIMEOUT_S` allows; together they get this long, so ten slow files cannot hold
+# the request for fifteen minutes. A file the time ran out for is refused, not queued.
+OFFICE_BUDGET_S = 180.0
 
 
 async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> Response:
@@ -560,25 +609,63 @@ def _place_files(
     A refusal of one file does not stop the others: each is its own document."""
     s = ctx.settings
     deadline = time.monotonic() + INSPECT_BUDGET_S
+    office_left = OFFICE_BUDGET_S
     placed: list[Placed] = []
     for file in files:
-        remaining = deadline - time.monotonic()
+        # A Word or PowerPoint file is made into a tagged PDF first (T3-30); from here on the
+        # PDF is what is probed, stored, split into parts and converted, as for any upload.
+        data, office = file.data, False
         try:
+            if is_office_upload(file.data) and office_convert.input_kinds(s):
+                office = True
+                if office_left < 5.0:
+                    raise UploadRejected("office_budget")
+                started = time.monotonic()
+                try:
+                    data = _office_to_pdf(
+                        ctx, file.data, timeout_s=min(s.office_timeout_s, office_left)
+                    )
+                finally:
+                    spent = time.monotonic() - started
+                    office_left -= spent
+                    deadline += spent  # the probes keep their own time
+            remaining = deadline - time.monotonic()
             if remaining < 1.0:
                 raise UploadRejected("unreadable")
             pages = inspect_pdf_isolated(
-                file.data,
+                data,
                 max_pages=s.source_page_limit,
                 timeout_s=min(INSPECT_TIMEOUT_S, remaining),
             )
+            if len(data) > s.upload_limit_bytes:  # the PDF made from a Word file can be big
+                raise UploadRejected("too_large")
         except UploadRejected as exc:
             placed.append(
-                Placed(file.filename, exc.pages or 0, code=exc.code, status=exc.status_code)
+                Placed(
+                    file.filename,
+                    exc.pages or 0,
+                    code=exc.code,
+                    status=exc.status_code,
+                    retry_after="10" if exc.code == "office_busy" else "",
+                    office=office,
+                )
             )
             continue
-        too_big = len(file.data) > max_upload_bytes(s.max_upload_mb)
+        too_big = len(data) > max_upload_bytes(s.max_upload_mb)
         if pages > s.max_pages_per_job or too_big:
-            placed.append(_keep_for_parts(ctx, user, file, pages, mode, course_id, exam, revises))
+            placed.append(
+                _keep_for_parts(
+                    ctx,
+                    user,
+                    UploadedFile(file.filename, data),
+                    pages,
+                    mode,
+                    course_id,
+                    exam,
+                    revises,
+                )
+            )
+            placed[-1].office = office
             continue
         try:
             job_id = store_job(
@@ -586,7 +673,7 @@ def _place_files(
                 s,
                 user.id,
                 file.filename,
-                file.data,
+                data,
                 pages,
                 mode,
                 course_id=course_id,
@@ -595,7 +682,9 @@ def _place_files(
                 now=utcnow(),
             )
         except TooManyJobs as exc:
-            placed.append(Placed(file.filename, code=exc.code, status=429, retry_after="60"))
+            placed.append(
+                Placed(file.filename, code=exc.code, status=429, retry_after="60", office=office)
+            )
             continue
         except QuotaRefused as exc:
             placed.append(
@@ -606,6 +695,7 @@ def _place_files(
                     status=429,
                     left=exc.left,
                     retry_after="3600",
+                    office=office,
                 )
             )
             continue
@@ -621,7 +711,7 @@ def _place_files(
         events.record_upload(
             ctx.factory, s, user_id=user.id, job_id=job_id, data=file.data, pages=pages
         )
-        placed.append(Placed(file.filename, pages, job_id=job_id))
+        placed.append(Placed(file.filename, pages, job_id=job_id, office=office))
     return placed
 
 
@@ -682,6 +772,7 @@ async def _answer_one(
             headers=headers,
             course=chosen,
             revises=revises,
+            office=item.office,
         )
     )
 
@@ -698,7 +789,11 @@ def _results_page(
     queued = [i for i in placed if i.job_id]
     choose = [i for i in placed if i.pending_id]
     refused = [
-        {"message": upload_error_message(i.code, ctx, i.filename, i.pages or None, i.left)}
+        {
+            "message": upload_error_message(
+                i.code, ctx, i.filename, i.pages or None, i.left, office=i.office
+            )
+        }
         for i in placed
         if i.code
     ]
@@ -718,6 +813,18 @@ def _results_page(
         "active": "app",
     }
     return render(request, "upload_results.html", context, status_code=status, headers=headers)
+
+
+def _office_to_pdf(ctx: AppContext, data: bytes, *, timeout_s: float | None = None) -> bytes:
+    """A Word or PowerPoint upload as PDF bytes (`web.office_convert`); `UploadRejected`
+    when this server cannot take it."""
+    s = ctx.settings
+    soffice = office_convert.soffice_command(s.soffice_path)
+    if not office_convert.input_kinds(s):
+        raise UploadRejected("office_unavailable")
+    return convert_office_isolated(
+        data, soffice=soffice, timeout_s=s.office_timeout_s if timeout_s is None else timeout_s
+    )
 
 
 def _job_course(request: Request, job_id: str, user: CurrentUser) -> dict[str, str] | None:
@@ -1110,6 +1217,50 @@ def download_canvas(request: Request, job_id: str, user: UserDep, course: str = 
             context={"job_id": job_id},
         )
     ctx = get_ctx(request)
+    export, title, job_ref, still_open = _canvas_export(ctx, user, job_id, number)
+    events.record_download(
+        ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, open_decisions=still_open
+    )
+    return Response(
+        export_canvas.build_zip(export),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": content_disposition(canvas_filename(title, job_ref)),
+            "Content-Security-Policy": VIEW_CSP,
+        },
+    )
+
+
+def cartridge_filename(title: str, job_id: str) -> str:
+    """The Common Cartridge's name: the HTML file's name, with the cartridge ending."""
+    return download_filename(title, job_id).removesuffix(".html") + ".imscc"
+
+
+@router.get("/jobs/{job_id}/download/cartridge")
+def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response:
+    """The same document as an IMS Common Cartridge 1.3 package (pipeline/export_cartridge.py),
+    which Canvas, Blackboard, Moodle and D2L import. A GET like the other downloads, for the
+    owner only."""
+    ctx = get_ctx(request)
+    export, title, job_ref, still_open = _canvas_export(ctx, user, job_id, None)
+    events.record_download(
+        ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, open_decisions=still_open
+    )
+    return Response(
+        export_cartridge.build_cartridge(export),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": content_disposition(cartridge_filename(title, job_ref)),
+            "Content-Security-Policy": VIEW_CSP,
+        },
+    )
+
+
+def _canvas_export(
+    ctx: AppContext, user: CurrentUser, job_id: str, number: str | None
+) -> tuple[export_canvas.CanvasExport, str, str, int]:
+    """The finished document, exported for Canvas (the owner's, done, up to date). A
+    picture the export cannot hold is a 409 page, and the HTML file stays available."""
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user)
         require_done(job)
@@ -1134,17 +1285,7 @@ def download_canvas(request: Request, job_id: str, user: UserDep, course: str = 
             "still available from the job page.",
             context={"job_id": job_ref},
         ) from None
-    events.record_download(
-        ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, open_decisions=still_open
-    )
-    return Response(
-        export_canvas.build_zip(export),
-        media_type="application/zip",
-        headers={
-            "Content-Disposition": content_disposition(canvas_filename(title, job_ref)),
-            "Content-Security-Policy": VIEW_CSP,
-        },
-    )
+    return export, title, job_ref, still_open
 
 
 @router.get("/jobs/{job_id}/view")

@@ -97,6 +97,8 @@ allowed-confusables = ["\u2212", "\u2032", "\u0394"]
 "src/a11y_stem/gold/devset_classify.py" = ["RUF001"]
 # Imports the `site` fixture of test_web_pipeline.py to use it.
 "tests/test_web_review_lazy_html.py" = ["F811"]
+# Hand-written OOXML parts are single long strings.
+"tests/fixtures/office.py" = ["E501"]
 # Styled maths letters (the reals, a script L) are what these tests check.
 "tests/test_letter_style_fonts.py" = ["RUF001", "RUF002", "RUF003"]
 

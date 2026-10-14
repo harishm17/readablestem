@@ -232,6 +232,9 @@ EXAM_REVISION = "3b8e5f1a9d27"
 FACTS_REVISION = "9d2f6a41c7e3"
 FACTS_COLUMNS = {"open_decisions", "result_title"}
 STALE_REVISION = "c4a7e9b05d18"
+SAMPLE_REVISION = "b1d5f7a29c46"  # the last of the jobs migrations
+SIGN_IN_REVISION = "5e2b8d70a3c1"
+SIGN_IN_TABLES = {"linked_emails", "login_links"}
 
 
 def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
@@ -244,10 +247,12 @@ def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
     assert facts is not None and facts.down_revision == EXAM_REVISION
     stale = script.get_revision(STALE_REVISION)
     assert stale is not None and stale.down_revision == FACTS_REVISION
-    # One head, the newest: later migrations (tests/test_web_jobs_migrations.py) follow it.
-    heads = migration_heads()
-    assert heads is not None and len(heads) == 1
+    # The jobs work follows it (tests/test_web_jobs_migrations.py); the sign-in fallback
+    # follows that, and is the one head.
     assert STALE_REVISION in {r.revision for r in script.walk_revisions()}
+    fallback = script.get_revision(SIGN_IN_REVISION)
+    assert fallback is not None and fallback.down_revision == SAMPLE_REVISION
+    assert migration_heads() == {SIGN_IN_REVISION}  # one head, the newest
 
 
 def test_the_job_page_migration_keeps_jobs_and_maps_the_old_opt_in(tmp_path):
@@ -463,5 +468,24 @@ def test_the_stale_html_migration_downgrades_without_handing_out_an_old_file(tmp
         with engine.connect() as conn:
             found = conn.execute(text("SELECT id, html_stale FROM jobs ORDER BY id")).all()
         assert [tuple(row) for row in found] == [("j1", False), ("j2", True)]
+    finally:
+        engine.dispose()
+
+
+def test_the_sign_in_fallback_migration_downgrades_and_upgrades_again(tmp_path):
+    url = f"sqlite:///{tmp_path}/fallback.db"
+    upgrade(url)
+    migrate(url, SAMPLE_REVISION, down=True)
+    engine = create_engine(url)
+    try:
+        assert not set(inspect(engine).get_table_names()) & SIGN_IN_TABLES
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        assert set(inspect(engine).get_table_names()) >= SIGN_IN_TABLES
+        with engine.connect() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
     finally:
         engine.dispose()

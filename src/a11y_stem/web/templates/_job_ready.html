@@ -25,6 +25,11 @@
     </div>
     <button type="submit" class="button-secondary" aria-describedby="canvas-help">For Canvas (zip with images)</button>
   </form>
+  {# T3-8: the same page as an IMS Common Cartridge, which Canvas, Blackboard, Moodle and D2L
+     import. Not yet tried in a live course; the page says so. #}
+  <p class="canvas-download"><a href="/jobs/{{ job.id }}/download/cartridge">Download as a Common Cartridge (.imscc)</a>
+    to import into Canvas, Blackboard, Moodle or D2L. Not yet tried in a live course:
+    <a href="/help/posting#cartridge">see the steps</a>.</p>
   <h3 id="before-heading">Before you share</h3>
   <ul aria-labelledby="before-heading">
     <li>Read the student version through once. The automatic checks look at the structure

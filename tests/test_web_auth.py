@@ -283,6 +283,8 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
     assert posts == [
         "/admin/allowlist",
         "/admin/allowlist/remove",
+        "/admin/linked-emails",  # another Google account for an instructor (T3-10)
+        "/admin/linked-emails/remove",
         # Courses and their notation (FEATURE_NOTATION_MEMORY): CSRF before the flag.
         "/courses",
         "/courses/{course_id}/delete",
@@ -301,10 +303,10 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs/{job_id}/feedback",
         "/jobs/{job_id}/keep",  # keep 7 more days (T1-8)
         "/jobs/{job_id}/language",
-        "/jobs/{job_id}/retry",  # try a stopped document again (T3-1)
         "/jobs/{job_id}/pages/{number}/add",  # a picture or an equation the tool missed (T3-5)
         "/jobs/{job_id}/pages/{number}/omit",  # a page left out (T3-16)
         "/jobs/{job_id}/pages/{number}/restore",
+        "/jobs/{job_id}/retry",  # try a stopped document again (T3-1)
         "/jobs/{job_id}/review/{element_id}",
         "/jobs/{job_id}/review/{element_id}/check",  # changes nothing, but sends LaTeX
         "/jobs/{job_id}/tables/accept-clean",  # the clean tables, in one write (T3-11)
@@ -312,6 +314,8 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs/{job_id}/title",  # the title students hear (T1-7)
         "/jobs/{job_id}/undo",
         "/login",
+        "/login/email",  # the emailed link (T3-10): CSRF before the flag
+        "/login/email/confirm",
         "/login/microsoft",
         "/logout",
         "/sample",  # opens the recorded sample document (T3-9)

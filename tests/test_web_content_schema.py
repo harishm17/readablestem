@@ -83,6 +83,12 @@ def seed_user(factory, email: str) -> dict[str, str]:
                 db.AuthIdentity(
                     user_id=user.id, provider="google", issuer=GOOGLE_ISSUER, subject=email
                 ),
+                db.LinkedEmail(user_id=user.id, email=f"other-{email}"),
+                db.LoginLink(
+                    user_id=user.id,
+                    token_hash=f"{email:0<64}"[:64],
+                    expires_at=now + timedelta(minutes=15),
+                ),
                 db.QuotaDay(user_id=user.id, day=date(2026, 10, 9), pages=3),
                 db.PendingUpload(
                     user_id=user.id,
@@ -196,6 +202,8 @@ def test_every_table_that_holds_a_user_id_is_known():
         ("courses", "user_id"),
         ("events", "user_id"),
         ("jobs", "user_id"),
+        ("linked_emails", "user_id"),
+        ("login_links", "user_id"),
         ("pending_uploads", "user_id"),
         ("quota_days", "user_id"),
         ("review_edits", "user_id"),

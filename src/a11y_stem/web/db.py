@@ -377,6 +377,39 @@ class AuthIdentity(Base):
     __table_args__ = (UniqueConstraint("provider", "issuer", "subject", name="uq_auth_identity"),)
 
 
+class LinkedEmail(Base):
+    """Another Google account an admin allowed for one instructor (T3-10).
+
+    Signing in with a verified Google address that is not a user's own, but is linked
+    here, signs in the linked user. It adds no person to the allowlist: the user's own
+    `is_allowed` decides, on every request, and removing the user ends this too. An address
+    belongs to one user at most, and is never also another user's own address
+    (`web.linked_emails`).
+    """
+
+    __tablename__ = "linked_emails"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class LoginLink(Base):
+    """A one-time email sign-in link (EMAIL_LOGIN_ENABLED, T3-10): only a SHA-256 of the
+    token is stored, so a copy of the database cannot sign anyone in. Short-lived, used
+    once, and made only for people on the allowlist. Content-free."""
+
+    __tablename__ = "login_links"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 # --------------------------------------------------------------------------- engine
 
 

@@ -26,6 +26,7 @@ arrived at; read them by question, not front to back.
 | How do I run, test and extend it? | [development.md](development.md) |
 | What is the threat model, what protects it, and how do I report a problem? | [security.md](security.md) |
 | What do I give an accessibility or procurement office? | [vendor-information.md](vendor-information.md), and the review record each document has (web.md "The review record") |
+| How do I test the Canvas export in a real Canvas? | [canvas-sandbox-test.md](canvas-sandbox-test.md) |
 | What is still open before real users, and what should the default be? | [launch.md](launch.md) |
 
 ## If you want to know why a choice was made

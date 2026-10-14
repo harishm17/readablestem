@@ -89,6 +89,8 @@ def part_filename(name: str, label: str) -> str:
     stem, dot, ext = name.rpartition(".")
     if not dot or not ext or len(ext) > 10:
         stem, ext = name, "pdf"
+    if ext.lower() in {"docx", "pptx"}:  # a part of a Word file is a PDF
+        ext = "pdf"
     tag = f" (pages {label})"
     room = max(20, 200 - len(tag) - len(ext) - 1)
     return safe_filename(f"{stem[:room]}{tag}.{ext}")

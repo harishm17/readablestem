@@ -51,6 +51,8 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | `SESSION_SECRET` | Signs the session cookie. Required in production, at least 32 characters (e.g. `python -c 'import secrets; print(secrets.token_urlsafe(48))'`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in. Without them the "Sign in with Google" button is hidden |
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft (Entra ID) sign-in, on only with all three set; tenants are directory ids, comma-separated. Half of them set refuses to start (`check_production`, any environment). See "Sign-in, sessions and CSRF" |
+| `EMAIL_LOGIN_ENABLED`, `EMAIL_SENDER`, `EMAIL_LINK_MINUTES` | Sign in by an emailed one-time link (T3-10). **Off, and no email provider is wired in.** `EMAIL_SENDER` names a registered sender (`web/email_senders.py`); the settings check refuses `EMAIL_LOGIN_ENABLED=true` without one in any environment, and in production refuses a sender that is for development only, which today means always. See "Sign-in, sessions and CSRF" and docs/launch.md "Sign-in fallback and Word input" |
+| `OFFICE_INPUT_ENABLED`, `SOFFICE_PATH`, `OFFICE_TIMEOUT_S` | Word and PowerPoint uploads (T3-30). On by default but taken only where LibreOffice is installed (`SOFFICE_PATH`, else `soffice` on `PATH`); `OFFICE_TIMEOUT_S` (90) is how long LibreOffice may take for one file. See "Uploads and limits" |
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default (docs/design/content-features.md "Flags") |
 | `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table; see "Usage events"). Both on by default; the questions are stored as events, so they need both |
 | `FEEDBACK_URL` | Where the footer's "Send feedback" link goes (http or https only). Unset: an email to `CONTACT_EMAIL`. A form service here is a new data processor: name it in the privacy notice first |
@@ -85,6 +87,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/login` | anyone | Sign-in page |
 | POST `/login` | anyone | Redirects to Google (CSRF-checked form) |
 | GET `/auth/callback` | Google | Finishes sign-in; 403 page if not allowlisted or email not verified |
+| POST `/login/email`, GET and POST `/login/email/confirm` | anyone | The emailed sign-in link (404 unless `EMAIL_LOGIN_ENABLED`): the form answers with the same page for every address; the link opens a page with a button, and only the button's POST (CSRF-checked) uses the link up. See "Sign-in, sessions and CSRF" |
 | POST `/login/microsoft` | anyone | Redirects to Microsoft (CSRF-checked form); 503 when Microsoft sign-in is not set up |
 | GET `/auth/microsoft/callback` | Microsoft | Finishes sign-in; 403 page if the organisation is not set up for the beta or the person is not allowlisted, 400 for any token that fails a check. With `admin_consent` (an IT admin back from the approval link, deploy.md step 3b): a thank-you notice on `/login`, nothing else |
 | GET, POST `/dev-login` | dev/test only | Any email, no password; the allowlist still applies |
@@ -105,6 +108,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | POST `/jobs/{id}/retry` | owner | "Try again" / "Convert the missing parts" on a stopped or partly converted document (below): the same job goes back in the queue; 409 when it is not stopped or has had its 3 tries, 429 with 10 documents already waiting or converting; rate limited per address and per person |
 | GET `/jobs/{id}/download` | owner | The HTML as an attachment |
 | GET `/jobs/{id}/download/canvas` | owner | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
+| GET `/jobs/{id}/download/cartridge` | owner | The same page as an IMS Common Cartridge 1.3 package, `.imscc` (`pipeline/export_cartridge.py`, docs/output.md "The Common Cartridge export"). Same errors and recording as the Canvas zip; a plain link on the job page |
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation, figure or table |
 | GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | owner | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
@@ -133,6 +137,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | POST `/courses/{id}/remember` | owner of the course and the job | "Remember for <course>" from the review screen; back to the review screen |
 | GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts, usage counts per day and per pseudonymous person |
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone |
+| POST `/admin/linked-emails`, `/admin/linked-emails/remove` | admins | Let an allowed instructor also sign in with another Google address, or take that away (T3-10; "Sign-in, sessions and CSRF") |
 | POST `/internal/cron/aggregate-and-purge` | Cloud Scheduler | `X-Cron-Token` header; aggregates, then purges |
 | GET `/healthz` | anyone | `{"status": "ok"}` after a database ping, else 503 |
 | GET `/readyz` | anyone | `{"status": "ready", "checks": {"database", "worker", "model_provider"}}`, one word per check, 503 `not_ready` if any is not ok (docs/operations.md, "Health, readiness and shutdown") |
@@ -204,6 +209,33 @@ yours to see". It is a 404 either way. The
   Refusing it (`login_refused reason=identity_conflict`, with an admin command to unlink
   an identity after a re-registration) is a decision for Harish, not taken here.
   TODO(Harish).
+- **Other Google accounts for one instructor** (T3-10, `web/linked_emails.py`, table
+  `linked_emails`). An instructor invited under a university address who can sign in with
+  Google only as a personal one is linked by an admin (`/admin`, "Let an instructor sign in
+  with another Google account", or `a11y-stem users link EMAIL OTHER` and `users unlink
+  OTHER`). Signing in with the linked address, verified by Google as always, signs in the
+  same user: same documents, courses and daily pages. Rules, each tested: the instructor
+  must be on the allowlist and their own `is_allowed` decides on every request, so removing
+  them ends the linked address too; a linked address is never another person's own address
+  and belongs to one instructor (adding someone to the allowlist under an address that is
+  linked to a different instructor is refused); at most five per instructor; removing a link
+  ends the instructor's sessions everywhere (a session does not remember which address it
+  came from); Google only (Microsoft signs in by directory identity). No new processor.
+- **Email sign-in link** (T3-10, `web/email_login.py`, `web/email_senders.py`, table
+  `login_links`), behind `EMAIL_LOGIN_ENABLED` (off). Built so that turning it on needs one
+  decision and one small module, not more code: Harish picks a provider and writes a class
+  with `send(message)`, registered under a name and chosen with `EMAIL_SENDER`
+  (docs/launch.md). Nothing is wired in; the start-up check refuses the setting without a
+  sender, and in production without one marked `production_ok`. How it works: the same
+  page is the answer for every address, so the form does not say who is on the list; a link
+  is made only for an allowed person's own or linked address; the token is 32 random bytes
+  of which only the SHA-256 is stored; a newer link replaces older ones; it works once and
+  for `EMAIL_LINK_MINUTES` (15); opening it shows a button and the button's POST (with the
+  session's CSRF token) signs in, so a mail scanner fetching the link does not use it up;
+  redeeming is one conditional UPDATE, so two clicks sign in once; at most three messages
+  per target address in 15 minutes whoever asks, besides the per-address sign-in limits; a
+  failing sender is logged by type and never shown. The link is in the URL, so Cloud Run's
+  request logs and the mailbox hold it until it expires or is used.
 - **Allowlist.** `users.is_allowed`, managed with `a11y-stem users allow|deny|list` or on
   `/admin`. It is checked on every request, so removing someone ends their access at
   once. People who are not on it see a polite 403 page with `CONTACT_EMAIL`; no row is
@@ -245,7 +277,10 @@ yours to see". It is a 404 either way. The
    choosing its pages ("Large files in parts"). The files stay in memory; they never touch the
    server's disk;
 4. the CSRF token;
-5. the PDF: magic bytes (`%PDF-` in the first 1024 bytes, else 415), then opened in a
+5. Word and PowerPoint (T3-30): a file that is not a PDF but is a ZIP or an old Office
+   container goes to `web/office_convert.py` first, in a child process, and the PDF that
+   comes back is what the next step sees (below, "Word and PowerPoint files");
+5b. the PDF: magic bytes (`%PDF-` in the first 1024 bytes, else 415), then opened in a
    child process (`python -m a11y_stem.web.pdf_probe`) with a 30 s timeout. A crash or
    hang in MuPDF *while opening the file and counting pages* kills the child, not the
    server. Password-protected, unreadable or empty files and more than
@@ -280,6 +315,44 @@ With JavaScript, `app.js` checks the chosen file's size and type as soon as it i
 (the same field error, in a polite live region) and refuses to send a wrong one; while a
 good one is sent it says "Uploading notes.pdf. Keep this tab open." and a second click
 does nothing. The server checks everything again.
+
+### Word and PowerPoint files (`web/office_convert.py`, T3-30)
+
+A `.docx` or `.pptx` is the best source an instructor has: the headings and the picture
+descriptions they wrote are in it. The upload form takes them where LibreOffice is
+installed (the Writer component for Word, Impress for PowerPoint; the form and the
+messages say which). The kind is decided by the file's parts, never by its name or media
+type: a Word file called `notes.pdf` is converted, a PDF called `notes.docx` is a PDF.
+
+The conversion is a child process like the PDF probe: `python -m
+a11y_stem.web.office_convert SOFFICE TIMEOUT`, file on stdin, a JSON line and then the
+PDF on stdout; a minimal environment (`core/childenv.py`); its own address-space cap; one
+at a time per instance (a second waits five seconds and is told to try again, 503). Before
+LibreOffice sees the file the child refuses, with a category: a ZIP that is damaged,
+encrypted, has more than 3000 entries or more than 200 MB unpacked (`office_unsafe`); one
+that is not exactly one Word document or one presentation (`office_unsupported`); an old
+binary `.doc` or `.ppt` or a password-protected file (`office_old_or_locked`); macros
+(`vbaProject.bin`, macro-enabled content types); a DOCTYPE or ENTITY declaration or UTF-16
+in any XML part; and any relationship that points outside the file except an ordinary
+hyperlink. The last one matters: **LibreOffice fetches the address of a linked picture
+when it converts** (tested: it connects), so linked pictures, linked objects, templates and
+sub-documents are refused. LibreOffice then runs headless in its own session with a
+private profile in a private temporary directory (removed in a `finally`; on Cloud Run
+that file system is memory), macros off, links never updated, an unreachable proxy set for
+every protocol (a second line behind the check, also tested), `RLIMIT_AS` 2 GiB, a CPU
+limit, an output size limit and 256 open files, and its whole process group is killed at
+`OFFICE_TIMEOUT_S`. It makes a **tagged** PDF (`UseTaggedPDF`), so the headings and alt
+text of T2-18 (`pipeline/tagged.py`) apply as for a PDF exported from Word. The PDF is then
+probed and limited like any upload (pages, size, scanned or blank), stored as the job's
+upload, and converted as usual; the Word file itself is not kept, and the daily pages
+counted are the PDF's. A page count from LibreOffice can differ from Word's. Measured on
+the development box: a one-page Word file converts in under a second; with the model, a
+one-page file with a Word equation took 5.5 s and $0.014 on Claude.
+
+Not done: Word fields are not evaluated (an `INCLUDETEXT` field did not read the local file
+it names, tested); no PowerPoint conversion could be run on the development box (Impress is
+not installed there), so that path is covered by the file checks and a stand-in only.
+`a11y-stem convert FILE.docx` takes Word and PowerPoint files too.
 
 A third box, off by default: "Exam or quiz: describe figures without giving answers"
 (`exam`). It is stored as `jobs.exam_mode` and the worker passes it to the conversion as

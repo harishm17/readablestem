@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{% if usable %}Finish signing in{% else %}This link does not work{% endif %}{% endblock %}
+{% block content %}
+{% if usable %}
+<h1>Finish signing in</h1>
+<p>Select the button to sign in. The link in your email stops working once you do.</p>
+<form method="post" action="/login/email/confirm">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  <input type="hidden" name="token" value="{{ token }}">
+  <button type="submit" class="button">Sign in</button>
+</form>
+{% else %}
+<h1>This link does not work</h1>
+<p>The link has expired, or it has already been used, or it was copied incompletely.
+  <a href="/login">Go to the sign-in page</a> to get a new one.</p>
+{% endif %}
+{% endblock %}

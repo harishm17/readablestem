@@ -51,13 +51,28 @@
   <table>
     <caption id="allowlist-caption" class="visually-hidden">People on the allowlist</caption>
     <thead>
-      <tr><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Last sign-in</th><th scope="col">Remove</th></tr>
+      <tr><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Other Google accounts</th><th scope="col">Last sign-in</th><th scope="col">Remove</th></tr>
     </thead>
     <tbody>
       {% for person in users %}
       <tr>
         <th scope="row">{{ person.email }}</th>
         <td>{{ "Admin" if person.is_admin else "Instructor" }}</td>
+        <td>
+          {% if person.linked %}
+          <ul class="plain-list">
+            {% for other in person.linked %}
+            <li>{{ other }}
+              <form method="post" action="/admin/linked-emails/remove" class="inline-form">
+                <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+                <input type="hidden" name="other" value="{{ other }}">
+                <button type="submit" class="button-secondary">Unlink<span class="visually-hidden"> {{ other }} from {{ person.email }}</span></button>
+              </form>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}None{% endif %}
+        </td>
         <td>{{ person.last_login_at|utc if person.last_login_at else "Never" }}</td>
         <td>
           {% if person.email != user.email %}
@@ -75,6 +90,26 @@
     </tbody>
   </table>
   </div>
+
+  <h3 id="link-heading">Let an instructor sign in with another Google account</h3>
+  <p>For an instructor whose invitation went to one address but who can sign in with Google
+    only under another, for example a personal account. The instructor must already be on
+    the allowlist. Signing in with the other account opens the same documents. Unlinking it
+    signs the instructor out everywhere.</p>
+  <form method="post" action="/admin/linked-emails" novalidate class="stack-form" aria-labelledby="link-heading">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <div class="field">
+      <label for="link-owner">Instructor's address on the allowlist</label>
+      <input type="email" id="link-owner" name="email" autocomplete="off" spellcheck="false" value="{{ link_owner_value }}">
+    </div>
+    <div class="field{% if link_error %} field-error{% endif %}">
+      <label for="link-other">Their other Google address</label>
+      {% if link_error %}<p class="error-message" id="link-other-error"><span class="visually-hidden">Error: </span>{{ link_error }}</p>{% endif %}
+      <input type="email" id="link-other" name="other" autocomplete="off" spellcheck="false"
+             value="{{ link_other_value }}"{% if link_error %} aria-invalid="true" aria-describedby="link-other-error"{% endif %}>
+    </div>
+    <button type="submit" class="button">Link account</button>
+  </form>
 </section>
 
 <section aria-labelledby="aggregates-heading">

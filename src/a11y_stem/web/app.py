@@ -57,6 +57,7 @@ from a11y_stem.web.routes import (
     courses,
     cron,
     edits,
+    email_login,
     feedback,
     job_settings,
     jobs,
@@ -417,6 +418,7 @@ def create_app(
         cron,
         courses,
         record,
+        email_login,
     ):
         app.include_router(module.router)
     app.include_router(auth_router)

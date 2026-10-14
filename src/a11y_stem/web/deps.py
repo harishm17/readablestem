@@ -270,6 +270,8 @@ def render(
         "google_login": ctx.sign_in_client("google") is not None,
         "microsoft_login": ctx.sign_in_client("microsoft") is not None,
         "dev_login": ctx.dev_login_enabled,
+        "email_login": ctx.settings.email_login_enabled,
+        "email_link_minutes": ctx.settings.email_link_minutes,
         "max_upload_mb": ctx.settings.max_upload_mb,
         "max_pages": ctx.settings.max_pages_per_job,
         "retention_hours": ctx.settings.retention_hours,

@@ -52,7 +52,7 @@ def test_no_route_answers_junk_with_a_server_error(site):  # noqa: F811
     for (method, template), who in ROUTES.items():
         if (method, template) in SKIP or who == "admin" or template.startswith("/auth/"):
             continue
-        if template in {"/logout", "/login", "/login/microsoft"}:
+        if template in {"/logout", "/login", "/login/microsoft", "/login/email"}:
             continue  # signing out / starting sign-in are covered elsewhere
         for junk in JUNK:
             fields = dict.fromkeys(FIELDS, junk) | {"csrf_token": csrf}

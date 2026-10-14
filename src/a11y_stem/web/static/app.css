@@ -125,6 +125,8 @@ button, .button, .button-secondary, .button-danger {
   text-decoration: underline; text-underline-offset: 0.15em; cursor: pointer;
 }
 .inline-form { display: inline; margin: 0; }
+.plain-list { list-style: none; margin: 0; padding: 0; }
+.plain-list li + li { margin-top: 0.5rem; }
 .button-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
 .actions { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: center; }
 .canvas-download { margin: 1.25rem 0 0; max-width: 40rem; }

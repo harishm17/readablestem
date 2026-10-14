@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import func, select
 
+from a11y_stem.web import office_convert
 from a11y_stem.web.database import ping
 from a11y_stem.web.db import Job, JobStatus, session_scope, utcnow
 from a11y_stem.web.deps import get_ctx, render
@@ -59,6 +60,9 @@ def privacy(request: Request) -> Response:
         "tables_on": ctx.settings.feature_tables,
         "notation_on": ctx.settings.feature_notation_memory,
         "microsoft_on": ctx.settings.ms_sign_in_enabled,
+        # Word and PowerPoint uploads are taken (T3-30): the page says how they are handled.
+        "office_on": bool(office_convert.input_kinds(ctx.settings)),
+        "email_login_on": ctx.settings.email_login_enabled,
         # Which company receives the images and nearby text (MODEL_PROVIDER).
         "provider": ctx.settings.model_provider,
     }

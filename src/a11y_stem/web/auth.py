@@ -32,7 +32,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from a11y_stem.config import Settings
-from a11y_stem.web import events, microsoft
+from a11y_stem.web import events, linked_emails, microsoft
 from a11y_stem.web.database import rowcount
 from a11y_stem.web.db import Job, JobStatus, User, session_scope, utcnow
 from a11y_stem.web.deps import (
@@ -112,6 +112,12 @@ def set_allowed(
     if user is None:
         if not allowed:
             return None
+        if linked_emails.is_linked(session, email):
+            raise linked_emails.LinkRefused(
+                "is_linked",
+                "That address is linked to another instructor as an extra Google account. "
+                "Remove the link first.",
+            )
         user = User(email=email, is_allowed=True, is_admin=bool(admin))
         session.add(user)
         session.flush()
@@ -143,16 +149,22 @@ def seed_admins(factory: sessionmaker[Session], emails: list[str]) -> None:
         for raw in emails:
             email = normalise_email(raw)
             if email:
-                set_allowed(session, email, allowed=True, admin=True)
+                try:
+                    set_allowed(session, email, allowed=True, admin=True)
+                except linked_emails.LinkRefused:
+                    log_event(logger, "admin_seed_skipped", reason="linked_address")
 
 
 def allowed_user(
     factory: sessionmaker[Session], email: str, name: str | None
 ) -> tuple[str, int] | None:
     """Record the sign-in for an allowlisted user and return (id, session version),
-    else None."""
+    else None. `email` is the person's own address or one an admin linked to them
+    (`web.linked_emails`)."""
     with session_scope(factory) as session:
         user = session.scalar(select(User).where(User.email == email))
+        if user is None:
+            user = linked_emails.user_for_linked(session, email)
         if user is None or not user.is_allowed:
             return None
         user.last_login_at = utcnow()
@@ -189,7 +201,7 @@ def finish_login(
     user_id, version = found
     if identity is not None:
         remember(ctx.factory, user_id, identity)
-    return _signed_in(request, user_id, version, provider)
+    return signed_in(request, user_id, version, provider)
 
 
 def finish_microsoft_login(request: Request, account: microsoft.MicrosoftAccount) -> Response:
@@ -209,10 +221,10 @@ def finish_microsoft_login(request: Request, account: microsoft.MicrosoftAccount
     if result.user_id is None:
         log_event(logger, "login_refused", reason="not_allowlisted", provider=MICROSOFT)
         return render(request, "not_allowed.html", {"email": result.email}, status_code=403)
-    return _signed_in(request, result.user_id, result.session_version, MICROSOFT)
+    return signed_in(request, result.user_id, result.session_version, MICROSOFT)
 
 
-def _signed_in(request: Request, user_id: str, version: int, provider: str) -> Response:
+def signed_in(request: Request, user_id: str, version: int, provider: str) -> Response:
     """The end of every sign-in (Google, Microsoft, dev): back to the page that asked for
     it (`web.return_to`), and the usage event."""
     ctx = get_ctx(request)

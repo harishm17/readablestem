@@ -197,6 +197,14 @@ class Settings(BaseSettings):
     # turns the feature off (the file is refused, as before).
     max_large_upload_mb: int = Field(default=30, gt=0)
     max_source_pages: int = Field(default=300, gt=0)
+    # Word and PowerPoint uploads (T3-30): converted to a tagged PDF by LibreOffice in a
+    # sandboxed child process (`web.office_convert`). Taken only when LibreOffice is
+    # installed (the production image has it only when built with INSTALL_LIBREOFFICE=true,
+    # docs/deploy.md); SOFFICE_PATH names the program when it is not `soffice` on PATH.
+    office_input_enabled: bool = True
+    soffice_path: str | None = None
+    # How long LibreOffice may take for one file, in seconds (it is killed after that).
+    office_timeout_s: float = Field(default=90.0, gt=0, le=300)
     # Uploads taken in at once per instance (one per user); see web/uploads.py.
     max_concurrent_uploads: int = Field(default=3, gt=0)
 
@@ -221,6 +229,14 @@ class Settings(BaseSettings):
     ms_client_id: str | None = None
     ms_client_secret: SecretStr | None = None
     ms_allowed_tenants: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    # Sign in by an emailed one-time link (T3-10). OFF, and no email provider is wired in:
+    # sending mail is a new data processor, which is Harish's decision (docs/launch.md,
+    # "Sign-in fallback"). Turning it on needs EMAIL_SENDER to name a registered sender
+    # (`web.email_senders`); production refuses to start without one that is meant for it.
+    email_login_enabled: bool = False
+    email_sender: str | None = None
+    # How long an emailed link works, in minutes. It works once.
+    email_link_minutes: int = Field(default=15, ge=5, le=60)
     # Shared secret that Cloud Scheduler sends to /internal/cron/* (header X-Cron-Token).
     cron_token: SecretStr | None = None
     # Run the background worker thread inside the web process (one Cloud Run service).
@@ -425,9 +441,10 @@ class Settings(BaseSettings):
         """Fail fast on a production start that would run without its safety limits.
 
         The Microsoft sign-in settings are checked in every environment: half of them set
-        is always a mistake (`_check_microsoft`).
+        is always a mistake (`_check_microsoft`); so is the email sign-in without a sender.
         """
         self._check_microsoft()
+        self._check_email_login()
         if self.env != "prod":
             if self.dev_login_enabled and self.env not in {"dev", "test"}:
                 raise ConfigError("DEV_LOGIN_ENABLED is only allowed with ENV=dev or test")
@@ -466,6 +483,14 @@ class Settings(BaseSettings):
 
     def provider_key(self) -> SecretStr | None:
         return self.anthropic_api_key if self.model_provider == "anthropic" else self.openai_api_key
+
+    def _check_email_login(self) -> None:
+        """EMAIL_LOGIN_ENABLED needs a configured sender (in production, a real one)."""
+        from a11y_stem.web.email_senders import sender_problem
+
+        problem = sender_problem(self)
+        if problem is not None:
+            raise ConfigError(problem)
 
     def _check_microsoft(self) -> None:
         """A client id needs its secret; a secret needs the tenants it may sign in from

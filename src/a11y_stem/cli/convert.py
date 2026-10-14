@@ -1,5 +1,7 @@
 """CLI: a11y-stem convert FILE.pdf --out OUT.html (--max-usd X | --fake) ...
 
+FILE may also be a Word (.docx) or PowerPoint (.pptx) file, made into a tagged PDF first.
+
 Runs the whole pipeline on one PDF and writes one HTML file. Model spend is capped twice
 (docs/design/beta-architecture.md rule 3): `--max-usd` sets an in-memory spend guard
 for this run, and `MAX_USD_PER_JOB` / `MAX_MODEL_CALLS_PER_JOB` cap the job. `--fake`
@@ -305,6 +307,26 @@ def _write_report(path: Path, output: ConversionOutput, checks: list[Check], axe
 # --------------------------------------------------------------------------- command
 
 
+def _pdf_bytes(path: Path, settings: Settings) -> bytes:
+    """The file's bytes; a Word or PowerPoint file is made into a tagged PDF first, in the
+    same limited child process the web app uses (T3-30)."""
+    from a11y_stem.web import office_convert, uploads
+
+    data = path.read_bytes()
+    if not uploads.is_office_upload(data):
+        return data
+    if not office_convert.input_kinds(settings):
+        raise _CliError("LibreOffice is not installed (or OFFICE_INPUT_ENABLED is false)")
+    try:
+        return uploads.convert_office_isolated(
+            data,
+            soffice=office_convert.soffice_command(settings.soffice_path),
+            timeout_s=settings.office_timeout_s,
+        )
+    except uploads.UploadRejected as exc:
+        raise _CliError(f"cannot read {path}: {exc.code}") from None
+
+
 def _cmd_convert(args: argparse.Namespace) -> int:
     try:
         return _convert(args)
@@ -331,7 +353,7 @@ def _convert(args: argparse.Namespace) -> int:
             raise _CliError(f"{target} is the input PDF; choose another output path")
     if args.report is not None and args.report.resolve() == args.out.resolve():
         raise _CliError("--report and --out must be different files")
-    pdf_bytes = args.pdf.read_bytes()
+    pdf_bytes = _pdf_bytes(args.pdf, settings)
     pages = _parse_pages(args.pages, _page_count(pdf_bytes, args.pdf), args.pdf)
 
     cap_usd = settings.max_usd_per_job if args.fake else args.max_usd

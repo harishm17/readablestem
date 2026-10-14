@@ -5,8 +5,8 @@ Uploads are untrusted bytes from the internet, so:
 - The size limit is enforced *while the body streams in* (`read_upload_form`), not after
   the whole body has been buffered. A Content-Length over the limit is refused before
   reading anything.
-- The file is kept in memory (never spooled to disk) and is only stored once every check
-  has passed.
+- The file is kept in memory (never spooled to disk; a Word or PowerPoint file is the one
+  exception, see `web.office_convert`) and is only stored once every check has passed.
 - The PDF is opened in a short-lived child process (`inspect_pdf_isolated`, see
   `web.pdf_probe`): a malformed file that crashes or hangs MuPDF takes down a child, not
   the web server.
@@ -36,6 +36,7 @@ from starlette.formparsers import MultiPartException, MultiPartParser
 from starlette.requests import Request
 
 from a11y_stem.core.childenv import child_env
+from a11y_stem.web import office_convert
 from a11y_stem.web.pdf_probe import ProbeRejected, looks_like_pdf, probe
 
 # Room for the multipart boundaries and the small text fields around the file itself.
@@ -63,6 +64,14 @@ REJECTION_STATUS = {
     "handwritten": 422,
     "handwritten_no_text": 422,
     "no_content": 422,
+    # Word and PowerPoint files (web.office_convert).
+    "office_unavailable": 422,
+    "office_unsupported": 415,
+    "office_old_or_locked": 422,
+    "office_unsafe": 422,
+    "office_failed": 422,
+    "office_busy": 503,
+    "office_budget": 422,  # several Word files in one upload used up the time for them
 }
 
 
@@ -302,3 +311,63 @@ def extract_part_isolated(
     if completed.returncode != 0 or not looks_like_pdf(completed.stdout):
         raise ExtractFailed
     return completed.stdout
+
+
+# --------------------------------------------------------------------------- Word and PowerPoint
+
+OFFICE_WAIT_S = 5.0  # how long a second conversion waits for the first before "busy"
+OFFICE_OVERHEAD_S = 20.0  # the wrapper's own time on top of LibreOffice's
+# One LibreOffice at a time per instance: it is the heaviest thing the app starts (hundreds
+# of megabytes), and the instance is sized for one.
+_OFFICE_SLOT = threading.BoundedSemaphore(1)
+
+
+def is_office_upload(data: bytes) -> bool:
+    """Not a PDF, but a ZIP or an old Office container: it goes to the converter."""
+    return not looks_like_pdf(data) and office_convert.looks_like_office(data)
+
+
+def convert_office_isolated(
+    data: bytes, *, soffice: str | None, timeout_s: float = office_convert.DEFAULT_TIMEOUT_S
+) -> bytes:
+    """A Word or PowerPoint file as a tagged PDF, made in a child process
+    (`web.office_convert`), or `UploadRejected` with a category. Call it from a worker
+    thread. The caller probes the PDF afterwards like any upload."""
+    if soffice is None:
+        raise UploadRejected("office_unavailable")
+    if not _OFFICE_SLOT.acquire(timeout=OFFICE_WAIT_S):
+        raise UploadRejected("office_busy")
+    try:
+        return _run_office_child(data, soffice, timeout_s)
+    finally:
+        _OFFICE_SLOT.release()
+
+
+def _run_office_child(data: bytes, soffice: str, timeout_s: float) -> bytes:
+    try:
+        child = subprocess.Popen(
+            [sys.executable, "-m", "a11y_stem.web.office_convert", soffice, str(timeout_s)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,  # whatever LibreOffice says is discarded, never logged
+            env=child_env(),
+            start_new_session=True,
+        )
+    except OSError:
+        raise UploadRejected("office_failed") from None
+    try:
+        out, _ = child.communicate(data, timeout=timeout_s + OFFICE_OVERHEAD_S)
+    except (subprocess.TimeoutExpired, OSError):
+        office_convert.kill_group(child)
+        raise UploadRejected("office_failed") from None
+    finally:
+        office_convert.kill_group(child)
+    header, _, body = out.partition(b"\n")
+    try:
+        answer = json.loads(header.decode("utf-8"))
+    except ValueError:
+        raise UploadRejected("office_failed") from None
+    if isinstance(answer, dict) and answer.get("ok") is True and body.startswith(b"%PDF-"):
+        return body
+    code = answer.get("code") if isinstance(answer, dict) else None
+    raise UploadRejected(code if code in REJECTION_STATUS else "office_failed")

@@ -41,6 +41,7 @@ class Rule:
 RULES: dict[str, Rule] = {
     "login": Rule(10, 300),  # starting a sign-in: the buttons on /login
     "callback": Rule(20, 300),  # coming back from Google or Microsoft
+    "email_link": Rule(3, 900),  # sign-in links sent to one address (T3-10), whoever asks
     "upload": Rule(30, 600),  # uploads, per address; accepted or not
     "upload_user": Rule(15, 600),  # uploads, per signed-in person
     "retry": Rule(20, 600),  # "Try again" on a stopped document, per address
