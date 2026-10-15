@@ -6,12 +6,14 @@
   <title>{% block title %}{% endblock %} | ReadableSTEM</title>
   {# Link previews (Open Graph, Twitter/X cards); og:image and og:url must be absolute. #}
   <meta name="description" content="{% block description %}Turns STEM course PDFs into accessible web pages: equations as MathML a screen reader can read, real headings, and described figures, with a short review by the instructor. Free and open source.{% endblock %}">
+  {% if not (hide_page_url is defined and hide_page_url) %}
   <link rel="canonical" href="{{ site_url }}{{ request.url.path }}">
+  <meta property="og:url" content="{{ site_url }}{{ request.url.path }}">
+  {% endif %}
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="ReadableSTEM">
   <meta property="og:title" content="{{ self.title() }} | ReadableSTEM">
   <meta property="og:description" content="{{ self.description() }}">
-  <meta property="og:url" content="{{ site_url }}{{ request.url.path }}">
   <meta property="og:image" content="{{ site_url }}{{ static_url('social-card.png') }}">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">

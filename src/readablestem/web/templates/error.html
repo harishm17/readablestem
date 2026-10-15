@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+{# No page address on error pages: a 404 for someone else's job must match the 404 for a
+   made-up id byte for byte, so it says nothing about what exists. #}
+{% set hide_page_url = true %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
 <h1>{{ title }}</h1>

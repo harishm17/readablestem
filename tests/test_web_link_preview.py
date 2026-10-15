@@ -35,3 +35,12 @@ def test_the_landing_page_has_preview_tags(tmp_path):
 def test_preview_addresses_are_absolute_when_the_site_address_is_known():
     env = make_templates("https://readablestem.com/").env
     assert env.globals["site_url"] == "https://readablestem.com"
+
+
+def test_error_pages_carry_no_page_address(tmp_path):
+    # A 404 must not echo the requested address: it would make the 404 for someone else's
+    # job differ from the 404 for a made-up one.
+    with WebEnv(tmp_path).running() as client:
+        html = client.get("/no-such-page").text
+    assert 'rel="canonical"' not in html and 'property="og:url"' not in html
+    assert 'property="og:title"' in html
