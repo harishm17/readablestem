@@ -3,13 +3,16 @@ the health check."""
 
 from __future__ import annotations
 
+import html
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import func, select
 
 from readablestem.web import office_convert
+from readablestem.web.assets import static_url
 from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import get_ctx, render
@@ -38,12 +41,47 @@ def demo(request: Request) -> Response:
     the same sandboxed policy as /jobs/{id}/view.
     """
     if DEMO_PAGE.is_file():
-        return FileResponse(
-            DEMO_PAGE,
-            media_type="text/html; charset=utf-8",
+        site = get_ctx(request).settings.base_url.rstrip("/")
+        return HTMLResponse(
+            _with_preview_tags(DEMO_PAGE.read_text(encoding="utf-8"), site),
             headers={"Content-Security-Policy": VIEW_CSP},
         )
     return render(request, "demo_pending.html", {"active": "demo"})
+
+
+DEMO_TITLE = "Demo: a physics textbook section converted | ReadableSTEM"
+DEMO_DESCRIPTION = (
+    "A real conversion of OpenStax Physics 2.3 (CC BY 4.0): equations as MathML a screen "
+    "reader can read, real headings and described figures. Open it with a screen reader."
+)
+
+
+def _with_preview_tags(page: str, site: str) -> str:
+    """The demo file with link-preview tags added after <head>. The file is a converted
+    student document and stays as it is on disk; only the copy sent for /demo carries the
+    tags, so a shared demo link shows a title, description and picture."""
+    image = f"{site}{static_url('social-card.png')}"
+    tags = {
+        "description": DEMO_DESCRIPTION,
+        "og:type": "website",
+        "og:site_name": "ReadableSTEM",
+        "og:title": DEMO_TITLE,
+        "og:description": DEMO_DESCRIPTION,
+        "og:url": f"{site}/demo",
+        "og:image": image,
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "twitter:card": "summary_large_image",
+        "twitter:title": DEMO_TITLE,
+        "twitter:description": DEMO_DESCRIPTION,
+        "twitter:image": image,
+    }
+    lines = [
+        f'<meta {"property" if key.startswith("og:") else "name"}="{key}" '
+        f'content="{html.escape(value, quote=True)}">'
+        for key, value in tags.items()
+    ]
+    return re.sub(r"<head[^>]*>", lambda m: m.group(0) + "\n" + "\n".join(lines), page, count=1)
 
 
 @router.get("/privacy")
