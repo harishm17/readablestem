@@ -150,7 +150,7 @@ def _usd(value: float | None) -> str:
     return f"${(value or 0):.4f}" if (value or 0) < 0.01 else f"${(value or 0):.2f}"
 
 
-def make_templates() -> Jinja2Templates:
+def make_templates(site_url: str = "") -> Jinja2Templates:
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
         autoescape=True,  # every template, whatever its extension
@@ -163,6 +163,9 @@ def make_templates() -> Jinja2Templates:
     env.filters["usd"] = _usd
     # /static/app.<hash>.css, cached for a year (jinja2 types `globals` as its own defaults)
     env.globals["static_url"] = static_url  # ty: ignore[invalid-assignment]
+    # Absolute address for link previews (og:image and og:url must be absolute); empty in
+    # tests, where the tags fall back to relative addresses.
+    env.globals["site_url"] = site_url.rstrip("/")  # ty: ignore[invalid-assignment]
     return Jinja2Templates(env=env)
 
 
@@ -320,7 +323,7 @@ def create_app(
         settings=settings,
         engine=engine,
         factory=factory,
-        templates=make_templates(),
+        templates=make_templates(settings.base_url),
         converter=converter or default_converter(),
         client_factory=client_factory or default_client_factory,
         guard=DbSpendGuard(factory, settings.daily_spend_cap_usd),
