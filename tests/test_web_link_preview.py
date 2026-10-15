@@ -44,3 +44,19 @@ def test_error_pages_carry_no_page_address(tmp_path):
         html = client.get("/no-such-page").text
     assert 'rel="canonical"' not in html and 'property="og:url"' not in html
     assert 'property="og:title"' in html
+
+
+def test_the_demo_page_has_preview_tags_and_the_file_is_unchanged(tmp_path):
+    from readablestem.web.routes import pages
+
+    on_disk = pages.DEMO_PAGE.read_text(encoding="utf-8")
+    with WebEnv(tmp_path).running() as client:
+        response = client.get("/demo")
+    html = response.text
+    assert response.headers["content-security-policy"] == pages.VIEW_CSP
+    assert 'property="og:title" content="Demo: a physics textbook section converted' in html
+    assert 'name="twitter:card" content="summary_large_image"' in html
+    assert re.search(r'property="og:image" content="[^"]*/static/social-card', html)
+    assert html.count('property="og:title"') == 1
+    assert "og:title" not in on_disk  # only the copy sent for /demo carries the tags
+    assert html.replace("\n", "").count("<main") == on_disk.replace("\n", "").count("<main")
