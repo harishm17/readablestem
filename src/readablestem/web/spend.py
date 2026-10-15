@@ -73,9 +73,6 @@ class DbSpendGuard:
         # its hold from the right row.
         self._days: dict[str, date] = {}
         self._lock = threading.Lock()
-        # Days whose row this process has seen exist: the row is created by the first
-        # reservation of a day, not checked for by every reservation and settlement.
-        self._known_days: set[date] = set()
 
     def _today(self) -> date:
         return utc_today(self._clock())
@@ -84,18 +81,15 @@ class DbSpendGuard:
     def _ensure_day(session: Session, day: date) -> None:
         insert_ignore(session, SpendDay, {"day": day, "spent_usd": 0.0, "held_usd": 0.0})
 
-    def _row_known(self, day: date) -> bool:
-        with self._lock:
-            return day in self._known_days
-
-    def _remember(self, day: date) -> None:
-        with self._lock:
-            self._known_days = {day} | {d for d in self._known_days if d >= day}
-
     def reserve(self, amount_usd: float) -> Reservation:
-        """One conditional UPDATE. The day's row is made (once per day per process) only
-        when the UPDATE finds none: a refusal by the cap and a missing row look the same
-        to it, so after making the row it runs once more."""
+        """One conditional UPDATE. A refusal by the cap and a missing row look the same to
+        it, so when it changes nothing the day's row is made if missing (an insert that does
+        nothing when the row exists) and the UPDATE runs once more; only then is it a
+        refusal. The extra statements run only on a refusal or the first hold of a day.
+
+        No per-process "row exists" cache decides this: another transaction's new row is
+        invisible until it commits, so trusting such a cache refused holds there was room
+        for when many started at once (20 threads got 61 of 100)."""
         if amount_usd < 0:
             raise ValueError("reservation must be >= 0")
         day = self._today()
@@ -111,12 +105,10 @@ class DbSpendGuard:
             )
         with session_scope(self.factory) as session:
             held = rowcount(session.execute(stmt)) == 1
-            if not held and not self._row_known(day):
+            if not held:
                 self._ensure_day(session, day)
                 held = rowcount(session.execute(stmt)) == 1
-            if held:  # the row is committed with this reservation
-                self._remember(day)
-            else:
+            if not held:
                 raise BudgetExceeded("daily", f"daily spend cap ${self.cap_usd:.2f} reached")
         reservation = Reservation(uuid.uuid4().hex, amount_usd)
         with self._lock:
