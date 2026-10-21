@@ -253,3 +253,13 @@ def test_the_attribution_block_and_the_running_footer_are_not_prose():
         stats=DocumentStats(pages=1, cost_usd=0, latency_ms=0, model_calls=0),
     )
     assert prose_wer.predicted_words(result) == ["speed", "is", "distance", "over", "time"]
+
+
+def test_the_bag_of_words_scores_recall_and_precision_without_order():
+    score = prose_wer.bag_score(
+        ["the", "speed", "of", "the", "cart"], ["cart", "the", "speed", "x"]
+    )
+    assert score == {"gold_words": 5, "predicted_words": 4, "matched": 3}
+    pooled = prose_wer.bag_pooled([score, {"gold_words": 5, "predicted_words": 6, "matched": 5}])
+    assert pooled["recall"] == 0.8 and pooled["precision"] == 0.8 and pooled["sections"] == 2
+    assert prose_wer.bag_pooled([])["recall"] is None

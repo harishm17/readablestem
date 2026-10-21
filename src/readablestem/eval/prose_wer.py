@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -192,6 +193,32 @@ def edit_distance(a: Sequence[str], b: Sequence[str]) -> int:
         vp = hn | (~(xv | hp) & mask)
         vn = hp & xv
     return score
+
+
+def bag_score(gold: Sequence[str], predicted: Sequence[str]) -> dict[str, int]:
+    """Word recall and precision with no order: how many of the answer key's words the output
+    has (`matched`, each word as often as the key has it at most), of the `gold_words` in the key
+    and the `predicted_words` in the output. For a set whose key is the PDF's own text layer
+    (the real-world papers: two columns, a reading order the layer does not give), where the
+    sequence a word error rate needs is not known."""
+    matched = sum((Counter(gold) & Counter(predicted)).values())
+    return {"gold_words": len(gold), "predicted_words": len(predicted), "matched": matched}
+
+
+def bag_pooled(rows: Iterable[dict[str, int]]) -> dict[str, float | int | None]:
+    """`bag_score` over many sections pooled (words counted, not rates averaged)."""
+    rows = list(rows)
+    gold = sum(r["gold_words"] for r in rows)
+    predicted = sum(r["predicted_words"] for r in rows)
+    matched = sum(r["matched"] for r in rows)
+    return {
+        "sections": len(rows),
+        "gold_words": gold,
+        "predicted_words": predicted,
+        "matched": matched,
+        "recall": round(matched / gold, 5) if gold else None,
+        "precision": round(matched / predicted, 5) if predicted else None,
+    }
 
 
 @dataclass(frozen=True)

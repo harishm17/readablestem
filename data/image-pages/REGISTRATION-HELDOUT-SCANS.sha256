@@ -1,0 +1,4 @@
+2febfd3e9ac0de8ded12c7e614d77cdf687dda188f34284c8a15fa5a9985fadf  data/image-pages/PREREGISTRATION-HELDOUT-SCANS.md
+d03e05ad267315f83c6f7ab2425a975b6bf0553c8352ca8accd0f331d535b070  src/readablestem/eval/scan.py
+632b4d297df30096b13c629e0c961ce30c74475e26f6ffc272ede6cb43c55a57  src/readablestem/models/prompts/image_page.md
+b37aad7e7cd49a1335d8fed8a64d84bf4329fe1c3ef1d3fda990bd1ce94adb36  /home/harish/.cache/readablestem/realworld/gold/heldout/manifest.json

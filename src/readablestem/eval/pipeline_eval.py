@@ -1776,6 +1776,7 @@ def _scan_metrics(items: Sequence[dict], gold_equations: int) -> dict:
         out["prose_only_wer"] = prose_wer.pooled(
             [i["prose_only"] for i in items if "prose_only" in i]
         )
+        out["prose_bag"] = prose_wer.bag_pooled([i["prose_bag"] for i in items if "prose_bag" in i])
     scored = [i["headings_scored"] for i in items if "headings_scored" in i]
     if scored:
         scored_headings = heading_metrics(scored)
@@ -2010,10 +2011,9 @@ def _document_section(
         item["prose"] = prose_wer.score(answer_key, prose_wer.predicted_words(result)).as_dict()
         # ... and the words of the prose alone (formulas out of both sides; three letters up)
         prose_key = gold_words(page, include_math=False) or []
-        item["prose_only"] = prose_wer.score(
-            prose_wer.prose_only(prose_key),
-            prose_wer.prose_only(prose_wer.predicted_words(result, include_math=False)),
-        ).as_dict()
+        prose_pred = prose_wer.prose_only(prose_wer.predicted_words(result, include_math=False))
+        item["prose_only"] = prose_wer.score(prose_wer.prose_only(prose_key), prose_pred).as_dict()
+        item["prose_bag"] = prose_wer.bag_score(prose_wer.prose_only(prose_key), prose_pred)
     item["verifier"] = vm.page_summary(result.fixes)
     item["verifier_cost_usd"] = sum(f.verifier_cost_usd for f in result.fixes)
     item["verifier_requests"] = sum(vm.requests_sent(f) for f in result.fixes)
