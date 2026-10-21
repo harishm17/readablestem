@@ -54,7 +54,7 @@ ROLES: tuple[str, ...] = (
 # Characters of text layer sent for one page. The fence scans 8,000 characters for tag names
 # (`openai_client._CONTEXT_SCAN_CHARS`); rows past this many are not offered to the model.
 CONTEXT_CHARS = 7600
-MAX_OUTPUT_TOKENS = 4096
+MAX_OUTPUT_TOKENS = 4096  # the default of `Settings.page_math_max_output_tokens`
 # A page with less text than this has nothing to place.
 MIN_PAGE_CHARS = 4
 # Pages in flight at once.
@@ -387,7 +387,7 @@ def build_request(
             instructions=prompt.text,
             images=[png],
             context_text=text,
-            max_output_tokens=MAX_OUTPUT_TOKENS,
+            max_output_tokens=settings.page_math_max_output_tokens,
             context_limit=CONTEXT_CHARS + 600,
             effort=settings.anthropic_effort_page_math or DEFAULT_EFFORT,
         ),

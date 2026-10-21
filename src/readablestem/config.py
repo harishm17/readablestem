@@ -315,6 +315,15 @@ class Settings(BaseSettings):
     # it helps. `page_math_model` None: the cheap model.
     feature_page_math: bool = False
     page_math_model: str | None = None
+    # Output limit of one page's call (thinking is allowed on top of it). 4096 loses the pages
+    # that hold more than about fifty expressions: on 114 real arXiv pages the answer ran into
+    # the limit on 25 of them (docs/eval-realworld.md); a cheap model's output costs little.
+    # When the crop's reading and the page pass's agree, raise the equation's confidence to the
+    # accept bar (pipeline/equation_step.py). Both readings share the page pass's span, so
+    # agreement says the symbols are right and nothing about the span's ends: on 114 real arXiv
+    # pages it let wrong-at-the-edges equations through without a decision (docs/eval-realworld.md).
+    page_math_agreement_lift: bool = True
+    page_math_max_output_tokens: int = Field(default=4096, ge=1024, le=32000)
     # A layout span the page pass did not confirm has its equation confidence scaled by this.
     # 1.0 (no change) because, on dev slice A, 16 aligned equations fell under the accept bar
     # for it and 14 of them were right (docs/eval-page-math.md); set below 1 to try it.
