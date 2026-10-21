@@ -120,8 +120,12 @@ def test_converter_gets_a_client_built_on_a_job_budget_under_the_daily_guard(env
     # A 1-page job gets the per-page allowance, which is below the per-job cap.
     assert (budget.max_usd, budget.max_calls) == job_caps(env.settings, 1)
     assert budget.max_usd == env.settings.max_usd_per_page < env.settings.max_usd_per_job
-    assert isinstance(budget.guard, DbSpendGuard)
-    assert budget.guard.cap_usd == env.settings.daily_spend_cap_usd
+    # The job's holds go through a view of the daily guard that records them against the job
+    # (`DbSpendGuard.scoped`, tests/test_web_spend_holds.py).
+    guard = getattr(budget.guard, "_guard", budget.guard)
+    assert isinstance(guard, DbSpendGuard)
+    assert guard.cap_usd == env.settings.daily_spend_cap_usd
+    assert len(getattr(budget.guard, "job_id", "")) == 32
 
 
 class Out(BaseModel):
