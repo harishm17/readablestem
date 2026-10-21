@@ -417,6 +417,7 @@ All codes are content-free (`Check.name`, `Check.code`); each has a sentence in
 | `table.cell_text` | `whitespace_differs` | each cell equal to the PDF cell in its place once spacing is ignored ("12 345" and "12345", "tempera- ture") | optional note |
 | `table.cell_text` | `no_pdf_text` | no PDF words to compare (no local grid with text, no element text) | required |
 | `table.math` | `flattened_maths` | a grid read from the PDF (the local-grid fallback, or "Use the grid read from the PDF") has a cell whose maths its text gives flat: an arrow over a symbol, another accent (a combining mark or spacing accent) on a word of at most three letters (an accented word such as an OT1 font's "Mu¨ller" is text), a stacked fraction (a raised digit before a baseline one), a raised run written `^(...)` (`assemble_tables.flattened_cells`). Error severity: no Accept, and `rebuilt_grid` keeps the image until those cells are LaTeX | required |
+| `table.edge_text` | `text_at_edge` | layout left a line of the table's own text size right under its box, starting where a column starts (`REASON_EDGE_TEXT`, `tables._edge_text`): probably the rest of a wrapped cell the box ended a line early. The grid and the crop both lack it, so no second reading can differ; never escalated | required |
 | `table.math` | `invalid_latex` | a maths cell's LaTeX fails a validator (error severity; the cell shows its text) | required |
 | `table.math_symbols` | `symbol_mismatch` | a maths cell's letters, digits or Greek letters differ from the PDF glyphs in its place; unlike an equation, with their case (5 mW is not 5 MW) and, unless the MathML stacks digits (a fraction, a root, scripts above and below), its numbers as written (6.67 is not 66.7, 10^-31 is not 10^-13; a text layer that runs a flattened exponent into its base, "1024" for 10^{24}, still agrees) | required |
 | `table.math_signs` | `sign_mismatch` | a sign or relation in a maths cell differs (the equation step's `compare_signs`; an en dash between digits in the PDF cell counts as a minus sign, the raise of 10^-18 lost) | required |
@@ -603,17 +604,17 @@ table with a required decision (`table_not_rebuilt`), and the formulas in its ce
 sections: the "A2" bucket of the 2026-10-20 analysis). This is what the flag does on the
 development sets, measured for this decision. Nothing on the held-out set was run.
 
-**Recommendation (updated after the real-paper run, below): the flag can go on for the
-invite-only beta, as a deployment setting, once the owner accepts two things the repository's own
-rule asks for and this work cannot supply: a labelled private set of real course PDFs (the
-real-document gate is skipped) and one gate floor missed by 2 tables in 179 (a wrapped cell's
-last line, below).** The code default stays off. On every set measured it is a net gain for a
-reader and changes nothing else: equations 0 to 65 of 223 table equations on real papers (0 to
-60 of 102 in the chemistry sections), required decisions per page down, headings, figures and
-equation scores identical, for +$0.005 to +$0.012 a PDF page. The spend caps would have to be
-`MAX_USD_PER_PAGE` at least $2.20 (the default is $1.00) and `MAX_USD_PER_JOB` at least $2.60 (the
-default $3.00 is enough): the measured cost is a fraction of that, the numbers exist for the
-worst-case reservation of $0.53 a table call.
+**Decision (2026-10-21, the owner's): `FEATURE_TABLES=true` in production**, with the settings in
+"The decision" below. The code default stays off. The blockers this section first listed were
+closed or measured: the gate floor (`wrong cells not flagged` 2 to 0), the real-document check
+(a public labelled set, "Real documents": precision 1.00, full-extent recall **0.56 against a
+floor of 0.85: missed**), the spend caps (the figures first given here were wrong; "The
+decision"). On every set measured it is a net gain for a reader and changes nothing else:
+equations 0 to 65 of 223 table equations on real papers (0 to 60 of 102 in the chemistry
+sections), required decisions per page down, headings, figures and equation scores identical, for
++$0.005 to +$0.012 a PDF page. What the missed recall means for a reader: a table the detector
+does not find is read as it is with the flag off (paragraph text or a picture), so the flag
+cannot make such a table worse; the tables it does find, it rebuilds.
 
 ### The tables task, model against no model
 
@@ -651,12 +652,29 @@ spelling rule body cells already had) and the same recorded answers score **0.85
 no-model 0.843. The other 3 are a title row the gold writes as a header (`colgroup`) and the
 model keeps as the caption: a convention. Nothing in the output changed, only what was compared.
 
-The gate (`eval gate --current ...`): every floor passes (recall 0.909 >= 0.86, precision 0.984 >=
-0.93, model TEDS 0.8815 >= 0.88, column headers 0.858 >= 0.75) **except
-`table_wrong_cells_not_flagged`: 2 against a floor of 0**; the real-document floors are skipped (no
-private set). Of the 11 tables wrong and not asked, 9 differ from the gold only in the header
-convention and 2 have one wrong cell: the last line of a wrapped cell lost by the grid and the
-model together (both agree, so nothing flags it), the failure the 2026-10-09 run described.
+The gate (`eval gate --current ...`, a replay of the recorded answers, $0): every floor passes
+(recall 0.909 >= 0.86, precision 0.984 >= 0.93, model TEDS 0.8815 >= 0.88, column headers 0.858 >=
+0.75, `table_wrong_cells_not_flagged` 0 <= 0); the real-document floors are not part of the
+committed reports (below). The first run of this section had 2 wrong cells nobody was asked
+about, and the cause given then (a wrapped cell's last line lost by the grid and the model
+alike) was wrong for both: they were a table title, the full-width first row of the gold's
+`colgroup`, that layout keeps as a heading above the box and the model keeps as the caption. Its
+words are in the output, only not in a cell, so the scorer no longer counts a gold title cell the
+output has as text just outside the table (`eval/tables.cell_fidelity`, `kept_text`: 10 of the
+5,616 gold cells; the output is unchanged). The 11 tables that are wrong and not asked about have
+become 7 (24 wrong, 17 asked), and all 7 differ from the gold in the header convention or a
+structure detail with no wrong cell. The share of tables a person must decide on is unchanged:
+**55 of 183 (0.301 a table, 0.081 a PDF page)**.
+
+The wrapped-cell failure is real, though, and the 2026-10-09 run did see it, so layout now checks
+for it: a line of the table's own size right under its box, starting where one of its columns
+starts and not running on across them (`tables._edge_text`, `REASON_EDGE_TEXT`), makes the table
+step ask a person (`table.edge_text`, `text_at_edge`, no escalation: the grid and the crop both
+lack the text, so no second reading can agree or differ). It is tested on synthetic pages only
+(`tests/test_tables_edge.py`: wrapped and short lines flagged; paragraph, heading, caption,
+title, a note off the columns and a paragraph that follows the table closely not): on the 183
+development tables it fires 0 times, so it has 0 true and 0 false positives there, and nothing in
+the numbers above comes from it.
 
 ### The document task, five chemistry sections
 
@@ -717,37 +735,64 @@ claimed, and the other 158 of the 223 table equations were not found (not analys
 table: a table the detector did not propose, or a cell the model wrote as text); no table of these
 papers was labelled, so how many real tables 17 is cannot be said.
 
-### What stands in the way
+### The blockers (2026-10-21), and what closed them
 
-1. **The real-document check.** The arbitration of what is a table was tuned on four lab manuals
-   and the 0.95 precision and 0.85 recall floors for real course PDFs have never been measured:
-   `private-inputs/tables/` does not exist (this page, "Numbers"; docs/eval.md, "Real documents").
-   The first line of this page's own rule: `FEATURE_TABLES` stays off until 3 to 5 real course
-   PDFs are labelled and measured.
-2. **One floor of the gate: `wrong cells not flagged` is 2, the floor 0.** The cause is known (a
-   wrapped cell's last line lost by the grid and the model alike); a join of the continuation
-   line in `tables.fill`, or a check against the text layer that the grid is not the only
-   witness of, would close it. Without it, about 1 table in 90 reaches the reader with a wrong cell
-   nobody was asked about.
-3. **Spend caps.** On, the worst-case reservation of a table call is $0.53, so `MAX_USD_PER_PAGE`
-   must be at least $2.20 and `MAX_USD_PER_JOB` at least $2.60 (docs/deploy.md; `ops launch-check`
-   says so). The measured cost is $0.0123 a table, 40 times less than the reservation; the caps
-   are a deployment decision.
-4. Smaller: the row-header convention (77 tables); a table
-   step that reads chemistry cells in `\ce` is refused (the table prompt, `models/prompts/table.md`,
-   does not teach it; `table_step` does not call `equation_step.expand_ce`: 60 of 102 cell
-   formulas were found anyway as `\text{...}` LaTeX); a model outage leaves a header-less
-   local grid.
+1. **The real-document check: measured, floor missed.** The first line of this page's rule was that
+   `FEATURE_TABLES` stays off until 3 to 5 real course documents are labelled and measured. The
+   private lab manuals of the research cannot be committed, so `data/real-tables/` holds five
+   openly licensed ones (CC BY 4.0 arXiv lecture notes, a textbook, a physics-lab study, two
+   tutorials), 64 pages, 25 labelled tables, and the floors were written down before detection was
+   run on any of them (its README; commit f545c73). No model: **precision 1.000 (14 of 14 predicted
+   data tables are real; Wilson 95% 0.78 to 1.00), full-extent recall 0.560 (14 of 25; 0.37 to
+   0.73) against floors of 0.95 and 0.85**. Every table found was found at its full extent.
+   The 11 missed: 6 are the notation lists of the lecture notes (two columns of formulas and
+   their meanings, no rules: whether a reader calls those tables is arguable, they are `tabular`
+   in the source; without them 14 of 19, 0.74, still under the floor), 1 a list ruled only above
+   and below (the textbook's acronyms), 1 a table on a rotated page, 1 a ruled two-column table of
+   long text that `judge` took for layout (`layout_grid`: a term-and-description grid), and 2 ruled
+   tables of long wrapped text with shaded quotes that came out as fragments. Nothing was tuned on
+   this set: after reading these numbers it is a development set, not a held-out one, and the
+   floors stay unmet. Per-table outcome counts: `data/real-tables/result-2026-10-21.json`;
+   repeat: `readablestem eval pipeline --task tables --mode local --real-dir data/real-tables`
+   (free, about four minutes).
+2. **The gate floor: closed.** `wrong cells not flagged` 2 to 0, as in "The tables task" above: a
+   scorer rule for a title kept outside the box, plus the edge check, which fires nowhere on the
+   development sets.
+3. **Spend caps: the figures first written here were wrong.** With the flag on, the worst-case
+   reservation of a table call is $0.53 and `ops launch-check` (`ops/limits.py`) refuses a
+   `MAX_USD_PER_PAGE` under $0.53 and warns about a `MAX_USD_PER_JOB` under **$4.66** (a 30-page
+   document's $0.45 plus eight calls held at once, $4.21), not $2.60: run on 2026-10-21 with the
+   job cap at $4.65 it reports one blocker, at $4.66 none. The measured cost is $0.0123 a table,
+   about 40 times less than the reservation; the caps only have to hold the reservations.
+4. **`\ce` in a table cell: closed without a prompt change.** The table prompt does not teach
+   mhchem, so a model rarely writes it; if one does, `table_step._cell` now writes it out as
+   plain LaTeX with `equation_step.expand_ce` before the checks, as the equation step does, and a
+   `\ce` outside the converted subset still fails the LaTeX check and goes to a person
+   (`tests/test_steps_table.py`). Nothing recorded changes (the prompt hash is the same,
+   `table-b3769ce7`; the recorded answers replay as before).
+5. Smaller, open: the row-header convention (77 tables); a model outage leaves a header-less
+   local grid; detection of unruled lists, rotated pages and long wrapped text (item 1).
 
-### If it were turned on
+### The decision
 
-The change is the setting, not code: `FEATURE_TABLES=true` and the two caps above in the
-deployment environment (`deploy/deploy.env.example`; `Settings.feature_tables` stays `False` by
-default, so a checkout, the tests and every other deployment behave as before). Nothing else needs
-to move; the tests of the step with the flag on (`tests/test_steps_table.py`, "a conversion with
-the flag on") already cover it. What to look at in the first week: the share of tables that need a
-decision (0.30 expected), `table_not_rebuilt` gone, `local_grid` (a model outage), and the review
-screen's table card.
+`FEATURE_TABLES=true` in the production deployment (`deploy/deploy.env.example`, which `deploy.sh`
+reads; `Settings.feature_tables` stays `False` by default, so a checkout, the tests and every
+other deployment behave as before), with, for `MODEL_PROVIDER=anthropic`:
+
+```
+FEATURE_TABLES=true
+MAX_USD_PER_PAGE=2.20
+MAX_USD_PER_JOB=4.70
+```
+
+`ops launch-check` with these and the daily cap of $10 and quota of 90 pages: `launch_blockers=0`.
+The minimum it accepts is $0.53 and $4.66; the page cap is $2.20 so that a one-page job holds four
+calls at once (at $0.53 its table and equation steps would run one after another), the job cap
+$4.70 is the minimum rounded up. Nothing else needs to move; the tests of the step with the flag
+on (`tests/test_steps_table.py`, "a conversion with the flag on") already cover it. What to look
+at in the first week: the share of tables that need a decision (0.30 expected), `table_not_rebuilt`
+gone, `local_grid` (a model outage), the review screen's table card, and how many tables of
+lists or wrapped text readers report as missed.
 
 How to repeat (needs a key; $2.3 for the tables task, $0.5 for the sections, at list price):
 

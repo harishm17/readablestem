@@ -1,0 +1,35 @@
+{
+ "date": "2026-10-21",
+ "mode": "local (no model)",
+ "pipeline_version": "0.5.0",
+ "command": "readablestem eval pipeline --task tables --mode local --real-dir data/real-tables",
+ "floors": {
+  "precision": 0.95,
+  "full_extent_recall": 0.85
+ },
+ "real_documents": {
+  "documents": 5,
+  "pdf_pages": 64,
+  "labelled_tables": 25,
+  "predicted_tables": 14,
+  "true_tables": 14,
+  "precision": 1.0,
+  "precision_ci95": [
+   0.7846891945970195,
+   0.9999999999999999
+  ],
+  "full_extent_recall": 0.56,
+  "full_extent_recall_ci95": [
+   0.37067331734646203,
+   0.7333436123222912
+  ],
+  "any_extent_recall": 0.56,
+  "errors": {},
+  "labels_sha256": "b548f2c6250a8bca526e03e97183061dbdce959cd7dc739154383c94070cf944"
+ },
+ "missed_by_cause": {
+  "no table proposed, or no grid found in the proposal (unruled notation lists: 6; a list ruled only above and below: 1; a rotated page: 1)": 8,
+  "judged a two-column text grid that is layout (ruled, captioned)": 1,
+  "no grid found in a ruled table of long wrapped text (the lab study's tables 4 and 5)": 2
+ }
+}
