@@ -27,11 +27,6 @@
     "low": 7.753918282855665,
     "high": 14.904739339091153
    },
-   "unsupported predictions per prediction": {
-    "point": 0.04724017901541522,
-    "low": 0.03216014726720344,
-    "high": 0.0615078915784037
-   },
    "cost per PDF page (USD)": {
     "point": 0.023455645438596497,
     "low": 0.01833356489479259,
@@ -74,11 +69,6 @@
     "low": 4.761607142857145,
     "high": 12.828947368421053
    },
-   "unsupported predictions per prediction": {
-    "point": 0.10218978102189781,
-    "low": 0.054673721340388004,
-    "high": 0.17363344051446947
-   },
    "cost per PDF page (USD)": {
     "point": 0.08783466666666666,
     "low": 0.07560476923076923,
@@ -120,11 +110,6 @@
     "point": 15.106382978723405,
     "low": 10.589440423984806,
     "high": 20.310040039181693
-   },
-   "unsupported predictions per prediction": {
-    "point": 0.11540168664003551,
-    "low": 0.07497007498599224,
-    "high": 0.16020994144642345
    },
    "cost per PDF page (USD)": {
     "point": 0.0022339561403508777,
@@ -653,6 +638,24 @@
    "gold_latex": "p_{\\text{out}} = p_{ij}",
    "pred_latex": "p_{out} = p_{ij}",
    "pdf_text": "pout = pij"
+  },
+  {
+   "bucket": "recognition",
+   "id": "arxiv/2305.06353/eq-129",
+   "page": 10,
+   "display": "block",
+   "gold_latex": "\\bigg| \\mathbb{P}\\bigg\\{ n \\rho_n^{1/2} \\big( {\\Sigma}_U^{(n)}(k) \\big)^{-1/2} \\widetilde W^{\\top} \\big( ( \\widehat U W )_{i*} - U_{i*} \\big) \\in \\mathcal{A} \\bigg\\} - \\mathbb{P} \\{ G \\in \\mathcal{A}\\} \\bigg| \\leq \\frac{C \\log(n\\rho_n)}{(n\\rho_n)^{1/2}}",
+   "pred_latex": "\\left|\\mathbb{P}\\left\\{n\\rho_n^{1/2}\\big(\\Sigma_U^{(n)}(k)\\big)^{-1/2}\\widetilde{W}^\\top\\big((\\widehat{U}W)_{i*}-U_{i*}\\big)\\in\\mathcal{A}\\right\\}-\\mathbb{P}\\{G\\in\\mathcal{A}\\}\\right|\\leq\\frac{C\\log(n\\rho_n)}{(n\\rho_n)^{1/2}}",
+   "pdf_text": "\ufffd\ufffd\ufffd\ufffd\u2119 \ufffd n\u03c11/n2 \u03a3(n) \ufffd \ufffd\u22121/2\ufffd U (k) W \u22a4\ufffd (\ufffdUW)i\u2217\u2212Ui\u2217 \u2208\ud835\udc9c \u2212\u2119{G \u2208\ud835\udc9c} \ufffd \ufffd \ufffd\ufffd\ufffd\ufffd\u2264C log(n\u03c1n) (n\u03c1n)1/2"
+  },
+  {
+   "bucket": "span",
+   "id": "arxiv/2503.07628/eq-014",
+   "page": 6,
+   "display": "inline",
+   "gold_latex": "\\boldsymbol{g}: \\Gamma_N \\to \\mathbb{R}^2",
+   "pred_latex": "\\Gamma_N \\rightarrow \\mathbb{R}^2",
+   "pdf_text": "\u0393N \u2192\u211d2"
   }
  ]
 }

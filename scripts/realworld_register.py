@@ -21,6 +21,7 @@ DATA = Path(__file__).resolve().parent.parent / "data" / "realworld"
 FILES = (
     "PREREGISTRATION.md",
     "PREREGISTRATION-ADDENDUM-1.md",
+    "PREREGISTRATION-ADDENDUM-2.md",
     "manifest-heldout.json",
     "manifest-dev.json",
     "pool.json",

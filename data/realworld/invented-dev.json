@@ -1,0 +1,59 @@
+{
+ "part": "dev",
+ "arms": {
+  "ReadableSTEM": {
+   "aligned to gold: an added symbol": {
+    "point": 0.06340895869691682,
+    "low": 0.03293559065646993,
+    "high": 0.10597315594370443
+   },
+   "no gold partner (3+ symbols): no match in the PDF's text": {
+    "point": 0.1206896551724138,
+    "low": 0.04878048780487805,
+    "high": 0.20967741935483872
+   },
+   "counts": {
+    "a_n": 1719,
+    "a_bad": 109,
+    "u_n": 116,
+    "u_bad": 14
+   }
+  },
+  "Chatbot, Opus": {
+   "aligned to gold: an added symbol": {
+    "point": 0.03375527426160337,
+    "low": 0.008756567425569177,
+    "high": 0.07861635220125786
+   },
+   "no gold partner (3+ symbols): no match in the PDF's text": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   },
+   "counts": {
+    "a_n": 474,
+    "a_bad": 16,
+    "u_n": 26,
+    "u_bad": 0
+   }
+  },
+  "Chatbot, Haiku": {
+   "aligned to gold: an added symbol": {
+    "point": 0.04977145759268664,
+    "low": 0.02463231429693681,
+    "high": 0.08546240671415516
+   },
+   "no gold partner (3+ symbols): no match in the PDF's text": {
+    "point": 0.16216216216216217,
+    "low": 0.06703723563447726,
+    "high": 0.30724050046339185
+   },
+   "counts": {
+    "a_n": 1969,
+    "a_bad": 98,
+    "u_n": 148,
+    "u_bad": 24
+   }
+  }
+ }
+}
