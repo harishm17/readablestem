@@ -52,7 +52,8 @@ def main() -> None:
         ours_right = {g for g in everyone if ours.get(g, {}).get("exact_lenient")}
         print(
             f"== {label}: of {len(everyone)} gold equations the chatbot is right on "
-            f"{len(theirs_right)}, the pipeline on {len(ours_right)}; both {len(theirs_right & ours_right)}, "
+            f"{len(theirs_right)}, the pipeline on {len(ours_right)}; "
+            f"both {len(theirs_right & ours_right)}, "
             f"only the chatbot {len(theirs_right - ours_right)}, only the pipeline "
             f"{len(ours_right - theirs_right)}"
         )
@@ -61,10 +62,7 @@ def main() -> None:
         examples = []
         for g in sorted(mine):
             pair = ours.get(g)
-            if pair is None:
-                bucket = "undetected"
-            else:
-                bucket = db.classify_pair(pair, gold[g]["mathml"])
+            bucket = "undetected" if pair is None else db.classify_pair(pair, gold[g]["mathml"])
             buckets[bucket] += 1
             if bucket != "correct" and len(examples) < 400:
                 examples.append((g, bucket, pair))
