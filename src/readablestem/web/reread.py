@@ -194,7 +194,7 @@ def read_budget(request: Request, job: Job) -> ReadBudget:
     from readablestem.web.worker import job_caps
 
     ctx = get_ctx(request)
-    max_usd, max_calls = job_caps(ctx.settings, job.page_count)
+    max_usd, max_calls = job_caps(ctx.settings, job.page_count, bool(job.image_pages))
     with session_scope(ctx.factory) as session:
         pool = access.spend_pool(access.tier_of(session, job.user_id))
     return ReadBudget(

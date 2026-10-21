@@ -200,6 +200,8 @@ REASON_LARGER_FONT = "larger font"
 REASON_BOLD_BODY = "bold body-size line"
 # The PDF's own tags call this line a heading, "tagged heading h2" (`pipeline.tagged`).
 REASON_TAGGED = "tagged heading h"
+# A heading read from an image of a page (ADR 0007): the level the page reader gave it.
+REASON_IMAGE_HEADING = "image heading h"
 REASON_NUMBERED = "numbered section"
 REASON_NUMBERED_LINE = "standalone numbered line"
 REASON_LIST_NUMBER = "list-style number"
@@ -513,10 +515,12 @@ def release(pdf_bytes: bytes | None = None) -> None:
 
 
 def tagged_level(element: Element) -> int | None:
-    """The heading level the PDF's tags gave this element, or None."""
+    """The heading level the PDF's tags gave this element, or the level the page reader gave
+    a heading read from an image of a page (`REASON_IMAGE_HEADING`), or None."""
     for reason in element.reasons:
-        if reason.startswith(REASON_TAGGED) and reason[len(REASON_TAGGED) :].isdigit():
-            return int(reason[len(REASON_TAGGED) :])
+        for prefix in (REASON_TAGGED, REASON_IMAGE_HEADING):
+            if reason.startswith(prefix) and reason[len(prefix) :].isdigit():
+                return int(reason[len(prefix) :])
     return None
 
 
@@ -1013,6 +1017,11 @@ def _union(boxes: Iterable[BBox]) -> BBox:
 
 def _rounded(box: BBox) -> BBox:
     return (round(box[0], 2), round(box[1], 2), round(box[2], 2), round(box[3], 2))
+
+
+def clean_text(text: str) -> str:
+    """`_clean` for other modules (the image page pass cleans a model's text the same way)."""
+    return _clean(text)
 
 
 def _clean(text: str) -> str:

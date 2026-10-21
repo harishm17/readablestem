@@ -323,9 +323,12 @@ def upload(
     keep: bool = False,
     share: bool = False,
     exam: bool = False,
+    image_pages: bool = False,
     csrf: str | None = None,
 ):
     fields = {"csrf_token": csrf if csrf is not None else token(client)}
+    if image_pages:
+        fields["image_pages"] = "on"
     if keep:
         fields["keep"] = "on"
     if share:

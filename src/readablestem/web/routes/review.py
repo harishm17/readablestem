@@ -52,7 +52,15 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from readablestem.core import triage
-from readablestem.core.types import Check, DocumentResult, Element, Fix, Kind, Status
+from readablestem.core.types import (
+    INLINE_MARKER_RE,
+    Check,
+    DocumentResult,
+    Element,
+    Fix,
+    Kind,
+    Status,
+)
 from readablestem.pipeline.layout import REASON_LARGER_FONT
 from readablestem.pipeline.validate import ALT_WARN_CHARS
 from readablestem.web import events, heading_groups, notation, notice_places, page_edits, retention
@@ -188,6 +196,14 @@ REJECT_WORDS = {
         "The image of the table is kept in the document, marked “not converted”.",
         "Kept as an image by you",
     ),
+    # Text read from an image of a scanned or handwritten page (ADR 0007).
+    Kind.PARAGRAPH: RejectWords(
+        "Keep as image",
+        "Students see a picture of the original text, marked “Not converted”; screen readers "
+        "get no text to read.",
+        "The text is kept as an image of the original, marked “Not converted”.",
+        "Kept as an image by you",
+    ),
     Kind.FIGURE: RejectWords(
         "Keep without a description",
         "The figure stays as it is in the PDF, marked “Needs a description”; screen readers "
@@ -274,6 +290,7 @@ NOUNS = {
     Kind.FIGURE: ("figure", "figures"),
     Kind.TABLE: ("table", "tables"),
     Kind.HEADING: ("heading", "headings"),
+    Kind.PARAGRAPH: ("piece of text", "pieces of text"),
 }
 # The list view's own section for pages and handwriting kept as images
 # (`web.review.kept_images_apart`): figures in the data, not in words.
@@ -412,6 +429,9 @@ class ReviewItem:
     # What the item is, in a few words, for lists that name it (UX review MF15): the
     # heading's text or the start of the alt text. Equations show `mathml` instead.
     preview: str = ""
+    # Text read from an image of a scanned or handwritten page (a PARAGRAPH fix): the words
+    # as read, an inline equation shown as "[equation]". Document content, owner only.
+    read_text: str = ""
     # What a screen reader gets from the PDF for an equation: its text layer ("" when
     # the PDF has none). Shown only to the job's owner, on the review screens.
     text_layer: str = ""
@@ -772,6 +792,7 @@ def _item(
         reject=reject_words(fix.kind, element, fix),
         by_you=fix.decided_by_reviewer,
         preview=_preview(fix, element),
+        read_text=_read_text(fix, element),
         text_layer=(element.text or "").strip()
         if element is not None and fix.kind is Kind.EQUATION
         else "",
@@ -832,12 +853,25 @@ def _figure_details(fix: Fix, element: Element | None) -> dict[str, Any]:
 PREVIEW_CHARS = 60  # of an alt text, in a list line
 
 
+def _read_text(fix: Fix, element: Element | None) -> str:
+    """The words of a text fix (ADR 0007) as the card shows them: an inline equation as
+    "[equation]", blanks collapsed."""
+    if fix.kind is not Kind.PARAGRAPH or element is None:
+        return ""
+    return " ".join(INLINE_MARKER_RE.sub("[equation]", element.text or "").split())
+
+
 def _preview(fix: Fix, element: Element | None) -> str:
     """A few words that say which item this is: a heading's text, the start of the alt
     text. Shown only on the owner's review screens (document content)."""
     if fix.kind is Kind.HEADING:
         text = fix.heading.text if fix.heading is not None else (element.text if element else "")
         return " ".join((text or "").split())
+    if fix.kind is Kind.PARAGRAPH:
+        words = _read_text(fix, element)
+        if len(words) <= PREVIEW_CHARS:
+            return words
+        return words[:PREVIEW_CHARS].rsplit(" ", 1)[0] + "…"
     if fix.kind is Kind.FIGURE and fix.figure is not None:
         if fix.figure.decorative:
             return ""

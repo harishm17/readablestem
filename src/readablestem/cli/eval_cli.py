@@ -276,6 +276,12 @@ def _cmd_pipeline(args: argparse.Namespace) -> int:
         return _error("--answers is for development sets: not for the held-out or check parts")
     if args.answers_offline and not args.answers:
         return _error("--answers-offline needs --answers FILE")
+    if args.scanned and args.task != "document":
+        return _error("--scanned applies to the document task")
+    if args.scanned and (
+        args.gold_set == "heldout" or (args.gold_set == "dev-v2" and args.part == "check")
+    ):
+        return _error("--scanned is for development sets: not for the held-out or check parts")
     if args.batch and not (args.answers and not args.answers_offline and not args.fake):
         return _error("--batch needs --answers FILE, real model calls, and no --answers-offline")
     if args.batch and (args.provider or _settings().model_provider) != "anthropic":
@@ -471,7 +477,12 @@ def _run_pipeline(
     fetcher = HttpFetcher(cache_dir=openstax_cache or _default(OPENSTAX_CACHE))
     with (media_cls or pe.CachedMedia)(
         gold_dir, cache_dir or args.cache or _default(EVAL_CACHE), fetcher, paper=args.paper
-    ) as media:
+    ) as inner_media:
+        media = inner_media
+        if getattr(args, "scanned", False):  # the pages as scans (ADR 0007, eval/scan.py)
+            from readablestem.eval.scan_media import ScannedMedia
+
+            media = ScannedMedia(inner_media, args.scan_seed)
         config = pe.EvalConfig(
             task=args.task,
             settings=settings,
@@ -1219,6 +1230,21 @@ def register(
         metavar="BOOK/PAGE",
         help="only the equations, figures or pages whose book/page id contains one of these "
         "strings (a slice of a set; applied before --every and --limit)",
+    )
+    pipeline.add_argument(
+        "--scanned",
+        action="store_true",
+        help="document task: every page is printed, then turned into the image-only PDF of a "
+        "degraded scan of it (eval/scan.py) before it is converted; the gold and the scorers "
+        "are the same, plus a prose word error rate. With FEATURE_IMAGE_PAGES off this "
+        "measures what the pipeline did with scans before (kept as images). Development sets "
+        "only",
+    )
+    pipeline.add_argument(
+        "--scan-seed",
+        type=int,
+        default=0,
+        help="--scanned: the seed of the degradation (the same seed gives the same scans)",
     )
     pipeline.add_argument("--items", type=Path, help="also write per-item rows as JSONL")
     pipeline.add_argument("--date", type=_iso_date, default=today, help="run date to record")

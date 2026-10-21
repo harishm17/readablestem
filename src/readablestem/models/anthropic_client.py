@@ -348,6 +348,8 @@ class AnthropicVisionClient:
     ) -> _Reply:
         """Send the request and classify what came back. Never raises for provider errors."""
         params = self._params(request, schema, content)
+        if request.timeout_s is not None:  # this step needs longer than the client's default
+            sdk = sdk.with_options(timeout=request.timeout_s, max_retries=0)
         try:
             if self._uses_fallback(request.model):
                 raw = sdk.beta.messages.with_raw_response.create(

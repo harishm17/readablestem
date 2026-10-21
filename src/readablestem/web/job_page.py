@@ -290,6 +290,8 @@ KIND_WORDS = {
     "figure": ("figure", "figures"),
     "table": ("table", "tables"),
     "heading": ("heading", "headings"),
+    # Text read from an image of a page (ADR 0007): paragraphs and list items with a fix.
+    "paragraph": ("piece of text", "pieces of text"),
     # Pages and handwriting kept as images (pipeline.page_type) are figures in the data
     # model, but not in words.
     "page": ("page", "pages"),

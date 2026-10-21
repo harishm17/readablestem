@@ -140,6 +140,10 @@ class Job(Base):
     # The upload form's "Exam or quiz" box: the figure step describes what is shown and
     # never the result (`ConversionOptions.exam_mode`, read by `web.notation.conversion_options`).
     exam_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # The upload form's "Convert scanned or handwritten pages": the pages `page_type` calls
+    # scanned or handwritten are read from an image of the page (ADR 0007) and the job's spend
+    # cap allows for it (`web.worker.job_caps`). Without it they are kept as images.
+    image_pages: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     # One part of a larger file converted in parts (T3-3, `web.routes.parts`): the id of the
     # waiting file it was cut from (the same for every part, not a foreign key: the waiting
     # file is deleted when its last page has been sent) and the pages it holds ("31-59").
@@ -342,6 +346,7 @@ class PendingUpload(Base):
         ForeignKey("courses.id", ondelete="SET NULL", name="fk_pending_uploads_course_id_courses")
     )
     exam_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    image_pages: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     retention_mode: Mapped[str] = mapped_column(String(8), default="day", server_default="day")
     # The 0-based pages already sent to be converted, so the rest can be chosen later.
     done_pages: Mapped[list] = mapped_column(JSON, default=list)

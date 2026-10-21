@@ -52,6 +52,8 @@ from readablestem import __version__
 from readablestem.config import get_settings
 from readablestem.core.types import (
     HEADING_REPEATS_ABOVE,
+    IMAGE_PAGE_ORIGINAL_REASON,
+    IMAGE_PAGE_REASON,
     KEPT_ORIGINAL_STATUSES,
     Element,
     Fix,
@@ -154,7 +156,32 @@ KEPT_IMAGE_WORDS = {
         "This is a picture of handwriting on the page, so a screen reader cannot read it. "
         "Ask your instructor for a text version.",
     ),
+    # A block of a page converted from an image that the instructor chose to keep as the
+    # picture (`_kept_prose`): not a page, and not a whole-page reason either.
+    "image_page_text": (
+        "Text on page {page}, not converted to text.",
+        "This is a picture of text on the page, so a screen reader cannot read it. Ask your "
+        "instructor for a text version.",
+    ),
 }
+# A page converted from an image of it (ADR 0007): the note at its start and the toggle that
+# shows the original. The notice is the author's wording; it assists, it does not say the
+# conversion is right.
+IMAGE_PAGE_NOTICE = "Converted from an image of the page."
+IMAGE_PAGE_CHECK = "Check it against the original."
+IMAGE_PAGE_SHOW = "Show the original page {page}"
+IMAGE_PAGE_ORIGINAL_ALT = "Original of page {page}, shown for checking the converted text."
+IMAGE_PAGE_CSS = """\
+.image-page-note { border: 3px solid #8a3c00; border-radius: 4px; padding: 0.75rem;
+  margin: 1.5em 0; }
+.image-page-note p { margin: 0 0 0.5em; }
+.image-page-note details { margin: 0; }
+.image-page-note summary { cursor: pointer; font-weight: 700; padding: 0.25em 0; }
+.image-page-note img { display: block; margin: 0.5em auto 0; }
+@media screen and (prefers-color-scheme: dark) {
+  .image-page-note { border-color: #ffa066; }
+}
+"""
 # The about section names the pages kept whole as images.
 KEPT_PAGE_REASONS = frozenset({"handwritten_page", "scanned_page", "unread_page"})
 
@@ -917,6 +944,8 @@ class _Renderer:
         """A figure: its image (re-encoded for the student file, `figure_images`), alt
         text and caption, then its long description and data table folded in a
         `<details>` when it has them (`figure_details`); or the original, flagged."""
+        if IMAGE_PAGE_ORIGINAL_REASON in element.reasons:
+            return self.image_page_note(element)
         fix = self.fixes.get(element.id)
         caption = (
             f"<figcaption>{self.rich(element.caption)}</figcaption>"
@@ -972,6 +1001,27 @@ class _Renderer:
             return html + details
         figure = f"<figure>{picture(FIGURE_NOT_DESCRIBED_ALT)}{caption}</figure>"
         return self.flag_block(element, reason, figure, "Needs a description.", FIGURE_NOTE)
+
+    def image_page_note(self, element: Element) -> str:
+        """The start of a page converted from an image (ADR 0007): the notice, and the
+        original page in a `<details>` the reader opens (no script; the summary is the
+        control and says which page). Without the picture, the notice alone."""
+        self.add_style("image_page", IMAGE_PAGE_CSS)
+        page = element.page + 1
+        notice = f'<p><span class="flag-label">{IMAGE_PAGE_NOTICE}</span> {IMAGE_PAGE_CHECK}</p>'
+        png = self.crops.get(element.id)
+        alt = IMAGE_PAGE_ORIGINAL_ALT.format(page=page)
+        image = figure_images.img_html(png, alt, _size_attrs(element), "photo")
+        if image is None:
+            shown = f'<p class="{AUTHORED_CLASS}">The original image is not available.</p>'
+        else:
+            summary = IMAGE_PAGE_SHOW.format(page=page)
+            shown = (
+                f'<details class="{AUTHORED_CLASS}"><summary>{summary}</summary>{image}</details>'
+            )
+        attrs = self.id_attr(element.id)
+        css = f"image-page-note {AUTHORED_CLASS}"
+        return f'<div class="{css}" role="note"{attrs}>{notice}{shown}</div>'
 
     def image_alt(self, element: Element, default: str) -> str:
         """The alt text of an item shown as an image: the instructor's own description in
@@ -1065,6 +1115,22 @@ def kept_pages_note(kept_pages: list[int]) -> str:
     return f"Pages {listed} are shown only as pictures of the pages and were not converted."
 
 
+def image_pages_note(pages: list[int]) -> str:
+    """ "Page 2 was converted from an image of the page: it starts with a note and the
+    original to check it against." (1-based), or "" when no page was."""
+    numbers = [str(p + 1) for p in sorted(set(pages))]
+    if not numbers:
+        return ""
+    tail = "it starts with a note and the original page to check it against."
+    if len(numbers) == 1:
+        return f"Page {numbers[0]} was converted from an image of the page: {tail}"
+    listed = ", ".join(numbers[:-1]) + " and " + numbers[-1]
+    return (
+        f"Pages {listed} were converted from images of the pages: each starts with a note "
+        "and the original page to check it against."
+    )
+
+
 def omitted_pages_note(omitted_pages: list[int]) -> str:
     """ "Page 1 of the original PDF was left out of this file." (1-based), or "" when no
     page was left out. The instructor chose it (a blank page, a cover: T3-16), so the
@@ -1086,6 +1152,7 @@ def _about_section(
     kept_pages: list[int] | None = None,
     contact: str | None = None,
     omitted_pages: list[int] | None = None,
+    image_pages: list[int] | None = None,
 ) -> str:
     """The note for students at the end of the file (MF7 of the UX review): what this
     is, whether the instructor has checked it, which pages are only pictures, who to tell
@@ -1097,6 +1164,8 @@ def _about_section(
     flagged_note = f"<p>{FLAGGED_NOTE}</p>\n" if flagged else ""
     if pages_line := kept_pages_note(kept_pages or []):
         flagged_note += f"<p>{pages_line}</p>\n"
+    if converted := image_pages_note(image_pages or []):
+        flagged_note += f"<p>{converted}</p>\n"
     if left_out := omitted_pages_note(omitted_pages or []):
         flagged_note += f"<p>{left_out}</p>\n"
     source = f"<p>{_escape(source_note)}</p>\n" if source_note and source_note.strip() else ""
@@ -1261,6 +1330,35 @@ def _without_dead_links(ordered: list[Element]) -> list[Element]:
     return out
 
 
+def _kept_prose(ordered: list[Element], fixes: dict[str, Fix]) -> list[Element]:
+    """Text read from an image of a page that the reviewer chose to keep as the picture: the
+    element is written as a kept image of its region (a figure with the reason
+    "image_page_text", like a kept page), and the inline equations inside it are not written
+    on their own. `fixes` is updated to match. Every other element is returned as it is."""
+    kept = {
+        e.id
+        for e in ordered
+        if IMAGE_PAGE_REASON in e.reasons
+        and e.kind in (Kind.PARAGRAPH, Kind.LIST_ITEM)
+        and (fix := fixes.get(e.id)) is not None
+        and fix.status in NOT_CONVERTED
+    }
+    if not kept:
+        return ordered
+    out: list[Element] = []
+    for element in ordered:
+        if element.id in kept:
+            fix = fixes[element.id]
+            fixes[element.id] = fix.model_copy(update={"reason": "image_page_text"})
+            element = element.model_copy(
+                update={"kind": Kind.FIGURE, "text": None, "links": [], "list_marker": None}
+            )
+        elif element.parent_id in kept:
+            continue
+        out.append(element)
+    return out
+
+
 def render_html(
     *,
     title: str | None,
@@ -1297,10 +1395,11 @@ def render_html(
     here, and the student note says so.
     """
     ordered = _without_dead_links(sorted(elements, key=lambda e: e.order))
-    equations = {e.id: e for e in ordered if e.kind is Kind.EQUATION}
     first_fix: dict[str, Fix] = {}
     for fix in fixes:  # first wins, like DocumentResult.fix_for
         first_fix.setdefault(fix.element_id, fix)
+    ordered = _kept_prose(ordered, first_fix)
+    equations = {e.id: e for e in ordered if e.kind is Kind.EQUATION}
     if math_alttext is None:
         math_alttext = get_settings().mathml_alttext
 
@@ -1330,6 +1429,7 @@ def render_html(
         kept_pages,
         contact,
         omitted_pages,
+        [e.page for e in ordered if IMAGE_PAGE_ORIGINAL_REASON in e.reasons],
     )
     heading_texts = [
         text

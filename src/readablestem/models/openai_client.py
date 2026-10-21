@@ -307,6 +307,8 @@ class OpenAIVisionClient:
         content: list[ResponseInputContentParam],
     ) -> _Reply:
         """Send the request and classify what came back. Never raises for provider errors."""
+        if request.timeout_s is not None:  # this step needs longer than the client's default
+            sdk = sdk.with_options(timeout=request.timeout_s, max_retries=0)
         try:
             raw = sdk.responses.with_raw_response.parse(
                 model=request.model,

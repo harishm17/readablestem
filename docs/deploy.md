@@ -279,6 +279,7 @@ calls are in flight at once (`MODEL_CONCURRENCY`, "Concurrency" below).
 | `MAX_USD_PER_PAGE` | **$1.00** | $0.30 | A job's cap is at most this times its pages, and holds count: a one-page job holds as many calls at once as its cap allows (seven at $0.14; four with long descriptions: "Concurrency"). $1.00 is also the most a runaway one-page job can spend |
 | `MAX_USD_PER_JOB` | **$3.00** | $2.00 | A 30-page dense document is $0.45 spent plus about $1.1 held at once, so $1.6 at worst: it never reaches $3.00; a runaway stops at 7x a normal document |
 | `MAX_MODEL_CALLS_PER_JOB` / `_PER_PAGE` | 400 / 80 | 400 / 80 | Measured 2-2.7 calls a page, so 30 pages is about 80 calls: 5x room |
+| `IMAGE_PAGES_USD_PER_PAGE` / `IMAGE_PAGES_MAX_USD_PER_JOB` | **$0.25** / **$7.50** (only with `FEATURE_IMAGE_PAGES=true`) | any | A job that asked for its scanned and handwritten pages to be converted may spend this much per page of the document, at most this per job (the main model reads a page for $0.10 to $0.13; $0.33 for the densest held-out paper's pages). The daily cap and the open pool still bound it |
 | `DAILY_SPEND_CAP_USD` | **$10** (set by you) | any | 5 instructors converting their full quota is 5 x 90 pages x $0.015 = $6.75, plus the calls in flight (two instances x $1.1) = $9 |
 | `PER_USER_DAILY_PAGE_QUOTA` | **90** (set by you) | any | Three full-size (30-page) documents a day each; a course week of lecture notes |
 | `SIGNUP_MODE` | `allowlist` (default), **`open`** for a beta anyone can try | any | See "Open sign-up" below |
