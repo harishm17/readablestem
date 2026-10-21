@@ -179,7 +179,7 @@ class AnthropicVisionClient:
         model. Raises `BudgetExceeded` when the first reservation is refused (nothing is
         sent). The returned `ModelCall` covers every send this call made.
         """
-        context = self._context(request.context_text)
+        context = self._context(request.context_text, request.context_limit)
         content = _user_content(request, context)
         sdk = self._client()
         estimate = estimate_max_cost_usd(
@@ -258,12 +258,12 @@ class AnthropicVisionClient:
         """The Messages parameters of `request` for one entry of a Message Batch: what `run`
         would send, less the refusal fallback (the Batches API takes none). Raises
         `ValueError` for a malformed request, as `run` does."""
-        context = self._context(request.context_text)
+        context = self._context(request.context_text, request.context_limit)
         return self._params(request, schema, _user_content(request, context))
 
     def batch_estimate_usd(self, request: VisionRequest) -> float:
         """The worst case of `request` at the Batches price, for the reservation."""
-        context = self._context(request.context_text)
+        context = self._context(request.context_text, request.context_limit)
         return BATCH_DISCOUNT * estimate_max_cost_usd(
             request.model,
             n_images=len(request.images),
@@ -401,13 +401,18 @@ class AnthropicVisionClient:
             },
         }
 
-    def _context(self, text: str | None) -> str | None:
+    def _context(self, text: str | None, limit: int | None = None) -> str | None:
         """The fenced document text for the user message. With
         `Settings.anthropic_notice_in_system` the fixed notice is not repeated here: it is
         in the cached system block (`_system_text`)."""
         if not self._settings.anthropic_notice_in_system:
-            return fenced_context(text)
-        return fence_untrusted(defang_context(text), notice=False) if text else None
+            return fenced_context(text, limit)
+        if not text:
+            return None
+        cleaned = defang_context(text)
+        if limit is None:
+            return fence_untrusted(cleaned, notice=False)
+        return fence_untrusted(cleaned, limit, notice=False)
 
     def _system_text(self, request: VisionRequest) -> str:
         """The instructions, and with `anthropic_notice_in_system` the untrusted-text notice

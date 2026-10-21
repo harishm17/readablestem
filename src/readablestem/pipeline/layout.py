@@ -68,7 +68,7 @@ from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property, lru_cache
 from itertools import combinations, count, pairwise
-from typing import Any
+from typing import Any, Literal
 
 import pymupdf
 
@@ -356,6 +356,9 @@ _LOCK = threading.RLock()  # PyMuPDF is not thread-safe: one PyMuPDF call at a t
 TABLE_PREFILTER = True
 
 
+PageStatus = Literal["span", "layout"]  # `Element.page_status`
+
+
 class LayoutError(ValueError):
     """The PDF cannot be processed. `code` is a category, safe to log."""
 
@@ -391,7 +394,11 @@ class Layout:
 
 
 def analyze(
-    pdf_bytes: bytes, *, pages: list[int] | None = None, max_pages: int | None = None
+    pdf_bytes: bytes,
+    *,
+    pages: list[int] | None = None,
+    max_pages: int | None = None,
+    page_math: Any = None,
 ) -> Layout:
     """Elements of the given 0-based pages (all by default), ids "p{page+1}-e{index}".
 
@@ -402,6 +409,11 @@ def analyze(
     The selected pages are first rendered once in a child process (see `_probe_pages`);
     the document is opened for this call only and closed again, so analysis leaves no
     user content in this module (only `crop` caches documents).
+
+    `page_math` (ADR 0006): an object with `on_page(number, rows, ordered, rules)` and
+    `after_regions(number, rows)` (`pipeline.page_math_reconcile.PageMathHook`). It is shown
+    each page's text rows before the display equations are grouped, and may return them
+    cut and marked by a verified plan. None (the default) is layout's own rules alone.
     """
     with _LOCK:
         _quiet_mupdf()
@@ -410,7 +422,7 @@ def analyze(
             try:
                 selected = _select_pages(doc.page_count, pages, max_pages)
                 _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
-                return _analyze_document(doc, selected)
+                return _analyze_document(doc, selected, page_math)
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
             finally:
@@ -462,6 +474,27 @@ def crop(
                 pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
             if tag_dpi:
                 pixmap.set_dpi(round(zoom * 72), round(zoom * 72))
+            return pixmap.tobytes("png")
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()
+
+
+def render_page(pdf_bytes: bytes, page: int, *, dpi: int = 150, max_side_px: int = 2048) -> bytes:
+    """PNG of the whole page at `dpi` on white (long side capped at `max_side_px`), the picture
+    the page math pass reads. Same document cache and lock as `crop`."""
+    if dpi <= 0 or max_side_px < 16:
+        raise ValueError("render_page needs dpi > 0 and max_side_px >= 16")
+    with _LOCK:
+        _quiet_mupdf()
+        try:
+            key, doc = _CACHE.document(pdf_bytes)
+            if not 0 <= page < doc.page_count:
+                raise ValueError(f"page {page} is not in the PDF")
+            _ensure_probed(pdf_bytes, key, [page])
+            sheet = doc[page]
+            rect = sheet.rect
+            zoom = min(dpi / 72.0, (max_side_px - 1) / max(rect.width, rect.height))
+            pixmap = sheet.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False)
             return pixmap.tobytes("png")
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()
@@ -1041,6 +1074,13 @@ class _Row:
     # A row of a function defined by cases (`_mark_case_rows`): its columns may stand
     # twice as far apart as those of an aligned row.
     case_row: bool = False
+    # The page math pass (ADR 0006, `pipeline.page_math_reconcile`), only with a plan for
+    # the page: `page_checked` says it ran; `page_inline` are the inline spans it placed in
+    # this row (character indexes into `chars`, and its LaTeX); `page_nonmath` the stretches
+    # it called look-alikes of maths.
+    page_checked: bool = False
+    page_inline: list[tuple[int, int, str]] = field(default_factory=list)
+    page_nonmath: list[tuple[int, int]] = field(default_factory=list)
 
     @cached_property
     def ink(self) -> list[_Char]:
@@ -2679,6 +2719,10 @@ class _Inline:
     reasons: list[str]
     font_size: float
     regular: str | None = None  # `Element.regular_letters`
+    # The page math pass (ADR 0006): its LaTeX reading of this run, and whether it placed
+    # the run ("span") or only layout found it ("layout"); None without a pass.
+    page_latex: str | None = None
+    page_status: PageStatus | None = None
 
 
 def _inline_runs(
@@ -4479,6 +4523,12 @@ class _Region:
     rules: list[_Path] = field(default_factory=list)
     labels: list[_Row] = field(default_factory=list)
     box: BBox = (0.0, 0.0, 0.0, 0.0)  # rows and rules, while lines are being stacked
+    # Placed by the page math pass instead of by the rules above: `forced`; its LaTeX
+    # reading; and, on a page that had a pass, whether the pass confirmed the region
+    # ("span") or only layout found it ("layout").
+    forced: bool = False
+    page_pass: PageStatus | None = None
+    latex: str | None = None
 
 
 @dataclass(eq=False)
@@ -4609,7 +4659,11 @@ def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
        aligned (the rows of an aligned derivation). Two whole equations stacked close
        together but centred on their own ("time = d / v" over "d = v t") stay apart.
     """
-    maths = [r for r in rows if r.kind == "math" and not r.absorbed and not r.vertical]
+    maths = [
+        r
+        for r in rows
+        if r.kind == "math" and not r.absorbed and not r.vertical and r.region is None
+    ]
     if not maths:
         return []
     parent = list(range(len(maths)))
@@ -5889,6 +5943,9 @@ class _Block:
     # written flat, and a notice says so (`scripts_flattened`).
     flat_scripts: bool = False
     marked: str | None = None  # headings: `text` with its raised and lowered runs marked
+    # Display equations placed by the page math pass: its LaTeX, and "span" or "layout".
+    page_latex: str | None = None
+    page_status: PageStatus | None = None
 
 
 def _dominant_size(rows: Sequence[_Row]) -> float:
@@ -6174,7 +6231,7 @@ def _wrapped_maths(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
     left margin at the usual line pitch. A numbered or multi-line equation is never one.
     """
     region = row.region
-    if region is None or region.labels or len(region.rows) != 1:
+    if region is None or region.forced or region.labels or len(region.rows) != 1:
         return False
     return abs(row.x0 - run.box[0]) <= 0.5 and _continues(prev, row, run, ctx)
 
@@ -6248,6 +6305,8 @@ def _equation_block(
     labels = sorted(region.labels, key=lambda r: (r.y0, r.x0)) if region else []
     if labels:
         reasons.append("equation number")
+    if region is not None and region.page_pass is not None:
+        reasons.append(PAGE_SPAN_REASON if region.page_pass == "span" else PAGE_LAYOUT_ONLY_REASON)
     return _Block(
         Kind.EQUATION,
         box,
@@ -6258,6 +6317,8 @@ def _equation_block(
         reasons=reasons,
         label=" ".join(r.clean for r in labels) or None,
         regular=_regular_letters(ink),
+        page_latex=region.latex if region is not None else None,
+        page_status=region.page_pass if region is not None else None,
     )
 
 
@@ -6481,6 +6542,40 @@ def _marked(chars: list[_Char], kinds: list[ScriptKind | None], start: int, end:
     return script_marks.wrap(text, marks)
 
 
+# `Element.reasons` the page math pass leaves on what it placed and on what it did not confirm.
+PAGE_SPAN_REASON = "page pass span"
+PAGE_LAYOUT_ONLY_REASON = "page pass did not confirm"
+
+
+def _carry_page_math(old: _Row, new: _Row, offset: int) -> None:
+    """The page math marks of `old` on `new`, a row made of `old.chars[offset:]`."""
+    new.page_checked = old.page_checked
+    new.page_inline = [(a - offset, b - offset, t) for a, b, t in old.page_inline if a >= offset]
+    new.page_nonmath = [(a - offset, b - offset) for a, b in old.page_nonmath if a >= offset]
+
+
+def _with_page_spans(
+    row: _Row, runs: list[tuple[int, int, list[str]]]
+) -> tuple[list[tuple[int, int, list[str]]], dict[tuple[int, int], str]]:
+    """Layout's inline runs of a row with the page pass's spans laid over them.
+
+    A run that touches a span the pass placed is replaced by that span (the pass settles
+    where the maths starts and ends); a run inside a stretch the pass called a look-alike of
+    maths is dropped; the other runs stay, marked as not confirmed. The pass's own spans
+    come with their LaTeX."""
+    spans = sorted(row.page_inline)
+    out: list[tuple[int, int, list[str]]] = []
+    for start, end, reasons in runs:
+        if any(start < b and a < end for a, b, _ in spans):
+            continue
+        if any(start < b and a < end for a, b in row.page_nonmath):
+            continue
+        out.append((start, end, [*reasons, PAGE_LAYOUT_ONLY_REASON]))
+    latex = {(a, b): t for a, b, t in spans}
+    out += [(a, b, [PAGE_SPAN_REASON]) for a, b, _ in spans]
+    return sorted(out, key=lambda r: (r[0], r[1])), latex
+
+
 def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
     """Paragraph (or list item) text with inline equations cut out, hyphenation repaired
     between rows. A list item's text starts after its marker."""
@@ -6491,13 +6586,18 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
     if block.marker is not None and block.marker.end:
         first = rows[0]
         rows[0] = _Row(first.chars[block.marker.end :], column=first.column)
+        _carry_page_math(first, rows[0], block.marker.end)
     letters = _BoldLetters.start()
     for row in rows:
         row_pieces: list[str | _Inline] = []
         cursor = 0
         info = _CharInfo.of(row)
         raw, kinds = _script_glyphs(row, info)
-        found = _bold_letter_runs(row, _inline_runs(row, info, kinds), letters)
+        runs = _inline_runs(row, info, kinds)
+        page_latex: dict[tuple[int, int], str] = {}
+        if row.page_checked:
+            runs, page_latex = _with_page_spans(row, runs)
+        found = _bold_letter_runs(row, runs, letters)
         found = sorted(
             [
                 *(
@@ -6526,8 +6626,20 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
             fonts = sorted({c.font for c in ink})
             score, _ = equation_score(text, fonts, any(c.flags & _SUPERSCRIPT_FLAG for c in ink))
             box = _clear_of_punctuation(_union((c.x0, c.y0, c.x1, c.y1) for c in ink), row, end)
+            status = (
+                ("span" if (start, end) in page_latex else "layout") if row.page_checked else None
+            )
             row_pieces.append(
-                _Inline(box, text, score, reasons, _dominant_size([row]), _regular_letters(ink))
+                _Inline(
+                    box,
+                    text,
+                    score,
+                    reasons,
+                    _dominant_size([row]),
+                    _regular_letters(ink),
+                    page_latex.get((start, end)),
+                    status,
+                )
             )
             cursor = end
         row_pieces.append(_marked(row.chars, kinds, cursor, len(row.chars)))
@@ -6845,6 +6957,7 @@ def _page_blocks(
     mixed_ink: bool = False,
     label_keys: Collection[tuple] = frozenset(),
     covers: Sequence[tuple[float, float]] = (),
+    page_math: Any = None,
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_exercise_numbers(_split_braced_systems(_split_labels(rows)))
@@ -6883,8 +6996,16 @@ def _page_blocks(
     _take_labels(restored, figures, rows)
     figures, rows = _equation_pictures(page, figures, rows, ctx, small_pictures)
     text_rows = [r for r in rows if not r.absorbed]
-    _equation_regions(text_rows, used_rules)
     placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
+    if page_math is not None:
+        # The page math pass (ADR 0006): the rows as they stand, in reading order, are what
+        # the model is shown, and its verified spans are laid over them before the rules
+        # below group them into equations.
+        first = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
+        text_rows = page_math.on_page(number, text_rows, [text_rows[i] for i in first], used_rules)
+    _equation_regions(text_rows, used_rules)
+    if page_math is not None:
+        page_math.after_regions(number, text_rows)
     order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
     ordered = _contiguous_regions([text_rows[i] for i in order])
     runs = _runs(ordered, ctx)
@@ -7542,7 +7663,7 @@ def _read_page(
     return rows, _page_paths(page, drawings, seen), kind
 
 
-def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
+def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any = None) -> Layout:
     frags: dict[int, list[_Row]] = {}
     paths: dict[int, list[_Path]] = {}
     types: dict[int, page_type.PageTypeResult] = {}
@@ -7619,6 +7740,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             mixed_ink=types[n].kind == "mixed_ink",
             label_keys=label_keys,
             covers=_covered_points(doc[n], types[n]),
+            page_math=page_math,
         )
         for n in selected
     ]
@@ -8047,6 +8169,8 @@ def _to_elements(
                             display="inline",
                             parent_id=element_id,
                             regular_letters=inline.regular,
+                            page_latex=inline.page_latex,
+                            page_status=inline.page_status,
                         )
                     )
                 continue
@@ -8071,6 +8195,8 @@ def _to_elements(
                     equation_label=block.label if kind == Kind.EQUATION else None,
                     caption=block.caption,
                     regular_letters=block.regular if kind == Kind.EQUATION else None,
+                    page_latex=block.page_latex if kind == Kind.EQUATION else None,
+                    page_status=block.page_status if kind == Kind.EQUATION else None,
                     table=block.table if kind == Kind.TABLE else None,
                 )
             )

@@ -108,6 +108,7 @@ from readablestem.core.types import (
     Kind,
     ModelCall,
     Notice,
+    PageMathSummary,
     PageStats,
     ProgressEvent,
     SourceFacts,
@@ -126,6 +127,8 @@ from readablestem.pipeline import (
     heading_step,
     html_checks,
     layout,
+    page_math,
+    page_math_reconcile,
     page_type,
     table_step,
     tagged,
@@ -1177,6 +1180,73 @@ def convert_pdf(
         )
 
 
+def _page_math_pass(
+    pdf_bytes: bytes,
+    doc: Any,
+    collector: page_math_reconcile.PageMathHook,
+    *,
+    client: VisionClient,
+    settings: Settings,
+    pages: list[int] | None,
+    concurrency: int,
+    tracer: Tracer,
+) -> tuple[Any, PageMathSummary]:
+    """The page math pass (ADR 0006) and the second layout run that lays its verified plan
+    over layout's rules. Fails open: a page the model could not answer, a cap that stopped
+    the pass, or a second run that fails leaves the pages as the first run has them.
+    `ConfigError` and `UnknownModelError` propagate like they do from every step."""
+    kept = set(getattr(doc, "kept_pages", None) or {})
+    offered = {
+        number: (rows, partial(layout.render_page, pdf_bytes, number))
+        for number, rows in collector.rows.items()
+        if number not in kept
+    }
+    with _span(tracer, "page_math", pages=len(offered)) as span:
+        result = page_math.run(client, settings, offered, concurrency=concurrency)
+        plan = result.plan
+        calls = result.calls
+        applied = page_math_reconcile.PageMathHook(plan)
+        answered = [n for n, p in plan.pages.items() if p.failed is None]
+        if answered:
+            try:
+                doc = layout.analyze(
+                    pdf_bytes,
+                    pages=pages,
+                    max_pages=settings.max_pages_per_job,
+                    page_math=applied,
+                )
+            except (layout.LayoutError, RuntimeError) as exc:
+                log.warning("page math: the second layout run failed: %s", type(exc).__name__)
+                applied = page_math_reconcile.PageMathHook()
+        stats, hook = plan.stats, applied.stats
+        summary = PageMathSummary(
+            pages=len(plan.pages),
+            failed=sum(p.failed is not None for p in plan.pages.values()),
+            calls=len(calls),
+            cost_usd=round(sum(c.cost_usd for c in calls), 8),
+            proposed=stats.proposed,
+            verified=stats.verified,
+            relocated=stats.relocated,
+            dropped=stats.dropped,
+            overlapped=stats.overlapped,
+            applied_pages=hook.pages_applied,
+            stale_pages=hook.pages_stale,
+            blocks=hook.blocks,
+            inline=hook.inline,
+            numbers=hook.numbers,
+            labels=hook.labels,
+            stopped_by=result.stopped.scope if result.stopped is not None else None,
+        )
+        _annotate(
+            span,
+            cost_usd=summary.cost_usd,
+            calls=summary.calls,
+            verified=summary.verified,
+            dropped=summary.dropped,
+        )
+    return doc, summary
+
+
 def _convert(
     pdf_bytes: bytes,
     *,
@@ -1200,7 +1270,25 @@ def _convert(
         cached = _CachedDocument(pdf_bytes)
         try:
             _send(stage_progress, "layout")
-            doc = layout.analyze(pdf_bytes, pages=pages, max_pages=settings.max_pages_per_job)
+            collector = page_math_reconcile.PageMathHook() if options.page_math else None
+            doc = layout.analyze(
+                pdf_bytes,
+                pages=pages,
+                max_pages=settings.max_pages_per_job,
+                page_math=collector,
+            )
+            page_math_summary: PageMathSummary | None = None
+            if collector is not None:
+                doc, page_math_summary = _page_math_pass(
+                    pdf_bytes,
+                    doc,
+                    collector,
+                    client=client,
+                    settings=settings,
+                    pages=pages,
+                    concurrency=concurrency,
+                    tracer=tracer,
+                )
             elements = sorted(doc.elements, key=lambda e: e.order)
             page_list = list(dict.fromkeys([*doc.pages, *(e.page for e in elements)]))
             kept: dict[int, str] = dict(getattr(doc, "kept_pages", None) or {})
@@ -1267,6 +1355,13 @@ def _convert(
             checks = html_checks.static_checks(html)
         wall_ms = round((time.perf_counter() - started) * 1000)
         stats = _stats(page_list, elements, ordered, run.page_ms, wall_ms)
+        if page_math_summary is not None:
+            stats = stats.model_copy(
+                update={
+                    "cost_usd": round(stats.cost_usd + page_math_summary.cost_usd, 8),
+                    "model_calls": stats.model_calls + page_math_summary.calls,
+                }
+            )
         _annotate(
             doc_span,
             pages=stats.pages,
@@ -1316,5 +1411,8 @@ def _convert(
             kind.to_record(page)
             for page, kind in sorted((getattr(doc, "page_types", None) or {}).items())
         ],
+        page_math=page_math_summary,
     )
+    if page_math_summary is not None:
+        result.prompt_versions["page_math"] = page_math.PROMPT_VERSION
     return PipelineOutput(result=result, crops=run.crops, checks=checks)

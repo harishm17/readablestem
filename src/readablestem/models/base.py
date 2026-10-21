@@ -42,6 +42,10 @@ class VisionRequest:
     context_text: str | None = None  # untrusted document text, fenced by the client
     max_output_tokens: int = 1024
     image_detail: str = "high"  # "low" | "high" | "auto"
+    # Characters of `context_text` kept (the fence's own limit by default). The page math pass
+    # sends a page's text layer, which is longer than the text near a crop. Not part of the
+    # recorded request key: a step that sets it always sets the same value.
+    context_limit: int | None = None
     # Claude only: the thinking effort for this request (`output_config.effort`). None: the
     # client's own setting for the model (`Settings.anthropic_effort_for`).
     effort: str | None = None
