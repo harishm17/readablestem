@@ -252,3 +252,140 @@ caveats raise the number: the dev sections are ones the rules were tuned against
 differences are probably smaller and less variable than a fresh set's; and the two recorded model
 runs of one system differ by 0.007 on equations (README), which is as large as the effect on the
 symbols score, so a real comparison needs replicates (two runs on each side) as well as sections.
+
+## Against the chatbot recipe, on the same development pages (2026-10-21)
+
+The held-out run had the Opus chatbot (Purdue's sentence, the PDF and a 150 dpi image of every
+page) ahead of ReadableSTEM 0.622 to 0.504, with the 0.4.0 pipeline. To see where that stands at
+this commit, the same recipe was run on the same dev-v2 sections with the proof's own code
+(`proof/chatbot.py`, `record_arms`, unchanged; `scripts/dev_chatbot.py` only chooses the sections
+and scores with `proof.systems.equation_item`, so the held-out path is untouched): the Haiku arm on
+both slices (10 sections, 114 pages), the Opus arm on slice B (5 sections, 49 pages), one run each
+(the proof made two), answers recorded under `.local/chat-dev`. Spend: Haiku $0.256, Opus $2.657;
+total live spend of this work **$5.71** of the $8 cap.
+
+| Dev, flag off / on and the chatbot arms | A+B off | A+B on | A+B Haiku | B off | B on | B Haiku | B Opus |
+|---|---|---|---|---|---|---|---|
+| gold equations / PDF pages | 724 / 114 | 724 / 114 | 724 / 114 | 452 / 49 | 452 / 49 | 452 / 49 | 452 / 49 |
+| primary `exact_lenient` | 0.486 | 0.482 | 0.514 | 0.597 | 0.589 | 0.580 | 0.586 |
+| symbols, credited | 0.718 | 0.724 | 0.718 | 0.799 | 0.805 | 0.781 | 0.783 |
+| detection recall | 0.797 | 0.803 | 0.855 | 0.872 | 0.872 | 0.945 | 0.801 |
+| detection precision | 0.756 | 0.678 | 0.565 | 0.793 | 0.796 | 0.771 | 0.557 |
+| equations with no gold partner | 186 | 276 | 477 | 103 | 101 | 127 | 288 |
+| wrong in the symbols, nobody asked, per 100 gold | 4.8 | 3.5 | 14.1 | 4.2 | 3.8 | 16.8 | 2.4 |
+| wrong on the primary, nobody asked, per 100 gold | 26.8 | 26.1 | 34.1 | 22.8 | 23.7 | 36.5 | 21.5 |
+| required decisions per PDF page | 1.67 | 1.61 | 0 | 2.14 | 1.90 | 0 | 0 |
+| cost per PDF page | $0.0149 | $0.0165 | $0.0022 | $0.0194 | $0.0196 | $0.0014 | $0.0542 |
+
+The chatbots ask nobody about anything, so every wrong aligned equation is unasked. Their "no gold
+partner" count is every equation the reader found beyond the gold, with no text-layer check (the
+pipeline's own `unsupported` column cannot be computed for them). Chemistry: the Opus arm wrote
+every formula as `\ce{...}` (mhchem), which the proof's converter, the one it uses for
+ReadableSTEM's own LaTeX, cannot read, so its chemistry sections score near 0 (0 of 36 and 5 of 57
+aligned); the held-out run had the same convention (all three systems near 0.04 on chemistry).
+Without the two chemistry sections the comparison on the maths sections of slice B (3 sections,
+359 gold equations, 37 pages) is:
+
+| Slice B, maths sections only | off | on | Haiku | Opus |
+|---|---|---|---|---|
+| primary `exact_lenient` | 0.749 | 0.738 | 0.730 | 0.738 |
+| symbols, credited | 0.919 | 0.928 | 0.969 | 0.975 |
+| detection recall / precision | 0.969 / 0.804 | 0.969 / 0.817 | 0.992 / 0.743 | 0.994 / 0.736 |
+| wrong in the symbols, nobody asked, per 100 | 2.5 | 2.2 | 2.8 | 2.8 |
+
+Paired differences (same sections, cluster bootstrap over sections; with 5 to 10 sections the
+intervals are wide and only indicative; `scripts/dev_paired.py`): Haiku minus flag off on the primary
+score +2.8 points (-6.7 to +13.2, ten sections), on the symbols score 0.0 (-12.9 to +9.8), on
+unasked symbols-wrong +9.3 per 100 (+0.1 to +27.1); Opus minus flag off on slice B: primary -1.1
+(-11.1 to +12.6), symbols -1.5 (-19.4 to +9.1), unasked symbols-wrong -1.8 per 100 (-7.2 to +0.5).
+The flag on against off: primary -0.4 (-1.9 to +0.9), symbols +0.6 (0.0 to +1.0), unasked
+symbols-wrong -1.4 per 100 (-4.6 to +0.9).
+
+**What this says.** At this commit, on these pages, the pipeline and the chatbot recipe are level on
+the primary score (Opus 0.586, flag off 0.597, flag on 0.589 on slice B; Haiku 0.514 against 0.486
+on both slices), where the held-out run at 0.4.0 had a 12-point gap. This is consistent with the
+0.5.0 layout rules having closed most of it, as the analysis projected, but dev is not held-out
+and these pages are rendered clean; it is evidence that the gap is much smaller, not a
+measurement of it. Where the chatbots lead is the symbols-correct score on the maths sections (+5
+points: they find and read the nested fractions and stacked nuclides the text layer cannot give)
+and detection recall; where the pipeline leads is chemistry under the mhchem convention, wrong
+equations nobody is asked about (Haiku 14 to 17 per 100 against 4 for the pipeline; Opus 2.4, below
+the pipeline's 3.8 and 4.2) and cost (Opus is 2.8 times the pipeline's cost per page).
+
+### Equations the chatbot gets right and the pipeline does not
+
+Pooled A+B against the Haiku arm: the chatbot is exactly right on 372 of 724, the pipeline on 352
+(flag off) or 349 (on); both on 312 or 314; only the chatbot on 60 (58 with the flag on), only the
+pipeline on 40 (35). Slice B against the Opus arm: 265 against 270 (266 on), both 243 (245), only
+the chatbot 22 (20), only the pipeline 27 (21).
+
+The 60 (flag off) / 58 (on) equations the Haiku arm gets and the pipeline does not, by what the
+pipeline did (`scripts/dev_gap.py`):
+
+| What the pipeline did | off | on |
+|---|---|---|
+| no aligned prediction (undetected) | 27 | 25 |
+| symbols right, the primary scorer says no (array against `cases`/`aligned`, `\left(`) | 15 | 15 |
+| span cut short or extended | 10 | 10 |
+| aligned, symbols differ inside | 4 | 5 |
+| aligned, no proposal (the model answer is missing, a fraction cut in half) | 4 | 3 |
+
+Against Opus on slice B (22 / 20): 10 undetected, 4 recognition, 4 no proposal, 3 scorer, 1 span.
+The page pass changes 2 of the 60; it fixes one glued exercise number
+(`8-5 ... eq-046`: `258.\ \frac{...}` off, `\frac{...}` on) and finds a lone variable.
+
+Ten concrete cases (gold is the symbol stream of the answer key; "span" is the text layer of the
+region the pipeline cut):
+
+| # | Section, gold | Pipeline (flag off) | Chatbot | Bucket |
+|---|---|---|---|---|
+| 1 | Chemistry 2.3 eq-011, `_1^1 H` | nothing aligned | `{}^{1}_{1}\mathrm{H}` | undetected (nuclide prefix scripts: the text layer has "H" and no atomic number in order; the model reads the picture) |
+| 2 | Elementary Algebra 8.5 eq-015, `((1/3)+(1/6)) / ((1/2)-(1/3))` | nothing aligned | `\dfrac{\frac13+\frac16}{\frac12-\frac13}` | undetected (nested fraction, the rows are a bag) |
+| 3 | 8.5 eq-013, `(2/(x^2-1)) / (3/(x+1))` | no proposal; the span is `𝑥−1 322` | `\dfrac{\frac{2}{x^2-1}}{\frac{3}{x+1}}` | no proposal (half of the fraction) |
+| 4 | 8.5 eq-038 | `\frac{\frac{4y}{y+5}+\frac{2}{y+6}}{3y}` (denominator cut) | the full denominator | recognition (span cut) |
+| 5 | 8.5 eq-046 | `258.\ \frac{\frac{8}{d^{2}+9d+18}}{\frac{12}{d+6}}` | the fraction | span: the exercise number glued on (fixed by the pass) |
+| 6 | College Algebra 9.6 eq-160, `(3x^2-sqrt(2y^3))^12` | `(3x^{2}-\sqrt{2y^{3}})^{1}` | `\left(3x^2-\sqrt{2y^3}\right)^{12}` | recognition (the exponent 12 is outside the region's text) |
+| 7 | authored matrices eq-019, `3[..]+7[..]=[..]` | the matrices without the leading 3 | `3\begin{bmatrix}...` | span (the 3 is outside the region) |
+| 8 | Elementary Algebra 5.2 eq-024, `(1/2) x` | `\frac{1}{2}x=-2x+5` | `\tfrac{1}{2}x` | span extended over the next equation |
+| 9 | authored exercises eq-044, braced system | `\left\{\begin{array}{rcl}...` | `\left\{\begin{array}{l}...` | scorer (three columns against one; same symbols) |
+| 10 | authored matrices eq-038, three-line derivation | `\begin{array}{rcl}...` | `\begin{aligned}...` | scorer (same symbols) |
+
+## Recommendation
+
+**(a) Production.** Not yet. The case for the flag is the second reading: of the equations wrong in
+the symbols, 58% instead of 41% reach a person, at the same decisions per page, for $0.0016 a page
+(about 11% of the pipeline's cost). Against it: the gain is concentrated in slice A, the slice it was
+tuned on (flag recall 0.33 to 0.70 there, 0.46 to 0.47 on B); every interval on the review numbers
+includes 0; the primary score does not move; it adds about half as many equations again that the
+answer key has no partner for (186 to 276 on 114 pages), each one a change to the output the page
+pass decided alone and the review screen then may ask about; and it runs layout twice. If the
+review-flag gain is the goal, it is worth trying only after a held-out check on fresh sections (c),
+or after a variant that compares readings on layout's own spans and never changes them is built
+and measured (not done here); the extra inline equations are the part to weigh.
+
+**(b) What would close the rest of the gap**, by expected points on the dev pages and cost
+(points are of gold equations on the 724 pooled; the held-out effect scales by the classes present):
+
+| Rank | Change | Expected | Cost |
+|---|---|---|---|
+| 1 | Include the vector-drawn brace in a braced system's region (a layout rule, no model): 12 of the 38 span-bucket equations on dev | +1.7 points | days of work, $0 |
+| 2 | Nuclide prefix scripts as one inline run (stacked mass and atomic number; `_1^1 H`): 20 undetected, all in one chemistry section | +2.8 points on chemistry sections, little elsewhere | days of work, $0 |
+| 3 | Nested and inline fractions the text layer cannot order (21 undetected plus cut spans such as cases 3 and 4): propose a box from the picture, not a quote from the text layer, and let the equation step read that crop | +2 to +3 points | a design change away from "grounded in the text layer"; about $0.003 a page for the proposals |
+| 4 | Write systems and derivations as `cases`/`aligned` as the answer key does: closes the 15 "scorer" cases | up to +2 points on the primary only; same symbols, so no real gain; the analysis already judged it gaming the scorer | $0 |
+| 5 | Chemistry formulas in running text (40 undetected): inline detection for sub/superscripted formulas | +3 to +5 points on chemistry sections | hard; depends on how many chemistry texts the beta has |
+| not worth it | the 55 single-glyph gold equations (a lone `×`); the page pass with a bigger model | 0 | the pass at medium already reads as well as the layout cuts, and a bigger model does not anchor what the text layer lacks |
+
+**(c) A fresh held-out run.** Two different questions. (1) Has the 0.5.0 layout closed the
+held-out gap? The dev result says the pipeline is level with the chatbots on maths, so the
+registered comparison (ReadableSTEM -0.118 against Opus) is probably out of date. Re-recording
+ReadableSTEM at this commit on the 15 registered sections costs about $1 to $2 per run (only the
+crops that changed need new answers; the rest replay), $3 for two runs; those sections are no longer
+blind (the analysis of 2026-10-20 read their errors), so it is a re-measurement, not a test. That is
+worth doing now. (2) Does the page pass help? That needs fresh sections: the paired on/off design
+needs about 17 sections for +1 point of the primary score and about 12 for +0.5 of the symbols score
+(above), and a chatbot comparison needs far more, because the section-level spread of the
+difference between systems is 0.21 on the primary score (held-out run): a 5-point difference needs
+about 140 sections, a 10-point one about 35. So a fresh set of 20 sections (about 320 pages) would
+settle the page pass: ReadableSTEM off and on, two runs each, about $12, and the chatbots (Haiku
+about $0.7, Opus about $17 per run) only if a head-to-head is wanted, which at that size can still
+only detect a gap of 10 points or more.
