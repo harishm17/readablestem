@@ -49,7 +49,9 @@ def is_open(tier: str) -> bool:
 
 def page_quota(settings: Settings, tier: str) -> int | None:
     """Pages a person of `tier` may submit per UTC day; None is unlimited (development)."""
-    return settings.open_tier_daily_page_quota if is_open(tier) else settings.per_user_daily_page_quota
+    return (
+        settings.open_tier_daily_page_quota if is_open(tier) else settings.per_user_daily_page_quota
+    )
 
 
 def reread_allowance(settings: Settings, tier: str) -> int | None:

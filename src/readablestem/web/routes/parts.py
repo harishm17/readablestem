@@ -26,7 +26,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
 
-from readablestem.web import events, pending, ranges
+from readablestem.web import access, events, pending, ranges
 from readablestem.web.database import utc_today
 from readablestem.web.db import PendingUpload, session_scope, utcnow
 from readablestem.web.deps import (
@@ -35,6 +35,7 @@ from readablestem.web.deps import (
     CurrentUser,
     PageError,
     UserDep,
+    conversions_closed,
     enforce,
     flash,
     get_ctx,
@@ -113,7 +114,9 @@ def chooser_context(
     now = utcnow()
     with session_scope(ctx.factory) as session:
         row = owned_pending(session, upload_id, user)
-        left = pages_left(session, user.id, quota=s.per_user_daily_page_quota, day=utc_today(now))
+        left = pages_left(
+            session, user.id, quota=access.page_quota(s, user.access_tier), day=utc_today(now)
+        )
         session.expunge(row)
     done = {p for p in (row.done_pages or []) if isinstance(p, int)}
     remaining = row.pages - len(done)
@@ -216,7 +219,7 @@ def _start_parts(
         except UploadRejected as exc:
             from readablestem.web.routes.jobs import upload_error_message
 
-            out.error = upload_error_message(exc.code, ctx, named, exc.pages)
+            out.error = upload_error_message(exc.code, ctx, named, exc.pages, tier=user.access_tier)
             out.status = exc.status_code
             break
         except TooManyJobs as exc:
@@ -232,9 +235,15 @@ def _start_parts(
             break
         except QuotaRefused as exc:
             left = exc.left
+            limit = access.page_quota(s, user.access_tier)
+            of_today = (
+                f"the {limit} pages a new account can convert today"
+                if access.is_open(user.access_tier)
+                else f"today's {limit} pages"
+            )
             out.error = (
                 f"{named} has {exc.pages} {'page' if exc.pages == 1 else 'pages'}, but you have "
-                f"{left} of today's {s.per_user_daily_page_quota} pages left. It was not started. "
+                f"{left} of {of_today} left. It was not started. "
                 "The count starts again at midnight UTC; this file is kept so you can choose it "
                 "then."
             )
@@ -268,15 +277,11 @@ async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Resp
     form = await request.form()
     text = str(form.get("parts") or "")
     shrink = form.get("shrink") == "on"
-    if await run_in_threadpool(ctx.guard.cap_reached, ctx.min_headroom_usd):
-        log_event(logger, "upload_rejected", code="spend_cap")
-        raise PageError(
-            503,
-            "Conversions are paused for today",
-            "Today's budget for conversions has been used up. New uploads open again "
-            "after midnight UTC. Nothing was started; this file is kept.",
-            headers={"Retry-After": "3600"},
-        )
+    if (closed := await run_in_threadpool(conversions_closed, ctx, user)) is not None:
+        from readablestem.web.routes.jobs import conversions_paused
+
+        log_event(logger, "upload_rejected", code="spend_cap" if closed == "daily" else "open_pool")
+        raise PageError(*conversions_paused(closed, kept=True), headers={"Retry-After": "3600"})
     if (refused := ctx.uploads.enter(user.id)) is not None:
         from readablestem.web.routes.jobs import UPLOAD_BUSY
 

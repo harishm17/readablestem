@@ -3,8 +3,8 @@
 Retention model: everything derived from a user's document (the upload, crops, the
 result JSON, the output HTML, review edits, stage progress) hangs off `jobs` and is
 deleted with it by `ops.retention`. Tables that survive a job's deletion (`spend_days`,
-`quota_days`, `signup_days`, `error_aggregates`, `events`) hold numbers and category codes only, never
-document text.
+`quota_days`, `signup_days`, `error_aggregates`, `events`) hold numbers and category codes
+only, never document text.
 
 User content that is not a document (a user's `courses` and their `notation_entries`)
 and sign-in data (`auth_identities`) belong to the user: they stay until the user deletes

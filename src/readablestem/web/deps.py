@@ -121,9 +121,9 @@ class CsrfFailed(Exception):
 
 def current_user(request: Request) -> CurrentUser | None:
     """The signed-in user, if they are still allowed (`users.is_allowed`, checked on every
-    request, so removing or blocking someone takes effect immediately) and the session is not older than
-    their last sign-out (`users.session_version`), so a copied cookie stops working
-    when its owner signs out."""
+    request, so removing or blocking someone takes effect immediately) and the session is
+    not older than their last sign-out (`users.session_version`), so a copied cookie stops
+    working when its owner signs out."""
     if hasattr(request.state, "user"):
         return request.state.user
     user: CurrentUser | None = None
@@ -198,6 +198,23 @@ async def require_csrf(request: Request) -> None:
     form = await request.form()
     if not csrf_valid(request, form.get(CSRF_FIELD)):
         raise CsrfFailed()
+
+
+# --------------------------------------------------------------------------- spend
+
+
+def conversions_closed(ctx: AppContext, user: CurrentUser) -> str | None:
+    """Why no new conversion can start for `user` today, or None while one can: "daily"
+    (the day's spend cap is used up: for everybody) or "open" (the pool for new accounts
+    is, and the day's cap is not: only for open-tier accounts, `web.spend`). One read."""
+    snapshot = ctx.guard.snapshot()
+    headroom = ctx.min_headroom_usd
+    if snapshot.remaining_usd is not None and snapshot.remaining_usd <= headroom:
+        return "daily"
+    pool_left = snapshot.open_remaining_usd
+    if user.access_tier == "open" and pool_left is not None and pool_left <= headroom:
+        return "open"
+    return None
 
 
 # --------------------------------------------------------------------------- rate limits

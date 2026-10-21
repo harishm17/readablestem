@@ -23,6 +23,7 @@ Measurements behind the numbers: docs/deploy.md, "Spend limits".
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -195,7 +196,9 @@ def spend_findings(settings: Settings) -> list[Finding]:
     return out
 
 
-def _open_signup_findings(settings: Settings, largest: float, warning) -> None:
+def _open_signup_findings(
+    settings: Settings, largest: float, warning: Callable[[str], None]
+) -> None:
     """What open sign-up (`SIGNUP_MODE=open`) adds to the limits. All warnings: each setting
     works, but these combinations are probably not what was meant."""
     pool = settings.open_tier_daily_spend_cap_usd

@@ -12,7 +12,11 @@ queue is safe with several workers or instances:
   see `web.auth.set_allowed`).
 - While less than one model call's worth (`spend.largest_reservation_usd`) is left under
   the daily cap, nothing is claimed: queued jobs wait for the next UTC day instead of
-  running into a document with every element "not converted".
+  running into a document with every element "not converted". The same for the open-tier
+  pool (`OPEN_TIER_DAILY_SPEND_CAP_USD`, `web.spend`) and the jobs of open-tier accounts
+  (`web.access`): they wait for the next day while the pool is spent, and the jobs of
+  invited people are claimed as before. A job of an open-tier account reserves in the
+  pool as well as under the daily cap (`_start_attempt`).
 - The conversion runs on its own thread. The worker thread waits for it and extends the
   job's lease (`lease_until`) every `lease_s / 3`. If the process dies, the lease runs
   out and the next worker requeues the job; after `MAX_ATTEMPTS` claims it is failed
@@ -85,7 +89,7 @@ from readablestem.config import ConfigError, Settings
 from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation, SpendGuard
 from readablestem.core.types import ConversionOutput, DocumentResult, ProgressEvent
 from readablestem.ops import limits
-from readablestem.web import carry_edits, events
+from readablestem.web import access, carry_edits, events
 from readablestem.web import retry as retry_rules
 from readablestem.web.database import as_utc, rowcount
 from readablestem.web.db import Blob, Job, JobStatus, ReviewEdit, User, session_scope, utcnow
@@ -350,6 +354,8 @@ class _Attempt:
     prior_calls: int
     max_usd: float  # the whole job's caps (every attempt), see `job_caps`
     max_calls: int
+    # The spend pool the job's owner draws on (`web.access.spend_pool`): None, or "open".
+    pool: str | None = None
     budget: JobBudget = field(init=False)
     cancelled: threading.Event = field(default_factory=threading.Event)
     # The finished steps kept for this job (T3-1); None for a converter that takes none.
@@ -398,7 +404,11 @@ class Worker:
         self.factory = factory
         self.converter = converter
         self.client_factory = client_factory
-        self.guard: SpendGuard = guard or DbSpendGuard(factory, settings.daily_spend_cap_usd)
+        self.guard: SpendGuard = guard or DbSpendGuard(
+            factory,
+            settings.daily_spend_cap_usd,
+            open_cap_usd=settings.open_tier_daily_spend_cap_usd,
+        )
         self.lease_s = lease_s
         self.clock = clock
         self.max_job_s = max_job_s  # overrides job_time_limit_s (tests)
@@ -491,10 +501,13 @@ class Worker:
             "attempts": Job.attempts + 1,
             "error_code": None,
         }
+        owners = [User.is_allowed.is_(True)]
+        if self.open_pool_closed():  # open-tier jobs wait for the next day; others go on
+            owners.append(User.access_tier != access.OPEN)
         oldest = (
             select(Job.id)
             .join(User, User.id == Job.user_id)
-            .where(Job.status == JobStatus.QUEUED, User.is_allowed.is_(True))
+            .where(Job.status == JobStatus.QUEUED, *owners)
             .order_by(Job.attempts, Job.created_at, Job.id)
             .limit(1)
         )
@@ -525,6 +538,13 @@ class Worker:
         if not callable(cap_reached):  # a guard without a snapshot (tests, CLI)
             return False
         return bool(cap_reached(self.headroom_usd))
+
+    def open_pool_closed(self) -> bool:
+        """True while not even one model call fits in the open-tier pool today."""
+        cap_reached = getattr(self.guard, "cap_reached", None)
+        if not callable(cap_reached) or not _accepts(cap_reached, "pool"):
+            return False  # a guard with no pools (tests, CLI)
+        return bool(cap_reached(self.headroom_usd, pool=access.POOL_OPEN))
 
     def _owned(self, claim: Claim):
         """WHERE clause: the job is still running under this claim."""
@@ -615,8 +635,19 @@ class Worker:
 
     # ------------------------------------------------------------------ one attempt
 
+    def _guard_for(self, pool: str | None) -> SpendGuard:
+        """The spend guard as jobs of `pool` see it (`DbSpendGuard.pooled`); a guard with no
+        pools (tests, CLI) is the same for everyone."""
+        pooled = getattr(self.guard, "pooled", None)
+        return pooled(pool) if pool is not None and callable(pooled) else self.guard
+
     def _start_attempt(
-        self, claim: Claim, prior_usd: float, prior_calls: int, page_count: int
+        self,
+        claim: Claim,
+        prior_usd: float,
+        prior_calls: int,
+        page_count: int,
+        pool: str | None = None,
     ) -> _Attempt:
         max_usd, max_calls = job_caps(self.settings, page_count)
         attempt = _Attempt(
@@ -625,9 +656,10 @@ class Worker:
             prior_calls=prior_calls,
             max_usd=max_usd,
             max_calls=max_calls,
+            pool=pool,
         )
         attempt.budget = _AttemptBudget(
-            guard=self.guard,
+            guard=self._guard_for(pool),
             max_usd=max(0.0, max_usd - prior_usd),
             max_calls=max(0, max_calls - prior_calls),
             hold_on_job=lambda amount, calls: self._hold_on_job(attempt, amount, calls),
@@ -713,7 +745,8 @@ class Worker:
         snapshot = getattr(self.guard, "snapshot", None)
         if callable(snapshot):
             try:
-                daily_left = snapshot().remaining_usd
+                taken = snapshot()
+                daily_left = taken.remaining_for(attempt.pool)
             except Exception as exc:  # the settings' number is the answer without a snapshot
                 log_exception(logger, "concurrency_snapshot_failed", exc)
         return affordable_concurrency(
@@ -835,8 +868,11 @@ class Worker:
         started = time.monotonic()
         with session_scope(self.factory) as session:
             job = session.execute(
-                select(Job.page_count, Job.cost_usd, Job.model_calls).where(Job.id == claim.job_id)
+                select(Job.page_count, Job.cost_usd, Job.model_calls, Job.user_id).where(
+                    Job.id == claim.job_id
+                )
             ).one_or_none()
+            pool = access.spend_pool(access.tier_of(session, job.user_id)) if job else None
             pdf = session.scalar(
                 select(Blob.content).where(Blob.job_id == claim.job_id, Blob.kind == "upload")
             )
@@ -845,7 +881,7 @@ class Worker:
             return DISCARDED
         page_count = int(job.page_count or 0)
         attempt = self._start_attempt(
-            claim, float(job.cost_usd or 0.0), int(job.model_calls or 0), page_count
+            claim, float(job.cost_usd or 0.0), int(job.model_calls or 0), page_count, pool
         )
         if pdf is None:
             return self._finish_failed(attempt, "upload_missing")

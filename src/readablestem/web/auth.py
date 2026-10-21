@@ -234,7 +234,9 @@ def _sign_in_by_email(
         if user is None:
             return SignIn(refused="not_allowlisted", email=email)
         if not user.is_allowed:
-            return SignIn(refused="blocked" if open_signup is not None else "not_allowlisted", email=email)
+            return SignIn(
+                refused="blocked" if open_signup is not None else "not_allowlisted", email=email
+            )
         user.last_login_at = utcnow()
         if name and not created:
             user.name = name[:200]

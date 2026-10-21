@@ -326,7 +326,11 @@ def create_app(
         templates=make_templates(settings.base_url),
         converter=converter or default_converter(),
         client_factory=client_factory or default_client_factory,
-        guard=DbSpendGuard(factory, settings.daily_spend_cap_usd),
+        guard=DbSpendGuard(
+            factory,
+            settings.daily_spend_cap_usd,
+            open_cap_usd=settings.open_tier_daily_spend_cap_usd,
+        ),
         oauth=make_oauth(settings),
         min_headroom_usd=largest_reservation_usd(settings),
         tracer=_job_tracer(settings),

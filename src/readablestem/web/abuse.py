@@ -5,9 +5,10 @@ route (each upload that is not a PDF still costs a probe process), or making acc
 (`signup`, counted only when a sign-in would create one). It is a seatbelt for a free beta,
 not a defence against a distributed flood (that is Cloud Run's and Cloud Armor's job):
 accounts made from many addresses are bounded by the daily cap on new accounts
-(`MAX_NEW_ACCOUNTS_PER_DAY`, kept in the database) and by the open-tier limits, not here. Limits are kept in memory per instance, so with two instances the real
-allowance is twice the numbers below; a restart forgets them. Both are acceptable here and
-stated in docs/security.md.
+(`MAX_NEW_ACCOUNTS_PER_DAY`, kept in the database) and by the open-tier limits, not here.
+Limits are kept in memory per instance, so with two instances the real allowance is twice
+the numbers below; a restart forgets them. Both are acceptable here and stated in
+docs/security.md.
 
 `client_ip` reads the address from `X-Forwarded-For`, counting `trusted_proxy_hops` entries
 from the right (Cloud Run's front end appends the address it saw, so one hop; an external

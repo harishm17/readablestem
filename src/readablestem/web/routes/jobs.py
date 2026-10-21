@@ -32,6 +32,7 @@ from readablestem.core.types import DocumentResult
 from readablestem.pipeline import export_canvas, export_cartridge, text_pass
 from readablestem.pipeline import language as languages
 from readablestem.web import (
+    access,
     documents,
     events,
     notation,
@@ -55,6 +56,7 @@ from readablestem.web.deps import (
     CurrentUser,
     PageError,
     UserDep,
+    conversions_closed,
     csrf_valid,
     enforce,
     flash,
@@ -119,17 +121,21 @@ def upload_error_message(
     left: int | None = None,
     *,
     office: bool = False,
+    tier: str = access.INVITED,
 ) -> str:
     """What went wrong with an upload, naming the file (and its pages) when known. The
     file name is shown to its owner only, never logged. `left`: pages left today, for
-    "page_quota". `office`: the file was a Word or PowerPoint file, made into a PDF first
-    (T3-30), so the advice about pages is about the document and not about a PDF."""
+    "page_quota", which counts against `tier`'s daily pages (`web.access`). `office`: the file
+    was a Word or PowerPoint file, made into a PDF first (T3-30), so the advice about pages
+    is about the document and not about a PDF."""
     s = ctx.settings
     name = filename or "This file"
     limit = s.source_page_limit
     too_many = f"{name} has {pages} pages" if pages else f"{name} has more than {limit} pages"
     if code == "page_quota":
-        return _quota_message(name, pages, left, s.per_user_daily_page_quota)
+        return _quota_message(
+            name, pages, left, access.page_quota(s, tier), new_account=access.is_open(tier)
+        )
     accepted = office_convert.input_kinds(s)  # Word and PowerPoint files taken (T3-30)
     word = bool(accepted)
     kinds, endings = office_convert.accepted_phrases(accepted)
@@ -230,18 +236,28 @@ def upload_error_summary(message: str) -> str:
     return first + "." if dot and rest else message
 
 
-def _quota_message(name: str, pages: int | None, left: int | None, quota: int | None) -> str:
+def _quota_message(
+    name: str,
+    pages: int | None,
+    left: int | None,
+    quota: int | None,
+    *,
+    new_account: bool = False,
+) -> str:
     """The daily page limit refused an upload (UX review MF20, MF21): the file, its
     pages, what is left, and when the count starts again (the page under it says when
-    in the reader's own time)."""
+    in the reader's own time). A new account (open tier) is told the number is the limit
+    for new accounts, not a fault."""
     has = f"{name} has {pages} {'page' if pages == 1 else 'pages'}"
+    whose = "a new account can convert" if new_account else "you can convert"
     if not left:
         return (
-            f"{has}, and you have used all {quota} pages you can convert today. Upload it "
+            f"{has}, and you have used all {quota} pages {whose} today. Upload it "
             "again after the count starts again at midnight UTC. Nothing was uploaded."
         )
+    limit = f"the {quota} pages {whose} today" if new_account else f"today's {quota} pages"
     return (
-        f"{has}, but you have {left} of today's {quota} pages left. Upload a part of up "
+        f"{has}, but you have {left} of {limit} left. Upload a part of up "
         f"to {left} {'page' if left == 1 else 'pages'} now, or the whole file after the "
         "count starts again at midnight UTC. Nothing was uploaded."
     )
@@ -327,17 +343,14 @@ def current_html(ctx: AppContext, session: Session, job: Job) -> Job:
 
 
 def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
-    spend_closed = ctx.guard.cap_reached(ctx.min_headroom_usd)
+    closed = conversions_closed(ctx, user)
+    spend_closed = closed is not None
+    quota = access.page_quota(ctx.settings, user.access_tier)
     now = utcnow()
     with session_scope(ctx.factory) as session:
         # My documents as a to-do list (web/documents.py); expired jobs count as deleted.
         listing = documents.documents(session, user.id, now=now, budget_closed=spend_closed)
-        left = pages_left(
-            session,
-            user.id,
-            quota=ctx.settings.per_user_daily_page_quota,
-            day=utc_today(),
-        )
+        left = pages_left(session, user.id, quota=quota, day=utc_today())
         # The upload form's course choice (notation memory); None hides it.
         courses = (
             notation.list_courses(session, user.id) if notation.enabled(ctx.settings) else None
@@ -360,8 +373,13 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
     return {
         "documents": listing,
         "pages_left": left,
-        "page_quota": ctx.settings.per_user_daily_page_quota,
+        "page_quota": quota,
+        # A new account (open tier) is told its limits are the ones for new accounts.
+        "new_account": access.is_open(user.access_tier),
         "spend_closed": spend_closed,
+        # Only the pool for new accounts is used up: the notice says so (invited people
+        # are unaffected, and never see it).
+        "open_pool_closed": closed == "open",
         # Daily limits and today's budget start again then (shown in local time by app.js).
         "next_reset": next_day_start(now),
         "active": "app",
@@ -426,7 +444,7 @@ def app_documents(request: Request, user: UserDep, v: str = "", course: str = ""
     query every few seconds; when something did, the whole list, with a `<title>` that
     htmx moves into the tab title ("My documents (4 of 6 finished)")."""
     ctx = get_ctx(request)
-    spend_closed = ctx.guard.cap_reached(ctx.min_headroom_usd)
+    spend_closed = conversions_closed(ctx, user) is not None
     now = utcnow()
     # The list of one course's documents (the course page, T3-4) polls with its own id.
     course_id = course if JOB_ID.match(course) else None
@@ -462,7 +480,9 @@ def _upload_error_page(
 ) -> Response:
     ctx = get_ctx(request)
     log_event(logger, "upload_rejected", code=code, office=office)
-    message = upload_error_message(code, ctx, filename, pages, left, office=office)
+    message = upload_error_message(
+        code, ctx, filename, pages, left, office=office, tier=user.access_tier
+    )
     context = app_context(ctx, user)
     # The course chosen stays chosen (the form marks it only among the user's courses),
     # so the file chosen again is read with the course's notation.
@@ -486,15 +506,9 @@ def _upload_error_page(
 async def create_job(request: Request, user: UserDep) -> Response:
     ctx = get_ctx(request)
     enforce(request, "upload_user", user.id)  # before anything is read or any process starts
-    if await run_in_threadpool(ctx.guard.cap_reached, ctx.min_headroom_usd):
-        log_event(logger, "upload_rejected", code="spend_cap")
-        raise PageError(
-            503,
-            "Conversions are paused for today",
-            "Today's budget for conversions has been used up. New uploads open again "
-            "after midnight UTC. Nothing was uploaded.",
-            headers={"Retry-After": "3600"},
-        )
+    if (closed := await run_in_threadpool(conversions_closed, ctx, user)) is not None:
+        log_event(logger, "upload_rejected", code="spend_cap" if closed == "daily" else "open_pool")
+        raise PageError(*conversions_paused(closed, kept=False), headers={"Retry-After": "3600"})
     if (refused := ctx.uploads.enter(user.id)) is not None:
         log_event(logger, "upload_rejected", code=f"upload_{refused}")
         raise PageError(*UPLOAD_BUSY[refused], headers={"Retry-After": "10"})
@@ -502,6 +516,27 @@ async def create_job(request: Request, user: UserDep) -> Response:
         return await _take_upload(request, ctx, user)
     finally:
         ctx.uploads.leave(user.id)
+
+
+def conversions_paused(closed: str, *, kept: bool) -> tuple[int, str, str]:
+    """Status, title and message of the page for an upload turned away because no model
+    spend is left today (`deps.conversions_closed`): the day's cap, or the pool for new
+    accounts. `kept`: the file is still waiting for its pages to be chosen."""
+    nothing = "Nothing was started; this file is kept." if kept else "Nothing was uploaded."
+    if closed == "open":
+        return (
+            503,
+            "Conversions for new accounts are paused for today",
+            "The share of today's budget set aside for new accounts has been used up. "
+            f"Uploads from new accounts open again after midnight UTC. {nothing} "
+            "Accounts that were invited are not affected.",
+        )
+    return (
+        503,
+        "Conversions are paused for today",
+        "Today's budget for conversions has been used up. New uploads open again "
+        f"after midnight UTC. {nothing}",
+    )
 
 
 # Status, title and message when the upload gate (web/uploads.py) turns someone away.
@@ -814,7 +849,13 @@ def upload_results_page(request: Request, result_id: str, user: UserDep) -> Resp
     refused = [
         {
             "message": upload_error_message(
-                i.code, ctx, i.filename, i.pages or None, i.left, office=i.office
+                i.code,
+                ctx,
+                i.filename,
+                i.pages or None,
+                i.left,
+                office=i.office,
+                tier=user.access_tier,
             )
         }
         for i in placed
@@ -928,7 +969,7 @@ def load_job_status(
         job = current_html(ctx, session, owned_job(session, job_id, user))
         view = job_view(session, job, with_page=True)
         status, error_code, result_json = str(job.status), job.error_code, job.result_json
-    budget_closed = status == JobStatus.QUEUED and ctx.guard.cap_reached(ctx.min_headroom_usd)
+    budget_closed = status == JobStatus.QUEUED and conversions_closed(ctx, user) is not None
     outcome = job_outcome(
         status=status,
         error_code=error_code,
