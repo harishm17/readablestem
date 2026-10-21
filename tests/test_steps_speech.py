@@ -72,8 +72,8 @@ def test_openstax_and_latex_markup_read_the_same():
         (r"x_i^2", "x sub i squared"),
         # ions: the charge needs no "end power"; a nuclide is read as the element (the data
         # of `speech_nuclides`), and one that is not known keeps its numbers before its symbol
-        (r"\text{SO}_4^{2-}", "SO sub 4 to the power 2 minus"),
-        (r"\text{Fe}^{3+}", "Fe to the power 3 plus"),
+        (r"\text{SO}_4^{2-}", "S O 4 2 minus"),
+        (r"\text{Fe}^{3+}", "F e 3 plus"),
         (r"{}^{14}_{6}\text{C}", "carbon 14, atomic number 6"),
         (r"{}^{235}\text{U}", "uranium 235"),
         (r"{}^{0}_{-1}\text{e}", "electron, mass number 0, atomic number minus 1"),

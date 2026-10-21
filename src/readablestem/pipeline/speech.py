@@ -94,13 +94,15 @@ SYMBOLS = {
     "∨": "or", "∪": "union", "∩": "intersection",
     # arrows
     "→": "right arrow", "⟶": "right arrow", "←": "left arrow", "⟵": "left arrow",
-    "↔": "left right arrow", "⇒": "implies", "⟹": "implies", "⇐": "is implied by",
+    "↔": "left right arrow", "⟷": "left right arrow", "⇒": "implies", "⟹": "implies",
+    "⇐": "is implied by",
     "⇔": "if and only if", "⟺": "if and only if", "↦": "maps to", "↑": "up arrow",
     "↓": "down arrow", "⇌": "equilibrium arrow",
     # fences and punctuation
     "(": "open parenthesis", ")": "close parenthesis", "[": "open bracket",
     "]": "close bracket", "{": "open brace", "}": "close brace", "|": "vertical bar",
-    "‖": "double vertical bar", "⟨": "open angle bracket", "⟩": "close angle bracket",
+    "‖": "double vertical bar", "│": "vertical bar", "║": "double vertical bar",
+    "⟨": "open angle bracket", "⟩": "close angle bracket",
     "⌊": "open floor", "⌋": "close floor", "⌈": "open ceiling", "⌉": "close ceiling",
     ",": "comma", ";": "semicolon", ":": "colon", ".": "period",
     # large operators (as plain symbols; with limits they read as "the sum from ...")

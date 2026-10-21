@@ -452,6 +452,8 @@ def _species_latex(s: str, i: int) -> tuple[str, int]:
     base = False  # the last thing written is something a script can hang on
     while i < n and not s[i].isspace():
         c = s[i]
+        if c == "-" and s.startswith(("->", "-->"), i):
+            break  # the arrow after the species, not a charge or a bond
         state = _STATE.match(s, i) if c == "(" and base else None
         if state:
             body.append(state.group(0))
@@ -527,16 +529,10 @@ def _species_latex(s: str, i: int) -> tuple[str, int]:
                 break
             body.append("^" + _group((str(count) if count > 1 else "") + _sign(c)))
             i += count
-        elif c == "-":  # a bond: a letter or a bracket follows
-            body.append("\\text{-}")
-            i += 1
-            base = False
-        elif c == "=":
-            body.append("=")
-            i += 1
-            base = False
-        elif c == "#":
-            body.append("\\equiv ")
+        elif c in "-=#":  # a bond: it joins two atoms, so something comes before it
+            if not base:
+                raise CeError("bond with nothing before it")
+            body.append({"-": "\\text{-}", "=": "=", "#": "\\equiv "}[c])
             i += 1
             base = False
         elif c in "*." and base:
@@ -576,8 +572,8 @@ def ce_to_latex(source: str) -> str:
     s = source.replace("~", " ").strip()
     if not s:
         raise CeError("empty")
-    if "$" in s:
-        raise CeError("math inside")
+    if "$" in re.sub(r"\[[^\]]*\]", "", s):
+        raise CeError("math inside")  # only an arrow's label may hold it: ->[$\Delta$]
     out: list[str] = []
     i, n = 0, len(s)
     while i < n:
