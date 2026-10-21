@@ -329,6 +329,9 @@ class Settings(BaseSettings):
     # Seconds the model may take to write one page (a dense page is a few thousand tokens;
     # `model_timeout_s` is for a crop's short answer).
     image_pages_timeout_s: float = Field(default=180.0, gt=0)
+    # Resolution of the page picture the model reads (long side capped at 2,576 px, where
+    # Claude stops scaling a picture down).
+    image_pages_dpi: int = Field(default=200, ge=72, le=400)
     # Write each converted equation's stored speech text (`pipeline.speech`, the reading
     # shown on the review screen) as the `alttext` attribute of its <math>. OFF until a
     # person has checked it with NVDA + MathCAT (and ideally JAWS and VoiceOver): some

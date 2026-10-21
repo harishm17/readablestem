@@ -48,21 +48,34 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gold", type=Path, default=Path("data/dev-v2/dev"))
     args = parser.parse_args(argv)
 
-    gold = pe.load_gold(args.gold)
-    units = [
-        u
-        for u in pe.group_pages(list(gold))
-        if f"{u[0]['book_slug']}/{u[0]['page_slug']}" == args.section
-    ]
-    if not units:
-        print(f"no development section {args.section!r}", file=sys.stderr)
-        return 2
-    fetcher = HttpFetcher(cache_dir=Path(".cache/openstax"))
-    with DevSetMedia(args.gold, Path(".cache/eval"), fetcher, paper="Letter") as media:
-        printed = media.page_pdf(units[0])
-    scanned, made = scan.scan_pdf(printed, args.seed)
     args.out.mkdir(parents=True, exist_ok=True)
-    stem = args.section.replace("/", "__")
+    if args.image:
+        import pymupdf
+
+        picture = Path(args.section)
+        stem = picture.stem
+        doc = pymupdf.open()
+        image = pymupdf.open(picture)
+        rect = image[0].rect
+        scale = 612 / min(rect.width, rect.height) if min(rect.width, rect.height) > 0 else 1
+        page = doc.new_page(width=rect.width * scale, height=rect.height * scale)
+        page.insert_image(page.rect, filename=str(picture))
+        scanned, made = doc.tobytes(), []
+    else:
+        gold = pe.load_gold(args.gold)
+        units = [
+            u
+            for u in pe.group_pages(list(gold))
+            if f"{u[0]['book_slug']}/{u[0]['page_slug']}" == args.section
+        ]
+        if not units:
+            print(f"no development section {args.section!r}", file=sys.stderr)
+            return 2
+        fetcher = HttpFetcher(cache_dir=Path(".cache/openstax"))
+        with DevSetMedia(args.gold, Path(".cache/eval"), fetcher, paper="Letter") as media:
+            printed = media.page_pdf(units[0])
+        scanned, made = scan.scan_pdf(printed, args.seed)
+        stem = args.section.replace("/", "__")
     (args.out / f"{stem}.scan.pdf").write_bytes(scanned)
 
     settings = with_provider(
@@ -96,7 +109,8 @@ def main(argv: list[str] | None = None) -> int:
         for record in summary.per_page:
             print(
                 f"page {record.page}: {record.outcome} {record.model} ${record.cost_usd:.4f} "
-                f"{record.latency_ms / 1000:.1f}s in={record.input_tokens} out={record.output_tokens} "
+                f"{record.latency_ms / 1000:.1f}s in={record.input_tokens} "
+                f"out={record.output_tokens} "
                 f"blocks={record.blocks} {record.by_kind} illegible={record.illegible} "
                 f"required={record.required} optional={record.optional}"
             )

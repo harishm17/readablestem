@@ -1300,7 +1300,7 @@ def _image_pages_pass(
             layout.render_page,
             pdf_bytes,
             number,
-            dpi=image_page.DPI,
+            dpi=settings.image_pages_dpi,
             max_side_px=image_page.MAX_SIDE_PX,
         )
         for number in pages

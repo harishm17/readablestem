@@ -104,7 +104,7 @@ ILLEGIBLE = "[illegible]"
 
 # The page picture: 200 dpi, long side at most the size at which Claude stops scaling a picture
 # down (`pricing.IMAGE_MAX_EDGE_PX`), so small subscripts stay legible.
-DPI = 200
+DPI = 200  # the default of `Settings.image_pages_dpi`
 MAX_SIDE_PX = 2576
 MAX_OUTPUT_TOKENS = 6144
 # Thinking effort. Transcription is reading, not reasoning; the measurement on the

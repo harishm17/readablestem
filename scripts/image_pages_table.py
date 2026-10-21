@@ -63,7 +63,9 @@ def rows(report: dict) -> dict[str, object]:
         "wrong inline not asked, per 100 gold": pick(
             flags, "inline", "wrong_not_asked_per_100_gold"
         ),
-        "display: second reading agreed / disagreed": f"{second.get('agreed')} / {second.get('disagreed')}",
+        "display: second reading agreed / disagreed": (
+            f"{second.get('agreed')} / {second.get('disagreed')}"
+        ),
         "display: agreed and wrong": second.get("agreed_wrong"),
         "pages read / kept as image": f"{pages.get('converted')} / {pages.get('fell_back')}",
         "page reader $ per page": pages.get("cost_per_page_usd"),
