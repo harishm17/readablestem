@@ -85,6 +85,10 @@ def main(argv: list[str] | None = None) -> int:
         options=ConversionOptions.from_settings(settings),
     )
     result = output.result
+    crops = args.out / f"{stem}.crops"
+    crops.mkdir(exist_ok=True)
+    for element_id, png in output.crops.items():
+        (crops / f"{element_id}.png").write_bytes(png)
     (args.out / f"{stem}.result.json").write_text(result.model_dump_json(indent=1))
     (args.out / f"{stem}.html").write_text(result.html, encoding="utf-8")
     summary = result.image_pages

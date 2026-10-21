@@ -58,7 +58,7 @@ KIND_LABELS = {
     Kind.FIGURE: "Figure",
     Kind.TABLE: "Table",
     Kind.HEADING: "Heading",
-    Kind.PARAGRAPH: "Text",  # (a fix of this kind: text read from an image of a page)
+    Kind.PARAGRAPH: "Paragraph",
     Kind.LIST_ITEM: "List item",
 }
 

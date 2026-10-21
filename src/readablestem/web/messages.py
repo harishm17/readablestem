@@ -121,6 +121,10 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("image_page.single_reading", "single_reading_no_box"): "The place of this equation on "
     "the page could not be found, so it was read once, from the whole page, and not read "
     "again from its own picture: compare it with the original page symbol by symbol.",
+    ("image_page.single_reading", "single_reading_crop_failed"): "The picture cut out for this "
+    "equation did not show an equation (its place on the page may be off), so this is the "
+    "reading from the whole page, not read again: compare it with the original page symbol by "
+    "symbol.",
     ("table.no_text_layer", "no_text_layer"): "This table was read from an image of the page, "
     "so nothing in the PDF can confirm its cells: compare every value with the original.",
     ("equation.region", "half_fraction"): "The part of the page this equation was read "

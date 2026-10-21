@@ -555,3 +555,44 @@ def test_a_cell_with_a_span_of_zero_does_not_cost_the_page():
     fix = built.fixes[by_kind(built, Kind.TABLE)[0].id]
     assert fix.table is not None and fix.table.grid.cells
     assert all(c.row_span >= 1 and c.col_span >= 1 for c in fix.table.grid.cells)
+
+
+# --------------------------------------------------------------------------- the rescue
+
+
+def stepped(status: Status, reason: str | None = None) -> tuple[Element, Fix]:
+    built = build(block("equation", latex="v = \\frac{d}{t}"))
+    [equation] = by_kind(built, Kind.EQUATION)
+    fix = Fix(element_id=equation.id, kind=Kind.EQUATION, status=status, reason=reason)
+    return equation, fix
+
+
+@pytest.mark.parametrize(
+    ("status", "reason"),
+    [
+        (Status.ABSTAINED, "not_equation"),
+        (Status.ABSTAINED, "low_confidence"),
+        (Status.FAILED, "model_refused"),
+    ],
+)
+def test_a_crop_that_could_not_be_read_keeps_the_page_readers_reading_as_a_decision(status, reason):
+    equation, fix = stepped(status, reason)
+    rescued = image_page.rescued(fix, equation)
+    assert (rescued.status, rescued.review) == (Status.NEEDS_REVIEW, "required")
+    assert rescued.reason is None and rescued.equation is not None
+    assert rescued.equation.latex == "v = \\frac{d}{t}" and "<math" in rescued.equation.mathml
+    assert {"no_text_layer", "single_reading_crop_failed"} <= {
+        c.code for c in rescued.failed_checks
+    }
+
+
+def test_the_rescue_leaves_everything_else_alone():
+    equation, fix = stepped(Status.ABSTAINED, "budget_job_usd")
+    assert image_page.rescued(fix, equation) is fix  # a spend cap is not a bad box
+    equation, fix = stepped(Status.NEEDS_REVIEW)
+    assert image_page.rescued(fix, equation) is fix
+    typed = equation.model_copy(update={"reasons": []})
+    failed = fix.model_copy(update={"status": Status.ABSTAINED})
+    assert image_page.rescued(failed, typed) is failed  # not an image page
+    unreadable = equation.model_copy(update={"page_latex": None})
+    assert image_page.rescued(failed, unreadable) is failed  # nothing to keep

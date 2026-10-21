@@ -598,7 +598,7 @@ def _run_step(
             log.warning("%s step failed: %s", step_name, type(exc).__name__)
             fix = _failed(element, "internal_error", recorder.calls)
         else:
-            fix = _validated(fix, element, recorder.calls)
+            fix = image_page.rescued(_validated(fix, element, recorder.calls), element)
             if (scope := _budget_scope(fix)) is not None:
                 stop.trip(scope)
         elapsed_ms = round((time.perf_counter() - started) * 1000)

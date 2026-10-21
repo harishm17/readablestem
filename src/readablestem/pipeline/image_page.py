@@ -876,6 +876,53 @@ def tier_headings(fixes: Sequence[Fix], elements: Sequence[Element]) -> None:
 # ------------------------------------------------------------------------------ pages
 
 
+def rescued(fix: Fix, element: Element) -> Fix:
+    """A display equation of an image page whose crop could not be read (the equation step
+    abstained or failed: the box may be misplaced) keeps the page reader's own reading as a
+    proposal, required, with no second reading, as when there was no box at all. Any other
+    fix, and a step that stopped for a spend cap, is returned as it is."""
+    if (
+        IMAGE_PAGE_REASON not in element.reasons
+        or element.kind is not Kind.EQUATION
+        or element.display != "block"
+        or fix.status not in (Status.ABSTAINED, Status.FAILED)
+        or (fix.reason or "").startswith("budget_")
+        or not element.page_latex
+    ):
+        return fix
+    mathml, checks = equation_step._convert(element.page_latex, "block")
+    if mathml is None or has_errors(checks):
+        return fix
+    speech, speech_check = equation_step._speech(mathml)
+    return fix.model_copy(
+        update={
+            "status": Status.NEEDS_REVIEW,
+            "reason": None,
+            "review": "required",
+            "confidence": min(CONFIDENCE_VALUE.get(element.image_confidence or "low", 0.4), 0.6),
+            "equation": EquationFix(
+                latex=element.page_latex, mathml=mathml, speech=speech, display="block"
+            ),
+            "checks": [
+                *checks,
+                speech_check,
+                Check(
+                    name="equation.no_text_layer",
+                    passed=False,
+                    severity="warning",
+                    code=equation_step.NO_TEXT_LAYER_CODE,
+                ),
+                Check(
+                    name="image_page.single_reading",
+                    passed=False,
+                    severity="warning",
+                    code="single_reading_crop_failed",
+                ),
+            ],
+        }
+    )
+
+
 def is_original(element: Element) -> bool:
     """The figure that stands for a converted page's own picture."""
     return ORIGINAL_REASON in element.reasons
