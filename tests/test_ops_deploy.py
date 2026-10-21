@@ -237,6 +237,57 @@ def test_microsoft_sign_in_is_opt_in_and_its_secret_is_a_secret(env):
     assert "directory (tenant) ids" in run(env).stderr
 
 
+def test_open_signup_settings_reach_the_service_only_when_set(env):
+    """deploy.env.example sets them (recommended production values); a deploy that does not
+    leaves the app's own defaults, which are invitation only."""
+    first = run(env, "service")
+    assert first.returncode == 0, first.stderr
+    (deploy,) = [c for c in calls(env) if c["argv"][2:4] == ["run", "deploy"]]
+    assert "SIGNUP_MODE" not in deploy["env_file"] and "OPEN_TIER" not in deploy["env_file"]
+
+    env.update(
+        SIGNUP_MODE="open",
+        OPEN_TIER_DAILY_PAGE_QUOTA="20",
+        OPEN_TIER_DAILY_REREADS="30",
+        MAX_NEW_ACCOUNTS_PER_DAY="100",
+        OPEN_TIER_DAILY_SPEND_CAP_USD="4",
+    )
+    result = run(env, "service")
+    assert result.returncode == 0, result.stderr
+    deploys = [c for c in calls(env) if c["argv"][2:4] == ["run", "deploy"]]
+    for line in (
+        "SIGNUP_MODE: 'open'",
+        "OPEN_TIER_DAILY_PAGE_QUOTA: '20'",
+        "OPEN_TIER_DAILY_REREADS: '30'",
+        "MAX_NEW_ACCOUNTS_PER_DAY: '100'",
+        "OPEN_TIER_DAILY_SPEND_CAP_USD: '4'",
+    ):
+        assert line in deploys[-1]["env_file"]
+
+
+def test_the_example_file_carries_the_recommended_open_signup_values():
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parents[1] / "deploy" / "deploy.env.example").read_text()
+    for line in (
+        "SIGNUP_MODE=open",
+        "OPEN_TIER_DAILY_PAGE_QUOTA=20",
+        "OPEN_TIER_DAILY_REREADS=30",
+        "MAX_NEW_ACCOUNTS_PER_DAY=100",
+        "OPEN_TIER_DAILY_SPEND_CAP_USD=4",
+    ):
+        assert line in text.splitlines()
+    railway = (Path(__file__).resolve().parents[1] / "docs" / "deploy-railway.md").read_text()
+    for name in (
+        "SIGNUP_MODE",
+        "OPEN_TIER_DAILY_PAGE_QUOTA",
+        "OPEN_TIER_DAILY_REREADS",
+        "MAX_NEW_ACCOUNTS_PER_DAY",
+        "OPEN_TIER_DAILY_SPEND_CAP_USD",
+    ):
+        assert f"| `{name}` |" in railway
+
+
 def policies(env: dict[str, str]) -> dict[str, dict]:
     return {c["policy"]["displayName"]: c["policy"] for c in calls(env) if "policy" in c}
 
