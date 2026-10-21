@@ -448,6 +448,22 @@ def test_a_bold_vector_read_as_plain_needs_review():
     assert "style_mismatch" in codes(fix) and fix.status is Status.NEEDS_REVIEW
 
 
+def test_a_ce_formula_in_a_cell_is_written_out_and_converted():
+    pdf = [["Quantity", "Value"], ["water", "H2O"]]
+    fix = run(by_model(cheap=maths_table(r"\ce{H2O}", "H2O", "water")), element(local(pdf)))
+    chem = fix.table.grid.cells[3]
+    assert chem.latex == r"\text{H}_2\text{O}" and chem.mathml is not None
+    assert fix.status is Status.ACCEPTED, codes(fix)
+
+
+def test_a_ce_formula_outside_the_converted_subset_is_not_guessed():
+    pdf = [["Quantity", "Value"], ["water", "H2O"]]
+    bad = maths_table(r"\ce{H2O\bond{~}H}", "H2O", "water")
+    fix = run(by_model(cheap=bad, main=bad), element(local(pdf)))
+    assert fix.status is Status.NEEDS_REVIEW
+    assert fix.table.grid.cells[3].mathml is None  # nothing guessed: a person decides
+
+
 def test_latex_that_fails_validation_needs_review_and_keeps_the_text():
     pdf = [["Quantity", "Value"], ["g", "9.8"]]
     bad = maths_table(r"\href{http://x}{9.8}", "9.8")
