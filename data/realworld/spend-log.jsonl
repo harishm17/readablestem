@@ -9,3 +9,5 @@
 {"actual_usd": 0.9779, "arm": "rs", "cap_usd": 4.0, "estimate_usd": 3.99, "note": "dev, FEATURE_PAGE_MATH on, answers seeded from the flag-off run", "part": "dev", "tag": "rs-pagemath", "when": "2026-10-21T10:40:44Z"}
 {"actual_usd": 0.8983, "arm": "rs", "cap_usd": 3.0, "estimate_usd": 3.99, "note": "dev, FEATURE_PAGE_MATH on, page pass output limit 12288, answers seeded from the first page-math run", "part": "dev", "tag": "rs-pagemath-tok", "when": "2026-10-21T10:55:48Z"}
 {"actual_usd": 0.0964, "arm": "rs", "cap_usd": 1.5, "estimate_usd": 3.99, "note": "dev, page math on, limit 12288, no agreement lift", "part": "dev", "tag": "rs-pagemath-tok-nolift", "when": "2026-10-21T11:08:03Z"}
+{"actual_usd": 2.46, "arm": "rs", "cap_usd": 3.5, "estimate_usd": 3.01, "note": "fresh split, registered: page math off (allowlist fix in)", "part": "fresh", "tag": "fresh-off", "when": "2026-10-21T11:32:30Z"}
+{"actual_usd": 1.063, "arm": "rs", "cap_usd": 3.5, "estimate_usd": 3.01, "note": "fresh split, registered: page math on, limit 12288, no agreement lift (answers seeded from fresh-off)", "part": "fresh", "tag": "fresh-on", "when": "2026-10-21T11:40:31Z"}

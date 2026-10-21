@@ -394,6 +394,50 @@ on a clean text layer (OpenStax) it measured no effect. The evidence is developm
 is default-on), so the safe form of the recommendation is: on, with the higher limit, for the beta; check it on a fresh set of arXiv papers (about 18 more would put a +2.5 point difference at
 roughly 80% power, from the paired standard deviation implied by the interval here) when the next real-world budget allows; and decide `PAGE_MATH_AGREEMENT_LIFT` by how much the review screen should be trusted to find errors.
 
+## The converter allowlist, and the page math pass on a fresh split
+
+**Allowlist.** Across every equation answer recorded in this work (3,336 distinct proposals) the LaTeX allowlist
+(`pipeline/validate.py`) refused 17 on development and a few more elsewhere for commands that latex2mathml converts fine or that
+only need a rewrite. Added, with tests (`tests/test_steps_validate.py`): `arg` (rewritten to `\operatorname{arg}`, the converter has no `\arg`), `substack`,
+`succsim`, `gtrapprox`, `trianglelefteq`, `coloneqq`, `triangleq`, `intercal`, `colon`, `rightsquigarrow`, `leadsto`. Not added: `\textmu` (the converter
+copies it as raw text), `\not` (it converts `\not=` to a mangled `mpadded`), `\textcolor`, `\^`. Replays at no cost (`--answers-offline`, 0 answers missing):
+real-world development, flag off 0.5617 to 0.5634 (4 more exact equations, no change in detection, required decisions 4.54 to 4.47), flag on (no lift) 0.5821 to 0.5838;
+OpenStax development slices A+B and `data/gold`, flag off and on, identical to the pre-change source tree to the fourth decimal
+(A+B off 0.4903, on 0.4862; `data/gold` off 0.7667, on 0.8000). The gold of all three real-world splits rebuilds identically.
+
+**Fresh split** (`data/realworld/PREREGISTRATION-FRESH.md`, hashed before any run; 18 new papers from the same pool by seed `realworld-fresh-2026-10-21`,
+86 pages, 1,836 gold equations, 142 display; 54 candidates visited). Two arms, both with the allowlist change, one run each, the `on` run starting from the `off`
+run's recorded answers (a shared request is answered once): **off** = `FEATURE_PAGE_MATH` off; **on** = `FEATURE_PAGE_MATH`,
+`PAGE_MATH_MAX_OUTPUT_TOKENS=12288`, `PAGE_MATH_AGREEMENT_LIFT=false`. Paired, 95% cluster bootstrap over the 18 papers:
+
+| Fresh, 18 papers | off | on | on minus off [95%] | sign-flip p |
+|---|---|---|---|---|
+| **exact_lenient (primary)** | 0.5931 | 0.6100 | **+0.0169 [+0.0050, +0.0302]** | 0.027 |
+| symbols, credited | 0.6187 | 0.6465 | +0.0278 [+0.0130, +0.0462] | 0.003 |
+| **wrong, not asked, per 100 gold** | 13.83 | 14.98 | **+1.14 [-0.43, +3.36]** | 0.27 |
+| flag recall (symbols-wrong equations that were a decision) | 0.433 | 0.368 | -0.065 [-0.144, -0.019] | 0.33 |
+| flag precision | 0.669 | 0.613 | -0.056 [-0.132, +0.000] | 0.11 |
+| required decisions per PDF page (all kinds) | 6.12 | 5.24 | -0.87 [-1.29, -0.49] | 0.001 |
+| detection recall / precision | 0.830 / 0.828 | 0.838 / 0.844 | +0.008 [+0.002, +0.015] / +0.016 [-0.005, +0.036] | 0.013 / 0.51 |
+| cost per PDF page | $0.0287 | $0.0302 | +$0.0015 [+$0.0003, +$0.0027] | 0.041 |
+
+The page pass answered nothing on 2 of 86 pages (the output limit works) and cost $0.0037 a page ($0.32). Buckets (per gold equation, off to on): correct 0.593 to 0.610,
+span 0.083 to 0.068 (cut too short 58 to 33, cut too long 92 to 91), undetected 0.170 to 0.162 (display equations 16 to 11, longer inline 45 to 38, two or three symbols
+34 to 28, single symbols 78 to 77, **figures 112 to 115, tables 28 to 29**), no proposal 0.009 to 0.006, recognition 0.124 to 0.123, scorer 0.020 to 0.031. 50 gold equations went from
+wrong to exact, 19 the other way (net +31 of 1,836): span to correct 23, undetected to correct 15, recognition to correct 7, no proposal to correct 4; correct to span 10, to recognition 4, to scorer 3, to undetected 2.
+Display equations 0.345 to 0.380, align-like 0.214 to 0.262, running text 0.645 to 0.663, research papers 0.554 to 0.583.
+
+**Registered decision (section 7 of the registration): not met.** (a) the primary difference is positive, +0.0169, as on the development set (+0.025), and
+its interval excludes 0; (b) wrong equations nobody is asked about rose by **1.14 per 100 gold** (254 to 275 equations), more than the registered 0.5, as they did on
+development (+0.6 to +1.1). So the production defaults **stay as they are** (`FEATURE_PAGE_MATH` off, `PAGE_MATH_MAX_OUTPUT_TOKENS` 4096, `PAGE_MATH_AGREEMENT_LIFT` on) and ADR 0006 stays
+"Proposed". The two splits agree on what it does: about +2 points of exact equations and 14% to 26% fewer questions for a person, paid for with more wrong equations
+that nobody is asked about and a review screen that finds fewer of the wrong ones. Whether that is the right trade for an instructor is a product decision, not a measurement: the page pass can be
+turned on for a deployment with the three settings of the "on" arm (`.env.example`), and the registered rule is what a default has to meet. The interval of the unflagged-wrong difference
+(-0.4 to +3.4) includes the registered limit, so the data do not show it is above 0.5 either; the rule was written for the point estimate and the point estimate fails it.
+
+Spend: fresh `off` $2.458, `on` $1.063: **$3.52** of the $8 (86 pages, so $0.0287 and $0.0302 a page with the shared answers counted in each). The whole real-world work is $18.91
+(`tally` prints more because the shared answers folder also holds runs of another task, `cw*`, not counted here). The invented-content rates of the fresh arms were not replayed.
+
 ## What it does not say
 
 The registered difference is not significant, and one run per arm gives no run-to-run noise. The papers are 15 (and 25) of ten fields,
@@ -414,7 +458,8 @@ given and its cap; the first start of the Haiku development arm, which a connect
 | Chatbot, Opus | $2.372 (27 pages, $0.0878) | $5.856 (71 pages, $0.0825) |
 | Total | $5.301 | $8.126 |
 | Page math experiments (development, [below](#the-page-math-pass-on-the-real-world-development-set)) | $1.97 | |
-| **Whole work** | | **$15.39** |
+| Fresh split, page math off and on ([below](#the-converter-allowlist-and-the-page-math-pass-on-a-fresh-split)) | | $3.52 |
+| **Whole work** | | **$18.91** |
 
 No run was repeated. The offline replays (ReadableSTEM's HTML for the invented-content rules, the reports) cost nothing.
 

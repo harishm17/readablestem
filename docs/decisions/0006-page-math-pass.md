@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Proposed**, behind `FEATURE_PAGE_MATH` (default off); measured on the development sets only (docs/eval-page-math.md) |
+| Status | **Proposed**, behind `FEATURE_PAGE_MATH` (default off). Development sets: no effect on OpenStax (docs/eval-page-math.md). Real LaTeX PDFs (arXiv): about +2 points of exact equations on the development papers and on a fresh registered split of 18 papers, but more wrong equations nobody is asked about (+1.1 per 100 on the fresh split, registered limit +0.5), so it is not on by default (docs/eval-realworld.md) |
 | Date | 2026-10-21 |
 | Decider | Harish |
 
@@ -131,3 +131,15 @@ variant that only compares readings and never changes spans was not built or mea
   measurement. Handwriting and scanned pages are kept as images and never reach this pass.
 - **When to revisit.** If the page pass drops or moves more spans than it fixes on a fresh
   set, or if layout's own rules close the gap (docs/layout.md), remove it.
+
+## Update 2026-10-21: real LaTeX PDFs
+
+On arXiv papers compiled by their authors (docs/eval-realworld.md) the pass does what it was built for: with
+`PAGE_MATH_MAX_OUTPUT_TOKENS=12288` (the default of 4,096 loses the answer on a fifth of dense pages) and
+`PAGE_MATH_AGREEMENT_LIFT=false` it raised the primary score by +0.025 on 25 development papers and by +0.017
+(95% +0.005 to +0.030) on a fresh registered split of 18 papers, cut spans cut too short by 40%, found more
+display equations, and asked about 14% to 26% fewer things per page. It also raised the wrong equations nobody
+is asked about by +1.1 per 100 gold on the fresh split (registered limit +0.5) and lowered the share of wrong equations that
+reach a person (flag recall 0.43 to 0.37). It does nothing for equations in tables and figures. The registered
+rule for making it the default was not met, so the defaults are unchanged. Two settings were added so that a deployment can choose it:
+`PAGE_MATH_MAX_OUTPUT_TOKENS` and `PAGE_MATH_AGREEMENT_LIFT`.
