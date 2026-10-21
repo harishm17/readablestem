@@ -44,7 +44,8 @@ page number in `labels.json` is the page's index in this file; `source_pages` in
 
 The five works are (c) their authors and licensed CC BY 4.0
 (<https://creativecommons.org/licenses/by/4.0/>). The files here are extracts: pages were
-selected from the arXiv PDFs and nothing else was changed. Originals:
+selected from the arXiv PDFs and, in the tutorial 2505.03022 only, its raster figures were
+downsampled to 72 dpi to keep the file small (text, vector graphics, page frames unchanged). Originals:
 <https://arxiv.org/abs/2401.00649>, <https://arxiv.org/abs/2412.19752>,
 <https://arxiv.org/abs/2505.03022>, <https://arxiv.org/abs/2409.08224>,
 <https://arxiv.org/abs/2407.13734>.
