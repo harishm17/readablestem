@@ -2774,7 +2774,82 @@ def _inline_runs(
             reasons = _inline_evidence(chars, info, start, end, kinds)
             if reasons:
                 runs.append((start, end, reasons))
+    return _with_nuclides(row, kinds, runs)
+
+
+NUCLIDE_REASON = "nuclide with numbers before its symbol"
+NUCLIDE_GAP = 0.35  # x font size: widest gap between the stacked numbers and the symbol
+MAX_NUCLIDE_DIGITS = 6  # a mass number and an atomic number of three digits each
+
+
+def _nuclide_runs(row: _Row, kinds: list[ScriptKind | None]) -> list[tuple[int, int, list[str]]]:
+    """(start, end, reasons) of nuclide notation in a prose row: the mass number raised and
+    usually the atomic number lowered before an element's symbol ("14C", "235U", "4 2 He" with
+    the 4 above the 2), one run from the first number to the last letter of the symbol.
+
+    The numbers are raised or lowered text of upright type that stands against the symbol
+    (`_script_glyphs` gives them a kind: a group of digits and a capital letter at once after
+    it). The run is kept only when the group is all digits, starts at the beginning of a word,
+    and the letters after it are the symbol of an element (`speech_nuclides.ELEMENTS`) that
+    does not go on into a longer word: "226Ra" is a nuclide, "10 m2S" is not."""
+    from readablestem.pipeline.speech_nuclides import ELEMENTS
+
+    chars = row.chars
+    n = len(chars)
+    runs: list[tuple[int, int, list[str]]] = []
+    i = 0
+    while i < n:
+        if kinds[i] is None:
+            i += 1
+            continue
+        j = i
+        while j < n and kinds[j] is not None:
+            j += 1
+        group = chars[i:j]
+        glued = i > 0 and chars[i - 1].c.isalnum()
+        k = j  # a blank the PDF puts between the stacked numbers and the symbol is not a gap
+        while k < n and chars[k].blank:
+            k += 1
+        if (
+            not glued
+            and group
+            and all(c.c.isdigit() for c in group)
+            and len(group) <= MAX_NUCLIDE_DIGITS
+            and k < n
+            and chars[k].c.isupper()
+            and chars[k].x0 - max(c.x1 for c in group) <= NUCLIDE_GAP * row.size
+        ):
+            end = k + 1
+            if end < n and chars[end].c.islower() and kinds[end] is None:
+                end += 1
+            symbol = "".join(c.c for c in chars[k:end])
+            after = chars[end].c if end < n else " "
+            if symbol in ELEMENTS and not after.isalpha():
+                runs.append((i, end, [NUCLIDE_REASON]))
+                i = end
+                continue
+        i = j
     return runs
+
+
+def _with_nuclides(
+    row: _Row, kinds: list[ScriptKind | None], runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """`runs` with the row's nuclide notation as runs of their own, a run that overlaps one
+    taken into it."""
+    found = _nuclide_runs(row, kinds)
+    if not found:
+        return runs
+    merged = list(runs)
+    for start, end, reasons in found:
+        touching = [r for r in merged if r[0] < end and start < r[1]]
+        merged = [r for r in merged if r not in touching]
+        lo = min([start, *(r[0] for r in touching)])
+        hi = max([end, *(r[1] for r in touching)])
+        merged.append(
+            (lo, hi, [*reasons, *(x for r in touching for x in r[2] if x not in reasons)])
+        )
+    return sorted(merged)
 
 
 def _between_formulas(chars: list[_Char], i: int) -> bool:
@@ -4240,10 +4315,23 @@ def _resolve_fragments(rows: list[_Row], rules: list[_Path]) -> list[_Path]:
     return used
 
 
+# How far to the right of a stray opening brace the first equation of its system may start.
+STRAY_BRACE_REACH = 2.0
+
+
 def _math_neighbours(row: _Row, other: _Row) -> bool:
     """Does fragment `row` belong with maths row `other`? Vertically adjacent and
-    overlapping in x, or an equation number beside it (`_number_beside`)."""
+    overlapping in x, or an equation number beside it (`_number_beside`), or an opening brace
+    level with `other` and a little to its left (the brace of a system, `_stray_brace_cut`)."""
     size = max(row.size, other.size)
+    if (
+        row.ink
+        and all(c.c in _OPENING_BRACES for c in row.ink)
+        and row.column == other.column
+        and 0 <= other.x0 - row.x1 <= STRAY_BRACE_REACH * size
+        and other.y0 - size <= (row.y0 + row.y1) / 2 <= other.y1 + size
+    ):
+        return True
     gap_y = max(row.y0 - other.y1, other.y0 - row.y1)
     gap_x = max(row.x0 - other.x1, other.x0 - row.x1)
     if gap_y <= 0.6 * size and gap_x <= 1.0 * size and gap_y > -0.5 * min(row.height, other.height):
@@ -4415,11 +4503,61 @@ def _split_braced_systems(rows: list[_Row]) -> list[_Row]:
     for row in rows:
         cut = _brace_cut(row, index)
         if cut is None:
+            cut = _stray_brace_cut(row, index)
+        if cut is None:
             out.append(row)
             continue
         out.append(_Row(row.chars[:cut], column=row.column, marker=row.marker))
         out.append(_Row(row.chars[cut:], column=row.column))
     return out
+
+
+def _stray_brace_cut(row: _Row, index: _RowIndex) -> int | None:
+    """Index of the opening brace that ends a row of text, when it is the brace of the system
+    set to its right, or None.
+
+    OpenStax also prints "Solve the system by substitution. {" with the brace the last glyph of
+    the sentence's row and the two equations in rows of their own to its right, level with the
+    brace, not with the sentence (the maths rows' baselines are above and below the brace's).
+    The row is then text with a brace at its end, and the system's crop starts at its first
+    equation, without the brace. The brace is cut off as a row of its own when a maths row starts
+    within `STRAY_BRACE_REACH` font sizes to its right, with another maths row under that one,
+    and the brace's middle is level with the two; `_math_neighbours` then takes it into the system.
+    """
+    chars = row.chars
+    ink = [i for i, c in enumerate(chars) if not c.blank]
+    if row.vertical or len(ink) < 3 or chars[ink[-1]].c != "{":
+        return None
+    start = ink[-1]
+    if not any(not c.blank for c in chars[:start]):
+        return None
+    brace = chars[start]
+    size = row.size
+    for right in index.near(brace.y0, brace.y1):
+        if right is row or right.column != row.column or right.vertical:
+            continue
+        if not 0 <= right.x0 - brace.x1 <= STRAY_BRACE_REACH * size:
+            continue
+        probe = _Row(right.chars, column=right.column)
+        _classify_row(probe)
+        if probe.kind != "math":
+            continue
+        for below in index.near(right.y1 - 0.3 * size, right.y1 + 1.0 * size):
+            if below is row or below is right or below.y0 < right.y1 - 0.3 * size:
+                continue
+            shared = min(below.x1, right.x1) - max(below.x0, right.x0)
+            if below.column == row.column and shared >= 0.5 * min(
+                below.x1 - below.x0, right.x1 - right.x0
+            ):
+                trial = _Row(below.chars, column=below.column)
+                _classify_row(trial)
+                middle = (brace.y0 + brace.y1) / 2
+                if (
+                    trial.kind == "math"
+                    and right.y0 - 0.5 * size <= middle <= below.y1 + 0.5 * size
+                ):
+                    return start  # level with the middle of the system's rows
+    return None
 
 
 def _brace_cut(row: _Row, index: _RowIndex) -> int | None:
@@ -6296,7 +6434,14 @@ def _equation_block(
 
     `plain`: the text layer keeps no letter styles. For a line set bold as a whole (a
     heading's weight), where bold says nothing about vectors."""
-    text = _clean(" ".join((r.text if plain else r.styled_text) for r in rows))
+    # A system's opening brace (a row of its own, standing left of all the others) is read first;
+    # the brace of "f(x) = {" stays where it is.
+    braces = [r for r in rows if r.ink and all(c.c in _OPENING_BRACES for c in r.ink)]
+    others = [r for r in rows if r not in braces]
+    left = min((r.x0 for r in others), default=0.0)
+    first = [r for r in braces if r.x1 <= left + 0.5]
+    ordered = [*first, *(r for r in rows if r not in first)]
+    text = _clean(" ".join((r.text if plain else r.styled_text) for r in ordered))
     script = any(c.flags & _SUPERSCRIPT_FLAG or c.size < SCRIPT_RATIO * size for c in ink)
     score, reasons = equation_score(text, sorted({c.font for c in ink}), script)
     if len(rows) > 1:
