@@ -181,6 +181,35 @@ def cmd_build(args: argparse.Namespace) -> int:
     return 0
 
 
+def gold_text(rows: list[dict]) -> str:
+    return "".join(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n" for r in rows)
+
+
+def cmd_verify(args: argparse.Namespace) -> int:
+    """Rebuild the gold of every paper of both manifests from the cached downloads and compare it
+    with the manifest's hash: the answer key is a function of the sources and the code."""
+    seed = json.loads(next(REPO_DATA.glob("order-*.json")).read_text())["seed"]
+    pool = {c["id"]: c for c in json.loads((args.root / "pool.json").read_text())["candidates"]}
+    bad = 0
+    for part in ("dev", "heldout"):
+        manifest = json.loads((REPO_DATA / f"manifest-{part}.json").read_text())
+        for paper in manifest["papers"]:
+            record = pool[paper["id"]]
+            with httpx.Client() as client:  # unused: every file is cached
+                analysis, pages, info = process(record, args.root, client, 0.0, seed)
+            rows = ag.gold_records(
+                analysis, pages, record, pdf_relpath=f"pdfs/{ag.paper_slug(record['id'])}.pdf",
+                retrieved_at=args.date, pdf_sha256=info["pdf_sha256"],
+                source_sha256=info["source_sha256"],
+            )  # fmt: skip
+            digest = hashlib.sha256(gold_text(rows).encode("utf-8")).hexdigest()
+            if digest != paper["gold_sha256"]:
+                bad += 1
+                print("DIFFERS", part, paper["id"])
+    print("all gold files rebuild identically" if not bad else f"{bad} differ")
+    return 1 if bad else 0
+
+
 def sha256_text(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -242,10 +271,7 @@ def emit(accepted: list[dict], args: argparse.Namespace, seed: str) -> None:
                 source_sha256=info["source_sha256"],
             )
             gold_path = out / f"{slug}.jsonl"
-            gold_path.write_text(
-                "".join(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n" for r in rows),
-                encoding="utf-8",
-            )
+            gold_path.write_text(gold_text(rows), encoding="utf-8")
             manifest["papers"].append(
                 {
                     "id": record["id"],
@@ -291,6 +317,9 @@ def main() -> int:
     b.add_argument("--pause", type=float, default=3.0)
     b.add_argument("--date", default="2026-10-21")
     b.set_defaults(func=cmd_build)
+    v = sub.add_parser("verify")
+    v.add_argument("--date", default="2026-10-21")
+    v.set_defaults(func=cmd_verify)
     args = parser.parse_args()
     return args.func(args)
 

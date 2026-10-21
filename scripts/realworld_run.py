@@ -31,6 +31,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 from readablestem.eval import pipeline_eval as pe
@@ -44,7 +45,7 @@ DATA = REPO / "data" / "realworld"
 SPEND_LOG = DATA / "spend-log.jsonl"
 # Per PDF page, list price, used only to size a run before it is paid for (from the OpenStax
 # held-out runs, 2026-10-14 and 2026-10-21); the real figure is measured and logged.
-ESTIMATE_PER_PAGE = {"rs": 0.020, "chatbot-haiku-purdue": 0.003, "chatbot-opus-purdue": 0.060}
+ESTIMATE_PER_PAGE = {"rs": 0.035, "chatbot-haiku-purdue": 0.003, "chatbot-opus-purdue": 0.060}
 
 
 def gold_dir(part: str) -> Path:
@@ -133,6 +134,8 @@ def cmd_rs(args: argparse.Namespace) -> int:
     ]  # fmt: skip
     if args.offline:
         argv.append("--answers-offline")
+    if args.papers:
+        argv += ["--sections", *(f"arxiv/{i.replace('/', '_')}" for i in args.papers.split(","))]
     ns = build_parser().parse_args(argv)
     before = answers_cost(answers)
     code = eval_cli._run_pipeline(
@@ -207,10 +210,21 @@ def cmd_chat(args: argparse.Namespace) -> int:
         f"cap ${args.max_usd}"
     )
     before = chatbot.recorded_cost(out, [arm.id])
-    summary = chatbot.record_arms(
-        pdfs, out, arms=[arm], max_usd=args.max_usd, client=chatbot.make_client(arm.provider),
-        workers=args.workers, runs=1,
-    )  # fmt: skip
+    client = chatbot.make_client(arm.provider)
+    summary: dict = {}
+    for attempt in range(4):  # a connection error while counting tokens ends one start, not the run
+        try:
+            summary = chatbot.record_arms(
+                pdfs, out, arms=[arm], max_usd=args.max_usd, client=client,
+                workers=args.workers, runs=1,
+            )  # fmt: skip
+            break
+        except Exception as exc:  # recorded jobs are skipped on the next start
+            print(f"start {attempt + 1} stopped: {type(exc).__name__}", flush=True)
+            time.sleep(30)
+            client = chatbot.make_client(arm.provider)
+    else:
+        raise SystemExit("the arm could not be recorded after 4 starts")
     spent = chatbot.recorded_cost(out, [arm.id]) - before
     print(json.dumps(summary))
     log_spend(
@@ -281,6 +295,7 @@ def main() -> int:
             p.add_argument("--max-usd", type=float, required=True)
             p.add_argument("--tag", default="rs")
             p.add_argument("--offline", action="store_true")
+            p.add_argument("--papers", help="comma-separated arXiv ids (default: all of the part)")
             p.add_argument("--note", default="")
         if name in ("chat", "chat-items"):
             p.add_argument("--arm", choices=sorted(chatbot.ARM_BY_ID), required=True)

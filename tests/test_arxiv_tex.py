@@ -317,3 +317,14 @@ def test_author_level_commands_are_prepared_for_the_converter():
     assert "\\operatorname{arg}" in ag.prepare("\\arg\\min_y")
     assert "\\operatorname{max}" in ag.prepare("\\mathop{max}_x")
     ag.to_mathml("\\ensuremath{x}^2 \\nolimits + \\arg\\max_y f", display=False)
+
+
+def test_float_kind_names_the_floats_outermost_first():
+    source = (
+        "\\begin{figure}\\begin{tikzpicture}\\node {$a$};\\end{tikzpicture}\\end{figure}"
+        "\\begin{table}\\caption{$b$}\\end{table} $c$"
+    )
+    kinds = {i.latex: i.float_kind for i in tex.extract(source).items}
+    assert kinds == {"a": "figure>tikzpicture", "b": "table", "c": None}
+    eqs = tex.equations_of(tex.extract(source).items)
+    assert [e.float_kind for e in eqs] == ["figure>tikzpicture", "table", None]

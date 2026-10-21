@@ -485,6 +485,7 @@ class Item:
     offset: int  # position in the body
     word_pos: int = 0  # words of main-stream prose before it
     float_id: int | None = None
+    float_kind: str | None = None  # the floats it is in, outermost first: "figure>tikzpicture"
     starred: bool = False
 
 
@@ -536,6 +537,7 @@ def extract(body: str) -> Extraction:
     skipped: dict[str, int] = {}
     unbalanced = 0
     float_stack: list[int] = []  # ids of the floats we are in
+    float_names: list[str] = []
     float_ends: list[int] = []
     n_floats = 0
     i = 0
@@ -565,6 +567,7 @@ def extract(body: str) -> Extraction:
                 env=env,
                 offset=offset,
                 float_id=current_float(),
+                float_kind=">".join(float_names) or None,
                 starred=starred,
             )
         )
@@ -574,6 +577,7 @@ def extract(body: str) -> Extraction:
             flush(float_ends[-1])
             float_ends.pop()
             float_stack.pop()
+            float_names.pop()
             new_segment()
         ch = body[i]
         if ch == "\\":
@@ -627,6 +631,7 @@ def extract(body: str) -> Extraction:
                         flush(i)
                         n_floats += 1
                         float_stack.append(n_floats - 1)
+                        float_names.append(base)
                         float_ends.append(close)
                         new_segment()
                         i = m.end()
@@ -691,6 +696,7 @@ class Equation:
     group: int = 0
     groups: int = 1
     float_id: int | None = None
+    float_kind: str | None = None
 
 
 _NUMBER_DROP = re.compile(
@@ -837,6 +843,7 @@ def equations_of(items: list[Item]) -> list[Equation]:
     for item in items:
         for eq in split_environment(item):
             eq.float_id = item.float_id
+            eq.float_kind = item.float_kind
             out.append(eq)
     return out
 
