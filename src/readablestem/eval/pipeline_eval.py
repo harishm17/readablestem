@@ -487,6 +487,26 @@ def _failed_codes(checks: Sequence[Check]) -> list[str]:
     return [c.code or c.name for c in checks if not c.passed and c.severity == "error"]
 
 
+def _equation_cost_split(fixes: Sequence[Fix], main_model: str) -> dict[str, float]:
+    """What the equation steps of a document cost, by who read the crop: `cheap` (the cheap
+    model's reads), `main_first` (the main model asked first: display equations),
+    `escalation` (the main model asked again after a cheap read), and `other` (anything else,
+    a fallback)."""
+    split = {"cheap": 0.0, "main_first": 0.0, "escalation": 0.0, "other": 0.0}
+    for fix in fixes:
+        if fix.kind is not Kind.EQUATION:
+            continue
+        first_main = bool(fix.calls) and fix.calls[0].model == main_model
+        for call in fix.calls:
+            if call.model != main_model:
+                split["cheap"] += call.cost_usd
+            elif first_main:
+                split["main_first"] += call.cost_usd
+            else:
+                split["escalation"] += call.cost_usd
+    return split
+
+
 def _calls_summary(calls: Sequence[ModelCall]) -> dict:
     return {
         "cost_usd": sum(c.cost_usd for c in calls),
@@ -1380,6 +1400,10 @@ def document_page_item(
                 "exact_symbols": symbols.exact,
                 "symbols_similarity": symbols.similarity,
                 **_page_pass_fields(element, fix),
+                # How far the predicted span's own text layer is from the gold equation (span
+                # fidelity, whatever the model then read), and that text, for examples.
+                "text_similarity": round(similarity(gold_sigs[gi], pred_sigs[pi][1]), 4),
+                "pred_text": (element.text or "")[:300],
                 "review": fix.review if fix is not None else None,
                 "tier_reasons": triage.tier_reasons(fix) if fix is not None else [],
                 "pred_latex": proposal.latex if proposal is not None else None,
@@ -1401,6 +1425,7 @@ def document_page_item(
                 "reason": reason,
                 "piece_of": gold[pieces[pi]]["id"] if pi in pieces else None,
                 "text_layer_supported": _text_layer_supported(element, fix, reason),
+                "pred_text": (element.text or "")[:300],
                 **_page_pass_fields(element, fix),
             }
         )
@@ -1932,6 +1957,7 @@ def _document_section(
     item["heading_flags"] = heading_flags(heading_item, headings)
     calls = [c for f in result.fixes for c in f.calls]
     item.update(_calls_summary(calls))
+    item["cost_split"] = _equation_cost_split(result.fixes, cfg.settings.main_model)
     if result.page_math is not None:
         # The page math pass (ADR 0006) is a model call of the pipeline's: its cost is in the
         # item's cost, and apart as `page_math_cost_usd`.
