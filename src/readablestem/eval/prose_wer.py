@@ -122,9 +122,9 @@ def predicted_text(result: DocumentResult, *, include_math: bool = True) -> str:
     key's does; without, formulas are left out."""
     fixes = {f.element_id: f for f in result.fixes}
     equations = {
-        e.id: fixes[e.id].equation.mathml
-        for e in result.elements
-        if e.kind is Kind.EQUATION and e.id in fixes and fixes[e.id].equation is not None
+        f.element_id: f.equation.mathml
+        for f in result.fixes
+        if f.kind is Kind.EQUATION and f.equation is not None
     }
 
     def inline(match: re.Match[str]) -> str:
