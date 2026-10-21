@@ -1,23 +1,27 @@
-# Scanned and handwritten pages read from an image: development measurement (2026-10-21)
+# Scanned and handwritten pages read from an image: measurement (2026-10-21)
 
 What [ADR 0007](decisions/0007-image-pages.md) built, how it was measured, what it did, what it
-cost, and what that does and does not say. Development material only: `data/dev-v2` (dev part)
-and eight public-domain or CC BY-SA pages found for this purpose. The held-out set and the sealed
-check part were not run, opened or used for anything. Every model answer was recorded once
+cost, and what that does and does not say. Two measurements: development material (`data/dev-v2`,
+dev part, turned into synthetic scans; eight public-domain or CC BY-SA real pages) and, once, the
+real-world held-out papers as scans (registered before the run, partial: see "Held-out check").
+The sealed check part was not run, opened or used. Every model answer was recorded once
 (`--answers`) and every table below is re-scored from those recordings.
 
 **The short version.** On 36 pages of development documents turned into synthetic scans, a page read
 from its image by `claude-opus-5-5` ends with the same equations right, end to end, as the same
 pages as typed PDFs through today's pipeline (0.593 on the primary `exact_lenient`, 0.834 against
 0.830 on the symbols score), reads the prose at a word error rate of 3 to 5 %, and costs $0.106 a
-page all in ($0.095 of it the page read) against $0.022 for the typed pages. `claude-haiku-5-5`
-reads the same pages for $0.003 and loses 12 points of symbols-correct equations and the
-reliability of its own confidence on handwriting. `claude-sonnet-5-5` is not better than Haiku
-here and costs seventeen times as much. The price of all of them is review: 3.5 required decisions
-per page against 1.4 for typed pages and 0.17 now, because no equation or table of an image page
-can be accepted without a person. **Recommendation: leave `FEATURE_IMAGE_PAGES` off by default;
-if it is offered, offer it as an opt-in with the main model (`IMAGE_PAGES_MODEL` unset), after a
-held-out measurement on scans.** Reasons and the open risks are at the end.
+page all in ($0.095 of it the page read) against $0.022 for the typed pages. On 9 of the 15
+real-world held-out papers (42 pages) made into scans, which the feature had never seen, it ends
+at 0.664 on the primary score against 0.619 for the typed pipeline on the same papers (symbols 0.693
+against 0.664; the difference is inside the noise), and costs $0.136 a page. `claude-haiku-5-5`
+reads the development pages for $0.003 and loses 12 points of symbols-correct equations and the
+reliability of its own confidence on handwriting; `claude-sonnet-5-5` is not better than Haiku and
+costs seventeen times as much. The price is review: 3.5 required decisions per page on the
+development pages (1.7 on the papers, where most mathematics is inline) against 1.4 for typed pages
+and 0.17 before, because no display equation or table of an image page can be accepted without a
+person. **Decision (2026-10-21): ship it as an opt-in per upload with the main model, default off;**
+reasons and the open risks are at the end.
 
 ## What was built
 
@@ -27,10 +31,12 @@ held-out measurement on scans.** Reasons and the open risks are at the end.
 | Integration (kept pages, crops, headings, cost, notices) | `pipeline/run.py` (`_image_pages_pass`), `pipeline/layout.py` (`REASON_IMAGE_HEADING`), `pipeline/heading_step.py` unchanged |
 | Output: notice, "Show the original page", about note, rejected text as a picture | `pipeline/assemble.py` |
 | Review of the text of an image page; upload of scans; job outcome | `web/review.py`, `web/routes/review.py`, `web/routes/split.py`, templates, `web/pdf_probe.py`, `web/uploads.py`, `web/worker.py` |
-| Settings | `FEATURE_IMAGE_PAGES`, `IMAGE_PAGES_MODEL`, `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`; `VisionRequest.timeout_s` |
+| The upload option (per document): the checkbox, the probe's count of scanned and handwritten pages, `Job.image_pages` (migration `c4e7a2b9d150`), the job's spend allowance, large files in parts | `web/templates/app.html`, `web/routes/jobs.py`, `web/routes/parts.py`, `web/pdf_probe.py`, `web/uploads.py`, `pipeline/page_type.py` (`image_page_count`), `web/intake.py`, `web/pending.py`, `web/worker.py` (`job_caps`), `web/notation.py` (`conversion_options`), `ops/limits.py` |
+| Settings | `FEATURE_IMAGE_PAGES` (the offer), `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE`, `IMAGE_PAGES_MAX_USD_PER_JOB`, `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`; `VisionRequest.timeout_s` |
 | Eval: scans, prose word error rate, image page numbers | `eval/scan.py`, `eval/scan_media.py`, `eval/prose_wer.py`, `eval/image_pages.py`; `eval pipeline --scanned [--scan-seed]` |
+| Held-out check | `data/image-pages/PREREGISTRATION-HELDOUT-SCANS.md` (+ `.sha256`), `scripts/realworld_scanned.py` |
 | Dev scripts | `scripts/image_pages_probe.py` (read pages live, or a picture), `scripts/image_pages_table.py` (reports side by side) |
-| Tests | `tests/test_image_page.py`, `test_image_page_run.py`, `test_web_image_pages.py`, `test_eval_scan.py`, `test_eval_image_pages.py`, browser: `test_image_page_browser.py`, `test_image_page_axe_browser.py` |
+| Tests | `tests/test_image_page.py`, `test_image_page_run.py`, `test_web_image_pages.py`, `test_eval_scan.py`, `test_eval_image_pages.py`, `test_web_image_pages_option.py`; browser: `test_image_page_browser.py`, `test_image_page_axe_browser.py`, `test_image_page_option_browser.py` |
 
 ## How it was measured
 
@@ -170,6 +176,60 @@ Resolution makes no measurable difference between 150 and 200 dpi on these pages
 and 200 dpi stay the defaults. Haiku also fell back to the page image never at the default and once
 at `medium` (a cut-off answer).
 
+## Held-out check on real papers as scans (2026-10-21, registered before the run)
+
+The decision to offer the conversion as an option waited on one check that the development work
+could not make: papers it was never tuned on. The 15 held-out papers of the real-world set
+(arXiv papers in the author's LaTeX, 71 pages, 1,826 gold equations; built and registered on branch
+`feat/realworld-eval`) had been used for typed-PDF scoring only. Registration, written and hashed
+before the run: [data/image-pages/PREREGISTRATION-HELDOUT-SCANS.md](../data/image-pages/PREREGISTRATION-HELDOUT-SCANS.md)
+(seed 20261021 for the scan recipe of `eval/scan.py`, `claude-opus-5-5` as the page reader, effort
+`low`, 200 dpi, cap $9, one run, no changes after seeing a number). Driver:
+`scripts/realworld_scanned.py`.
+
+**The run is partial, as the registration allows for.** The $9 cap stopped it (`budget_job_usd`)
+after 9 of the 15 papers (42 of 71 pages, 1,147 of 1,826 gold equations: the first nine by paper
+id, a cut that does not depend on any result). The page reads cost more than on the development
+pages ($0.131 a page, $0.136 with the equation step, against $0.095 and $0.106), because these
+pages are denser (about 28 s a page), and $2.45 of the $8.15 spent went to papers that were in
+flight when the cap stopped the run and are not scored. No rerun was made to finish; the typed result is
+taken for the same nine papers.
+
+| 9 of the 15 held-out papers, 42 pages, 1,147 gold equations | typed PDF (current pipeline) | the same pages as scans, Opus |
+|---|---|---|
+| equations right end to end, primary `exact_lenient` | 0.619 | **0.664** |
+| equations right end to end, symbols (credit) | 0.664 | **0.693** |
+| detection recall / precision | 0.822 / 0.859 | 0.757 / 0.948 |
+| decisions asked per page | 6.4 (every equation fix) | 1.7 (every block's fix; inline formulas ride with their paragraph) |
+| prose: recall / precision of the words (3+ letters) of the PDF's text layer | n.a. | 0.918 / 0.983 |
+| heading F1 | n.a. (no heading gold in this set) | n.a. |
+| cost per PDF page, whole pipeline | $0.033 | $0.136 ($0.131 for the page read) |
+| page read: seconds per page | | 28 |
+| pages read / kept as image | | 42 / 0 |
+
+- **The difference.** Scans read by Opus end 4.5 points above the typed pipeline on the primary
+  score on these nine papers (a cluster bootstrap over the nine papers: -0.7 to +9.6 points,
+  inconclusive: the sign differs between papers, from +24 to -20 points) and 2.9 above on the
+  symbols score. It is not a result that scans beat typed PDFs: the typed pipeline loses on these
+  LaTeX PDFs where the text layer is bad (accents drawn from several glyphs, mathematics in tables
+  and figures, the cuts of its own rules), which a model reading a picture does not meet. The
+  fair reading is "no worse than the typed pipeline on these papers", with detection recall lower
+  (0.76 against 0.82: it misses short inline symbols in running text) and precision higher.
+- **The review load is lower, and that is a finding about the design.** The typed arm asks about
+  6.4 things per page because every inline equation is a decision of its own; the image arm asks
+  1.7, because inline formulas ride with their paragraph. That is where the risk now is: 59 of the
+  833 matched inline equations were wrong by the primary score and not asked about (5.1 per 100
+  gold equations), 38 by the symbols score (3.3 per 100); the typed pipeline, on the same nine
+  papers and counted the same way, leaves 9.7 per 100 (5.8 by the symbols score) unasked. Of 25 unasked "wrong" equations looked at, most are notation
+  the scorer counts (`\text{vol}` for `\mathrm{vol}`, `\dots` for `\cdots`, a thin space); a few
+  are words kept out of the gold's formula (`million kcals`). None was a changed number or sign
+  among those looked at, and the sample is small.
+- **Display equations are all asked about**: 35 matched, 27 wrong by the strict score, readings
+  of crop and page agreed on 27 (19 of them wrong by the strict score) and disagreed on 6.
+- **The prose** is the model's transcription, checked only against the PDF's own text layer
+  (including its headers, references and figure text), so 0.92 recall is a floor on what was read:
+  the omitted words are mostly running headers, reference lists and text inside figures.
+
 ## Real pages (no answer key; qualitative)
 
 Eight pages, found for this purpose, public domain or CC BY-SA, in
@@ -212,16 +272,22 @@ screenshots are of the saved HTML at 760 px.)
 
 ## Spend
 
-Recorded live spend, summed over every call in the three answers files (what each call was
-charged at list price): **$9.23** of the $15 cap.
+Recorded live spend, summed over every call in the answers files (what each call was charged at
+list price). **Development material $9.23** of the $15 cap; **held-out check $8.15** of its own
+$9 cap, approved separately: $17.38 in all.
 
-| Step and model | $ |
+| Step and model, development material | $ |
 |---|---|
 | page reader, `claude-opus-5-5` (36 slice pages, 8 real pages, 2 probe pages) | 4.06 |
 | page reader, `claude-sonnet-5-5` | 1.79 |
 | page reader, `claude-haiku-5-5` (pilot, slice, settings runs, real pages) | 0.32 |
 | equation step, `claude-opus-5-5` (second readings and the typed baseline) | 2.75 |
 | equation step `claude-haiku-5-5`, figure step, shadow second check (typed baseline only) | 0.31 |
+
+| Held-out check | $ |
+|---|---|
+| page reader, `claude-opus-5-5`: 59 pages read (42 scored, 17 in flight when the cap stopped the run) | 7.93 |
+| equation step, `claude-opus-5-5` | 0.22 |
 
 No run was repeated to confirm another; the final tables were re-scored from the recordings at
 no cost (`--answers-offline`).
@@ -236,6 +302,9 @@ no cost (`--answers-offline`).
   claim here about a word or symbol error rate on handwriting.
 - One run per arm, 36 pages, six documents; no interval. The Haiku-to-Opus gap on equations is
   large enough to take seriously, the Sonnet-to-Haiku one is not.
+- The held-out check is nine of fifteen papers, one run, one seed, with no heading gold and a prose
+  measure against the PDF's own text layer. Its typed comparison is the other branch's recorded run on
+  the same nine papers.
 - The score of equations in prose (inline) is the key's, with its glued brackets and its text
   written maths; the flag numbers for inline formulas follow it.
 - Cost is the provider's list price as recorded, with the refusal fallback's occasional dearer
@@ -244,23 +313,32 @@ no cost (`--answers-offline`).
   of how long they take or how many wrong readings a tired person lets through. That is the
   risk this design leans on most.
 
-## Recommendation
+## Decision and what stays open
 
-1. **Keep `FEATURE_IMAGE_PAGES` off by default.** The measurement is on development material and
-   synthetic scans; the held-out set has not been used (and should not be used to tune). A held-out
-   measurement on scans of held-out sections (the same `--scanned` option, a fresh registration)
-   decides the default.
-2. **If it is offered before then, offer it as an opt-in with the main model** (`IMAGE_PAGES_MODEL`
-   unset): it is the only reader that matched the typed pipeline on equations, read handwriting
-   without a confident misread, and had boxes good enough for the second reading to read what the
-   page reader meant. Raise the job caps for such documents (`MAX_USD_PER_JOB` to about $4 for 30 pages).
-   Haiku at $0.003 a page is the choice when cost matters more than equations: its mistakes are
-   mostly caught by its own second reading, but it will misread a handwritten heading with confidence.
-   Sonnet is not recommended here.
-3. **Turning it on means editing the public copy**, which is the author's: the README ("not an OCR
-   engine for scans or handwriting"), `limits.html`, the site's method and home pages, and the
-   known-limits text all say such pages are kept as images.
-4. **Open questions for the author** (ADR 0007, "Consequences"): whether inline formulas stay part of
-   their paragraph's item; whether a display equation the two readers agree on may become an optional
-   note (here agreement is not evidence when the same model reads twice, and 49 agreed equations were
-   wrong by the strict score); how much review a 30-page scan may ask of an instructor (105 decisions).
+**Decided (2026-10-21): offer the conversion as an option on the upload form, per document, with the
+main model, default off.** It is `FEATURE_IMAGE_PAGES` on the server (the offer), the checkbox
+"Convert scanned or handwritten pages (slower; every converted equation and table needs your check)"
+(the choice, `Job.image_pages`), and a job spend allowance of `IMAGE_PAGES_USD_PER_PAGE` ($0.25) a
+page of the document, at most `IMAGE_PAGES_MAX_USD_PER_JOB` ($7.50), inside the daily caps and the
+open-tier pool. Why this and not the alternatives:
+
+- **Opt-in, not default:** it costs four to six times a typed page, takes a person's check of every
+  display equation and table, and was measured on synthetic scans, nine papers and eight real pages;
+  a person chooses it knowing that.
+- **The main model:** the only reader that matched the typed pipeline on equations on the
+  development pages, read handwriting without a confident misread, and cut boxes good enough for the
+  second reading to read what the page reader meant. Haiku at $0.003 a page is the cheap option
+  (`IMAGE_PAGES_MODEL`), at 12 points fewer symbols-correct equations on the development pages;
+  Sonnet is not recommended.
+- **The allowance:** the held-out papers cost $0.136 a page on average and $0.33 for the densest,
+  so $0.15 would have stopped a dense document half way; $0.25 leaves room and is still a
+  tenth of what the daily open-tier pool ($4) allows per day.
+
+**Open for the author** (ADR 0007, "Consequences"): whether inline formulas stay part of their
+paragraph's item (on the papers this leaves 5 wrong per 100 gold equations unasked, fewer than
+the typed pipeline's 10, and asks 1.7 things a page instead of 6.4); whether a display equation the
+two readers agree on may become an optional note (agreement is no evidence when the same model reads
+twice, and 49 agreed development equations and 19 agreed held-out ones were wrong by the strict
+score); how much review a 30-page scan may ask of an instructor (about 105 decisions on the
+development pages, about 50 on the papers); and a measurement of reviewers, which this work does
+not make.
