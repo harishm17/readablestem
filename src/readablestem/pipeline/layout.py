@@ -76,7 +76,7 @@ from readablestem.core.childenv import child_env
 from readablestem.core.mathchars import base_char, char_variant, styled_char
 from readablestem.core.notation import canonical_from_parts
 from readablestem.core.types import BBox, Element, Kind, Link, Notice, TableGrid, inline_marker
-from readablestem.pipeline import equation_images, hyphens, page_type, script_marks, tables
+from readablestem.pipeline import chem, equation_images, hyphens, page_type, script_marks, tables
 from readablestem.pipeline import options as run_options
 from readablestem.pipeline.notation_memory import (
     BOLD_LETTER_REASON,
@@ -2710,6 +2710,10 @@ def _classify_row(row: _Row) -> None:
         row.kind = "frag"  # a lone "," or "." belongs to the maths it ends, if any
     elif _is_equation_number(text):
         row.kind = "frag"  # "(2.4)", "Eq. 2.4", "2.4": maths only beside an equation
+    elif _reaction_row(row, info):
+        row.kind = "math"  # a chemical reaction on its own line
+        row.reasons = [*row.reasons, REACTION_REASON]
+        row.score = max(row.score, EQUATION_THRESHOLD)
     elif prose == 0 and row.score >= EQUATION_THRESHOLD and ratio >= 0.5:
         row.kind = "math"
     elif prose == 0 and ratio >= 0.6 and len(ink) <= 40:
@@ -2783,7 +2787,7 @@ def _inline_runs(
             reasons = _inline_evidence(chars, info, start, end, kinds)
             if reasons:
                 runs.append((start, end, reasons))
-    return _with_nuclides(row, kinds, runs)
+    return _with_chemistry(row, kinds, _with_nuclides(row, kinds, runs))
 
 
 NUCLIDE_REASON = "nuclide with numbers before its symbol"
@@ -2859,6 +2863,126 @@ def _with_nuclides(
             (lo, hi, [*reasons, *(x for r in touching for x in r[2] if x not in reasons)])
         )
     return sorted(merged)
+
+
+FORMULA_REASON = "chemical formula"
+REACTION_REASON = "chemical reaction"
+CHEM_WORD_GAP = 0.25  # x glyph size: a wider gap between two glyphs of a row ends a word
+_CHEM_DASHES = frozenset("\u2212-\u2013")
+
+
+def _chem_words(row: _Row, kinds: Sequence[ScriptKind | None]) -> list[chem.Word]:
+    """The row's words as `pipeline.chem` reads them: cut at a blank, at a gap (TeX sets no
+    space after a script: "Cl-and"), and around an arrow glyph, which is a word of its own
+    with the dash that is its shaft ("\u2212\u2192")."""
+    chars = row.chars
+    words: list[chem.Word] = []
+    current: list[int] = []
+    right = 0.0
+
+    def flush() -> None:
+        if current:
+            first, last = current[0], current[-1] + 1
+            words.append(
+                chem.Word(
+                    first,
+                    last,
+                    "".join(chars[k].c for k in range(first, last)),
+                    tuple(kinds[first:last]),
+                )
+            )
+            current.clear()
+
+    for i, c in enumerate(chars):
+        if c.blank:
+            flush()
+            continue
+        if c.c in chem.ARROW_HEADS:
+            shaft = i
+            while (
+                shaft - 1 in current
+                and chars[shaft - 1].c in _CHEM_DASHES
+                and kinds[shaft - 1] is None
+                and c.x0 - chars[shaft - 1].x1 <= CHEM_WORD_GAP * c.size
+            ):
+                shaft -= 1
+                current.remove(shaft)
+            flush()
+            words.append(
+                chem.Word(
+                    shaft,
+                    i + 1,
+                    "".join(x.c for x in chars[shaft : i + 1]),
+                    (None,) * (i + 1 - shaft),
+                )
+            )
+            right = c.x1
+            continue
+        if current and c.x0 - right >= CHEM_WORD_GAP * c.size:
+            flush()
+        if not current:
+            right = c.x1
+        current.append(i)
+        right = max(right, c.x1)
+    flush()
+    return words
+
+
+def _has_chemistry(row: _Row, kinds: Sequence[ScriptKind | None]) -> bool:
+    """A cheap test before the words are cut: a raised or lowered glyph of upright text, or
+    an arrow."""
+    return any(k is not None for k in kinds) or any(c.c in chem.ARROW_HEADS for c in row.chars)
+
+
+def _chem_runs(row: _Row, kinds: Sequence[ScriptKind | None]) -> list[tuple[int, int, list[str]]]:
+    """(start, end, reasons) of the chemical formulas, ions and reactions in a prose row
+    (`pipeline.chem`, docs/chemistry.md): formulas with lowered counts or raised charges,
+    with their state symbols; reactions, an arrow with species on both sides."""
+    if not _has_chemistry(row, kinds):
+        return []
+    labelled = chem.label_words(_chem_words(row, kinds))
+    found = [(a, b, [FORMULA_REASON]) for a, b in chem.formulas(labelled)]
+    found += [(a, b, [REACTION_REASON]) for a, b in chem.reactions(labelled)]
+    return sorted(found)
+
+
+def _with_chemistry(
+    row: _Row, kinds: Sequence[ScriptKind | None], runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """`runs` with the row's chemistry as runs of their own; a run that overlaps one is taken
+    into it (the arrow of a reaction was a run by itself, a formula may sit inside a run
+    that is maths for another reason)."""
+    found = _chem_runs(row, kinds)
+    if not found:
+        return runs
+    merged = list(runs)
+    for start, end, reasons in found:
+        touching = [r for r in merged if r[0] < end and start < r[1]]
+        merged = [r for r in merged if r not in touching]
+        lo = min([start, *(r[0] for r in touching)])
+        hi = max([end, *(r[1] for r in touching)])
+        # Formulas already inside this stretch (a reaction found them too) are one run.
+        merged = [r for r in merged if not (lo <= r[0] and r[1] <= hi)]
+        merged.append(
+            (lo, hi, [*reasons, *(x for r in touching for x in r[2] if x not in reasons)])
+        )
+    return sorted(merged)
+
+
+def _reaction_row(row: _Row, info: _CharInfo) -> bool:
+    """Is the whole row one chemical reaction (`Ag+(aq) + Cl-(aq) -> AgCl(s)`)? Then it is a
+    display equation line, not a sentence with an arrow in it: the ink outside the reaction
+    is at most the punctuation that ends it."""
+    if not any(c.c in chem.ARROW_HEADS for c in row.chars):
+        return False
+    kinds = _script_kinds(row, info)
+    labelled = chem.label_words(_chem_words(row, kinds))
+    spans = chem.reactions(labelled)
+    if len(spans) != 1:
+        return False
+    start, end = spans[0]
+    outside = [c.c for i, c in enumerate(row.chars) if not c.blank and not start <= i < end]
+    return all(ch in ",.;:" for ch in outside)
 
 
 def _between_formulas(chars: list[_Char], i: int) -> bool:
@@ -6730,6 +6854,31 @@ def _with_page_spans(
     return sorted(out, key=lambda r: (r[0], r[1])), latex
 
 
+_NO_SPACE_BEFORE = frozenset(",.;:!?)]}\u2019\u201d")
+_NO_SPACE_AFTER = frozenset("([{\u2018\u201c")
+
+
+def _gap_before(chars: list[_Char], start: int) -> bool:
+    """Is there a visible gap between the glyph before an inline equation and its first
+    glyph, with no blank in the text layer for it ("ions" and "SO42-" in TeX output, which
+    sets no space after a script)? Then the text before it gets one."""
+    if start == 0 or chars[start - 1].blank or chars[start].blank:
+        return False
+    before, first = chars[start - 1], chars[start]
+    return (
+        before.c not in _NO_SPACE_AFTER and first.x0 - before.x1 >= SPACE_AFTER_SCRIPT * first.size
+    )
+
+
+def _gap_after(chars: list[_Char], start: int, end: int) -> bool:
+    """The same after an inline equation: a visible gap to the next glyph, no blank."""
+    if end >= len(chars) or chars[end].blank or chars[end - 1].blank:
+        return False
+    nxt = chars[end]
+    right = max((c.x1 for c in chars[start:end] if not c.blank), default=chars[end - 1].x1)
+    return nxt.c not in _NO_SPACE_BEFORE and nxt.x0 - right >= SPACE_AFTER_SCRIPT * nxt.size
+
+
 def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
     """Paragraph (or list item) text with inline equations cut out, hyphenation repaired
     between rows. A list item's text starts after its marker."""
@@ -6770,6 +6919,8 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
             block.flat_scripts = True  # raised or lowered text that is written flat
         for start, end, reasons in found:
             row_pieces.append(_marked(row.chars, kinds, cursor, start))
+            if _gap_before(row.chars, start):
+                row_pieces.append(" ")
             chars = row.chars[start:end]
             text = (
                 ""
@@ -6796,6 +6947,8 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
                 )
             )
             cursor = end
+            if _gap_after(row.chars, start, end):
+                row_pieces.append(" ")
         row_pieces.append(_marked(row.chars, kinds, cursor, len(row.chars)))
         _append_row(pieces, row_pieces)
     return _strip_teacher_tags(_tidy(pieces))

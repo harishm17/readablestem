@@ -550,13 +550,14 @@ section) is English whatever the document's language.
 
 ## Raised and lowered text
 
-Raised and lowered text of upright text (`Element.script_runs`: H2O, Na+, g/cm3; a nuclide's numbers
-before its symbol are an inline equation since 2026-10-21, docs/layout.md) is
+Raised and lowered text of upright text (`Element.script_runs`: g/cm3, a footnote mark, a letter
+subscript; formulas and ions such as H2O and Na+, and a nuclide's numbers before its symbol, are
+inline equations since 2026-10-21, see "Chemistry" below and docs/layout.md) is
 written as `<sup>` and `<sub>` inside the paragraph, list item or heading, inside any link or
 colour:
 
 ```html
-<p id="p1-e2">Water is H<sub>2</sub>O, table salt is Na<sup>+</sup> and gold is 19.3 g/cm<sup>3</sup>.</p>
+<p id="p1-e2">Gold is 19.3 g/cm<sup>3</sup>, and the measurement is in Nature<sup>1</sup>.</p>
 ```
 
 A lowered and a raised run side by side (the count and the charge of SO4 2-, the two
@@ -573,6 +574,33 @@ The text itself is unchanged (`H2O`), so search and copy read as before. A run i
 when it would start inside an inline equation's marker or overlap another. What cannot be
 carried (a figure caption, a table cell's lowered text, a script with nothing before it) is
 written flat, and the notice `scripts_flattened` ("Worth checking") says where.
+
+## Chemistry
+
+Formulas, ions, state symbols, reactions and concentrations are inline or display equations
+(docs/chemistry.md). The MathML the converter makes for them is shaped for a screen reader:
+
+```html
+<!-- the ion Fe3+, from \ce{Fe^3+} -->
+<msup><mi mathvariant="normal">Fe</mi><mrow><mn>3</mn><mo>+</mo></mrow></msup>
+```
+
+- A charge or a count hangs on the whole element symbol: the converter wrote `\mathrm{Na^+}` as
+  `N`, `msup(a, +)` and a reader said "N a to the power plus"; it is now `msup(mrow(N, a), +)`
+  ("N a plus"). The letters stay one `mi` each, as published MathML has them. Only real element
+  symbols are grouped (`Hz_2` and `km^2` stay as the model wrote them).
+- A subscript or superscript after a closing bracket belongs to the whole group, `[A]_0` is
+  `msub(mrow([A]), 0)` and `Al_2(SO_4)_3` has `msub(mrow((SO4)), 3)`; the converter used to hang
+  it on the bracket alone (`msub(], 0)`), which was read "close bracket sub 0". This is done for
+  every `(...)` and `[...]` that carries a script, in chemistry and in maths.
+- A reaction arrow is an `mo` (`\longrightarrow` came out as an `mi`).
+- The review screen's reading says "H 2 O", "S O 4 2 minus", "aqueous", "reacts to form", "is in
+  equilibrium with", "the concentration of H 3 O plus" (`pipeline/speech_chem.py`); the reading is
+  written into the file only with `MATHML_ALTTEXT` on, as for any equation.
+
+A formula's own MathML is checked like any other (`mathml.*` checks) and against the PDF's text
+layer. A reading the model wrote as mhchem (`\ce{...}`) that the converter does not read is
+refused by the LaTeX check, so the equation stays a picture with a required decision.
 
 ## Coloured text (FEATURE_COLOUR)
 

@@ -1,5 +1,31 @@
 # Changelog
 
+## Chemistry (2026-10-21, branch feat/chemistry)
+
+- Formulas, ions, state symbols and reactions in running text are inline equations, and a line
+  that is one reaction is a display equation (`pipeline/chem.py`, `layout._with_chemistry`,
+  `_reaction_row`; docs/chemistry.md, docs/layout.md). Raised and lowered text that is not
+  chemistry (units, footnote marks, a letter subscript) stays `<sup>`/`<sub>`.
+- The equation prompt asks for mhchem (`\ce{...}`) for chemical species; a tested subset is written
+  out as plain LaTeX before the checks (`equation_step.expand_ce`), the rest is refused and the
+  picture stays with a decision. `clean_latex` is unchanged (the proof applies it to recorded
+  chatbot answers).
+- A subscript or superscript after `(...)` or `[...]` belongs to the group (`[A]_0`, `Al_2(SO_4)_3`,
+  also in maths: `(a+b)^2`), a charge or count hangs on the whole two-letter element symbol, and a
+  long arrow is an operator (`validate.safe_latex_to_mathml`; docs/output.md, "Chemistry").
+- Speech for chemistry (`pipeline/speech_chem.py`): "H 3 O plus", "S O 4 2 minus", "aqueous",
+  "reacts to form", "is in equilibrium with", "the concentration of H 3 O plus".
+- Side effect of the converter change on maths that is not chemistry, checked by replay
+  (`scripts/dev_converter_effect.py`; docs/chemistry.md): +5.5 points of primary where the gold is
+  written by people, and an apparent -1.1 on gold made by the old converter (the real-world arXiv set)
+  that is +0.26 when the gold is converted again.
+- Table headers: a header cell's text is compared without the marks of LaTeX (`d_i` is `di`), which
+  was most of the apparent fall of column-header exactness with the table step on (0.792 to 0.858).
+- Evaluation: `scripts/dev_chem.py` (a content score that does not depend on the gold's spelling),
+  `table_cell_maths` in the document task's report (formulas in the gold's table cells found in
+  the output's cells). Tables: measured on, and left off with the blockers listed
+  (docs/tables.md, "Tables on, on the development sets").
+
 ## Scanned and handwritten pages read from an image (2026-10-21, branch feat/scanned-pages)
 
 - Behind `FEATURE_IMAGE_PAGES` (off; [ADR 0007](docs/decisions/0007-image-pages.md)), pages

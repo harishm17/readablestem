@@ -1,7 +1,8 @@
-"""Raised and lowered text in running text (backlog T2-4, T2-5): the scripts of upright
-text (H2O, Na+, SO4 2-, cm3, 226Ra) come out as `Element.script_runs`, not flat and not as
-inline equations; those of a variable (an italic x) stay an inline equation; what cannot be
-carried is flagged `scripts_flattened`. Pages are built here glyph by glyph, so the sizes
+"""Raised and lowered text in running text (backlog T2-4, T2-5): the scripts of a unit
+(cm3) come out as `Element.script_runs`, not flat and not as inline equations; formulas and
+ions (H2O, Na+, SO4 2-) and nuclides (226Ra) are inline equations since 2026-10-21; those of
+a variable (an italic x) stay an inline equation; what cannot be carried is flagged
+`scripts_flattened`. Pages are built here glyph by glyph, so the sizes
 and offsets are the ones the test says."""
 
 from __future__ import annotations
@@ -76,24 +77,28 @@ def runs_of(element: Element) -> list[tuple[str, str]]:
     return [(text[r.start : r.end], r.kind) for r in element.script_runs]
 
 
-def test_a_formula_and_an_ion_keep_their_subscripts_and_charges():
+def test_a_formula_and_an_ion_are_inline_equations_not_raised_text():
+    """Since 2026-10-21 (docs/chemistry.md) formulas and ions with raised or lowered text are
+    inline equations: the equation step reads them, the speech says "H 2 O", "N a plus"."""
     pdf = build(
         [
             [("Water is H", None), ("2", "sub"), ("O and table salt is Na", None), ("+", "sup")],
             [("Cl", None), ("-", "sup"), (" is the chloride ion and Ca", None), ("2+", "sup")],
         ]
     )
-    (paragraph,) = paragraphs(pdf)
-    assert "H2O" in (paragraph.text or "") and "Na+" in (paragraph.text or "")
-    assert runs_of(paragraph) == [("2", "sub"), ("+", "sup"), ("-", "sup"), ("2+", "sup")]
-    assert not any(e.kind is Kind.EQUATION for e in layout.analyze(pdf).elements)
+    elements = layout.analyze(pdf).elements
+    (paragraph,) = [e for e in elements if e.kind is Kind.PARAGRAPH]
+    assert paragraph.script_runs == []
+    assert [e.text for e in elements if e.kind is Kind.EQUATION] == ["H2O", "Na+", "Cl-", "Ca2+"]
+    assert all(e.display == "inline" for e in elements if e.kind is Kind.EQUATION)
 
 
 def test_a_count_under_a_charge_is_read_count_first():
     pdf = build([[("The sulfate ion SO", None), ("4|2-", "stack"), (" is common.", None)]])
-    (paragraph,) = paragraphs(pdf)
-    assert (paragraph.text or "").startswith("The sulfate ion SO42-")
-    assert runs_of(paragraph) == [("4", "sub"), ("2-", "sup")]
+    elements = layout.analyze(pdf).elements
+    (paragraph,) = [e for e in elements if e.kind is Kind.PARAGRAPH]
+    assert paragraph.script_runs == []
+    assert [e.text for e in elements if e.kind is Kind.EQUATION] == ["SO42-"]
 
 
 def test_a_unit_exponent_is_raised_text():

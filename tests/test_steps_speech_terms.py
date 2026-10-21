@@ -91,7 +91,7 @@ def test_aligned_equations_and_brace_matrices_stay_plain_tables():
         (
             r"{}^{14}_{7}\mathrm{N} + {}^{4}_{2}\mathrm{He} \to {}^{17}_{8}\mathrm{O} "
             r"+ {}^{1}_{1}\mathrm{p}",
-            "nitrogen 14, atomic number 7 plus helium 4, atomic number 2 right arrow oxygen 17, "
+            "nitrogen 14, atomic number 7 plus helium 4, atomic number 2 reacts to form oxygen 17, "
             "atomic number 8 plus proton, mass number 1, atomic number 1",
         ),
         (r"{}^{1}_{0}n", "neutron, mass number 1, atomic number 0"),

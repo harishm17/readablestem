@@ -56,8 +56,10 @@ import defusedxml.ElementTree as DET
 from latex2mathml.converter import convert as _latex2mathml_convert
 from latex2mathml.tokenizer import PATTERN as _LATEX2MATHML_TOKEN
 
+from readablestem.core.latex_groups import group_delimited_scripts
 from readablestem.core.mathchars import bake_bold_variants
 from readablestem.core.types import Check
+from readablestem.pipeline.chem import arrows_as_operators, group_element_symbols
 
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 
@@ -505,7 +507,9 @@ def safe_latex_to_mathml(latex: str, display: str = "block") -> str:
     if len(latex) > MAX_LATEX_CHARS:  # same limit as check_latex; bounds the work below
         raise LatexConversionError("input too long")
     try:
-        source = _escape_raw_text(rewrite_alignment_environments(_rewrite_operator_names(latex)))
+        source = _escape_raw_text(
+            group_delimited_scripts(rewrite_alignment_environments(_rewrite_operator_names(latex)))
+        )
         raw = _latex2mathml_convert(source, display=display)
     except Exception as exc:  # latex2mathml raises many exception types
         raise LatexConversionError(f"latex2mathml failed ({type(exc).__name__})") from None
@@ -520,6 +524,8 @@ def safe_latex_to_mathml(latex: str, display: str = "block") -> str:
     root.set("display", display)
     _unescape_text_specials(root)
     bake_bold_variants(root)
+    group_element_symbols(root)
+    arrows_as_operators(root)
     try:
         return serialize_mathml(root)
     except UnsafeMathMLError as exc:
