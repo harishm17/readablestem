@@ -161,14 +161,23 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("dump", type=Path, help="folder with layout.json and html.json")
     parser.add_argument("--out", type=Path)
+    parser.add_argument(
+        "--expect",
+        type=float,
+        nargs=2,
+        metavar=("RUN1", "RUN2"),
+        help="ReadableSTEM's primary end-to-end of the two runs the dump replays, to check "
+        "(default: the registered run's 0.5004 and 0.5069)",
+    )
     args = parser.parse_args()
     gold = load_gold()
     arms: dict[str, list[list[dict]]] = {}
     for run in (1, 2):
         items = readablestem_items(args.dump, run, gold)
         got = pe.document_metrics(items)["end_to_end_exact_lenient"]
-        if abs(got - RECORDED_PRIMARY[run]) > 1e-9:
-            print(f"run {run}: rebuilt {got} != recorded {RECORDED_PRIMARY[run]}", file=sys.stderr)
+        expected = args.expect[run - 1] if args.expect else RECORDED_PRIMARY[run]
+        if abs(got - expected) > 1e-6:
+            print(f"run {run}: rebuilt {got} != recorded {expected}", file=sys.stderr)
             return 2
         arms.setdefault("readablestem", []).append(items)
     for arm in ("chatbot-opus-purdue", "chatbot-haiku-purdue"):

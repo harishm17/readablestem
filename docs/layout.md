@@ -543,6 +543,20 @@ Modern Sans):
   letters, or has a relation sign and no longer italic run: "at" in `v = v₀ + at` is
   not the English word. Beamer captions have no number ("Figure: ...") and still attach.
 
+### A stray opening brace (2026-10-21)
+
+OpenStax also prints "Solve the system by substitution. {" with the brace the last glyph of the
+sentence's row and the two equations in rows of their own to its right, level with the brace and
+not with the sentence. `_stray_brace_cut` cuts the brace off the sentence's row when a maths row
+starts within two font sizes to its right, another maths row sits under that one, and the brace's
+middle is level with the two; `_math_neighbours` then takes the brace row into the system, so the
+crop shows the brace and the text reads it first (`_equation_block`). Measured on dev-v2 with the
+layout alone: Elementary Algebra 5.2 has 80 instead of 53 of its 101 gold equations cut as the
+answer key has them (text layer within 0.99), the rest of the set moves by one; nothing else in
+the 121 PDFs of `scripts/layout_identity.py` changes except nuclide paragraphs and the brace text
+order (headings, figures, tables, lists, kept pages are identical; the "scripts flattened" notice
+goes where a nuclide was raised text).
+
 ### Raised and lowered text in prose (backlog T2-4, T2-5)
 
 Text sets formulas, ions, units and nuclides with scripts that the text layer flattens:
@@ -558,9 +572,21 @@ the assembler writes as `<sup>` and `<sub>` (docs/output.md "Raised and lowered 
   letter, digit or closing bracket just before it (a gap of at most 35 % of the row size), a
   closing bracket only when the group it closes holds upright text (`(SO4)3`, `[Zn]2+`), or,
   for digits only, the capital letter right after it (`226Ra`, a mass number; before a word,
-  never after one). A script of an italic letter or a letter in a maths font (`E` with a
+  never after one; since 2026-10-21 that case is no longer raised text, see "Nuclides" below).
+  A script of an italic letter or a letter in a maths font (`E` with a
   subscript `k`, `x2`) is not given to this: it stays an inline equation, as before, and the
   model reads it.
+- **Nuclides** (`_nuclide_runs`, 2026-10-21): the mass number raised and the atomic number
+  lowered before an element's symbol (`14C`, `235U`, `4 2 He` with the 4 above the 2), in running
+  text, are one inline run from the first number to the last letter of the symbol, so the equation
+  step reads it and the speech says "carbon 14, atomic number 6" (it was `<sup>14</sup>
+  <sub>6</sub>C`). The group must be all digits (at most six), at the start of a word, with the
+  symbol of an element right after it (a blank the PDF puts between is not a gap, `NUCLIDE_GAP`)
+  that does not go on into a longer word; `10 m2 S`, `3 Xx` and `235Uranium` are not nuclides.
+  Measured on dev-v2 with the layout alone (`--fake`): the authored chemistry document finds 70 of
+  its 108 gold equations instead of 64 and Chemistry 2.3 finds 12 of 38 instead of 7; the
+  isotope tables of 2.3 are tables, not prose, and are untouched. The new inline equations in a
+  Word lecture are real nuclides its gold does not list as equations.
 - **Evidence** (`_inline_evidence`): a script of upright text is no evidence that a run is
   maths. `H2` was an inline equation, `SO4` was not, and half a formula reached the model
   ("2O3", "34-"); now a run that only such scripts made is dropped. Inside a run that is

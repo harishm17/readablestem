@@ -5,7 +5,7 @@ recorded the run; a recording can only be replayed through that code), from any 
 
     git worktree add /tmp/heldout-tag proof-heldout-2026-10
     cd /tmp/heldout-tag && uv sync --all-groups
-    uv run python /path/to/scripts/heldout_replay_dump.py /tmp/heldout-tag DUMP_DIR
+    uv run python /path/to/scripts/heldout_replay_dump.py /tmp/heldout-tag DUMP_DIR [BUNDLE]
 
 It replays the committed bundle (`make proof`'s replay: no key, no network, no model call,
 about ten minutes; the keys are removed from the environment first) and writes
@@ -25,6 +25,7 @@ from pathlib import Path
 
 def main() -> int:
     tag, dump = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve()
+    bundle = sys.argv[3:4]  # optionally another recorded run than the set's own (`--bundle`)
     sys.path.insert(0, str(tag / "src"))
     for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
         os.environ.pop(key, None)
@@ -72,6 +73,7 @@ def main() -> int:
         str(dump / "PROOF-replay.md"),
         "--work",
         str(dump / "work"),
+        *(["--bundle", bundle[0]] if bundle else []),
     ]
     main_module.main()
     return 0
