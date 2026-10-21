@@ -1063,9 +1063,13 @@ codes and the labels file's SHA-256. No file name, page or text leaves the priva
 The research's four public manuals are copyrighted: use them for local work only, never
 commit them or their labels.
 
-TODO(Harish): add 3-5 of your own course PDFs (or colleagues' with permission) to
-`private-inputs/tables/` and label their tables; the real-document gate has no data
-until then.
+`data/real-tables/` is a committed set of the same shape: five openly licensed (CC BY 4.0)
+lecture notes, textbook and tutorial extracts, 64 pages, 25 labelled tables, with the floors and
+the licences in its README. Run it with `--real-dir data/real-tables`, free and without a model
+(about four minutes). First measured 2026-10-21: precision 1.000 (14 of 14), full-extent recall
+0.560 (14 of 25), so the recall floor is missed (docs/tables.md, "The blockers"). The committed
+`latest-tables-*` reports are made without it. A private `private-inputs/tables/` of your own
+course PDFs is still the better test (lab-manual worksheets are not among the five).
 
 ### Gate
 

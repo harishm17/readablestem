@@ -149,6 +149,7 @@ from readablestem.pipeline.equation_step import (
     _mathml_symbols,
     _symbol_bag,
     clean_latex,
+    expand_ce,
     text_layer_similarity,
     text_layer_style,
     text_layer_symbols_differ,
@@ -362,7 +363,10 @@ def to_mathml(latex: str) -> str | None:
 
 
 def _cell(out: CellOutput, row: int, col: int, row_span: int, col_span: int) -> TableCell:
-    latex = clean_latex(out.latex) if out.latex.strip() else ""
+    # `\ce` (mhchem) is written out as plain LaTeX, as for equations: the table prompt does not
+    # ask for it, but a model that reads a chemical formula in a cell may use it, and the
+    # converter does not know it (a `\ce` outside the converted subset stays and fails the check).
+    latex = clean_latex(expand_ce(out.latex)) if out.latex.strip() else ""
     maths = bool(latex) and is_maths(latex)
     return TableCell(
         row=row,

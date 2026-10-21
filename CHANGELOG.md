@@ -1,5 +1,22 @@
 # Changelog
 
+## Tables on in production (2026-10-21, branch feat/tables-on)
+
+- Decision: `FEATURE_TABLES=true`, `MAX_USD_PER_PAGE=2.20`, `MAX_USD_PER_JOB=4.70` for the Claude
+  deployment (`deploy/deploy.env.example`, docs/deploy.md, docs/tables.md "The decision"); the code
+  default stays off. `ops launch-check` with these: `launch_blockers=0`. The job cap the check
+  needs with tables on is $4.66, not the $2.60 earlier docs gave.
+- Gate floor `table_wrong_cells_not_flagged` 2 to 0 on replay ($0): the two were a table title
+  kept as a heading above the box (the scorer no longer counts it as a lost cell), not a wrapped
+  cell. New check for the wrapped-cell case itself: text of the table's size just under its box
+  where a column starts makes the step ask a person (`table.edge_text`, `text_at_edge`; fires on
+  no development table). Share of tables needing a decision unchanged: 55 of 183 (0.301).
+- Real documents: `data/real-tables/`, five CC BY 4.0 lecture-note, textbook and tutorial extracts
+  with 25 labelled tables; precision 1.000 (14 of 14), full-extent recall 0.560 against the 0.85
+  floor: unruled lists, a rotated page and long wrapped-text tables are missed (docs/tables.md).
+- `\ce` in a table cell is written out as plain LaTeX like in equations (`table_step._cell`); no
+  prompt change.
+
 ## Chemistry (2026-10-21, branch feat/chemistry)
 
 - Formulas, ions, state symbols and reactions in running text are inline equations, and a line
