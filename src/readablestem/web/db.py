@@ -3,7 +3,8 @@
 Retention model: everything derived from a user's document (the upload, crops, the
 result JSON, the output HTML, review edits, stage progress) hangs off `jobs` and is
 deleted with it by `ops.retention`. Tables that survive a job's deletion (`spend_days`,
-`quota_days`, `error_aggregates`, `events`) hold numbers and category codes only, never
+`spend_holds`, `quota_days`, `signup_days`, `deleted_accounts`, `error_aggregates`, `events`) hold
+numbers and category codes only (`deleted_accounts` a day-long hash of an address), never
 document text.
 
 User content that is not a document (a user's `courses` and their `notation_entries`)
@@ -74,6 +75,12 @@ class User(Base):
     # older value (a copied cookie, another browser) no longer signs anyone in. The
     # server default keeps rows inserted by an older release valid after a rollback.
     session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # How the person got in (`web.access`): "invited" (an admin allowlisted them, or the
+    # command line did) or "open" (they signed themselves up in SIGNUP_MODE=open). It sets the
+    # daily limits and which spend pool their conversions use. Whether they may sign in at all
+    # is `is_allowed`, in either tier: a blocked person keeps their tier. The server default
+    # keeps rows inserted by an older release valid after a rollback.
+    access_tier: Mapped[str] = mapped_column(String(8), default="invited", server_default="invited")
 
     jobs: Mapped[list[Job]] = relationship(back_populates="user")
 
@@ -237,17 +244,61 @@ class ReviewEdit(Base):
 
 
 class SpendDay(Base):
-    """Global model spend per UTC day. Updated with conditional UPDATEs (see web.spend)."""
+    """Global model spend per UTC day. Updated with conditional UPDATEs (see web.spend).
+
+    `open_spent_usd` and `open_held_usd` are the part of `spent_usd` and `held_usd` that
+    belongs to jobs of open-tier accounts: the pool `OPEN_TIER_DAILY_SPEND_CAP_USD` limits.
+    They are changed by the same statements as the totals, never on their own."""
 
     __tablename__ = "spend_days"
 
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     spent_usd: Mapped[float] = mapped_column(Float, default=0.0)
     held_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    open_spent_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    open_held_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+
+
+class SpendHold(Base):
+    """One open reservation of the spend guard (`web.spend`): what a model call holds against
+    the day's cap (and the open pool) until it settles. Written in the same transaction as the
+    hold on `spend_days`, deleted by the settlement that releases it. It exists so that a hold
+    cannot outlive the process that made it: a worker that died leaves rows behind, and the
+    worker that comes next releases them (`DbSpendGuard.release_holds`, by job when a lease
+    runs out, by age at start-up). `job_id` is a job id but not a foreign key, so deleting a job
+    never touches the guard's books. Numbers only."""
+
+    __tablename__ = "spend_holds"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, index=True)
+    amount_usd: Mapped[float] = mapped_column(Float)
+    in_pool: Mapped[bool] = mapped_column(Boolean, default=False)
+    job_id: Mapped[str | None] = mapped_column(String(32), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+
+class DeletedAccount(Base):
+    """What an account that was deleted today had used, kept until the day ends so that
+    deleting an account and signing up again does not reset the day's limits
+    (`web.tombstones`). Keyed by an HMAC of the normalised email address, never the address;
+    holds the day's pages and model reads and whether the account took one of the day's
+    places for new accounts. Purged after its day (`ops.retention.purge_tombstones`)."""
+
+    __tablename__ = "deleted_accounts"
+
+    email_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True, index=True)
+    pages: Mapped[int] = mapped_column(Integer, default=0)
+    rereads: Mapped[int] = mapped_column(Integer, default=0)
+    slot_taken: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class QuotaDay(Base):
-    """Pages a user has submitted per UTC day."""
+    """Pages a user has submitted per UTC day, and the model reads from review they have
+    started (`rereads`, counted for open-tier accounts only: `web.quota`)."""
 
     __tablename__ = "quota_days"
 
@@ -256,6 +307,20 @@ class QuotaDay(Base):
     )
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     pages: Mapped[int] = mapped_column(Integer, default=0)
+    rereads: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class SignupDay(Base):
+    """Accounts made by open sign-up per UTC day: a number, nothing about anyone. Added to
+    by one conditional UPDATE in the transaction that makes the account
+    (`web.quota.try_take_signup`), so `MAX_NEW_ACCOUNTS_PER_DAY` cannot be passed by two
+    sign-ups at once. Not given back when an account is deleted: creating and deleting
+    accounts must not make room for more."""
+
+    __tablename__ = "signup_days"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    accounts: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class PendingUpload(Base):

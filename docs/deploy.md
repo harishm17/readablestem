@@ -110,7 +110,10 @@ policies exist (`readablestem readyz failing`, `readablestem cron not running`, 
 or purge problem`) and **Billing > Budgets** shows `readablestem monthly budget`.
 
 **8. HARISH: add the instructors.** Sign in as admin, open **Admin**, add each email under
-Allowlist. They must also be test users in item 4 while the consent screen is in Testing.
+Allowlist. They must also be test users in item 4 while the consent screen is in Testing. With
+`SIGNUP_MODE=open` (below) there is nobody to add: publish the consent screen (In production)
+and anyone with a Google account can sign in; people who sign themselves up are in the open
+tier, and allowing one makes them an instructor.
 
 **9. HARISH: backups, once** (details in operations.md, "Backups and restore"):
 
@@ -278,11 +281,25 @@ calls are in flight at once (`MODEL_CONCURRENCY`, "Concurrency" below).
 | `MAX_MODEL_CALLS_PER_JOB` / `_PER_PAGE` | 400 / 80 | 400 / 80 | Measured 2-2.7 calls a page, so 30 pages is about 80 calls: 5x room |
 | `DAILY_SPEND_CAP_USD` | **$10** (set by you) | any | 5 instructors converting their full quota is 5 x 90 pages x $0.015 = $6.75, plus the calls in flight (two instances x $1.1) = $9 |
 | `PER_USER_DAILY_PAGE_QUOTA` | **90** (set by you) | any | Three full-size (30-page) documents a day each; a course week of lecture notes |
+| `SIGNUP_MODE` | `allowlist` (default), **`open`** for a beta anyone can try | any | See "Open sign-up" below |
+| `OPEN_TIER_DAILY_PAGE_QUOTA` / `OPEN_TIER_DAILY_REREADS` | **20** / **30** | any | A new account can convert two small handouts and read 30 marked regions a day |
+| `MAX_NEW_ACCOUNTS_PER_DAY` | **100** | any | 100 accounts x 20 pages x $0.015 is $30 if every one used its quota, far more than the pool pays for: the pool, not the count, is the bound on money |
+| `OPEN_TIER_DAILY_SPEND_CAP_USD` | **$4** | any | Inside `DAILY_SPEND_CAP_USD`; about 260 dense pages a day for all new accounts together |
 
 If you set `MAX_USD_PER_PAGE`/`MAX_USD_PER_JOB` yourself, they apply to whichever provider
 is selected. The worst case for the day: $10 a day is $300 a month; the Anthropic
 workspace limit ($100, checklist item 3) is the hard stop above that. A realistic month for
 3-5 instructors converting a few documents a week is under $15.
+
+**Open sign-up.** With `SIGNUP_MODE=open` accounts that signed themselves up (the open tier)
+get the lower daily limits above and draw on `OPEN_TIER_DAILY_SPEND_CAP_USD`, a pool that is a
+share of `DAILY_SPEND_CAP_USD` and not extra money: the day can never pass the cap, and
+strangers can take at most the pool from the instructors' budget. When the pool is spent,
+uploads from new accounts are paused until midnight UTC and invited people are not affected.
+`readablestem ops launch-check` warns about a pool larger than the daily cap, smaller than one
+call, or a new-account page quota above the invited one. The provider's monthly workspace limit
+stays the hard stop. The settings are optional in `deploy/deploy.env.example`; `deploy.sh` passes
+them on to the service when they are set.
 
 `Settings.check_production` refuses to start (and `deploy.sh` stops before touching
 anything) when a number cannot work for the provider: a page or job cap below one call's
@@ -426,7 +443,9 @@ turns it off where it is installed. One conversion runs at a time per instance.
 1. In the Cloud console for the new project, open **Google Auth Platform**. Under
    **Branding** set the app name and support email; under **Audience** choose
    **External** and leave it in **Testing**, then add each beta instructor as a test
-   user. Only allowlisted accounts can use the app anyway (`readablestem users allow`).
+   user. With `SIGNUP_MODE=allowlist` only allowlisted accounts can use the app anyway
+   (`readablestem users allow`); with `open` anyone who signs in can, so publish the consent
+   screen when you open sign-up.
 2. **Clients > Create client**, application type **Web application**.
 3. **Authorized redirect URIs**: add the service's own URL,
    `https://readablestem-PROJECT_NUMBER.REGION.run.app/auth/callback` (Cloud Run's

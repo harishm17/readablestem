@@ -1,11 +1,14 @@
 """Abuse limits that need no database: a per-address rate limit and the client address.
 
 What this is for: a script guessing at the sign-in or cron endpoints, or hammering the upload
-route (each upload that is not a PDF still costs a probe process). It is a seatbelt for a
-beta of a few people, not a defence against a distributed flood (that is Cloud Run's and
-Cloud Armor's job). Limits are kept in memory per instance, so with two instances the real
-allowance is twice the numbers below; a restart forgets them. Both are acceptable here and
-stated in docs/security.md.
+route (each upload that is not a PDF still costs a probe process), or making accounts
+(`signup`, counted only when a sign-in would create one). It is a seatbelt for a free beta,
+not a defence against a distributed flood (that is Cloud Run's and Cloud Armor's job):
+accounts made from many addresses are bounded by the daily cap on new accounts
+(`MAX_NEW_ACCOUNTS_PER_DAY`, kept in the database) and by the open-tier limits, not here.
+Limits are kept in memory per instance, so with two instances the real allowance is twice
+the numbers below; a restart forgets them. Both are acceptable here and stated in
+docs/security.md.
 
 `client_ip` reads the address from `X-Forwarded-For`, counting `trusted_proxy_hops` entries
 from the right (Cloud Run's front end appends the address it saw, so one hop; an external
@@ -41,6 +44,10 @@ class Rule:
 RULES: dict[str, Rule] = {
     "login": Rule(10, 300),  # starting a sign-in: the buttons on /login
     "callback": Rule(20, 300),  # coming back from Google or Microsoft
+    # New accounts made by open sign-up (SIGNUP_MODE=open), per address: counted when a
+    # sign-in is about to create one, not on every sign-in. A shared university or office
+    # address still has room for a class trying it together.
+    "signup": Rule(5, 3600),
     "email_link": Rule(3, 900),  # sign-in links sent to one address (T3-10), whoever asks
     "upload": Rule(30, 600),  # uploads, per address; accepted or not
     "upload_user": Rule(15, 600),  # uploads, per signed-in person

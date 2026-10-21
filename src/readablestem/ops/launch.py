@@ -3,8 +3,10 @@
 `launch_blockers()` lists unfinished public copy (a `TODO(Harish)` or a "Draft" note on a
 page anyone can open), a missing or placeholder demo, and a missing eval baseline (the CI
 gate skips without one). Given the settings, it also lists what a setting turns on that
-the public pages do not describe yet (Microsoft sign-in and the privacy notice), and
-whether the production settings are complete and the spend limits fit the model provider
+the public pages do not describe yet (Microsoft sign-in and the privacy notice; open
+sign-up, which makes an account at the first sign-in, and the privacy notice that must say
+so and how to delete it), and whether the production settings are complete and the spend
+limits fit the model provider
 (`ops.limits`: the same errors that stop a production start, plus warnings).
 `readablestem ops launch-check` prints the list and exits 1 while it is not empty; the web
 app logs `launch_blockers` with the count at a production start.
@@ -36,6 +38,26 @@ PUBLIC_TEMPLATES = (
     "login.html",
     "_signin.html",
     "org_not_set_up.html",
+    "not_allowed.html",
+    "signups_full.html",
+    "login_email.html",
+)
+# Words that say sign-in is by invitation. A public page may carry them only when it also
+# looks at `signup_open`, so that with SIGNUP_MODE=open it says something else (the pages
+# render from the setting: docs/web.md "Sign-up modes").
+INVITE_ONLY_PHRASES = (
+    "by invitation",
+    "small group of instructors",
+    "Not invited yet",
+    "beta list",
+    "your invitation",
+)
+SIGNUP_SWITCH = "signup_open"
+# What the privacy notice must say while sign-up is open (settings.signup_open): that the
+# first sign-in makes an account, and where to delete it. Matched against the template text.
+OPEN_SIGNUP_NOTICE = (
+    ("first time you sign in, we make an account", "that the first sign-in makes an account"),
+    ("Delete my account", "how to delete the account"),
 )
 # Written into a demo built with the offline client (`readablestem demo build --fake`);
 # the same string as eval.render.PLACEHOLDER_ATTR (kept here so this module stays light).
@@ -75,11 +97,23 @@ def launch_blockers(
                 items.append(
                     f"web/templates/privacy.html: {what} but the privacy notice does not say so"
                 )
+    if settings is not None and settings.signup_open and notice is not None:
+        for phrase, what in OPEN_SIGNUP_NOTICE:
+            if phrase not in notice:
+                items.append(
+                    f"web/templates/privacy.html: SIGNUP_MODE=open but the privacy notice "
+                    f"does not say {what}"
+                )
     for name in PUBLIC_TEMPLATES:
         path = TEMPLATES_DIR / name
         if not path.is_file():
             continue
         text = path.read_text(encoding="utf-8")
+        if SIGNUP_SWITCH not in text and (words := [p for p in INVITE_ONLY_PHRASES if p in text]):
+            items.append(
+                f"web/templates/{name}: says sign-in is by invitation ({words[0]!r}) whatever "
+                f"SIGNUP_MODE is; render it from {SIGNUP_SWITCH}"
+            )
         if "TODO(Harish)" in text:
             items.append(f"web/templates/{name}: still has a TODO(Harish) note")
         if 'class="draft-note"' in text:

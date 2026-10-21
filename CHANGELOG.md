@@ -1,5 +1,22 @@
 # Changelog
 
+## Open sign-up (2026-10-21)
+
+- `SIGNUP_MODE=open` lets anyone with a verified Google account (or an allowed Microsoft one)
+  sign in; the first sign-in makes the account. The default, `allowlist`, is unchanged. A person an
+  admin blocked stays refused and is never made again. Accounts have a tier, `invited` (added by an
+  admin) or `open`; the admin page shows it and can block and unblock.
+- New accounts have lower daily limits: `OPEN_TIER_DAILY_PAGE_QUOTA` pages (20) and
+  `OPEN_TIER_DAILY_REREADS` model reads from review (30); the service takes at most
+  `MAX_NEW_ACCOUNTS_PER_DAY` (100) new accounts a day and 5 an hour per address; and their documents
+  draw on `OPEN_TIER_DAILY_SPEND_CAP_USD` ($4), a pool inside the daily cap, so strangers cannot use
+  up the instructors' budget. Invited people are unaffected when it is spent.
+- People can delete their own account (Account page, a confirmation first). The public pages (sign-in,
+  landing, privacy, terms, known limits) say what is true for the mode the server runs in, and
+  `ops launch-check` checks the privacy notice says the first sign-in makes an account and how to
+  delete it. Migration `a6c2e9f4b713` (additive). Details: docs/web.md, "Sign-up modes and access
+  tiers".
+
 ## One heading for a doubled box title (2026-10-14)
 
 - OpenStax prints a box's label and its title as two lines ("Teacher Support" twice), and a

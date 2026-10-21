@@ -14,7 +14,12 @@ Spending is controlled exactly as in the worker, because the money is the same m
 - a refusal by either cap is `ReadRefused` with a sentence for the reviewer (nothing was
   sent), never an error page;
 - the routes count each read against a per-person rate limit (`abuse.RULES["reread"]`) and
-  allow one at a time per person (`ReadGate`), so a script cannot queue model calls.
+  allow one at a time per person (`ReadGate`), so a script cannot queue model calls;
+- a read for an open-tier account (`web.access`) also draws on the open spend pool
+  (`web.spend`) and counts against their daily allowance of reads
+  (`OPEN_TIER_DAILY_REREADS`, `web.quota.try_consume_reread`). The count is made before
+  the call and not given back, like the page quota: it limits what is asked for. Invited
+  accounts have neither.
 
 The call is made with no database transaction open and no row locked (it takes seconds);
 the route locks the job afterwards, to check that nothing changed meanwhile, and applies
@@ -33,11 +38,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation
 from readablestem.core.types import Element, Fix
-from readablestem.web import notation
-from readablestem.web.database import rowcount
+from readablestem.web import access, notation
+from readablestem.web.database import rowcount, utc_today
 from readablestem.web.db import Job, JobStatus, session_scope
 from readablestem.web.deps import get_ctx
 from readablestem.web.logsafe import log_event, log_exception
+from readablestem.web.quota import try_consume_reread
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +59,10 @@ REFUSALS = {
     "could not be read. Type it yourself.",
     "cancelled": "This document was deleted or changed hands, so nothing was read.",
 }
+OPEN_POOL_REFUSAL = (
+    "Reading with the model is paused for new accounts for today, so this could not be read "
+    "now. Try again tomorrow, or type it yourself."
+)
 FAILED = "The tool could not read it just now. Try again in a minute, or type it yourself."
 BUSY = "You already have something being read. Wait for it to finish, then try again."
 
@@ -165,14 +175,30 @@ class ReadBudget(JobBudget):
             log_exception(logger, "job_spend_update_failed", exc, job_id=self.job_id)
 
 
+def reread_allowance_message(allowance: int) -> str:
+    """What the reviewer is told when an open-tier account has started all the reads it may
+    today (the number is the setting; a read is counted when it starts; the count starts
+    again at midnight UTC)."""
+    reads = "read" if allowance == 1 else "reads"
+    return (
+        f"You have started {allowance} {reads} with the model today, the most a new account "
+        "can start (a read counts when it starts, whether or not it worked). So this could "
+        "not be read. The count starts again at midnight UTC. Type it yourself, or try "
+        "again then."
+    )
+
+
 def read_budget(request: Request, job: Job) -> ReadBudget:
-    """The budget of a read on this job: what is left of the job's caps and of the day's."""
+    """The budget of a read on this job: what is left of the job's caps and of the day's, and
+    of the open pool when the job's owner is an open-tier account."""
     from readablestem.web.worker import job_caps
 
     ctx = get_ctx(request)
     max_usd, max_calls = job_caps(ctx.settings, job.page_count)
+    with session_scope(ctx.factory) as session:
+        pool = access.spend_pool(access.tier_of(session, job.user_id))
     return ReadBudget(
-        guard=ctx.guard,
+        guard=ctx.guard.scoped(pool, job.id),
         max_usd=max(0.0, max_usd - float(job.cost_usd or 0.0)),
         max_calls=max(0, max_calls - int(job.model_calls or 0)),
         factory=ctx.factory,
@@ -180,6 +206,20 @@ def read_budget(request: Request, job: Job) -> ReadBudget:
         job_max_usd=max_usd,
         job_max_calls=max_calls,
     )
+
+
+def _count_against_allowance(request: Request, user_id: str) -> None:
+    """One more read started today for an open-tier account; `ReadRefused` when they have
+    used the day's allowance. Nothing for an invited account."""
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
+        allowance = access.reread_allowance(ctx.settings, access.tier_of(session, user_id))
+        if allowance is None:
+            return
+        counted = try_consume_reread(session, user_id, allowance=allowance, day=utc_today())
+    if not counted:
+        log_event(logger, "reread_refused", scope="allowance")
+        raise ReadRefused(reread_allowance_message(allowance))
 
 
 def read_equation(
@@ -199,6 +239,7 @@ def read_equation(
     job_id = job.id
     GATE.enter(user_id)
     try:
+        _count_against_allowance(request, user_id)
         budget = read_budget(request, job)
         client = ctx.client_factory(ctx.settings, budget)
         try:
@@ -208,6 +249,8 @@ def read_equation(
                 )
         except BudgetExceeded as exc:
             log_event(logger, "reread_refused", job_id=job_id, scope=exc.scope)
+            if getattr(exc, "pool", None) == access.POOL_OPEN:
+                raise ReadRefused(OPEN_POOL_REFUSAL) from None
             raise ReadRefused(REFUSALS.get(exc.scope, FAILED)) from None
         except ReadRefused:
             raise

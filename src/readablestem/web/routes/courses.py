@@ -31,6 +31,7 @@ from readablestem.web.deps import (
     CurrentUser,
     PageError,
     UserDep,
+    conversions_closed,
     flash,
     get_ctx,
     render,
@@ -128,7 +129,7 @@ def _course_page(
             session,
             user.id,
             now=utcnow(),
-            budget_closed=ctx.guard.cap_reached(ctx.min_headroom_usd),
+            budget_closed=conversions_closed(ctx, user) is not None,
             course_id=course.id,
         )
         context = {

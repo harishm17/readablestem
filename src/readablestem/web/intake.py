@@ -12,7 +12,9 @@ makes jobs can skip them:
   place from the person's own files.
 - the daily page quota (`web.quota.try_consume_pages`): the pages of this document, added by
   one conditional UPDATE in the same transaction as the job, so a refusal costs nothing and
-  two uploads racing cannot both squeeze under the limit.
+  two uploads racing cannot both squeeze under the limit. The limit depends on the person's
+  tier (`web.access.page_quota`): `PER_USER_DAILY_PAGE_QUOTA` for invited people,
+  `OPEN_TIER_DAILY_PAGE_QUOTA` for accounts made by open sign-up.
 
 Nothing here reads the file: the bytes were checked before they got here.
 """
@@ -25,7 +27,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import Settings
-from readablestem.web import retention
+from readablestem.web import access, retention
 from readablestem.web.database import utc_today
 from readablestem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 from readablestem.web.quota import pages_left, try_consume_pages
@@ -107,7 +109,7 @@ def store_job(
             raise TooManyJobs("too_many_active")
         if live_job_count(session, user_id, now) >= MAX_LIVE_JOBS_PER_USER:
             raise TooManyJobs("too_many_stored")
-        quota = settings.per_user_daily_page_quota
+        quota = access.page_quota(settings, access.tier_of(session, user_id))
         if not try_consume_pages(session, user_id, pages, quota=quota, day=utc_today(now)):
             left = pages_left(session, user_id, quota=quota, day=utc_today(now))
             raise QuotaRefused(pages, left or 0)

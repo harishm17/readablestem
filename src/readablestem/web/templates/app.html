@@ -71,16 +71,24 @@
   {% endif %}
   {% if spend_closed %}
   {# The form would only send the whole file to be refused (UX review MF20): say when
-     uploads open again instead. #}
+     uploads open again instead. `open_pool_closed`: only the budget set aside for new
+     accounts is used up. #}
   <div class="notice notice-warning">
+    {% if open_pool_closed %}
+    <p><strong>Conversions for new accounts are paused for today.</strong> The share of
+      today's budget set aside for new accounts has been used up. Uploads open again at
+      {{ next_reset|utc }}. Documents already in the queue wait until then. Accounts that
+      were invited are not affected.</p>
+    {% else %}
     <p><strong>Conversions are paused for today.</strong> Today's budget for conversions
       has been used up. Uploads open again at {{ next_reset|utc }}. Documents already in
       the queue wait until then.</p>
+    {% endif %}
   </div>
   {% elif pages_left == 0 %}
   {# The same for this person's daily page limit (MF20): no form that can only fail. #}
   <div class="notice" id="upload-closed" tabindex="-1">
-    <p><strong>You have converted all {{ page_quota }} pages you can today.</strong>
+    <p><strong>You have converted all {{ page_quota }} pages {% if new_account %}a new account can convert{% else %}you can{% endif %} today.</strong>
       Uploads open again at {{ next_reset|utc }}.</p>
   </div>
   {% else %}
@@ -96,7 +104,8 @@
         (all files together {{ upload_limit_mb }} MB), is kept and you choose which pages to convert.
         {% endif %}
         {% if pages_left is not none %}You can convert {{ pages_left }} more
-        {{ "page" if pages_left == 1 else "pages" }} today; the count starts again at
+        {{ "page" if pages_left == 1 else "pages" }} today{% if new_account %} (a new account
+        can convert {{ page_quota }} pages a day){% endif %}; the count starts again at
         {{ next_reset|utc }}.{% endif %}
         {% if office_kinds %}Word (.docx){% if "pptx" in office_kinds %} and PowerPoint (.pptx){% endif %}
         files also work; they are turned into a PDF on the server first, so the page count

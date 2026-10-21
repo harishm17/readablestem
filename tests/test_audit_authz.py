@@ -56,8 +56,13 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/admin"): ADMIN_ONLY,
     ("POST", "/admin/allowlist"): ADMIN_ONLY,
     ("POST", "/admin/allowlist/remove"): ADMIN_ONLY,
+    ("POST", "/admin/users/block"): ADMIN_ONLY,  # open sign-up: stop an account
+    ("POST", "/admin/users/unblock"): ADMIN_ONLY,
     ("POST", "/admin/linked-emails"): ADMIN_ONLY,  # T3-10: another Google account per instructor
     ("POST", "/admin/linked-emails/remove"): ADMIN_ONLY,
+    ("GET", "/account"): USER,  # open sign-up: what is held, the limits, delete my account
+    ("GET", "/account/delete"): USER,
+    ("POST", "/account/delete"): USER,  # CSRF; erases the caller's own account only
     ("GET", "/app"): USER,
     ("GET", "/app/documents"): USER,
     ("GET", "/app/download"): USER,  # T3-4: a zip of the person's own ready documents
@@ -247,6 +252,8 @@ def test_non_admins_cannot_use_admin_routes_even_with_a_valid_token(site):
     for path in (
         "/admin/allowlist",
         "/admin/allowlist/remove",
+        "/admin/users/block",
+        "/admin/users/unblock",
         "/admin/linked-emails",
         "/admin/linked-emails/remove",
     ):

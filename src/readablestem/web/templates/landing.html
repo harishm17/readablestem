@@ -49,9 +49,20 @@
 <p>Or <a href="/demo">look at an example conversion</a> first (no sign-in needed).</p>
 
 <h2>Who can use it</h2>
+{% if signup_open %}
+<p>ReadableSTEM is a free beta run by Harish Manoharan, an individual developer. Anyone with
+  a Google account can sign in and try it{% if microsoft_login %}, and so can people with a
+  Microsoft account from a university that is set up for it{% endif %}. Signing in the first
+  time makes your account. New accounts have daily limits: {{ open_page_quota }} pages a day,
+  and the service pauses for the day when its budget for AI model calls is used up. The
+  example conversion needs no sign-in. Upload only materials you wrote or have the right to
+  adapt, and never upload student records or anything with students' personal information in
+  it.</p>
+{% else %}
 <p>The beta is open to a small group of instructors, by invitation. Upload only materials
   you wrote or have the right to adapt, and never upload student records or anything with
   students' personal information in it.</p>
+{% endif %}
 
 <h2>What happens to your documents</h2>
 <p>Your PDF and everything made from it are deleted {{ retention_hours }} hours after you

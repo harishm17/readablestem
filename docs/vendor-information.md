@@ -23,7 +23,7 @@ checks ran, and what was not checked.
 
 | Question | Answer |
 |---|---|
-| Who can use it | People on an allowlist, signed in with Google or a Microsoft school or work account. Each person sees only their own documents. |
+| Who can use it | Anyone with a Google account (or a Microsoft school or work account of a university that is set up), with lower daily limits for new accounts; a server can instead be set to people on an allowlist (`SIGNUP_MODE`). Each person sees only their own documents, and can delete their account. |
 | What may be uploaded | Course material the instructor wrote or may adapt. Not student records or graded work. |
 | What is stored | The PDF and file name, images cut from it (equations, figures), the conversion result, the HTML, and the review decisions with their times. |
 | How long | Deleted automatically 24 hours after the instructor last worked on it; 7 days if the instructor keeps it; 30 days if the instructor also lets the developer look at results. Deleting by hand removes it from the database at once. One daily database backup is kept, so a deleted document can remain in it for about a day more. |

@@ -52,6 +52,7 @@ from readablestem.web.health import stop_worker_on_sigterm
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.return_to import decision_link, remember_return, signed_out_page
 from readablestem.web.routes import (
+    account,
     admin,
     bundle,
     courses,
@@ -326,7 +327,11 @@ def create_app(
         templates=make_templates(settings.base_url),
         converter=converter or default_converter(),
         client_factory=client_factory or default_client_factory,
-        guard=DbSpendGuard(factory, settings.daily_spend_cap_usd),
+        guard=DbSpendGuard(
+            factory,
+            settings.daily_spend_cap_usd,
+            open_cap_usd=settings.open_tier_daily_spend_cap_usd,
+        ),
         oauth=make_oauth(settings),
         min_headroom_usd=largest_reservation_usd(settings),
         tracer=_job_tracer(settings),
@@ -408,6 +413,7 @@ def create_app(
     app.mount("/static", CachedStaticFiles(directory=STATIC_DIR), name="static")
     for module in (
         pages,
+        account,
         jobs,
         parts,
         bundle,

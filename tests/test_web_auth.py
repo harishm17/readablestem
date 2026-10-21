@@ -281,10 +281,13 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         route.path for route in all_routes(web.app.routes) if "POST" in (route.methods or ())
     )
     assert posts == [
+        "/account/delete",  # a person deletes their own account (open sign-up)
         "/admin/allowlist",
         "/admin/allowlist/remove",
         "/admin/linked-emails",  # another Google account for an instructor (T3-10)
         "/admin/linked-emails/remove",
+        "/admin/users/block",  # open sign-up: stop an account, or let it back
+        "/admin/users/unblock",
         # Courses and their notation (FEATURE_NOTATION_MEMORY): CSRF before the flag.
         "/courses",
         "/courses/{course_id}/delete",

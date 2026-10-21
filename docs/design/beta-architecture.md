@@ -7,7 +7,7 @@ map names the work package, a unit of the original build plan, that owns each co
 
 ## What the app does
 
-An instructor signs in (Google, allowlisted), uploads a PDF of course material, and gets
+An instructor signs in (Google; allowlisted, or with `SIGNUP_MODE=open` any verified account), uploads a PDF of course material, and gets
 back one self-contained HTML file where:
 
 - equations are MathML a screen reader can speak (image -> LaTeX -> MathML),
@@ -24,7 +24,7 @@ It "assists". It never claims WCAG/ADA compliance.
 
 ```mermaid
 flowchart LR
-  U[Instructor] -->|Google sign-in + allowlist| W[FastAPI web app]
+  U[Instructor] -->|Google sign-in + allowlist or open sign-up| W[FastAPI web app]
   W -->|upload PDF, quota check| DB[(Postgres: jobs, blobs, spend, quotas, aggregates)]
   WK[Worker thread] -->|claim job| DB
   WK --> L[layout.analyze: headings, paragraphs, list items, equations, figures, reading order]

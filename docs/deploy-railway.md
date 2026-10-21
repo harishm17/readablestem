@@ -42,8 +42,10 @@ What the first deploy found, and how production is actually configured:
   Every run also restores the new dump into a scratch database `restore_check`, counts its
   tables, reads `alembic_version`, drops it and logs `backup_ok file=... tables=... alembic=...`;
   a dump that does not restore fails the run. First verified run: 2026-10-14, 17 tables.
-- **Google sign-in** is published (In production): any Google account can reach the sign-in;
-  the app's own allowlist decides who gets in (`/admin`).
+- **Google sign-in** is published (In production): any Google account can reach the sign-in.
+  With `SIGNUP_MODE=allowlist` the app's own allowlist decides who gets in (`/admin`); with
+  `SIGNUP_MODE=open` anyone with a verified Google account gets an account at the first
+  sign-in, with the open-tier limits below.
 - **Smoke test, 2026-10-14:** sign-in, the sample job, a 2-page LaTeX handout converted in 19 s
   (31 model calls, $0.087), and a 28.9 MB upload accepted into "choose pages".
 
@@ -97,7 +99,8 @@ Already set by hand on the web service: `ENV=prod`, `PORT=8080`, `BASE_URL=https
 `DATABASE_URL`, `MODEL_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, `SESSION_SECRET`, `CRON_TOKEN`,
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `CONTACT_EMAIL`, `ADMIN_EMAILS`,
 `DAILY_SPEND_CAP_USD=10`, `PER_USER_DAILY_PAGE_QUOTA=90`, `TRUSTED_PROXY_HOPS=1`, the `FEATURE_*` and
-the `DECISIONS_*` variables.
+the `DECISIONS_*` variables. For open sign-up, set the five variables in the next table (the new
+settings are not set yet; the app starts without them, in `allowlist` mode).
 
 `PORT` must stay `8080`: the Dockerfile's start command is fixed to that port, and Railway
 sends its health check to `$PORT`. `railway.json` leaves the start command to the image.
@@ -107,6 +110,11 @@ production if a required one is missing, and logs the reason):
 
 | Variable | Why | Suggested |
 |---|---|---|
+| `SIGNUP_MODE` | `allowlist` (the default) or `open`: whether anyone with a verified Google (or allowed Microsoft) account gets an account at the first sign-in (docs/web.md, "Sign-up modes and access tiers"; launch.md "Open sign-up"). | **`open`** for the free beta anyone can try. Set it last, after the checks below. |
+| `OPEN_TIER_DAILY_PAGE_QUOTA` | Pages a day for an account that signed itself up. Invited people keep `PER_USER_DAILY_PAGE_QUOTA` (90). | **`20`** (a couple of short handouts a day; the default). |
+| `OPEN_TIER_DAILY_REREADS` | Model reads from the review screen (a marked equation, a table cell) a day for such an account. Each costs model spend that no page count bounds. | **`30`** (the default). |
+| `MAX_NEW_ACCOUNTS_PER_DAY` | Accounts open sign-up may make per UTC day, for the whole service. When it is used up, new sign-ins get "Sign-ups are full for today"; people with accounts are not affected. `0` pauses sign-up. | **`100`** (the default). |
+| `OPEN_TIER_DAILY_SPEND_CAP_USD` | The part of `DAILY_SPEND_CAP_USD` that documents of such accounts may use together; invited people are not held back when it is spent. It is inside the daily cap, not added to it. | **`4`** (the default; $4 of the $10 day, so strangers can never take the instructors' whole budget). |
 | `SOURCE_URL` | The footer's link to the source (AGPL, launch.md B12). The default is the public repository, `https://github.com/harishm17/readablestem`, which has to exist before the first sign-in. | Leave unset, or set it to the deployed commit's URL (launch.md B12). |
 | `MAX_USD_PER_JOB`, `MAX_USD_PER_PAGE` | Per-conversion dollar caps. | Leave unset: the defaults for Claude are $3.00 and $1.00, and the start-up check refuses numbers that cannot work. |
 | `FEEDBACK_URL` | The footer's Feedback link. | Leave unset: it becomes an email to `CONTACT_EMAIL`. A form service is a new data processor to name on the privacy page. |
@@ -165,7 +173,9 @@ client address to `X-Forwarded-For`).
 6. **Deploy,** watch the build and deploy logs. The first deploy creates the schema.
 7. **Create the first admin.** `ADMIN_EMAILS` makes admins at startup; check with
    `railway ssh -s web -- readablestem users list` (**confirm** the `ssh` flags for your CLI
-   version with `railway ssh --help`). Add instructors with `readablestem users allow EMAIL`.
+   version with `railway ssh --help`). Add instructors with `readablestem users allow EMAIL`
+   (people who sign themselves up with `SIGNUP_MODE=open` need no step; allowing one of them makes
+   them invited, with the instructors' limits).
 8. **Cron service** (next section).
 9. **Backups** (below).
 10. **Check it:** `curl https://readablestem.com/healthz`, `/readyz` (each worker, database, provider
@@ -368,7 +378,8 @@ The bill is the $5 subscription plus any usage above the $5 included: about $7 o
 So expect $5 to $8 a month for the app and database, not counting the model: Claude is paid separately and is
 capped at `DAILY_SPEND_CAP_USD=10` a day by the app (at most about $300 in a 30-day month if the cap were hit
 every day; measured costs are about $0.004 to $0.014 per page, so a few instructors converting a few hundred
-pages a week cost a few dollars). Set the provider's own monthly workspace limit as the hard stop. Railway has
+pages a week cost a few dollars). With open sign-up, accounts that signed themselves up can use at most
+`OPEN_TIER_DAILY_SPEND_CAP_USD` ($4) of that cap a day, and the day's cap still binds them too. Set the provider's own monthly workspace limit as the hard stop. Railway has
 a usage limit setting under billing (**confirm** on Hobby): set it a little above the estimate so a runaway
 service cannot bill without bound.
 

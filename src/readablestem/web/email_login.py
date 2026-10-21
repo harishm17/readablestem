@@ -8,8 +8,10 @@ How it works, and why:
 
 - The person types their address. The answer is the same page whatever they typed (on the
   list, linked, or a stranger), so the form cannot be used to learn who is on the list. A
-  message is made and sent only for an address that signs in (`auth.allowed_user`'s rule:
-  the person's own address or one linked to them, and allowed).
+  message is made and sent only for an address that signs in: an existing, allowed account
+  by the person's own address or one linked to them. It never makes an account: open
+  sign-up (`SIGNUP_MODE=open`) is by a verified Google or Microsoft identity only, because
+  a link sent to an address nobody has checked would be a mail relay.
 - The link carries a random token (32 bytes, `secrets`). Only its SHA-256 is stored
   (`login_links.token_hash`), so a copy of the database cannot sign anyone in. A newer link
   replaces older unused ones. A link works once and for `EMAIL_LINK_MINUTES` (15 by default).

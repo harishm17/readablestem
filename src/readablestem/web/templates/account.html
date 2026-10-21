@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Your account{% endblock %}
+{% block content %}
+<h1>Your account</h1>
+
+<section aria-labelledby="account-details">
+  <h2 id="account-details">What we hold</h2>
+  <dl class="summary-list">
+    <div><dt>Email address</dt><dd>{{ user.email }}</dd></div>
+    {% if user.name %}<div><dt>Name</dt><dd>{{ user.name }}</dd></div>{% endif %}
+    {% if joined %}<div><dt>Account made</dt><dd>{{ joined|utc }}</dd></div>{% endif %}
+    <div><dt>Documents kept now</dt><dd>{{ documents }}</dd></div>
+  </dl>
+  <p>The <a href="/privacy">privacy notice</a> says what else is stored and for how long.</p>
+</section>
+
+<section aria-labelledby="account-limits">
+  <h2 id="account-limits">Your daily limits</h2>
+  {% if tier_open %}
+  <p>You signed yourself up, so the limits for new accounts apply. They start again at
+    {{ next_reset|utc }}.</p>
+  {% else %}
+  <p>You were invited, so the limits for invited people apply. They start again at
+    {{ next_reset|utc }}.</p>
+  {% endif %}
+  <ul>
+    <li>Pages you can convert today: {% if page_quota is none %}no limit set{% else %}{{ pages_left }} of {{ page_quota }}{% endif %}.</li>
+    {% if reread_allowance is not none %}
+    <li>Reads with the model from the review screen (marking an equation, reading a table
+      cell): {{ rereads_left }} of {{ reread_allowance }} left today.</li>
+    {% endif %}
+  </ul>
+  <p><a href="/limits">Known limits</a> lists the rest.</p>
+</section>
+
+<section aria-labelledby="account-delete">
+  <h2 id="account-delete">Delete my account</h2>
+  <p>This deletes your account and everything in it: your email address and name, every
+    document you uploaded and everything made from it, your review decisions, courses and
+    notation, and the notes about what you did in the app. It cannot be undone.</p>
+  {% include "_account_deletion_notes.html" %}
+  <p><a class="button-danger" href="/account/delete">Delete my account</a></p>
+</section>
+{% endblock %}

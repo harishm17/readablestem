@@ -12,6 +12,7 @@ import os
 import threading
 import uuid
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, func, select, text
@@ -620,3 +621,261 @@ def test_the_step_cache_round_trips_on_postgres(factory):
         assert session.scalar(select(func.count()).select_from(db.StepRecord)) == 1
         delete_jobs(session, [job_id])
         assert session.scalar(select(func.count()).select_from(db.StepRecord)) == 0
+
+
+# --------------------------------------------------------------------------- open sign-up
+
+
+def test_the_open_pool_and_the_day_are_never_passed_with_20_threads(factory):
+    """Open and invited holds racing: at most the pool for the open ones, at most the day for
+    everyone, one conditional UPDATE each, and settling leaves the columns exact."""
+    from readablestem.web.spend import PoolExhausted
+
+    guard = DbSpendGuard(factory, 1.0, open_cap_usd=0.4)
+    granted: dict[str, list] = {"open": [], "invited": []}
+    lock = threading.Lock()
+
+    def reserve_many(kind: str) -> None:
+        for _ in range(10):
+            try:
+                reservation = guard.reserve(0.01, pool="open" if kind == "open" else None)
+            except PoolExhausted:
+                continue
+            except BudgetExceeded:
+                continue
+            with lock:
+                granted[kind].append(reservation)
+
+    kinds = ["open"] * 12 + ["invited"] * 8
+    barrier = threading.Barrier(len(kinds))
+
+    def wrapped(kind: str) -> None:
+        barrier.wait()
+        reserve_many(kind)
+
+    threads = [threading.Thread(target=wrapped, args=(k,)) for k in kinds]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    opened, invited = len(granted["open"]), len(granted["invited"])
+    assert opened <= 40 and opened + invited <= 100
+    assert opened == 40 or opened + invited == 100  # a limit is what stopped them
+    snapshot = guard.snapshot()
+    assert snapshot.open_held_usd == pytest.approx(0.01 * opened)
+    assert snapshot.held_usd == pytest.approx(0.01 * (opened + invited))
+    for reservation in granted["open"] + granted["invited"]:
+        guard.settle(reservation, 0.005)
+    snapshot = guard.snapshot()
+    assert snapshot.held_usd == pytest.approx(0.0, abs=1e-9)
+    assert snapshot.open_held_usd == pytest.approx(0.0, abs=1e-9)
+    assert snapshot.open_spent_usd == pytest.approx(0.005 * opened)
+    assert snapshot.spent_usd == pytest.approx(0.005 * (opened + invited))
+
+
+def test_the_first_open_holds_of_a_day_racing_for_its_row_are_all_granted(factory):
+    guard = DbSpendGuard(factory, 100.0, open_cap_usd=100.0)
+    granted = []
+    lock = threading.Lock()
+
+    def reserve() -> None:
+        reservation = guard.reserve(0.01, pool="open")
+        with lock:
+            granted.append(reservation)
+
+    run_threads(20, reserve)
+    assert len(granted) == 20
+    assert guard.snapshot().open_held_usd == pytest.approx(0.2)
+
+
+def test_new_accounts_never_pass_the_daily_cap_with_20_threads(factory):
+    from readablestem.web.auth import sign_in_by_email
+
+    settings = make_settings(Path("."), signup_mode="open", max_new_accounts_per_day=5)
+    results = []
+    lock = threading.Lock()
+    counter = iter(range(1000))
+
+    def sign_up() -> None:
+        with lock:
+            n = next(counter)
+        outcome = sign_in_by_email(factory, settings, f"user{n}@example.org", None)
+        with lock:
+            results.append(outcome)
+
+    run_threads(20, sign_up)
+    assert sum(1 for r in results if r.created) == 5
+    assert sum(1 for r in results if r.refused == "signups_full") == 15
+    with db.session_scope(factory) as session:
+        assert session.scalar(select(func.count()).select_from(db.User)) == 5
+        assert session.scalar(select(db.SignupDay.accounts)) == 5
+
+
+def test_one_address_signing_up_20_times_at_once_makes_one_account(factory):
+    from readablestem.web.auth import sign_in_by_email
+
+    settings = make_settings(Path("."), signup_mode="open")
+    results = []
+    lock = threading.Lock()
+
+    def sign_up() -> None:
+        outcome = sign_in_by_email(factory, settings, "same@example.org", None)
+        with lock:
+            results.append(outcome)
+
+    run_threads(20, sign_up)
+    assert len(results) == 20 and len({r.user_id for r in results}) == 1
+    assert sum(1 for r in results if r.created) == 1
+    with db.session_scope(factory) as session:
+        assert session.scalar(select(func.count()).select_from(db.User)) == 1
+        assert session.scalar(select(db.SignupDay.accounts)) == 1
+
+
+def test_the_reread_allowance_does_not_overshoot_with_20_threads(factory):
+    from readablestem.web.quota import rereads_used, try_consume_reread
+
+    user_id = add_user(factory)
+    day = db.utcnow().date()
+    ok = []
+    lock = threading.Lock()
+
+    def consume() -> None:
+        with db.session_scope(factory) as session:
+            if try_consume_reread(session, user_id, allowance=7, day=day):
+                with lock:
+                    ok.append(1)
+
+    run_threads(20, consume)
+    assert len(ok) == 7
+    with db.session_scope(factory) as session:
+        assert rereads_used(session, user_id, day) == 7
+
+
+def test_the_open_signup_migration_round_trips_on_postgres(pg_url):
+    """Existing accounts become `invited`, the numbers of the day and the quota are kept,
+    down drops the columns and the table, up again matches the models, and an older
+    release's inserts still work."""
+    from alembic import command
+    from alembic.autogenerate import compare_metadata
+    from alembic.runtime.migration import MigrationContext
+    from sqlalchemy import inspect
+
+    from readablestem.web.database import alembic_config
+
+    config = alembic_config(pg_url)
+    config.attributes["configure_logger"] = False
+    command.upgrade(config, "d3f8a1c5b920")
+    engine = create_engine(pg_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO users (id, email, is_allowed, is_admin, created_at) VALUES "
+                    "('u1', 'a@example.org', true, false, '2026-10-08 00:00:00'), "
+                    "('u2', 'gone@example.org', false, false, '2026-10-08 00:00:00')"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO spend_days (day, spent_usd, held_usd) "
+                    "VALUES ('2026-10-20', 1.5, 0.25)"
+                )
+            )
+            conn.execute(
+                text("INSERT INTO quota_days (user_id, day, pages) VALUES ('u1', '2026-10-20', 7)")
+            )
+    finally:
+        engine.dispose()
+    command.upgrade(config, "head")
+    engine = create_engine(pg_url)
+    try:
+        with engine.begin() as conn:
+            tiers = conn.execute(text("SELECT access_tier FROM users")).scalars().all()
+            assert tiers == ["invited", "invited"]
+            spend = conn.execute(
+                text("SELECT spent_usd, held_usd, open_spent_usd, open_held_usd FROM spend_days")
+            ).one()
+            assert tuple(spend) == (1.5, 0.25, 0.0, 0.0)
+            assert tuple(conn.execute(text("SELECT pages, rereads FROM quota_days")).one()) == (
+                7,
+                0,
+            )
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+            # An older release inserts without the new columns.
+            conn.execute(
+                text(
+                    "INSERT INTO users (id, email, is_allowed, is_admin, created_at) "
+                    "VALUES ('u3', 'old@example.org', true, false, '2026-10-21 00:00:00')"
+                )
+            )
+            assert (
+                conn.execute(text("SELECT access_tier FROM users WHERE id = 'u3'")).scalar_one()
+                == "invited"
+            )
+    finally:
+        engine.dispose()
+    command.downgrade(config, "d3f8a1c5b920")
+    engine = create_engine(pg_url)
+    try:
+        inspector = inspect(engine)
+        assert "access_tier" not in {c["name"] for c in inspector.get_columns("users")}
+        assert "signup_days" not in inspector.get_table_names()
+        assert "rereads" not in {c["name"] for c in inspector.get_columns("quota_days")}
+    finally:
+        engine.dispose()
+    command.upgrade(config, "head")
+    engine = create_engine(pg_url)
+    try:
+        with engine.begin() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+def test_settlements_and_releases_racing_for_the_same_holds_release_each_once(factory):
+    guard = DbSpendGuard(factory, 100.0, open_cap_usd=100.0)
+    reservations = [guard.scoped("open", "a" * 32).reserve(0.1) for _ in range(40)]
+    turn = iter(range(8))
+    lock = threading.Lock()
+
+    def settle_or_release() -> None:
+        with lock:
+            me = next(turn)
+        if me == 0:  # one thread settles all forty ...
+            for reservation in reservations:
+                guard.settle(reservation, 0.05)
+        for _ in range(20):  # ... while every thread keeps releasing the job's holds
+            guard.release_holds(job_ids=["a" * 32])
+
+    run_threads(8, settle_or_release)
+    snapshot = guard.snapshot()
+    assert snapshot.held_usd == pytest.approx(0.0, abs=1e-9)
+    assert snapshot.open_held_usd == pytest.approx(0.0, abs=1e-9)
+    assert snapshot.spent_usd == pytest.approx(0.05 * 40)
+    with db.session_scope(factory) as session:
+        assert session.scalar(select(func.count()).select_from(db.SpendHold)) == 0
+
+
+def test_signing_up_again_after_deleting_takes_no_new_place_with_20_threads(factory):
+    from readablestem.ops.retention import erase_user
+    from readablestem.web import tombstones
+    from readablestem.web.auth import sign_in_by_email
+
+    settings = make_settings(Path("."), signup_mode="open", max_new_accounts_per_day=3)
+    first = sign_in_by_email(factory, settings, "back@example.org", None)
+    assert first.user_id is not None
+    with db.session_scope(factory) as session:
+        erase_user(session, first.user_id, tombstone_key=tombstones.tombstone_key(settings))
+    results = []
+    lock = threading.Lock()
+
+    def come_back() -> None:
+        outcome = sign_in_by_email(factory, settings, "back@example.org", None)
+        with lock:
+            results.append(outcome)
+
+    run_threads(20, come_back)
+    assert len({r.user_id for r in results}) == 1 and all(r.user_id for r in results)
+    with db.session_scope(factory) as session:
+        assert session.scalar(select(db.SignupDay.accounts)) == 1  # her place, used once
+        assert session.scalar(select(func.count()).select_from(db.User)) == 1

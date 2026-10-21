@@ -9,7 +9,7 @@ rather than "think about it".
 
 - **blocking-beta**: settle before the 3 to 5 instructors get their first sign-in.
 - **blocking-public**: settle before the repository is made public or sign-up is opened beyond
-  the pilot.
+  the pilot (`SIGNUP_MODE=open`: see "Open sign-up" below).
 - **later**: improves things; nothing breaks or misleads without it.
 
 `uv run readablestem ops launch-check` lists the unfinished copy in the public pages (it reads the
@@ -99,6 +99,30 @@ feature on; each row says what the feature does while it is off.
 | P9 | `docs/eval.md` | Promote the reviewed `latest-<task>.json` runs as baselines so CI's eval gate stops skipping. | Promote after you have read the numbers once. |
 | P10 | `docs/eval.md`, `/demo` | Build the demo page with the real model (`readablestem demo build`, about 7 cents) and keep `2-2-speed-and-velocity`. | Do it; launch-check flags a missing or offline-built demo. (launch-check) |
 | P11 | `docs/eval.md` | Own course PDFs for the real-document gate. | Add 3 to 5 with the owners' permission; never commit them (`private-inputs/` is ignored). |
+
+### Open sign-up (`SIGNUP_MODE=open`)
+
+Owner's request, 2026-10-21: anyone with an account can use ReadableSTEM, so that recruiters
+and other strangers can try it. The mode is a setting, `allowlist` stays the default, and
+everything below is about `open`. How it works is in docs/web.md, "Sign-up modes and access
+tiers". What was decided, and what is still a decision:
+
+| ID | Where | Decision | Recommended default |
+|---|---|---|---|
+| O1 | `SIGNUP_MODE` and four numbers in the production variables (docs/deploy-railway.md) | How open, and how much stranger traffic the budget carries. | `SIGNUP_MODE=open`, `OPEN_TIER_DAILY_PAGE_QUOTA=20`, `OPEN_TIER_DAILY_REREADS=30`, `MAX_NEW_ACCOUNTS_PER_DAY=100`, `OPEN_TIER_DAILY_SPEND_CAP_USD=4`. The pool sits inside `DAILY_SPEND_CAP_USD`, so strangers can take at most $4 a day of it; invited people keep 90 pages. |
+| O2 | `privacy.html`, `terms.html`, `landing.html`, `login.html`, `limits.html` | Wording for a free beta that anyone can join. | Done: they render from the setting. With `open`, the privacy notice says the first sign-in makes an account and how to delete it, and `ops launch-check` fails if it stops saying so. Read the open wording once before switching. (launch-check) |
+| O3 | Google Auth Platform | The consent screen must be In production for strangers to sign in (it is: docs/deploy-railway.md). | Check it still is, and that the scopes are only `openid email profile`. |
+| O4 | Anthropic Console | The hard stop under all of this. | Keep the $100 monthly workspace limit and the $25 alert; the app's own caps are the first line; the provider's is the one that survives a bug in this code. |
+| O5 | `web/abuse.py` | The per-address rule on new accounts is per instance and keyed by the caller's address. | Fine at 1 to 2 instances (L11). The daily cap on accounts and the open pool are in the database, so they hold across instances. Check `TRUSTED_PROXY_HOPS` first, or one rule is shared by everyone. |
+| O6 | No captcha, no email check beyond Google's `email_verified` | Whether to add either. | Not now: a verified Google account, 5 accounts an hour per address, 100 accounts a day, a $4 pool, and a day-long memory of what a deleted account used (deleting and signing up again resets nothing) are the controls. Add a captcha if `/admin` shows the daily cap used up by accounts that never convert. |
+| O7 | `web/identities.py`, `docs/web.md` (identity conflict, P8) | With open sign-up a Microsoft identity may make an account or link to one only by an address its directory vouches for (`xms_edov` true), and may link only to an open-tier account that is not an admin. An invited person or an admin is refused ("Please sign in with Google") unless their identity was linked before sign-up opened. | Link the pilot's Microsoft identities (sign in once) before switching to `open`, or have those people use Google. `MS_ALLOWED_TENANTS` should list only directories whose administrators are trusted. Do the P8 refusal before adding more. |
+
+| O8 | Rolling back to a release from before open sign-up | A pre-open release does not know the tiers or the setting: every account with `is_allowed` true, the ones made by open sign-up too, would carry on with the invited limits (90 pages, the whole daily budget, no pool). It makes no new accounts (an unknown address is refused, as it always was). | **Before any rollback to a pre-open release, set `SIGNUP_MODE=allowlist`** (so rolling forward again does not reopen sign-up by itself), and decide about the open accounts: either accept that they carry on, or stop them first on the production database: `UPDATE users SET is_allowed = false, session_version = session_version + 1 WHERE access_tier = 'open'` (they are then refused and signed out; `readablestem users unblock EMAIL` restores one). The migration is additive and stays; the old code ignores the new columns and tables. |
+| O9 | `TRUSTED_PROXY_HOPS` | The per-address rule on new accounts (5 an hour), the sign-in and upload rules all key on the address `TRUSTED_PROXY_HOPS` entries from the right of `X-Forwarded-For`. Too small: everyone shares one address, so the whole service could make only 5 new accounts an hour. Too large: a caller can forge the header and get a rule of their own. | On Railway the value is **1** when Railway's edge is the only proxy in front of the app (docs/deploy-railway.md, "Variables": the service already has `TRUSTED_PROXY_HOPS=1`), and **2** if readablestem.com's DNS goes through Cloudflare's proxy ("orange cloud"). Check before opening sign-up: sign up from two networks in turn and confirm each gets its own count, and that the limiter key in the logs is not Railway's address. (Cloud Run: 1; behind an external load balancer: 2.) |
+
+To go back to invitation only: set `MAX_NEW_ACCOUNTS_PER_DAY=0` to stop new accounts at once and keep
+the rest, or `SIGNUP_MODE=allowlist` to stop sign-up altogether. Neither signs anyone out: block an
+account (`/admin`, `readablestem users deny EMAIL`) to end its access.
 
 ### Before the repository is public
 

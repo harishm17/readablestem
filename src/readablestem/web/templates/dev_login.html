@@ -6,8 +6,10 @@
 {% with errors = [{"field_id": "email", "message": error}] %}{% include "_error_summary.html" %}{% endwith %}
 {% endif %}
 <p>This server runs in development mode, so you can sign in with any email address and no
-  password. The allowlist still applies: the address must be allowed (for example with
-  <code>readablestem users allow EMAIL</code>, or listed in <code>ADMIN_EMAILS</code>).</p>
+  password.{% if signup_open %} Sign-up is open on this server (<code>SIGNUP_MODE=open</code>): an
+  address that has no account gets one, in the open tier. A blocked address is refused.{% else %}
+  The allowlist still applies: the address must be allowed (for example with
+  <code>readablestem users allow EMAIL</code>, or listed in <code>ADMIN_EMAILS</code>).{% endif %}</p>
 <form method="post" action="/dev-login" novalidate>
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
   <div class="field{% if error %} field-error{% endif %}">

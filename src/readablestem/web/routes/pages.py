@@ -127,6 +127,8 @@ def limits(request: Request) -> Response:
         "tables_on": settings.feature_tables,
         "colour_on": settings.feature_colour,
         "office_on": bool(office_convert.input_kinds(settings)),
+        # The daily page limit of invited people; the open tier's is in every page's context.
+        "invited_page_quota": settings.per_user_daily_page_quota,
     }
     return render(request, "limits.html", context)
 

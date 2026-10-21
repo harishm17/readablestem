@@ -20,8 +20,10 @@ handwriting (those pages are kept as images and flagged). It is not a general PD
 converter, and it does not work from Word, LaTeX or PowerPoint sources: it starts from the
 PDF.
 
-**Status.** Beta. The service is live at https://readablestem.com as an invite-only beta for
-instructors; the demo needs no sign-in. The code, the evaluation harness and the documentation
+**Status.** Beta. The service is live at https://readablestem.com as a free beta run by Harish
+Manoharan. Anyone with a Google account can sign in and try it, with daily limits for new
+accounts (a server can instead be set to invitation only, `SIGNUP_MODE=allowlist`); the demo
+needs no sign-in. The code, the evaluation harness and the documentation
 are here. `uv run readablestem ops launch-check` lists the checks a deploy has to pass.
 
 ## See it
@@ -237,7 +239,8 @@ flowchart LR
   A --> V[Review screen: accept, edit or reject]
 ```
 
-A FastAPI app wraps the pipeline with sign-in, an allowlist, spend caps and short retention
+A FastAPI app wraps the pipeline with sign-in (open to anyone with a Google account, or by
+allowlist), spend caps, daily limits and short retention
 (uploads are deleted 24 hours after the last activity, or after 7 days or 30 days if the user chooses). Every model request
 reserves its worst-case cost before it is sent. Logs carry counts and category codes, never
 document content. The architecture, its module contracts and the rules every part follows
@@ -325,9 +328,10 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
   not on a broad set of real course PDFs.
 - **Figure alt text is short.** It describes; it does not replace a long description for a
   complex diagram.
-- **Beta.** Sign-in is by invitation (an allowlist), with spend caps and daily quotas. The
-  privacy, terms and known-limits pages are the beta wording, written for a small group of
-  instructors.
+- **Beta.** Sign-in is open to anyone with a Google account (or, with `SIGNUP_MODE=allowlist`,
+  by invitation), with spend caps and daily limits, lower ones for new accounts than for
+  invited people. The privacy, terms and known-limits pages are the beta wording, and they
+  describe whichever sign-up mode the server runs in.
 
 ## Documentation
 

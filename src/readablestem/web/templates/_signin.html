@@ -15,7 +15,7 @@
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
   <div class="field">
     <label for="signin-email">Or get a sign-in link by email</label>
-    <p class="hint" id="signin-email-hint">We send a link to people on the beta list. It works once and expires after {{ email_link_minutes }} minutes.</p>
+    <p class="hint" id="signin-email-hint">We send a link to addresses that {% if signup_open %}already have an account{% else %}are on the beta list{% endif %}. It works once and expires after {{ email_link_minutes }} minutes.</p>
     <input type="email" id="signin-email" name="email" autocomplete="email" spellcheck="false" aria-describedby="signin-email-hint">
   </div>
   <button type="submit" class="button-secondary">Email me a sign-in link</button>
