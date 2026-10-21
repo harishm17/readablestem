@@ -280,6 +280,27 @@ def cmd_chat_items(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_tally(args: argparse.Namespace) -> int:
+    """Spend of everything recorded, from the recorded answers (each answer paid once)."""
+    rows = []
+    for part in ("dev", "heldout"):
+        for tag_dir in sorted((runs_dir(part)).glob("*/answers.jsonl")):
+            rows.append((part, f"rs:{tag_dir.parent.name}", answers_cost(tag_dir), 0))
+        systems = runs_dir(part) / "chat" / "systems"
+        for arm_dir in sorted(systems.glob("*")) if systems.is_dir() else []:
+            jobs = list(arm_dir.glob("*.json"))
+            cost = sum(float(json.loads(j.read_text()).get("cost_usd") or 0) for j in jobs)
+            pages = sum(int(json.loads(j.read_text()).get("pdf_pages") or 0) for j in jobs)
+            rows.append((part, arm_dir.name, cost, pages))
+    total = 0.0
+    for part, arm, cost, pages in rows:
+        total += cost
+        per_page = f"  ${cost / pages:.4f}/page ({pages} pages)" if pages else ""
+        print(f"{part:8s} {arm:28s} ${cost:8.4f}{per_page}")
+    print(f"{'total':37s} ${total:8.4f}  (hard cap $20)")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -288,9 +309,11 @@ def main() -> int:
         ("rs", cmd_rs),
         ("chat", cmd_chat),
         ("chat-items", cmd_chat_items),
+        ("tally", cmd_tally),
     ):
         p = sub.add_parser(name)
-        p.add_argument("--part", choices=["dev", "heldout"], required=True)
+        if name != "tally":
+            p.add_argument("--part", choices=["dev", "heldout"], required=True)
         if name == "rs":
             p.add_argument("--max-usd", type=float, required=True)
             p.add_argument("--tag", default="rs")

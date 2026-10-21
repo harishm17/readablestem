@@ -1,3 +1,5 @@
 {"actual_usd": 0.1745, "arm": "rs", "cap_usd": 0.8, "estimate_usd": 2.28, "note": "cost probe: 2 dev papers", "part": "dev", "tag": "rs", "when": "2026-10-21T09:16:55Z"}
 {"actual_usd": 2.4994, "arm": "rs", "cap_usd": 4.2, "estimate_usd": 3.99, "note": "dev, all 25 papers (the probe paper replays)", "part": "dev", "tag": "rs", "when": "2026-10-21T09:28:07Z"}
 {"actual_usd": 0.8929, "arm": "chatbot-opus-purdue", "cap_usd": 4.0, "estimate_usd": 0.6, "note": "dev Opus cost probe: first 2 papers of the registered order", "pages": 10, "papers": 2, "part": "dev", "refused_by_cap": [], "when": "2026-10-21T09:30:51Z"}
+{"actual_usd": 1.4786, "arm": "chatbot-opus-purdue", "cap_usd": 3.5, "estimate_usd": 1.62, "note": "dev Opus: first 6 papers of the registered order (2 recorded by the probe)", "pages": 27, "papers": 6, "part": "dev", "refused_by_cap": [], "when": "2026-10-21T09:38:45Z"}
+{"actual_usd": 0.2019, "arm": "chatbot-haiku-purdue", "cap_usd": 1.2, "estimate_usd": 0.34, "note": "dev, all 25 papers (restarted after a connection error)", "pages": 114, "papers": 25, "part": "dev", "refused_by_cap": [], "when": "2026-10-21T09:38:59Z"}
