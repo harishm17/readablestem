@@ -7,14 +7,12 @@ generated (a scan is a page rendered to a JPEG and set in a PDF with nothing els
 
 from __future__ import annotations
 
-import io
 from typing import Any
 
-import pymupdf
 import pytest
-from PIL import Image, ImageDraw
 from pydantic import ValidationError
 
+from image_page_support import block, cell, math, png_of, scan_pdf, text
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
 from readablestem.core.types import (
@@ -37,49 +35,8 @@ def settings(**kw: Any) -> Settings:
     return Settings(_env_file=None, **kw)  # type: ignore[call-arg]
 
 
-def block(kind: str, **kw: Any) -> dict[str, Any]:
-    """A block as the model sends it: every field present, the ones that do not apply empty."""
-    base: dict[str, Any] = {
-        "kind": kind,
-        "x0": 100,
-        "y0": 100,
-        "x1": 900,
-        "y1": 160,
-        "confidence": "high",
-        "level": 0,
-        "marker": "",
-        "runs": [],
-        "latex": "",
-        "label": "",
-        "description": "",
-        "caption": "",
-        "rows": [],
-    }
-    base.update(kw)
-    return base
-
-
-def text(value: str) -> dict[str, str]:
-    return {"kind": "text", "value": value}
-
-
-def math(value: str) -> dict[str, str]:
-    return {"kind": "math", "value": value}
-
-
 def parsed(*blocks: dict[str, Any]) -> ImagePageOutput:
     return ImagePageOutput.model_validate({"blocks": list(blocks)})
-
-
-def png_of(boxes: list[tuple[int, int, int, int]] | None = None) -> bytes:
-    """A white 600 x 800 page with a dark bar at each box (pixels)."""
-    image = Image.new("RGB", (600, 800), "white")
-    draw = ImageDraw.Draw(image)
-    for box in boxes or []:
-        draw.rectangle(box, fill=(20, 20, 20))
-    out = io.BytesIO()
-    image.save(out, format="PNG")
-    return out.getvalue()
 
 
 def build(*blocks: dict[str, Any], png: bytes | None = None) -> image_page.Built:
@@ -300,10 +257,6 @@ def test_an_unusable_box_and_unusable_latex_keeps_the_equation_as_an_image():
 # ----------------------------------------------------------------------------- tables
 
 
-def cell(text_: str, header: str = "none", **kw: Any) -> dict[str, Any]:
-    return {"text": text_, "latex": "", "header": header, "row_span": 1, "col_span": 1, **kw}
-
-
 def test_a_table_is_a_required_decision_whatever_the_confidence():
     built = build(
         block(
@@ -483,20 +436,6 @@ def test_a_typed_heading_is_not_touched():
 
 
 # ----------------------------------------------------------------------------- the call
-
-
-def scan_pdf(pages: int = 1) -> bytes:
-    """A scan: each page a JPEG of ruled text, set across a page with nothing else on it."""
-    out = pymupdf.open()
-    for number in range(pages):
-        drawn = pymupdf.open()
-        sheet = drawn.new_page(width=612, height=792)
-        for line in range(10):
-            sheet.insert_text((72, 100 + 30 * line), f"Line {line} of page {number}", fontsize=14)
-        picture = sheet.get_pixmap(dpi=120).tobytes("jpg")
-        page = out.new_page(width=612, height=792)
-        page.insert_image(page.rect, stream=picture)
-    return out.tobytes()
 
 
 def renders(pdf: bytes, pages: list[int]) -> dict[int, Any]:
