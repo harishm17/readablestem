@@ -603,9 +603,17 @@ table with a required decision (`table_not_rebuilt`), and the formulas in its ce
 sections: the "A2" bucket of the 2026-10-20 analysis). This is what the flag does on the
 development sets, measured for this decision. Nothing on the held-out set was run.
 
-**Recommendation: keep it off for now.** On the numbers below it is a net gain for a reader, and
-three things still stand in the way (below). They are small, and they are not mine to settle
-here (a private set of real course PDFs, the production spend caps, one gate floor).
+**Recommendation (updated after the real-paper run, below): the flag can go on for the
+invite-only beta, as a deployment setting, once the owner accepts two things the repository's own
+rule asks for and this work cannot supply: a labelled private set of real course PDFs (the
+real-document gate is skipped) and one gate floor missed by 2 tables in 179 (a wrapped cell's
+last line, below).** The code default stays off. On every set measured it is a net gain for a
+reader and changes nothing else: equations 0 to 65 of 223 table equations on real papers (0 to
+60 of 102 in the chemistry sections), required decisions per page down, headings, figures and
+equation scores identical, for +$0.005 to +$0.012 a PDF page. The spend caps would have to be
+`MAX_USD_PER_PAGE` at least $2.20 (the default is $1.00) and `MAX_USD_PER_JOB` at least $2.60 (the
+default $3.00 is enough): the measured cost is a fraction of that, the numbers exist for the
+worst-case reservation of $0.53 a table call.
 
 ### The tables task, model against no model
 
@@ -621,7 +629,7 @@ both.
 | tables found: recall / precision | 0.909 / 0.984 | 0.909 / 0.984 |
 | TEDS (all gold tables; found tables only) | 0.866 (0.954) | **0.882 (0.970)** |
 | TEDS of the structure alone, found tables | 0.971 | 0.990 |
-| column headers exact | **0.843** | 0.792 |
+| column headers exact | 0.843 | **0.858** (0.792 before the header-text fix, below) |
 | header texts exact (all headers, rows too) | 0.812 | 0.442 |
 | cells right (of 5,616 gold cells) | 98.3% | **99.4%** |
 | wrong cells | 188 | 112 |
@@ -634,11 +642,17 @@ both.
 By style (TEDS): grid 0.969, booktabs 0.858, no rules 0.779, authored 0.940; the lower rows are
 detection (recall 0.889 and 0.815), not the model: TEDS of the found tables is 0.97, 0.97 and
 0.96 on the three. Headers: the model proposes row headers on an identifying first column, valid
-markup the OpenStax gold does not have (77 tables), which is most of the fall in exact headers; the
-column headers fall from 0.843 to 0.792.
+markup the OpenStax gold does not have (77 tables), which is most of the fall in the exactness of
+all header texts. Column headers first read 0.792 against 0.843: of the 18 tables that lost it
+(8 gained it), 15 were one header cell of a formula whose *text* the model gives with the marks of
+its LaTeX (`d_i`, `v_w (m/s)`, `10^-18`) where the PDF's text, and so the gold's, has the letters
+(`di`, `vw (m/s)`); the comparison now leaves `_ ^ { }` out (`eval/tables.header_text`, the
+spelling rule body cells already had) and the same recorded answers score **0.858**, above the
+no-model 0.843. The other 3 are a title row the gold writes as a header (`colgroup`) and the
+model keeps as the caption: a convention. Nothing in the output changed, only what was compared.
 
 The gate (`eval gate --current ...`): every floor passes (recall 0.909 >= 0.86, precision 0.984 >=
-0.93, model TEDS 0.8815 >= 0.88, column headers 0.792 >= 0.75) **except
+0.93, model TEDS 0.8815 >= 0.88, column headers 0.858 >= 0.75) **except
 `table_wrong_cells_not_flagged`: 2 against a floor of 0**; the real-document floors are skipped (no
 private set). Of the 11 tables wrong and not asked, 9 differ from the gold only in the header
 convention and 2 have one wrong cell: the last line of a wrapped cell lost by the grid and the
@@ -673,7 +687,37 @@ are mostly units and scientific-notation powers the table step writes as text; a
 outage with the flag on writes the local grid with no header cells (the fake client does it:
 `html.table_no_headers`), a decision for a person, not a table a reader can use.
 
-### What blocks it
+### On real papers (2026-10-21): the real-world dev set, flag on
+
+The real-world arXiv dev split (25 papers, 114 PDF pages, 2,350 gold equations, of which 223 are
+typed in a table; docs/eval-realworld.md on branch `feat/realworld-eval`) converted with
+`FEATURE_TABLES=true` and the equation answers of its tables-off run replayed (one new recording,
+$0.81 at list price, of which about $0.23 re-asked equations whose context a layout change had
+altered; the cap was $4). The comparison is the same code and the same answers with the flag off,
+replayed free. The published tables-off result of that branch is 0.562 primary; this branch scores
+0.550 on the same answers because its converter changed (docs/chemistry.md, "Side effect"): the
+gold of that set was made with the old converter. `on` and `off` below are this branch.
+
+| 25 papers, 114 pages | flag off | flag on |
+|---|---|---|
+| primary `exact_lenient` | 0.5498 | 0.5498 |
+| symbols scorer, credited | 0.5872 | 0.5872 |
+| detection recall / precision | 0.737 / 0.861 | 0.737 / 0.861 |
+| gold equations typed in a table (223) found in a table cell | 0 | **65 (29%)**; 61 exact on the symbols scorer, 49 on the primary |
+| `<math>` elements written in table cells | 0 | 102 |
+| tables the pipeline claimed in the 25 papers | 17 | 17 |
+| required decisions per PDF page (of which tables) | 4.50 (17) | **4.40 (6)**; 1 more optional |
+| cost per PDF page | $0.0237 | $0.0286 (+$0.0049: 17 tables, $0.033 each) |
+| dearest paper | | $0.38 for 5 pages ($0.077 a page) |
+
+Nothing else moves: the equations, their scores and their flags are identical, the headings and
+figures are the same elements. Tables of these papers are bigger and dearer to read than the
+OpenStax ones ($0.033 against $0.012). The limit is detection, not the table step: 17 tables are
+claimed, and the other 158 of the 223 table equations were not found (not analysed table by
+table: a table the detector did not propose, or a cell the model wrote as text); no table of these
+papers was labelled, so how many real tables 17 is cannot be said.
+
+### What stands in the way
 
 1. **The real-document check.** The arbitration of what is a table was tuned on four lab manuals
    and the 0.95 precision and 0.85 recall floors for real course PDFs have never been measured:
@@ -689,7 +733,7 @@ outage with the flag on writes the local grid with no header cells (the fake cli
    must be at least $2.20 and `MAX_USD_PER_JOB` at least $2.60 (docs/deploy.md; `ops launch-check`
    says so). The measured cost is $0.0123 a table, 40 times less than the reservation; the caps
    are a deployment decision.
-4. Smaller: the column-header exactness (0.843 to 0.792) and the row-header convention; a table
+4. Smaller: the row-header convention (77 tables); a table
    step that reads chemistry cells in `\ce` is refused (the table prompt, `models/prompts/table.md`,
    does not teach it; `table_step` does not call `equation_step.expand_ce`: 60 of 102 cell
    formulas were found anyway as `\text{...}` LaTeX); a model outage leaves a header-less
@@ -718,5 +762,6 @@ FEATURE_TABLES=true uv run readablestem eval pipeline --task document --set dev-
 
 Spend of this measurement (list price, from the answer files; cap $4): the tables task in model
 mode $2.26 (249 calls for 183 tables), the table calls of the five document sections $0.51 (36
-calls); total **$2.77**. The equation and figure answers those sections replay are the chemistry
+calls); the real-world dev run $0.81 (2026-10-21, second measurement, above); total **$3.58** of the $4 and
+$4 caps. The equation and figure answers those sections replay are the chemistry
 work's (docs/chemistry.md, "Spend").

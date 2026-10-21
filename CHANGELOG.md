@@ -15,6 +15,12 @@
   long arrow is an operator (`validate.safe_latex_to_mathml`; docs/output.md, "Chemistry").
 - Speech for chemistry (`pipeline/speech_chem.py`): "H 3 O plus", "S O 4 2 minus", "aqueous",
   "reacts to form", "is in equilibrium with", "the concentration of H 3 O plus".
+- Side effect of the converter change on maths that is not chemistry, checked by replay
+  (`scripts/dev_converter_effect.py`; docs/chemistry.md): +5.5 points of primary where the gold is
+  written by people, and an apparent -1.1 on gold made by the old converter (the real-world arXiv set)
+  that is +0.26 when the gold is converted again.
+- Table headers: a header cell's text is compared without the marks of LaTeX (`d_i` is `di`), which
+  was most of the apparent fall of column-header exactness with the table step on (0.792 to 0.858).
 - Evaluation: `scripts/dev_chem.py` (a content score that does not depend on the gold's spelling),
   `table_cell_maths` in the document task's report (formulas in the gold's table cells found in
   the output's cells). Tables: measured on, and left off with the blockers listed

@@ -258,6 +258,41 @@ Twenty of the 24, as read (the rest are in the tests):
 | [Cu(NH₃)₄]²⁺ | open bracket C u open parenthesis N H 3 close parenthesis 4 close bracket 2 plus |
 | Na⁺ + Cl⁻ → NaCl | N a plus, plus C l minus reacts to form N a C l |
 
+## Side effect on maths that is not chemistry
+
+The conversion repair that hangs a script on the group before it (`(a+b)^2`, `[A]_0`) is for
+every equation, not only chemistry, and so are the arrow and the element-symbol repairs. Checked
+without a model call (`scripts/dev_converter_effect.py`): every recorded answer of the tables-off
+runs is converted by the converter as it was (the three repairs off) and as it is, and scored
+against the gold. The equation prompt was put back to the recorded one for these replays, so every
+request is answered from the recordings.
+
+| set | primary before to after | symbols |
+|---|---|---|
+| `data/gold` (30 equations) | 0.767 to 0.767 | 0.967 to 0.967 |
+| dev-v2 maths written by people (OpenStax College Algebra 9.6, Elementary Algebra 5.2 and 8.5; 360 gold) | 0.569 to 0.658 (205 to 237 of 360) | unchanged |
+| of which 9.6 Binomial Theorem | 94 to 126 of 161 | unchanged |
+| dev-v2 authored LaTeX (exercises, matrices; 147 gold) | 136 to 132 | unchanged |
+| real-world arXiv dev (25 papers, 2,350 gold), the gold as stored | 0.4987 to 0.4877 (**-1.11 points**) | 0.5209 to 0.5209 |
+| the same, the gold converted again from its LaTeX by the same converter | 0.5017 to 0.5043 (+0.26) | 0.5196 to 0.5187 (-0.09, 2 equations) |
+
+Where the gold is MathML written by people the change helps (binomials, 32 equations: OpenStax
+groups `(a+b)^n`, as the converter now does) and moves nothing else. Where the gold was made *by
+the old converter* it can only lose: the authored LaTeX documents and the arXiv gold
+(`gold/arxiv_gold.to_mathml` calls `safe_latex_to_mathml`, so that "gold and a prediction are made
+by the same converter"). Their stored MathML keeps the old shape, `msup(")", 2)` and an arrow as an
+`mi`; the four authored equations and the 26 arXiv equations that fall are right on both readings
+of their LaTeX (`(x-5)^{2}+(y+13)^{2}=36` against the gold's `(x - 5)^2 + ...`). Re-making the gold
+with the converter it is compared to gives +0.26 and -0.09 points on the real-world set: no
+regression, which is why the change was not narrowed to chemical species (that would also lose the
+binomials). Two consequences for the merge: the real-world dev result of its own branch (0.562
+primary) reads 0.550 on the same answers with this converter, and its held-out gold (registered,
+hashed) cannot be re-made, so a comparison there has to convert the gold's LaTeX again when it
+scores (the script above does it); and the space layout now puts after an inline equation that TeX
+leaves no space glyph before (`ions` after `SO42-`) changes the context text of the equations in
+script-heavy paragraphs: 400 of the 2,750 recorded real-world dev requests were asked again
+(about $0.23).
+
 ## What does not work yet
 
 - **A reaction with a label over the arrow** (`CaCO₃(s) →Δ CaO(s)`) set as TeX does: the label is a
@@ -286,6 +321,7 @@ Twenty of the 24, as read (the rest are in the tests):
 | Part 1 baseline, the 12 documents (batch: half this was paid) | 1.347 |
 | Part 1 after: the authored document (live, with the shadow second check, 0.174 of it unneeded) and the 11 OpenStax sections | 1.503 |
 | **Part 1 total** (cap 6.00; 3.0 with every replay free) | **2.850** |
+| The side-effect check: replays only | 0 |
 
 The development set only; the held-out sections and the sealed check part were not run or read
 for this work (the recorded held-out results were read to describe the problem and nothing was
