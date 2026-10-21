@@ -449,3 +449,83 @@ def test_quote_text_maps_every_character_back_to_the_layout_row(quote):
     assert len(first.chars) == len(first.text)
     assert first.chars == tuple(sorted(first.chars))
     assert quote in first.text
+
+
+# ----------------------------------------------- recorded answers on development pages
+#
+# Two single pages of the development set (tests/fixtures/page_math: OpenStax Elementary
+# Algebra 5.2, CC BY 4.0, and the authored LaTeX matrices document, MIT) with the page pass's
+# answer as the model gave it (claude-haiku-5-5, effort medium), so the cases below are what a
+# real answer does to real pages. The answer is replayed through a stand-in client.
+
+from pathlib import Path  # noqa: E402
+
+FIXTURES = Path(__file__).parent / "fixtures" / "page_math"
+
+
+class Replays(StandIn):
+    def __init__(self, name: str):
+        text = (FIXTURES / f"{name}.answer.json").read_text(encoding="utf-8")
+        super().__init__(PageMathOutput.model_validate_json(text))
+
+
+def recorded(name: str):
+    pdf = (FIXTURES / f"{name}.pdf").read_bytes()
+    hook = collect(pdf)
+    rows = hook.rows[0]
+    plan = page_math.run_page(Replays(name), settings(), rows, b"png")
+    applied = reconcile.PageMathHook(MathPlan({0: plan}))
+    return pdf, plan, applied
+
+
+def display_texts(elements):
+    return [e.text or "" for e in elements if e.kind == Kind.EQUATION and e.display == "block"]
+
+
+def test_a_recorded_answer_for_a_page_of_systems_places_lone_variables_and_a_brace_on_a_text_row():
+    pdf, plan, hook = recorded("elementary-algebra-5-2-p12")
+    assert plan.failed is None and len(plan.spans) >= 10
+    elements = layout.analyze(pdf, page_math=hook).elements
+    inline = [e for e in elements if e.kind == Kind.EQUATION and e.display == "inline"]
+    lone = [e for e in inline if (e.text or "") in {"x", "y"}]
+    assert len(lone) >= 4 and all(e.page_status == "span" and e.page_latex for e in lone)
+    # the layout alone finds none of them
+    alone = layout.analyze(pdf).elements
+    assert not [e for e in alone if e.kind == Kind.EQUATION and (e.text or "") in {"x", "y"}]
+    # the third system has its brace on the sentence's row ("Solve ... substitution. {"): the
+    # equation is the brace and the two lines, and the sentence stays text
+    systems = display_texts(elements)
+    third = next(t for t in systems if "15" in t and "20" in t)
+    assert "{" in third and "Solve" not in third
+    sentence = [
+        e for e in elements if e.kind == Kind.PARAGRAPH and "Solve the system" in (e.text or "")
+    ]
+    assert sentence
+
+
+def test_a_recorded_answer_for_a_page_of_determinants_completes_a_row_layout_left_out():
+    pdf, _, hook = recorded("latex-matrices-p2")
+    alone = display_texts(layout.analyze(pdf).elements)
+    planned = display_texts(layout.analyze(pdf, page_math=hook).elements)
+    first_alone = next(t for t in alone if t.startswith("det A"))
+    first_planned = next(t for t in planned if t.startswith("det A"))
+    assert "11 3" not in first_alone and "11 3" in first_planned
+    assert hook.stats.refused == 0 and hook.stats.pages_applied == 1
+    assert len(planned) == len(alone)  # nothing was split or lost
+
+
+def test_a_recorded_plan_never_changes_the_text_the_pdf_has():
+    """Every letter and digit of the page is still in the elements: prose words that became
+    inline equations move to equation elements; none is added or invented."""
+    import re
+
+    def letters(elements) -> list[str]:
+        text = " ".join(e.text or "" for e in elements)
+        return sorted(ch for ch in re.sub("\u27e6[^\u27e7]*\u27e7", "", text) if ch.isalnum())
+
+    for name in ("elementary-algebra-5-2-p12", "latex-matrices-p2"):
+        pdf, _, hook = recorded(name)
+        alone = letters(layout.analyze(pdf).elements)
+        planned = letters(layout.analyze(pdf, page_math=hook).elements)
+        assert not [c for c in planned if c not in alone], name
+        assert len(planned) >= 0.97 * len(alone), name

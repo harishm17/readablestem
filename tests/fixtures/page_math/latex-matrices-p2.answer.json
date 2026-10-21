@@ -1,0 +1,292 @@
+{
+ "expressions": [
+  {
+   "anchors": [
+    {
+     "line": "L2",
+     "start": 0,
+     "quote": "det A = ����= 32"
+    },
+    {
+     "line": "L3",
+     "start": 0,
+     "quote": "���� 7 −1"
+    },
+    {
+     "line": "L4",
+     "start": 0,
+     "quote": "11 3"
+    }
+   ],
+   "display": "block",
+   "role": "math",
+   "latex": "\\det A = \\begin{vmatrix} 7 & -1 \\\\ 11 & 3 \\end{vmatrix} = 32"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L6",
+     "start": 0,
+     "quote": "������"
+    },
+    {
+     "line": "L7",
+     "start": 0,
+     "quote": "������"
+    },
+    {
+     "line": "L8",
+     "start": 0,
+     "quote": "2 1 7"
+    },
+    {
+     "line": "L9",
+     "start": 0,
+     "quote": "det B = 7 1 7 = −200"
+    },
+    {
+     "line": "L10",
+     "start": 0,
+     "quote": "−3 −7 −9"
+    }
+   ],
+   "display": "block",
+   "role": "math",
+   "latex": "\\det B = \\begin{vmatrix} 2 & 1 & 7 \\\\ 7 & 1 & 7 \\\\ -3 & -7 & -9 \\end{vmatrix} = -200"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L12",
+     "start": 0,
+     "quote": "����9a b"
+    },
+    {
+     "line": "L13",
+     "start": 0,
+     "quote": "3c d"
+    },
+    {
+     "line": "L14",
+     "start": 0,
+     "quote": "����= 9ad −3bc"
+    }
+   ],
+   "display": "block",
+   "role": "math",
+   "latex": "\\begin{vmatrix} 9a & b \\\\ 3c & d \\end{vmatrix} = 9ad - 3bc"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L16",
+     "start": 0,
+     "quote": "����x −7 9"
+    },
+    {
+     "line": "L17",
+     "start": 0,
+     "quote": "1 x + 7"
+    },
+    {
+     "line": "L18",
+     "start": 0,
+     "quote": "����= 0"
+    }
+   ],
+   "display": "block",
+   "role": "math",
+   "latex": "\\begin{vmatrix} x-7 & 9 \\\\ 1 & x+7 \\end{vmatrix} = 0"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L20",
+     "start": 0,
+     "quote": "����2 11����"
+    },
+    {
+     "line": "L21",
+     "start": 0,
+     "quote": "1 −3"
+    },
+    {
+     "line": "L22",
+     "start": 0,
+     "quote": "����15 2����"
+    },
+    {
+     "line": "L23",
+     "start": 0,
+     "quote": "−9 1"
+    },
+    {
+     "line": "L24",
+     "start": 0,
+     "quote": "x ="
+    },
+    {
+     "line": "L25",
+     "start": 0,
+     "quote": ", y ="
+    },
+    {
+     "line": "L26",
+     "start": 0,
+     "quote": "����15 11���� ����15 11����"
+    },
+    {
+     "line": "L27",
+     "start": 0,
+     "quote": "−9 −3"
+    },
+    {
+     "line": "L28",
+     "start": 0,
+     "quote": "−9 −3"
+    }
+   ],
+   "display": "block",
+   "role": "math",
+   "latex": "x=\\frac{\\begin{vmatrix} 2 & 11 \\\\ 1 & -3 \\end{vmatrix}}{\\begin{vmatrix} 15 & 11 \\\\ -9 & -3 \\end{vmatrix}}, \\quad y=\\frac{\\begin{vmatrix} 15 & 2 \\\\ -9 & 1 \\end{vmatrix}}{\\begin{vmatrix} 15 & 11 \\\\ -9 & -3 \\end{vmatrix}}"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L32",
+     "start": 0,
+     "quote": "�−7 −7 −4"
+    },
+    {
+     "line": "L33",
+     "start": 0,
+     "quote": "�"
+    },
+    {
+     "line": "L34",
+     "start": 0,
+     "quote": " "
+    },
+    {
+     "line": "L35",
+     "start": 0,
+     "quote": "−7 −1"
+    },
+    {
+     "line": "L36",
+     "start": 0,
+     "quote": "A ="
+    },
+    {
+     "line": "L37",
+     "start": 0,
+     "quote": "−1 11 7"
+    },
+    {
+     "line": "L38",
+     "start": 0,
+     "quote": ", AT = −7 11"
+    },
+    {
+     "line": "L39",
+     "start": 0,
+     "quote": "−4 7"
+    }
+   ],
+   "display": "block",
+   "role": "math",
+   "latex": "A = \\begin{bmatrix} -7 & -7 & -4 \\\\ -1 & 11 & 7 \\end{bmatrix}, \\quad A^T = \\begin{bmatrix} -7 & -1 \\\\ -7 & 11 \\\\ -4 & 7 \\end{bmatrix}"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L41",
+     "start": 0,
+     "quote": "�2"
+    },
+    {
+     "line": "L42",
+     "start": 0,
+     "quote": "1 −9 0 4"
+    },
+    {
+     "line": "L43",
+     "start": 0,
+     "quote": "−7"
+    },
+    {
+     "line": "L44",
+     "start": 0,
+     "quote": "��4� �"
+    },
+    {
+     "line": "L45",
+     "start": 0,
+     "quote": "="
+    },
+    {
+     "line": "L46",
+     "start": 0,
+     "quote": "�8"
+    }
+   ],
+   "display": "block",
+   "role": "math",
+   "latex": "\\begin{pmatrix} 2 & -7 \\\\ 1 & -9 \\end{pmatrix}\\begin{pmatrix} 4 \\\\ 0 \\end{pmatrix} = \\begin{pmatrix} 8 \\\\ 4 \\end{pmatrix}"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L48",
+     "start": 0,
+     "quote": "A−1 = 1"
+    },
+    {
+     "line": "L49",
+     "start": 0,
+     "quote": "�3"
+    },
+    {
+     "line": "L50",
+     "start": 0,
+     "quote": "−1"
+    },
+    {
+     "line": "L51",
+     "start": 0,
+     "quote": "�"
+    },
+    {
+     "line": "L52",
+     "start": 0,
+     "quote": "15 9 2"
+    }
+   ],
+   "display": "block",
+   "role": "math",
+   "latex": "A^{-1} = \\frac{1}{15}\\begin{bmatrix} 3 & -1 \\\\ 9 & 2 \\end{bmatrix}"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L54",
+     "start": 0,
+     "quote": "�−5 0 1"
+    },
+    {
+     "line": "L55",
+     "start": 0,
+     "quote": "−4 −7 2"
+    },
+    {
+     "line": "L56",
+     "start": 0,
+     "quote": "�"
+    }
+   ],
+   "display": "block",
+   "role": "math",
+   "latex": "\\left[\\begin{array}{rr|r} -5 & 0 & 1 \\\\ -4 & -7 & 2 \\end{array}\\right]"
+  }
+ ]
+}

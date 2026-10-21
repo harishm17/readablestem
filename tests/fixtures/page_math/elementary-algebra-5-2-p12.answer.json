@@ -1,0 +1,216 @@
+{
+ "expressions": [
+  {
+   "anchors": [
+    {
+     "line": "L0",
+     "start": 0,
+     "quote": "Try It 5.35"
+    }
+   ],
+   "display": "inline",
+   "role": "not_math_but_looks_like_it",
+   "latex": "Try It 5.35"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L2",
+     "start": 0,
+     "quote": "{ 𝑥−4𝑦= −4"
+    },
+    {
+     "line": "L3",
+     "start": 0,
+     "quote": "−3𝑥+ 4𝑦= 0"
+    }
+   ],
+   "display": "block",
+   "role": "math",
+   "latex": "\\left\\{\\begin{array}{l} x-4y=-4 \\\\ -3x+4y=0 \\end{array}\\right."
+  },
+  {
+   "anchors": [
+    {
+     "line": "L4",
+     "start": 0,
+     "quote": "Try It 5.36"
+    }
+   ],
+   "display": "inline",
+   "role": "not_math_but_looks_like_it",
+   "latex": "Try It 5.36"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L6",
+     "start": 0,
+     "quote": "{ 4𝑥−𝑦= 0"
+    },
+    {
+     "line": "L7",
+     "start": 0,
+     "quote": "2𝑥−3𝑦= 5"
+    }
+   ],
+   "display": "block",
+   "role": "math",
+   "latex": "\\left\\{\\begin{array}{l} 4x-y=0 \\\\ 2x-3y=5 \\end{array}\\right."
+  },
+  {
+   "anchors": [
+    {
+     "line": "L8",
+     "start": 76,
+     "quote": "x"
+    }
+   ],
+   "display": "inline",
+   "role": "math",
+   "latex": "x"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L8",
+     "start": 81,
+     "quote": "y"
+    }
+   ],
+   "display": "inline",
+   "role": "math",
+   "latex": "y"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L9",
+     "start": 0,
+     "quote": "Example 5.19"
+    }
+   ],
+   "display": "inline",
+   "role": "not_math_but_looks_like_it",
+   "latex": "Example 5.19"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L10",
+     "start": 0,
+     "quote": "4𝑥−3𝑦= 6"
+    },
+    {
+     "line": "L11",
+     "start": 34,
+     "quote": "{"
+    },
+    {
+     "line": "L12",
+     "start": 0,
+     "quote": "15𝑦−20𝑥= −30"
+    }
+   ],
+   "display": "block",
+   "role": "math",
+   "latex": "\\left\\{\\begin{array}{l} 4x-3y=6 \\\\ 15y-20x=-30 \\end{array}\\right."
+  },
+  {
+   "anchors": [
+    {
+     "line": "L14",
+     "start": 85,
+     "quote": "x"
+    }
+   ],
+   "display": "inline",
+   "role": "math",
+   "latex": "x"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L15",
+     "start": 29,
+     "quote": "x"
+    }
+   ],
+   "display": "inline",
+   "role": "math",
+   "latex": "x"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L16",
+     "start": 11,
+     "quote": "3 4𝑦+ 3 2"
+    }
+   ],
+   "display": "inline",
+   "role": "math",
+   "latex": "\\frac{3}{4}y+\\frac{3}{2}"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L16",
+     "start": 25,
+     "quote": "x"
+    }
+   ],
+   "display": "inline",
+   "role": "math",
+   "latex": "x"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L17",
+     "start": 12,
+     "quote": "x"
+    }
+   ],
+   "display": "inline",
+   "role": "math",
+   "latex": "x"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L17",
+     "start": 19,
+     "quote": "3 4𝑦+ 3 2"
+    }
+   ],
+   "display": "inline",
+   "role": "math",
+   "latex": "\\frac{3}{4}y+\\frac{3}{2}"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L18",
+     "start": 10,
+     "quote": "y"
+    }
+   ],
+   "display": "inline",
+   "role": "math",
+   "latex": "y"
+  },
+  {
+   "anchors": [
+    {
+     "line": "L19",
+     "start": 6,
+     "quote": "0 = 0"
+    }
+   ],
+   "display": "inline",
+   "role": "math",
+   "latex": "0 = 0"
+  }
+ ]
+}
