@@ -190,7 +190,33 @@ def spend_findings(settings: Settings) -> list[Finding]:
             f"PER_USER_DAILY_PAGE_QUOTA {quota} is below MAX_PAGES_PER_JOB "
             f"{settings.max_pages_per_job}: a full-size document is refused"
         )
+    if settings.signup_open:
+        _open_signup_findings(settings, largest, warning)
     return out
+
+
+def _open_signup_findings(settings: Settings, largest: float, warning) -> None:
+    """What open sign-up (`SIGNUP_MODE=open`) adds to the limits. All warnings: each setting
+    works, but these combinations are probably not what was meant."""
+    pool = settings.open_tier_daily_spend_cap_usd
+    daily = settings.daily_spend_cap_usd
+    if 0 < pool < largest:
+        warning(
+            f"OPEN_TIER_DAILY_SPEND_CAP_USD ${pool:.2f} is below one call's reservation, so "
+            f"no conversion for a new account could start (use 0 to close it on purpose)"
+        )
+    if daily is not None and pool > daily:
+        warning(
+            f"OPEN_TIER_DAILY_SPEND_CAP_USD ${pool:.2f} is above DAILY_SPEND_CAP_USD "
+            f"${daily:.2f}: the daily cap still applies to new accounts, so the pool is never "
+            f"the limit"
+        )
+    invited = settings.per_user_daily_page_quota
+    if invited is not None and settings.open_tier_daily_page_quota > invited:
+        warning(
+            f"OPEN_TIER_DAILY_PAGE_QUOTA {settings.open_tier_daily_page_quota} is above "
+            f"PER_USER_DAILY_PAGE_QUOTA {invited}: new accounts would get more than invited ones"
+        )
 
 
 def main() -> int:

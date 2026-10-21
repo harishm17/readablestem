@@ -3,7 +3,7 @@
 Retention model: everything derived from a user's document (the upload, crops, the
 result JSON, the output HTML, review edits, stage progress) hangs off `jobs` and is
 deleted with it by `ops.retention`. Tables that survive a job's deletion (`spend_days`,
-`quota_days`, `error_aggregates`, `events`) hold numbers and category codes only, never
+`quota_days`, `signup_days`, `error_aggregates`, `events`) hold numbers and category codes only, never
 document text.
 
 User content that is not a document (a user's `courses` and their `notation_entries`)
@@ -74,6 +74,12 @@ class User(Base):
     # older value (a copied cookie, another browser) no longer signs anyone in. The
     # server default keeps rows inserted by an older release valid after a rollback.
     session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # How the person got in (`web.access`): "invited" (an admin allowlisted them, or the
+    # command line did) or "open" (they signed themselves up in SIGNUP_MODE=open). It sets the
+    # daily limits and which spend pool their conversions use. Whether they may sign in at all
+    # is `is_allowed`, in either tier: a blocked person keeps their tier. The server default
+    # keeps rows inserted by an older release valid after a rollback.
+    access_tier: Mapped[str] = mapped_column(String(8), default="invited", server_default="invited")
 
     jobs: Mapped[list[Job]] = relationship(back_populates="user")
 
@@ -237,17 +243,24 @@ class ReviewEdit(Base):
 
 
 class SpendDay(Base):
-    """Global model spend per UTC day. Updated with conditional UPDATEs (see web.spend)."""
+    """Global model spend per UTC day. Updated with conditional UPDATEs (see web.spend).
+
+    `open_spent_usd` and `open_held_usd` are the part of `spent_usd` and `held_usd` that
+    belongs to jobs of open-tier accounts: the pool `OPEN_TIER_DAILY_SPEND_CAP_USD` limits.
+    They are changed by the same statements as the totals, never on their own."""
 
     __tablename__ = "spend_days"
 
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     spent_usd: Mapped[float] = mapped_column(Float, default=0.0)
     held_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    open_spent_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    open_held_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
 
 
 class QuotaDay(Base):
-    """Pages a user has submitted per UTC day."""
+    """Pages a user has submitted per UTC day, and the model reads from review they have
+    started (`rereads`, counted for open-tier accounts only: `web.quota`)."""
 
     __tablename__ = "quota_days"
 
@@ -256,6 +269,20 @@ class QuotaDay(Base):
     )
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     pages: Mapped[int] = mapped_column(Integer, default=0)
+    rereads: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class SignupDay(Base):
+    """Accounts made by open sign-up per UTC day: a number, nothing about anyone. Added to
+    by one conditional UPDATE in the transaction that makes the account
+    (`web.quota.try_take_signup`), so `MAX_NEW_ACCOUNTS_PER_DAY` cannot be passed by two
+    sign-ups at once. Not given back when an account is deleted: creating and deleting
+    accounts must not make room for more."""
+
+    __tablename__ = "signup_days"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    accounts: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class PendingUpload(Base):

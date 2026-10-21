@@ -25,6 +25,10 @@ CHEAP_MODEL = "gpt-6-luna"
 ANTHROPIC_MAIN_MODEL = "claude-opus-5-5"
 ANTHROPIC_CHEAP_MODEL = "claude-haiku-5-5"
 Provider = Literal["openai", "anthropic"]
+# Who may sign in (`Settings.signup_mode`, docs/web.md "Sign-up modes"): "allowlist" admits
+# only people an admin added; "open" admits anyone whose Google (or allowed Microsoft)
+# identity is verified, with smaller daily limits for those who were not invited.
+SignupMode = Literal["allowlist", "open"]
 # The job spend caps differ by provider, because a call's worst-case reservation does: about
 # $0.03 on gpt-6.1-sol, about $0.14 on claude-opus-5-5 ($0.22 with long descriptions; a
 # 2,048-token thinking allowance and the crop's size). Up to `model_concurrency` (8) calls are
@@ -181,6 +185,23 @@ class Settings(BaseSettings):
     # one (`PROVIDER_LIMIT_DEFAULTS`).
     daily_spend_cap_usd: float | None = Field(default=None, gt=0)
     per_user_daily_page_quota: int | None = Field(default=None, gt=0)
+    # --- open sign-up (SIGNUP_MODE=open; docs/web.md "Sign-up modes"). The defaults are the
+    # production values: they only apply in open mode, and the first three only to accounts
+    # that were not invited ("open tier"). Invited people keep PER_USER_DAILY_PAGE_QUOTA.
+    # Pages an open-tier account may submit per UTC day.
+    open_tier_daily_page_quota: int = Field(default=20, gt=0)
+    # Model reads from review (a marked equation region, a table cell read as maths) an
+    # open-tier account may start per UTC day. Each one costs model spend that no page count
+    # bounds. 0 turns them off for that tier.
+    open_tier_daily_rereads: int = Field(default=30, ge=0)
+    # New accounts the whole service takes per UTC day; sign-ups are paused for the rest of
+    # the day once it is reached (people who already have an account are not affected). 0
+    # pauses sign-up altogether.
+    max_new_accounts_per_day: int = Field(default=100, ge=0)
+    # Model spend per UTC day that jobs of open-tier accounts may use together. It is checked
+    # in addition to DAILY_SPEND_CAP_USD (their spend counts toward that cap too), so
+    # strangers can never use more than this of the instructors' budget. 0 closes it.
+    open_tier_daily_spend_cap_usd: float = Field(default=4.0, ge=0)
     max_usd_per_job: float = Field(default=2.0, gt=0)
     max_model_calls_per_job: int = Field(default=400, gt=0)
     # A job's caps are also at most this much per page of the upload (web.worker.job_caps),
@@ -218,6 +239,11 @@ class Settings(BaseSettings):
     session_secret: SecretStr | None = None
     google_client_id: str | None = None
     google_client_secret: SecretStr | None = None
+    # "allowlist" (the default): only people an admin added may sign in; anyone else is
+    # refused and nothing about them is stored. "open": anyone with a verified identity may
+    # sign in; the first sign-in creates the account (tier "open"), within the open-tier
+    # limits above. An admin can still block a person in either mode.
+    signup_mode: SignupMode = "allowlist"
     # Comma-separated emails created as allowed admins at startup (the allowlist itself
     # lives in the database; manage it with `readablestem users allow EMAIL`).
     admin_emails: str = ""
@@ -294,6 +320,12 @@ class Settings(BaseSettings):
     langfuse_host: str | None = None
 
     log_level: str = "INFO"
+
+    @field_validator("signup_mode", mode="before")
+    @classmethod
+    def _signup_mode(cls, value: object) -> object:
+        """SIGNUP_MODE=Open and " open " are the same as "open"."""
+        return value.strip().lower() if isinstance(value, str) else value
 
     @field_validator("admin_emails")
     @classmethod
@@ -389,6 +421,11 @@ class Settings(BaseSettings):
         """The most pages of a file that can be kept for choosing its pages (never below
         `max_pages_per_job`)."""
         return max(self.max_source_pages, self.max_pages_per_job)
+
+    @property
+    def signup_open(self) -> bool:
+        """Anyone with a verified identity may sign in (`SIGNUP_MODE=open`)."""
+        return self.signup_mode == "open"
 
     @property
     def ms_sign_in_enabled(self) -> bool:

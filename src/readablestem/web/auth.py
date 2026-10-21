@@ -1,4 +1,4 @@
-"""Sign-in: Google and Microsoft OpenID Connect plus an allowlist kept in the database.
+"""Sign-in: Google and Microsoft OpenID Connect, with who may sign in kept in the database.
 
 - Google sign-in uses Authlib's Starlette client (discovery document, scope "openid email
   profile", nonce-checked ID token). Only a verified email is trusted. The Google account
@@ -6,16 +6,23 @@
 - Microsoft (Entra ID) sign-in, when MS_CLIENT_ID, MS_CLIENT_SECRET and MS_ALLOWED_TENANTS
   are set: work and school accounts of the allowed directories only, the ID token checked
   by `web/microsoft.py`, and people recognised by their identity once it is linked.
-- The allowlist is `users.is_allowed`. People not on it get a polite 403 page with the
-  contact address; no row is created for them, so their email is not stored.
+- Who may sign in is `users.is_allowed`, and `SIGNUP_MODE` says what happens to a person
+  with no row. `allowlist` (the default): they get a polite 403 page with the contact
+  address, and no row is created, so their email is not stored. `open`: the first sign-in
+  with a verified identity creates the row, allowed, in the "open" access tier (`web.access`:
+  smaller daily limits), unless today's limit on new accounts is used up (`signups_full`)
+  or the per-address sign-up rate rule says wait. A row with `is_allowed` false is a person
+  an admin blocked: refused in both modes (with the blocked wording in open mode), never
+  made again by a sign-in.
 - Admin emails from settings are created/updated as allowed admins at startup.
 - Sessions are signed cookies (Starlette SessionMiddleware, 7 days, SameSite=Lax, Secure
   in production) and are rotated at sign-in. Every state-changing POST carries a
   per-session CSRF token (`deps.require_csrf`). Sign-out is a POST for the same reason.
 - Signing in goes back to the page (or the review decision) the session ended on, when
   there was one (`web.return_to`), else to `/app`.
-- `/dev-login` (any email, no password; the allowlist still applies) exists only when
-  DEV_LOGIN_ENABLED is set and ENV is dev or test.
+- `/dev-login` (any email, no password; the mode and the allowlist still apply) exists only
+  when DEV_LOGIN_ENABLED is set and ENV is dev or test.
+- A signed-in person can delete their own account (`/account`): `delete_account`.
 """
 
 from __future__ import annotations
@@ -29,15 +36,17 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import Settings
-from readablestem.web import events, linked_emails, microsoft
+from readablestem.web import access, events, linked_emails, microsoft
 from readablestem.web.database import rowcount
 from readablestem.web.db import Job, JobStatus, User, session_scope, utcnow
 from readablestem.web.deps import (
     PageError,
     current_user,
+    enforce,
     flash,
     get_ctx,
     limited,
@@ -50,6 +59,9 @@ from readablestem.web.identities import (
     GOOGLE_ISSUER,
     MICROSOFT,
     Identity,
+    OpenSignup,
+    SignIn,
+    create_open_user,
     microsoft_sign_in,
     remember,
 )
@@ -103,6 +115,10 @@ def set_allowed(
 ) -> User | None:
     """Add (allowed=True) or remove someone. Removing an unknown email returns None.
 
+    Adding makes the person `invited` (`web.access`): a new row, or an existing one, which is
+    how an open-tier person gets the instructors' limits, and how a blocked one is let back
+    in as an instructor. (Lifting a block and keeping the tier is `set_blocked`.)
+
     Removing someone also stops their work: their queued and running jobs are failed with
     "access_removed", so nothing more of theirs is converted or charged to the shared
     daily budget (a running conversion stops at its next spend reservation, which checks
@@ -118,11 +134,13 @@ def set_allowed(
                 "That address is linked to another instructor as an extra Google account. "
                 "Remove the link first.",
             )
-        user = User(email=email, is_allowed=True, is_admin=bool(admin))
+        user = User(email=email, is_allowed=True, is_admin=bool(admin), access_tier=access.INVITED)
         session.add(user)
         session.flush()
         return user
     user.is_allowed = allowed
+    if allowed:
+        user.access_tier = access.INVITED
     if not allowed:
         user.is_admin = False
         # Signed-in sessions end now and stay ended if they are allowed back later.
@@ -130,6 +148,22 @@ def set_allowed(
         stop_jobs_of(session, user.id, "access_removed")
     elif admin is not None:
         user.is_admin = admin
+    return user
+
+
+def set_blocked(session: Session, email: str, *, blocked: bool) -> User | None:
+    """Block or unblock the person with this email; None when nobody has it.
+
+    Blocking is `set_allowed(allowed=False)`: they are signed out everywhere, their queued
+    and running jobs are stopped, they lose admin rights, and a sign-in is refused in either
+    sign-up mode, without making a new row. Unblocking only lets them sign in again: their
+    tier stays what it was (an open-tier person keeps the open limits; allowlisting them
+    is what makes them `invited`) and an admin they were is not an admin again."""
+    if blocked:
+        return set_allowed(session, email, allowed=False)
+    user = session.scalar(select(User).where(User.email == email))
+    if user is not None:
+        user.is_allowed = True
     return user
 
 
@@ -155,22 +189,56 @@ def seed_admins(factory: sessionmaker[Session], emails: list[str]) -> None:
                     log_event(logger, "admin_seed_skipped", reason="linked_address")
 
 
-def allowed_user(
-    factory: sessionmaker[Session], email: str, name: str | None
-) -> tuple[str, int] | None:
-    """Record the sign-in for an allowlisted user and return (id, session version),
-    else None. `email` is the person's own address or one an admin linked to them
-    (`web.linked_emails`)."""
+def open_signup_for(settings: Settings, before_create=None) -> OpenSignup | None:
+    """The sign-up rules when `SIGNUP_MODE=open`, else None (nobody is made by signing in)."""
+    if not settings.signup_open:
+        return None
+    return OpenSignup(settings.max_new_accounts_per_day, before_create or (lambda: None))
+
+
+def sign_in_by_email(
+    factory: sessionmaker[Session],
+    settings: Settings,
+    email: str,
+    name: str | None,
+    *,
+    before_create=None,
+) -> SignIn:
+    """Record the sign-in of the person `email` names and say who they are, or why nobody.
+
+    `email` is the person's own address or one an admin linked to them
+    (`web.linked_emails`). An allowed user signs in. With no row, sign-up open and room in
+    today's count, the account is made (`created`). A row that is not allowed is a blocked
+    person: refused, and never made again. `before_create` runs just before an account would
+    be made (the per-address rate rule) and may raise."""
+    open_signup = open_signup_for(settings, before_create)
+    try:
+        return _sign_in_by_email(factory, email, name, open_signup)
+    except IntegrityError:  # the same address signing up in two tabs: the second finds the row
+        return _sign_in_by_email(factory, email, name, open_signup)
+
+
+def _sign_in_by_email(
+    factory: sessionmaker[Session], email: str, name: str | None, open_signup: OpenSignup | None
+) -> SignIn:
     with session_scope(factory) as session:
+        created = False
         user = session.scalar(select(User).where(User.email == email))
         if user is None:
             user = linked_emails.user_for_linked(session, email)
-        if user is None or not user.is_allowed:
-            return None
+        if user is None and open_signup is not None:
+            user = create_open_user(session, open_signup, email, name)
+            if user is None:
+                return SignIn(refused="signups_full", email=email)
+            created = True
+        if user is None:
+            return SignIn(refused="not_allowlisted", email=email)
+        if not user.is_allowed:
+            return SignIn(refused="blocked" if open_signup is not None else "not_allowlisted", email=email)
         user.last_login_at = utcnow()
-        if name:
+        if name and not created:
             user.name = name[:200]
-        return user.id, user.session_version
+        return SignIn(user_id=user.id, session_version=user.session_version, created=created)
 
 
 def end_sessions(factory: sessionmaker[Session], user_id: str) -> None:
@@ -192,45 +260,80 @@ def finish_login(
     provider: str = "dev",
     identity: Identity | None = None,
 ) -> Response:
-    """Sign in by allowlisted email (Google, dev login), recording the Google identity."""
+    """Sign in by email (Google, dev login), recording the Google identity. A person who
+    has no account yet gets one when sign-up is open."""
     ctx = get_ctx(request)
-    found = allowed_user(ctx.factory, email, name)
-    if found is None:
-        log_event(logger, "login_refused", reason="not_allowlisted", provider=provider)
-        return render(request, "not_allowed.html", {"email": email}, status_code=403)
-    user_id, version = found
+    result = sign_in_by_email(
+        ctx.factory,
+        ctx.settings,
+        email,
+        name,
+        before_create=lambda: enforce(request, "signup"),
+    )
+    if result.user_id is None:
+        return refused_page(request, result, provider)
     if identity is not None:
-        remember(ctx.factory, user_id, identity)
-    return signed_in(request, user_id, version, provider)
+        remember(ctx.factory, result.user_id, identity)
+    return signed_in(request, result.user_id, result.session_version, provider, result.created)
+
+
+def refused_page(request: Request, result: SignIn, provider: str) -> Response:
+    """The page for a sign-in that signs nobody in: the day's sign-ups are full, or the
+    person has no access (not on the list, or blocked). Nothing about them is stored."""
+    log_event(logger, "login_refused", reason=result.refused, provider=provider)
+    if result.refused == "signups_full":
+        return render(
+            request,
+            "signups_full.html",
+            {"email": result.email},
+            status_code=503,
+            headers={"Retry-After": "3600"},
+        )
+    return render(
+        request,
+        "not_allowed.html",
+        {"email": result.email, "blocked": result.refused == "blocked"},
+        status_code=403,
+    )
 
 
 def finish_microsoft_login(request: Request, account: microsoft.MicrosoftAccount) -> Response:
-    """Sign in by Microsoft identity, linking it by email the first time."""
+    """Sign in by Microsoft identity, linking it by email the first time (and, when
+    sign-up is open, making the account if the address has none)."""
     ctx = get_ctx(request)
     identity = Identity(MICROSOFT, account.issuer, account.subject, tenant=account.tenant)
     email = next(filter(None, map(normalise_email, account.email_claims)), None)
-    result = microsoft_sign_in(ctx.factory, identity, email, account.name)
+    result = microsoft_sign_in(
+        ctx.factory,
+        identity,
+        email,
+        account.name,
+        open_signup=open_signup_for(ctx.settings, lambda: enforce(request, "signup")),
+    )
     if result.refused == "no_email":
         log_event(logger, "login_refused", reason="no_email", provider=MICROSOFT)
         raise PageError(
             403,
             "No email address",
-            "Microsoft did not share an email address for your account, so we cannot find "
-            "you on the beta list.",
+            "Microsoft did not share an email address for your account, so we cannot tell "
+            "which account is yours.",
         )
     if result.user_id is None:
-        log_event(logger, "login_refused", reason="not_allowlisted", provider=MICROSOFT)
-        return render(request, "not_allowed.html", {"email": result.email}, status_code=403)
-    return signed_in(request, result.user_id, result.session_version, MICROSOFT)
+        return refused_page(request, result, MICROSOFT)
+    return signed_in(request, result.user_id, result.session_version, MICROSOFT, result.created)
 
 
-def signed_in(request: Request, user_id: str, version: int, provider: str) -> Response:
+def signed_in(
+    request: Request, user_id: str, version: int, provider: str, created: bool = False
+) -> Response:
     """The end of every sign-in (Google, Microsoft, dev): back to the page that asked for
-    it (`web.return_to`), and the usage event."""
+    it (`web.return_to`), and the usage event. `created`: the sign-in made the account."""
     ctx = get_ctx(request)
     target = take_return(request)  # before the session is rotated (web.return_to)
     start_session(request, user_id, version)
     log_event(logger, "login", user_id=user_id, provider=provider)
+    if created:
+        log_event(logger, "signup", user_id=user_id, provider=provider)
     events.record(ctx.factory, ctx.settings, user_id, events.SIGNED_IN)  # usage event
     return RedirectResponse(target, status_code=303)
 

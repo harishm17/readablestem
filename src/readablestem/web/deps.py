@@ -82,6 +82,8 @@ class CurrentUser:
     email: str
     name: str | None
     is_admin: bool
+    # "invited" or "open" (`web.access`): which daily limits and spend pool apply.
+    access_tier: str = "invited"
 
 
 class PageError(Exception):
@@ -107,7 +109,7 @@ class PageError(Exception):
 
 
 class LoginRequired(Exception):
-    """No signed-in, allowlisted user: browsers are sent to the sign-in page."""
+    """No signed-in, allowed user: browsers are sent to the sign-in page."""
 
 
 class CsrfFailed(Exception):
@@ -118,8 +120,8 @@ class CsrfFailed(Exception):
 
 
 def current_user(request: Request) -> CurrentUser | None:
-    """The signed-in user, if they are still on the allowlist (checked on every request,
-    so removing someone takes effect immediately) and the session is not older than
+    """The signed-in user, if they are still allowed (`users.is_allowed`, checked on every
+    request, so removing or blocking someone takes effect immediately) and the session is not older than
     their last sign-out (`users.session_version`), so a copied cookie stops working
     when its owner signs out."""
     if hasattr(request.state, "user"):
@@ -132,8 +134,14 @@ def current_user(request: Request) -> CurrentUser | None:
         with session_scope(get_ctx(request).factory) as session:
             row = session.scalar(select(User).where(User.id == uid, User.is_allowed.is_(True)))
             if row is not None and row.session_version == version:
-                user = CurrentUser(id=row.id, email=row.email, name=row.name, is_admin=row.is_admin)
-        if user is None:  # deleted, removed from the allowlist or signed out since
+                user = CurrentUser(
+                    id=row.id,
+                    email=row.email,
+                    name=row.name,
+                    is_admin=row.is_admin,
+                    access_tier=row.access_tier,
+                )
+        if user is None:  # deleted, removed from the allowlist, blocked or signed out since
             request.session.pop(SESSION_USER, None)
     request.state.user = user
     return user
@@ -278,6 +286,11 @@ def render(
         "opt_in_days": ctx.settings.opt_in_retention_days,
         # Course notation (FEATURE_NOTATION_MEMORY): its pages are in the main navigation.
         "courses_enabled": ctx.settings.feature_notation_memory,
+        # Sign-up mode and the limits of the open tier, for the pages whose words differ
+        # (docs/web.md "Sign-up modes").
+        "signup_open": ctx.settings.signup_open,
+        "open_page_quota": ctx.settings.open_tier_daily_page_quota,
+        "open_rereads": ctx.settings.open_tier_daily_rereads,
     }
     return ctx.templates.TemplateResponse(
         request, template, base | (context or {}), status_code=status_code, headers=headers
