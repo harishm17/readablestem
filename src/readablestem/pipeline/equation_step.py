@@ -81,6 +81,7 @@ from readablestem.models import router
 from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.models.prompts import load_prompt
 from readablestem.pipeline import equation_images, layout, notation_memory, page_math
+from readablestem.pipeline.chem import CeError, convert_ce_commands
 from readablestem.pipeline.signs import compare_signs
 from readablestem.pipeline.speech import SpeechError, mathml_to_speech
 from readablestem.pipeline.text_layer_compare import compare_case, numbers_differ
@@ -209,6 +210,20 @@ _DISPLAYSTYLE = re.compile(r"\\(?:displaystyle|textstyle)(?![A-Za-z])")
 # hangs it on the previous symbol, so the numbers of a nuclide after a plus ("+ ^{4}_{2}He")
 # become the plus's own; an empty group gives it an empty base (the nuclide's prefix scripts).
 _BARE_SCRIPT = re.compile(r"(?:^|(?<=[+\-=(\[,<>]))(\s*)(?=[\^_])")
+
+
+def expand_ce(latex: str) -> str:
+    r"""`latex` with each `\ce{...}` (mhchem, which the prompt asks the model to use for
+    chemical species) written out as plain LaTeX (`pipeline.chem`). A `\ce` outside the
+    converted subset is left as it is, so the LaTeX check refuses it (`unknown_command`) and
+    the equation goes to the main model or to a person: nothing is guessed. Not part of
+    `clean_latex`, which the proof also applies to the chatbot arms' LaTeX as recorded."""
+    if "\\ce" not in latex:
+        return latex
+    try:
+        return convert_ce_commands(latex)
+    except CeError:
+        return latex
 
 
 def clean_latex(latex: str) -> str:
@@ -670,7 +685,7 @@ def _evaluate(
     candidate = _Candidate(output, calls, confidence=output.confidence)
     if not output.is_equation:
         return candidate
-    candidate.latex = clean_latex(output.latex)
+    candidate.latex = clean_latex(expand_ce(output.latex))
     if display == "inline":
         candidate.latex = strip_trailing_punctuation(candidate.latex)
     candidate.mathml, candidate.checks = _convert(candidate.latex, display)

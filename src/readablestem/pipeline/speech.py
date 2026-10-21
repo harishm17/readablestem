@@ -49,6 +49,7 @@ import defusedxml.ElementTree as DET
 
 from readablestem.core.notation import canonical_from_parts
 from readablestem.eval.equations import normalize
+from readablestem.pipeline import speech_chem
 from readablestem.pipeline.speech_nuclides import nuclide_words
 from readablestem.pipeline.speech_units import unit_words
 
@@ -392,6 +393,9 @@ def _pre_script(word: str, script: ET.Element) -> list[str]:
 def _speak_msub(node: ET.Element) -> list[str]:
     if len(node) != 2:
         return _speak_children(node)
+    chemical = speech_chem.scripted_words(node, _speak)
+    if chemical is not None:
+        return chemical
     base, sub = node[0], node[1]
     if _no_base(base):
         return _pre_script("subscript", sub)
@@ -402,6 +406,9 @@ def _speak_msub(node: ET.Element) -> list[str]:
 def _speak_msup(node: ET.Element) -> list[str]:
     if len(node) != 2:
         return _speak_children(node)
+    chemical = speech_chem.scripted_words(node, _speak)
+    if chemical is not None:
+        return chemical
     base, sup = node[0], node[1]
     if _no_base(base):
         return _pre_script("superscript", sup)
@@ -412,6 +419,9 @@ def _speak_msup(node: ET.Element) -> list[str]:
 def _speak_msubsup(node: ET.Element) -> list[str]:
     if len(node) != 3:
         return _speak_children(node)
+    chemical = speech_chem.scripted_words(node, _speak)
+    if chemical is not None:
+        return chemical
     base, sub, sup = node[0], node[1], node[2]
     if _no_base(base):  # a nuclide's mass number over its atomic number: {}^{14}_{6}C
         return [*_pre_script("superscript", sup), *_pre_script("subscript", sub)]
@@ -751,9 +761,12 @@ def _degrees(kids: list[ET.Element], i: int) -> tuple[list[str], int] | None:
 def _speak_children(node: ET.Element) -> list[str]:
     words: list[str] = []
     kids = list(node)
+    chemistry = speech_chem.is_chem_row(kids)
     i = 0
     while i < len(kids):
         found = _fenced_table(kids, i) or _nuclide(kids, i) or _degrees(kids, i)
+        if found is None and chemistry:
+            found = speech_chem.read_at(kids, i, _speak)
         if found is None and i > 0:
             count = _after_number(kids[i - 1])
             found = _unit_run(kids, i, count) if count is not None else None
