@@ -46,6 +46,7 @@
           {% if courses_enabled %}
           <li><a href="/courses"{% if active == "courses" %} aria-current="page"{% endif %}>Courses</a></li>
           {% endif %}
+          <li><a href="/account"{% if active == "account" %} aria-current="page"{% endif %}>Account</a></li>
           {% if user.is_admin %}
           <li><a href="/admin"{% if active == "admin" %} aria-current="page"{% endif %}>Admin</a></li>
           {% endif %}

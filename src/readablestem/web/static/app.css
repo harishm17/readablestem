@@ -118,7 +118,7 @@ button, .button, .button-secondary, .button-danger {
 .button:hover, button.button:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
 .button-secondary { background: var(--bg); color: var(--accent); }
 .button-secondary:hover { background: var(--panel); }
-.button-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.button-danger, .button-danger:visited { background: var(--danger); border-color: var(--danger); color: #fff; }
 .button-danger:hover { background: var(--danger-dark); border-color: var(--danger-dark); }
 .link-button {
   background: none; border: 0; padding: 0; color: var(--link);

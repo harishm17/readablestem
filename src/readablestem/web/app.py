@@ -52,6 +52,7 @@ from readablestem.web.health import stop_worker_on_sigterm
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.return_to import decision_link, remember_return, signed_out_page
 from readablestem.web.routes import (
+    account,
     admin,
     bundle,
     courses,
@@ -412,6 +413,7 @@ def create_app(
     app.mount("/static", CachedStaticFiles(directory=STATIC_DIR), name="static")
     for module in (
         pages,
+        account,
         jobs,
         parts,
         bundle,
