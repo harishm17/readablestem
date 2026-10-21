@@ -1,0 +1,309 @@
+"""Real-world set, step 4: the tables of a part (dev or held-out) from the recorded runs.
+
+    uv run python scripts/realworld_report.py --part dev [--out data/realworld/results-dev.json]
+
+Reads the items of each arm that was run (ReadableSTEM `runs/PART/rs/items.jsonl`, the chatbots'
+`runs/PART/chat/ARM.items.jsonl` made by `realworld_run.py chat-items`) and the gold, and prints:
+
+- the registered metrics, pooled, with 95% cluster bootstrap intervals over papers
+  (`proof.stats.cluster_bootstrap`, 10,000 resamples, seed 0): primary `exact_lenient`, symbols
+  credited (the secondary), detection recall and precision, wrong equations nobody is asked
+  about per 100 gold, unsupported predictions per prediction, cost per PDF page;
+- paired differences ReadableSTEM minus each chatbot on the papers both ran on (cluster bootstrap
+  and the sign-flip test), for the primary and the symbols-credited scores;
+- the buckets of docs/eval-page-math.md (correct, scorer, span, recognition, no proposal,
+  undetected) per arm, and the primary score by stratum: display or inline, single symbol or
+  longer, style of paper, alignment environments;
+- with `--examples N`: failures of ReadableSTEM, a seeded draw from every bucket.
+
+Nothing here calls a model, and nothing in it may be used to change a system on the held-out part.
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import json
+import sys
+from collections import Counter, defaultdict
+from pathlib import Path
+
+import numpy as np
+
+from readablestem.eval import pipeline_eval as pe
+from readablestem.proof import stats
+
+ROOT = Path.home() / ".cache" / "readablestem" / "realworld"
+REPO = Path(__file__).resolve().parent.parent
+ARMS = {
+    "ReadableSTEM": "rs/items.jsonl",
+    "Chatbot, Opus": "chat/chatbot-opus-purdue.items.jsonl",
+    "Chatbot, Haiku": "chat/chatbot-haiku-purdue.items.jsonl",
+}
+
+
+def load_buckets_module():
+    spec = importlib.util.spec_from_file_location(
+        "dev_buckets", REPO / "scripts" / "dev_buckets.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["dev_buckets"] = module
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    return module
+
+
+# Columns of the per-paper count vectors.
+COLUMNS = (
+    "gold", "exact", "symbols_credit", "matched", "pred", "wrong_unasked", "unsupported",
+    "cost", "pages", "required", "sym_wrong", "sym_wrong_flagged", "extra",
+)  # fmt: skip
+COL = {name: i for i, name in enumerate(COLUMNS)}
+
+
+def paper_counts(item: dict) -> list[float]:
+    pairs = item["pairs"]
+    credited = set(item["symbols_credited"]["split"]) | set(item["symbols_credited"]["merged"])
+    symbol_ids = {p["gold_id"] for p in pairs if p["exact_symbols"]} | credited
+    unsupported = sum(
+        (not u["text_layer_supported"]) and not u["piece_of"] for u in item["unmatched"]
+    )
+    flagged = [p for p in pairs if p.get("review") == "required"]
+    sym_wrong = [p for p in pairs if not p["exact_symbols"]]
+    vec = [0.0] * len(COLUMNS)
+    vec[COL["gold"]] = item["n_gold"]
+    vec[COL["exact"]] = sum(p["exact_lenient"] for p in pairs)
+    vec[COL["symbols_credit"]] = len(symbol_ids)
+    vec[COL["matched"]] = len(pairs)
+    vec[COL["pred"]] = item["n_pred"]
+    vec[COL["wrong_unasked"]] = sum(
+        (not p["exact_lenient"]) and p.get("review") != "required" for p in pairs
+    )
+    vec[COL["unsupported"]] = unsupported
+    vec[COL["cost"]] = item.get("cost_usd", 0.0)
+    vec[COL["pages"]] = item.get("pdf_pages", 0)
+    vec[COL["required"]] = len(flagged)
+    vec[COL["sym_wrong"]] = len(sym_wrong)
+    vec[COL["sym_wrong_flagged"]] = sum(p.get("review") == "required" for p in sym_wrong)
+    vec[COL["extra"]] = len(item["unmatched"])
+    return vec
+
+
+def ratio_of(num: str, den: str, scale: float = 1.0):
+    n, d = COL[num], COL[den]
+
+    def statistic(sums: np.ndarray) -> float | None:
+        return float(scale * sums[n] / sums[d]) if sums[d] else None
+
+    return statistic
+
+
+METRICS = {
+    "exact_lenient (primary)": ratio_of("exact", "gold"),
+    "symbols, credited (secondary)": ratio_of("symbols_credit", "gold"),
+    "detection recall": ratio_of("matched", "gold"),
+    "detection precision": ratio_of("matched", "pred"),
+    "wrong, not asked, per 100 gold": ratio_of("wrong_unasked", "gold", 100.0),
+    "unsupported predictions per prediction": ratio_of("unsupported", "pred"),
+    "cost per PDF page (USD)": ratio_of("cost", "pages"),
+    "required decisions per PDF page": ratio_of("required", "pages"),
+}
+
+
+def fmt(value: float | None, digits: int = 3) -> str:
+    return "n/a" if value is None else f"{value:.{digits}f}"
+
+
+def interval_text(point: float | None, interval: stats.Interval, digits: int = 3) -> str:
+    if point is None:
+        return "n/a"
+    return f"{fmt(point, digits)} [{fmt(interval.low, digits)}, {fmt(interval.high, digits)}]"
+
+
+def per_paper(items: list[dict]) -> dict[str, list[float]]:
+    return {i["id"]: paper_counts(i) for i in items}
+
+
+def table(headers: list[str], rows: list[list[str]]) -> str:
+    out = ["| " + " | ".join(headers) + " |", "|" + "|".join("---" for _ in headers) + "|"]
+    out += ["| " + " | ".join(r) + " |" for r in rows]
+    return "\n".join(out)
+
+
+def strata_rows(
+    items: list[dict], gold: dict[str, dict]
+) -> dict[str, dict[str, tuple[int, int, int]]]:
+    """name -> stratum -> (gold, exact, detected) from the pairs."""
+    out: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(lambda: [0, 0, 0]))
+    for item in items:
+        pair_by_gold = {p["gold_id"]: p for p in item["pairs"]}
+        for gid in [p["gold_id"] for p in item["pairs"]] + item["missed_gold_ids"]:
+            g = gold[gid]
+            pair = pair_by_gold.get(gid)
+            keys = {
+                "display": g["display"],
+                "length": "single symbol" if g["tokens"] == 1 else "longer",
+                "paper style": g.get("style") or "?",
+                "environment": "align-like"
+                if g["env"] in {"align", "eqnarray", "flalign", "alignat", "gather", "multline"}
+                else ("inline" if g["display"] == "inline" else "single-line display"),
+                "in float": "float" if g.get("in_float") else "text",
+            }
+            for name, value in keys.items():
+                cell = out[name][value]
+                cell[0] += 1
+                cell[1] += bool(pair and pair["exact_lenient"])
+                cell[2] += pair is not None
+    return {k: {s: tuple(v) for s, v in d.items()} for k, d in out.items()}
+
+
+def examples(
+    items: list[dict], gold: dict[str, dict], buckets, n: int, seed: str = "examples"
+) -> list[dict]:
+    """A seeded draw of failures, round-robin over the buckets."""
+    import hashlib
+
+    pool: dict[str, list[dict]] = defaultdict(list)
+    for item in items:
+        for pair in item["pairs"]:
+            g = gold[pair["gold_id"]]
+            bucket = buckets.classify_pair(pair, g["mathml"])
+            if bucket != "correct":
+                pool[bucket].append(
+                    {
+                        "bucket": bucket, "id": pair["gold_id"], "page": g["pdf_page"],
+                        "display": g["display"], "gold_latex": g["latex"],
+                        "pred_latex": pair.get("pred_latex"), "pdf_text": pair.get("pred_text"),
+                    }
+                )  # fmt: skip
+        for gid in item["missed_gold_ids"]:
+            g = gold[gid]
+            pool["undetected"].append(
+                {
+                    "bucket": "undetected", "id": gid, "page": g["pdf_page"],
+                    "display": g["display"], "gold_latex": g["latex"],
+                    "pred_latex": None, "pdf_text": None,
+                }
+            )  # fmt: skip
+    for entries in pool.values():
+        entries.sort(key=lambda e: hashlib.sha256((seed + e["id"]).encode()).hexdigest())
+    picked: list[dict] = []
+    order = ["recognition", "span", "undetected", "no_proposal", "scorer"]
+    while len(picked) < n and any(pool[b] for b in order):
+        for b in order:
+            if pool[b] and len(picked) < n:
+                picked.append(pool[b].pop(0))
+    return picked
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--part", choices=["dev", "heldout"], required=True)
+    parser.add_argument("--out", type=Path)
+    parser.add_argument("--examples", type=int, default=0)
+    parser.add_argument("--tag", default="rs", help="ReadableSTEM's run folder under runs/PART")
+    args = parser.parse_args()
+    runs = ROOT / "runs" / args.part
+    gold_dir = ROOT / "gold" / args.part
+    gold = {r["id"]: r for r in pe.load_gold(gold_dir) if r.get("kind") == "equation"}
+    buckets = load_buckets_module()
+    items: dict[str, list[dict]] = {}
+    for label, rel in ARMS.items():
+        path = runs / (rel.replace("rs/", f"{args.tag}/") if rel.startswith("rs/") else rel)
+        if path.is_file():
+            items[label] = [json.loads(line) for line in path.read_text().splitlines() if line]
+    result: dict = {"part": args.part, "arms": {}}
+    print(f"## {args.part}: " + ", ".join(f"{k}: {len(v)} papers" for k, v in items.items()))
+    # pooled metrics with cluster intervals
+    rows = []
+    vectors = {label: per_paper(its) for label, its in items.items()}
+    for name, statistic in METRICS.items():
+        row = [name]
+        for label in items:
+            pp = vectors[label]
+            point = stats.point(pp, statistic)
+            interval = stats.cluster_bootstrap(pp, statistic)
+            row.append(interval_text(point, interval, 4 if "cost" in name else 3))
+            result["arms"].setdefault(label, {})[name] = {
+                "point": point, "low": interval.low, "high": interval.high,
+            }  # fmt: skip
+        rows.append(row)
+    sizes = ["gold equations / papers"] + [
+        f"{int(sum(v[COL['gold']] for v in vectors[k].values()))} / {len(vectors[k])}"
+        for k in items
+    ]
+    rows.insert(0, sizes)
+    print(table(["metric (95% cluster bootstrap over papers)", *items], rows))
+    # paired differences
+    if "ReadableSTEM" in items:
+        print()
+        diff_rows = []
+        for other in [k for k in items if k != "ReadableSTEM"]:
+            common = sorted(set(vectors["ReadableSTEM"]) & set(vectors[other]))
+            a = {k: vectors["ReadableSTEM"][k] for k in common}
+            b = {k: vectors[other][k] for k in common}
+            for name in (
+                "exact_lenient (primary)",
+                "symbols, credited (secondary)",
+                "detection recall",
+                "wrong, not asked, per 100 gold",
+            ):
+                est, ci = stats.paired_difference(a, b, METRICS[name])
+                flip = stats.sign_flip(a, b, METRICS[name])
+                diff_rows.append(
+                    [
+                        f"ReadableSTEM minus {other}", name, str(len(common)),
+                        interval_text(est, ci), fmt(flip.p, 3),
+                    ]
+                )  # fmt: skip
+                result.setdefault("paired", []).append(
+                    {
+                        "other": other, "metric": name, "papers": len(common), "estimate": est,
+                        "low": ci.low, "high": ci.high, "sign_flip_p": flip.p,
+                    }
+                )  # fmt: skip
+        print(table(["difference", "metric", "papers", "estimate [95%]", "sign-flip p"], diff_rows))
+    # buckets
+    print()
+    summaries = {label: buckets.summarize(its, gold) for label, its in items.items()}
+    keys = [k for k in next(iter(summaries.values())) if k.startswith("bucket") or "credited" in k]
+    print(
+        table(
+            ["bucket, per gold equation", *items],
+            [[k, *[fmt(summaries[label][k]) for label in items]] for k in keys],
+        )
+    )
+    result["buckets"] = {label: {k: summaries[label][k] for k in keys} for label in items}
+    # strata
+    print()
+    for label, its in items.items():
+        st = strata_rows(its, gold)
+        result.setdefault("strata", {})[label] = st
+        rows = []
+        for name, values in st.items():
+            for value, (n, ex, det) in sorted(values.items()):
+                rows.append([name, value, str(n), fmt(ex / n), fmt(det / n)])
+        print(f"### {label}: by stratum")
+        print(table(["stratum", "value", "gold", "exact_lenient", "detected"], rows))
+        print()
+    # status of chatbot runs
+    for label, its in items.items():
+        counts = Counter(i.get("status", "ok") for i in its)
+        if set(counts) != {"ok"}:
+            print(f"{label}: run statuses {dict(counts)}")
+    if args.examples and "ReadableSTEM" in items:
+        picked = examples(items["ReadableSTEM"], gold, buckets, args.examples)
+        result["examples"] = picked
+        print("### failures of ReadableSTEM (seeded draw)")
+        for e in picked:
+            print(
+                f"- {e['bucket']} {e['id']} (page {e['page']}, {e['display']}): "
+                f"gold `{e['gold_latex']}`"
+                f" ; wrote `{e['pred_latex']}` ; text layer `{(e['pdf_text'] or '')[:80]}`"
+            )
+    if args.out:
+        args.out.write_text(json.dumps(result, indent=1, default=float) + "\n", encoding="utf-8")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
