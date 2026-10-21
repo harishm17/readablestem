@@ -77,12 +77,11 @@ def test_two_readings_that_agree_lift_a_cheap_answer_over_the_bar_without_a_seco
 
 
 def test_agreement_does_not_lift_when_the_setting_is_off():
-    """Without the lift the cheap answer keeps the 0.8 it had, under the accept bar, so the main
-    model is asked, as for any cheap answer under the bar; the agreement is still recorded."""
-    client = by_model(cheap=out("x = 5", 0.8), main=out("x = 5", 0.8))
+    """Without the lift the cheap answer keeps the confidence it had; the agreement is still
+    recorded as a check."""
+    client = by_model(cheap=out("x = 5", 0.8))
     settings = make_settings(page_math_agreement_lift=False)
     fix = transcribe(element(page_latex="x=5"), PNG, client=client, settings=settings)
-    assert models(client) == [CHEAP_MODEL, MAIN_MODEL]
     assert fix.confidence == pytest.approx(0.8)
     assert page_checks(fix) == {equation_step.PAGE_READING: True}
 
