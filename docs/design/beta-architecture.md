@@ -24,7 +24,7 @@ It "assists". It never claims WCAG/ADA compliance.
 
 ```mermaid
 flowchart LR
-  U[Instructor] -->|Google sign-in + allowlist| W[FastAPI web app]
+  U[Instructor] -->|Google sign-in + allowlist or open sign-up| W[FastAPI web app]
   W -->|upload PDF, quota check| DB[(Postgres: jobs, blobs, spend, quotas, aggregates)]
   WK[Worker thread] -->|claim job| DB
   WK --> L[layout.analyze: headings, paragraphs, list items, equations, figures, reading order]
