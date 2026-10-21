@@ -120,12 +120,14 @@ def test_verbatim_tikz_and_floats():
     text = tex.strip_comments((FIXTURES / "paper_b.tex").read_text())
     extraction = tex.extract(tex.body_of(text))
     latex = [i.latex for i in extraction.items]
-    assert not any("z = 3" in x for x in latex)  # tikz
     assert not any("verbatim" in x for x in latex)
     assert not any("not math" in x for x in latex)  # \verb
-    assert extraction.skipped_environments == {"tikzpicture": 1, "verbatim": 1}
+    assert extraction.skipped_environments == {"verbatim": 1}
+    # a picture is placed by its own words, like a float: its maths is extracted
+    node = next(i for i in extraction.items if i.latex == "z = 3")
     caption = next(i for i in extraction.items if i.latex == "k=1")
-    assert caption.float_id == 0 and extraction.n_floats == 1
+    assert node.float_id is not None and caption.float_id is not None
+    assert node.float_id != caption.float_id and extraction.n_floats == 2
     assert next(i for i in extraction.items if i.latex == "x").float_id is None
 
 

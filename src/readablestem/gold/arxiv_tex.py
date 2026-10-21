@@ -16,8 +16,9 @@ What it does, in order (each step is a function, and has a test in `tests/test_a
    in `MacroTable.failures`; the paper is skipped when a failure touches its mathematics.
 3. `extract`: walk the body and cut out `equation`, `align`, `gather`, `multline`, `eqnarray`,
    `flalign`, `alignat`, `displaymath`, `math` (and the starred forms), `$$..$$`, `\[..\]`,
-   `\(..\)` and `$..$`. Verbatim, listings and TikZ pictures are skipped. Material in a float
-   (`figure`, `table`) is kept apart, because a float is printed somewhere else than it is typed.
+   `\(..\)` and `$..$`. Verbatim and listings are skipped. Material in a float or a picture
+   (`figure`, `table`, `algorithm`, `tikzpicture`) is kept apart, because a float is printed
+   somewhere else than it is typed.
 4. `split_environment`: an `align`, `eqnarray` or `flalign` with several numbered rows is one gold
    equation per numbered row (a run of unnumbered rows belongs to the next numbered row), a
    starred one is a single equation, `gather` is one equation per row, `multline` is one equation.
@@ -33,8 +34,8 @@ What it does, in order (each step is a function, and has a test in `tests/test_a
 Limits (also in docs/eval-realworld.md): an align block split by numbers is a convention, not a
 fact about the PDF; macros with delimited parameters, `\newenvironment` with arguments, packages
 that define maths commands (`physics`, `braket`) are not expanded unless the author defined them
-in the source; an equation inside a picture or a minipage that the text anchors cannot place is
-refused rather than guessed; TikZ and listing contents are not counted.
+in the source; an equation inside a picture or a float that its own words cannot place is
+refused rather than guessed (it blocks the pages it may be on); listing contents are not counted.
 """
 
 from __future__ import annotations
@@ -450,23 +451,23 @@ DISPLAY_ENVS = (
     "displaymath",
 )
 INLINE_ENVS = ("math",)
-SKIP_ENVS = frozenset(
+SKIP_ENVS = frozenset({"verbatim", "lstlisting", "minted", "filecontents", "comment"})
+# Typeset content that sits somewhere else than where it is typed (floats), or inside a picture:
+# its mathematics is extracted, and placed by its own words.
+FLOAT_ENVS = frozenset(
     {
-        "verbatim",
-        "lstlisting",
-        "minted",
+        "figure",
+        "table",
+        "wrapfigure",
+        "wraptable",
+        "sidewaystable",
+        "sidewaysfigure",
+        "subfigure",
+        "algorithm",
         "tikzpicture",
         "pgfpicture",
-        "filecontents",
-        "comment",
-        "thebibliography",
-        "algorithm",
-        "algorithmic",
         "tikzcd",
     }
-)
-FLOAT_ENVS = frozenset(
-    {"figure", "table", "wrapfigure", "wraptable", "sidewaystable", "sidewaysfigure", "subfigure"}
 )
 NUMBERED_ENVS = frozenset(
     {"equation", "align", "gather", "multline", "eqnarray", "flalign", "alignat"}
