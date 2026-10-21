@@ -74,10 +74,17 @@ def cmd_harvest(args: argparse.Namespace) -> int:
 def cmd_order(args: argparse.Namespace) -> int:
     pool = json.loads((args.root / "pool.json").read_text(encoding="utf-8"))
     records = [ac.Record(**c) for c in pool["candidates"]]
+    skip: set[str] = set()
+    for name in args.exclude or ():
+        data = json.loads(Path(name).read_text(encoding="utf-8"))
+        # a manifest (papers) or a candidates log (candidates): the ids it names
+        skip |= {p["id"] for p in data.get("papers", data.get("candidates", []))}
+    records = [r for r in records if r.id not in skip]
     ordered = ac.order_candidates(records, args.seed)
     out = {
         "seed": args.seed,
         "pool_sha256": ac.pool_sha256(pool),
+        "excluded": len(skip),
         "order": [r.id for r in ordered],
     }
     path = REPO_DATA / f"order-{args.seed}.json"
@@ -95,6 +102,9 @@ def main() -> int:
     h.set_defaults(func=cmd_harvest)
     o = sub.add_parser("order")
     o.add_argument("--seed", required=True)
+    o.add_argument(
+        "--exclude", nargs="*", help="manifests or candidate logs whose papers are left out"
+    )
     o.set_defaults(func=cmd_order)
     args = parser.parse_args()
     return args.func(args)

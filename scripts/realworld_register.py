@@ -18,6 +18,13 @@ import sys
 from pathlib import Path
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "realworld"
+FRESH_FILES = (
+    "PREREGISTRATION-FRESH.md",
+    "manifest-fresh.json",
+    "candidates-fresh.json",
+    "order-realworld-fresh-2026-10-21.json",
+    "pool.json",
+)
 FILES = (
     "PREREGISTRATION.md",
     "PREREGISTRATION-ADDENDUM-1.md",
@@ -37,9 +44,11 @@ def digest(name: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--set", choices=["heldout", "fresh"], default="heldout")
     args = parser.parse_args()
-    target = DATA / "REGISTRATION.sha256"
-    lines = [f"{digest(name)}  {name}" for name in FILES]
+    target = DATA / ("REGISTRATION-fresh.sha256" if args.set == "fresh" else "REGISTRATION.sha256")
+    files = FRESH_FILES if args.set == "fresh" else FILES
+    lines = [f"{digest(name)}  {name}" for name in files]
     if args.check:
         recorded = target.read_text().splitlines()
         if recorded != lines:

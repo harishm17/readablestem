@@ -168,7 +168,7 @@ def cmd_build(args: argparse.Namespace) -> int:
             print(json.dumps(entry)[:240], flush=True)
             held.write_text(json.dumps(list(done.values()), indent=1), encoding="utf-8")
     REPO_DATA.mkdir(parents=True, exist_ok=True)
-    (REPO_DATA / "candidates.json").write_text(
+    (REPO_DATA / args.candidates_out).write_text(
         json.dumps(
             {"seed": seed, "order_sha256": sha256_text(args.order), "candidates": log}, indent=1
         )
@@ -188,11 +188,12 @@ def gold_text(rows: list[dict]) -> str:
 def cmd_verify(args: argparse.Namespace) -> int:
     """Rebuild the gold of every paper of both manifests from the cached downloads and compare it
     with the manifest's hash: the answer key is a function of the sources and the code."""
-    seed = json.loads(next(REPO_DATA.glob("order-*.json")).read_text())["seed"]
     pool = {c["id"]: c for c in json.loads((args.root / "pool.json").read_text())["candidates"]}
     bad = 0
-    for part in ("dev", "heldout"):
-        manifest = json.loads((REPO_DATA / f"manifest-{part}.json").read_text())
+    for path in sorted(REPO_DATA.glob("manifest-*.json")):
+        part = path.stem.removeprefix("manifest-")
+        manifest = json.loads(path.read_text())
+        seed = manifest["seed"]
         for paper in manifest["papers"]:
             record = pool[paper["id"]]
             with httpx.Client() as client:  # unused: every file is cached
@@ -242,7 +243,11 @@ def split_papers(accepted: list[dict], seed: str, n_held: int) -> dict[str, list
 
 
 def emit(accepted: list[dict], args: argparse.Namespace, seed: str) -> None:
-    parts = split_papers(accepted, seed, args.held_out)
+    parts = (
+        {args.single_part: sorted(accepted, key=lambda e: e["record"]["id"])}
+        if args.single_part
+        else split_papers(accepted, seed, args.held_out)
+    )
     for part, entries in parts.items():
         out = args.root / "gold" / part
         if out.exists():
@@ -315,6 +320,12 @@ def main() -> int:
     b.add_argument("--target", type=int, default=40)
     b.add_argument("--held-out", type=int, default=15)
     b.add_argument("--pause", type=float, default=3.0)
+    b.add_argument(
+        "--single-part", help="no split: every accepted paper goes to a part of this name"
+    )
+    b.add_argument(
+        "--candidates-out", default="candidates.json", help="the log under data/realworld"
+    )
     b.add_argument("--date", default="2026-10-21")
     b.set_defaults(func=cmd_build)
     v = sub.add_parser("verify")

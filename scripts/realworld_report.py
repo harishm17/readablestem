@@ -109,6 +109,12 @@ METRICS = {
     # the region an equation was cut from, which a chatbot's output has not:
     # scripts/realworld_invented.py reads every arm's output by one rule instead.
     "cost per PDF page (USD)": ratio_of("cost", "pages"),
+    "flag recall (symbols-wrong aligned equations that were a decision)": ratio_of(
+        "sym_wrong_flagged", "sym_wrong"
+    ),
+    "flag precision (decisions on aligned equations that were symbols-wrong)": ratio_of(
+        "sym_wrong_flagged", "required"
+    ),
     "required decisions per PDF page, all kinds": ratio_of("required_all", "pages"),
     "  of which on an aligned equation": ratio_of("required", "pages"),
 }
@@ -269,7 +275,7 @@ def examples(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--part", choices=["dev", "heldout"], required=True)
+    parser.add_argument("--part", choices=["dev", "heldout", "fresh"], required=True)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--examples", type=int, default=0)
     parser.add_argument(

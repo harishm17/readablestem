@@ -76,19 +76,28 @@ def verify_gold(part: str) -> None:
             raise SystemExit(f"PDF of {paper['id']} differs from the manifest")
 
 
+REGISTRATIONS = {"heldout": "REGISTRATION.sha256", "fresh": "REGISTRATION-fresh.sha256"}
+
+
 def require_registration(part: str, arm: str, offline: bool) -> None:
-    if part != "heldout":
+    if part not in REGISTRATIONS:
         return
-    reg = DATA / "REGISTRATION.sha256"
+    reg = DATA / REGISTRATIONS[part]
     if not reg.is_file():
-        raise SystemExit("the held-out part is not registered (data/realworld/REGISTRATION.sha256)")
+        raise SystemExit(f"the {part} part is not registered (data/realworld/{reg.name})")
     for line in reg.read_text().splitlines():
         digest, _, name = line.partition("  ")
         if sha256(DATA / name) != digest:
             raise SystemExit(f"registered file {name} has changed since registration")
     marker = runs_dir(part) / f"{arm}.recorded"
     if marker.is_file() and not offline:
-        raise SystemExit(f"{arm} was already recorded on the held-out part: replay with --offline")
+        raise SystemExit(f"{arm} was already recorded on the {part} part: replay with --offline")
+
+
+def registered_arm(args: argparse.Namespace) -> str:
+    """The name a registered run is recorded under: `rs` on the held-out part, the tag on the
+    fresh part (two arms of one registration)."""
+    return args.tag if args.part == "fresh" else "rs"
 
 
 def papers(part: str) -> list[dict]:
@@ -127,7 +136,7 @@ def cmd_rs(args: argparse.Namespace) -> int:
     from readablestem.cli.main import build_parser
 
     verify_gold(args.part)
-    require_registration(args.part, "rs", args.offline)
+    require_registration(args.part, registered_arm(args), args.offline)
     out_dir = runs_dir(args.part) / args.tag
     out_dir.mkdir(parents=True, exist_ok=True)
     answers = out_dir / "answers.jsonl"
@@ -167,8 +176,9 @@ def cmd_rs(args: argparse.Namespace) -> int:
                 "cap_usd": args.max_usd, "actual_usd": round(spent, 4), "note": args.note,
             }
         )  # fmt: skip
-        if args.part == "heldout":
-            (runs_dir(args.part) / "rs.recorded").write_text(dt.date.today().isoformat())
+        if args.part in REGISTRATIONS:
+            marker = runs_dir(args.part) / f"{registered_arm(args)}.recorded"
+            marker.write_text(dt.date.today().isoformat())
     print(f"spent this start: ${spent:.4f}")
     return code
 
@@ -190,7 +200,7 @@ def answers_cost(path: Path) -> float:
 def chat_order(part: str) -> list[str]:
     """Paper ids in the registered order for arms run on a part of the papers only: by the
     SHA-256 of seed, "chat-order" and the id."""
-    seed = json.loads(next(DATA.glob("order-*.json")).read_text())["seed"]
+    seed = manifest(part)["seed"]
     ids = [p["id"] for p in papers(part)]
     return sorted(ids, key=lambda i: hashlib.sha256(f"{seed}|chat-order|{i}".encode()).hexdigest())
 
@@ -246,7 +256,7 @@ def cmd_chat(args: argparse.Namespace) -> int:
             "note": args.note,
         }
     )  # fmt: skip
-    if args.part == "heldout" and not summary["refused_by_cap"]:
+    if args.part in REGISTRATIONS and not summary["refused_by_cap"]:
         (runs_dir(args.part) / f"{arm.id}.recorded").write_text(dt.date.today().isoformat())
     return 0
 
@@ -296,7 +306,7 @@ def cmd_tally(args: argparse.Namespace) -> int:
     run's answers (`--seed-answers-from`) holds copies of them: each answer is counted once,
     under the first run that holds it (`rs` first, then by tag)."""
     rows = []
-    for part in ("dev", "heldout"):
+    for part in ("dev", "heldout", "fresh"):
         counted: set[str] = set()
         for tag_dir in sorted(
             runs_dir(part).glob("*/answers.jsonl"),
@@ -339,7 +349,7 @@ def main() -> int:
     ):
         p = sub.add_parser(name)
         if name != "tally":
-            p.add_argument("--part", choices=["dev", "heldout"], required=True)
+            p.add_argument("--part", choices=["dev", "heldout", "fresh"], required=True)
         if name == "rs":
             p.add_argument("--max-usd", type=float, required=True)
             p.add_argument("--tag", default="rs")

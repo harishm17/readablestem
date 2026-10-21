@@ -37,7 +37,7 @@ def pair_map(items: list[dict]) -> dict[str, dict]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--part", choices=["dev"], default="dev")
+    parser.add_argument("--part", choices=["dev", "fresh"], default="dev")
     parser.add_argument("--a", default="rs")
     parser.add_argument("--b", required=True)
     parser.add_argument("--examples", type=int, default=10)

@@ -1,0 +1,383 @@
+{
+ "part": "fresh",
+ "seed": "realworld-fresh-2026-10-21",
+ "papers": [
+  {
+   "id": "2210.13562",
+   "title": "Prediction intervals for economic fixed-event forecasts",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "econ:econ:EM",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    10,
+    12,
+    27,
+    34,
+    36
+   ],
+   "equations": 108,
+   "display": 7,
+   "pdf_sha256": "5d86412676774b0deda9ed3657059a7a34f0a65944e0de81325a36472ed5a4d9",
+   "source_sha256": "9bc5561dc4cdf1c0e950b600e2dcecd06d0959de278718302616bb4e5370d8a2",
+   "extract_pdf_sha256": "9c557d91712c7b366b49b64cb800e08a62d92aa5b953db81f79d515eb27daa2c",
+   "gold_sha256": "ddd71b09827f89213fe047267cac1ca84a848b4698d138462b36b137755cfb9a"
+  },
+  {
+   "id": "2212.05955",
+   "title": "Lower bounds on the rate of convergence for accept-reject-based Markov chains in Wasserstein and total variation distances",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:TH",
+   "style": "research",
+   "pages_chosen": [
+    4,
+    5,
+    20,
+    21,
+    28,
+    32
+   ],
+   "equations": 74,
+   "display": 9,
+   "pdf_sha256": "c37b2e48090a7279a8cfb57c831ac92ef5f19c1cf15caa190d9b130b171a5073",
+   "source_sha256": "d83dda547e3bd6697b6fe04a2223c2d1edf1962c49f4612ce179d7c12864e1a4",
+   "extract_pdf_sha256": "1cd99f9455d3c431eebade709dcb158e6f460454739ca70cb94d6ba6eec798af",
+   "gold_sha256": "947f8c3f16d9cb5b39d17b5c0c5d87ca7b9274be8508ca28f0f339eca9b934da"
+  },
+  {
+   "id": "2303.02529",
+   "title": "The Critical Beta-splitting Random Tree II: Overview and Open Problems",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:PR",
+   "style": "tutorial",
+   "pages_chosen": [
+    35,
+    36,
+    44,
+    47
+   ],
+   "equations": 42,
+   "display": 1,
+   "pdf_sha256": "a93a520bc7e7f1579802bfb87ac8888712aadd5906c0980ca15d2efd4fa7735d",
+   "source_sha256": "65e546d7156f5ac0d3f06b8d20d8f1bf028decbdbf16cc1b81e24b6df9f352e5",
+   "extract_pdf_sha256": "c6b95e5912f2622610f147d020dfbb155c6feb19abfad0a9f4211cd50ed801e6",
+   "gold_sha256": "8cc2ecbbfa8e4b40f4e6e41852731b28648e3b2b644e0f3dfa70b2beacc9c82e"
+  },
+  {
+   "id": "2307.16839",
+   "title": "Simple Python tools for modelling few-level atom-light interactions",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:ed-ph",
+   "style": "tutorial",
+   "pages_chosen": [
+    7,
+    10,
+    20,
+    21,
+    22,
+    26
+   ],
+   "equations": 94,
+   "display": 7,
+   "pdf_sha256": "f9a7d53898f5b2259d216089606df9984c685e3efa63c64ea915a39f24e8529d",
+   "source_sha256": "e9b17f07c20c5f8ce423b2247b216c7e244739807ba0e4adba08f3aa97ab0d77",
+   "extract_pdf_sha256": "b7e8c9f8bdfdceee295c59b51a70699ca2b1748a556b79908b0a0a50405ba97a",
+   "gold_sha256": "c911c88d9103a7a563bdcd76e02fb7062df72783255912679afbb5ae2060448d"
+  },
+  {
+   "id": "2309.01229",
+   "title": "Inverse modeling of time-delayed interactions via the dynamic-entropy formalism",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "q-bio:q-bio:QM",
+   "style": "research",
+   "pages_chosen": [
+    5,
+    6,
+    12,
+    13
+   ],
+   "equations": 180,
+   "display": 14,
+   "pdf_sha256": "ed2d2a4c9d98f8062f4e9d13f8534adf182fbb2ffb1c16334d9667dfdcc568ce",
+   "source_sha256": "be70d63359bb7acc9f7d85037467d6440194cbb0d6722060bb0b057a8ff3e9ff",
+   "extract_pdf_sha256": "a4bd78a4cb0066f6ab46a7e077864090dc6e09ee8403463c77ffd372947a05ac",
+   "gold_sha256": "a4efad23614e2fe10eed4431355bdb0448acfe077b5c2d493fa4b8ac358a1504"
+  },
+  {
+   "id": "2402.10836",
+   "title": "Manipulation Test for Multidimensional RDD",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "econ:econ:EM",
+   "style": "research",
+   "pages_chosen": [
+    8,
+    16,
+    17,
+    19,
+    20,
+    27
+   ],
+   "equations": 57,
+   "display": 4,
+   "pdf_sha256": "cae67a687c6f77860ff78eb59b25031ff5730c13b3997f6b477528d3dcb292e6",
+   "source_sha256": "370ce123c556b15d1d3a1e7f147310e6372b02eb2044c7321a84131c19e82463",
+   "extract_pdf_sha256": "703d2b43a57d5b84e2250164e7ef2445f87c7c055692ddc91e7df55a74aab5a2",
+   "gold_sha256": "de6e39ef71525a46be2dbfe13b3030c55ff664a5894e88c2dcfadab4300a53f3"
+  },
+  {
+   "id": "2406.12157",
+   "title": "An Introduction to Computational Fluctuating Hydrodynamics",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:flu-dyn",
+   "style": "tutorial",
+   "pages_chosen": [
+    2,
+    7,
+    10,
+    11
+   ],
+   "equations": 79,
+   "display": 16,
+   "pdf_sha256": "898cbe74a0ce3f03b93a7b93b248e03034363d5d00fb7e26113e2560083e91ac",
+   "source_sha256": "9f253f785c73ab4c7f6dbfb0bcd7f3dd549c9cb904f85b3547506cdc973f2e09",
+   "extract_pdf_sha256": "876d824361353f1569e69c2edb5e79504307b0850a64b49f0b3c7a6a8cfad482",
+   "gold_sha256": "097a5e775a5fd756295445b056631c999c6c093b424e938ea3357b02b51872f9"
+  },
+  {
+   "id": "2406.19702",
+   "title": "Vector AutoRegressive Moving Average Models: A Review",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "econ:econ:EM",
+   "style": "tutorial",
+   "pages_chosen": [
+    3,
+    5,
+    16,
+    17
+   ],
+   "equations": 102,
+   "display": 5,
+   "pdf_sha256": "b6671225dda3423b755f824dfba2bda05f5ff7acd17f279d027a30d4a0f352cf",
+   "source_sha256": "dd7414f6fac904e06fe9a5a8fdadd9864bf7f842dc848257ad20142184a7f485",
+   "extract_pdf_sha256": "fe0b9b0f539f331358ddf59a1923e1722ae2e9346a1dd77b73a482c8bd894c11",
+   "gold_sha256": "a5b5533e912adb19efe0662f7ca0b98351781ca8a6dd415f429c86e69070edf0"
+  },
+  {
+   "id": "2407.08602",
+   "title": "An Introduction to Causal Discovery",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "econ:econ:EM",
+   "style": "tutorial",
+   "pages_chosen": [
+    6,
+    20,
+    26,
+    27
+   ],
+   "equations": 89,
+   "display": 1,
+   "pdf_sha256": "35ed89b6d1133b728ef783df0729f43b85e833939447a3c0f3c9e83463f5362b",
+   "source_sha256": "702d8ad6bd4f24ca5e74264b6341c8121f503af0d26bf995715c510ec3c76732",
+   "extract_pdf_sha256": "017719b2c2f5e5c90f59720827ac7d718d13d3e7f2b003930c8fce337dc21e53",
+   "gold_sha256": "5b98a42f99417ba155c59a9fd0fa8fd904d9e908f9d7acb2f679e83f97d80c7d"
+  },
+  {
+   "id": "2407.10832",
+   "title": "Methods for quantifying self-organization in biology: a forward-looking survey and tutorial",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "q-bio:q-bio:QM",
+   "style": "tutorial",
+   "pages_chosen": [
+    4,
+    6,
+    7,
+    8,
+    9,
+    11
+   ],
+   "equations": 79,
+   "display": 4,
+   "pdf_sha256": "f681c63eac650e7b8747e9f2b57222eafbeda9da3df14376433fdf07e685374a",
+   "source_sha256": "c3dfe2784111618159e2e69c713ea322bf5a23be92d62bc3a1d47fa1f6c0b9a2",
+   "extract_pdf_sha256": "2ee9db4a00af7a7603f787141899263e0157dc439bdc27f546c32a6ae33abd03",
+   "gold_sha256": "d9d15b29ca2a0e59bdea8d1205d7f6786eb414236edeea6212034d4565643f40"
+  },
+  {
+   "id": "2410.04138",
+   "title": "Long-range angular correlations of particle displacements at a plastic-to-elastic transition in jammed amorphous solids",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:cond-mat:stat-mech",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    3,
+    7,
+    11
+   ],
+   "equations": 230,
+   "display": 4,
+   "pdf_sha256": "18dbc029a4dd506b8029b43d3a27f49568ca5b2f83dd6d92f5be37c8645180e6",
+   "source_sha256": "13b1ed1689aec8afd0d3bc78709906a6289f164e5d11543a31c92c6c395ce19d",
+   "extract_pdf_sha256": "733e1a857ec326904adc8d928ad4753ddd4970480f47ff0baf07857f9078807b",
+   "gold_sha256": "75210dc5f857d9fa44788e46c71ee276efedd62e622a80c06fad240f00c3dd3c"
+  },
+  {
+   "id": "2411.04352",
+   "title": "The High-Order Magnetic Near-Axis Expansion: Ill-Posedness and Regularization",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:NA",
+   "style": "research",
+   "pages_chosen": [
+    16,
+    25,
+    26,
+    38
+   ],
+   "equations": 108,
+   "display": 12,
+   "pdf_sha256": "3820559416e7d6a6419a1df560a552e744e7cd5a3d39bc9f0308964ecb9fc8e5",
+   "source_sha256": "0faeb097a3a44eeb73f78c3ef7d5bef48b7eb4ed78b7722d2d49047a79e10afd",
+   "extract_pdf_sha256": "24a3ff70cb9940057a7893be2a08022e332db4e5119afa984f039189b636d10c",
+   "gold_sha256": "2824a8587a02d7cb8233646ba25845cac386071f0295fce19987d8d958cdb562"
+  },
+  {
+   "id": "2411.07613",
+   "title": "A Theoretical Review of Area Production Rates as Test Statistics for Detecting Nonequilibrium Dynamics in Ornstein-Uhlenbeck Processes",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:PR",
+   "style": "tutorial",
+   "pages_chosen": [
+    5,
+    6,
+    18,
+    19
+   ],
+   "equations": 163,
+   "display": 24,
+   "pdf_sha256": "7336399d8cdf4c0157a8fb5b90bf88435ae331312de3080683db602961718d5b",
+   "source_sha256": "53416b90810bfca256689b30b52876ba6664a08d96dc12d8286ac9094d31a4fd",
+   "extract_pdf_sha256": "222928c3d1cb77a607d18cba074012efc52b6fc0bb6be8b64040f81ce7217bb5",
+   "gold_sha256": "9160153ab9f111c9da47c6be120af27f693164d05989a05adb7cde003d55c96b"
+  },
+  {
+   "id": "2501.00140",
+   "title": "Notes on stochastic integration theory with respect to càdlàg semimartingales and a brief introduction to Lévy processes",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:PR",
+   "style": "tutorial",
+   "pages_chosen": [
+    9,
+    38,
+    39,
+    55,
+    58
+   ],
+   "equations": 99,
+   "display": 12,
+   "pdf_sha256": "3526383d69700c4e16cc9253509dbdb2bcdbc70de9bedea3ce56fa9db62f4fef",
+   "source_sha256": "65424817da18286b796a8703f471fa50fd7f2d9288232f0cbc10d7ab1949514b",
+   "extract_pdf_sha256": "b290e0c608c1855be451d27f01cf42015be77c0323a5c1cabda5c3cecd2eaa82",
+   "gold_sha256": "e9c105ecad664eac99da2305151b81393a387e57092a570d2c62a4155af527d8"
+  },
+  {
+   "id": "2502.04553",
+   "title": "Variance component mixture modelling for longitudinal T-cell receptor clonal dynamics",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ME",
+   "style": "research",
+   "pages_chosen": [
+    10,
+    11,
+    12,
+    14,
+    17
+   ],
+   "equations": 61,
+   "display": 6,
+   "pdf_sha256": "2ce213ba4537d7c4efd382761ebf2f4e6836c9c05cf4614265effdbcc1091ed8",
+   "source_sha256": "8b48cbe4f3720bc1abd52ab925a65d2cc6cb5678e291cac5b0807277f6edcf57",
+   "extract_pdf_sha256": "1d5dc85716bc391b762bdb4de2a1b43743aa2a743c93a88194f16ca25cde96f6",
+   "gold_sha256": "6f5f2bd3a37a79e2674694e2d22dea220d1714546ba31ffb5cc7623548989813"
+  },
+  {
+   "id": "2502.08443",
+   "title": "Tutorial for Surrogate Endpoint Validation Using Joint modeling and Mediation Analysis",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ME",
+   "style": "tutorial",
+   "pages_chosen": [
+    12,
+    13,
+    22,
+    26
+   ],
+   "equations": 58,
+   "display": 0,
+   "pdf_sha256": "8f1c28843ac6a6ad8334c7e867cf0a58d38005636fdd130699882aa7e1578628",
+   "source_sha256": "8bc6e265c338b0af734f14a5d228f13dba3a0bd13a73977417dc894b476edda5",
+   "extract_pdf_sha256": "2b35fdc48b337424aba6b6d453ee9f7957adcbe6c9550332e03135a28ba0e836",
+   "gold_sha256": "f8c696b0b16d7463e064f7e064033931bcb0425f0f8133f31bc4c529c42a6d88"
+  },
+  {
+   "id": "2504.19306",
+   "title": "Spatial-Sign based High dimensional Change Point Inference",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ME",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    3,
+    7,
+    13
+   ],
+   "equations": 144,
+   "display": 12,
+   "pdf_sha256": "99b3359a6c03932c6f01ef1431fe540d41d2bd8ed82abdd82594a77e62829f55",
+   "source_sha256": "de6b5dc2415292752efdfe060ba0730e064ccfc4b7eab5a9f5f9621fad5a99cc",
+   "extract_pdf_sha256": "c3a3cf2f1d5632c33587a6ba11f00312804cb3c1df1f15f7f73871849fde7063",
+   "gold_sha256": "0c5767aeca21fa91567ae26ea0c8e27c45bb10e4ece8d3bcba9faf5630505071"
+  },
+  {
+   "id": "2506.01997",
+   "title": "NELM: Modern Open-Source Software for Multipurpose Impedance Spectra Analysis",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:data-an",
+   "style": "research",
+   "pages_chosen": [
+    5,
+    6,
+    10,
+    16,
+    17,
+    26
+   ],
+   "equations": 69,
+   "display": 4,
+   "pdf_sha256": "12a9ff61dc59a672bd444f30dd24bd7078c3f3f03c4c7506977c8ccd5de8e2b6",
+   "source_sha256": "09eef3538b4ee1128e432c05746b55ed2e4864a978b5bb2abe010369add1ed19",
+   "extract_pdf_sha256": "a7103f4e54ac77d18d4ad201579092822deed9f31733fb8f79c51b29397e3eb8",
+   "gold_sha256": "aa96acbfd4c56e0a1fccef18d1a64341c6a78156dc8f1fa41220f19aceaaf79f"
+  }
+ ],
+ "n_papers": 18,
+ "n_equations": 1836,
+ "n_pages": 86
+}
