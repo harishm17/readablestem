@@ -106,6 +106,23 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.no_text_layer", "no_text_layer"): "This equation is a picture, so the PDF holds "
     "no text to check the transcription against: compare it with the picture symbol by "
     "symbol.",
+    # A page converted from an image (pipeline.image_page, ADR 0007)
+    ("image_page.no_text_layer", "image_page"): "This was read from an image of the page, so "
+    "nothing in the PDF can confirm it: compare it with the original page.",
+    ("image_page.read_confidence", "read_medium"): "The reader was not sure of every word or "
+    "symbol here and used the context to settle some, so compare it with the original page.",
+    ("image_page.read_confidence", "read_low"): "Part of this was hard to read, so compare "
+    "it with the original page and correct what is wrong.",
+    ("image_page.illegible", "illegible"): "Some of this could not be read and is marked "
+    "[illegible]: look at the original page and write what it says.",
+    ("image_page.inline_math", "inline_math_invalid"): "A formula in this text could not be "
+    "converted and is shown as its LaTeX in square brackets: look at the original page and "
+    "correct it.",
+    ("image_page.single_reading", "single_reading_no_box"): "The place of this equation on "
+    "the page could not be found, so it was read once, from the whole page, and not read "
+    "again from its own picture: compare it with the original page symbol by symbol.",
+    ("table.no_text_layer", "no_text_layer"): "This table was read from an image of the page, "
+    "so nothing in the PDF can confirm its cells: compare every value with the original.",
     ("equation.region", "half_fraction"): "The part of the page this equation was read "
     "from ends at a fraction bar and may hold only the top or the bottom of a fraction, so "
     "compare it with the page and write the whole fraction if part is missing.",
@@ -357,6 +374,9 @@ NOTICE_MESSAGES: dict[str, str] = {
     "so English is assumed: check it is right.",
     "long_description_missing": "A complex figure, such as a chart or a diagram, has no "
     "long description yet.",
+    "image_page_converted": "A scanned or handwritten page was converted from an image of "
+    "it: nothing in the PDF can confirm the reading, so check it against the original, which "
+    "is kept with the page.",
     "page_omitted": "You left this page out of the student file and of the review, and the "
     "file says that it is not there.",
 }

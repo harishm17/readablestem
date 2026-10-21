@@ -88,6 +88,8 @@ class Settings(BaseSettings):
     anthropic_effort_figure: Effort | None = None
     # Effort of the page math pass (ADR 0006). Unset: low.
     anthropic_effort_page_math: Effort | None = None
+    # Effort of the image page pass (ADR 0007). Unset: `pipeline.image_page.DEFAULT_EFFORT`.
+    anthropic_effort_image_pages: Effort | None = None
     # The fixed untrusted-text notice rides in the cached system block instead of in every
     # request's user message (T3-23). Claude only. On by default: the same answers on the
     # development sets, 6-10% less per call once the cache is warm (docs/eval.md "Model cost").
@@ -317,6 +319,13 @@ class Settings(BaseSettings):
     # 1.0 (no change) because, on dev slice A, 16 aligned equations fell under the accept bar
     # for it and 14 of them were right (docs/eval-page-math.md); set below 1 to try it.
     page_math_unconfirmed_factor: float = Field(default=1.0, gt=0, le=1)
+    # Scanned and handwritten pages (`page_type`) are read from an image of the page by one
+    # vision call and put into the document as elements that are all review items (ADR 0007,
+    # pipeline/image_page.py); off, they are kept as page images marked "Not converted". Off
+    # until the development measurement (docs/eval-image-pages.md) says it is good enough.
+    # `image_pages_model` None: the main model.
+    feature_image_pages: bool = False
+    image_pages_model: str | None = None
     # Write each converted equation's stored speech text (`pipeline.speech`, the reading
     # shown on the review screen) as the `alttext` attribute of its <math>. OFF until a
     # person has checked it with NVDA + MathCAT (and ideally JAWS and VoiceOver): some
