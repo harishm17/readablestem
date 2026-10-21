@@ -40,14 +40,16 @@ CHAT = {"Chatbot, Opus": "chatbot-opus-purdue", "Chatbot, Haiku": "chatbot-haiku
 COLS = ("a_n", "a_bad", "u_n", "u_bad")
 
 
-def rs_html(part: str) -> dict[str, str]:
+def rs_html(part: str, tag: str = "rs", page_math: bool = False) -> dict[str, str]:
     """ReadableSTEM's output HTML per paper, from the recorded answers (replayed, offline)."""
     os.environ["CLAUDE_SECOND_CHECK"] = "off"
+    if page_math:
+        os.environ["FEATURE_PAGE_MATH"] = "true"
     from readablestem.cli import eval_cli
     from readablestem.cli.main import build_parser
     from readablestem.pipeline import run
 
-    out_dir = ROOT / "runs" / part / "rs"
+    out_dir = ROOT / "runs" / part / tag
     html_dir = out_dir / "html"
     html_dir.mkdir(exist_ok=True)
     pdfs = sorted((ROOT / "gold" / part / "pdfs").glob("*.pdf"))
@@ -114,9 +116,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--part", choices=["dev", "heldout"], required=True)
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--tag", default="rs", help="ReadableSTEM run folder under runs/PART")
+    parser.add_argument("--page-math", action="store_true", help="the run had FEATURE_PAGE_MATH on")
+    parser.add_argument("--rs-only", action="store_true")
     args = parser.parse_args()
-    outputs = {"ReadableSTEM": rs_html(args.part)}
-    for label, arm in CHAT.items():
+    outputs = {f"ReadableSTEM ({args.tag})": rs_html(args.part, args.tag, args.page_math)}
+    for label, arm in {} if args.rs_only else CHAT.items():
         outputs[label] = chat_html(args.part, arm)
     result: dict = {"part": args.part, "arms": {}}
     print(

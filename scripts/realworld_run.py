@@ -30,6 +30,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -116,6 +117,8 @@ def cmd_rs(args: argparse.Namespace) -> int:
     # No second automated check: it is shadow-only (it changes no output) and costs model calls,
     # and the registered OpenStax run had none either.
     os.environ["CLAUDE_SECOND_CHECK"] = "off"
+    if args.page_math:
+        os.environ["FEATURE_PAGE_MATH"] = "true"
     from readablestem.cli import eval_cli
     from readablestem.cli.main import build_parser
 
@@ -124,6 +127,10 @@ def cmd_rs(args: argparse.Namespace) -> int:
     out_dir = runs_dir(args.part) / args.tag
     out_dir.mkdir(parents=True, exist_ok=True)
     answers = out_dir / "answers.jsonl"
+    if args.seed_answers_from and not answers.exists():
+        # an experiment that asks mostly the same questions starts from the baseline's answers:
+        # a request already answered replays for free and is not paid for twice
+        shutil.copyfile(runs_dir(args.part) / args.seed_answers_from / "answers.jsonl", answers)
     report = out_dir / "report.json"
     items = out_dir / "items.jsonl"
     argv = [
@@ -318,6 +325,10 @@ def main() -> int:
             p.add_argument("--max-usd", type=float, required=True)
             p.add_argument("--tag", default="rs")
             p.add_argument("--offline", action="store_true")
+            p.add_argument("--page-math", action="store_true", help="FEATURE_PAGE_MATH on")
+            p.add_argument(
+                "--seed-answers-from", help="tag whose answers file this run starts from"
+            )
             p.add_argument("--papers", help="comma-separated arXiv ids (default: all of the part)")
             p.add_argument("--note", default="")
         if name in ("chat", "chat-items"):
