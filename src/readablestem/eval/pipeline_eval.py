@@ -1379,6 +1379,7 @@ def document_page_item(
                 "stream_similarity": stream.similarity,
                 "exact_symbols": symbols.exact,
                 "symbols_similarity": symbols.similarity,
+                **_page_pass_fields(element, fix),
                 "review": fix.review if fix is not None else None,
                 "tier_reasons": triage.tier_reasons(fix) if fix is not None else [],
                 "pred_latex": proposal.latex if proposal is not None else None,
@@ -1400,6 +1401,7 @@ def document_page_item(
                 "reason": reason,
                 "piece_of": gold[pieces[pi]]["id"] if pi in pieces else None,
                 "text_layer_supported": _text_layer_supported(element, fix, reason),
+                **_page_pass_fields(element, fix),
             }
         )
     split = _split_gold(gold, pairs, pieces)
@@ -1493,6 +1495,24 @@ def _stream_credits(
                 merged += [gold[gj]["id"] for gj in covered]
                 break
     return {"split": split, "merged": merged}
+
+
+def _page_pass_fields(element: Element, fix: Fix | None) -> dict[str, Any]:
+    """What the page math pass (ADR 0006) said about a predicted equation: whether it placed
+    the span or only layout found it, its LaTeX, and how the two readings met
+    ("agree", "overruled" or "mismatch"; None when they were not compared)."""
+    reading = None
+    for check in fix.checks if fix is not None else []:
+        if check.name == equation_step.PAGE_READING:
+            reading = "agree" if check.passed else "mismatch"
+        elif check.name == equation_step.PAGE_READING_OVERRULED:
+            reading = "overruled"
+    return {
+        "page_status": element.page_status,
+        "page_latex": element.page_latex,
+        "page_reading": reading,
+        "escalation": fix.escalation if fix is not None else None,
+    }
 
 
 def _shadow_pair(fix: Fix | None) -> dict[str, Any]:
@@ -1912,6 +1932,14 @@ def _document_section(
     item["heading_flags"] = heading_flags(heading_item, headings)
     calls = [c for f in result.fixes for c in f.calls]
     item.update(_calls_summary(calls))
+    if result.page_math is not None:
+        # The page math pass (ADR 0006) is a model call of the pipeline's: its cost is in the
+        # item's cost, and apart as `page_math_cost_usd`.
+        pass_ = result.page_math
+        item["page_math"] = pass_.model_dump()
+        item["page_math_cost_usd"] = pass_.cost_usd
+        item["cost_usd"] += pass_.cost_usd
+        item["model_calls"] += pass_.calls
     item["verifier"] = vm.page_summary(result.fixes)
     item["verifier_cost_usd"] = sum(f.verifier_cost_usd for f in result.fixes)
     item["verifier_requests"] = sum(vm.requests_sent(f) for f in result.fixes)
@@ -2023,6 +2051,10 @@ def _cost(task: str, items: Sequence[dict], budget: JobBudget | None) -> dict:
         out["pdf_pages"] = pdf_pages
         out["per_pdf_page_usd"] = step_cost / pdf_pages if pdf_pages else None
         out["verifier_per_pdf_page_usd"] = verifier_cost / pdf_pages if pdf_pages else None
+        page_math_cost = sum(i.get("page_math_cost_usd", 0.0) for i in items)
+        if any("page_math" in i for i in items):  # the page math pass ran (ADR 0006)
+            out["page_math_usd"] = page_math_cost
+            out["page_math_per_pdf_page_usd"] = page_math_cost / pdf_pages if pdf_pages else None
     if budget is not None:
         out["budget_spent_usd"] = budget.spent_usd
         out["budget_calls"] = budget.calls

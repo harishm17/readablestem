@@ -543,6 +543,16 @@ def text_layer_similarity(text_layer: str | None, mathml: str) -> float | None:
     return 2 * sum((expected & got).values()) / total if total else None
 
 
+def symbol_dice(text: str, mathml: str) -> float:
+    """Dice similarity of the symbol bags of a text and a MathML, with no minimum of symbols
+    (`text_layer_similarity` declines to judge a text of fewer than three): 1.0 when neither
+    has a letter, digit or Greek letter. For comparing two readings of the same stretch."""
+    expected = _symbol_bag(text)
+    got = _mathml_symbols(mathml)
+    total = sum(expected.values()) + sum(got.values())
+    return 2 * sum((expected & got).values()) / total if total else 1.0
+
+
 def text_layer_symbols_differ(text_layer: str | None, mathml: str) -> bool | None:
     """Do the letters, digits and Greek letters of the PDF text layer and the MathML
     differ at all (as multisets: one wrong digit, one misread Greek letter, a dropped

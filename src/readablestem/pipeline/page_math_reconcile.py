@@ -35,13 +35,19 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
-from readablestem.pipeline import layout
+from readablestem.pipeline import equation_step, layout
 from readablestem.pipeline.page_math import MathPlan, PageRow, Segment, Span
+from readablestem.pipeline.validate import LatexConversionError, safe_latex_to_mathml
 
 log = logging.getLogger(__name__)
 
 # Rules this far outside a placed region's rows still belong to it (points).
 RULE_MARGIN = 2.0
+# A span is laid over layout only when its LaTeX reading and the text it quotes have the same
+# letters, digits and Greek letters, by Dice similarity of the two symbol bags: a reading that
+# says more (or less) than the characters quoted means the quote cut the expression short or
+# wide, and layout's own cut is kept.
+CONSISTENT_FROM = 0.8
 
 
 def quote_text(row: Any) -> tuple[str, list[int]]:
@@ -106,6 +112,8 @@ class HookStats:
     labels: int = 0
     nonmath: int = 0
     skipped: int = 0
+    inconsistent: int = 0  # spans whose LaTeX and quoted text disagree: left to layout
+    absorbed: int = 0  # bracket and rule rows with no symbols taken into a placed region
 
     def as_dict(self) -> dict[str, int]:
         return dict(self.__dict__)
@@ -157,6 +165,13 @@ class PageMathHook:
         rules: list[Any],
     ) -> list[Any]:
         by_id = {r.id: r for r in rows}
+        kept: list[Span] = []
+        for span in spans:
+            if span.role == "math" and not _consistent(span, by_id):
+                self.stats.inconsistent += 1
+                continue
+            kept.append(span)
+        spans = kept
         cuts: dict[int, list[_Cut]] = {}  # id(layout row) -> cuts
         inline: list[tuple[str, int, int, str]] = []
         nonmath: list[tuple[str, int, int]] = []
@@ -234,6 +249,7 @@ class PageMathHook:
             ]
             region.box = layout._union([region.box, *(r.bbox for r in region.rules)])
             self.stats.blocks += 1
+        self._absorb_brackets(out, list(regions.values()))
         for label in label_pieces:
             host = _region_beside(label, list(regions.values()))
             if host is None:
@@ -267,6 +283,22 @@ class PageMathHook:
             self.stats.nonmath += 1
         self.stats.pages_applied += 1
         return out
+
+    def _absorb_brackets(self, rows: list[Any], regions: list[Any]) -> None:
+        """Rows of a matrix's or determinant's brackets (glyphs with no letter or digit in
+        them, which the model's quotes leave out) that sit against a placed region belong to
+        it: left alone they would each become an equation of their own."""
+        for row in rows:
+            if row.kind != "math" or row.region is not None or row.vertical:
+                continue
+            if any(c.c.isalnum() for c in row.ink):
+                continue
+            host = _region_touching(row, regions)
+            if host is not None:
+                host.rows.append(row)
+                host.box = layout._union([host.box, row.bbox])
+                row.region = host
+                self.stats.absorbed += 1
 
     def summary(self) -> Counter[str]:
         return Counter(self.stats.as_dict())
@@ -309,6 +341,34 @@ def _piece(row: Any, lo: int, hi: int) -> Any:
         case_row=row.case_row,
         page_checked=True,
     )
+
+
+def _consistent(span: Span, rows: dict[str, PageRow]) -> bool:
+    """Does the span's LaTeX say what the text it quotes says (module constant)?"""
+    text = " ".join(rows[seg.row].text[seg.start : seg.end] for seg in span.segments)
+    try:
+        mathml = safe_latex_to_mathml(span.latex, "block" if span.display == "block" else "inline")
+        similarity = equation_step.symbol_dice(text, mathml)
+    except (LatexConversionError, ValueError, RecursionError):
+        return False  # a reading that does not convert grounds nothing
+    return similarity >= CONSISTENT_FROM
+
+
+def _region_touching(row: Any, regions: list[Any]) -> Any | None:
+    """The region whose box `row` overlaps or touches (within half a font size), nearest first."""
+    reach = 0.5 * row.size
+    best, distance = None, float("inf")
+    for region in regions:
+        x0, y0, x1, y1 = region.box
+        bx0, by0, bx1, by1 = row.bbox
+        if bx1 < x0 - reach or bx0 > x1 + reach or by1 < y0 - reach or by0 > y1 + reach:
+            continue
+        if region.rows[0].column != row.column:
+            continue
+        gap = abs((x0 + x1) / 2 - (bx0 + bx1) / 2) + abs((y0 + y1) / 2 - (by0 + by1) / 2)
+        if gap < distance:
+            best, distance = region, gap
+    return best
 
 
 def _region_beside(label: Any, regions: list[Any]) -> Any | None:
