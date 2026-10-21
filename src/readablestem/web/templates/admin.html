@@ -13,6 +13,32 @@
     <div><dt>Daily cap</dt><dd>{% if spend.cap_usd is not none %}{{ spend.cap_usd|usd }}{% else %}None set (development){% endif %}</dd></div>
     <div><dt>Left today</dt><dd>{% if spend.remaining_usd is not none %}{{ spend.remaining_usd|usd }}{% else %}No limit{% endif %}</dd></div>
   </dl>
+  <h3 id="open-spend-heading">Pool for new accounts (open tier)</h3>
+  <p>The part of the figures above that belongs to documents of accounts that signed
+    themselves up. It is a share of the daily cap, not extra money: when it is used up,
+    invited people can still convert.</p>
+  <dl class="summary-list">
+    <div><dt>Spent</dt><dd>{{ spend.open_spent_usd|usd }}</dd></div>
+    <div><dt>Held for calls in progress</dt><dd>{{ spend.open_held_usd|usd }}</dd></div>
+    <div><dt>Pool</dt><dd>{% if spend.open_cap_usd is not none %}{{ spend.open_cap_usd|usd }}{% else %}None set{% endif %}</dd></div>
+    <div><dt>Left today</dt><dd>{% if spend.open_remaining_usd is not none %}{{ spend.open_remaining_usd|usd }}{% else %}No limit{% endif %}</dd></div>
+  </dl>
+</section>
+
+<section aria-labelledby="signup-heading">
+  <h2 id="signup-heading">Sign-up</h2>
+  <p>{% if signup.open %}Open: anyone with a verified Google account (or an allowed Microsoft
+    account) gets an account on first sign-in, in the open tier. New accounts can convert
+    {{ signup.page_quota }} pages and start {{ signup.rereads }} model reads from review a day.
+    {% else %}By invitation: only the people listed below can sign in. (Accounts made while
+    sign-up was open keep working until you block them.){% endif %}
+    Set with <code>SIGNUP_MODE</code>.</p>
+  <dl class="summary-list">
+    <div><dt>New accounts today (UTC)</dt><dd>{{ signup.today }} of {{ signup.limit }}</dd></div>
+    <div><dt>Invited accounts</dt><dd>{{ signup.invited }}</dd></div>
+    <div><dt>Open-tier accounts</dt><dd>{{ signup.open_accounts }}</dd></div>
+    <div><dt>Blocked accounts</dt><dd>{{ signup.blocked }}</dd></div>
+  </dl>
 </section>
 
 <section aria-labelledby="queue-heading">
@@ -28,7 +54,10 @@
 <section aria-labelledby="allowlist-heading">
   <h2 id="allowlist-heading">Allowlist</h2>
   <p>People who may sign in. Addresses in <code>ADMIN_EMAILS</code> are made admins again
-    every time the app starts.</p>
+    every time the app starts. Allowing an address makes that person <strong>invited</strong>
+    (the instructors' limits), also when they already have an open-tier account. Someone who
+    signed themselves up is in the <strong>open</strong> tier; you can block them here.
+    {% if people_rows %}The first {{ people_rows }} accounts are listed.{% endif %}</p>
   <form method="post" action="/admin/allowlist" novalidate class="stack-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     <div class="field{% if email_error %} field-error{% endif %}">
@@ -51,13 +80,14 @@
   <table>
     <caption id="allowlist-caption" class="visually-hidden">People on the allowlist</caption>
     <thead>
-      <tr><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Other Google accounts</th><th scope="col">Last sign-in</th><th scope="col">Remove</th></tr>
+      <tr><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Access</th><th scope="col">Other Google accounts</th><th scope="col">Last sign-in</th><th scope="col">Remove or block</th></tr>
     </thead>
     <tbody>
       {% for person in users %}
       <tr>
         <th scope="row">{{ person.email }}</th>
         <td>{{ "Admin" if person.is_admin else "Instructor" }}</td>
+        <td>{{ "Open" if person.tier == "open" else "Invited" }}</td>
         <td>
           {% if person.linked %}
           <ul class="plain-list">
@@ -76,10 +106,10 @@
         <td>{{ person.last_login_at|utc if person.last_login_at else "Never" }}</td>
         <td>
           {% if person.email != user.email %}
-          <form method="post" action="/admin/allowlist/remove" class="inline-form">
+          <form method="post" action="{{ '/admin/users/block' if person.tier == 'open' else '/admin/allowlist/remove' }}" class="inline-form">
             <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
             <input type="hidden" name="email" value="{{ person.email }}">
-            <button type="submit" class="button-secondary">Remove<span class="visually-hidden"> {{ person.email }}</span></button>
+            <button type="submit" class="button-secondary">{{ "Block" if person.tier == "open" else "Remove" }}<span class="visually-hidden"> {{ person.email }}</span></button>
           </form>
           {% else %}
           You
@@ -90,6 +120,39 @@
     </tbody>
   </table>
   </div>
+
+  <h3 id="blocked-heading">Blocked accounts</h3>
+  <p>Accounts that cannot sign in: people you removed or blocked. Their documents are deleted
+    on schedule and their jobs were stopped. Unblocking lets them sign in again with the
+    access they had.</p>
+  {% if blocked %}
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="blocked-caption">
+  <table>
+    <caption id="blocked-caption" class="visually-hidden">Blocked accounts</caption>
+    <thead>
+      <tr><th scope="col">Email</th><th scope="col">Access</th><th scope="col">Last sign-in</th><th scope="col">Unblock</th></tr>
+    </thead>
+    <tbody>
+      {% for person in blocked %}
+      <tr>
+        <th scope="row">{{ person.email }}</th>
+        <td>{{ "Open" if person.tier == "open" else "Invited" }}</td>
+        <td>{{ person.last_login_at|utc if person.last_login_at else "Never" }}</td>
+        <td>
+          <form method="post" action="/admin/users/unblock" class="inline-form">
+            <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+            <input type="hidden" name="email" value="{{ person.email }}">
+            <button type="submit" class="button-secondary">Unblock<span class="visually-hidden"> {{ person.email }}</span></button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>No one is blocked.</p>
+  {% endif %}
 
   <h3 id="link-heading">Let an instructor sign in with another Google account</h3>
   <p>For an instructor whose invitation went to one address but who can sign in with Google

@@ -1,4 +1,4 @@
-"""CLI: `readablestem serve`, `readablestem users allow|deny|link|unlink|delete|list`,
+"""CLI: `readablestem serve`, `readablestem users allow|deny|unblock|link|unlink|delete|list`,
 `readablestem db upgrade`.
 
 - serve: runs the web app with uvicorn (`create_app` as a factory, so settings are read
@@ -6,8 +6,10 @@
 - users: manages the sign-in allowlist in the database named by DATABASE_URL. In dev the
   tables are created on first use; in production the schema must be migrated first.
   `link` adds another Google address for an allowed instructor and `unlink` takes it away
-  again (`web.linked_emails`). `deny` removes someone from the allowlist and stops their
-  queued and running jobs;
+  again (`web.linked_emails`). `allow` makes the person `invited` (`web.access`), also when
+  they signed themselves up. `deny` removes someone from the allowlist (blocks them, in
+  either sign-up mode) and stops their queued and running jobs; `unblock` lets them sign in
+  again with the tier they had;
   `delete` also erases them (a data-deletion request, `ops.retention.erase_user`): every
   job with everything derived from it (through `delete_jobs`, so counts are kept), their
   review edits, courses and notation, usage events, sign-in identities, daily page counts
@@ -49,6 +51,11 @@ def register(
     deny = users.add_parser("deny", help="remove an email address from the allowlist")
     deny.add_argument("email")
     deny.set_defaults(func=_cmd_users_deny)
+    unblock = users.add_parser(
+        "unblock", help="let a removed or blocked person sign in again, with the tier they had"
+    )
+    unblock.add_argument("email")
+    unblock.set_defaults(func=_cmd_users_unblock)
     link = users.add_parser(
         "link", help="let an allowed instructor also sign in with another Google address"
     )
@@ -202,6 +209,26 @@ def _cmd_users_deny(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_users_unblock(args: argparse.Namespace) -> int:
+    from readablestem.config import ConfigError
+    from readablestem.web.auth import normalise_email, set_blocked
+    from readablestem.web.db import session_scope
+
+    email = normalise_email(args.email)
+    if email is None:
+        return _error(f"not an email address: {args.email!r}")
+    try:
+        factory = _factory()
+    except ConfigError as exc:
+        return _error(str(exc))
+    with session_scope(factory) as session:
+        user = set_blocked(session, email, blocked=False)
+    if user is None:
+        return _error(f"{email} is not a known user")
+    print(f"unblocked {email}")
+    return 0
+
+
 def _cmd_users_delete(args: argparse.Namespace) -> int:
     from sqlalchemy import select
 
@@ -242,15 +269,18 @@ def _cmd_users_list(args: argparse.Namespace) -> int:
         users = session.scalars(
             select(User).where(User.is_allowed.is_(True)).order_by(User.email)
         ).all()
-        rows = [(u.email, "admin" if u.is_admin else "user", u.last_login_at) for u in users]
+        rows = [
+            (u.email, "admin" if u.is_admin else "user", u.access_tier, u.last_login_at)
+            for u in users
+        ]
     if not rows:
         print("no allowed users")
         return 0
-    width = max(len(email) for email, _, _ in rows) + 2
-    print(f"{'email':<{width}} {'role':<6} last sign-in")
-    for email, role, last in rows:
+    width = max(len(email) for email, _, _, _ in rows) + 2
+    print(f"{'email':<{width}} {'role':<6} {'tier':<8} last sign-in")
+    for email, role, tier, last in rows:
         shown = last.strftime("%Y-%m-%d %H:%M") if last else "never"
-        print(f"{email:<{width}} {role:<6} {shown}")
+        print(f"{email:<{width}} {role:<6} {tier:<8} {shown}")
     return 0
 
 

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Sign-ups are full for today{% endblock %}
+{% block content %}
+<h1>Sign-ups are full for today</h1>
+<p>ReadableSTEM is a free beta, and it takes a limited number of new accounts each day so
+  that it stays affordable. Today's places are taken, so we could not create an account for
+  <strong>{{ email }}</strong>.</p>
+<p>Please try again tomorrow. New places open at {{ next_reset|utc }}. If you already have
+  an account, you can still sign in as usual.</p>
+<p>In the meantime you can <a href="/demo">look at a demo conversion</a>, which needs no
+  sign-in. We did not keep your email address.</p>
+{% endblock %}

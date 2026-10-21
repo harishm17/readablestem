@@ -1,6 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Not on the beta list yet{% endblock %}
+{# Two cases (web/auth.py `refused_page`). `blocked`: sign-up is open and an admin blocked
+   this account. Otherwise sign-up is by invitation and the address is not on the list. #}
+{% block title %}{% if blocked %}This account cannot be used{% else %}Not on the beta list yet{% endif %}{% endblock %}
 {% block content %}
+{% if blocked %}
+<h1>This account cannot be used</h1>
+<p>You signed in as <strong>{{ email }}</strong>. That account has been blocked, so it
+  cannot sign in or convert documents.</p>
+{% if contact_email %}
+<p>If you think this is a mistake, email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.
+  Please say which address you signed in with.</p>
+{% endif %}
+<p>In the meantime you can <a href="/demo">look at a demo conversion</a>, which needs no
+  sign-in.</p>
+{% else %}
 <h1>You are not on the beta list yet</h1>
 <p>Thank you for your interest. You signed in as <strong>{{ email }}</strong>, and that
   address is not on the list for this beta. The beta is open to a small group of
@@ -11,4 +24,5 @@
 {% endif %}
 <p>We did not keep your email address. In the meantime you can
   <a href="/demo">look at a demo conversion</a>.</p>
+{% endif %}
 {% endblock %}
