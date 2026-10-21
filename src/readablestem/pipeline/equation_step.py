@@ -222,6 +222,10 @@ def clean_latex(latex: str) -> str:
 _TRAILING_SPACING = re.compile(r"(?:\s|~|\\[,;:! ]|\\q?quad(?![A-Za-z]))+$")
 
 
+# `\left` or `\right` (not `\leftarrow`, `\rightarrow`...) right before a ".".
+_NULL_DELIMITER = re.compile(r"\\(?:left|right)(?![A-Za-z])\s*$")
+
+
 def strip_trailing_punctuation(latex: str) -> str:
     r"""Drop sentence punctuation (, . ; : ?) from the end of an inline transcription.
 
@@ -229,14 +233,17 @@ def strip_trailing_punctuation(latex: str) -> str:
     the model also transcribes it (the crop showed part of it) the output reads
     "d0, ,". Spacing left in front of the mark goes with it. A mark after a backslash is
     a command (\, \; \: are spaces) and stays; so does LaTeX that would be left empty.
-    "!" stays: after maths it is a factorial. Display equations keep their punctuation:
-    it is part of the line the reader sees.
+    "!" stays: after maths it is a factorial. The "." of `\right.` and `\left.` is the
+    invisible delimiter that closes (or opens) a brace and is not punctuation either.
+    Display equations keep their punctuation: it is part of the line the reader sees.
     """
     text = latex.rstrip()
     while text and text[-1] in ",.;:?":
         backslashes = len(text[:-1]) - len(text[:-1].rstrip("\\"))
         if backslashes % 2:
             break  # "\," is a thin space, not a comma
+        if text[-1] == "." and _NULL_DELIMITER.search(text[:-1]):
+            break  # "\right." is a delimiter, not a full stop
         stripped = _TRAILING_SPACING.sub("", text[:-1])
         if not stripped.strip():
             break
