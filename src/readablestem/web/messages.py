@@ -327,12 +327,12 @@ REASON_MESSAGES: dict[str, str] = {
     "budget_unknown": "A spending limit was reached before this item was converted.",
     # Pages and handwriting kept as images before any model work (pipeline.page_type).
     # Final wording for the beta (handwriting design, section 3.3).
-    "handwritten_page": "This page is handwritten and was not converted, so the page is kept as "
-    "an image, marked “Not converted”. Where the upload form offers “Convert scanned or "
-    "handwritten pages”, ticking it when you upload again reads such pages from their pictures.",
-    "scanned_page": "This page is a scanned image and was not converted, so the page is kept as "
-    "an image, marked “Not converted”. Where the upload form offers “Convert scanned or "
-    "handwritten pages”, ticking it when you upload again reads such pages from their pictures.",
+    "handwritten_page": "This page is handwritten and was not converted, so it is kept as an "
+    "image, marked “Not converted” (upload again with “Convert scanned or handwritten pages” "
+    "ticked).",
+    "scanned_page": "This page is a scanned image and was not converted, so it is kept as an "
+    "image, marked “Not converted” (upload again with “Convert scanned or handwritten pages” "
+    "ticked).",
     "unread_page": "Nothing on this page could be read as text, so the page is kept as an "
     "image, marked “Not converted”.",
     "handwriting_on_page": "This is handwriting on a typed page and this tool does not "
