@@ -47,7 +47,7 @@ tell the model that text between `<document_text>` tags is data, not instruction
 
 | Prompt | Output schema (strict pydantic, `extra=forbid`) | What it asks for |
 |---|---|---|
-| `equation.md` | `EquationOutput {is_equation: bool, latex: str, confidence: 0..1}` | Math-mode LaTeX only (no `$`, no `\displaystyle`); transcribe symbol by symbol, never simplify; `\mathbf` for bold vectors, `\vec` for arrows, `\text{}` for words and units, with `<`, `>` and `&` kept outside it; `\%` for a percent sign (a bare `%` is a comment); multi-line equations as `\begin{array}{rcl}` (relation in its own column, matching OpenStax), never `aligned`/`align`/`split`; standard commands only; calibrated confidence bands; a best partial reading with low confidence when unreadable. |
+| `equation.md` | `EquationOutput {is_equation: bool, latex: str, confidence: 0..1}` | Math-mode LaTeX only (no `$`, no `\displaystyle`); transcribe symbol by symbol, never simplify; `\mathbf` for bold vectors, `\vec` for arrows, `\text{}` for words and units, with `<`, `>` and `&` kept outside it; `\%` for a percent sign (a bare `%` is a comment); multi-line equations as `\begin{array}{rcl}` (relation in its own column, matching OpenStax), never `aligned`/`align`/`split`; standard commands only, except `\ce{...}` for chemical species ("Chemistry" in the prompt); calibrated confidence bands; a best partial reading with low confidence when unreadable. |
 | `equation_notation.md` | `EquationOutput`, as above | `equation.md` plus how to use the fenced course notation list; sent only when the run has course notation ("Course notation" below) |
 | `figure.md` | `FigureOutput {figure_type: FigureType, decorative: bool, alt: str, confidence: 0..1}` | Classify the figure; decorative only when it adds no information (charts, diagrams, tables and captioned figures never are); alt of at most 150 characters that gives a student the figure's information (charts: type, variables, main trend; diagrams: what it shows and the key relationship); no "Image of ..."; no file names, URLs, markup or LaTeX; do not repeat the caption; abstain (confidence below 0.3, empty alt) when unreadable. |
 | `figure_long.md` (long descriptions on) | `FigureLongOutput`: `FigureOutput` plus `long_description: str`, `long_description_unsure: bool`, `data_table: {header: [str], rows: [[str]]} \| null`, `values_printed: bool`, `colour_only: bool` | Everything in `figure.md` (the alt text must stand on its own), plus: for charts, diagrams and illustrations with several labelled parts, a long description of 100-1,200 characters in at most 8 short plain lines (what it shows; axes with quantity, unit and range, or the parts and how they connect; the trend; the key values), never inventing a value ("about" for one read off an axis); for charts whose values can be read, a data table with units in the headers, the horizontal axis first, at most 40 rows and 8 columns; `values_printed` only when every value is printed in the figure; `colour_only` when series or parts are told apart by colour alone. |
@@ -562,6 +562,12 @@ and a trailing `\\` (`equation_step.clean_latex`). It also escapes every bare `%
 `\%` (`validate.escape_percent_signs`): in one transcribed equation a `%` is a percent
 sign, never a comment. None of this changes the mathematics. Other callers of
 `check_latex` (for example a reviewer's LaTeX edit) get `comment` for a bare `%`.
+
+Chemistry: the prompt asks for mhchem, `\ce{...}`, for chemical species, and
+`equation_step.expand_ce` writes each `\ce` out as plain LaTeX (`pipeline/chem.py`, a tested
+subset) before `clean_latex` and the checks; one outside the subset is left as it is and
+`check_latex` refuses it (`unknown_command`). `clean_latex` does not convert, because the proof
+applies it to the chatbot arms' recorded LaTeX. See [chemistry.md](chemistry.md).
 
 ### `safe_latex_to_mathml(latex, display)`
 

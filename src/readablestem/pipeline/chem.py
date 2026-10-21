@@ -441,12 +441,25 @@ def _bond_next(s: str, i: int) -> bool:
 
 
 def _species_latex(s: str, i: int) -> tuple[str, int]:
-    """One species starting at `s[i]`: LaTeX and the index after it."""
+    r"""One species starting at `s[i]`: LaTeX and the index after it.
+
+    Element symbols are set as `\text{...}`, a run of them in one group (`\text{NaCl}`), with
+    the counts and charges as scripts after it (`\text{H}_2\text{O}`, `\text{SO}_4^{2-}`). That
+    is how OpenStax writes them (`mtext`) and how the equation model wrote them before it was
+    asked for `\ce`, so the readings are the same shape either way."""
     prefix = ""
     nuclide = _nuclide_prefix(s, i)
     if nuclide is not None:
         prefix, i = nuclide
     body: list[str] = []
+    letters: list[str] = []  # element symbols not yet written: one \text group
+
+    def put(piece: str) -> None:
+        if letters:
+            body.append("\\text{" + "".join(letters) + "}")
+            letters.clear()
+        body.append(piece)
+
     n = len(s)
     atoms = 0
     base = False  # the last thing written is something a script can hang on
@@ -456,35 +469,35 @@ def _species_latex(s: str, i: int) -> tuple[str, int]:
             break  # the arrow after the species, not a charge or a bond
         state = _STATE.match(s, i) if c == "(" and base else None
         if state:
-            body.append(state.group(0))
+            put("\\text{" + state.group(0) + "}")
             i = state.end()
             base = False
         elif c in "([":
-            body.append(c)
+            put(c)
             i += 1
             base = False
         elif c in ")]":
-            body.append(c)
+            put(c)
             i += 1
             base = True
         elif "A" <= c <= "Z":
             two = s[i : i + 2]
             if len(two) == 2 and "a" <= two[1] <= "z" and two in ELEMENTS:
-                body.append(two)
+                letters.append(two)
                 i += 2
             elif c in ELEMENTS:
-                body.append(c)
+                letters.append(c)
                 i += 1
             else:
                 raise CeError("not an element symbol")
             atoms += 1
             base = True
-        elif c in "enp" and not body:
+        elif c in "enp" and not body and not letters:
             # the electron, neutron and proton: a lowercase symbol on its own
             after = s[i + 1 : i + 2]
             if after.isalpha() or (c != "e" and after and after not in " +,"):
                 raise CeError("not a species")
-            body.append(c)
+            letters.append(c)
             i += 1
             atoms += 1
             base = True
@@ -492,13 +505,13 @@ def _species_latex(s: str, i: int) -> tuple[str, int]:
             j = i
             while j < n and s[j].isdigit():
                 j += 1
-            body.append(("_" + _group(s[i:j])) if base else s[i:j])
+            put(("_" + _group(s[i:j])) if base else s[i:j])
             i = j
         elif c == "^":
             if not base:
                 raise CeError("superscript with nothing before it")
             latex, i = _caret(s, i)
-            body.append(latex)
+            put(latex)
         elif c == "_":
             if not base:
                 raise CeError("subscript with nothing before it")
@@ -511,7 +524,7 @@ def _species_latex(s: str, i: int) -> tuple[str, int]:
                 if not match:
                     raise CeError("unreadable subscript")
                 inner, j = match.group(1), i + match.end()
-            body.append("_" + _group(inner))
+            put("_" + _group(inner))
             i = j
         elif c in _SIGNS and not (c == "-" and _bond_next(s, i + 1)):
             # a charge: signs right after the species ("Na+", "OH-", "Fe+++", "Cl-(aq)")
@@ -527,23 +540,24 @@ def _species_latex(s: str, i: int) -> tuple[str, int]:
                 break  # "H2+O2": a plus between two species
             if c == "+" and nxt == "(" and not _STATE.match(s, i + count):
                 break
-            body.append("^" + _group((str(count) if count > 1 else "") + _sign(c)))
+            put("^" + _group((str(count) if count > 1 else "") + _sign(c)))
             i += count
         elif c in "-=#":  # a bond: it joins two atoms, so something comes before it
             if not base:
                 raise CeError("bond with nothing before it")
-            body.append({"-": "\\text{-}", "=": "=", "#": "\\equiv "}[c])
+            put({"-": "\\text{-}", "=": "=", "#": "\\equiv "}[c])
             i += 1
             base = False
         elif c in "*." and base:
-            body.append("\\cdot ")
+            put("\\cdot ")
             i += 1
             base = False
         else:
             break
     if not atoms:
         raise CeError("not a species")
-    return prefix + "\\mathrm{" + "".join(body).strip() + "}", i
+    put("")
+    return prefix + "".join(body).strip(), i
 
 
 def _arrow_label(s: str, i: int) -> tuple[str | None, int]:

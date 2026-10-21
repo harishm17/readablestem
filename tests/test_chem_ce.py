@@ -18,76 +18,71 @@ NS = "{http://www.w3.org/1998/Math/MathML}"
     ("ce", "latex"),
     [
         # formulas
-        ("H2O", r"\mathrm{H_2O}"),
-        ("C6H12O6", r"\mathrm{C_6H_{12}O_6}"),
-        ("Ca(OH)2", r"\mathrm{Ca(OH)_2}"),
-        ("Al2(SO4)3", r"\mathrm{Al_2(SO_4)_3}"),
-        ("NaCl", r"\mathrm{NaCl}"),
-        ("CuSO4.5H2O", r"\mathrm{CuSO_4\cdot 5H_2O}"),
+        ("H2O", r"\text{H}_2\text{O}"),
+        ("C6H12O6", r"\text{C}_6\text{H}_{12}\text{O}_6"),
+        ("Ca(OH)2", r"\text{Ca}(\text{OH})_2"),
+        ("Al2(SO4)3", r"\text{Al}_2(\text{SO}_4)_3"),
+        ("NaCl", r"\text{NaCl}"),
+        ("CuSO4.5H2O", r"\text{CuSO}_4\cdot 5\text{H}_2\text{O}"),
         # charges
-        ("Na+", r"\mathrm{Na^+}"),
-        ("OH-", r"\mathrm{OH^-}"),
-        ("H3O+", r"\mathrm{H_3O^+}"),
-        ("NH4+", r"\mathrm{NH_4^+}"),
-        ("SO4^2-", r"\mathrm{SO_4^{2-}}"),
-        ("Fe^3+", r"\mathrm{Fe^{3+}}"),
-        ("Fe^{3+}", r"\mathrm{Fe^{3+}}"),
-        ("Fe+++", r"\mathrm{Fe^{3+}}"),
-        ("CH3CO2-", r"\mathrm{CH_3CO_2^-}"),
-        ("Hg2^2+", r"\mathrm{Hg_2^{2+}}"),
-        ("[Cu(NH3)4]^2+", r"\mathrm{[Cu(NH_3)_4]^{2+}}"),
-        ("e-", r"\mathrm{e^-}"),
+        ("Na+", r"\text{Na}^+"),
+        ("OH-", r"\text{OH}^-"),
+        ("H3O+", r"\text{H}_3\text{O}^+"),
+        ("NH4+", r"\text{NH}_4^+"),
+        ("SO4^2-", r"\text{SO}_4^{2-}"),
+        ("Fe^3+", r"\text{Fe}^{3+}"),
+        ("Fe^{3+}", r"\text{Fe}^{3+}"),
+        ("Fe+++", r"\text{Fe}^{3+}"),
+        ("CH3CO2-", r"\text{CH}_3\text{CO}_2^-"),
+        ("Hg2^2+", r"\text{Hg}_2^{2+}"),
+        ("[Cu(NH3)4]^2+", r"[\text{Cu}(\text{NH}_3)_4]^{2+}"),
+        ("e-", r"\text{e}^-"),
         # states
-        ("NaCl(aq)", r"\mathrm{NaCl(aq)}"),
-        ("H2O(l)", r"\mathrm{H_2O(l)}"),
-        ("CO2(g)", r"\mathrm{CO_2(g)}"),
-        ("AgCl(s)", r"\mathrm{AgCl(s)}"),
-        ("Cl-(aq)", r"\mathrm{Cl^-(aq)}"),
+        ("NaCl(aq)", r"\text{NaCl}\text{(aq)}"),
+        ("H2O(l)", r"\text{H}_2\text{O}\text{(l)}"),
+        ("CO2(g)", r"\text{CO}_2\text{(g)}"),
+        ("AgCl(s)", r"\text{AgCl}\text{(s)}"),
+        ("Cl-(aq)", r"\text{Cl}^-\text{(aq)}"),
         # coefficients and reactions
-        ("2 H2 + O2 -> 2 H2O", r"2 \mathrm{H_2} + \mathrm{O_2} \longrightarrow 2 \mathrm{H_2O}"),
-        ("2H2+O2->2H2O", r"2 \mathrm{H_2} + \mathrm{O_2} \longrightarrow 2 \mathrm{H_2O}"),
-        ("1/2 O2", r"\frac{1}{2} \mathrm{O_2}"),
-        ("0.5 O2", r"0.5 \mathrm{O_2}"),
-        (
-            "N2 + 3 H2 <=> 2 NH3",
-            r"\mathrm{N_2} + 3 \mathrm{H_2} \rightleftharpoons 2 \mathrm{NH_3}",
-        ),
-        ("A <- B", None),  # A is not an element: rejected, below
-        (
-            "Fe^3+ + e- -> Fe^2+",
-            r"\mathrm{Fe^{3+}} + \mathrm{e^-} \longrightarrow \mathrm{Fe^{2+}}",
-        ),
+        ("2 H2 + O2 -> 2 H2O", r"2 \text{H}_2 + \text{O}_2 \longrightarrow 2 \text{H}_2\text{O}"),
+        ("2H2+O2->2H2O", r"2 \text{H}_2 + \text{O}_2 \longrightarrow 2 \text{H}_2\text{O}"),
+        ("1/2 O2", r"\frac{1}{2} \text{O}_2"),
+        ("0.5 O2", r"0.5 \text{O}_2"),
+        ("N2 + 3 H2 <=> 2 NH3", r"\text{N}_2 + 3 \text{H}_2 \rightleftharpoons 2 \text{NH}_3"),
+        ("A <- B", None),  # refused
+        ("Fe^3+ + e- -> Fe^2+", r"\text{Fe}^{3+} + \text{e}^- \longrightarrow \text{Fe}^{2+}"),
         (
             "Ag+(aq) + Cl-(aq) -> AgCl(s)",
-            r"\mathrm{Ag^+(aq)} + \mathrm{Cl^-(aq)} \longrightarrow \mathrm{AgCl(s)}",
+            r"\text{Ag}^+\text{(aq)} + \text{Cl}^-\text{(aq)}"
+            r" \longrightarrow \text{AgCl}\text{(s)}",
         ),
-        ("H+ + OH- -> H2O", r"\mathrm{H^+} + \mathrm{OH^-} \longrightarrow \mathrm{H_2O}"),
-        ("H2 + I2 <-> 2 HI", r"\mathrm{H_2} + \mathrm{I_2} \longleftrightarrow 2 \mathrm{HI}"),
-        ("CaO <-- CaCO3", r"\mathrm{CaO} \longleftarrow \mathrm{CaCO_3}"),
+        ("H+ + OH- -> H2O", r"\text{H}^+ + \text{OH}^- \longrightarrow \text{H}_2\text{O}"),
+        ("H2 + I2 <-> 2 HI", r"\text{H}_2 + \text{I}_2 \longleftrightarrow 2 \text{HI}"),
+        ("CaO <-- CaCO3", r"\text{CaO} \longleftarrow \text{CaCO}_3"),
         (
-            "CaCO3(s) ->[\\Delta] CaO(s) + CO2(g)",
-            r"\mathrm{CaCO_3(s)} \xrightarrow{\Delta} \mathrm{CaO(s)} + \mathrm{CO_2(g)}",
+            r"CaCO3(s) ->[\Delta] CaO(s) + CO2(g)",
+            r"\text{CaCO}_3\text{(s)} \xrightarrow{\Delta}"
+            r" \text{CaO}\text{(s)} + \text{CO}_2\text{(g)}",
         ),
-        ("A ->[heat] B", None),
+        ("A ->[heat] B", None),  # refused
         (
             "H2 + O2 ->[heat] H2O",
-            r"\mathrm{H_2} + \mathrm{O_2} \xrightarrow{\text{heat}} \mathrm{H_2O}",
+            r"\text{H}_2 + \text{O}_2 \xrightarrow{\text{heat}} \text{H}_2\text{O}",
         ),
-        ("N2 <=>[$\\Delta$] NO", r"\mathrm{N_2} \overset{\Delta}{\rightleftharpoons} \mathrm{NO}"),
+        (r"N2 <=>[$\Delta$] NO", r"\text{N}_2 \overset{\Delta}{\rightleftharpoons} \text{NO}"),
         # bonds
-        ("H2C=CH2", r"\mathrm{H_2C=CH_2}"),
-        ("HC#CH", r"\mathrm{HC\equiv CH}"),
-        ("CH3-CH3", r"\mathrm{CH_3\text{-}CH_3}"),
+        ("H2C=CH2", r"\text{H}_2\text{C}=\text{CH}_2"),
+        ("HC#CH", r"\text{HC}\equiv \text{CH}"),
+        ("CH3-CH3", r"\text{CH}_3\text{-}\text{CH}_3"),
         # nuclides
-        ("^{14}_{6}C", r"{}^{14}_6\mathrm{C}"),
-        ("^{0}_{-1}e", r"{}^0_{-1}\mathrm{e}"),
-        ("_{6}^{14}C", r"{}^{14}_6\mathrm{C}"),
+        ("^{14}_{6}C", r"{}^{14}_6\text{C}"),
+        ("^{0}_{-1}e", r"{}^0_{-1}\text{e}"),
+        ("_{6}^{14}C", r"{}^{14}_6\text{C}"),
         (
             "^{238}_{92}U -> ^{234}_{90}Th + ^{4}_{2}He",
-            r"{}^{238}_{92}\mathrm{U} \longrightarrow {}^{234}_{90}\mathrm{Th}"
-            r" + {}^4_2\mathrm{He}",
+            r"{}^{238}_{92}\text{U} \longrightarrow {}^{234}_{90}\text{Th} + {}^4_2\text{He}",
         ),
-        ("n", r"\mathrm{n}"),
+        ("n", r"\text{n}"),
     ],
 )
 def test_ce_subset(ce, latex):
@@ -130,11 +125,11 @@ def test_ce_outside_the_subset_is_refused(ce):
 def test_convert_ce_commands_in_a_longer_expression():
     assert (
         convert_ce_commands(r"K = \frac{[\ce{NH3}]^2}{[\ce{N2}][\ce{H2}]^3}")
-        == r"K = \frac{[\mathrm{NH_3}]^2}{[\mathrm{N_2}][\mathrm{H_2}]^3}"
+        == r"K = \frac{[\text{NH}_3]^2}{[\text{N}_2][\text{H}_2]^3}"
     )
     assert convert_ce_commands(r"x + 1") == r"x + 1"
-    assert convert_ce_commands(r"\ce{H2O}\ce{Na+}") == r"\mathrm{H_2O}\mathrm{Na^+}"
-    assert convert_ce_commands(r"\ce {H2O}") == r"\mathrm{H_2O}"  # a space before the brace
+    assert convert_ce_commands(r"\ce{H2O}\ce{Na+}") == r"\text{H}_2\text{O}\text{Na}^+"
+    assert convert_ce_commands(r"\ce {H2O}") == r"\text{H}_2\text{O}"  # a space before the brace
 
 
 def test_a_name_that_only_starts_with_ce_is_not_converted():
@@ -211,18 +206,30 @@ def test_a_subscript_after_a_parenthesis_in_a_formula_belongs_to_the_group():
     assert "".join(groups[0][1].itertext()) == "3"
 
 
-def test_a_charge_or_count_hangs_on_the_whole_element_symbol():
-    # The converter hangs it on the lowercase letter: N, msup(a, +). It belongs to "Na".
+def test_a_converted_species_has_its_element_symbols_in_one_token_each():
+    # \text groups: "Na" is one token and the charge hangs on it, as OpenStax writes it.
     root = parse(ce_to_latex("Na+"))
+    (msup,) = [n for n in root.iter() if local(n) == "msup"]
+    assert local(msup[0]) == "mtext" and "".join(msup[0].itertext()) == "Na"
+    assert "".join(msup[1].itertext()) == "+"
+    root = parse(ce_to_latex("CaCl2"))
+    tokens = [(local(n), "".join(n.itertext())) for n in root.iter() if local(n) in {"mtext", "mn"}]
+    assert tokens == [("mtext", "CaCl"), ("mn", "2")]
+
+
+def test_a_charge_on_a_mathrm_symbol_hangs_on_the_whole_symbol():
+    # What a model writes without \ce: the converter hangs the charge on the lowercase letter
+    # (N, msup(a, +)); it belongs to "Na".
+    root = parse(r"\mathrm{Na^+}")
     (msup,) = [n for n in root.iter() if local(n) == "msup"]
     assert local(msup[0]) == "mrow" and [local(c) for c in msup[0]] == ["mi", "mi"]
     assert "".join(msup[0].itertext()) == "Na" and "".join(msup[1].itertext()) == "+"
-    root = parse(ce_to_latex("CaCl2"))
+    root = parse(r"\mathrm{Cl_2}")
     (msub,) = [n for n in root.iter() if local(n) == "msub"]
     assert "".join(msub[0].itertext()) == "Cl" and "".join(msub[1].itertext()) == "2"
-    # A symbol with no script stays two upright letters, as published MathML has it.
-    tokens = ["".join(n.itertext()) for n in root.iter() if local(n) in {"mi", "mn"}]
-    assert tokens == ["C", "a", "C", "l", "2"]
+    # A symbol with no script stays two upright letters.
+    root = parse(r"\mathrm{CaO}")
+    assert ["".join(n.itertext()) for n in root.iter() if local(n) == "mi"] == ["C", "a", "O"]
 
 
 def test_symbols_that_are_not_elements_are_not_grouped():

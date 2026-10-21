@@ -162,7 +162,11 @@ def _scripted_species(node: ET.Element) -> bool:
 
 
 def _state_at(kids: list[ET.Element], i: int) -> tuple[str, int] | None:
-    """`( aq )` at kids[i]: the state word and the siblings used."""
+    """`( aq )` at kids[i], or one `mtext` "(aq)": the state word and the siblings used."""
+    if kids[i].tag in {"mtext", "mi"}:
+        text = _text(kids[i])
+        if text.startswith("(") and text.endswith(")") and text[1:-1] in STATE_WORDS:
+            return STATE_WORDS[text[1:-1]], 1
     if i + 2 >= len(kids) or not (kids[i].tag == "mo" and _text(kids[i]) == "("):
         return None
     for used in (1, 2):
@@ -224,6 +228,9 @@ def is_chem_row(kids: list[ET.Element]) -> bool:
             return True
         if _flat_pair(kids, i):
             return True
+        symbols = _formula_text(node)
+        if symbols is not None and len(symbols) >= 2:
+            return True  # "NaCl", "HSO": more than one element symbol in one token
         if _is_species_token(node):
             species += 1
             if i > 0 and (_is_species_token(kids[i - 1]) or _scripted_species(kids[i - 1])):

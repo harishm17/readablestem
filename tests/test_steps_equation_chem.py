@@ -44,9 +44,9 @@ def test_a_ce_answer_is_converted_checked_and_spoken():
     fix = run(client, equation_element(display="inline", text="H3O+"))
     assert fix.status == Status.ACCEPTED
     assert fix.equation is not None
-    assert fix.equation.latex == r"\mathrm{H_3O^+}"
+    assert fix.equation.latex == r"\text{H}_3\text{O}^+"
     assert fix.equation.speech == "H 3 O plus"
-    assert '<mi mathvariant="normal">H</mi>' in fix.equation.mathml
+    assert "<mtext>H</mtext>" in fix.equation.mathml
     assert [r.model for r in client.requests] == [CHEAP_MODEL]
 
 
@@ -71,7 +71,7 @@ def test_ce_inside_ordinary_latex_is_converted_too():
         equation_element(text="K = [NH3]2 [N2][H2]3"),
     )
     assert fix.equation is not None
-    assert fix.equation.latex == r"K = \frac{[\mathrm{NH_3}]^2}{[\mathrm{N_2}][\mathrm{H_2}]^3}"
+    assert fix.equation.latex == r"K = \frac{[\text{NH}_3]^2}{[\text{N}_2][\text{H}_2]^3}"
     assert fix.status == Status.ACCEPTED
 
 
@@ -95,7 +95,7 @@ def test_the_text_layer_still_checks_a_ce_reading():
 
 def test_expand_ce_leaves_everything_else_alone():
     assert expand_ce(r"x^2 + 1") == r"x^2 + 1"
-    assert expand_ce(r"\ce{H2O}") == r"\mathrm{H_2O}"
+    assert expand_ce(r"\ce{H2O}") == r"\text{H}_2\text{O}"
     assert expand_ce(r"\ce{A <=>> B}") == r"\ce{A <=>> B}"  # refused: left for the check
     assert clean_latex(r"\ce{H2O}") == r"\ce{H2O}"  # clean_latex itself does not convert
 
