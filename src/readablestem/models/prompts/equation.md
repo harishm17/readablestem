@@ -66,7 +66,7 @@ units, words, fractions, and quantities such as `K_\text{sp}`) as ordinary LaTeX
   (A, B, X) is not chemistry: `[A]_0`.
 - Whatever `\ce` cannot hold goes in ordinary LaTeX, with `\ce` only for the species inside
   it: `K = \frac{[\ce{NH3}]^2}{[\ce{N2}][\ce{H2}]^3}`, `\text{rate} = k[\ce{NO}]^2`, and a
-  state symbol with a concentration, `\ce{Zn^2+}\text{(aq, 0.10 M)}`. Never put `\text`,
+  state symbol with a concentration, `\mathrm{Zn^{2+}(aq,\ 0.10\ M)}`. Never put `\text`,
   `$` or other LaTeX commands inside `\ce`.
 - Write only what is drawn: do not balance, complete or correct a reaction.
 
