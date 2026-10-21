@@ -67,7 +67,7 @@ from readablestem.core.types import Check, ConversionOptions, Element, Fix, Kind
 from readablestem.eval import equations_symbols as sym
 from readablestem.eval import equations_v2 as v2
 from readablestem.eval import judge as judge_mod
-from readablestem.eval import prose_classes
+from readablestem.eval import prose_classes, table_maths
 from readablestem.eval import verifier_metrics as vm
 from readablestem.eval.equations import (
     EquationScore,
@@ -1717,8 +1717,10 @@ def document_metrics(items: Sequence[dict]) -> dict:
         for reason in UNMATCHED_REASONS
     }
     classes = prose_classes.summarize([i["prose_classes"] for i in items if "prose_classes" in i])
+    cells = [i["table_maths"] for i in items if "table_maths" in i]
     return {
         **({"prose_classes": classes} if classes else {}),
+        **({"table_cell_maths": table_maths.summarize(cells)} if cells else {}),
         "gold_equations": gold,
         "predicted_equations": pred,
         "matched": matched,
@@ -1981,6 +1983,9 @@ def _document_section(
     # glossary, hyphenated words): scored on the output HTML; absent without such gold.
     if classes := prose_classes.score_page(result.html, page):
         item["prose_classes"] = classes
+    # Formulas in the gold's table cells, and how many the page has in cells of its own.
+    if cells := table_maths.score_page(result.html, page):
+        item["table_maths"] = cells
     return item, None
 
 
@@ -2361,6 +2366,9 @@ def format_markdown(report: dict) -> str:
     if metrics.get("prose_classes"):
         lines += ["", "### Prose classes (dev-v2: scripts, code, glossary, hyphenated words)", ""]
         lines += _table(["class", "n", "right", "rate", "other results"], _class_rows(metrics))
+    if metrics.get("table_cell_maths"):
+        lines += ["", "### Formulas in table cells (the gold's data tables with MathML cells)", ""]
+        lines += _table(["metric", "value"], metrics["table_cell_maths"].items())
     if report["task"] in {"equations", "document"} and metrics.get("secondary_stream_v2"):
         lines += ["", "### Secondary scorer: stream v2 (the rows above are primary)", ""]
         lines += _table(
