@@ -1215,7 +1215,7 @@ def _page_math_pass(
                     max_pages=settings.max_pages_per_job,
                     page_math=applied,
                 )
-            except (layout.LayoutError, RuntimeError) as exc:
+            except Exception as exc:  # the first run's pages stand
                 log.warning("page math: the second layout run failed: %s", type(exc).__name__)
                 applied = page_math_reconcile.PageMathHook()
         stats, hook = plan.stats, applied.stats

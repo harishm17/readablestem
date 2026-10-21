@@ -132,20 +132,32 @@ class PageMathHook:
     # -------------------------------------------------------------- layout's two calls
 
     def on_page(self, number: int, text_rows: list[Any], ordered: list[Any], rules: list[Any]):
-        rows, objects = page_rows(ordered)
-        self.rows[number] = rows
-        self.stats.pages_seen += 1
-        page = self.plan.pages.get(number) if self.plan is not None else None
-        if page is None or page.failed is not None:
+        """Layout's first call for a page: record its rows and, with a plan, lay it over them.
+        Never raises: a page this cannot handle is left as layout has it."""
+        try:
+            rows, objects = page_rows(ordered)
+            self.rows[number] = rows
+            self.stats.pages_seen += 1
+            page = self.plan.pages.get(number) if self.plan is not None else None
+            if page is None or page.failed is not None:
+                return text_rows
+            if [(r.id, r.text) for r in page.rows] != [(r.id, r.text) for r in rows]:
+                self.stats.pages_stale += 1
+                log.warning("page math: page %d reads differently than when it was asked", number)
+                return text_rows
+            self._checked.add(number)
+            for row in text_rows:
+                row.page_checked = True
+            return self._apply(page.spans, rows, objects, text_rows, rules)
+        except Exception as exc:  # the page is layout's, whatever went wrong
+            log.warning("page math: page %d left as layout has it: %s", number, type(exc).__name__)
+            self._checked.discard(number)
+            for row in text_rows:
+                row.region = None
+                row.page_checked = False
+                row.page_inline.clear()
+                row.page_nonmath.clear()
             return text_rows
-        if [(r.id, r.text) for r in page.rows] != [(r.id, r.text) for r in rows]:
-            self.stats.pages_stale += 1
-            log.warning("page math: page %d reads differently than when it was asked", number)
-            return text_rows
-        self._checked.add(number)
-        for row in text_rows:
-            row.page_checked = True
-        return self._apply(page.spans, rows, objects, text_rows, rules)
 
     def after_regions(self, number: int, text_rows: list[Any]) -> None:
         if number not in self._checked:

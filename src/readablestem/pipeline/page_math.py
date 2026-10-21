@@ -127,7 +127,7 @@ class PageMathOutput(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    expressions: list[Expression] = Field(default_factory=list)
+    expressions: list[Expression]
 
 
 # ----------------------------------------------------------------------------- plan

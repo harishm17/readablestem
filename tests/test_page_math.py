@@ -241,7 +241,7 @@ def test_a_row_the_context_left_out_cannot_be_anchored():
 
 
 def test_the_pass_skips_a_page_with_no_text_and_a_page_whose_image_fails():
-    client = StandIn(PageMathOutput())
+    client = StandIn(PageMathOutput(expressions=[]))
     pages = {
         0: ([row("L0", "x")], lambda: b"png"),  # too little text
         1: ([row("L0", "x = 5 and more")], lambda: b"png"),
@@ -259,7 +259,7 @@ def test_a_budget_refusal_stops_the_pass_and_keeps_what_was_answered():
                 raise BudgetExceeded("budget_job_usd", "no more")
             return super().run(request, schema, is_fallback=is_fallback)
 
-    client = Refuses(PageMathOutput())
+    client = Refuses(PageMathOutput(expressions=[]))
     pages = {
         0: ([row("L0", "first page, x = 1")], lambda: b"png"),
         1: ([row("L0", "second page, y = 2")], lambda: b"png"),
@@ -556,3 +556,19 @@ def test_an_inline_span_is_grown_over_the_letters_glued_to_it():
         if e.kind == Kind.EQUATION and e.display == "inline"
     ]
     assert inline == ["nth", "n"]
+
+
+def test_a_failure_while_laying_the_plan_leaves_the_page_as_layout_has_it(monkeypatch):
+    pdf = pdf_with(sentence_page)
+    rows = collect(pdf).rows[0]
+    span = Span((find(rows, "x + y = 5"), find(rows, "y = 2 x")), "block", "math", "x+y=5")
+    hook = reconcile.PageMathHook(MathPlan({0: PagePlan(rows, [span])}))
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("broken")
+
+    monkeypatch.setattr(reconcile.PageMathHook, "_screen_blocks", boom)
+    base = layout.analyze(pdf).elements
+    got = layout.analyze(pdf, page_math=hook).elements
+    assert [(e.kind, e.text, e.bbox) for e in got] == [(e.kind, e.text, e.bbox) for e in base]
+    assert all(e.page_status is None for e in got)

@@ -1486,6 +1486,25 @@ paragraphs of coloured text on the same page gets the optional notice
 pages of an open PyMuPDF document (hold layout's lock): `SourceFacts.links`. The pass
 also returns the same count for the analysed pages as `TextPassResult.annotations`.
 
+## The page math hook (`pipeline/page_math_reconcile.py`, `FEATURE_PAGE_MATH`, off)
+
+`analyze(pdf, page_math=hook)` calls `hook.on_page(number, rows, ordered, rules)` once per page
+after the fragments are resolved and before `_equation_regions`, and `hook.after_regions` after it.
+With a collecting hook (no plan) layout is unchanged and the hook records each page's rows as
+the page pass is shown them: `L0, L1, ...` in reading order, rotated rows left out, each row's
+text with control characters dropped and blanks collapsed, one character of that text for one
+character of the row (`page_math.PageRow`). With a verified plan the hook cuts rows at the
+anchors, makes the block spans `_Region`s (`forced`, with their rules and labels), marks inline
+spans on their rows (`_Row.page_inline`, which `_paragraph_pieces` turns into inline
+equations) and what the pass called a look-alike (`_Row.page_nonmath`, which drops layout's runs
+inside it), and the rest of the page goes through the rules above unchanged. `Element.page_latex`
+and `Element.page_status` ("span": the pass placed it; "layout": only layout found it) carry the
+result to the equation step. A block span that would split a layout region or leave a piece layout
+reads as maths in a shared row is refused (`HookStats.refused`); a span whose LaTeX and quoted text
+disagree is dropped (`inconsistent`); an exception in the hook leaves the page as layout has it.
+The design and its measurements: [ADR 0006](decisions/0006-page-math-pass.md),
+[eval-page-math.md](eval-page-math.md).
+
 ## Errors
 
 `LayoutError.code` is a category, safe to log; messages never contain document text.
