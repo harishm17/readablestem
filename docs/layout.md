@@ -590,7 +590,7 @@ raised text (next section).
   glyph between them (the text after `SO42-` in TeX output) gets a space on that side
   (`_gap_before`, `_gap_after`); `releases ⟦e1⟧ions` read as one word before.
 - Measured on the 121 PDFs of `scripts/layout_identity.py`: 96 are identical, and the 25 that differ
-  are the chemistry sections (21 prints), the authored chemistry document, the Word lecture (its
+  are the chemistry material (21 files: the section prints, the authored chemistry document, a fixture), the Word lecture (its
   formulas and ions), one slide whose reaction line was a heading and is now an equation, and
   a space after "Simplify:" in the two prints of an algebra section. Nothing in physics, algebra,
   statistics or the other slides and Word material gains a formula that is not one.
