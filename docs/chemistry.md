@@ -271,6 +271,10 @@ Twenty of the 24, as read (the rest are in the tests):
 - **The primary and symbols scorers reward the spelling of the gold**, so a change that is right
   for a reader (the group a bracket's script belongs to, an arrow as an operator) can lower them
   on gold made by the older converter; `scripts/dev_chem.py` has a score that does not.
+- **The prompt's one `\mathrm` example** (a state symbol with a concentration) is older than the
+  `\text` shape the converter now writes; changing it changes the prompt's version and with it
+  every recorded answer, so it waits for the next re-recording. The table prompt
+  (`models/prompts/table.md`) does not teach `\ce` either, and `table_step` does not expand it.
 - **Real screen readers were not run.** The reading is the review screen's string; what NVDA with
   MathCAT or VoiceOver says about this MathML (`mtext` element symbols in OpenStax's shape,
   grouped scripts) is the manual test of docs/mathml-alttext.md and was not done.
