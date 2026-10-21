@@ -282,3 +282,17 @@ def test_a_split_gold_equation_is_credited_in_the_symbols_scorer_too():
     secondary = pe.document_metrics([item])["secondary_symbols"]
     assert secondary["end_to_end_exact"] == 0.0
     assert secondary["end_to_end_exact_with_credit"] == 1.0
+
+
+def test_a_binomial_is_the_same_symbols_as_brackets_around_a_one_column_table():
+    gold = (
+        "<mo>(</mo><mtable><mtr><mtd><mn>17</mn></mtd></mtr><mtr><mtd><mn>6</mn></mtd></mtr>"
+        "</mtable><mo>)</mo>"
+    )
+    assert sym.score_symbols_latex(r"\binom{17}{6}", mml(gold)).exact
+    assert sym.score_symbols_latex(
+        r"\left( \begin{array}{c} 17 \\ 6 \end{array} \right)", mml(gold)
+    ).exact
+    assert not sym.score_symbols_latex(r"\binom{17}{7}", mml(gold)).exact
+    # a fraction with a bar is still a fraction
+    assert not sym.score_symbols_latex(r"\left( \frac{17}{6} \right)", mml(gold)).exact

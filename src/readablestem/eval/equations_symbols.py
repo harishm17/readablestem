@@ -35,7 +35,9 @@ unified here:
    reading order whether the script hangs on a single symbol or on a bracketed group that
    ends in that symbol. A slot holding more than one atom is still a group (`<g>...</g>`),
    so `x^{ab}` and `x^a b` differ, but the `mrow`s that make the group do not matter.
-3. **Under and over are scripts.** `\lim_{x \to 0}` (limits) and `\lim_{x \to 0}` written as
+3. **A fraction with no bar is a stack.** A binomial coefficient written `\binom{n}{k}` is the
+   same symbols as the answer key's brackets around a one-column table.
+4. **Under and over are scripts.** `\lim_{x \to 0}` (limits) and `\lim_{x \to 0}` written as
    a subscript are the same symbols.
 
 On the development sets (docs/eval-symbols note) every pair stream v2 calls exact is exact
@@ -46,6 +48,7 @@ streams) and a similarity (1 - edit distance / longer stream), and `credit_split
 
 from __future__ import annotations
 
+import re
 import xml.etree.ElementTree as ET
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
@@ -116,6 +119,10 @@ def _walk(elem: ET.Element) -> list[str]:
         else:
             out += ["_", *_slot(children[1]), "^", *_slot(children[2])]
         return out
+    if tag == "mfrac" and len(children) == 2 and _no_bar(elem):
+        # A binomial coefficient (`\binom`, a fraction with no bar) is two entries one over the
+        # other: the same symbols as a one-column table between brackets.
+        return [a for child in children for a in _walk(child)]
     if tag == "mfrac" and len(children) == 2:
         return ["<frac>", *_slot(children[0]), "|", *_slot(children[1]), "</frac>"]
     if tag == "msqrt":
@@ -126,6 +133,13 @@ def _walk(elem: ET.Element) -> list[str]:
     for child in children:
         out += _walk(child)
     return out
+
+
+def _no_bar(frac: ET.Element) -> bool:
+    """A fraction drawn with no bar (`linethickness` zero)."""
+    value = (frac.get("linethickness") or "").strip().lower()
+    match = re.fullmatch(r"([0-9.]+)\s*[a-z%]*", value)
+    return bool(match) and float(match.group(1) or 1) == 0.0
 
 
 def symbols_of(source: str | ET.Element) -> list[str]:

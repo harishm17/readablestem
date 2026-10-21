@@ -198,6 +198,7 @@ class PageMathHook:
                     else:
                         self.stats.skipped += 1
                 elif span.role == "math":  # inline
+                    lo, hi = _with_scripts(row, lo, hi)
                     inline.append((seg.row, lo, hi, span.latex))
                 else:
                     nonmath.append((seg.row, lo, hi))
@@ -370,6 +371,45 @@ class PageMathHook:
 
     def summary(self) -> Counter[str]:
         return Counter(self.stats.as_dict())
+
+
+ATTACHED_LETTERS = 4  # at most this many glued letters or digits after a span
+
+
+def _with_scripts(row: Any, lo: int, hi: int) -> tuple[int, int]:
+    """`lo:hi` grown over what is stuck to it: sub- and superscript glyphs on either side (a
+    charge, an index the model's quote left outside), and up to `ATTACHED_LETTERS` letters
+    or digits glued to its end with no space (the "th" of "(r+1)th" and "nth"; a model quotes
+    what it reads as the formula and leaves the word-ending behind, but the text layer has
+    one token there, and the answer key's formula holds it)."""
+    chars = row.chars
+    gap = 0.3 * row.size
+    while (
+        hi < len(chars)
+        and not chars[hi].blank
+        and row.is_script(chars[hi])
+        and chars[hi].x0 - chars[hi - 1].x1 <= gap
+    ):
+        hi += 1
+    glued = 0
+    while (
+        hi < len(chars)
+        and glued < ATTACHED_LETTERS
+        and chars[hi].c.isalnum()
+        and chars[hi].x0 - chars[hi - 1].x1 <= gap
+    ):
+        hi += 1
+        glued += 1
+    if hi < len(chars) and glued and chars[hi].c.isalnum():
+        hi -= glued  # a longer word: the quote was right to stop where it did
+    while (
+        lo > 0
+        and not chars[lo - 1].blank
+        and row.is_script(chars[lo - 1])
+        and chars[lo].x0 - chars[lo - 1].x1 <= gap
+    ):
+        lo -= 1
+    return lo, hi
 
 
 def _gaps(length: int, taken: list[tuple[int, int]]) -> list[tuple[int, int]]:

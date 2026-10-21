@@ -529,3 +529,30 @@ def test_a_recorded_plan_never_changes_the_text_the_pdf_has():
         planned = letters(layout.analyze(pdf, page_math=hook).elements)
         assert not [c for c in planned if c not in alone], name
         assert len(planned) >= 0.97 * len(alone), name
+
+
+def test_an_inline_span_is_grown_over_the_letters_glued_to_it():
+    """A quote of "n" in "the nth term" leaves the "th" behind: the text layer has one token
+    there and the answer key's formula holds the ordinal, so the span takes it (`nth`), but a
+    longer word is left alone ("nonsense")."""
+
+    def draw(page):
+        page.insert_text((72, 100), "Find the nth term and the nonsense term here.", fontsize=11)
+
+    pdf = pdf_with(draw)
+
+    def build(rows):
+        text = rows[0].text
+        a, b = text.index("nth"), text.index("nonsense")
+        return [
+            Span((Segment("L0", a, a + 1),), "inline", "math", "n"),
+            Span((Segment("L0", b, b + 1),), "inline", "math", "n"),
+        ]
+
+    hook = plan_for(pdf, build)
+    inline = [
+        e.text
+        for e in layout.analyze(pdf, page_math=hook).elements
+        if e.kind == Kind.EQUATION and e.display == "inline"
+    ]
+    assert inline == ["nth", "n"]
