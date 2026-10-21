@@ -1,5 +1,12 @@
 # Changelog
 
+## Railway infrastructure as code (2026-10-21)
+
+- The Railway project is now described in `.railway/railway.ts` (imported from production, so
+  `railway config plan` reports no changes) instead of `railway.json` and
+  `deploy/railway.cron.json`, which Railway stops reading on 2026-12-01 and which no service read.
+  Both files are deleted. How to change the infrastructure: [docs/deploy-railway.md](docs/deploy-railway.md).
+
 ## Open sign-up (2026-10-21)
 
 - `SIGNUP_MODE=open` lets anyone with a verified Google account (or an allowed Microsoft one)
