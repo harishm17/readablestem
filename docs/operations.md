@@ -487,9 +487,14 @@ tiers"; decisions: docs/launch.md, "Open sign-up".
 - **Deletion requests.** A person can delete their own account (Account page). If they cannot sign
   in, `readablestem users delete EMAIL --yes` does the same. Backups keep the row until they roll
   over.
-- **A day's accounts are counted once.** Deleting an account does not give its place back, and a
-  person who deletes and signs up again starts with new quotas; the per-address rule (5 an hour),
-  the day's cap and the pool bound that, they do not stop it.
+- **A day's accounts are counted once.** Deleting an account does not give its place back, and an
+  address that deleted its account today comes back with the day's pages, reads and place already
+  used (`deleted_accounts`, a keyed hash of the address, purged the next day). The per-address rule
+  (5 an hour) and the pool bound what a determined person can still do with many addresses.
+- **Spend holds.** `holds_released` (a warning, with a count and dollars) means a dead process's
+  holds were given back, at start-up, by the hourly backstop or when a lease ran out; one after a
+  deploy is normal. Holds are rows of `spend_holds`; a row older than a day with the worker running
+  is a bug.
 
 ## Tracing (Langfuse)
 

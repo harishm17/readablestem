@@ -28,7 +28,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func, select
 
 from readablestem.ops.retention import erase_user
-from readablestem.web import access
+from readablestem.web import access, tombstones
 from readablestem.web.database import as_utc, utc_today
 from readablestem.web.db import Job, User, session_scope, utcnow
 from readablestem.web.deps import CurrentUser, UserDep, flash, get_ctx, render, require_csrf
@@ -68,6 +68,9 @@ def _context(request: Request, user: CurrentUser) -> dict[str, Any]:
         "reread_allowance": allowance,
         "rereads_left": rereads_left,
         "documents": documents,
+        "is_admin": user.is_admin,
+        "provider": s.model_provider,
+        "signup_open": s.signup_open,
         "next_reset": next_day_start(now),
     }
 
@@ -104,8 +107,11 @@ async def delete_account(
 
 
 def _delete_now(request: Request, user: CurrentUser) -> Response:
+    settings = get_ctx(request).settings
     with session_scope(get_ctx(request).factory) as session:
-        stats = erase_user(session, user.id)
+        # What the account used today is kept, under a hash of its address, for the rest of
+        # the day (`web.tombstones`): deleting it does not reset the day's limits.
+        stats = erase_user(session, user.id, tombstone_key=tombstones.tombstone_key(settings))
     log_event(logger, "account_deleted", jobs=stats.jobs_deleted, tier=user.access_tier)
     request.session.clear()  # signed out; the cookie is signed, so nothing else to end
     request.state.user = None

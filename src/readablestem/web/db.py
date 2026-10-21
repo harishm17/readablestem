@@ -3,8 +3,9 @@
 Retention model: everything derived from a user's document (the upload, crops, the
 result JSON, the output HTML, review edits, stage progress) hangs off `jobs` and is
 deleted with it by `ops.retention`. Tables that survive a job's deletion (`spend_days`,
-`quota_days`, `signup_days`, `error_aggregates`, `events`) hold numbers and category codes
-only, never document text.
+`spend_holds`, `quota_days`, `signup_days`, `deleted_accounts`, `error_aggregates`, `events`) hold
+numbers and category codes only (`deleted_accounts` a day-long hash of an address), never
+document text.
 
 User content that is not a document (a user's `courses` and their `notation_entries`)
 and sign-in data (`auth_identities`) belong to the user: they stay until the user deletes
@@ -256,6 +257,43 @@ class SpendDay(Base):
     held_usd: Mapped[float] = mapped_column(Float, default=0.0)
     open_spent_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     open_held_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+
+
+class SpendHold(Base):
+    """One open reservation of the spend guard (`web.spend`): what a model call holds against
+    the day's cap (and the open pool) until it settles. Written in the same transaction as the
+    hold on `spend_days`, deleted by the settlement that releases it. It exists so that a hold
+    cannot outlive the process that made it: a worker that died leaves rows behind, and the
+    worker that comes next releases them (`DbSpendGuard.release_holds`, by job when a lease
+    runs out, by age at start-up). `job_id` is a job id but not a foreign key, so deleting a job
+    never touches the guard's books. Numbers only."""
+
+    __tablename__ = "spend_holds"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, index=True)
+    amount_usd: Mapped[float] = mapped_column(Float)
+    in_pool: Mapped[bool] = mapped_column(Boolean, default=False)
+    job_id: Mapped[str | None] = mapped_column(String(32), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+
+class DeletedAccount(Base):
+    """What an account that was deleted today had used, kept until the day ends so that
+    deleting an account and signing up again does not reset the day's limits
+    (`web.tombstones`). Keyed by an HMAC of the normalised email address, never the address;
+    holds the day's pages and model reads and whether the account took one of the day's
+    places for new accounts. Purged after its day (`ops.retention.purge_tombstones`)."""
+
+    __tablename__ = "deleted_accounts"
+
+    email_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True, index=True)
+    pages: Mapped[int] = mapped_column(Integer, default=0)
+    rereads: Mapped[int] = mapped_column(Integer, default=0)
+    slot_taken: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class QuotaDay(Base):

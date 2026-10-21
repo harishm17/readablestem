@@ -830,3 +830,52 @@ def test_the_open_signup_migration_round_trips_on_postgres(pg_url):
             assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
     finally:
         engine.dispose()
+
+
+def test_settlements_and_releases_racing_for_the_same_holds_release_each_once(factory):
+    guard = DbSpendGuard(factory, 100.0, open_cap_usd=100.0)
+    reservations = [guard.scoped("open", "a" * 32).reserve(0.1) for _ in range(40)]
+    turn = iter(range(8))
+    lock = threading.Lock()
+
+    def settle_or_release() -> None:
+        with lock:
+            me = next(turn)
+        if me == 0:  # one thread settles all forty ...
+            for reservation in reservations:
+                guard.settle(reservation, 0.05)
+        for _ in range(20):  # ... while every thread keeps releasing the job's holds
+            guard.release_holds(job_ids=["a" * 32])
+
+    run_threads(8, settle_or_release)
+    snapshot = guard.snapshot()
+    assert snapshot.held_usd == pytest.approx(0.0, abs=1e-9)
+    assert snapshot.open_held_usd == pytest.approx(0.0, abs=1e-9)
+    assert snapshot.spent_usd == pytest.approx(0.05 * 40)
+    with db.session_scope(factory) as session:
+        assert session.scalar(select(func.count()).select_from(db.SpendHold)) == 0
+
+
+def test_signing_up_again_after_deleting_takes_no_new_place_with_20_threads(factory):
+    from readablestem.ops.retention import erase_user
+    from readablestem.web import tombstones
+    from readablestem.web.auth import sign_in_by_email
+
+    settings = make_settings(Path("."), signup_mode="open", max_new_accounts_per_day=3)
+    first = sign_in_by_email(factory, settings, "back@example.org", None)
+    assert first.user_id is not None
+    with db.session_scope(factory) as session:
+        erase_user(session, first.user_id, tombstone_key=tombstones.tombstone_key(settings))
+    results = []
+    lock = threading.Lock()
+
+    def come_back() -> None:
+        outcome = sign_in_by_email(factory, settings, "back@example.org", None)
+        with lock:
+            results.append(outcome)
+
+    run_threads(20, come_back)
+    assert len({r.user_id for r in results}) == 1 and all(r.user_id for r in results)
+    with db.session_scope(factory) as session:
+        assert session.scalar(select(db.SignupDay.accounts)) == 1  # her place, used once
+        assert session.scalar(select(func.count()).select_from(db.User)) == 1

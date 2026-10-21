@@ -9,7 +9,9 @@ dev login, the fake converter and the offline model client.
 
 from __future__ import annotations
 
+import re
 import threading
+import time
 from datetime import timedelta
 
 import pytest
@@ -550,7 +552,8 @@ def test_an_open_tier_account_can_start_only_so_many_model_reads_a_day(reviewing
     third = mark_region(reviewing)
     assert third.status_code == 422
     text = " ".join(third.text.split())
-    assert "You have used all 2 reads with the model that a new account has today" in text
+    assert "You have started 2 reads with the model today, the most a new account can start" in text
+    assert "counts when it starts" in text
     assert "Type it yourself" in text
     assert rereads_counted(reviewing) == 2
 
@@ -637,7 +640,8 @@ def test_the_admin_page_offers_block_for_open_tier_and_remove_for_invited(admin_
     admin_web.allow(BOB)
     login(admin_web.client(), CAROL)
     page = admin_web.browser.get("/admin").text
-    assert page.count('action="/admin/users/block"') == 1
+    # The "Block by email" form, and the one button of the open-tier account.
+    assert page.count('action="/admin/users/block"') == 2
     assert page.count('action="/admin/allowlist/remove"') == 1  # bob; not the admin's own row
 
 
@@ -666,15 +670,35 @@ def test_blocking_stops_the_accounts_queued_work(open_web):
     assert open_web.run_worker() is None  # nothing of theirs is claimed
 
 
-def test_the_admin_list_says_how_many_it_shows(tmp_path):
+def test_the_admin_list_shows_the_newest_accounts_and_block_by_email_reaches_the_rest(
+    tmp_path, monkeypatch
+):
     import readablestem.web.routes.admin as admin_routes
 
+    monkeypatch.setattr(admin_routes, "PEOPLE_ROWS", 3)
     env = make_env(tmp_path)
-    with env.running() as client:
-        login(client, ADMIN)
-        assert (
-            f"The first {admin_routes.PEOPLE_ROWS} accounts are listed" in client.get("/admin").text
-        )
+    with env.running() as admin:
+        login(admin, ADMIN)
+        for n in range(6):
+            login(env.client(), f"person{n}@example.org")
+            time.sleep(0.01)  # created_at orders them
+        page = admin.get("/admin").text
+        assert "The newest 3 accounts are listed" in page
+        shown = [e for e in re.findall(r"person\d@example.org", page)]
+        assert {"person5@example.org", "person4@example.org", "person3@example.org"} <= set(shown)
+        assert "person0@example.org" not in page  # older than the list reaches
+        assert shown.index("person5@example.org") < shown.index("person3@example.org")
+        # The form takes any address, listed or not.
+        assert 'for="block-email"' in page and "Block by email" in page
+        post_admin(env_for(admin), "/admin/users/block", email="person0@example.org")
+        refused = login(env.client(), "person0@example.org")
+        assert refused.status_code == 403 and "This account cannot be used" in refused.text
+        assert "person0@example.org" in admin.get("/admin").text  # now in the blocked table
+
+
+def env_for(client):
+    """`post_admin` wants an env with a `browser`; a bare client is enough."""
+    return type("E", (), {"browser": client})()
 
 
 # --------------------------------------------------------------------------- deleting an account
@@ -793,15 +817,16 @@ def test_deleting_an_account_removes_the_person_and_everything_of_theirs(open_we
     assert kept["identities"] == 1 and kept["linked"] == 1
 
 
-def test_a_deleted_account_signing_in_again_is_a_new_empty_account_and_counts_as_new(open_web):
+def test_a_deleted_account_signing_in_again_is_a_new_empty_account(open_web):
+    """Empty of documents; the day's counts are not reset (tests/test_web_account_tombstones.py)."""
     old = populate(open_web, CAROL)
     delete_account(client_for(open_web, CAROL))
-    assert signups_now(open_web) == 1  # not given back
+    assert signups_now(open_web) == 1  # her place for today stays used, and is reused
     assert login(open_web.client(), CAROL).status_code == 303
     row = user_row(open_web, CAROL)
     assert row is not None and row.id != old and row.access_tier == access.OPEN
     assert rows_of(open_web, row.id)["jobs"] == 0
-    assert signups_now(open_web) == 2
+    assert signups_now(open_web) == 1
 
 
 def test_in_invitation_mode_the_confirmation_says_deleting_leaves_the_list(closed_web):

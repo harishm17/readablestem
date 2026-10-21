@@ -38,8 +38,9 @@ router = APIRouter()
 AGGREGATE_DAYS = 14
 AGGREGATE_ROWS = 200
 USAGE_DAYS = 28  # four weeks: the return-visit measure of the beta
-# Rows of each people table. With open sign-up there can be thousands of accounts: the page
-# lists the first of them by address and says how many there are.
+# Rows of each people table, newest accounts first. With open sign-up there can be thousands
+# of accounts: the page lists the newest and says so, and the "Block by email" form reaches
+# any account, listed or not.
 PEOPLE_ROWS = 300
 
 
@@ -58,7 +59,7 @@ def admin_context(request: Request) -> dict[str, Any]:
             for u in session.scalars(
                 select(User)
                 .where(User.is_allowed.is_(True))
-                .order_by(User.email)
+                .order_by(User.created_at.desc(), User.email)
                 .limit(PEOPLE_ROWS)
             )
         ]
@@ -71,7 +72,7 @@ def admin_context(request: Request) -> dict[str, Any]:
             for u in session.scalars(
                 select(User)
                 .where(User.is_allowed.is_(False))
-                .order_by(User.email)
+                .order_by(User.created_at.desc(), User.email)
                 .limit(PEOPLE_ROWS)
             )
         ]

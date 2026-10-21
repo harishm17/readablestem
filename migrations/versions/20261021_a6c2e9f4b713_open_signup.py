@@ -9,6 +9,10 @@ working on the migrated schema (a traffic rollback between `migrate` and `servic
   to jobs of open-tier accounts (the pool `OPEN_TIER_DAILY_SPEND_CAP_USD` limits).
 - `quota_days.rereads`: model reads from review started per person per day.
 - `signup_days`: accounts made by open sign-up per UTC day (`MAX_NEW_ACCOUNTS_PER_DAY`).
+- `spend_holds`: one row per open reservation of the spend guard, so a hold cannot outlive
+  the process that made it (`web.spend`, released by job and by age). Empty at the start.
+- `deleted_accounts`: what an account deleted today had used, under a hash of its address,
+  for the rest of that day (`web.tombstones`). Empty at the start.
 
 Nothing changes while `SIGNUP_MODE` is "allowlist" (the default). The downgrade drops the
 columns and the table. `tests/test_web_migrations.py` and `tests/test_web_postgres.py` check
@@ -55,9 +59,36 @@ def upgrade() -> None:
         sa.Column("accounts", sa.Integer(), nullable=False),
         sa.PrimaryKeyConstraint("day"),
     )
+    op.create_table(
+        "spend_holds",
+        sa.Column("id", sa.String(length=32), nullable=False),
+        sa.Column("day", sa.Date(), nullable=False),
+        sa.Column("amount_usd", sa.Float(), nullable=False),
+        sa.Column("in_pool", sa.Boolean(), nullable=False),
+        sa.Column("job_id", sa.String(length=32), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    with op.batch_alter_table("spend_holds", schema=None) as batch_op:
+        batch_op.create_index(batch_op.f("ix_spend_holds_day"), ["day"], unique=False)
+        batch_op.create_index(batch_op.f("ix_spend_holds_job_id"), ["job_id"], unique=False)
+        batch_op.create_index(batch_op.f("ix_spend_holds_created_at"), ["created_at"], unique=False)
+    op.create_table(
+        "deleted_accounts",
+        sa.Column("email_hash", sa.String(length=64), nullable=False),
+        sa.Column("day", sa.Date(), nullable=False),
+        sa.Column("pages", sa.Integer(), nullable=False),
+        sa.Column("rereads", sa.Integer(), nullable=False),
+        sa.Column("slot_taken", sa.Boolean(), nullable=False),
+        sa.PrimaryKeyConstraint("email_hash", "day"),
+    )
+    with op.batch_alter_table("deleted_accounts", schema=None) as batch_op:
+        batch_op.create_index(batch_op.f("ix_deleted_accounts_day"), ["day"], unique=False)
 
 
 def downgrade() -> None:
+    op.drop_table("deleted_accounts")
+    op.drop_table("spend_holds")
     op.drop_table("signup_days")
     with op.batch_alter_table("quota_days", schema=None) as batch_op:
         batch_op.drop_column("rereads")

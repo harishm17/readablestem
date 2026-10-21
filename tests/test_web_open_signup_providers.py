@@ -157,6 +157,7 @@ def test_the_per_address_rule_applies_to_the_google_callback_too(tmp_path, monke
 def microsoft_env(tmp_path, **overrides) -> tuple[WebEnv, FakeMicrosoft]:
     env = WebEnv(tmp_path, **GOOGLE | MS | overrides)
     fake = FakeMicrosoft(ALICE)
+    fake.claims["xms_edov"] = True  # the directory vouches for the address (open sign-up needs it)
     fake.install(env.ctx)
     return env, fake
 
@@ -229,3 +230,122 @@ def test_a_microsoft_token_without_an_address_gets_no_account(tmp_path, mode):
         response = ms_sign_in(env, fake, client)
         assert response.status_code == 403 and "No email address" in response.text
         assert users(env) == 1 and identities(env) == []
+
+
+# --------------------------------------------------------------------------- Microsoft: trust
+
+
+def refusal(response) -> str:
+    return " ".join(response.text.split())
+
+
+@pytest.mark.parametrize(
+    "label, claims",
+    [
+        ("absent", {}),
+        ("false", {"xms_edov": False}),
+        ("sign-in name only", {"xms_edov": False, "email": None}),
+    ],
+)
+def test_an_address_the_directory_does_not_vouch_for_makes_no_account(tmp_path, label, claims):
+    """nOAuth: with open sign-up an email claim anyone can put in a directory would make an
+    account, or take one over, for any address. Only `xms_edov` true counts."""
+    env, fake = microsoft_env(tmp_path, signup_mode="open")
+    fake.claims.pop("xms_edov", None)
+    for key, value in claims.items():
+        if value is None:
+            fake.claims.pop(key, None)
+        else:
+            fake.claims[key] = value
+    with env.running() as client:
+        response = ms_sign_in(env, fake, client)
+        text = refusal(response)
+        assert response.status_code == 403
+        assert "Please sign in with Google" in text
+        assert "Sign in with your Google account instead" in text
+        assert user(env, ALICE) is None and identities(env) == []
+        with session_scope(env.ctx.factory) as session:
+            assert signups_today(session, utc_today()) == 0
+        assert client.get("/app").status_code == 303
+
+
+def test_an_unverified_address_cannot_take_over_an_open_account(tmp_path):
+    env, fake = microsoft_env(tmp_path, signup_mode="open")
+    with env.running():
+        with session_scope(env.ctx.factory) as session:  # a Google sign-up made this account
+            session.add(User(email=ALICE, is_allowed=True, access_tier=access.OPEN))
+        fake.claims["xms_edov"] = False
+        response = ms_sign_in(env, fake, env.client())
+        assert response.status_code == 403 and "Please sign in with Google" in refusal(response)
+        assert identities(env) == []
+
+
+def test_a_first_microsoft_sign_in_does_not_link_to_an_invited_account_or_an_admin(tmp_path):
+    env, fake = microsoft_env(tmp_path, signup_mode="open")
+    with env.running():
+        env.allow(ALICE)  # invited
+        response = ms_sign_in(env, fake, env.client())
+        assert response.status_code == 403 and "Please sign in with Google" in refusal(response)
+        assert identities(env) == []
+        env.allow(ALICE, admin=True)
+        assert ms_sign_in(env, fake, env.client()).status_code == 403
+        assert identities(env) == []
+        # An open-tier admin is refused too: the check is on the role, not only the tier.
+        with session_scope(env.ctx.factory) as session:
+            row = session.scalar(select(User).where(User.email == ALICE))
+            assert row is not None
+            row.access_tier = access.OPEN
+        assert ms_sign_in(env, fake, env.client()).status_code == 403
+        assert identities(env) == []
+
+
+def test_an_open_tier_account_can_link_a_verified_microsoft_identity(tmp_path):
+    env, fake = microsoft_env(tmp_path, signup_mode="open")
+    with env.running():
+        with session_scope(env.ctx.factory) as session:
+            session.add(User(email=ALICE, is_allowed=True, access_tier=access.OPEN))
+        response = ms_sign_in(env, fake, env.client())
+        assert response.status_code == 303
+        assert [i[0] for i in identities(env)] == ["microsoft"]
+        with session_scope(env.ctx.factory) as session:
+            assert signups_today(session, utc_today()) == 0  # no new account
+
+
+def test_an_identity_linked_before_sign_up_opened_keeps_signing_in(tmp_path):
+    """Linking is refused for invited people only the first time: the identity decides
+    afterwards, whatever the token's address says."""
+    from readablestem.web.identities import MICROSOFT, Identity, link
+
+    env, fake = microsoft_env(tmp_path, signup_mode="open")
+    with env.running():
+        env.allow(ALICE, admin=True)
+        alice = user(env, ALICE)
+        assert alice is not None
+        issuer = f"https://login.microsoftonline.com/{TENANT}/v2.0"
+        with session_scope(env.ctx.factory) as session:
+            link(session, alice.id, Identity(MICROSOFT, issuer, fake.claims["sub"], tenant=TENANT))
+        fake.claims["xms_edov"] = False  # even an unverified token signs a linked identity in
+        assert ms_sign_in(env, fake, env.client()).status_code == 303
+
+
+def test_in_allowlist_mode_the_microsoft_rules_are_as_they_were(tmp_path):
+    """No `xms_edov`, an invited user: still linked by address (the pilot's way in)."""
+    env, fake = microsoft_env(tmp_path, signup_mode="allowlist")
+    fake.claims.pop("xms_edov")
+    with env.running() as client:
+        env.allow(ALICE)
+        assert ms_sign_in(env, fake, client).status_code == 303
+        assert [i[0] for i in identities(env)] == ["microsoft"]
+
+
+def test_the_verified_address_is_the_email_claim_with_a_verified_domain_only():
+    from readablestem.web.microsoft import verified_email
+
+    claims = {"email": "a@uni.edu", "preferred_username": "b@uni.edu"}
+    assert verified_email(claims) is None  # absent: not known to be verified
+    for yes in (True, "true", "True", "1"):
+        assert verified_email(claims | {"xms_edov": yes}) == "a@uni.edu"
+    for no in (False, "false", "False", "0", None, 0):
+        assert verified_email(claims | {"xms_edov": no}) is None
+    assert verified_email({"preferred_username": "b@uni.edu", "xms_edov": True}) is None
+    assert verified_email({"email": 7, "xms_edov": True}) is None

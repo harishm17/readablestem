@@ -118,6 +118,11 @@
   to you: daily totals of spend and of error categories. If you cannot sign in,
   {% if contact_email %}email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>
   and we will delete it{% else %}use the contact address of this service{% endif %}.
+  Deleting does not reach what is described under "What is stored, and for how long" and "Who else
+  sees your documents": database backups (about 6 days) and what the model provider has
+  already received. For the rest of that day we keep a scrambled fingerprint of the address
+  (a keyed hash, not the address) with the day's page and read counts, so that deleting an
+  account and signing up again does not reset the day's limits; it is deleted the next day.
   An account that an administrator has blocked is kept, with its address, so that the block
   holds; write to us to have it deleted.</p>
 {% else %}

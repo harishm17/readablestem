@@ -300,3 +300,76 @@ def test_launch_check_wants_the_privacy_notice_to_say_what_open_sign_up_does(
     assert len(items) == 1 and what.split()[0] in items[0].replace("first time", "first")
     # The notice for allowlist mode is not held to it.
     assert not [i for i in launch.launch_blockers(settings=closed_settings) if "SIGNUP_MODE" in i]
+
+
+# --------------------------------------------------------------------------- deleting an account
+
+
+def account_pages(
+    env: WebEnv, email: str, *, invited: bool = False, admin: bool = False
+) -> tuple[str, str]:
+    with env.running() as client:
+        if invited:
+            env.allow(email, admin=admin)
+        login(client, email)
+        page = " ".join(client.get("/account").text.split())
+        confirm = " ".join(client.get("/account/delete").text.split())
+    return page, confirm
+
+
+@pytest.mark.parametrize("which", [0, 1], ids=["account page", "confirmation"])
+def test_deleting_does_not_promise_more_than_it_does(tmp_path, which):
+    """Backups keep a copy for about 6 days (docs/deploy-railway.md, the privacy notice) and
+    what the model provider already received is under its own retention."""
+    env = WebEnv(tmp_path / "a", signup_mode="open", model_provider="anthropic")
+    text = account_pages(env, ALICE)[which]
+    assert "What deleting does not reach." in text
+    assert "each backup is kept for about 6 days" in text
+    assert "up to about a week after you delete them" in text
+    assert "Anthropic stay under its own retention" in text
+    assert "delete API inputs and outputs within 30 days, longer for material" in text
+    assert "scrambled fingerprint of your address" in text and "It is deleted tomorrow." in text
+    other = WebEnv(tmp_path / "b", signup_mode="open", model_provider="openai")
+    text = account_pages(other, ALICE)[which]
+    assert "OpenAI stay under its own retention" in text and "Anthropic" not in text
+
+
+def test_the_fingerprint_is_not_mentioned_where_sign_up_is_not_open(tmp_path):
+    env = WebEnv(tmp_path, signup_mode="allowlist")
+    _, page = account_pages(env, ALICE, invited=True)
+    assert "each backup is kept for about 6 days" in page
+    assert "fingerprint" not in page and "You are on the invitation list" in page
+
+
+def test_an_invited_person_is_told_what_signing_in_again_would_be(tmp_path):
+    env = WebEnv(tmp_path, signup_mode="open", open_tier_daily_page_quota=20)
+    _, confirm = account_pages(env, ALICE, invited=True)
+    assert (
+        "You were invited. If you sign in again later, you come back as a new, empty account"
+        in confirm
+    )
+    assert "with the limits for new accounts (20 pages a day), not the invited ones" in confirm
+    assert "Today's pages and reads that you have already used stay used" in confirm
+    assert "an admin would have to make you one again" not in confirm
+
+
+def test_an_admin_is_told_they_would_lose_admin_rights(tmp_path):
+    env = WebEnv(tmp_path, signup_mode="open")
+    _, confirm = account_pages(env, ALICE, invited=True, admin=True)
+    assert "You are an admin: the new account has no admin rights" in confirm
+    assert "an admin would have to make you one again" in confirm
+
+
+def test_a_new_account_is_told_the_days_use_stays_used(tmp_path):
+    env = WebEnv(tmp_path, signup_mode="open")
+    _, confirm = account_pages(env, ALICE)  # signs up: open tier
+    assert "you get a new, empty account, and it counts as a new account" in confirm
+    assert "deleting does not reset the day's limits" in confirm
+    assert "You were invited" not in confirm
+
+
+def test_the_privacy_notice_names_what_deletion_does_not_reach(tmp_path):
+    text = page(WebEnv(tmp_path, signup_mode="open", **GOOGLE), "/privacy")
+    assert "Deleting does not reach" in text and "database backups (about 6 days)" in text
+    assert "what the model provider has already received" in text
+    assert "a keyed hash, not the address" in text and "it is deleted the next day" in text

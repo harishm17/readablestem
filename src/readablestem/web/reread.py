@@ -177,12 +177,14 @@ class ReadBudget(JobBudget):
 
 def reread_allowance_message(allowance: int) -> str:
     """What the reviewer is told when an open-tier account has started all the reads it may
-    today (the number is the setting; the count starts again at midnight UTC)."""
+    today (the number is the setting; a read is counted when it starts; the count starts
+    again at midnight UTC)."""
     reads = "read" if allowance == 1 else "reads"
     return (
-        f"You have used all {allowance} {reads} with the model that a new account has "
-        "today, so this could not be read. The count starts again at midnight UTC. "
-        "Type it yourself, or try again then."
+        f"You have started {allowance} {reads} with the model today, the most a new account "
+        "can start (a read counts when it starts, whether or not it worked). So this could "
+        "not be read. The count starts again at midnight UTC. Type it yourself, or try "
+        "again then."
     )
 
 
@@ -196,7 +198,7 @@ def read_budget(request: Request, job: Job) -> ReadBudget:
     with session_scope(ctx.factory) as session:
         pool = access.spend_pool(access.tier_of(session, job.user_id))
     return ReadBudget(
-        guard=ctx.guard.pooled(pool),
+        guard=ctx.guard.scoped(pool, job.id),
         max_usd=max(0.0, max_usd - float(job.cost_usd or 0.0)),
         max_calls=max(0, max_calls - int(job.model_calls or 0)),
         factory=ctx.factory,

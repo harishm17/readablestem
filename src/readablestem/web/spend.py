@@ -11,8 +11,14 @@ If no row matched, the cap would be exceeded and `BudgetExceeded("daily")` is ra
 Postgres re-checks the WHERE clause against the newest row version when two UPDATEs
 collide, and SQLite serialises writers, so concurrent reservations never overshoot.
 
-A process that dies between reserve and settle leaves its hold in place until the UTC day
-ends. That errs on the side of spending less, which is the point of the cap.
+A process that dies between reserve and settle must not leave its hold in place until the
+UTC day ends: a few crashes would close the day on money nobody spent. Every hold is also a
+row of `spend_holds`, written in the transaction that makes the hold and deleted by the
+settlement that releases it (so a hold is released once, however many settle or release it).
+`release_holds` gives back the holds of jobs whose lease ran out or whose process is gone, and
+of any hold older than a job can run; the worker calls it when a lease expires and at
+start-up. A released hold counts no spend (the call that made it may have been billed; the
+provider's own monthly limit is what covers that).
 
 **The open pool.** Jobs of open-tier accounts (`web.access`) also draw on a pool of their
 own, `open_cap_usd` (`OPEN_TIER_DAILY_SPEND_CAP_USD`), kept in two more columns of the same
@@ -40,19 +46,19 @@ from __future__ import annotations
 
 import threading
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import case, select, update
+from sqlalchemy import case, delete, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded, Reservation, SpendGuard
 from readablestem.web.access import POOL_OPEN
 from readablestem.web.database import insert_ignore, rowcount, utc_today
-from readablestem.web.db import SpendDay, session_scope, utcnow
+from readablestem.web.db import SpendDay, SpendHold, session_scope, utcnow
 
 # Float sums of many small costs drift by ~1e-16; this keeps an exact fit under the cap.
 _EPSILON = 1e-9
@@ -124,8 +130,9 @@ class DbSpendGuard:
         self.cap_usd = cap_usd
         self.open_cap_usd = open_cap_usd
         self._clock = clock
-        # Reservation id -> (day it was held on, whether it is in the open pool), so a call
-        # that straddles midnight releases its hold from the right row and columns.
+        # Reservation id -> (day, in the open pool): what this process made. The books are
+        # `spend_holds`; this only tells a settlement whose row was already released (a hold
+        # given back after a lease ran out) which columns the spend belongs in.
         self._holds: dict[str, tuple[date, bool]] = {}
         self._lock = threading.Lock()
 
@@ -151,7 +158,14 @@ class DbSpendGuard:
         `core.budget.JobBudget` is given, so the budget code needs to know nothing of pools."""
         return self if pool is None else _PooledGuard(self, pool)
 
-    def reserve(self, amount_usd: float, *, pool: str | None = None) -> Reservation:
+    def scoped(self, pool: str | None, job_id: str | None) -> SpendGuard:
+        """`pooled`, and every hold made through it is recorded against `job_id`, so
+        `release_holds(job_ids=...)` can give back what that job's dead attempt held."""
+        return self if pool is None and job_id is None else _PooledGuard(self, pool, job_id)
+
+    def reserve(
+        self, amount_usd: float, *, pool: str | None = None, job_id: str | None = None
+    ) -> Reservation:
         """One conditional UPDATE. A refusal by the cap and a missing row look the same to
         it, so when it changes nothing the day's row is made if missing (an insert that does
         nothing when the row exists) and the UPDATE runs once more; only then is it a
@@ -188,6 +202,7 @@ class DbSpendGuard:
                 SpendDay.open_spent_usd + SpendDay.open_held_usd + amount_usd
                 <= self.open_cap_usd + _EPSILON
             )
+        reservation = Reservation(uuid.uuid4().hex, amount_usd)
         with session_scope(self.factory) as session:
             held = rowcount(session.execute(stmt)) == 1
             if not held:
@@ -197,7 +212,17 @@ class DbSpendGuard:
                 if in_pool and self._pool_is_the_limit(session, day, amount_usd):
                     raise PoolExhausted(self.open_cap_usd)
                 raise BudgetExceeded("daily", f"daily spend cap ${self.cap_usd:.2f} reached")
-        reservation = Reservation(uuid.uuid4().hex, amount_usd)
+            # The hold and its record are one transaction: neither exists without the other.
+            session.add(
+                SpendHold(
+                    id=reservation.id,
+                    day=day,
+                    amount_usd=amount_usd,
+                    in_pool=in_pool,
+                    job_id=job_id,
+                    created_at=self._clock(),
+                )
+            )
         with self._lock:
             self._holds[reservation.id] = (day, in_pool)
         return reservation
@@ -214,34 +239,107 @@ class DbSpendGuard:
         return committed + amount_usd <= self.cap_usd + _EPSILON
 
     def settle(self, reservation: Reservation, actual_usd: float) -> None:
-        with self._lock:
-            hold = self._holds.pop(reservation.id, None)
-        if hold is None:  # not ours (should not happen); count the spend, release nothing
-            day, in_pool, release = self._today(), False, 0.0
-        else:
-            (day, in_pool), release = hold, reservation.amount_usd
+        """Replace the hold with the actual cost. The hold's record is deleted first and only
+        the settlement that deleted it releases the amount, so a hold that was already given
+        back (`release_holds`) is not given back twice: the spend is still counted."""
         spent = max(0.0, actual_usd)
-        held_after = SpendDay.held_usd - release
-        values: dict[str, Any] = {
-            "held_usd": case((held_after < 0, 0.0), else_=held_after),
-            "spent_usd": SpendDay.spent_usd + spent,
-        }
-        if in_pool:
-            open_held_after = SpendDay.open_held_usd - release
-            values["open_held_usd"] = case((open_held_after < 0, 0.0), else_=open_held_after)
-            values["open_spent_usd"] = SpendDay.open_spent_usd + spent
-        stmt = (
-            update(SpendDay)
-            .where(SpendDay.day == day)
-            .values(**values)
-            .execution_options(synchronize_session=False)
-        )
+        with self._lock:
+            hint = self._holds.pop(reservation.id, None)
         with session_scope(self.factory) as session:
-            # The row exists: this reservation made it. Only a settlement of a hold this
-            # process did not make (above) can find none, and then it is made first.
+            row = session.execute(
+                select(SpendHold.day, SpendHold.in_pool, SpendHold.amount_usd).where(
+                    SpendHold.id == reservation.id
+                )
+            ).first()
+            won = row is not None and (
+                rowcount(
+                    session.execute(
+                        delete(SpendHold)
+                        .where(SpendHold.id == reservation.id)
+                        .execution_options(synchronize_session=False)
+                    )
+                )
+                == 1
+            )
+            if won and row is not None:
+                day, in_pool, release = row.day, bool(row.in_pool), float(row.amount_usd)
+            else:  # released already, or not ours: the spend still counts, nothing is released
+                day, in_pool = hint if hint is not None else (self._today(), False)
+                release = 0.0
+            held_after = SpendDay.held_usd - release
+            values: dict[str, Any] = {
+                "held_usd": case((held_after < 0, 0.0), else_=held_after),
+                "spent_usd": SpendDay.spent_usd + spent,
+            }
+            if in_pool:
+                open_held_after = SpendDay.open_held_usd - release
+                values["open_held_usd"] = case((open_held_after < 0, 0.0), else_=open_held_after)
+                values["open_spent_usd"] = SpendDay.open_spent_usd + spent
+            stmt = (
+                update(SpendDay)
+                .where(SpendDay.day == day)
+                .values(**values)
+                .execution_options(synchronize_session=False)
+            )
+            # The day's row exists: the reservation made it. Only a settlement of a hold this
+            # database never saw can find none, and then it is made first.
             if rowcount(session.execute(stmt)) != 1:
                 self._ensure_day(session, day)
                 session.execute(stmt)
+
+    def release_holds(
+        self, *, job_ids: Collection[str] | None = None, older_than_s: float | None = None
+    ) -> tuple[int, float]:
+        """Give back holds nobody will settle: those recorded against `job_ids` (their
+        attempt died or overran its lease) and/or older than `older_than_s` seconds (a job
+        cannot run that long). Returns (holds released, dollars). No spend is counted. Safe
+        against a live settlement of the same hold: whoever deletes the record releases it."""
+        conditions = []
+        if job_ids is not None:
+            if not job_ids:
+                return 0, 0.0
+            conditions.append(SpendHold.job_id.in_(list(job_ids)))
+        if older_than_s is not None:
+            conditions.append(
+                SpendHold.created_at < self._clock() - timedelta(seconds=older_than_s)
+            )
+        if not conditions:
+            raise ValueError("release_holds needs job_ids or older_than_s")
+        released, dollars = 0, 0.0
+        with session_scope(self.factory) as session:
+            rows = session.execute(
+                select(SpendHold.id, SpendHold.day, SpendHold.in_pool, SpendHold.amount_usd).where(
+                    or_(*conditions)
+                )
+            ).all()
+            totals: dict[date, list[float]] = {}
+            for row in rows:
+                gone = session.execute(
+                    delete(SpendHold)
+                    .where(SpendHold.id == row.id)
+                    .execution_options(synchronize_session=False)
+                )
+                if rowcount(gone) != 1:
+                    continue
+                total = totals.setdefault(row.day, [0.0, 0.0])
+                total[0] += float(row.amount_usd)
+                if row.in_pool:
+                    total[1] += float(row.amount_usd)
+                released += 1
+                dollars += float(row.amount_usd)
+            for day, (held, open_held) in totals.items():
+                held_after = SpendDay.held_usd - held
+                open_after = SpendDay.open_held_usd - open_held
+                session.execute(
+                    update(SpendDay)
+                    .where(SpendDay.day == day)
+                    .values(
+                        held_usd=case((held_after < 0, 0.0), else_=held_after),
+                        open_held_usd=case((open_after < 0, 0.0), else_=open_after),
+                    )
+                    .execution_options(synchronize_session=False)
+                )
+        return released, dollars
 
     def snapshot(self) -> SpendSnapshot:
         day = self._today()
@@ -280,14 +378,16 @@ class DbSpendGuard:
 
 
 class _PooledGuard:
-    """A `DbSpendGuard` seen by jobs of one pool: `reserve` holds in that pool too."""
+    """A `DbSpendGuard` seen by the jobs of one pool and/or one job: `reserve` holds in that
+    pool too and records the hold against that job."""
 
-    def __init__(self, guard: DbSpendGuard, pool: str) -> None:
+    def __init__(self, guard: DbSpendGuard, pool: str | None, job_id: str | None = None) -> None:
         self._guard = guard
         self.pool = pool
+        self.job_id = job_id
 
     def reserve(self, amount_usd: float) -> Reservation:
-        return self._guard.reserve(amount_usd, pool=self.pool)
+        return self._guard.reserve(amount_usd, pool=self.pool, job_id=self.job_id)
 
     def settle(self, reservation: Reservation, actual_usd: float) -> None:
         self._guard.settle(reservation, actual_usd)

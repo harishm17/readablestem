@@ -32,9 +32,9 @@ from sqlalchemy import ColumnElement, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from readablestem.web import access, linked_emails
+from readablestem.web import access, linked_emails, tombstones
 from readablestem.web.database import utc_today
-from readablestem.web.db import AuthIdentity, User, session_scope, utcnow
+from readablestem.web.db import AuthIdentity, QuotaDay, User, session_scope, utcnow
 from readablestem.web.quota import try_take_signup
 
 GOOGLE = "google"
@@ -54,11 +54,12 @@ class Identity:
 class SignIn:
     """Who signs in (`user_id` and their session version), or why nobody does. `refused` is
     "no_email"; "not_allowlisted" (the address is not on the list and sign-up is not open);
-    "blocked" (sign-up is open, and an admin has blocked this person, or the address is
-    another person's linked Google address); or "signups_full"
-    (sign-up is open, and today's limit on new accounts is used up). For the last three
-    `email` is the address the refusal page shows the person. `created` is True when this
-    sign-in made the account."""
+    "use_google" (open sign-up, Microsoft: the address is not one the directory vouches for,
+    or it belongs to an invited person or an admin: sign in with Google); "blocked" (sign-up
+    is open, and an admin has blocked this person, or the address is another person's linked
+    Google address); or "signups_full" (sign-up is open, and today's limit on new accounts is
+    used up). For "not_allowlisted", "blocked" and "signups_full" `email` is the address the
+    refusal page shows the person. `created` is True when this sign-in made the account."""
 
     user_id: str | None = None
     session_version: int = 0
@@ -76,6 +77,9 @@ class OpenSignup:
 
     max_per_day: int
     before_create: Callable[[], None] = field(default=lambda: None, compare=False)
+    # The key of `web.tombstones`: with it, an address whose account was deleted today comes
+    # back with the day's pages and reads already used, and without taking another place.
+    tombstone_key: bytes | None = None
 
 
 def create_open_user(
@@ -87,7 +91,18 @@ def create_open_user(
     the account is committed. Two sign-ups of one address at once both get here; the second
     one's insert fails on the unique email and the caller tries again, finding the row."""
     open_signup.before_create()
-    if not try_take_signup(session, limit=open_signup.max_per_day, day=utc_today()):
+    day = utc_today()
+    earlier = (
+        tombstones.find(session, open_signup.tombstone_key, email, day)
+        if open_signup.tombstone_key is not None
+        else None
+    )
+    # An address whose account was made and deleted today already has its place in the day's
+    # count: coming back takes no new one, so deleting and signing up again cannot use up the
+    # day's places. An account from an earlier day does take one now.
+    if (earlier is None or not earlier.slot_taken) and not try_take_signup(
+        session, limit=open_signup.max_per_day, day=day
+    ):
         return None
     user = User(
         email=email,
@@ -99,6 +114,11 @@ def create_open_user(
     )
     session.add(user)
     session.flush()
+    if earlier is not None and (earlier.pages or earlier.rereads):
+        # What the deleted account used today is still used: deleting is not a reset.
+        session.add(
+            QuotaDay(user_id=user.id, day=day, pages=earlier.pages, rereads=earlier.rereads)
+        )
     return user
 
 
@@ -139,17 +159,24 @@ def microsoft_sign_in(
     name: str | None,
     *,
     open_signup: OpenSignup | None = None,
+    email_verified: bool = False,
 ) -> SignIn:
     """Sign in by identity; the first time, link it to the allowed user with `email`, or,
     with `open_signup`, make that user first.
+
+    With `open_signup` the address must be one the directory vouches for (`email_verified`,
+    `MicrosoftAccount.verified_email`), and it may link only to an account made by open
+    sign-up that is not an admin: an invited person or an admin is reached by Google (a
+    verified address) or by an identity linked before sign-up opened. Anything else is
+    refused as "use_google". Without `open_signup` the rules are those of the allowlist.
 
     Two first sign-ins of one identity at once (two tabs) both try to link it; the
     second one's insert fails on the unique key and is tried again, finding the link.
     """
     try:
-        return _microsoft_sign_in(factory, identity, email, name, open_signup)
+        return _microsoft_sign_in(factory, identity, email, name, open_signup, email_verified)
     except IntegrityError:
-        return _microsoft_sign_in(factory, identity, email, name, open_signup)
+        return _microsoft_sign_in(factory, identity, email, name, open_signup, email_verified)
 
 
 def _microsoft_sign_in(
@@ -158,6 +185,7 @@ def _microsoft_sign_in(
     email: str | None,
     name: str | None,
     open_signup: OpenSignup | None,
+    email_verified: bool = False,
 ) -> SignIn:
     # Who is refused by `is_allowed` is "blocked" when sign-up is open (the person has an
     # account and an admin stopped it), "not_allowlisted" otherwise: as it always was.
@@ -168,6 +196,10 @@ def _microsoft_sign_in(
         if user is None:
             if email is None:
                 return SignIn(refused="no_email")
+            if open_signup is not None and not email_verified:
+                # nOAuth: an address a directory merely states proves nothing, and with open
+                # sign-up it would make an account, or take over one, for any address.
+                return SignIn(refused="use_google", email=email)
             user = session.scalar(select(User).where(User.email == email))
             if user is None and open_signup is not None:
                 if linked_emails.is_linked(session, email):
@@ -182,6 +214,8 @@ def _microsoft_sign_in(
                 return SignIn(refused="not_allowlisted", email=email)
             if not user.is_allowed:
                 return SignIn(refused=no_access, email=email)
+            if open_signup is not None and (user.is_admin or user.access_tier == access.INVITED):
+                return SignIn(refused="use_google", email=email)
             link(session, user.id, identity)
         elif not user.is_allowed:
             return SignIn(refused=no_access, email=user.email)

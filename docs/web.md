@@ -205,11 +205,13 @@ yours to see". It is a 404 either way. The
   if they are on the allowlist. Afterwards the identity alone decides, so a changed
   address, or one that is now someone else's, does not move it. Removal from the
   allowlist still ends access. Nothing is stored for people who are refused. With open
-  sign-up an identity whose address has no account makes one (open tier) and is linked to it;
-  so the nOAuth caveat below reaches every address then, not only the allowlisted ones: an
-  administrator of an allowed directory could link their identity to an existing account by
-  setting its address on theirs. `MS_ALLOWED_TENANTS` is the control, and should list only
-  directories whose administrators are trusted.
+  sign-up an identity whose address has no account makes one (open tier) and is linked to it,
+  so the address must be one the directory vouches for (`email` with `xms_edov` true; an
+  absent or false claim, or only `preferred_username`, is refused with "Please sign in with
+  Google"), and an identity may link only to an open-tier account that is not an admin: an
+  invited person or an admin is reached by Google, or by an identity linked before sign-up
+  opened. Without that the nOAuth caveat below would reach every address, not only the
+  allowlisted ones. `MS_ALLOWED_TENANTS` stays the first control.
   Why `sub` and not `oid`: OpenID Connect promises that `iss` and `sub` together are a
   stable identifier that is never reassigned (Core 1.0, section 5.7), the same rule as
   for Google; and Microsoft's `sub` is pairwise per app registration, so a token minted
@@ -283,7 +285,10 @@ yours to see". It is a 404 either way. The
 | Pages that differ | Invitation wording | Open wording (`signup_open` in the templates: login, landing, privacy, terms, limits, sign-in links, not-allowed, org-not-set-up) |
 
 Open sign-up is for Google (verified email) and Microsoft (an allowed tenant; the token is
-checked as always). The emailed sign-in link (off) never makes an account. Making an account
+checked as always, and the address must be one the directory vouches for: the `email` claim with
+`xms_edov` true, never `preferred_username`; it may make an account or link to an open-tier account
+that is not an admin, and an invited person or an admin gets "Please sign in with Google" unless
+their identity was linked before sign-up opened). The emailed sign-in link (off) never makes an account. Making an account
 takes, in this order: the per-address rule `signup` (5 new accounts an hour per address,
 `web/abuse.py`, counted only when an account would be made), then one conditional UPDATE on
 `signup_days` (`web/quota.py:try_take_signup`, at most `MAX_NEW_ACCOUNTS_PER_DAY` a UTC day),
@@ -324,18 +329,23 @@ users delete`: every job counted first, review decisions, waiting files, courses
 usage events, identities, linked addresses, sign-in links, daily counts, the row), clears the
 session and goes to `/` with a notice. Usage events go with the account (they hold a pseudonymous
 user id and no content, and are deleted with the user, as before); what remains is the content-free
-daily totals. `signup_days` is not given back, and a person who signs in again gets a new empty
-account that counts as new, so creating and deleting accounts does not make room for more. A
-deleted account's quota rows go with it: deleting and signing up again resets that
-person's daily pages, which `MAX_NEW_ACCOUNTS_PER_DAY`, the per-address rule and the spend pool
-bound but do not remove.
+daily totals. **Deleting is not a reset** (`web/tombstones.py`, table `deleted_accounts`): when an
+account is erased, what it used today (pages, model reads, and whether it took one of the day's
+places for new accounts) is kept under an HMAC of its address, for the rest of that UTC day. A person
+who signs in again that day gets a new empty account (no documents) that starts with those pages and
+reads already used, and takes no new place from `MAX_NEW_ACCOUNTS_PER_DAY` if the deleted account
+already had one (an account from an earlier day takes one when it comes back, once). The records are
+purged the next day (`ops.retention.purge_tombstones`). Without this one person could loop
+delete and sign-up and drain the open spend pool and the day's places. `signup_days` itself is never
+given back.
 
 **Admins.** `/admin` shows accounts today against the limit, accounts by tier and blocked, each
 person's tier, the open pool's spend, and a "Blocked accounts" table with Unblock. Block is
 `auth.set_blocked(blocked=True)`: `set_allowed(allowed=False)`, so sessions end, queued and
 running jobs fail with `access_removed`, and admin rights are lost (not given back by
 unblocking). An admin cannot block themselves. With thousands of accounts the page lists the
-first 300 of each table.
+newest 300 of each table, and a "Block by email" form (the same `POST /admin/users/block`) reaches
+any account, listed or not.
 
 Pages and `ops launch-check`: the public pages that carry invitation wording render it only
 when `signup_open` is false; the check fails a public template that has the words and does not
@@ -913,6 +923,18 @@ is the view a job's budget is given; the worker reads the owner's tier once per 
 the day for claiming: while less than one call's worth is left in it, open-tier owners' jobs
 are not claimed. Without `open_cap_usd` (tests, the command line) the pool's spend is
 recorded and never refuses.
+
+**Holds do not outlive their process** (`spend_holds`). Every hold is also a row (id, day, amount,
+pool flag, job id, time) written in the same transaction as the hold, and the settlement deletes it
+first; whichever statement deletes a row is the one that releases its amount, so a hold is given
+back once however many settle or release it, and a late settlement of a released hold counts its
+spend and releases nothing. `DbSpendGuard.release_holds` gives back holds by job (the worker calls it
+when a lease runs out and requeues or fails the job, and when an attempt ends) and by age (at
+start-up and in the hourly backstop: older than the longest job may run plus two leases). A released
+hold counts no spend: if the dead call was billed, the provider's own monthly limit is the cover. The
+job row's own `cost_usd` keeps counting what the dead attempt held, as before, so job caps stay
+conservative. A model call now costs one more INSERT to hold and a SELECT and a DELETE to settle;
+`tests/test_web_spend_holds.py` pins the crash, the lease, the start-up and the race.
 
 ## Worker (`web/worker.py`)
 
@@ -2179,7 +2201,7 @@ test fails when a table with a user id is added without it.
 - Last, `a6c2e9f4b713` (open sign-up, the head): `users.access_tier` (server default
   `invited`, which is also the backfill: every existing account was added by an admin),
   `spend_days.open_spent_usd` and `open_held_usd`, `quota_days.rereads` (all server default 0)
-  and the table `signup_days`. Additive, so a release from before it keeps working on the
+  and the tables `signup_days`, `spend_holds` and `deleted_accounts`. Additive, so a release from before it keeps working on the
   migrated schema; the downgrade drops them. `tests/test_web_open_signup_migration.py` runs it
   up and down on SQLite with real rows, and `tests/test_web_postgres.py` on Postgres.
 - New migration: change `web/db.py`, then

@@ -155,7 +155,10 @@ def test_no_quota_still_counts(factory):
 
 def test_a_reservation_and_its_settlement_are_one_statement_each(factory):
     """The day's row is made by the first reservation of the day (and only then): after
-    that a model call costs two UPDATEs on this table, not two INSERTs and two UPDATEs."""
+    that a model call costs one UPDATE on this table to hold and one to settle, not an
+    insert-ignore each. Each hold is also recorded in `spend_holds` (one INSERT, in the same
+    transaction), and its settlement deletes the record first (a SELECT and a DELETE), so a
+    hold can be given back by whoever finds it orphaned and is never released twice."""
     from sqlalchemy import event
 
     guard = DbSpendGuard(factory, 5.0)
@@ -168,12 +171,16 @@ def test_a_reservation_and_its_settlement_are_one_statement_each(factory):
     event.listen(engine, "before_cursor_execute", record)
     try:
         first = guard.reserve(0.1)
-        assert statements == ["UPDATE", "INSERT", "UPDATE"]  # no row yet: made, then held
+        # no row yet: tried, made, held again, and recorded
+        assert statements == ["UPDATE", "INSERT", "UPDATE", "INSERT"]
         statements.clear()
         second = guard.reserve(0.1)
         guard.settle(first, 0.05)
         guard.settle(second, 0.02)
-        assert statements == ["UPDATE", "UPDATE", "UPDATE"]
+        assert statements == [
+            *["UPDATE", "INSERT"],  # the second hold and its record
+            *["SELECT", "DELETE", "UPDATE"] * 2,  # two settlements
+        ]
     finally:
         event.remove(engine, "before_cursor_execute", record)
     assert guard.snapshot().spent_usd == pytest.approx(0.07)

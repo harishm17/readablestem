@@ -40,7 +40,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import Settings
-from readablestem.web import access, events, linked_emails, microsoft
+from readablestem.web import access, events, linked_emails, microsoft, tombstones
 from readablestem.web.database import rowcount
 from readablestem.web.db import Job, JobStatus, User, session_scope, utcnow
 from readablestem.web.deps import (
@@ -194,7 +194,11 @@ def open_signup_for(settings: Settings, before_create=None) -> OpenSignup | None
     """The sign-up rules when `SIGNUP_MODE=open`, else None (nobody is made by signing in)."""
     if not settings.signup_open:
         return None
-    return OpenSignup(settings.max_new_accounts_per_day, before_create or (lambda: None))
+    return OpenSignup(
+        settings.max_new_accounts_per_day,
+        before_create or (lambda: None),
+        tombstone_key=tombstones.tombstone_key(settings),
+    )
 
 
 def sign_in_by_email(
@@ -312,6 +316,7 @@ def finish_microsoft_login(request: Request, account: microsoft.MicrosoftAccount
         email,
         account.name,
         open_signup=open_signup_for(ctx.settings, lambda: enforce(request, "signup")),
+        email_verified=email is not None and normalise_email(account.verified_email) == email,
     )
     if result.refused == "no_email":
         log_event(logger, "login_refused", reason="no_email", provider=MICROSOFT)
@@ -320,6 +325,15 @@ def finish_microsoft_login(request: Request, account: microsoft.MicrosoftAccount
             "No email address",
             "Microsoft did not share an email address for your account, so we cannot tell "
             "which account is yours.",
+        )
+    if result.refused == "use_google":
+        log_event(logger, "login_refused", reason="use_google", provider=MICROSOFT)
+        raise PageError(
+            403,
+            "Please sign in with Google",
+            "We could not match this Microsoft account to a ReadableSTEM account by an email "
+            "address that your organisation has verified, so it cannot be used to sign in or "
+            "to make an account. Sign in with your Google account instead.",
         )
     if result.user_id is None:
         return refused_page(request, result, MICROSOFT)

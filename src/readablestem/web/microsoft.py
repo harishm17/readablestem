@@ -92,6 +92,10 @@ class MicrosoftAccount:
     # yet normalised): the email claim unless unverified, then preferred_username.
     email_claims: tuple[str, ...]
     name: str | None
+    # The `email` claim when the directory says the owner of its domain is verified
+    # (`xms_edov` true): the only address open sign-up trusts to make an account or to link
+    # an identity to one that exists (`web.identities`). None otherwise.
+    verified_email: str | None = None
 
 
 def register_microsoft(oauth: Any, settings: Settings) -> None:
@@ -232,7 +236,19 @@ def verify_id_token(
         tenant=tenant,
         email_claims=email_claims(claims),
         name=name if isinstance(name, str) and name.strip() else None,
+        verified_email=verified_email(claims),
     )
+
+
+_VERIFIED = (True, "true", "True", "1")
+
+
+def verified_email(claims: Mapping[str, Any]) -> str | None:
+    """The `email` claim, only when the directory itself says its domain's owner is verified
+    (`xms_edov`, an optional claim: absent means we do not know, which is not verified).
+    `preferred_username` is never one: it is a sign-in name, not a checked address."""
+    email = claims.get("email")
+    return email if isinstance(email, str) and claims.get("xms_edov") in _VERIFIED else None
 
 
 def email_claims(claims: Mapping[str, Any]) -> tuple[str, ...]:

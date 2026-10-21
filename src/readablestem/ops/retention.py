@@ -54,6 +54,7 @@ from readablestem.web.db import (
     Blob,
     Course,
     CourseNotation,
+    DeletedAccount,
     Event,
     Job,
     LinkedEmail,
@@ -79,6 +80,7 @@ class PurgeStats:
     events_deleted: int = 0  # usage events past EVENT_RETENTION_DAYS
     pending_deleted: int = 0  # large files waiting for their pages to be chosen (T3-3)
     results_deleted: int = 0  # answers to uploads of several files, past their hour (T3-4)
+    tombstones_deleted: int = 0  # deleted-account records of earlier days (web.tombstones)
 
 
 def purge_expired(
@@ -106,6 +108,7 @@ def purge_expired(
         stats.events_deleted = purge_old_events(session, now)
         stats.pending_deleted = purge_pending(session, now)
         stats.results_deleted = purge_upload_results(session, now)
+        stats.tombstones_deleted = purge_tombstones(session, now)
     get_logger(__name__).info(
         "purge_done",
         source=source,
@@ -115,6 +118,7 @@ def purge_expired(
         events_deleted=stats.events_deleted,
         pending_deleted=stats.pending_deleted,
         results_deleted=stats.results_deleted,
+        tombstones_deleted=stats.tombstones_deleted,
     )
     return stats
 
@@ -129,6 +133,14 @@ def purge_upload_results(session: Session, now: datetime) -> int:
     """Delete the stored answers to uploads of several files (`web.upload_result`) that are
     past their hour, in the caller's transaction. Returns how many."""
     return _deleted(session.execute(delete(UploadResult).where(UploadResult.retain_until < now)))
+
+
+def purge_tombstones(session: Session, now: datetime) -> int:
+    """Delete the records of accounts deleted on an earlier UTC day (`web.tombstones`): they
+    only matter for the day they were made, in the caller's transaction. Returns how many."""
+    return _deleted(
+        session.execute(delete(DeletedAccount).where(DeletedAccount.day < _as_utc(now).date()))
+    )
 
 
 def purge_old_events(session: Session, now: datetime) -> int:
@@ -213,7 +225,13 @@ def delete_jobs(
     return PurgeStats(jobs_deleted=jobs, blobs_deleted=blobs, unaggregated_deleted=unaggregated)
 
 
-def erase_user(session: Session, user_id: str, now: datetime | None = None) -> PurgeStats:
+def erase_user(
+    session: Session,
+    user_id: str,
+    now: datetime | None = None,
+    *,
+    tombstone_key: bytes | None = None,
+) -> PurgeStats:
     """Delete a user and everything of theirs, in the caller's transaction.
 
     Their jobs go through `delete_jobs` (counted first, like any deletion); then, children
@@ -221,8 +239,18 @@ def erase_user(session: Session, user_id: str, now: datetime | None = None) -> P
     review edits they made on any job, their courses' notation entries, their courses,
     their usage events, sign-in identities, linked Google addresses, email sign-in links and
     daily page counts, and the user row.
+    With `tombstone_key`, what the account used today is first recorded under a hash of its
+    address (`web.tombstones`), so that signing up again today does not reset the day's limits.
     Returns the job deletion's stats.
     """
+    if tombstone_key is not None:
+        from readablestem.web import tombstones
+
+        person = session.get(User, user_id)
+        if person is not None:
+            tombstones.write(
+                session, person, tombstone_key, _as_utc(now or datetime.now(UTC)).date()
+            )
     job_ids = list(session.scalars(select(Job.id).where(Job.user_id == user_id)))
     stats = delete_jobs(session, job_ids, now)
     courses = select(Course.id).where(Course.user_id == user_id).scalar_subquery()

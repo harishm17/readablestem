@@ -444,6 +444,7 @@ class Worker:
         now = now or self.clock()
         expired = (Job.status == JobStatus.RUNNING, Job.lease_until < now)
         with session_scope(self.factory) as session:
+            gone = list(session.scalars(select(Job.id).where(*expired)))
             failed = rowcount(
                 session.execute(
                     update(Job)
@@ -469,6 +470,9 @@ class Worker:
             )
         if requeued or failed:
             log_event(logger, "leases_expired", logging.WARNING, requeued=requeued, failed=failed)
+            # The attempt that held these is dead or overran its lease: its holds go back
+            # (a late settlement of one counts its spend and releases nothing more).
+            self.release_holds(job_ids=gone)
         return requeued, failed
 
     def pending(self, now: datetime | None = None) -> tuple[bool, bool]:
@@ -635,11 +639,38 @@ class Worker:
 
     # ------------------------------------------------------------------ one attempt
 
-    def _guard_for(self, pool: str | None) -> SpendGuard:
-        """The spend guard as jobs of `pool` see it (`DbSpendGuard.pooled`); a guard with no
-        pools (tests, CLI) is the same for everyone."""
-        pooled = getattr(self.guard, "pooled", None)
-        return pooled(pool) if pool is not None and callable(pooled) else self.guard
+    def _guard_for(self, pool: str | None, job_id: str | None = None) -> SpendGuard:
+        """The spend guard as the job `job_id` of `pool` sees it (`DbSpendGuard.scoped`:
+        its holds are in the pool and recorded against the job); a guard with no pools
+        (tests, CLI) is the same for everyone."""
+        scoped = getattr(self.guard, "scoped", None)
+        return scoped(pool, job_id) if callable(scoped) else self.guard
+
+    def release_holds(
+        self, *, job_ids: list[str] | None = None, older_than_s: float | None = None
+    ) -> int:
+        """Give back spend holds nobody will settle (`DbSpendGuard.release_holds`): those of
+        jobs whose lease ran out, and any older than a job can run. Never raises; returns
+        how many were released."""
+        release = getattr(self.guard, "release_holds", None)
+        if not callable(release):  # a guard with no record of holds (tests, CLI)
+            return 0
+        try:
+            released, dollars = release(job_ids=job_ids, older_than_s=older_than_s)
+        except Exception as exc:  # the holds stay: they err on the side of spending less
+            log_exception(logger, "hold_release_failed", exc)
+            return 0
+        if released:
+            log_event(
+                logger, "holds_released", logging.WARNING, holds=released, usd=round(dollars, 4)
+            )
+        return released
+
+    def stale_hold_s(self) -> float:
+        """How old a hold must be before it cannot belong to a running call: longer than
+        the longest job may run, and than a lease takes to run out."""
+        longest = job_time_limit_s(self.settings.max_pages_per_job, self.settings)
+        return longest + 2 * self.lease_s + self.timeout_grace_s
 
     def _start_attempt(
         self,
@@ -659,7 +690,7 @@ class Worker:
             pool=pool,
         )
         attempt.budget = _AttemptBudget(
-            guard=self._guard_for(pool),
+            guard=self._guard_for(pool, claim.job_id),
             max_usd=max(0.0, max_usd - prior_usd),
             max_calls=max(0, max_calls - prior_calls),
             hold_on_job=lambda amount, calls: self._hold_on_job(attempt, amount, calls),
@@ -890,6 +921,9 @@ class Worker:
             return self._convert_and_store(attempt, pdf, page_count, started)
         finally:
             self._current = None
+            # Whatever this attempt still holds is over with it (an abandoned conversion
+            # thread settles late and its spend still counts).
+            self.release_holds(job_ids=[claim.job_id])
 
     def _convert_and_store(
         self, attempt: _Attempt, pdf: bytes, page_count: int, started: float
@@ -1243,6 +1277,7 @@ class Worker:
         if time.monotonic() < self._next_purge:
             return None
         self._next_purge = time.monotonic() + PURGE_EVERY_S
+        self.release_holds(older_than_s=self.stale_hold_s())
         from readablestem.ops.retention import purge_expired
 
         try:
@@ -1278,6 +1313,9 @@ class Worker:
         self._thread = threading.Thread(target=self._loop, name="readablestem-worker", daemon=True)
         self._thread.start()
         log_event(logger, "worker_started")
+        # Holds left by a process that died (a restart, a crash) are given back now, not at
+        # midnight. Those of a job still marked running are released when its lease runs out.
+        self.release_holds(older_than_s=self.stale_hold_s())
         if self.settings.env == "prod" and self.settings.preload_table_models:
             from readablestem.pipeline import tables
 

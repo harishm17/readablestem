@@ -232,8 +232,9 @@ def _cmd_users_unblock(args: argparse.Namespace) -> int:
 def _cmd_users_delete(args: argparse.Namespace) -> int:
     from sqlalchemy import select
 
-    from readablestem.config import ConfigError
+    from readablestem.config import ConfigError, get_settings
     from readablestem.ops.retention import erase_user
+    from readablestem.web import tombstones
     from readablestem.web.auth import normalise_email
     from readablestem.web.db import User, session_scope
 
@@ -250,7 +251,7 @@ def _cmd_users_delete(args: argparse.Namespace) -> int:
         user_id = session.scalar(select(User.id).where(User.email == email))
         if user_id is None:
             return _error(f"{email} is not a known user")
-        stats = erase_user(session, user_id)
+        stats = erase_user(session, user_id, tombstone_key=tombstones.tombstone_key(get_settings()))
     print(f"deleted {email}: jobs_deleted={stats.jobs_deleted} blobs_deleted={stats.blobs_deleted}")
     return 0
 

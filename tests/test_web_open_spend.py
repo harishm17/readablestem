@@ -192,12 +192,12 @@ def test_the_statements_of_a_pool_reservation_are_those_of_any_reservation(facto
     event.listen(engine, "before_cursor_execute", record)
     try:
         first = guard.reserve(0.1, pool=OPEN)
-        assert statements == ["UPDATE", "INSERT", "UPDATE"]
+        assert statements == ["UPDATE", "INSERT", "UPDATE", "INSERT"]  # + the hold's record
         statements.clear()
         second = guard.reserve(0.1, pool=OPEN)
         guard.settle(first, 0.05)
         guard.settle(second, 0.02)
-        assert statements == ["UPDATE", "UPDATE", "UPDATE"]
+        assert statements == ["UPDATE", "INSERT", *["SELECT", "DELETE", "UPDATE"] * 2]
     finally:
         event.remove(engine, "before_cursor_execute", record)
     assert day_row(factory, utc_today()) == pytest.approx((0.07, 0.0, 0.07, 0.0))

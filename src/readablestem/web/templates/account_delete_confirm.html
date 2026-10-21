@@ -10,12 +10,20 @@
 </ul>
 <p>It cannot be undone. Files you have already downloaded are not affected. You will be
   signed out.</p>
+{% include "_account_deletion_notes.html" %}
 {% if invitation_only %}
 <p>You are on the invitation list. Deleting your account takes you off it, so you would need
   to be invited again to come back.</p>
+{% elif tier_open %}
+<p>If you sign in again later, you get a new, empty account, and it counts as a new account.
+  Today's pages and reads that you have already used stay used: deleting does not reset the
+  day's limits.</p>
 {% else %}
-<p>If you sign in again later, you get a new, empty account. Your daily limits start again
-  with it, and it counts as a new account.</p>
+<p>You were invited. If you sign in again later, you come back as a new, empty account with
+  the limits for new accounts ({{ open_page_quota }} pages a day), not the invited ones, and
+  it counts as a new account. Today's pages and reads that you have already used stay
+  used.{% if is_admin %} You are an admin: the new account has no admin rights, and an admin
+  would have to make you one again.{% endif %}</p>
 {% endif %}
 <form method="post" action="/account/delete" class="inline-form">
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">

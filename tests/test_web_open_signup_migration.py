@@ -120,7 +120,8 @@ def test_the_migration_downgrades_and_upgrades_again(tmp_path):
         assert "access_tier" not in columns(engine, "users")
         assert not columns(engine, "spend_days") & {"open_spent_usd", "open_held_usd"}
         assert "rereads" not in columns(engine, "quota_days")
-        assert "signup_days" not in inspect(engine).get_table_names()
+        tables = set(inspect(engine).get_table_names())
+        assert not tables & {"signup_days", "spend_holds", "deleted_accounts"}
     finally:
         engine.dispose()
     migrate(url, "head")
@@ -129,7 +130,11 @@ def test_the_migration_downgrades_and_upgrades_again(tmp_path):
         assert "access_tier" in columns(engine, "users")
         assert {"open_spent_usd", "open_held_usd"} <= columns(engine, "spend_days")
         assert "rereads" in columns(engine, "quota_days")
-        assert "signup_days" in inspect(engine).get_table_names()
+        tables = set(inspect(engine).get_table_names())
+        assert tables >= {"signup_days", "spend_holds", "deleted_accounts"}
+        with engine.connect() as conn:  # both start empty
+            assert conn.execute(text("SELECT count(*) FROM spend_holds")).scalar_one() == 0
+            assert conn.execute(text("SELECT count(*) FROM deleted_accounts")).scalar_one() == 0
         with engine.connect() as conn:
             assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
     finally:

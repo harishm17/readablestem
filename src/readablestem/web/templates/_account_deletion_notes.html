@@ -1,0 +1,18 @@
+{# What deleting an account does not reach. Shared by the Account page and its confirmation
+   (web/routes/account.py); keep it in step with privacy.html. #}
+<p><strong>What deleting does not reach.</strong></p>
+<ul>
+  <li>The database is backed up once a day, and each backup is kept for about 6 days, so your
+    account and documents can remain in a backup for up to about a week after you delete
+    them. Backups are only used to recover the service after a failure.</li>
+  <li>The images and nearby text of equations and figures that were already sent to
+    {% if provider == "anthropic" %}Anthropic stay under its own retention: its published
+    policy is to delete API inputs and outputs within 30 days, longer for material its safety
+    systems flag{% else %}OpenAI stay under its own retention: see OpenAI's API data
+    policies{% endif %}. Nothing in them names you.</li>
+  {% if signup_open %}
+  <li>For the rest of today we keep a scrambled fingerprint of your address, with today's
+    page and read counts, so that deleting an account and signing up again does not reset
+    today's limits. It is deleted tomorrow.</li>
+  {% endif %}
+</ul>
