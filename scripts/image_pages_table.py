@@ -46,6 +46,8 @@ def rows(report: dict) -> dict[str, object]:
         ),
         "detection recall": m["detection_recall"],
         "detection precision": m["detection_precision"],
+        "heading F1": pick(m, "headings", "f1"),
+        "heading level right (among matched)": pick(m, "headings", "level_accuracy"),
         "prose WER (all words, formulas included)": pick(m, "prose_wer", "wer"),
         "prose WER (words of 3+ letters, formulas out)": pick(m, "prose_only_wer", "wer"),
         "required decisions per PDF page (equations, tables, figures, headings)": load[

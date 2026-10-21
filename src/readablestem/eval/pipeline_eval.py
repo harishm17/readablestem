@@ -1776,6 +1776,13 @@ def _scan_metrics(items: Sequence[dict], gold_equations: int) -> dict:
         out["prose_only_wer"] = prose_wer.pooled(
             [i["prose_only"] for i in items if "prose_only" in i]
         )
+    scored = [i["headings_scored"] for i in items if "headings_scored" in i]
+    if scored:
+        scored_headings = heading_metrics(scored)
+        out["headings"] = {
+            k: scored_headings[k]
+            for k in ("gold_headings", "predicted_headings", "matched", "precision", "recall", "f1")
+        } | {"level_accuracy": scored_headings["level_accuracy"]}
     if pages := image_pages_eval.metrics(items, gold_equations):
         out["image_pages"] = pages
     return out
@@ -1977,6 +1984,8 @@ def _document_section(
     headings = predicted_headings(result.fixes)
     heading_item = heading_page_item(_page_id(page), _of_kind(page, "heading"), headings)
     item["heading_flags"] = heading_flags(heading_item, headings)
+    if result.image_pages is not None or getattr(cfg.media, "gold_words", None) is not None:
+        item["headings_scored"] = heading_item  # scanned inputs: the headings task's scorer
     calls = [c for f in result.fixes for c in f.calls]
     item.update(_calls_summary(calls))
     item["cost_split"] = _equation_cost_split(result.fixes, cfg.settings.main_model)

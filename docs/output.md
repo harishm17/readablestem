@@ -179,6 +179,7 @@ What Canvas still removes, and why that is accepted:
 | Contents page (T2-17) | a list (`<ul>`, nested by indent) of the entries' titles, each a link to the heading it names when there is one; no dot leaders, no page numbers | (no fix) |
 | Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
 | Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text.", "Handwriting on page 3, not converted to text."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items") |
+| Page read from an image (`FEATURE_IMAGE_PAGES`, ADR 0007) | at the start of the page, `<div class="image-page-note" role="note">` with the notice and `<details><summary>Show the original page 2</summary><img alt="Original of page 2, shown for checking the converted text."></details>`, then the page's blocks as ordinary elements (see "Pages converted from an image") | a prose block the instructor keeps as the picture: `<div class="flagged" data-reason="image_page_text">`; an equation or table whose reading could not be used: the usual flagged equation or table |
 | Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
 | Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables"); a grid that is not a table of data is its text in reading order: a grid of terms as a `<ul>` (layout), one the model calls not data as a `<dl>`, `<ul>` or paragraphs in a `<div id>` | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
 
@@ -407,6 +408,38 @@ and label are unchanged. In a document in another language the alt text is marke
 - NEEDS_REVIEW fixes are shown as converted and not flagged here: the review screen is
   where they are handled. So are fixes accepted with an optional note
   (`Fix.review == "optional"`, docs/design/beta-architecture.md "Review tiers").
+
+## Pages converted from an image (ADR 0007, `FEATURE_IMAGE_PAGES`)
+
+A page `page_type` calls scanned or handwritten, with the flag on, is read by one vision call
+and written as ordinary elements (`pipeline/image_page.py`); with the flag off, or when the
+read fails, it is a page kept as an image as before ("Flagged items"). What the output holds
+for such a page:
+
+- **The notice and the original.** The page starts with a bordered note, labelled in words and
+  not by colour alone: "**Converted from an image of the page.** Check it against the
+  original.", and under it a `<details>` whose summary reads "Show the original page N". Opened,
+  it shows the page's own picture (a JPEG at the student file's size, `figure_images`) with the
+  alt text "Original of page N, shown for checking the converted text." No script: the control
+  is the browser's own disclosure, so it works with the keyboard (Enter, Space) and a screen
+  reader announces it as one. The element is the figure for the whole page
+  (`IMAGE_PAGE_ORIGINAL_REASON`); it has no fix, because nothing is decided about it, and the
+  steps leave it alone.
+- **The blocks.** Headings, paragraphs and list items as written elsewhere; a display equation
+  as `<math>` with its printed number; an inline formula as `<math>` inside its paragraph; a
+  figure as `<figure><img alt>` with the model's short description as its alt text; a table as
+  a `<table>` with `scope`d headers. A word the reader could not read is the visible marker
+  `[illegible]`; an inline formula that did not validate is its LaTeX in square brackets.
+- **What readers are told.** The about section says which pages were converted from images.
+  The wording assists; it never says the conversion is right (architecture rule 7).
+- **When the instructor keeps text as the picture.** A prose block rejected on the review
+  screen is written as the picture of its region (a figure with
+  `data-reason="image_page_text"`, alt "Text on page 3, not converted to text.", the label
+  "Not converted."), like any kept image.
+
+How the pipeline tiers each block, and why every one is a review item, is in
+[ADR 0007](decisions/0007-image-pages.md); how it was measured, in
+[eval-image-pages.md](eval-image-pages.md).
 
 ## Equations kept as pictures (T3-15)
 
@@ -668,6 +701,9 @@ review words ("needs review", "rejected"): those are for the instructor, on the 
   "Needs a description": ask your instructor for a version you can read.", and when whole
   pages are kept as images, which ones: "Pages 2 and 5 are pictures of handwritten or
   scanned pages and were not converted." (`assemble.kept_pages_note`);
+- when pages were read from an image of the page: "Page 2 was converted from an image of the
+  page: it starts with a note and the original page to check it against."
+  (`assemble.image_pages_note`);
 - "If something is hard to read or looks wrong, tell your instructor.";
 - an optional plain-text `source_note`, such as an OpenStax attribution.
 
