@@ -331,10 +331,10 @@ pipeline did (`scripts/dev_gap.py`):
 | aligned, no proposal (the model answer is missing, a fraction cut in half) | 4 | 3 |
 
 Against Opus on slice B (22 / 20): 10 undetected, 4 recognition, 4 no proposal, 3 scorer, 1 span.
-The page pass changes 2 of the 60; it fixes one glued exercise number
-(`8-5 ... eq-046`: `258.\ \frac{...}` off, `\frac{...}` on) and finds a lone variable.
+With the flag on, 2 of the 60 become right; one is a glued exercise number the pass cut off
+(`8-5 ... eq-046`: `258.\ \frac{...}` off, `\frac{...}` on).
 
-Ten concrete cases (gold is the symbol stream of the answer key; "span" is the text layer of the
+Ten concrete cases (cases 1, 7, 8 and 10 are from the Haiku arm, the others from the Opus arm; gold is the symbol stream of the answer key; "span" is the text layer of the
 region the pipeline cut):
 
 | # | Section, gold | Pipeline (flag off) | Chatbot | Bucket |
@@ -386,6 +386,6 @@ needs about 17 sections for +1 point of the primary score and about 12 for +0.5 
 (above), and a chatbot comparison needs far more, because the section-level spread of the
 difference between systems is 0.21 on the primary score (held-out run): a 5-point difference needs
 about 140 sections, a 10-point one about 35. So a fresh set of 20 sections (about 320 pages) would
-settle the page pass: ReadableSTEM off and on, two runs each, about $12, and the chatbots (Haiku
+settle the page pass: ReadableSTEM off and on, two runs each, about $20 (about $10 for one run of both settings), and the chatbots (Haiku
 about $0.7, Opus about $17 per run) only if a head-to-head is wanted, which at that size can still
 only detect a gap of 10 points or more.
