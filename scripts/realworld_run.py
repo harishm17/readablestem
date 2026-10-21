@@ -119,6 +119,8 @@ def cmd_rs(args: argparse.Namespace) -> int:
     os.environ["CLAUDE_SECOND_CHECK"] = "off"
     if args.page_math:
         os.environ["FEATURE_PAGE_MATH"] = "true"
+    if args.page_math_tokens:
+        os.environ["PAGE_MATH_MAX_OUTPUT_TOKENS"] = str(args.page_math_tokens)
     from readablestem.cli import eval_cli
     from readablestem.cli.main import build_parser
 
@@ -326,6 +328,7 @@ def main() -> int:
             p.add_argument("--tag", default="rs")
             p.add_argument("--offline", action="store_true")
             p.add_argument("--page-math", action="store_true", help="FEATURE_PAGE_MATH on")
+            p.add_argument("--page-math-tokens", type=int, help="PAGE_MATH_MAX_OUTPUT_TOKENS")
             p.add_argument(
                 "--seed-answers-from", help="tag whose answers file this run starts from"
             )
