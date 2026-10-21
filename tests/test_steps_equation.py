@@ -649,6 +649,12 @@ def test_fix_codes_and_reasons_are_content_free():
         (r"a \\,", r"a \\"),  # a comma after a line break is a comma
         (",", ","),  # nothing would be left
         (r"\{1, 2, 3\}", r"\{1, 2, 3\}"),
+        (r"\left\{ x \right.", r"\left\{ x \right."),  # the null delimiter, not a full stop
+        (r"\left. x \right|_0 \right.", r"\left. x \right|_0 \right."),
+        (r"f(x) = \left\{ a \right. .", r"f(x) = \left\{ a \right."),  # the real full stop goes
+        (r"\left\{ x \right.,", r"\left\{ x \right."),  # a comma after it goes
+        (r"x \to \rightarrow.", r"x \to \rightarrow"),  # \rightarrow is an arrow, not \right
+        (r"a \right  .", r"a \right  ."),
     ],
 )
 def test_strip_trailing_punctuation(raw, clean):

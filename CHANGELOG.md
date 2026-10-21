@@ -1,5 +1,33 @@
 # Changelog
 
+## Page math pass, secondary equation scores, `\right.` (2026-10-21, branch feat/page-math)
+
+- Two layout fixes: a stray opening brace at the end of a sentence goes with its system, and
+  nuclides in running text (`14C`, `235U`) are inline equations instead of raised text
+  (docs/layout.md). Re-measurement of the held-out sections with the current system, not a blind
+  result: [docs/remeasurement-2026-10-21.md](docs/remeasurement-2026-10-21.md); the README keeps
+  the registered numbers beside it.
+
+- Invented-content check: a secondary count `unsupported_by_rows` (rows of a derivation checked
+  one at a time) beside the unchanged rule, and an audit of why the unsupported-equation rate rose
+  with 0.5.0 (equation pictures are now read, and have no text to match):
+  [docs/remeasurement-2026-10-21.md](docs/remeasurement-2026-10-21.md).
+
+- Page math pass (off: `FEATURE_PAGE_MATH`, [ADR 0006](docs/decisions/0006-page-math-pass.md)):
+  one cheap-model call per page proposes where the equations are, quoting the PDF's text layer;
+  every quote is verified against the text layer, verified spans are laid over layout's own
+  decisions (layout stays the fallback), and the page's LaTeX is a second reading that the
+  equation step compares with its own. Development-set results and cost:
+  [docs/eval-page-math.md](docs/eval-page-math.md).
+- A second labelled secondary equation score, `symbols` (tables flattened, scripts as markers),
+  beside stream v2; what both say about the recorded held-out run:
+  [docs/eval-secondary-metrics.md](docs/eval-secondary-metrics.md). The primary
+  `exact_lenient` and every committed report are unchanged.
+- `eval pipeline --sections` runs a slice of a set; `scripts/dev_buckets.py` and
+  `scripts/dev_spans.py` compare runs on a development set.
+- The "." of `\right.` and `\left.` is no longer taken for sentence punctuation and stripped
+  from an inline equation.
+
 ## Open sign-up (2026-10-21)
 
 - `SIGNUP_MODE=open` lets anyone with a verified Google account (or an allowed Microsoft one)

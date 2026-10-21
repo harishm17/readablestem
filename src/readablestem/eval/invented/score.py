@@ -102,6 +102,10 @@ class Counts:
     unsupported_authored: int = 0
     unchecked: int = 0  # the rule could not look at them (TeX that did not convert, ...)
     too_short: int = 0  # unaligned equations under 3 symbols
+    # Of the unaligned equations: those unsupported when the rows of a table (a system, the steps
+    # of a derivation) are checked one at a time (`row_support`). A secondary reading, reported
+    # beside the rule above, never instead of it.
+    unsupported_by_rows: int = 0
     # Of the unsupported aligned equations: those whose only added symbols are a printed
     # equation number at the end ("... = 1.7 m/s 2.1"; see `equation_tag`).
     tag_only: int = 0
@@ -122,6 +126,7 @@ class Counts:
             "unsupported_authored": self.unsupported_authored,
             "unchecked": self.unchecked,
             "too_short": self.too_short,
+            "unsupported_by_rows": self.unsupported_by_rows,
             "tag_only": self.tag_only,
             "tag_only_authored": self.tag_only_authored,
         }
@@ -371,6 +376,68 @@ def equation_tag(tokens: str, added: Counter[str], reference: Reference) -> bool
     return not (added - symbol_bag(number))
 
 
+ROW_MIN_SYMBOLS = 4  # a shorter row is too short to tell a real match from a chance one
+ROW_SUPPORT_MIN = 0.8  # of an equation's symbols, the share that must sit in supported rows
+
+
+def rows_of(mathml: str) -> list[str]:
+    """The symbol streams of an equation's rows: the outermost table rows (a system, the steps of
+    a derivation, a determinant's lines, each row's cells joined), then whatever the equation
+    holds outside its tables as one more row. An equation with no table is one row."""
+    try:
+        root = normalize(mathml, lenient=True)
+    except MathMLError:
+        return []
+    rows: list[str] = []
+    inside: set[int] = set()
+
+    def walk(node: Any, in_row: bool) -> None:
+        for child in node:
+            if child.tag == "mtr" and not in_row:
+                text = " ".join(" ".join(child.itertext()).split())
+                rows.append(symbol_stream(text))
+                inside.update(id(n) for n in child.iter())
+                continue
+            walk(child, in_row or child.tag == "mtr")
+
+    walk(root, False)
+    if not rows:
+        return [symbol_stream(" ".join(" ".join(root.itertext()).split()))]
+    rest = " ".join(
+        " ".join(n.text or "" for n in root.iter() if id(n) not in inside and n.text).split()
+    )
+    if symbol_stream(rest):
+        rows.append(symbol_stream(rest))
+    return [r for r in rows if r]
+
+
+def row_support(reference: Reference, mathml: str) -> tuple[bool, float]:
+    """(supported, share): is the equation supported when its rows are checked one at a time
+    against R's symbol stream, and the share of its symbols in rows that were found. A row is
+    found by the rule above (window and ratio), but only rows of `ROW_MIN_SYMBOLS` or more can be
+    checked: a 3-digit row of a matrix matches somewhere on a page of numbers by chance. The
+    equation is supported when `ROW_SUPPORT_MIN` of its symbols sit in found rows, so an
+    equation made of short rows (a matrix, a column of one-step simplifications) stays
+    unsupported, as under the rule above, and a row can only help when it is long enough to mean
+    something.
+
+    The rule above reads an equation as one run of R's stream. A system or a derivation read
+    row by row is not one run when the text layer puts other text between its rows (a
+    statement, the next step, a margin note), and the same equation printed as text is
+    "unsupported" for that alone."""
+    rows = rows_of(mathml)
+    total = sum(len(r) for r in rows)
+    if total == 0:
+        return True, 1.0
+    found = sum(
+        len(r)
+        for r in rows
+        if len(r) >= ROW_MIN_SYMBOLS and reference.symbol_index.best_ratio(r) >= UNALIGNED_RATIO
+    )
+    share = found / total
+    return share >= ROW_SUPPORT_MIN, share
+
+
 def _tokens_of(mathml: str) -> str | None:
     """The tokens of a MathML equation after the scorer's own normalisation (annotations,
     layout-only elements dropped; math letters folded); None when it will not parse."""
@@ -448,7 +515,11 @@ def _score_equations(
             continue
         ratio = reference.symbol_index.best_ratio(stream)
         unsupported = ratio < UNALIGNED_RATIO
+        rows_ok, share = (
+            (True, 1.0) if not unsupported else row_support(reference, equation.mathml or "")
+        )
         counts[EQUATION_UNALIGNED].add(unsupported, equation.authored)
+        counts[EQUATION_UNALIGNED].unsupported_by_rows += unsupported and not rows_ok
         verdicts.append(
             Verdict(
                 EQUATION_UNALIGNED,
@@ -458,6 +529,7 @@ def _score_equations(
                 equation.authored,
                 {
                     "ratio": round(ratio, 3),
+                    "row_share": round(share, 3),
                     "symbols": len(stream),
                     "source": equation.source,
                     "display": equation.display,
@@ -518,6 +590,8 @@ def rule_summary() -> dict[str, Any]:
         "unaligned_min_symbols": UNALIGNED_MIN_SYMBOLS,
         "unaligned_ratio": UNALIGNED_RATIO,
         "equation_align_min": pe.EQUATION_ALIGN_MIN,
+        "row_min_symbols": ROW_MIN_SYMBOLS,
+        "row_support_min": ROW_SUPPORT_MIN,
     }
 
 

@@ -68,7 +68,7 @@ from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property, lru_cache
 from itertools import combinations, count, pairwise
-from typing import Any
+from typing import Any, Literal
 
 import pymupdf
 
@@ -356,6 +356,9 @@ _LOCK = threading.RLock()  # PyMuPDF is not thread-safe: one PyMuPDF call at a t
 TABLE_PREFILTER = True
 
 
+PageStatus = Literal["span", "layout"]  # `Element.page_status`
+
+
 class LayoutError(ValueError):
     """The PDF cannot be processed. `code` is a category, safe to log."""
 
@@ -391,7 +394,11 @@ class Layout:
 
 
 def analyze(
-    pdf_bytes: bytes, *, pages: list[int] | None = None, max_pages: int | None = None
+    pdf_bytes: bytes,
+    *,
+    pages: list[int] | None = None,
+    max_pages: int | None = None,
+    page_math: Any = None,
 ) -> Layout:
     """Elements of the given 0-based pages (all by default), ids "p{page+1}-e{index}".
 
@@ -402,6 +409,11 @@ def analyze(
     The selected pages are first rendered once in a child process (see `_probe_pages`);
     the document is opened for this call only and closed again, so analysis leaves no
     user content in this module (only `crop` caches documents).
+
+    `page_math` (ADR 0006): an object with `on_page(number, rows, ordered, rules)` and
+    `after_regions(number, rows)` (`pipeline.page_math_reconcile.PageMathHook`). It is shown
+    each page's text rows before the display equations are grouped, and may return them
+    cut and marked by a verified plan. None (the default) is layout's own rules alone.
     """
     with _LOCK:
         _quiet_mupdf()
@@ -410,7 +422,7 @@ def analyze(
             try:
                 selected = _select_pages(doc.page_count, pages, max_pages)
                 _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
-                return _analyze_document(doc, selected)
+                return _analyze_document(doc, selected, page_math)
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
             finally:
@@ -462,6 +474,27 @@ def crop(
                 pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
             if tag_dpi:
                 pixmap.set_dpi(round(zoom * 72), round(zoom * 72))
+            return pixmap.tobytes("png")
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()
+
+
+def render_page(pdf_bytes: bytes, page: int, *, dpi: int = 150, max_side_px: int = 2048) -> bytes:
+    """PNG of the whole page at `dpi` on white (long side capped at `max_side_px`), the picture
+    the page math pass reads. Same document cache and lock as `crop`."""
+    if dpi <= 0 or max_side_px < 16:
+        raise ValueError("render_page needs dpi > 0 and max_side_px >= 16")
+    with _LOCK:
+        _quiet_mupdf()
+        try:
+            key, doc = _CACHE.document(pdf_bytes)
+            if not 0 <= page < doc.page_count:
+                raise ValueError(f"page {page} is not in the PDF")
+            _ensure_probed(pdf_bytes, key, [page])
+            sheet = doc[page]
+            rect = sheet.rect
+            zoom = min(dpi / 72.0, (max_side_px - 1) / max(rect.width, rect.height))
+            pixmap = sheet.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False)
             return pixmap.tobytes("png")
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()
@@ -1041,6 +1074,13 @@ class _Row:
     # A row of a function defined by cases (`_mark_case_rows`): its columns may stand
     # twice as far apart as those of an aligned row.
     case_row: bool = False
+    # The page math pass (ADR 0006, `pipeline.page_math_reconcile`), only with a plan for
+    # the page: `page_checked` says it ran; `page_inline` are the inline spans it placed in
+    # this row (character indexes into `chars`, and its LaTeX); `page_nonmath` the stretches
+    # it called look-alikes of maths.
+    page_checked: bool = False
+    page_inline: list[tuple[int, int, str]] = field(default_factory=list)
+    page_nonmath: list[tuple[int, int]] = field(default_factory=list)
 
     @cached_property
     def ink(self) -> list[_Char]:
@@ -2679,6 +2719,10 @@ class _Inline:
     reasons: list[str]
     font_size: float
     regular: str | None = None  # `Element.regular_letters`
+    # The page math pass (ADR 0006): its LaTeX reading of this run, and whether it placed
+    # the run ("span") or only layout found it ("layout"); None without a pass.
+    page_latex: str | None = None
+    page_status: PageStatus | None = None
 
 
 def _inline_runs(
@@ -2730,7 +2774,82 @@ def _inline_runs(
             reasons = _inline_evidence(chars, info, start, end, kinds)
             if reasons:
                 runs.append((start, end, reasons))
+    return _with_nuclides(row, kinds, runs)
+
+
+NUCLIDE_REASON = "nuclide with numbers before its symbol"
+NUCLIDE_GAP = 0.35  # x font size: widest gap between the stacked numbers and the symbol
+MAX_NUCLIDE_DIGITS = 6  # a mass number and an atomic number of three digits each
+
+
+def _nuclide_runs(row: _Row, kinds: list[ScriptKind | None]) -> list[tuple[int, int, list[str]]]:
+    """(start, end, reasons) of nuclide notation in a prose row: the mass number raised and
+    usually the atomic number lowered before an element's symbol ("14C", "235U", "4 2 He" with
+    the 4 above the 2), one run from the first number to the last letter of the symbol.
+
+    The numbers are raised or lowered text of upright type that stands against the symbol
+    (`_script_glyphs` gives them a kind: a group of digits and a capital letter at once after
+    it). The run is kept only when the group is all digits, starts at the beginning of a word,
+    and the letters after it are the symbol of an element (`speech_nuclides.ELEMENTS`) that
+    does not go on into a longer word: "226Ra" is a nuclide, "10 m2S" is not."""
+    from readablestem.pipeline.speech_nuclides import ELEMENTS
+
+    chars = row.chars
+    n = len(chars)
+    runs: list[tuple[int, int, list[str]]] = []
+    i = 0
+    while i < n:
+        if kinds[i] is None:
+            i += 1
+            continue
+        j = i
+        while j < n and kinds[j] is not None:
+            j += 1
+        group = chars[i:j]
+        glued = i > 0 and chars[i - 1].c.isalnum()
+        k = j  # a blank the PDF puts between the stacked numbers and the symbol is not a gap
+        while k < n and chars[k].blank:
+            k += 1
+        if (
+            not glued
+            and group
+            and all(c.c.isdigit() for c in group)
+            and len(group) <= MAX_NUCLIDE_DIGITS
+            and k < n
+            and chars[k].c.isupper()
+            and chars[k].x0 - max(c.x1 for c in group) <= NUCLIDE_GAP * row.size
+        ):
+            end = k + 1
+            if end < n and chars[end].c.islower() and kinds[end] is None:
+                end += 1
+            symbol = "".join(c.c for c in chars[k:end])
+            after = chars[end].c if end < n else " "
+            if symbol in ELEMENTS and not after.isalpha():
+                runs.append((i, end, [NUCLIDE_REASON]))
+                i = end
+                continue
+        i = j
     return runs
+
+
+def _with_nuclides(
+    row: _Row, kinds: list[ScriptKind | None], runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """`runs` with the row's nuclide notation as runs of their own, a run that overlaps one
+    taken into it."""
+    found = _nuclide_runs(row, kinds)
+    if not found:
+        return runs
+    merged = list(runs)
+    for start, end, reasons in found:
+        touching = [r for r in merged if r[0] < end and start < r[1]]
+        merged = [r for r in merged if r not in touching]
+        lo = min([start, *(r[0] for r in touching)])
+        hi = max([end, *(r[1] for r in touching)])
+        merged.append(
+            (lo, hi, [*reasons, *(x for r in touching for x in r[2] if x not in reasons)])
+        )
+    return sorted(merged)
 
 
 def _between_formulas(chars: list[_Char], i: int) -> bool:
@@ -4196,10 +4315,23 @@ def _resolve_fragments(rows: list[_Row], rules: list[_Path]) -> list[_Path]:
     return used
 
 
+# How far to the right of a stray opening brace the first equation of its system may start.
+STRAY_BRACE_REACH = 2.0
+
+
 def _math_neighbours(row: _Row, other: _Row) -> bool:
     """Does fragment `row` belong with maths row `other`? Vertically adjacent and
-    overlapping in x, or an equation number beside it (`_number_beside`)."""
+    overlapping in x, or an equation number beside it (`_number_beside`), or an opening brace
+    level with `other` and a little to its left (the brace of a system, `_stray_brace_cut`)."""
     size = max(row.size, other.size)
+    if (
+        row.ink
+        and all(c.c in _OPENING_BRACES for c in row.ink)
+        and row.column == other.column
+        and 0 <= other.x0 - row.x1 <= STRAY_BRACE_REACH * size
+        and other.y0 - size <= (row.y0 + row.y1) / 2 <= other.y1 + size
+    ):
+        return True
     gap_y = max(row.y0 - other.y1, other.y0 - row.y1)
     gap_x = max(row.x0 - other.x1, other.x0 - row.x1)
     if gap_y <= 0.6 * size and gap_x <= 1.0 * size and gap_y > -0.5 * min(row.height, other.height):
@@ -4371,11 +4503,61 @@ def _split_braced_systems(rows: list[_Row]) -> list[_Row]:
     for row in rows:
         cut = _brace_cut(row, index)
         if cut is None:
+            cut = _stray_brace_cut(row, index)
+        if cut is None:
             out.append(row)
             continue
         out.append(_Row(row.chars[:cut], column=row.column, marker=row.marker))
         out.append(_Row(row.chars[cut:], column=row.column))
     return out
+
+
+def _stray_brace_cut(row: _Row, index: _RowIndex) -> int | None:
+    """Index of the opening brace that ends a row of text, when it is the brace of the system
+    set to its right, or None.
+
+    OpenStax also prints "Solve the system by substitution. {" with the brace the last glyph of
+    the sentence's row and the two equations in rows of their own to its right, level with the
+    brace, not with the sentence (the maths rows' baselines are above and below the brace's).
+    The row is then text with a brace at its end, and the system's crop starts at its first
+    equation, without the brace. The brace is cut off as a row of its own when a maths row starts
+    within `STRAY_BRACE_REACH` font sizes to its right, with another maths row under that one,
+    and the brace's middle is level with the two; `_math_neighbours` then takes it into the system.
+    """
+    chars = row.chars
+    ink = [i for i, c in enumerate(chars) if not c.blank]
+    if row.vertical or len(ink) < 3 or chars[ink[-1]].c != "{":
+        return None
+    start = ink[-1]
+    if not any(not c.blank for c in chars[:start]):
+        return None
+    brace = chars[start]
+    size = row.size
+    for right in index.near(brace.y0, brace.y1):
+        if right is row or right.column != row.column or right.vertical:
+            continue
+        if not 0 <= right.x0 - brace.x1 <= STRAY_BRACE_REACH * size:
+            continue
+        probe = _Row(right.chars, column=right.column)
+        _classify_row(probe)
+        if probe.kind != "math":
+            continue
+        for below in index.near(right.y1 - 0.3 * size, right.y1 + 1.0 * size):
+            if below is row or below is right or below.y0 < right.y1 - 0.3 * size:
+                continue
+            shared = min(below.x1, right.x1) - max(below.x0, right.x0)
+            if below.column == row.column and shared >= 0.5 * min(
+                below.x1 - below.x0, right.x1 - right.x0
+            ):
+                trial = _Row(below.chars, column=below.column)
+                _classify_row(trial)
+                middle = (brace.y0 + brace.y1) / 2
+                if (
+                    trial.kind == "math"
+                    and right.y0 - 0.5 * size <= middle <= below.y1 + 0.5 * size
+                ):
+                    return start  # level with the middle of the system's rows
+    return None
 
 
 def _brace_cut(row: _Row, index: _RowIndex) -> int | None:
@@ -4479,6 +4661,12 @@ class _Region:
     rules: list[_Path] = field(default_factory=list)
     labels: list[_Row] = field(default_factory=list)
     box: BBox = (0.0, 0.0, 0.0, 0.0)  # rows and rules, while lines are being stacked
+    # Placed by the page math pass instead of by the rules above: `forced`; its LaTeX
+    # reading; and, on a page that had a pass, whether the pass confirmed the region
+    # ("span") or only layout found it ("layout").
+    forced: bool = False
+    page_pass: PageStatus | None = None
+    latex: str | None = None
 
 
 @dataclass(eq=False)
@@ -4609,7 +4797,11 @@ def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
        aligned (the rows of an aligned derivation). Two whole equations stacked close
        together but centred on their own ("time = d / v" over "d = v t") stay apart.
     """
-    maths = [r for r in rows if r.kind == "math" and not r.absorbed and not r.vertical]
+    maths = [
+        r
+        for r in rows
+        if r.kind == "math" and not r.absorbed and not r.vertical and r.region is None
+    ]
     if not maths:
         return []
     parent = list(range(len(maths)))
@@ -5889,6 +6081,9 @@ class _Block:
     # written flat, and a notice says so (`scripts_flattened`).
     flat_scripts: bool = False
     marked: str | None = None  # headings: `text` with its raised and lowered runs marked
+    # Display equations placed by the page math pass: its LaTeX, and "span" or "layout".
+    page_latex: str | None = None
+    page_status: PageStatus | None = None
 
 
 def _dominant_size(rows: Sequence[_Row]) -> float:
@@ -6174,7 +6369,7 @@ def _wrapped_maths(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
     left margin at the usual line pitch. A numbered or multi-line equation is never one.
     """
     region = row.region
-    if region is None or region.labels or len(region.rows) != 1:
+    if region is None or region.forced or region.labels or len(region.rows) != 1:
         return False
     return abs(row.x0 - run.box[0]) <= 0.5 and _continues(prev, row, run, ctx)
 
@@ -6239,7 +6434,14 @@ def _equation_block(
 
     `plain`: the text layer keeps no letter styles. For a line set bold as a whole (a
     heading's weight), where bold says nothing about vectors."""
-    text = _clean(" ".join((r.text if plain else r.styled_text) for r in rows))
+    # A system's opening brace (a row of its own, standing left of all the others) is read first;
+    # the brace of "f(x) = {" stays where it is.
+    braces = [r for r in rows if r.ink and all(c.c in _OPENING_BRACES for c in r.ink)]
+    others = [r for r in rows if r not in braces]
+    left = min((r.x0 for r in others), default=0.0)
+    first = [r for r in braces if r.x1 <= left + 0.5]
+    ordered = [*first, *(r for r in rows if r not in first)]
+    text = _clean(" ".join((r.text if plain else r.styled_text) for r in ordered))
     script = any(c.flags & _SUPERSCRIPT_FLAG or c.size < SCRIPT_RATIO * size for c in ink)
     score, reasons = equation_score(text, sorted({c.font for c in ink}), script)
     if len(rows) > 1:
@@ -6248,6 +6450,8 @@ def _equation_block(
     labels = sorted(region.labels, key=lambda r: (r.y0, r.x0)) if region else []
     if labels:
         reasons.append("equation number")
+    if region is not None and region.page_pass is not None:
+        reasons.append(PAGE_SPAN_REASON if region.page_pass == "span" else PAGE_LAYOUT_ONLY_REASON)
     return _Block(
         Kind.EQUATION,
         box,
@@ -6258,6 +6462,8 @@ def _equation_block(
         reasons=reasons,
         label=" ".join(r.clean for r in labels) or None,
         regular=_regular_letters(ink),
+        page_latex=region.latex if region is not None else None,
+        page_status=region.page_pass if region is not None else None,
     )
 
 
@@ -6481,6 +6687,40 @@ def _marked(chars: list[_Char], kinds: list[ScriptKind | None], start: int, end:
     return script_marks.wrap(text, marks)
 
 
+# `Element.reasons` the page math pass leaves on what it placed and on what it did not confirm.
+PAGE_SPAN_REASON = "page pass span"
+PAGE_LAYOUT_ONLY_REASON = "page pass did not confirm"
+
+
+def _carry_page_math(old: _Row, new: _Row, offset: int) -> None:
+    """The page math marks of `old` on `new`, a row made of `old.chars[offset:]`."""
+    new.page_checked = old.page_checked
+    new.page_inline = [(a - offset, b - offset, t) for a, b, t in old.page_inline if a >= offset]
+    new.page_nonmath = [(a - offset, b - offset) for a, b in old.page_nonmath if a >= offset]
+
+
+def _with_page_spans(
+    row: _Row, runs: list[tuple[int, int, list[str]]]
+) -> tuple[list[tuple[int, int, list[str]]], dict[tuple[int, int], str]]:
+    """Layout's inline runs of a row with the page pass's spans laid over them.
+
+    A run that touches a span the pass placed is replaced by that span (the pass settles
+    where the maths starts and ends); a run inside a stretch the pass called a look-alike of
+    maths is dropped; the other runs stay, marked as not confirmed. The pass's own spans
+    come with their LaTeX."""
+    spans = sorted(row.page_inline)
+    out: list[tuple[int, int, list[str]]] = []
+    for start, end, reasons in runs:
+        if any(start < b and a < end for a, b, _ in spans):
+            continue
+        if any(start < b and a < end for a, b in row.page_nonmath):
+            continue
+        out.append((start, end, [*reasons, PAGE_LAYOUT_ONLY_REASON]))
+    latex = {(a, b): t for a, b, t in spans}
+    out += [(a, b, [PAGE_SPAN_REASON]) for a, b, _ in spans]
+    return sorted(out, key=lambda r: (r[0], r[1])), latex
+
+
 def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
     """Paragraph (or list item) text with inline equations cut out, hyphenation repaired
     between rows. A list item's text starts after its marker."""
@@ -6491,13 +6731,18 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
     if block.marker is not None and block.marker.end:
         first = rows[0]
         rows[0] = _Row(first.chars[block.marker.end :], column=first.column)
+        _carry_page_math(first, rows[0], block.marker.end)
     letters = _BoldLetters.start()
     for row in rows:
         row_pieces: list[str | _Inline] = []
         cursor = 0
         info = _CharInfo.of(row)
         raw, kinds = _script_glyphs(row, info)
-        found = _bold_letter_runs(row, _inline_runs(row, info, kinds), letters)
+        runs = _inline_runs(row, info, kinds)
+        page_latex: dict[tuple[int, int], str] = {}
+        if row.page_checked:
+            runs, page_latex = _with_page_spans(row, runs)
+        found = _bold_letter_runs(row, runs, letters)
         found = sorted(
             [
                 *(
@@ -6526,8 +6771,20 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
             fonts = sorted({c.font for c in ink})
             score, _ = equation_score(text, fonts, any(c.flags & _SUPERSCRIPT_FLAG for c in ink))
             box = _clear_of_punctuation(_union((c.x0, c.y0, c.x1, c.y1) for c in ink), row, end)
+            status = (
+                ("span" if (start, end) in page_latex else "layout") if row.page_checked else None
+            )
             row_pieces.append(
-                _Inline(box, text, score, reasons, _dominant_size([row]), _regular_letters(ink))
+                _Inline(
+                    box,
+                    text,
+                    score,
+                    reasons,
+                    _dominant_size([row]),
+                    _regular_letters(ink),
+                    page_latex.get((start, end)),
+                    status,
+                )
             )
             cursor = end
         row_pieces.append(_marked(row.chars, kinds, cursor, len(row.chars)))
@@ -6845,6 +7102,7 @@ def _page_blocks(
     mixed_ink: bool = False,
     label_keys: Collection[tuple] = frozenset(),
     covers: Sequence[tuple[float, float]] = (),
+    page_math: Any = None,
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_exercise_numbers(_split_braced_systems(_split_labels(rows)))
@@ -6883,8 +7141,16 @@ def _page_blocks(
     _take_labels(restored, figures, rows)
     figures, rows = _equation_pictures(page, figures, rows, ctx, small_pictures)
     text_rows = [r for r in rows if not r.absorbed]
-    _equation_regions(text_rows, used_rules)
     placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
+    if page_math is not None:
+        # The page math pass (ADR 0006): the rows as they stand, in reading order, are what
+        # the model is shown, and its verified spans are laid over them before the rules
+        # below group them into equations.
+        first = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
+        text_rows = page_math.on_page(number, text_rows, [text_rows[i] for i in first], used_rules)
+    _equation_regions(text_rows, used_rules)
+    if page_math is not None:
+        page_math.after_regions(number, text_rows)
     order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
     ordered = _contiguous_regions([text_rows[i] for i in order])
     runs = _runs(ordered, ctx)
@@ -7542,7 +7808,7 @@ def _read_page(
     return rows, _page_paths(page, drawings, seen), kind
 
 
-def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
+def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any = None) -> Layout:
     frags: dict[int, list[_Row]] = {}
     paths: dict[int, list[_Path]] = {}
     types: dict[int, page_type.PageTypeResult] = {}
@@ -7619,6 +7885,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             mixed_ink=types[n].kind == "mixed_ink",
             label_keys=label_keys,
             covers=_covered_points(doc[n], types[n]),
+            page_math=page_math,
         )
         for n in selected
     ]
@@ -8047,6 +8314,8 @@ def _to_elements(
                             display="inline",
                             parent_id=element_id,
                             regular_letters=inline.regular,
+                            page_latex=inline.page_latex,
+                            page_status=inline.page_status,
                         )
                     )
                 continue
@@ -8071,6 +8340,8 @@ def _to_elements(
                     equation_label=block.label if kind == Kind.EQUATION else None,
                     caption=block.caption,
                     regular_letters=block.regular if kind == Kind.EQUATION else None,
+                    page_latex=block.page_latex if kind == Kind.EQUATION else None,
+                    page_status=block.page_status if kind == Kind.EQUATION else None,
                     table=block.table if kind == Kind.TABLE else None,
                 )
             )

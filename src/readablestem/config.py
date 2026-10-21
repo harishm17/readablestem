@@ -86,6 +86,8 @@ class Settings(BaseSettings):
     # the model's own effort above. The measurement is in docs/eval.md "Model cost".
     anthropic_effort_equation: Effort | None = None
     anthropic_effort_figure: Effort | None = None
+    # Effort of the page math pass (ADR 0006). Unset: low.
+    anthropic_effort_page_math: Effort | None = None
     # The fixed untrusted-text notice rides in the cached system block instead of in every
     # request's user message (T3-23). Claude only. On by default: the same answers on the
     # development sets, 6-10% less per call once the cache is warm (docs/eval.md "Model cost").
@@ -306,6 +308,15 @@ class Settings(BaseSettings):
     # Per-course notation memory: hints for the equation step, spoken readings, bold
     # letters in running text as maths, "remember for this course" on the review screen.
     feature_notation_memory: bool = False
+    # A page math pass proposes where each page's equations start and end, grounded in the
+    # PDF's text layer (ADR 0006, pipeline/page_math.py). Off until a fresh held-out set says
+    # it helps. `page_math_model` None: the cheap model.
+    feature_page_math: bool = False
+    page_math_model: str | None = None
+    # A layout span the page pass did not confirm has its equation confidence scaled by this.
+    # 1.0 (no change) because, on dev slice A, 16 aligned equations fell under the accept bar
+    # for it and 14 of them were right (docs/eval-page-math.md); set below 1 to try it.
+    page_math_unconfirmed_factor: float = Field(default=1.0, gt=0, le=1)
     # Write each converted equation's stored speech text (`pipeline.speech`, the reading
     # shown on the review screen) as the `alttext` attribute of its <math>. OFF until a
     # person has checked it with NVDA + MathCAT (and ideally JAWS and VoiceOver): some

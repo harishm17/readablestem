@@ -517,7 +517,8 @@ section) is English whatever the document's language.
 
 ## Raised and lowered text
 
-Raised and lowered text of upright text (`Element.script_runs`: H2O, Na+, g/cm3, 226Ra) is
+Raised and lowered text of upright text (`Element.script_runs`: H2O, Na+, g/cm3; a nuclide's numbers
+before its symbol are an inline equation since 2026-10-21, docs/layout.md) is
 written as `<sup>` and `<sub>` inside the paragraph, list item or heading, inside any link or
 colour:
 

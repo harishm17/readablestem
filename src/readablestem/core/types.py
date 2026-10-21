@@ -120,7 +120,7 @@ class Check(BaseModel):
     code: str | None = None  # category when it fails, e.g. "unknown_command"
 
 
-Step = Literal["equation", "figure", "judge", "table", "check"]
+Step = Literal["equation", "figure", "judge", "table", "check", "page_math"]
 
 Outcome = Literal[
     "ok", "refused", "invalid_output", "timeout", "api_error", "budget_exceeded", "skipped"
@@ -480,6 +480,13 @@ class Element(BaseModel):
     # plain, so a bold reading of it (a scalar read as a vector) is a real difference.
     # None when layout did not record it (older results, equations built outside layout).
     regular_letters: str | None = None
+    # Equations, only with the page math pass (ADR 0006): its LaTeX reading of this span
+    # (a second reading, never output text), and whether the pass placed the span ("span")
+    # or only layout found it on a page the pass read ("layout"). None: no pass.
+    page_latex: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    page_status: Literal["span", "layout"] | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
     # Tables: the grid layout built from the PDF's own words and lines (source "local").
     table: TableGrid | None = None
     # Paragraphs: program code. `text` keeps its line breaks and the indentation it was
@@ -754,6 +761,31 @@ class OmittedPage(BaseModel):
 LangSource = Literal["pdf", "detected", "default", "user"]
 
 
+class PageMathSummary(BaseModel):
+    """What the page math pass did for one document (ADR 0006). Content-free: counts and
+    cost only. `cost_usd` is also in `DocumentStats.cost_usd`."""
+
+    pages: int = 0  # pages the model was asked about
+    failed: int = 0  # pages with no usable answer
+    calls: int = 0
+    cost_usd: float = 0.0
+    proposed: int = 0  # expressions the model proposed
+    verified: int = 0  # ... whose quotes held
+    relocated: int = 0  # ... found elsewhere in their row than stated
+    dropped: int = 0  # ... dropped, a quote that held nowhere
+    overlapped: int = 0  # ... dropped, overlapping another
+    applied_pages: int = 0  # pages where the plan was laid over layout
+    stale_pages: int = 0  # pages whose rows changed between the two layout runs
+    blocks: int = 0  # display spans placed
+    inline: int = 0  # inline spans placed
+    numbers: int = 0  # exercise or item numbers cut off
+    labels: int = 0  # equation numbers cut off
+    refused: int = 0  # display spans that would split a layout region: layout's cut is kept
+    inconsistent: int = 0  # spans whose LaTeX and quoted text disagree
+    absorbed: int = 0  # bracket rows taken into a placed region
+    stopped_by: str | None = None  # a spend cap that ended the pass early
+
+
 class DocumentResult(BaseModel):
     """Everything the pipeline produced for one PDF. Crop images are kept separately."""
 
@@ -793,6 +825,8 @@ class DocumentResult(BaseModel):
     # Pages the reviewer left out (`OmittedPage`); empty for every result before the
     # option existed, and left out of the JSON then.
     omitted: list[OmittedPage] = Field(default_factory=list, exclude_if=lambda v: not v)
+    # The page math pass (ADR 0006); None when the flag was off, and left out of the JSON.
+    page_math: PageMathSummary | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @property
     def omitted_pages(self) -> list[int]:
@@ -855,6 +889,8 @@ class ConversionOptions(BaseModel):
     long_descriptions: bool = False
     colour: bool = False
     notation_memory: bool = False
+    # A page math pass places each page's equations (ADR 0006).
+    page_math: bool = False
     # The document is an exam or graded assessment: figure alt text describes what is
     # shown and never the result (prompt `figure_exam.md`), and the long description and
     # data table, which give values and trends, are not asked for even when
@@ -870,6 +906,7 @@ class ConversionOptions(BaseModel):
             long_descriptions=settings.feature_long_descriptions,
             colour=settings.feature_colour,
             notation_memory=settings.feature_notation_memory,
+            page_math=settings.feature_page_math,
         )
 
 

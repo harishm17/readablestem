@@ -188,7 +188,7 @@ class OpenAIVisionClient:
         sent). The returned `ModelCall` covers every send this call made: tokens and cost are
         summed, latency includes backoff, and the outcome is the last send's.
         """
-        context = fenced_context(request.context_text)
+        context = fenced_context(request.context_text, request.context_limit)
         content = _input_content(request, context)
         sdk = self._client()
         estimate = estimate_max_cost_usd(
@@ -385,9 +385,13 @@ def defang_context(text: str) -> str:
         text = cleaned
 
 
-def fenced_context(text: str | None) -> str | None:
-    """The exact text sent to the model for `text` (notice + fence), or None if empty."""
-    return fence_untrusted(defang_context(text)) if text else None
+def fenced_context(text: str | None, limit: int | None = None) -> str | None:
+    """The exact text sent to the model for `text` (notice + fence), or None if empty.
+    `limit`: characters kept (default: the fence's own)."""
+    if not text:
+        return None
+    cleaned = defang_context(text)
+    return fence_untrusted(cleaned) if limit is None else fence_untrusted(cleaned, limit)
 
 
 def _input_content(request: VisionRequest, context: str | None) -> list[ResponseInputContentParam]:

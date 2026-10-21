@@ -234,6 +234,13 @@ Docling's default setting keeps equations as pictures, so it has none to check.
 - A sign flipped in an equation that has no gold partner and still matches R's symbol
   stream at ratio 0.8. Aligned equations count symbols, so a changed sign is not an added
   symbol either; only an added letter, digit or Greek letter is.
+- An equation that is a picture in the PDF, read correctly. R has no text for it, so the
+  rule counts it unsupported: with a layout that reads equation pictures (0.5.0), the rate for
+  equations with no gold partner measures how many equations are pictures more than how many are
+  invented (audit and numbers: `docs/remeasurement-2026-10-21.md`). The count
+  `unsupported_by_rows` beside it (`score.row_support`) checks a derivation or system row by row,
+  for rows of 4+ symbols, for the equations whose rows the text layer separates; it is secondary,
+  and the rule above is the registered one.
 - Faithful paraphrase and re-ordering (counted as unsupported), and an equation read out in
   words ("In words: velocity equals ...") which says what the PDF says in other words.
 - Numbers read off a graph. R holds what is printed; an axis value that exists only in the
