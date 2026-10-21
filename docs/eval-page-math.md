@@ -389,3 +389,46 @@ about 140 sections, a 10-point one about 35. So a fresh set of 20 sections (abou
 settle the page pass: ReadableSTEM off and on, two runs each, about $20 (about $10 for one run of both settings), and the chatbots (Haiku
 about $0.7, Opus about $17 per run) only if a head-to-head is wanted, which at that size can still
 only detect a gap of 10 points or more.
+
+## Two deterministic layout fixes (2026-10-21)
+
+The page pass stays off (decision of 2026-10-21; this document, the ADR and the code are the record
+of the experiment). Two of the failures it could not repair were fixed in layout, with no model:
+
+1. **A stray brace.** OpenStax prints "Solve the system by substitution. {" with the brace at the
+   end of the sentence's row and the equations in rows of their own to its right, so the system's
+   crop started at its first equation and the model wrote no brace (12 of the 38 `span`-bucket
+   equations on dev). `layout._stray_brace_cut` cuts the brace off the sentence and
+   `_math_neighbours` takes it into the system (docs/layout.md, "A stray opening brace").
+2. **Nuclides in running text.** The mass number raised and the atomic number lowered before an
+   element's symbol (`14C`, `235U`, `4 2 He`) were raised text; they are one inline run now, so the
+   equation step reads them and the speech says "carbon 14, atomic number 6"
+   (`layout._nuclide_runs`). Two tests that pinned the old raised-text behaviour were rewritten.
+
+Layout alone on all 28 dev-v2 documents (`--fake`, no model): matched gold equations 1,524 to 1,535
+of 1,809; equations whose span text is within 0.99 of the gold 978 to 1,002 (Elementary Algebra
+5.2: 53 to 80, the brace). The 121 PDFs of `scripts/layout_identity.py` (fixtures, development
+material, development pages): 102 identical, 19 different, and the differences are in paragraphs and
+equations only: no heading, figure, table, list item, kept page or page type changes, the
+"scripts flattened" notice goes where a nuclide was raised text, and the ids of inline equations
+shift (`make reproduce-rerun` passes).
+
+With the model, flag off, recorded answers for what did not change and live calls for the new crops
+(slice B has none: nothing there changes; spend $0.098):
+
+| Dev, flag off | A before | A after | B before / after | A+B before | A+B after |
+|---|---|---|---|---|---|
+| primary `exact_lenient` | 0.302 | 0.313 | 0.597 / 0.597 | 0.486 | 0.490 |
+| symbols, credited | 0.585 | 0.618 | 0.799 / 0.799 | 0.718 | 0.731 |
+| span fidelity (0.99) | 0.338 | 0.430 | 0.624 / 0.624 | 0.517 | 0.551 |
+| detection recall / precision | .673 / .688 | .691 / .627 | .872 / .793 | .797 / .756 | .804 / .730 |
+| wrong in symbols, unasked, per 100 | 5.9 | 4.4 | 4.2 / 4.2 | 4.8 | 4.3 |
+| cost per PDF page | $0.0116 | $0.0125 | $0.0194 | $0.0149 | $0.0155 |
+
+Paired over the ten sections: primary +0.4 points (0.0 to +1.3), symbols +1.2 (-0.9 to +4.4), unasked
+symbols-wrong -0.6 per 100 (-4.1 to +3.4). The estimate of +1.7 points for the brace alone was
+about right for what it fixes (the brace equations are in the symbols score, +9 on slice A), but
+most of them are still wrong on the primary scorer, which also wants `cases` and not
+`array`; the nuclide fix moves chemistry detection (the authored chemistry document 64 to 70 of
+108; Chemistry 2.3 7 to 12 of 38, the rest of its nuclides are cells of tables). Dev spend of the
+whole task: $5.80 of $8.

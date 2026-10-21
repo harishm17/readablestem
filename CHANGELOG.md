@@ -2,6 +2,12 @@
 
 ## Page math pass, secondary equation scores, `\right.` (2026-10-21, branch feat/page-math)
 
+- Two layout fixes: a stray opening brace at the end of a sentence goes with its system, and
+  nuclides in running text (`14C`, `235U`) are inline equations instead of raised text
+  (docs/layout.md). Re-measurement of the held-out sections with the current system, not a blind
+  result: [docs/remeasurement-2026-10-21.md](docs/remeasurement-2026-10-21.md); the README keeps
+  the registered numbers beside it.
+
 - Page math pass (off: `FEATURE_PAGE_MATH`, [ADR 0006](docs/decisions/0006-page-math-pass.md)):
   one cheap-model call per page proposes where the equations are, quoting the PDF's text layer;
   every quote is verified against the text layer, verified spans are laid over layout's own

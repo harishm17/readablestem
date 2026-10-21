@@ -42,6 +42,11 @@ run. The second kind comes from the sample on which the checks were developed.
 
 ### Held-out results (2026-10-14)
 
+> **Superseded for the current system, not for this run.** The table and text below are the
+> registered held-out results of the system as it was on 2026-10-14 (pipeline 0.4.0) and are kept as
+> they were. The system has changed since; a re-measurement on the same sections, which is **not a
+> blind result**, follows this section ("Re-measurement on the same sections, 2026-10-21").
+
 Fifteen sections of five OpenStax books (242 Letter pages, 1,369 equations, 509 headings,
 69 figures with an OpenStax alt text), chosen by a rule and registered before any system ran.
 The full report, with every table, interval and per-section number, is [PROOF.md](PROOF.md);
@@ -144,6 +149,42 @@ stylesheet, clean inputs, from retired first editions; real course PDFs are hard
 are one recording on Claude: model output varies run to run (the two document runs differ by
 0.007 on equations, the two Opus chatbot runs by 0.007), and the OpenAI models the
 registration names were not used.
+
+### Re-measurement on the same sections, 2026-10-21 (not a blind result)
+
+The current system (pipeline 0.5.0 and later changes, `docs/remeasurement-2026-10-21.md`) was run
+again, through the same held-out path, on the same 15 sections: two runs, production settings, the
+page math pass off. **These sections have been examined since the registered run** (the errors of the
+registered run were read, and the 0.5.0 rules were written to fix classes of them), so these numbers
+are optimistic and are not held-out results of the current system; nothing was tuned after the first
+number was seen. Registered numbers stay as above. The chatbot arms are the registered arms, not run
+again (the PDFs were printed again, so their bytes differ; text and gold are the same).
+
+| 15 sections, 2 runs | ReadableSTEM, registered (0.4.0) | ReadableSTEM, re-measured (**not blind**) | Chatbot, Opus (registered) | Chatbot, Haiku (registered) |
+|---|---|---|---|---|
+| Equations right, end to end (primary) | 0.504 [0.376, 0.599] | **0.596** [0.448, 0.697] | 0.622 [0.464, 0.727] | 0.600 [0.437, 0.708] |
+| Same, symbols scorer, split/merge credited (secondary) | 0.722 | **0.827** | 0.835 | 0.801 |
+| Wrong equations nobody is asked about, per 100 | 23.3 [19.0, 29.5] | **22.4** [16.2, 31.0] | 24.0 | 25.2 |
+| Heading F1 | 0.961 | 0.963 | 0.932 | 0.914 |
+| Figure descriptions the judge passes | 0.971 | 0.957 | 0.804 | 0.833 |
+| Equations with an added symbol (aligned) | 0.087 | 0.013 | 0.020 | 0.017 |
+| Equations with no gold partner and no match in the PDF | 0.027 | **0.234** | 0.294 | 0.226 |
+| Required decisions per PDF page | 1.76 | 1.33 | 0 | 0 |
+| Cost per PDF page (median) | $0.0125 | $0.0104 | $0.0477 | $0.0015 |
+
+By the registered method, ReadableSTEM minus the Opus chatbot on the primary score is -0.025 (99%
+interval -0.069 to +0.020, sign-flip p = 0.39): no difference this set can detect, where the
+registered run had -0.118 (-0.199 to -0.025). The change of ReadableSTEM itself on these sections is
++0.093 (95% +0.039 to +0.144, sign-flip p = 0.023). What got worse: equations with no gold partner
+and no match in the PDF went from 0.027 to 0.234 (mostly multi-row derivations that are read as one
+equation now and that the rule cannot match to the PDF's symbol order; a reading of three sections,
+not an audit), and the share of wrong equations a person is asked about fell (flag recall 0.34 to
+0.21, precision 0.79 to 0.89). Chemistry is as before (0.04). Recorded spend $9.23. The same recipe
+on the development sets (one run each, `docs/eval-page-math.md`): Haiku 0.514 against 0.486 on 114
+pages, Opus 0.586 and ReadableSTEM 0.597 on 49, a tie on maths sections and the chatbots ahead on
+the symbols score. A replay of this run reproduces every number but one axe-core count
+(`docs/remeasurement-2026-10-21.md`, deviation 1). The recording is not committed
+(`~/.cache/a11y-proof/heldout-remeasure-2026-10-21`).
 
 The interim report from before the model run, with the headings and parser inputs and outputs,
 is [`proof/interim/INTERIM-heldout-2026-10.md`](proof/interim/INTERIM-heldout-2026-10.md); its

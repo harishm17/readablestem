@@ -15,6 +15,7 @@ arrived at; read them by question, not front to back.
 | How are headings, lists, equations and figures found in a PDF? | [layout.md](layout.md): "How a page is read" and "Known failure modes" |
 | How do tables work, and why are they off by default? | [tables.md](tables.md); [eval.md](eval.md), "Tables" |
 | Which equation scores are secondary, and what do they say about the held-out run? | [eval-secondary-metrics.md](eval-secondary-metrics.md) |
+| What does the current system score on the held-out sections (a re-measurement, not blind)? | [remeasurement-2026-10-21.md](remeasurement-2026-10-21.md) |
 | Does the page math pass help, and what did it cost? | [eval-page-math.md](eval-page-math.md); [decisions/0006-page-math-pass.md](decisions/0006-page-math-pass.md) |
 
 ## If you want to know how it is built
