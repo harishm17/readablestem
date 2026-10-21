@@ -1,0 +1,219 @@
+{
+ "a": "rs-pagemath-tok",
+ "b": "rs-pagemath-tok-nolift",
+ "metrics": {
+  "exact_lenient (primary)": {
+   "a": 0.5863829787234043,
+   "b": 0.5821276595744681,
+   "diff": -0.004255319148936176,
+   "low": -0.008302895911891336,
+   "high": -0.0008295313148071193,
+   "p": 0.02734375
+  },
+  "symbols, credited (secondary)": {
+   "a": 0.6161702127659574,
+   "b": 0.6119148936170212,
+   "diff": -0.004255319148936176,
+   "low": -0.008192535974555456,
+   "high": -0.001170046801872049,
+   "p": 0.015625
+  },
+  "detection recall": {
+   "a": 0.7519148936170212,
+   "b": 0.7519148936170212,
+   "diff": 0.0,
+   "low": 0.0,
+   "high": 0.0,
+   "p": null
+  },
+  "detection precision": {
+   "a": 0.8812967581047382,
+   "b": 0.8812967581047382,
+   "diff": 0.0,
+   "low": 0.0,
+   "high": 0.0,
+   "p": null
+  },
+  "wrong, not asked, per 100 gold": {
+   "a": 12.297872340425531,
+   "b": 11.702127659574469,
+   "diff": -0.5957446808510625,
+   "low": -1.1045316769615827,
+   "high": -0.1715192438732113,
+   "p": 0.02734375
+  },
+  "cost per PDF page (USD)": {
+   "a": 0.02337407210526316,
+   "b": 0.025103147543859648,
+   "diff": 0.001729075438596489,
+   "low": 0.0012236488083003881,
+   "high": 0.002286066160591055,
+   "p": 0.0
+  },
+  "required decisions per PDF page, all kinds": {
+   "a": 3.3508771929824563,
+   "b": 3.763157894736842,
+   "diff": 0.4122807017543857,
+   "low": 0.24369747899159666,
+   "high": 0.5964949137549761,
+   "p": 6.103515625e-05
+  },
+  "  of which on an aligned equation": {
+   "a": 1.4649122807017543,
+   "b": 1.868421052631579,
+   "diff": 0.4035087719298247,
+   "low": 0.23931623931623935,
+   "high": 0.5812121212121212,
+   "p": 6.103515625e-05
+  }
+ },
+ "buckets": {
+  "bucket correct": {
+   "a": 0.5863829787234043,
+   "b": 0.5821276595744681
+  },
+  "bucket scorer": {
+   "a": 0.02170212765957447,
+   "b": 0.02170212765957447
+  },
+  "bucket span": {
+   "a": 0.0748936170212766,
+   "b": 0.0774468085106383
+  },
+  "bucket recognition": {
+   "a": 0.06382978723404255,
+   "b": 0.06553191489361702
+  },
+  "bucket no_proposal": {
+   "a": 0.005106382978723404,
+   "b": 0.005106382978723404
+  },
+  "bucket undetected": {
+   "a": 0.24808510638297873,
+   "b": 0.24808510638297873
+  },
+  "  of which credited split/merged": {
+   "a": 0.002127659574468085,
+   "b": 0.002127659574468085
+  }
+ },
+ "breakdown": {
+  "A": {
+   "undetected": {
+    "single symbol in running text": 111,
+    "longer inline expression": 33,
+    "display equation": 11,
+    "2 or 3 symbols in running text": 76,
+    "typed in a figure": 143,
+    "typed in a table": 209
+   },
+   "span": {
+    "cut too long (extra symbols)": 129,
+    "cut too short": 46,
+    "both": 1
+   }
+  },
+  "B": {
+   "undetected": {
+    "single symbol in running text": 111,
+    "longer inline expression": 33,
+    "display equation": 11,
+    "2 or 3 symbols in running text": 76,
+    "typed in a figure": 143,
+    "typed in a table": 209
+   },
+   "span": {
+    "cut too long (extra symbols)": 135,
+    "cut too short": 46,
+    "both": 1
+   }
+  }
+ },
+ "transitions": {
+  "helped": 2,
+  "hurt": 12,
+  "exact_a": 1378,
+  "exact_b": 1368
+ },
+ "flows": {
+  "helped: scorer -> correct": 1,
+  "helped: recognition -> correct": 1,
+  "hurt: correct -> span": 6,
+  "hurt: correct -> recognition": 5,
+  "hurt: correct -> scorer": 1
+ },
+ "helped": [
+  {
+   "id": "arxiv/2505.08251/eq-091",
+   "flow": "recognition -> correct",
+   "page": 8,
+   "typed_in": "text",
+   "gold": "G*",
+   "a": "G^{*}",
+   "b": "G*",
+   "b_text": "G\u2217"
+  },
+  {
+   "id": "arxiv/2504.04210/eq-027",
+   "flow": "scorer -> correct",
+   "page": 6,
+   "typed_in": "text",
+   "gold": "\\langle\\ \\rangle_{t}",
+   "a": "\\left\\langle \\right\\rangle_t",
+   "b": "\\langle \\rangle_{t}",
+   "b_text": "\u27e8\u27e9\ud835\udc61"
+  }
+ ],
+ "hurt": [
+  {
+   "id": "arxiv/2505.03099/eq-034",
+   "flow": "correct -> span",
+   "page": 17,
+   "typed_in": "text",
+   "gold": "x_{n-1}",
+   "a": "x_{n-1}",
+   "b": "`x_{n-1}",
+   "b_text": "xn\u22121"
+  },
+  {
+   "id": "arxiv/2503.00937/eq-027",
+   "flow": "correct -> recognition",
+   "page": 3,
+   "typed_in": "text",
+   "gold": "\\mathbf{S}",
+   "a": "\\mathbf{S}",
+   "b": "S",
+   "b_text": "\ud835\udc12"
+  },
+  {
+   "id": "arxiv/2412.08797/eq-136",
+   "flow": "correct -> scorer",
+   "page": 19,
+   "typed_in": "text",
+   "gold": "\\theta_{\\max} )",
+   "a": "\\theta_{\\max})",
+   "b": "\\theta_\\text{max})",
+   "b_text": "\u03b8max)"
+  },
+  {
+   "id": "arxiv/2408.09889/eq-082",
+   "flow": "correct -> span",
+   "page": 8,
+   "typed_in": "text",
+   "gold": "\\vec{d}_L",
+   "a": "\\vec{d}_L",
+   "b": ", \\vec{d}_L",
+   "b_text": "\u20d7dL"
+  },
+  {
+   "id": "arxiv/2503.07628/eq-002",
+   "flow": "correct -> recognition",
+   "page": 6,
+   "typed_in": "text",
+   "gold": "\\boldsymbol{f}",
+   "a": "\\boldsymbol{f}",
+   "b": "f",
+   "b_text": "\ud835\udc1f"
+  }
+ ]
+}

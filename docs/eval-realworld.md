@@ -23,7 +23,7 @@ is where the equations are and how they are cut: mathematics in tables and figur
 equations, the chatbots 23% to 31%), the edges of inline spans (8.7% of the gold, against 2% for the chatbots), and
 short inline expressions in running text that it does not detect. In running text, where 82% of the gold is, it is 2 to 4
 points behind (0.671 against 0.695 and 0.709). It is cheaper than Opus ($0.030 against $0.083 per page) and 13 times the cost of Haiku
-($0.0023), and it asks a person about 5.6 things per page. Spend: $13.43 of the $20 cap.
+($0.0023), and it asks a person about 5.6 things per page. Spend: $13.43 of the $20 cap for the registered runs, $15.39 with the page math experiments of the last section (development only: the page pass lifts the development primary score by 2.5 points).
 
 ## What the set is
 
@@ -309,6 +309,91 @@ Review screen (ReadableSTEM only): of the aligned equations that are wrong in th
 
    Across them: **no proposal for display equations whose glyphs have no Unicode value** (2.6% of the held-out gold).
 
+## The page math pass on the real-world development set
+
+ADR 0006's page math pass (`FEATURE_PAGE_MATH`: one Haiku call per page places the equations, the reconciliation policy of
+`page_math_reconcile.py` lays them over layout, and each crop's reading is compared with the page's) did nothing measurable on
+OpenStax, whose text layer is clean ([eval-page-math.md](eval-page-math.md)). The failure modes above (span edges, short
+inline math not found, glyphs without Unicode) are what it was built for, so it was run on the 25 development papers
+(114 pages, 2,350 gold equations). Development only: the held-out part is not used. Each run's model answers are recorded; a later run starts from
+the answers of the one before, so a request already answered costs nothing the second time. `scripts/realworld_compare.py` makes the paired tables
+(95% cluster bootstrap over the 25 papers, sign-flip test).
+
+| Dev, 25 papers | Flag off | Page pass, as committed | + output limit 12,288 | + no agreement lift |
+|---|---|---|---|---|
+| **exact_lenient (primary)** | 0.5617 | 0.5809 (+0.019 [+0.009, +0.031], p = 0.001) | **0.5864 (+0.025 [+0.011, +0.041], p = 0.003)** | 0.5821 |
+| symbols, credited | 0.5877 | 0.6089 (+0.021 [+0.011, +0.033]) | 0.6162 (+0.029 [+0.015, +0.045]) | 0.6119 |
+| detection recall | 0.7366 | 0.7489 (+0.012 [+0.004, +0.022]) | 0.7519 (+0.015 [-0.003, +0.034]) | 0.7519 |
+| detection precision | 0.8608 | 0.8674 | 0.8813 (+0.021 [-0.003, +0.040]) | 0.8813 |
+| wrong, not asked, per 100 gold | 11.2 | 11.7 | 12.3 (+1.1 [0.0, +2.4]) | 11.7 |
+| required decisions per PDF page (all kinds) | 4.54 | 3.96 | 3.35 (-1.19 [-1.69, -0.72]) | 3.76 |
+| equation flags: precision / recall (symbols-wrong) | 0.583 / 0.380 | 0.571 / 0.323 | 0.557 / 0.275 | 0.540 / 0.330 |
+| unsupported equations, aligned / no partner | 0.063 / 0.121 | 0.060 / 0.112 | 0.061 / 0.081 | |
+| cost per PDF page | $0.0235 | $0.0250 | $0.0234 (page pass $0.0028) | $0.0251 |
+| pages where the page pass answered nothing | | 25 of 112 | 2 of 112 | 2 of 112 |
+
+**What the committed pass loses, and the fix.** On 25 of the 112 pages that have text the page pass returned nothing: the
+answer ran into its output limit (`MAX_OUTPUT_TOKENS` 4,096, 6,144 with the thinking allowance; every failed call stopped at
+6,144 tokens, `invalid_output`). Those are the dense pages (a real paper page has 25 to 50 inline expressions, the OpenStax pages the pass was built on have far fewer),
+that is, the ones where it would help. The limit is now the setting `PAGE_MATH_MAX_OUTPUT_TOKENS` (default 4,096, unchanged); at 12,288 two pages fail, the page pass costs $0.0028 a page
+($0.32 for the 112 pages; Haiku's output is cheap) and the whole conversion costs what it did without the pass ($0.0234 against $0.0235 a page), because
+agreeing readings are accepted without a second look. All numbers in the last two columns are with the limit raised.
+
+**Which buckets moved** (per gold equation, flag off to page pass at 12,288):
+
+| Bucket | Off | On | Change |
+|---|---|---|---|
+| correct | 0.562 | 0.586 | +0.025 |
+| span (symbols differ at an end) | 0.086 | 0.075 | -0.011 (cut too long 138 to 129, too short 59 to 46, both 6 to 1) |
+| recognition | 0.065 | 0.064 | -0.001 |
+| undetected | 0.263 | 0.248 | -0.015: single symbols in text 126 to 111, 2 to 3 symbols 86 to 76, display equations 21 to 11, longer inline 34 to 33, **tables 208 to 209, figures 144 to 143** |
+| no proposal | 0.005 | 0.005 | 0 |
+| scorer | 0.018 | 0.022 | +0.003 |
+
+By stratum (exact_lenient): display 0.503 to 0.558, align-like 0.385 to 0.462, running text 0.659 to 0.688, single symbols 0.548 to 0.587, research papers
+0.499 to 0.534; **tables 0.058 to 0.049 and figures 0.122 to 0.145: the pass does not touch what the real-world set showed is lost most**
+(equations in tables are not paragraph text, and the pass's spans are laid over paragraph rows and display regions only). Of the gold equations: 103 went from wrong to exact, 45 from exact to wrong
+(net +58 of 2,350): undetected to correct 46, span to correct 39, recognition to correct 16, scorer to correct 2; correct to span 23, to undetected 14, to recognition 6, to scorer 2.
+Of the aligned pairs, 961 sit on a page-pass span (77% exact) and 725 on a layout run the pass did not confirm (79%).
+
+**Ten that it helped** (gold; flag off; page pass): `a`, nothing, `a` (a lone variable in a figure label); `N_i > 0`, `\text{(i) } N_i > 0` (the item number taken in), `N_{i} > 0`;
+`K(t)`, `K(t+\Delta t)` (a neighbour taken in), `K(t)`; `m`, nothing, `m`; `S, M \rightarrow \infty`, `M \rightarrow \infty` (the left half lost), whole;
+`P(f)/P_{\phi=0\%}(f)`, `P_{\phi=0^\circ}` (the `%` read as a degree sign from the glyphs), right; `\mathbf{A}`, nothing, found; `0\sim 20\%`, `0 \sim 20` (percent sign left out), whole;
+`\bm g_{t+1}`, `\mathbf{g}_{t+1}`, `\boldsymbol{g}_{t+1}`; `\theta_{\max} )`, `\theta_\text{max})`, `\theta_{\max})`.
+**Five that it hurt:** `t=1, 2, 3` in a table cell, right, now `t = 1, 2, 3, \underline{w}_{t}` (the span runs on into the next cell: twice); `z_i = z_j`, found,
+now not found (the page pass read the line as part of a `cases` block); a long `\langle N\rangle = ... \langle N^2\rangle` display, right, now misread inside; `(W^\top W)^{-1}`, right,
+now `\left(W^{\top}W\right)^{-1}` (the symbols scorer calls both right; the primary does not).
+
+**The cost: fewer questions, and fewer of the wrong ones are asked about.** The pass lowers required decisions per page by 26% (4.54 to 3.35) because two agreeing
+readings are accepted. But both readings share the page pass's span, so agreement says the symbols are right and nothing about where the span
+ends, and the equation flags' recall of symbol-wrong equations falls from 0.38 to 0.275; the wrong equations nobody is asked about rise from 11.2 to 12.3 per 100
+(+1.1, 95% 0.0 to +2.4, so not clear). Of the wrong equations that are accepted without a decision with the pass on, 163 of 289 are ones where the two readings agreed. The setting
+`PAGE_MATH_AGREEMENT_LIFT` (default true) turns the confidence lift off: the last column. It brings decisions back to 3.76 a page and recall to 0.33, takes the unflagged-wrong back to
+11.7, and costs $0.0017 a page and 0.4 points of primary score (the main model's second reads change some right answers; p = 0.03). It is a dial between the decisions asked and the errors not asked about,
+not an improvement in accuracy; the default is left as it was.
+
+**Policy changes considered.**
+- *Page-pass inline spans overriding layout's runs when the quote verifies* is already how it works: a layout run that touches a page span is replaced by it
+  (`layout._with_page_spans`), and a span is dropped only when its LaTeX and the text it quotes disagree in their symbols (4 of 1,566 spans on dev). Nothing to change; the 14 equations that
+  went from found to not found are not runs dropped as look-alikes (checked by replaying three papers: none was).
+- *Page-pass-only displays where the glyphs have no Unicode value* is already allowed (a block span stands where layout found no display or only part of one, and its crop
+  is transcribed). The dev equations without a proposal are not a Unicode problem: 7 of the 12 are rejected by the LaTeX allowlist (`unknown_command`: `\arg` (6 of the 17
+  distinct proposals the allowlist refused), `\substack`, `\succsim`, `\colon`, `\coloneqq`, `\triangleq`, `\textmu`), a defect of the converter's command list, not of the pass. A rewrite
+  of `\arg` to `\operatorname{arg}` and an allowance for the others would recover roughly 7 to 9 gold equations of 2,350 (0.3 to 0.4 point), with or without the page pass. Not done here (outside the flag).
+- *The output limit* is the policy change that mattered, above.
+- *Not tried:* putting equations in tables and figures on the pass's reading list (the pass is given paragraph rows; the 57% of undetected equations that are typed in tables and figures
+  are untouched), and splitting a very dense page in two.
+
+**Spend:** $0.978 (pass as committed) + $0.898 (limit 12,288) + $0.096 (no lift) = **$1.97** of the $4 + $3 allowed; the whole work is now $15.39 of the $20 cap.
+No run was repeated; the invented-content rates come from replaying the recorded answers offline.
+
+**Recommendation.** Turn the flag on for production, **with `PAGE_MATH_MAX_OUTPUT_TOKENS=12288`** (the default of 4,096 loses a fifth of dense pages and half of the gain). On real LaTeX PDFs it adds about 2.5 points of
+exact equations (paired interval +1.1 to +4.1 on 25 papers, positive in the symbols score and in recall), raises display equations by 5.5 points, and cuts the review load by a quarter at no cost per page. Against that,
+the review screen asks about fewer of the wrong equations (recall 0.38 to 0.28; 1.1 more wrong equations per 100 are not asked about, an interval touching 0), it does nothing for tables and figures, and
+on a clean text layer (OpenStax) it measured no effect. The evidence is development-only (the held-out part is spent for tuning, and ADR 0006 asks for a fresh held-out set before the flag
+is default-on), so the safe form of the recommendation is: on, with the higher limit, for the beta; check it on a fresh set of arXiv papers (about 18 more would put a +2.5 point difference at
+roughly 80% power, from the paired standard deviation implied by the interval here) when the next real-world budget allows; and decide `PAGE_MATH_AGREEMENT_LIFT` by how much the review screen should be trusted to find errors.
+
 ## What it does not say
 
 The registered difference is not significant, and one run per arm gives no run-to-run noise. The papers are 15 (and 25) of ten fields,
@@ -328,7 +413,8 @@ given and its cap; the first start of the Haiku development arm, which a connect
 | Chatbot, Haiku | $0.255 (114 pages) | $0.165 (71 pages) |
 | Chatbot, Opus | $2.372 (27 pages, $0.0878) | $5.856 (71 pages, $0.0825) |
 | Total | $5.301 | $8.126 |
-| **Whole work** | | **$13.43** |
+| Page math experiments (development, [below](#the-page-math-pass-on-the-real-world-development-set)) | $1.97 | |
+| **Whole work** | | **$15.39** |
 
 No run was repeated. The offline replays (ReadableSTEM's HTML for the invented-content rules, the reports) cost nothing.
 

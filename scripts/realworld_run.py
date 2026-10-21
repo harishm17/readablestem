@@ -292,11 +292,26 @@ def cmd_chat_items(args: argparse.Namespace) -> int:
 
 
 def cmd_tally(args: argparse.Namespace) -> int:
-    """Spend of everything recorded, from the recorded answers (each answer paid once)."""
+    """Spend of everything recorded, from the recorded answers. A run that started from another
+    run's answers (`--seed-answers-from`) holds copies of them: each answer is counted once,
+    under the first run that holds it (`rs` first, then by tag)."""
     rows = []
     for part in ("dev", "heldout"):
-        for tag_dir in sorted((runs_dir(part)).glob("*/answers.jsonl")):
-            rows.append((part, f"rs:{tag_dir.parent.name}", answers_cost(tag_dir), 0))
+        counted: set[str] = set()
+        for tag_dir in sorted(
+            runs_dir(part).glob("*/answers.jsonl"),
+            key=lambda p: (p.parent.name != "rs", p.parent.name),
+        ):
+            cost = 0.0
+            for line in tag_dir.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if row.get("k") in counted:
+                    continue
+                counted.add(row.get("k"))
+                cost += float((row.get("call") or {}).get("cost_usd") or 0.0)
+            rows.append((part, f"rs:{tag_dir.parent.name}", cost, 0))
         systems = runs_dir(part) / "chat" / "systems"
         for arm_dir in sorted(systems.glob("*")) if systems.is_dir() else []:
             jobs = list(arm_dir.glob("*.json"))
