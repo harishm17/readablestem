@@ -251,6 +251,21 @@ def inspect_pdf_isolated(
     Cheap checks (empty, magic bytes) run here first so obvious junk never starts a child.
     Costs about 0.1 s per upload. Call it from a worker thread, not the event loop.
     """
+    return inspect_pdf_detail(
+        data, max_pages=max_pages, timeout_s=timeout_s, allow_image_pages=allow_image_pages
+    )[0]
+
+
+def inspect_pdf_detail(
+    data: bytes,
+    *,
+    max_pages: int,
+    timeout_s: float = INSPECT_TIMEOUT_S,
+    allow_image_pages: bool = False,
+) -> tuple[int, int]:
+    """`(pages, image_pages)`: `inspect_pdf_isolated` and, when `allow_image_pages` (the person
+    asked for scanned and handwritten pages to be converted), how many pages the probe found
+    scanned or handwritten (0 without the request)."""
     if not data:
         raise UploadRejected("empty")
     if not looks_like_pdf(data):
@@ -276,7 +291,8 @@ def inspect_pdf_isolated(
     if not isinstance(answer, dict):
         raise UploadRejected("unreadable")
     if answer.get("ok") is True and isinstance(answer.get("pages"), int):
-        return answer["pages"]
+        found = answer.get("image_pages")
+        return answer["pages"], found if isinstance(found, int) and found >= 0 else 0
     code = answer.get("code")
     pages = answer.get("pages")
     raise UploadRejected(

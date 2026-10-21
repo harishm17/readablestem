@@ -423,8 +423,10 @@ def conversion_options(
     factory: sessionmaker[Session], settings: Settings, job_id: str
 ) -> ConversionOptions | None:
     """The job's run options: its course notation (when the feature is on and the course
-    has entries) and its exam choice (`Job.exam_mode`, the upload form's box). None when
-    it has neither (the run then uses the settings' flags)."""
+    has entries), its exam choice (`Job.exam_mode`, the upload form's box) and whether its
+    scanned and handwritten pages are converted (`Job.image_pages`, the form's other box; the
+    feature flag only offers it, so a job that did not ask for it never has it). None when
+    the job has neither a course, nor an exam, and the settings' own flags are what it needs."""
     from readablestem.web.db import session_scope
 
     with session_scope(factory) as session:
@@ -432,15 +434,18 @@ def conversion_options(
         if job is None:
             return None
         exam = bool(job.exam_mode)
+        image_pages = bool(job.image_pages) and settings.feature_image_pages
         found: list[NotationEntry] = []
         if enabled(settings) and job.course_id is not None:
             course = owned_course(session, job.course_id, job.user_id)
             if course is not None:
                 found = notation_entries(course.notation)
-    if not found and not exam:
+    if not found and not exam and not image_pages and not settings.feature_image_pages:
         return None
     options = ConversionOptions.from_settings(settings)
-    return options.model_copy(update={"notation": found, "exam_mode": exam})
+    return options.model_copy(
+        update={"notation": found, "exam_mode": exam, "image_pages": image_pages}
+    )
 
 
 @contextmanager

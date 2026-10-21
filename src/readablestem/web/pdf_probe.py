@@ -103,6 +103,14 @@ IMAGE_PAGE_REFUSALS = frozenset({"scanned", "scanned_ocr", "handwritten", "handw
 def probe(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> int:
     """Return the page count or raise ProbeRejected (in-process; see module docstring).
     `allow_image_pages`: a document of scanned or handwritten pages is accepted."""
+    return inspect(data, max_pages=max_pages, allow_image_pages=allow_image_pages)[0]
+
+
+def inspect(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> tuple[int, int]:
+    """`(pages, image_pages)` or raise ProbeRejected. `image_pages` is how many pages are
+    scanned or handwritten (`page_type.image_page_count`), counted only with
+    `allow_image_pages` (the person asked for them to be converted: a document with none
+    is not refused, the request just does not apply); 0 otherwise."""
     if not data:
         raise ProbeRejected("empty")
     if not looks_like_pdf(data):
@@ -128,9 +136,21 @@ def probe(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> in
         if pages > max_pages:
             raise ProbeRejected("too_many_pages", pages=pages)
         _check_pages(doc, allow_image_pages=allow_image_pages)
+        image_pages = _image_pages(doc) if allow_image_pages else 0
     finally:
         doc.close()
-    return pages
+    return pages, image_pages
+
+
+def _image_pages(doc: pymupdf.Document) -> int:
+    """The scanned and handwritten pages of an open document; 0 when MuPDF cannot say (the
+    conversion would fail such a page as well, and says so)."""
+    from readablestem.pipeline.page_type import image_page_count
+
+    try:
+        return image_page_count(doc)
+    except Exception:
+        return 0
 
 
 def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> None:
@@ -494,10 +514,10 @@ def main(argv: list[str] | None = None) -> int:
     images = len(args) > 1 and args[1] == "image_pages"
     data = sys.stdin.buffer.read()
     try:
-        answer: dict[str, object] = {
-            "ok": True,
-            "pages": probe(data, max_pages=max_pages, allow_image_pages=images),
-        }
+        pages, image_pages = inspect(data, max_pages=max_pages, allow_image_pages=images)
+        answer: dict[str, object] = {"ok": True, "pages": pages}
+        if images:
+            answer["image_pages"] = image_pages
     except ProbeRejected as exc:
         answer = {"ok": False, "code": exc.code}
         if exc.pages is not None:

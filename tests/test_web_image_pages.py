@@ -76,7 +76,7 @@ def web(tmp_path):
         login(client, ALICE)
         env.browser = client
         env.pdf = pdf
-        env.job_id = job_id_from(upload(client, pdf))
+        env.job_id = job_id_from(upload(client, pdf, image_pages=True))
         env.run_worker()
         yield env
 

@@ -319,10 +319,12 @@ class Settings(BaseSettings):
     # 1.0 (no change) because, on dev slice A, 16 aligned equations fell under the accept bar
     # for it and 14 of them were right (docs/eval-page-math.md); set below 1 to try it.
     page_math_unconfirmed_factor: float = Field(default=1.0, gt=0, le=1)
-    # Scanned and handwritten pages (`page_type`) are read from an image of the page by one
-    # vision call and put into the document as elements that are all review items (ADR 0007,
-    # pipeline/image_page.py); off, they are kept as page images marked "Not converted". Off
-    # until the development measurement (docs/eval-image-pages.md) says it is good enough.
+    # Scanned and handwritten pages (`page_type`) can be read from an image of the page by one
+    # vision call each and put into the document as elements that are all review items (ADR 0007,
+    # pipeline/image_page.py). In the web app this flag only OFFERS the option: the upload form
+    # shows "Convert scanned or handwritten pages", a job converts them only when its owner ticked
+    # it (`Job.image_pages`), and a job without it keeps such pages as images marked "Not
+    # converted", as before. For the CLI and the eval it turns the pass on for the whole run.
     # `image_pages_model` None: the main model.
     feature_image_pages: bool = False
     image_pages_model: str | None = None
@@ -332,6 +334,14 @@ class Settings(BaseSettings):
     # Resolution of the page picture the model reads (long side capped at 2,576 px, where
     # Claude stops scaling a picture down).
     image_pages_dpi: int = Field(default=200, ge=72, le=400)
+    # What a job that asked for its scanned and handwritten pages to be converted may spend, per
+    # PDF page of the document, and at most per job. Measured with the main model: $0.106 a page
+    # on the development pages, $0.136 on the real-world held-out papers (about $0.33 for the
+    # densest), so $0.25 leaves room for a dense document (docs/eval-image-pages.md). It replaces
+    # MAX_USD_PER_JOB and MAX_USD_PER_PAGE for such a job when it is larger; the daily caps and the
+    # open-tier pool bound it all the same (`web.worker.job_caps`).
+    image_pages_usd_per_page: float = Field(default=0.25, gt=0)
+    image_pages_max_usd_per_job: float = Field(default=7.5, gt=0)
     # Write each converted equation's stored speech text (`pipeline.speech`, the reading
     # shown on the review screen) as the `alttext` attribute of its <math>. OFF until a
     # person has checked it with NVDA + MathCAT (and ideally JAWS and VoiceOver): some
