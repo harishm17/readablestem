@@ -43,6 +43,18 @@
     or PowerPoint file, save a copy as a PDF first.{% endif %}</li>
   <li><strong>Two-column pages and slides</strong> convert less well than single-column
     notes: check the reading order.</li>
+  <li><strong>Daily limits.</strong>
+    {% if signup_open %}A new account (one you made by signing in) can convert
+    {{ open_page_quota }} pages and start {{ open_rereads }} reads with the model from the
+    review screen (marking an equation, reading a table cell) a day{% if invited_page_quota %}; an
+    invited account can convert {{ invited_page_quota }} pages a day{% endif %}. New accounts
+    also share a small part of the day's budget for model calls: when it is used up,
+    conversions for new accounts pause until midnight UTC while others go on. New accounts
+    are limited in number each day too.
+    {% elif invited_page_quota %}You can convert {{ invited_page_quota }} pages a day.
+    {% endif %}
+    All limits start again at midnight UTC, and the whole service pauses for the day when its
+    budget for model calls is used up.</li>
   <li><strong>Size.</strong> Up to {{ max_pages }} pages and {{ max_upload_mb }} MB per upload.
     {% if in_parts %}A bigger file, up to {{ source_pages }} pages and {{ upload_limit_mb }} MB, is kept
     for a day so you can choose which pages to convert; each part becomes a document of its

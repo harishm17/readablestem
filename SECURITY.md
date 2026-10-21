@@ -24,12 +24,16 @@ level.
 
 Please test against a local checkout (`docs/web.md`, "Run it locally") rather than the
 hosted beta whenever you can, and do not run load tests against the hosted beta or touch
-documents that are not yours.
+documents that are not yours. The hosted beta may be open to anyone with a Google account, so
+you can make an account of your own to test with; make one, not many, and delete it from the
+Account page when you are done.
 
 ## What is in scope
 
 - The web app: sign-in and sessions, CSRF, upload handling, the review screen, access
-  to other people's jobs, retention and deletion.
+  to other people's jobs, retention and deletion. When sign-up is open: the limits on new
+  accounts (the daily cap on accounts, the lower daily limits of a new account and its
+  separate share of the spend budget), blocking, and deleting your own account.
 - The conversion of untrusted PDFs: crashes, hangs or memory blow-ups from a crafted
   file, and any way document content reaches HTML, logs or a model request without the
   checks described below.

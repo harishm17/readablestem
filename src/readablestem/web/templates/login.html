@@ -2,6 +2,26 @@
 {% block title %}Sign in{% endblock %}
 {% block content %}
 <h1>Sign in</h1>
+{% if signup_open %}
+{# SIGNUP_MODE=open: the first sign-in makes the account (web/auth.py). #}
+{% if microsoft_login and google_login %}
+<p>Sign in with your Google account, or with your university's Microsoft account if your
+  university is set up for it. If you do not have an account yet, signing in makes one.</p>
+{% elif microsoft_login %}
+<p>Sign in with your university's Microsoft account. If you do not have an account yet,
+  signing in makes one.</p>
+{% else %}
+<p>Sign in with your Google account. If you do not have an account yet, signing in makes
+  one.</p>
+{% endif %}
+<p>ReadableSTEM is a free beta run by Harish Manoharan, open to anyone. New accounts have
+  daily limits ({{ open_page_quota }} pages a day). You can delete your account yourself at
+  any time.</p>
+{% include "_signin.html" %}
+<p>Not ready to sign in? You can <a href="/demo">look at a demo conversion</a> first. It
+  needs no sign-in.{% if contact_email %} Questions? Email
+  <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.{% endif %}</p>
+{% else %}
 {% if microsoft_login and google_login %}
 <p>Sign in with your university's Microsoft account, or with the Google account your
   invitation was sent to. The beta is open to a small group of instructors.</p>
@@ -16,5 +36,6 @@
 {% if contact_email %}
 <p>Not invited yet? Email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a> to ask
   for access.</p>
+{% endif %}
 {% endif %}
 {% endblock %}

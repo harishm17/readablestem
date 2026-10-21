@@ -1,6 +1,8 @@
 {% extends "base.html" %}
-{# Two cases (web/auth.py `refused_page`). `blocked`: sign-up is open and an admin blocked
-   this account. Otherwise sign-up is by invitation and the address is not on the list. #}
+{# Two cases (web/auth.py `refused_page`). `blocked`: sign-up is open (`signup_open`) and an
+   admin blocked this account. Otherwise sign-up is by invitation and the address is not on
+   the list: this page is not shown to anyone while sign-up is open (`ops.launch` checks
+   that pages with invitation wording look at `signup_open`). #}
 {% block title %}{% if blocked %}This account cannot be used{% else %}Not on the beta list yet{% endif %}{% endblock %}
 {% block content %}
 {% if blocked %}

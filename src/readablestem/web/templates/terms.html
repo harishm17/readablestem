@@ -6,9 +6,13 @@
 
 <h2>The service</h2>
 <p>ReadableSTEM is a free beta run by Harish Manoharan, an individual developer
-  (an independent project, not a company or a university). It is open by invitation to a small group of instructors. It may
-  change, pause or stop at any time. Daily limits apply to pages and uploads, and the
-  service pauses for the day when its budget for AI model calls is used up.</p>
+  (an independent project, not a company or a university).
+  {% if signup_open %}It is open to anyone with a Google account{% if microsoft_on %} (or a Microsoft school
+  or work account from a university that is set up for it){% endif %}.{% else %}It is open by invitation to a small group of instructors.{% endif %}
+  It may change, pause or stop at any time. Daily limits apply to pages and uploads, and the
+  service pauses for the day when its budget for AI model calls is used up.
+  {% if signup_open %}New accounts have lower daily limits than invited ones and their own share of
+  that budget, so conversions for new accounts can pause while others go on.{% endif %}</p>
 
 <h2>What it does, and what it does not</h2>
 <p>The tool assists you in making course materials more accessible: it proposes MathML for
@@ -38,9 +42,17 @@
   <a href="{{ source_url }}">{{ source_url }}</a>.</p>
 
 <h2>Accounts</h2>
+{% if signup_open %}
+<p>Anyone can make an account by signing in with their own Google account{% if microsoft_on %} or their
+  Microsoft school or work account{% endif %}. Do not share your session or let others use
+  your account. You can delete your account yourself at any time, from the Account page;
+  that deletes your documents too. An account can be blocked, and access removed, at any time,
+  for example if the service is misused or its limits are being got around.</p>
+{% else %}
 <p>Access is by invitation. You sign in with your own Google account{% if microsoft_on %} or your
   Microsoft school or work account{% endif %}. Do not
   share your session or let others use your access. Access can be removed at any time.</p>
+{% endif %}
 
 <h2>Your institution</h2>
 <p>This is an independent project, not a service of your university, and it is not
@@ -49,7 +61,7 @@
 
 <h2>Changes to these terms</h2>
 <p>If these terms change in a way that matters to you, the new version will be shown here
-  with its date before it applies, and the people on the beta list will be told.</p>
+  with its date before it applies{% if not signup_open %}, and the people on the beta list will be told{% endif %}.</p>
 <h2>Governing law</h2>
 <p>These terms are governed by the law of the State of Texas, USA.</p>
 

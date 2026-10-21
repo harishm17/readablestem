@@ -53,7 +53,8 @@ Deletion does not wait for statistics. If counting fails at that point (an aggre
 bug, say), the job is deleted anyway and counted in `unaggregated_deleted`. A non-zero
 value there means some counts are missing; it never means a document was kept.
 
-What survives deletion: users and the allowlist, the daily spend and quota counters, the
+What survives deletion: accounts (the allowlist, and with open sign-up the people who signed
+themselves up, until they delete them or an admin does), the daily spend and quota counters, the
 content-free aggregates below, the usage events (next section), and database backups. A
 backup holds every document that existed when it ran, so a deleted document stays in the
 backups taken before its deletion until they are dropped. The deploy keeps one daily
@@ -367,10 +368,16 @@ carries `Retry-After: 30` and links to `/status`. Only the exception type is log
 
 **What is in the database, and what a backup is for.** Documents and everything made from
 them (uploads, crops, results, review edits) are deleted after `RETENTION_HOURS` (24), so
-a backup mostly protects what is not temporary: the allowlist and admins, courses and
+a backup mostly protects what is not temporary: accounts (the allowlist and, with open
+sign-up, everyone who signed up) and admins, courses and
 notation memory, the daily spend and quota counters, the content-free aggregates and usage
 events, and opted-in documents (30 days). Losing the lot would cost you the allowlist
-(re-add the instructors) and some history; instructors would upload again.
+(re-add the instructors) and some history; instructors would upload again, and people who
+signed themselves up would sign in again and get a new account.
+
+An account deleted by its owner is gone from the database at once and stays in the backups
+taken before, until they are dropped (the privacy notice says so for documents; the same holds
+for the account row).
 
 **What the deploy sets up.** Cloud SQL's automated backup, daily at 08:00 UTC, of which
 `SQL_RETAINED_BACKUPS` (1) is kept, and no point-in-time recovery. That is deliberate:
@@ -453,6 +460,36 @@ output is counts only. It is also the way to test a `pg_dump` schedule for `DB_M
 a cron job running `pg_dump --format=custom --file=a11y-$(date +%F).dump` to storage you
 control, with the file deleted after a day for the same reason as the Cloud SQL setting.
 `tests/test_ops_backup.py` runs both commands against a real Postgres.
+
+## Open sign-up (`SIGNUP_MODE=open`)
+
+What to look at, and what to do. Setting and design: docs/web.md, "Sign-up modes and access
+tiers"; decisions: docs/launch.md, "Open sign-up".
+
+- **The Admin page** shows "New accounts today (UTC)" against `MAX_NEW_ACCOUNTS_PER_DAY`,
+  accounts by tier and blocked, the open pool's spend, and every account with its tier. A day
+  that fills the account count early, or the pool by mid-morning, is the thing to notice; the
+  public `/status` page says when conversions are paused (it does not distinguish the pool).
+- **Logs.** `signup` (one per new account, provider only), `login_refused` with `reason` =
+  `blocked`, `signups_full` or `not_allowlisted`, `rate_limited` with `rule=signup`,
+  `upload_rejected` with `code=open_pool`, `reread_refused` with `scope=allowance` and
+  `account_deleted`. No address or name in any of them.
+- **Block someone** on the Admin page ("Block" next to an open-tier account, "Remove" next to an
+  invited one) or with `readablestem users deny EMAIL`. They are signed out everywhere, their
+  queued and running jobs are stopped with `access_removed`, and sign-ins are refused without
+  making a new account. `readablestem users unblock EMAIL` or the Unblock button lets them back
+  with the tier they had.
+- **Stop new accounts now** by setting `MAX_NEW_ACCOUNTS_PER_DAY=0` (people who already have an
+  account carry on) and redeploying or restarting. `SIGNUP_MODE=allowlist` does the same and
+  more: nobody new can sign in at all. Neither signs anyone out.
+- **Pause strangers' spending** by setting `OPEN_TIER_DAILY_SPEND_CAP_USD=0`: their uploads are
+  refused, their queued jobs wait, invited people are unaffected.
+- **Deletion requests.** A person can delete their own account (Account page). If they cannot sign
+  in, `readablestem users delete EMAIL --yes` does the same. Backups keep the row until they roll
+  over.
+- **A day's accounts are counted once.** Deleting an account does not give its place back, and a
+  person who deletes and signs up again starts with new quotas; the per-address rule (5 an hour),
+  the day's cap and the pool bound that, they do not stop it.
 
 ## Tracing (Langfuse)
 

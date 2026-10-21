@@ -98,12 +98,38 @@
 </ul>
 
 <h2>Your account</h2>
+{% if signup_open %}
+{# SIGNUP_MODE=open. Keep in step with web/auth.py, web/routes/account.py and the checks of
+   ops/launch.py (this page must say that the first sign-in makes an account, and how to
+   delete it). #}
+<p>You sign in with Google{% if microsoft_on %} or with Microsoft (a school or work
+  account){% endif %}. We receive your email address, your name, and whether the address
+  is verified. <strong>The first time you sign in, we make an account for you.</strong> It
+  stores your email address, your name, the time of your last sign-in, and the id your
+  sign-in provider gives your account{% if microsoft_on %} (for Microsoft, also your
+  organisation's directory id){% endif %}, so we know it is you next time. An account is
+  made only for a verified address, and only while the day's sign-ups are not full.
+  If a sign-in is turned away, nothing is stored about it. We also keep a count of the
+  accounts made each day, with no names in it.</p>
+<p><strong>To delete your account,</strong> sign in, open <a href="/account">Account</a>
+  and choose "Delete my account". That deletes your email address and name, every document
+  you uploaded and everything made from it, your courses, your review decisions and the
+  notes about what you did in the app, straight away. What stays has no content and no link
+  to you: daily totals of spend and of error categories. If you cannot sign in,
+  {% if contact_email %}email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>
+  and we will delete it{% else %}use the contact address of this service{% endif %}.
+  An account that an administrator has blocked is kept, with its address, so that the block
+  holds; write to us to have it deleted.</p>
+{% else %}
 <p>You sign in with Google{% if microsoft_on %} or with Microsoft (a school or work
   account){% endif %}. We receive your email address, your name, and whether the address
   is verified. For people on the beta list we store the email address, name, the time of
   the last sign-in, and the id your sign-in provider gives your account{% if microsoft_on %}
   (for Microsoft, also your organisation's directory id){% endif %}, so we know it is you
-  next time. If you sign in and are not on the list, nothing is stored about you.</p>
+  next time. If you sign in and are not on the list, nothing is stored about you. You can
+  delete your account yourself from the <a href="/account">Account</a> page once you are
+  signed in.</p>
+{% endif %}
 
 <h2>Cookies</h2>
 <p>One cookie keeps you signed in (for up to 7 days) and protects forms against forgery.
@@ -165,10 +191,12 @@
 
 <h2>Changes to this notice</h2>
 <p>If this notice changes in a way that affects what is stored or who receives it, we will
-  say so on this page, with the date, before the change takes effect, and email the people
-  on the beta list.</p>
+  say so on this page, with the date, before the change takes effect{% if not signup_open %}, and email the people
+  on the beta list{% endif %}.</p>
 
 <h2>Requests, takedowns and rights</h2>
-<p>To have your data deleted, to report material that should not be here, or for any
+<p>You can delete your account and everything in it yourself, any time you are signed in
+  (<a href="/account">Account</a>, "Delete my account"). To have your data deleted by us,
+  to report material that should not be here, or for any
   rights concern{% if contact_email %}, email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% else %}, use the contact address of this service{% endif %}.</p>
 {% endblock %}

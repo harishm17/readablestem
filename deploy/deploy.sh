@@ -405,6 +405,12 @@ write_env_file() {
       MODEL_TIMEOUT_S MODEL_MAX_RETRIES; do
       if [ -n "${!name:-}" ]; then yaml_line "$name" "${!name}"; fi
     done
+    # Open sign-up (docs/web.md, "Sign-up modes and access tiers"): unset leaves the app's
+    # own defaults (SIGNUP_MODE=allowlist).
+    for name in SIGNUP_MODE OPEN_TIER_DAILY_PAGE_QUOTA OPEN_TIER_DAILY_REREADS \
+      MAX_NEW_ACCOUNTS_PER_DAY OPEN_TIER_DAILY_SPEND_CAP_USD; do
+      if [ -n "${!name:-}" ]; then yaml_line "$name" "${!name}"; fi
+    done
     for name in MAX_USD_PER_JOB MAX_USD_PER_PAGE MAX_MODEL_CALLS_PER_JOB \
       MAX_MODEL_CALLS_PER_PAGE MAX_PAGES_PER_JOB MAX_UPLOAD_MB MAX_LARGE_UPLOAD_MB \
       MAX_SOURCE_PAGES MAX_CONCURRENT_UPLOADS \

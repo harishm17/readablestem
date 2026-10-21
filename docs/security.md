@@ -8,14 +8,15 @@ a test disagree, the test is right and this page is the bug. The policy for repo
 ## What is protected, and from whom
 
 **Assets.** Instructors' course PDFs and what is made from them (copyrighted, and occasionally
-carrying a student's name by mistake); instructors' email addresses and names; the session
+carrying a student's name by mistake); the email addresses and names of people with an account; the session
 cookie; the model provider's API key and the daily spend it can create; the database.
 
 **Who might attack.**
 
 | Actor | What they can do | Main controls |
 |---|---|---|
-| Anyone on the internet | Reach public pages, the sign-in routes and the cron route; send anything | Allowlist sign-in, CSRF, rate limits, body-size caps, security headers |
+| Anyone on the internet | Reach public pages, the sign-in routes and the cron route; send anything | Sign-in (the allowlist, or with `SIGNUP_MODE=open` a verified Google or allowed Microsoft identity), CSRF, rate limits, body-size caps, security headers |
+| Someone who makes many accounts (open sign-up) | Use the free quota again and again, run up model spend, fill the database | A verified identity, 5 new accounts an hour per address, `MAX_NEW_ACCOUNTS_PER_DAY` for the service, lower daily pages and model reads for a new account, a separate spend pool inside the daily cap, block on `/admin` |
 | A signed-in instructor (curious or malicious) | Call every route with other people's ids, send hostile files, send floods | Owner check on every job and course route, 404 for strangers, per-person quotas and queue caps |
 | A crafted PDF | Crash or stall the parser, balloon memory, smuggle text that becomes HTML or a prompt | Isolated probe process with time and memory limits, page and size limits, escaping and allowlists on everything that reaches HTML |
 | The model's output | Contain markup, script, unsafe URLs, wrong content | Validation before use; HTML built by escaping and by rebuilding MathML from an allowlisted tree |
@@ -49,8 +50,15 @@ provider's own handling of what is sent to it (see "Where document data goes").
   button, a limit of three messages per target address per 15 minutes besides the
   sign-in rate limits, nothing about the address or token logged. Tests:
   `test_web_email_login.py`, `test_web_signin_browser.py`.
-- Access is the allowlist (`users.is_allowed`), checked on **every request**, so removing
+- Access is `users.is_allowed`, checked on **every request**, so removing or blocking
   someone ends their session at once, and admin demotion likewise (`test_audit_auth.py`).
+  With `SIGNUP_MODE=allowlist` (default) only people an admin added have a row; with `open`
+  the first verified sign-in makes one (tier `open`), unless the day's accounts are used up,
+  and a blocked account is refused and never made again. The tier sets the daily limits and
+  the spend pool (`web/access.py`). Tests: `test_web_open_signup.py`, `test_web_open_spend.py`.
+- A signed-in person can delete their own account (`/account/delete`, a confirmation, then a
+  POST with the CSRF token): the same erasure as the command line, then signed out. Tests:
+  `test_web_open_signup.py`.
 - The session is a signed cookie: HttpOnly, SameSite=Lax, 7 days, and in production Secure
   with the `__Host-` prefix (browsers then refuse it unless it is Secure with Path=/ and no
   Domain). It is rotated at sign-in (a token seen before sign-in is worthless afterwards).
@@ -80,8 +88,8 @@ cannot skip these checks unnoticed.
 | Class | Routes |
 |---|---|
 | Public | `/`, `/demo`, `/privacy`, `/terms`, `/limits`, `/help/posting`, `/status`, `/healthz`, `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
-| Signed-in user, owner only | `/app`, `/app/documents`, `/app/download`, `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages), everything under `/courses/...` (including `/courses/{id}/download`) |
-| Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
+| Signed-in user, owner only | `/account`, `/account/delete` (GET, POST), `/app`, `/app/documents`, `/app/download`, `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages), everything under `/courses/...` (including `/courses/{id}/download`) |
+| Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
 | Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare) |
 
 `POST /jobs/{id}/retry` ("Try again") is owner-only and CSRF-checked like every other write on a job, and rate limited; it refuses with 409 when the document is not stopped or has had its 3 tries, and with 429 when the person already has 10 documents waiting or converting.
@@ -162,10 +170,13 @@ script injected into an app page is refused by the policy.
 | Sample document | one per person, outside the quota, the spend and the caps; `sample` rate rule 10 per 10 minutes per address | `web/sample.py` |
 | Probe child | 30 s timeout, 768 MiB address space, minimal environment | `inspect_pdf_isolated`, `pdf_probe` |
 | Word and PowerPoint (T3-30) | File checks in a child with a minimal environment and a 768 MiB cap; LibreOffice in its own session and process group with 2 GiB address space, CPU, output-size and open-file limits and `OFFICE_TIMEOUT_S` (90 s) then killed; one conversion at a time per instance; the PDF it makes is probed like any upload | `convert_office_isolated`, `office_convert` |
-| Daily pages per person | `PER_USER_DAILY_PAGE_QUOTA` | `web/quota.py` |
+| Daily pages per person | `PER_USER_DAILY_PAGE_QUOTA` (invited), `OPEN_TIER_DAILY_PAGE_QUOTA` (open tier) | `web/quota.py`, `web/access.py` |
+| Model reads from review per person per day (open tier) | `OPEN_TIER_DAILY_REREADS`, counted before the read and not given back | `web/quota.py` (`try_consume_reread`), `web/reread.py` |
+| New accounts (open sign-up) | `MAX_NEW_ACCOUNTS_PER_DAY` a UTC day for the service, not given back when an account is deleted; 5 an hour per address | `web/quota.py` (`try_take_signup`), `web/abuse.py` (`signup`) |
 | Waiting or running documents per person | 10 | `web/intake.py` (every route that makes a job: the upload and the parts of a large file) |
 | Kept documents per person | 40 (the sample document does not count) | `web/intake.py`; "Keep 7 more days" (`routes/job_settings.py`) refuses with a 429 page when it would exceed it |
 | Daily and per-job model spend | `DAILY_SPEND_CAP_USD`, per-job caps | `web/spend.py` |
+| Daily spend of open-tier accounts | `OPEN_TIER_DAILY_SPEND_CAP_USD`, a pool inside the daily cap, held and settled by the same conditional UPDATE; their queued jobs wait when it is spent | `web/spend.py`, `web/worker.py` |
 | Tries again of one document | 3 | `web/retry.py`; "Try again" never touches the page quota, the job's spend caps cover all tries |
 | "Try again" requests, per address / per person | 20 / 10 per 10 minutes | `web/abuse.py` |
 | Regions added to a document (T3-5), per person | 60 per 10 minutes; at most 30 added per document | `web/abuse.py` (`edit_region`), `web/page_edits.py` |
@@ -247,7 +258,8 @@ a wrong alt text or equation, which the instructor reviews.
   the job, its blobs and review edits. `test_audit_privacy.py` moves a clock through the
   upload route, the job page and the cron endpoint to check 23 h 59 min, 24 h 1 min, 29 days
   and 30 days 1 min. "Delete now" removes the same rows at once.
-- Erasure of a person (`readablestem users delete EMAIL --yes`, `ops.retention.erase_user`)
+- Erasure of a person (`readablestem users delete EMAIL --yes`, or the person's own "Delete my
+  account", `ops.retention.erase_user`)
   removes their jobs, blobs, review edits, courses and notation, events, sign-in identities,
   quota rows and the user. Only content-free aggregates and global daily spend remain. A test
   fails when a table with a user id is added without being listed there.

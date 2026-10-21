@@ -335,7 +335,7 @@ def test_the_tier_decides_the_limits():
     assert access.spend_pool(access.OPEN) == access.POOL_OPEN
 
 
-# --------------------------------------------------------------------------- the daily cap on accounts
+# ----------------------------------------------------------------- the daily cap on accounts
 
 
 def test_when_the_days_accounts_are_taken_new_sign_ups_get_a_calm_page(tmp_path):

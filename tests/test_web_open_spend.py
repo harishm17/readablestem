@@ -175,7 +175,7 @@ def test_a_call_that_straddles_midnight_releases_the_pool_on_its_own_day(factory
     assert guard.snapshot().open_spent_usd == 0.0  # a new day starts with an empty pool
 
 
-# --------------------------------------------------------------------------- the first-row fix is kept
+# ----------------------------------------------------------------- the first-row fix is kept
 
 
 def test_the_statements_of_a_pool_reservation_are_those_of_any_reservation(factory):

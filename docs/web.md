@@ -32,7 +32,9 @@ CONTACT_EMAIL=you@example.org
 Without `FAKE_MODELS` and without a key, jobs fail with `model_not_configured` ("Conversions
 are not set up on this server yet") rather than a generic error.
 
-`/dev-login` then signs you in with any allowlisted email and no password. In dev and
+`/dev-login` then signs you in with any allowlisted email and no password (with
+`SIGNUP_MODE=open` any email: a new one gets an account, in the open tier; "Sign-up modes
+and access tiers"). In dev and
 test the tables are created on start-up; there is no session secret, so a random one is
 made per process and a restart (or `--reload`) signs everyone out.
 
@@ -57,10 +59,14 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table; see "Usage events"). Both on by default; the questions are stored as events, so they need both |
 | `FEEDBACK_URL` | Where the footer's "Send feedback" link goes (http or https only). Unset: an email to `CONTACT_EMAIL`. A form service here is a new data processor: name it in the privacy notice first |
 | `BASE_URL` | Builds the OAuth redirect URIs, `${BASE_URL}/auth/callback` (Google) and `${BASE_URL}/auth/microsoft/callback` (Microsoft). Production: `https://readablestem.com`, so Google's redirect URI is `https://readablestem.com/auth/callback` |
+| `SIGNUP_MODE` | `allowlist` (the default: only people an admin added may sign in) or `open` (anyone with a verified Google identity, or an allowed Microsoft one, gets an account at the first sign-in). See "Sign-up modes and access tiers" |
+| `OPEN_TIER_DAILY_PAGE_QUOTA` (20), `OPEN_TIER_DAILY_REREADS` (30) | What an open-tier account may do per UTC day: pages to convert, and model reads from the review screen (a region marked as an equation, a table cell read as maths). Invited accounts keep `PER_USER_DAILY_PAGE_QUOTA` and have no read allowance beyond the rate limits |
+| `MAX_NEW_ACCOUNTS_PER_DAY` (100) | Accounts open sign-up may make per UTC day, for the whole service (`signup_days`). 0 pauses sign-up |
+| `OPEN_TIER_DAILY_SPEND_CAP_USD` (4.00) | The pool of the day's model spend that open-tier accounts' documents share. It sits inside `DAILY_SPEND_CAP_USD`, not on top of it. 0 closes it |
 | `ADMIN_EMAILS` | Comma-separated; made allowed admins at every start-up |
 | `DEV_LOGIN_ENABLED` | Enables `/dev-login` (only with `ENV=dev` or `test`) |
 | `DAILY_SPEND_CAP_USD` | Global model spend per UTC day (`spend_days`) |
-| `PER_USER_DAILY_PAGE_QUOTA` | Pages per user per UTC day (`quota_days`) |
+| `PER_USER_DAILY_PAGE_QUOTA` | Pages per invited user per UTC day (`quota_days`); open-tier accounts have `OPEN_TIER_DAILY_PAGE_QUOTA` instead |
 | `MAX_UPLOAD_MB`, `MAX_PAGES_PER_JOB`, `MAX_CONCURRENT_UPLOADS` | Upload limits (the last: uploads taken in at once per instance, one per user) |
 | `MAX_LARGE_UPLOAD_MB` (30), `MAX_SOURCE_PAGES` (300) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (Cloud Run takes at most 32 MiB). Equal to the limits above, they turn the feature off: such files are refused |
 | `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
@@ -86,11 +92,13 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET `/status` | anyone | Service status: up, conversions open or paused for today, whether the AI service is answering (from this server's own last requests), documents waiting and converting (numbers only; 503 when the database does not answer) |
 | GET `/login` | anyone | Sign-in page |
 | POST `/login` | anyone | Redirects to Google (CSRF-checked form) |
-| GET `/auth/callback` | Google | Finishes sign-in; 403 page if not allowlisted or email not verified |
+| GET `/auth/callback` | Google | Finishes sign-in; with open sign-up a new verified address gets an account (303 to `/app`); 403 page if not allowlisted (allowlist mode), blocked (open mode) or email not verified; 503 "Sign-ups are full for today" when the day's new accounts are used up; 429 when one address has made too many accounts |
 | POST `/login/email`, GET and POST `/login/email/confirm` | anyone | The emailed sign-in link (404 unless `EMAIL_LOGIN_ENABLED`): the form answers with the same page for every address; the link opens a page with a button, and only the button's POST (CSRF-checked) uses the link up. See "Sign-in, sessions and CSRF" |
 | POST `/login/microsoft` | anyone | Redirects to Microsoft (CSRF-checked form); 503 when Microsoft sign-in is not set up |
-| GET `/auth/microsoft/callback` | Microsoft | Finishes sign-in; 403 page if the organisation is not set up for the beta or the person is not allowlisted, 400 for any token that fails a check. With `admin_consent` (an IT admin back from the approval link, deploy.md step 3b): a thank-you notice on `/login`, nothing else |
-| GET, POST `/dev-login` | dev/test only | Any email, no password; the allowlist still applies |
+| GET `/auth/microsoft/callback` | Microsoft | Finishes sign-in (with open sign-up, makes the account of an allowed tenant's new address, as for Google); 403 page if the organisation is not set up for the beta or the person is not allowlisted or is blocked, 400 for any token that fails a check. With `admin_consent` (an IT admin back from the approval link, deploy.md step 3b): a thank-you notice on `/login`, nothing else |
+| GET, POST `/dev-login` | dev/test only | Any email, no password; the mode and the allowlist still apply |
+| GET `/account` | signed in | The address and name held, the access tier, today's limits, and the "Delete my account" link ("Sign-up modes and access tiers") |
+| GET, POST `/account/delete` | signed in | "Delete your account?" confirmation; only a POST with `confirm=yes` (and the CSRF token) erases the account and everything of theirs, signs them out and goes to `/` |
 | POST `/logout` | signed in | Clears the session |
 | GET `/app?revises=` | signed in | My documents as a to-do list (below), then the upload form; with `revises=<job id>` of the person's own finished document, the form for a revised version of it ("Revised versions" below) |
 | GET `/app/documents?v=&course=` | signed in | The documents list alone, polled by htmx while a document is waiting or converting (204 while unchanged); with `course=` only that course's documents (the course page polls it) |
@@ -135,8 +143,9 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/record`, `/jobs/{id}/record.csv` | owner | The review record (T3-6, "The review record" below): a page to print and a CSV; owner only, finished jobs only (409 otherwise), changes nothing |
 | POST `/courses/{id}/suggestions` | owner of the course (and of the job, when sent) | Add the ticked symbols found in the course's documents; back to the course page or the job page |
 | POST `/courses/{id}/remember` | owner of the course and the job | "Remember for <course>" from the review screen; back to the review screen |
-| GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts, usage counts per day and per pseudonymous person |
-| POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone |
+| GET `/admin` | admins | Sign-up numbers (accounts today against the limit, accounts by tier, blocked), the allowlist with each person's tier, blocked accounts, today's spend against the cap and the open pool, queue depth, aggregate counts, usage counts per day and per pseudonymous person |
+| POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone (adding makes them `invited`; removing blocks them) |
+| POST `/admin/users/block`, `/admin/users/unblock` | admins | Block an account (signed out everywhere, jobs stopped, sign-ins refused in either mode, no new row) or lift the block (the tier is kept). Not oneself |
 | POST `/admin/linked-emails`, `/admin/linked-emails/remove` | admins | Let an allowed instructor also sign in with another Google address, or take that away (T3-10; "Sign-in, sessions and CSRF") |
 | POST `/internal/cron/aggregate-and-purge` | Cloud Scheduler | `X-Cron-Token` header; aggregates, then purges |
 | GET `/healthz` | anyone | `{"status": "ok"}` after a database ping, else 503 |
@@ -195,7 +204,12 @@ yours to see". It is a 404 either way. The
   once: on the first sign-in, the identity is linked to the user with that address only
   if they are on the allowlist. Afterwards the identity alone decides, so a changed
   address, or one that is now someone else's, does not move it. Removal from the
-  allowlist still ends access. Nothing is stored for people who are refused.
+  allowlist still ends access. Nothing is stored for people who are refused. With open
+  sign-up an identity whose address has no account makes one (open tier) and is linked to it;
+  so the nOAuth caveat below reaches every address then, not only the allowlisted ones: an
+  administrator of an allowed directory could link their identity to an existing account by
+  setting its address on theirs. `MS_ALLOWED_TENANTS` is the control, and should list only
+  directories whose administrators are trusted.
   Why `sub` and not `oid`: OpenID Connect promises that `iss` and `sub` together are a
   stable identifier that is never reassigned (Core 1.0, section 5.7), the same rule as
   for Google; and Microsoft's `sub` is pairwise per app registration, so a token minted
@@ -235,10 +249,11 @@ yours to see". It is a 404 either way. The
   per target address in 15 minutes whoever asks, besides the per-address sign-in limits; a
   failing sender is logged by type and never shown. The link is in the URL, so Cloud Run's
   request logs and the mailbox hold it until it expires or is used.
-- **Allowlist.** `users.is_allowed`, managed with `readablestem users allow|deny|list` or on
-  `/admin`. It is checked on every request, so removing someone ends their access at
-  once. People who are not on it see a polite 403 page with `CONTACT_EMAIL`; no row is
-  created for them.
+- **Allowlist.** `users.is_allowed`, managed with `readablestem users allow|deny|unblock|list`
+  or on `/admin`. It is checked on every request, so removing or blocking someone ends their
+  access at once. With `SIGNUP_MODE=allowlist` people who are not on it see a polite 403 page
+  with `CONTACT_EMAIL`; no row is created for them. With `SIGNUP_MODE=open` they get an
+  account instead ("Sign-up modes and access tiers").
 - **Sessions.** Starlette `SessionMiddleware`: a signed cookie `readablestem_session`
   (`__Host-readablestem_session` in production), HttpOnly, SameSite=Lax, 7 days, Secure in
   production. The session is cleared and a new
@@ -255,6 +270,77 @@ yours to see". It is a 404 either way. The
 - **CSRF.** Every form that changes something carries a hidden `csrf_token`, compared in
   constant time with the session's. `tests/test_web_auth.py` lists every POST route and
   checks each refuses a forged token, so a new route cannot skip the check unnoticed.
+
+## Sign-up modes and access tiers (`web/access.py`, `web/auth.py`, `web/routes/account.py`)
+
+`SIGNUP_MODE` decides what happens to a verified sign-in that has no account.
+
+| | `allowlist` (default) | `open` |
+|---|---|---|
+| No account yet | 403 "You are not on the beta list yet"; nothing is stored | The account is made (`users` row, allowed, tier `open`) and the person is signed in, unless the day's accounts are used up (503 "Sign-ups are full for today", nothing stored) |
+| Account, `is_allowed` | Signed in | Signed in |
+| Account, not allowed (removed or blocked) | The same 403 page as above | 403 "This account cannot be used"; never a new row |
+| Pages that differ | Invitation wording | Open wording (`signup_open` in the templates: login, landing, privacy, terms, limits, sign-in links, not-allowed, org-not-set-up) |
+
+Open sign-up is for Google (verified email) and Microsoft (an allowed tenant; the token is
+checked as always). The emailed sign-in link (off) never makes an account. Making an account
+takes, in this order: the per-address rule `signup` (5 new accounts an hour per address,
+`web/abuse.py`, counted only when an account would be made), then one conditional UPDATE on
+`signup_days` (`web/quota.py:try_take_signup`, at most `MAX_NEW_ACCOUNTS_PER_DAY` a UTC day),
+then the `users` insert, all in one transaction; two first sign-ins of one address at once
+make one account (the unique email; the second finds the row). A person whose address is
+another account's linked Google address signs that account in and makes nothing.
+
+**Tiers** (`users.access_tier`, migration `a6c2e9f4b713`). `invited`: added by an admin, the
+command line or `ADMIN_EMAILS`; every account that existed before the migration. `open`: made
+by sign-up. Allowlisting someone (admin page, `users allow`) makes them `invited`, which is how
+an open-tier person gets the instructors' limits; blocking and unblocking keep the tier.
+`is_allowed` alone decides whether anyone may sign in, in both tiers and both modes. Changing
+`SIGNUP_MODE` back to `allowlist` stops new accounts only: open-tier accounts keep working
+until an admin blocks them (to turn people away, block them, or set
+`MAX_NEW_ACCOUNTS_PER_DAY=0` to stop new ones without touching the mode).
+
+What the open tier changes, and where:
+
+- **Pages.** `OPEN_TIER_DAILY_PAGE_QUOTA` instead of `PER_USER_DAILY_PAGE_QUOTA`
+  (`access.page_quota`, read by `intake.store_job` in the job's own transaction, the page
+  chooser and the upload pages). The refusal says "the N pages a new account can convert
+  today".
+- **Model reads from review.** `OPEN_TIER_DAILY_REREADS` a UTC day, counted in
+  `quota_days.rereads` by one conditional UPDATE (`quota.try_consume_reread`) before the
+  read starts and not given back, like pages. Every model read from review (a region marked
+  as an equation, a table cell read as maths) goes through `reread.read_equation`, so one
+  place counts them; adding a picture costs no model call and is not counted. Invited
+  accounts have no allowance beyond the rate limits.
+- **Spend.** Their documents' reservations also draw on the open pool
+  (`OPEN_TIER_DAILY_SPEND_CAP_USD`, "Spend cap" below). When it is spent, new uploads of open-tier
+  accounts are refused with "Conversions for new accounts are paused for today", the worker
+  leaves their queued jobs waiting for the next day (it still claims invited people's), and
+  invited people are not affected.
+
+**Accounts delete themselves.** `/account` lists what is held and the limits; `/account/delete`
+asks, and a POST with `confirm=yes` runs `ops.retention.erase_user` (the path of `readablestem
+users delete`: every job counted first, review decisions, waiting files, courses and notation,
+usage events, identities, linked addresses, sign-in links, daily counts, the row), clears the
+session and goes to `/` with a notice. Usage events go with the account (they hold a pseudonymous
+user id and no content, and are deleted with the user, as before); what remains is the content-free
+daily totals. `signup_days` is not given back, and a person who signs in again gets a new empty
+account that counts as new, so creating and deleting accounts does not make room for more. A
+deleted account's quota rows go with it: deleting and signing up again resets that
+person's daily pages, which `MAX_NEW_ACCOUNTS_PER_DAY`, the per-address rule and the spend pool
+bound but do not remove.
+
+**Admins.** `/admin` shows accounts today against the limit, accounts by tier and blocked, each
+person's tier, the open pool's spend, and a "Blocked accounts" table with Unblock. Block is
+`auth.set_blocked(blocked=True)`: `set_allowed(allowed=False)`, so sessions end, queued and
+running jobs fail with `access_removed`, and admin rights are lost (not given back by
+unblocking). An admin cannot block themselves. With thousands of accounts the page lists the
+first 300 of each table.
+
+Pages and `ops launch-check`: the public pages that carry invitation wording render it only
+when `signup_open` is false; the check fails a public template that has the words and does not
+mention `signup_open`, and, with `SIGNUP_MODE=open`, a privacy notice that does not say that
+the first sign-in makes an account and how to delete it (`ops/launch.py`).
 
 ## Uploads and limits
 
@@ -301,7 +387,11 @@ yours to see". It is a 404 either way. The
    itself is not isolated this way; see "Limits of the worker" below;
 6. the page quota: one conditional `UPDATE quota_days SET pages = pages + n WHERE ... AND
    pages + n <= quota`, in the same transaction as the job insert (if over: 429 and the
-   upload page again, naming the file, its pages and the pages left today).
+   upload page again, naming the file, its pages and the pages left today). The quota is
+   the person's tier's (`PER_USER_DAILY_PAGE_QUOTA` for invited people,
+   `OPEN_TIER_DAILY_PAGE_QUOTA` for open-tier accounts, whose message says "the N pages a new
+   account can convert today"). Before all of this, an upload is refused (503) while the
+   day's spend cap is used up or, for an open-tier account, while its pool is.
 
 Validation errors re-show the upload page with an error summary linked to the file input.
 For a refused handwritten or scanned PDF the summary's link is the message's first
@@ -778,7 +868,7 @@ tool does, what happens to a document, and where it falls short.
 
 ## Spend cap (`web/spend.py`)
 
-`DbSpendGuard(factory, cap_usd)` implements `core.budget.SpendGuard` on `spend_days`
+`DbSpendGuard(factory, cap_usd, open_cap_usd=...)` implements `core.budget.SpendGuard` on `spend_days`
 (one row per UTC day). A reservation is a single conditional UPDATE:
 
 ```sql
@@ -795,6 +885,34 @@ the job's, instead of four and two inserts). Settling moves the hold to `spent_u
 day it was reserved. The Postgres test runs 20 threads against the
 cap and checks it is never exceeded. If a process dies between reserve and settle, its
 hold stays until the day ends: the cap errs on the side of spending less.
+
+**The open pool.** Jobs of open-tier accounts (and their review reads) also draw on
+`OPEN_TIER_DAILY_SPEND_CAP_USD`, the part of the day that strangers may use. It is two more
+columns of the same row, `open_spent_usd` and `open_held_usd`, changed by the same
+statements as the totals:
+
+```sql
+UPDATE spend_days SET held_usd = held_usd + :a, open_held_usd = open_held_usd + :a
+WHERE day = :d AND spent_usd + held_usd + :a <= :cap
+  AND open_spent_usd + open_held_usd + :a <= :open_cap
+```
+
+A reservation for the pool must fit both, so the pool is inside the daily cap and open spend
+counts toward it: the instructors' budget can lose at most the pool to strangers, and the day
+can never pass the cap. Settling releases and counts in both pairs of columns, and a
+reservation remembers its day and pool, so a call that straddles midnight, or is settled
+through another view, still releases the right numbers. A refusal for the pool is
+`PoolExhausted`, a `BudgetExceeded("daily")` to everything that handles one (a job stopped
+by it has the code `budget_daily` and "Try again" works the next day); it is raised when the
+daily cap alone would have allowed the hold. The "no row yet" rule above is unchanged and
+holds for pool reservations too (`tests/test_web_open_spend.py` pins the statement sequence
+and the first-row race that "Spend guard: never refuse a hold because of a cached 'day row
+exists'" fixed; `tests/test_web_postgres.py` runs 20 threads). `DbSpendGuard.pooled("open")`
+is the view a job's budget is given; the worker reads the owner's tier once per attempt
+(`_start_attempt`), `reread.read_budget` once per read. The worker also treats the pool like
+the day for claiming: while less than one call's worth is left in it, open-tier owners' jobs
+are not claimed. Without `open_cap_usd` (tests, the command line) the pool's spend is
+recorded and never refuses.
 
 ## Worker (`web/worker.py`)
 
@@ -2014,10 +2132,12 @@ white text on the numbered discs at least 4.5:1.
   checks none reach the logs.
 - File names, emails and document content are not written to logs or error codes; the
   file name is shown only to its owner and deleted with the job.
-- Not-allowlisted sign-ins, and Microsoft sign-ins from directories that are not set
-  up, are not stored. For allowlisted people the sign-in identity (provider, issuer,
-  subject id and, for Microsoft, the directory id) is kept with the account and erased
-  with it.
+- Sign-ins that are refused (not allowlisted in allowlist mode, blocked, turned away because
+  the day's accounts are used up), and Microsoft sign-ins from directories that are not set
+  up, are not stored. With open sign-up the first sign-in of a verified address makes an
+  account (email, name, last sign-in), which the person can delete from `/account`. For
+  people with an account the sign-in identity (provider, issuer, subject id and, for
+  Microsoft, the directory id) is kept with the account and erased with it.
 - Usage events are content-free and pseudonymous (see "Usage events"); the privacy page
   has one line on them (its final wording is Harish's) and admins see them per day and
   per pseudonym only.
@@ -2029,10 +2149,10 @@ URL comes from `DATABASE_URL` (or the settings, which read `.env`).
 
 Besides jobs and their children, the schema holds a user's courses and their notation
 entries (user content), content-free usage events, sign-in identities and the daily
-counters (docs/design/content-features.md "Database"). `readablestem users delete` erases a
-person through `ops.retention.erase_user`: every job (counted first), then every row of
-every table that holds their user id, then the account; a test fails when a table with
-a user id is added without it.
+counters (docs/design/content-features.md "Database"). `readablestem users delete` and the
+account's own "Delete my account" erase a person through `ops.retention.erase_user`: every job
+(counted first), then every row of every table that holds their user id, then the account; a
+test fails when a table with a user id is added without it.
 
 - Dev and test create tables directly on start-up. Production refuses to start when the
   schema is missing or behind this release's migrations: run `uv run readablestem db
@@ -2056,6 +2176,12 @@ a user id is added without it.
   it when the two were merged) and `d3f8a1c5b920` (`upload_results`: the answer to an upload of
   several files, kept an hour). `tests/test_web_migrations.py` checks the chain, the one head
   and both downgrades.
+- Last, `a6c2e9f4b713` (open sign-up, the head): `users.access_tier` (server default
+  `invited`, which is also the backfill: every existing account was added by an admin),
+  `spend_days.open_spent_usd` and `open_held_usd`, `quota_days.rereads` (all server default 0)
+  and the table `signup_days`. Additive, so a release from before it keeps working on the
+  migrated schema; the downgrade drops them. `tests/test_web_open_signup_migration.py` runs it
+  up and down on SQLite with real rows, and `tests/test_web_postgres.py` on Postgres.
 - New migration: change `web/db.py`, then
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic upgrade head` followed by
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic revision --autogenerate -m "..."`,
@@ -2069,6 +2195,9 @@ a user id is added without it.
 | `uv run pytest tests/test_web_*.py` | Offline web tests (SQLite) plus the Postgres ones when a server is available |
 | `uv run pytest -m postgres` | Postgres only: spend and quota under 20 threads, SKIP LOCKED with two workers, migration check, first sign-ins of one identity under 20 threads (`tests/test_web_auth_postgres.py`) |
 | `uv run pytest tests/test_web_auth_microsoft.py` | Microsoft sign-in against a fake identity platform (`tests/fixtures/web/oidc.py`: keys made and tokens signed in the test, served to Authlib through an httpx mock transport): every ID-token check, tenants, linking, identities, sessions |
+| `uv run pytest tests/test_web_open_signup.py tests/test_web_open_signup_providers.py tests/test_web_open_signup_migration.py` | Open sign-up: the setting, who gets in (never invited against blocked, in both modes), tiers, the daily cap on accounts and the per-address rule, the page and model-read quotas by tier, the admin page and block, deleting an account, Google and Microsoft sign-in with open sign-up, the migration up and down with real rows |
+| `uv run pytest tests/test_web_open_spend.py` | The open spend pool on SQLite (one conditional UPDATE, 20-thread and mixed-thread races, settling, midnight, the first-row case) and what the app and worker do when it is spent |
+| `uv run pytest tests/test_web_signup_copy.py` | The public pages in both modes: no invitation wording with `SIGNUP_MODE=open`, the old wording unchanged without it, and the `launch-check` wording checks |
 | `uv run pytest -m browser tests/test_web_browser.py` | Chromium: axe-core on every page, CSP, htmx polling, no-JS flow |
 | `uv run pytest -m browser tests/test_web_auth_browser.py` | Chromium: the sign-in pages with Microsoft set up (axe, 320 px reflow) and the whole Microsoft round trip under the real CSP |
 | `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |

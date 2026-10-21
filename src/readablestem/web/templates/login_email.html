@@ -3,11 +3,11 @@
 {% block content %}
 {% if sent %}
 <h1>Check your email</h1>
-<p>If that address is on the beta list, we have sent it a sign-in link. The link works once
+<p>If that address {% if signup_open %}has an account{% else %}is on the beta list{% endif %}, we have sent it a sign-in link. The link works once
   and expires after {{ email_link_minutes }} minutes.</p>
 <p>Nothing arrived? Check your spam folder, or <a href="/login">go back and try again</a>.
-  The same message appears for every address, so this page does not tell anyone who is on
-  the list.</p>
+  The same message appears for every address, so this page does not tell anyone who
+  {% if signup_open %}has an account{% else %}is on the list{% endif %}.</p>
 {% else %}
 <h1>Sign in by email</h1>
 {% if error %}
