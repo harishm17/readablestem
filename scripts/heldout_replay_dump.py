@@ -25,7 +25,9 @@ from pathlib import Path
 
 def main() -> int:
     tag, dump = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve()
-    bundle = sys.argv[3:4]  # optionally another recorded run than the set's own (`--bundle`)
+    # Optionally another recorded run than the set's own (`--bundle`); a replay of it goes on
+    # past a stale axe answer (`--allow-misses --allow-drift`).
+    bundle = sys.argv[3:4]
     sys.path.insert(0, str(tag / "src"))
     for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
         os.environ.pop(key, None)
@@ -73,7 +75,7 @@ def main() -> int:
         str(dump / "PROOF-replay.md"),
         "--work",
         str(dump / "work"),
-        *(["--bundle", bundle[0]] if bundle else []),
+        *(["--bundle", bundle[0], "--allow-misses", "--allow-drift"] if bundle else []),
     ]
     main_module.main()
     return 0
