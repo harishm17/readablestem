@@ -46,9 +46,10 @@ def load_buckets_module():
     spec = importlib.util.spec_from_file_location(
         "dev_buckets", REPO / "scripts" / "dev_buckets.py"
     )
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules["dev_buckets"] = module
-    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    spec.loader.exec_module(module)
     return module
 
 
@@ -129,8 +130,30 @@ def table(headers: list[str], rows: list[list[str]]) -> str:
     return "\n".join(out)
 
 
+def float_kinds(part: str, gold: dict[str, dict]) -> dict[str, str]:
+    """Gold id -> where the equation is typed: "text", or the floats it is in ("table", "figure",
+    "figure>tikzpicture", "algorithm" ...). Not stored in the gold; derived again from the cached
+    source by the extractor that made the gold (`arxiv_gold.analyse`)."""
+    from readablestem.gold import arxiv_gold as ag
+    from readablestem.gold import arxiv_tex as tex
+
+    kinds: dict[str, str] = {}
+    by_paper: dict[str, list[dict]] = defaultdict(list)
+    for record in gold.values():
+        by_paper[record["arxiv_id"]].append(record)
+    for paper, records in by_paper.items():
+        base = ROOT / "papers" / paper.replace("/", "_")
+        analysis = ag.analyse(tex.read_sources(base / "src"), ag.page_texts_of(base / "paper.pdf"))
+        if isinstance(analysis, str):
+            continue
+        by_key = {(e.item, e.latex): e.float_kind for e in analysis.equations}
+        for record in records:
+            kinds[record["id"]] = by_key.get((record["tex_item"], record["latex"])) or "text"
+    return kinds
+
+
 def strata_rows(
-    items: list[dict], gold: dict[str, dict]
+    items: list[dict], gold: dict[str, dict], kinds: dict[str, str]
 ) -> dict[str, dict[str, tuple[int, int, int]]]:
     """name -> stratum -> (gold, exact, detected) from the pairs."""
     out: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(lambda: [0, 0, 0]))
@@ -146,14 +169,14 @@ def strata_rows(
                 "environment": "align-like"
                 if g["env"] in {"align", "eqnarray", "flalign", "alignat", "gather", "multline"}
                 else ("inline" if g["display"] == "inline" else "single-line display"),
-                "in float": "float" if g.get("in_float") else "text",
+                "typed in": kinds.get(gid, "?"),
             }
             for name, value in keys.items():
                 cell = out[name][value]
                 cell[0] += 1
                 cell[1] += bool(pair and pair["exact_lenient"])
                 cell[2] += pair is not None
-    return {k: {s: tuple(v) for s, v in d.items()} for k, d in out.items()}
+    return {k: {s: (v[0], v[1], v[2]) for s, v in d.items()} for k, d in out.items()}
 
 
 def examples(
@@ -282,8 +305,9 @@ def main() -> int:
     result["buckets"] = {label: {k: summaries[label][k] for k in keys} for label in items}
     # strata
     print()
+    kinds = float_kinds(args.part, gold)
     for label, its in items.items():
-        st = strata_rows(its, gold)
+        st = strata_rows(its, gold, kinds)
         result.setdefault("strata", {})[label] = st
         rows = []
         for name, values in st.items():
