@@ -20,6 +20,7 @@ from pathlib import Path
 DATA = Path(__file__).resolve().parent.parent / "data" / "realworld"
 FILES = (
     "PREREGISTRATION.md",
+    "PREREGISTRATION-ADDENDUM-1.md",
     "manifest-heldout.json",
     "manifest-dev.json",
     "pool.json",

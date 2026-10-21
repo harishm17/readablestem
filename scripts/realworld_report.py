@@ -179,6 +179,51 @@ def strata_rows(
     return {k: {s: (v[0], v[1], v[2]) for s, v in d.items()} for k, d in out.items()}
 
 
+def undetected_class(g: dict, kind: str) -> str:
+    """Why an undetected gold equation is hard, by the first rule that fits."""
+    if kind not in ("text", "algorithm"):
+        return f"typed in a {kind.split('>')[0]}"
+    if g["display"] == "block":
+        return "display equation"
+    if g["tokens"] == 1:
+        return "single symbol in running text"
+    if g["tokens"] <= 3:
+        return "2 or 3 symbols in running text"
+    return "longer inline expression"
+
+
+def breakdown(items: list[dict], gold: dict[str, dict], kinds: dict[str, str], buckets) -> dict:
+    """Counts behind the buckets: what the undetected are, and which way a span is wrong."""
+    import difflib
+
+    from readablestem.eval import equations_symbols as sym
+
+    undetected: Counter[str] = Counter()
+    span: Counter[str] = Counter()
+    for item in items:
+        for gid in item["missed_gold_ids"]:
+            undetected[undetected_class(gold[gid], kinds.get(gid, "text"))] += 1
+        for pair in item["pairs"]:
+            g = gold[pair["gold_id"]]
+            if buckets.classify_pair(pair, g["mathml"]) != "span":
+                continue
+            a = sym.symbols_of_latex(pair["pred_latex"])
+            b = sym.symbols_of(g["mathml"])
+            ops = {
+                op[0]
+                for op in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes()
+                if op[0] != "equal"
+            }
+            span[
+                "cut too long (extra symbols)"
+                if ops == {"delete"}
+                else "cut too short"
+                if ops == {"insert"}
+                else "both"
+            ] += 1
+    return {"undetected": dict(undetected), "span": dict(span)}
+
+
 def examples(
     items: list[dict], gold: dict[str, dict], buckets, n: int, seed: str = "examples"
 ) -> list[dict]:
@@ -256,6 +301,23 @@ def main() -> int:
     ]
     rows.insert(0, sizes)
     print(table(["metric (95% cluster bootstrap over papers)", *items], rows))
+    # the papers every arm ran on (the Opus arm may be a subset)
+    common = sorted(set.intersection(*(set(v) for v in vectors.values()))) if vectors else []
+    if common and len(common) < max(len(v) for v in vectors.values()):
+        rows = []
+        for name, statistic in METRICS.items():
+            row = [name]
+            for label in items:
+                pp = {k: vectors[label][k] for k in common}
+                interval = stats.cluster_bootstrap(pp, statistic)
+                row.append(
+                    interval_text(stats.point(pp, statistic), interval, 4 if "cost" in name else 3)
+                )
+            rows.append(row)
+        print()
+        print(f"### the {len(common)} papers every arm ran on")
+        print(table(["metric", *items], rows))
+        result["common_papers"] = common
     # paired differences
     if "ReadableSTEM" in items:
         print()
@@ -315,6 +377,13 @@ def main() -> int:
                 rows.append([name, value, str(n), fmt(ex / n), fmt(det / n)])
         print(f"### {label}: by stratum")
         print(table(["stratum", "value", "gold", "exact_lenient", "detected"], rows))
+        print()
+    for label, its in items.items():
+        counts = breakdown(its, gold, kinds, buckets)
+        result.setdefault("breakdown", {})[label] = counts
+        print(f"### {label}: undetected and span")
+        for name, values in counts.items():
+            print(f"- {name}: " + ", ".join(f"{k} {v}" for k, v in sorted(values.items())))
         print()
     # status of chatbot runs
     for label, its in items.items():
