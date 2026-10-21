@@ -176,3 +176,12 @@ def test_a_confident_layout_only_span_is_still_accepted():
         element(page_latex=None, status="layout"), PNG, client=client, settings=settings
     )
     assert fix.status == Status.ACCEPTED
+
+
+def test_a_letters_weight_is_not_part_of_the_comparison_of_two_readings():
+    """The page pass often reads a bold vector as a plain letter; weight is the text-layer
+    checks' business, so the readings still agree."""
+    client = by_model(cheap=out(r"\mathbf{d}_0", 0.8))
+    fix = run(client, element(page_latex="d_0", text="d0"))
+    assert page_checks(fix) == {equation_step.PAGE_READING: True}
+    assert models(client) == [CHEAP_MODEL]

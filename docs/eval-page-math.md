@@ -1,0 +1,254 @@
+# The page math pass on the development sets (2026-10-21)
+
+What [ADR 0006](decisions/0006-page-math-pass.md) built, what it did on the development sets,
+what it cost, and what that says about a held-out run. Development sets only (`data/gold` and
+dev-v2's dev part); the held-out set was not run, opened or used to tune anything, and the sealed
+check part of dev-v2 was not touched. Every number is from this branch's pipeline with
+`FEATURE_PAGE_MATH` off (baseline) or on, with every model answer recorded once and replayed.
+
+**The short version.** On 114 development PDF pages (724 gold equations) the pass does not move
+the primary `exact_lenient` (0.486 off, 0.482 on; the change is -0.4 points, interval -1.9 to
++0.9). The symbols-correct score moves by +0.5 points. Detection recall by +0.6 points, span
+fidelity by +0.4, and detection precision falls by 7.8 points because the pass finds many more
+inline pieces of mathematics than the answer key counts. What does move is the review screen:
+of the equations that are wrong in the symbols, the share sent to a person goes from 41% to 58%
+(precision of those flags from 44% to 56%), and the wrong equations nobody is asked about fall
+from 4.8 to 3.5 per 100 gold, at the same number of required decisions per page (1.67 to
+1.61) and $0.0016 more per page. The cause is the second reading, not the spans. The page pass
+alone cuts the answer key's spans no better than layout's own rules at this commit (0.32 against
+0.34 faithful on one slice), because at this commit the rules already cut what a text-grounded
+pass can fix (below), and the expressions it cannot fix are the ones the text layer cannot
+anchor.
+
+## What was built
+
+| Part | Where |
+|---|---|
+| The pass: prompt, strict output schema, verification of every quote against the text layer, the call | `src/readablestem/pipeline/page_math.py`, `src/readablestem/models/prompts/page_math.md` |
+| Reconciliation with layout (a hook in layout's page analysis; layout runs twice with the flag on) | `src/readablestem/pipeline/page_math_reconcile.py`; hook points in `pipeline/layout.py` (`analyze(page_math=...)`, `_page_blocks`, `_paragraph_pieces`, `render_page`) |
+| Two readings (agreement lifts confidence, disagreement asks the main model once, a reading nobody shares is a required decision) | `pipeline/equation_step.py` (`_compare_readings`, `PAGE_READING*`), `web/messages.py` |
+| Flag and settings | `FEATURE_PAGE_MATH`, `PAGE_MATH_MODEL`, `ANTHROPIC_EFFORT_PAGE_MATH`, `PAGE_MATH_UNCONFIRMED_FACTOR`; `core/types.py` (`ConversionOptions.page_math`, `Element.page_latex`, `Element.page_status`, `PageMathSummary`, `Step`) |
+| Longer fenced context for one step | `models/base.py` (`VisionRequest.context_limit`), both clients |
+| Eval: cost split, per-pair page-pass fields, `--sections` | `eval/pipeline_eval.py`, `cli/eval_cli.py` |
+| Comparison scripts | `scripts/dev_buckets.py` (headline numbers and buckets per run), `scripts/dev_spans.py` (span-level effect with no equation model, about $0.002 a page) |
+| Tests | `tests/test_page_math.py` (verification, reconciliation, the call, two recorded answers on dev pages in `tests/fixtures/page_math`), `tests/test_steps_equation_page.py` |
+
+How a page goes through it: layout reads the page (first run, rows are collected); one claude-haiku-5-5
+call (effort medium) gets the page at 150 dpi and the rows as `L12 | text`, and returns expressions
+with anchors that quote the rows; each quote is checked against the row (`verify`), a block
+span's LaTeX is checked against the text it quotes, and layout runs again with the verified
+plan; the equation step then reads every crop as before and compares its reading with the page's.
+
+## How it was measured
+
+Two slices of the 28 dev-v2 documents (338 pages would have cost about $5 for a baseline alone), chosen
+for the classes the held-out analysis named before any run, not by looking at results:
+
+| Slice | Sections | PDF pages | Gold equations |
+|---|---|---|---|
+| A (tuned on) | Elementary Algebra 5.2 (systems, numbered exercises), authored LaTeX matrices, Chemistry 2.3 (nuclides), 17.3 (rate laws), 1.4 (measurements) | 65 | 272 |
+| B (looked at less) | Elementary Algebra 8.5 (complex fractions), College Algebra 9.6 (binomials), authored LaTeX exercises, Chemistry 16.3, 14.1 | 49 | 452 |
+
+Slice A is where the prompt and the reconciliation were iterated; B was run after the first policy
+was fixed and then used for two more fixes (below), so neither is a clean confirmation set. The
+original development set (`data/gold`, 30 equations on 43 pages) is the regression check; its
+baseline is the one recorded on 2026-10-14 (replays at no cost against this commit). The baseline of
+each slice is this branch with the flag off, run live once (`--answers`), replayed to rescore.
+The second automated check was off in every run (shadow only; it changes no output).
+
+## Results
+
+Baseline (flag off) against the pass on, pooled over A and B (724 gold equations, 114 PDF pages),
+and for the two slices and `data/gold`:
+
+| | A off | A on | B off | B on | **A+B off** | **A+B on** | gold off | gold on |
+|---|---|---|---|---|---|---|---|---|
+| **primary `exact_lenient`** | 0.302 | 0.305 | 0.597 | 0.589 | **0.486** | **0.482** | 0.767 | 0.800 |
+| secondary: stream v2, credit | 0.445 | 0.449 | 0.639 | 0.631 | 0.566 | 0.562 | 0.967 | 1.000 |
+| secondary: symbols, credit | 0.585 | 0.588 | 0.799 | 0.805 | 0.718 | 0.724 | 0.967 | 1.000 |
+| detection recall | 0.673 | 0.688 | 0.872 | 0.872 | 0.797 | 0.803 | 1.000 | 1.000 |
+| detection precision | 0.688 | 0.517 | 0.793 | 0.796 | 0.756 | 0.678 | 0.750 | 0.283 |
+| span fidelity (span text within 0.99 of the gold) | 0.338 | 0.342 | 0.624 | 0.628 | 0.517 | 0.521 | 0.600 | 0.733 |
+| unmatched predictions (unsupported by the PDF's text) | 83 (31) | 175 (32) | 103 (45) | 101 (41) | 186 (76) | 276 (73) | 10 (0) | 76 (2) |
+| required decisions per PDF page (equations) | 1.31 (0.72) | 1.40 (0.83) | 2.14 (1.82) | 1.90 (1.57) | 1.67 (1.19) | 1.61 (1.15) | 0.14 (0) | 0.21 (0.07) |
+| wrong, not asked, per 100 gold (primary) | 33.5 | 30.1 | 22.8 | 23.7 | 26.8 | 26.1 | 23.3 | 20.0 |
+| wrong in the symbols, not asked, per 100 gold | 5.9 | 2.9 | 4.2 | 3.8 | **4.8** | **3.5** | 3.3 | 0.0 |
+| flag precision (flagged equations wrong in the symbols) | 0.53 | 0.76 | 0.41 | 0.42 | **0.44** | **0.56** | | |
+| flag recall (symbols-wrong equations that were flagged) | 0.33 | 0.70 | 0.46 | 0.47 | **0.41** | **0.58** | | |
+| cost per PDF page | $0.0116 | $0.0142 | $0.0194 | $0.0196 | **$0.0149** | **$0.0165** | $0.0038 | $0.0054 |
+
+"Flag" is a required decision on an aligned equation. "Unmatched predictions" are the equations the
+pipeline wrote that no gold equation aligns to (the answer key writes quantities and lone variables
+in the text as plain text; "unsupported" are those the PDF's own text does not support). Precision of
+detection fell because the pass marks quantities with units, lone variables and bold vectors in
+sentences as inline mathematics, which is what it was told to do and what a screen reader
+benefits from, and the answer key does not count. On `data/gold` it writes 76 equations the answer key has no partner for, against 10, 60 of them
+"other" (a quantity or a lone symbol); the gold's own 30 equations are all symbols-correct with
+the pass on (29 off), nothing is worse.
+
+The pooled change in `exact_lenient` is -0.4 points; a cluster bootstrap over the 10 sections gives
+-1.9 to +0.9, and the symbols score +0.5 (0.0 to +1.0). Losses and gains are single equations:
+on slice B the pass lost seven binomial coefficients to representation (`\binom` against the
+answer key's brackets around a table; the symbols scorer now treats the two as equal, the primary
+cannot) and gained two complex fractions the layout alone had missed.
+
+### Buckets
+
+Per gold equation (pooled A and B; the bucket definitions are those of the held-out analysis of
+2026-10-20, `scripts/dev_buckets.py`):
+
+| Bucket | off | on |
+|---|---|---|
+| correct (`exact_lenient`) | 0.486 | 0.482 |
+| scorer: symbols right, primary says no | 0.229 | 0.239 |
+| span: aligned, symbols differ at an end | 0.051 | 0.053 |
+| recognition: aligned, symbols differ inside | 0.017 | 0.017 |
+| no proposal | 0.014 | 0.012 |
+| undetected: no aligned prediction | 0.203 | 0.198 |
+
+The undetected 143 gold equations (of 724) of the pass-on run are: 55 single glyphs (an answer key
+equation that is only "x", "+" or "="), 40 chemical formulas and equations, 21 inline fractions
+(most of them the nested fractions of "complex rational expressions"), 20 nuclide symbols
+(prefix mass and atomic numbers, a stack the text layer gives in no usable order) and 7 others.
+The pass recovered about four of them.
+
+### Span level: what the model's own cut is worth
+
+`scripts/dev_spans.py` aligns what layout finds, what layout finds with the verified plan, and
+the model's spans alone to the gold by text, with no equation model (the answer is the
+fidelity: the span's text within 0.9 of the gold equation's):
+
+| | Recall | Precision | Faithful (0.99) |
+|---|---|---|---|
+| Slice A, layout alone | 0.629 | 0.643 | 0.342 |
+| Slice A, layout with the plan | 0.647 | 0.486 | 0.346 |
+| Slice A, the pass alone (medium) | 0.570 | 0.502 | 0.316 |
+| Slice A, the pass alone (low, prompt without examples) | 0.577 | 0.549 | 0.210 |
+| Slice B, layout alone | 0.872 | 0.793 | 0.624 |
+| Slice B, layout with the plan | 0.872 | 0.796 | 0.628 |
+| Slice B, the pass alone (medium) | 0.449 | 0.935 | 0.281 |
+
+By class (gold equations right at fidelity 0.9, A and B together, `layout alone / with the plan /
+the pass alone`): systems with a brace 85 / 86 / 86 of 87; numbered exercises 119 / 121 / 108 of
+131; inline fractions 125 / 127 / 78 of 184; chemical formulas 37 / 37 / 18 of 91; matrices
+31 / 31 / 18 of 50; nuclides 2 / 2 / 1 of 24. At this commit layout already gets the exercise
+numbers and the systems the held-out run showed it cutting wrongly (the 0.5.0 rules; docs/layout.md);
+what is left is mostly not reachable from the text layer.
+
+## Cost
+
+Per PDF page, pooled A and B, flag off then on:
+
+| | off | on |
+|---|---|---|
+| the page pass (claude-haiku-5-5, medium) | 0 | $0.0018 |
+| cheap reads of crops | $0.0002 | $0.0002 |
+| main model, first read (display equations) | $0.0103 | $0.0105 |
+| main model, escalation after a cheap read | $0.0018 | $0.0016 |
+| figures and the rest | $0.0026 | $0.0025 |
+| **all** | **$0.0149** | **$0.0165** |
+
+The target was about $0.017 per page: slice A is $0.0142, slice B $0.0196 (its baseline is already
+$0.0194), `data/gold` $0.0054, pooled $0.0165. Escalations do not rise: where the two readings
+agree a cheap answer is accepted without the second read, and where they disagree the second
+read is one the pipeline would often have made anyway. At effort low the pass costs $0.0010 a
+page but cuts the answer key's spans right 0.21 of the time (0.32 at medium on the same slice).
+
+## What was iterated, and why anything was run again
+
+| Step | Why | What changed | Result |
+|---|---|---|---|
+| First end-to-end run on slice A (page pass v1 prompt, effort low, replace-on-verify) | the first full measurement | | primary 0.302 to 0.305, detection precision 0.688 to 0.519, required decisions 1.31 to 2.11 per page: more flags and no gain |
+| Reconciliation: a span must agree with its quote; bracket rows are absorbed; a span that would split a layout region is refused | the first run cut matrices and derivations into pieces layout had right (3 symbols-exact equations lost on the matrices document) | `_consistent` (Dice 0.8 of the symbol bags of the LaTeX and the quote), `_absorb_brackets`, `_screen_blocks` | splits stopped; `refused` counts them (18 on the six pages of the matrices document) |
+| Prompt v2 (examples) and effort medium | the pass alone cut systems and fractions worse than layout (fidelity 0.21 on slice A) | four worked examples in the prompt, effort low to medium | fidelity 0.21 (low, v1) / 0.20 (low, v2) / 0.32 (medium, v2): the effort did it, the examples did not |
+| `PAGE_MATH_UNCONFIRMED_FACTOR` 0.9 to 1.0 | measured on slice A: of 16 aligned equations that fell under the accept bar for being unconfirmed, 14 were right | default 1.0 | below-accept decisions on slice A fell from 38 to 8 (with the other changes of that step) |
+| Slice B run (first policy) | | two losses were the pass quoting "n" for "nth" and "(r+1)" for "(r+1)th" | `_with_scripts`: a span takes up to four letters or digits glued to its end, and script glyphs at either end |
+| The symbols scorer: `\binom` and brackets around a one-column table | seven binomials counted as lost | `mfrac` with no bar is a stack | the held-out tables above moved by less than 0.001 |
+| Agreement of the readings is by symbols without letter weight | on `data/gold` the pass flagged bold vectors it read as plain letters (8 false flags) | `page_math._unstyled` | required decisions on `data/gold` 0.49 to 0.21 per page, pooled A+B 1.67 to 1.61 |
+
+The last two were measured by replaying the recorded answers (every request they changed had
+been asked already), so they cost nothing; the reruns of the full pipeline at the end only paid for
+crops whose box changed.
+
+## Spend
+
+Live model spend of this work, under the $8 cap, from the answer files (list price, each answer paid once):
+
+| What | USD |
+|---|---|
+| Slice A baseline (flag off) | 0.7536 |
+| Probe: 3 pages of the matrices document, prompt v1 | 0.0064 |
+| Slice A, flag on, first policy (prompt v1, effort low) | 0.3325 |
+| Page pass prompt and effort iteration (A low v2, A medium, B medium; page pass only) | 0.2635 |
+| Slice A, flag on, medium (crops that changed) | 0.1927 |
+| Slice B baseline (flag off) | 0.9460 |
+| Slice B, flag on (crops that changed) | 0.1230 |
+| Slice B, final code (2 crops) | 0.0027 |
+| `data/gold`, flag on (page pass $0.056, crops $0.112) | 0.1680 |
+| Recorded answers for the two test fixtures | 0.0050 |
+| **Total** | **2.7934** |
+
+Replays of the 2026-10-14 `data/gold` baseline and of every baseline rescore cost nothing.
+
+## What still fails
+
+Development examples (gold id, what the pipeline wrote):
+
+- **Nested complex fractions** (`8-5-simplify-complex-rational-expressions` eq-003, eq-013, eq-021): the
+  text layer is a bag of numerators and denominators with no order, so neither layout nor a
+  quote can cut them, and the crop is cut where the rows are.
+- **Braces drawn as paths** (`5-2-solve-systems`, eq-014, 016, 023, 028, 029, 037, 040, 041: 12 of the 38 `span`
+  bucket equations): the brace is not in the text layer, the crop is cut inside it, the equation
+  step reads the two lines and writes no brace, the page pass writes `\left\{` and the two readings
+  disagree, which is the flag that works (they are required decisions), but nothing repairs the span.
+- **Nuclide prefix scripts** (`2-3-atomic-structure`, `_1^1 H` to `_9^19 F`): 20 undetected; the
+  pass found four, as `2H` without the stack.
+- **Chemical formulas and equations in running text** (`17-3-rate-laws`, `16-3-standard-reduction-potentials`):
+  40 undetected, many of them formulas the answer key writes as MathML and the PDF prints as plain
+  text with raised digits.
+- **Single glyphs** (55): the answer key has an equation that is a lone `×`; not a defect of the pipeline.
+- **Both readings agree and are wrong** (10 of 280 aligned equations the pass placed and both
+  readings agreed on, A and B): a lone variable cut without the "=" the answer key keeps with it
+  (`5-2-solve-systems` eq-046, 055, 056: `n =` against `n`), a nuclide without its atomic number
+  (`2-3-atomic-structure` eq-012, 013), the first half of a complex fraction (`8-5` eq-002).
+
+## What this says about a held-out run
+
+The held-out gap to the Opus chatbot is -0.118 on the primary scorer
+(docs/eval-secondary-metrics.md), and it is made of segmentation and the scorer, in about equal
+parts. The scorer part does not change. Of the segmentation part, the 0.5.0 layout rules (exercise
+numbers and systems) were estimated at about +10 points before this work; they are independent of it.
+On the development sets the pass adds nothing measurable beyond them to the primary score. My
+estimate for the held-out effect of turning it on, with the 0.5.0 layout as the baseline:
+
+- primary `exact_lenient`: **0 points, plausible range -1.5 to +1** (the dev interval is -1.9 to
+  +0.9 and dev is where it was tuned); it does not close the gap to the chatbots;
+- symbols-correct end to end: **+0.5 points** (0.0 to +1.0 on dev);
+- equations wrong in the symbols that nobody is asked about, per 100 gold: **down about 1.4**
+  (4.8 to 3.5 on dev, interval -4.6 to +0.9 per 100 over 10 sections), with equation flag recall
+  up from about 0.4 to 0.6;
+- more inline equations, which a screen reader benefits from and the answer key does not count:
+  detection precision falls by about 8 points (47 points on `data/gold`, whose text is full of
+  quantities with units and bold vectors) and `unmatched predictions` rise by about half;
+- cost $0.0016 to $0.0018 per page on top of $0.015.
+
+### Sections a fresh held-out set needs
+
+The comparison is the same sections with the flag on and off, so the registered paired design
+applies (PROOF.md: cluster bootstrap over sections, with the sign-flip test for small
+numbers of clusters). The standard deviation of the per-section difference on the dev sections is
+what sets the number; at 80% power and a two-sided 5% level, `n = (1.96 + 0.84)^2 sd^2 / effect^2`:
+
+| Effect to detect | Per-section sd on dev | Sections |
+|---|---|---|
+| +1 point of primary `exact_lenient` | 1.45 points | about 17 |
+| +0.5 points of symbols-correct | 0.68 points | about 12 |
+| -1.4 per 100 in symbols-wrong equations nobody is asked about | 4.1 per 100 | about 68 |
+| Equation flag recall +17 points | equation-level (McNemar), not section-level | the registered sections (14 with equations) have about 270 symbols-wrong aligned equations per run, enough for a standard error of about 3 points |
+
+The first row is what it takes to tell a +1 point effect from none, so confirming "no effect on the
+primary score" needs at least that many sections, more than the 15 of the registered set. Two
+caveats raise the number: the dev sections are ones the rules were tuned against, so their
+differences are probably smaller and less variable than a fresh set's; and the two recorded model
+runs of one system differ by 0.007 on equations (README), which is as large as the effect on the
+symbols score, so a real comparison needs replicates (two runs on each side) as well as sections.

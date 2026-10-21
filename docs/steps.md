@@ -447,6 +447,26 @@ with a vector product a × that became a · anywhere counts as the swap. Signs i
   subscript before the sign (`→𝐹12 · →𝑑`), `\overrightarrow{AB}`, and inline maths
   that layout cuts at the dot.
 
+## Page math pass and the second reading (equations; `FEATURE_PAGE_MATH`, off)
+
+With the flag on, one cheap-model call per page (`pipeline/page_math.py`, prompt `page_math`) says
+where the page's equations are, quoting the PDF's text layer; the verified spans are laid over
+layout's own decisions (`pipeline/page_math_reconcile.py`, [ADR 0006](decisions/0006-page-math-pass.md)),
+and `Element.page_latex` is the page's reading of each span. The equation step reads the crop as
+always and then compares the two readings as symbol streams (letter weight left out):
+
+- they agree and every check but a note passed: the confidence is lifted to 0.9, so a cheap answer
+  that two readings share is accepted without the main model's second read (`equation.page_reading`);
+- they disagree: the main model reads the crop once (as for an unsure answer); if it reads what the
+  cheap model read, the page pass was the odd one out (`equation.page_reading_overruled`); if it matches
+  neither reading, or the main model read first and the page contradicts it, the fix is a required
+  decision (`equation.page_reading` / `page_reading_mismatch`);
+- layout found the span and the page pass did not: unchanged by default
+  (`PAGE_MATH_UNCONFIRMED_FACTOR` 1.0).
+
+Agreement never overrides a text-layer check. The pass fails open: a page it cannot answer is
+layout's. Measurements: [eval-page-math.md](eval-page-math.md).
+
 ## Course notation (equations)
 
 With `FEATURE_NOTATION_MEMORY` on and a job converted for a course with notation entries

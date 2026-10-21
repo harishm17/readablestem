@@ -469,14 +469,27 @@ def run(
 # -------------------------------------------------------------------- two readings
 
 
+_STYLE_PREFIX = re.compile(r"^[a-z][a-z-]*:(?=.)")
+
+
+def _unstyled(stream: list[str]) -> list[str]:
+    """The stream without the style that letters carry (`bold:d`): the two readings of a span
+    are compared for symbols, and a letter's weight is the text-layer checks' business
+    (`equation.text_layer_style`), where the PDF's own glyphs say what it is. The page pass
+    reads a bold vector as a plain letter often enough that comparing weight made it
+    disagree with a right answer."""
+    return [_STYLE_PREFIX.sub("", atom) for atom in stream]
+
+
 def latex_stream(latex: str) -> list[str] | None:
     """The normalised symbol stream of a LaTeX reading (`eval.equations_symbols`, the
-    stream the eval's secondary scorer compares); None if it does not convert."""
+    stream the eval's secondary scorer compares) without letter styles; None if it does not
+    convert."""
     from readablestem.eval import equations_symbols as symbols
     from readablestem.eval.equations import MathMLError
 
     try:
-        return symbols.symbols_of_latex(latex)
+        return _unstyled(symbols.symbols_of_latex(latex))
     except (MathMLError, ValueError, RecursionError):
         return None
 
@@ -487,6 +500,6 @@ def mathml_stream(mathml: str) -> list[str] | None:
     from readablestem.eval.equations import MathMLError
 
     try:
-        return symbols.symbols_of(mathml)
+        return _unstyled(symbols.symbols_of(mathml))
     except (MathMLError, ValueError, RecursionError):
         return None
