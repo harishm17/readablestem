@@ -548,6 +548,11 @@ Results on the development sets and the scripts that compare runs (`scripts/dev_
 score (`secondary_symbols`) and what the secondary scores say about the held-out run:
 [eval-secondary-metrics.md](eval-secondary-metrics.md).
 
+`--scanned` (document task, development sets) turns every printed page into the image-only PDF
+of a degraded scan before it is converted, adds a prose word error rate and, with
+`FEATURE_IMAGE_PAGES=true`, the image page numbers; `--scan-seed N` picks the degradation. See
+[eval-image-pages.md](eval-image-pages.md).
+
 `--section-workers N` (document task, default 1) converts N sections at once. It shortens a
 live run, which waits on a hosted model, and gives the same items in the same order (a
 budget stop still ends the run at the first section it stopped, in section order, although

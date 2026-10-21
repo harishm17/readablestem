@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Proposed**, behind `FEATURE_IMAGE_PAGES` (default off); measured on the development sets only (docs/eval-image-pages.md) |
+| Status | **Proposed**, behind `FEATURE_IMAGE_PAGES` (default off); measured on the development sets only ([eval-image-pages.md](../eval-image-pages.md)) |
 | Date | 2026-10-21 |
 | Decider | Harish |
 | Revisits | the 2026-10-09 decision in `pipeline/page_type.py` and docs/layout.md ("There is no handwriting or scan conversion": such pages are kept as page images, marked "Not converted") |
@@ -82,7 +82,7 @@ its image exactly as before.
    original page N"), with alt text that says what it is. No script. The notice is also a
    content-free job notice (`image_page_converted`), and the about section for students says
    which pages were converted from images. The wording follows architecture rule 7: it
-   assists, it never says the page is verified.
+   assists, and it never says that the conversion has been checked or is right.
 5. **A second reading for display equations** (`equation_step`, unchanged). The block's
    bounding box is cut from the page and the existing equation step reads the crop; its LaTeX
    is compared with the page reader's as symbol streams (`page_math.latex_stream`, the same
@@ -127,10 +127,34 @@ Report, per model: equations (primary and symbols), headings F1, prose WER, requ
 and optional notes per page, flag precision and recall for equations, wrong inline formulas not
 asked about, cost per page and seconds per page, and how often the fallback fired.
 
-## Result
+## Result on the development material (2026-10-21)
 
-See docs/eval-image-pages.md. (Filled in when the runs are done; this ADR is committed before
-any model was called so that the design, the tiers and the questions above were fixed first.)
+Full numbers, caveats and screenshots in [docs/eval-image-pages.md](../eval-image-pages.md). On 36
+pages of development documents made into synthetic scans (253 answer-key equations), page reader
+`claude-opus-5-5`: equations right end to end 0.593 on the primary score and 0.834 on the symbols
+score, the same as the same pages as typed PDFs (0.593 and 0.830); heading F1 0.961 (typed 0.967),
+the relative level right for 66 % of matched headings (typed 100 %); prose word error rate 3 to 5 %; $0.095 a
+page for the read and $0.106 all in (typed: $0.022); 3.5 required decisions per page (typed 1.4,
+kept as images 0.17). `claude-haiku-5-5` reads for $0.003 a page and ends 12 points lower on the
+symbols score; `claude-sonnet-5-5` is no better than Haiku at 17 times the price. Eight real pages (four
+handwritten, four scanned prints, public domain or CC BY-SA, no answer key): all read but one
+dense numeric table that exceeded the output limit and stayed an image; Opus reads a student's
+handwritten algebra nearly line for line, Haiku misread two section numbers in it with `high`
+confidence. Live spend $9.23 of the $15 cap.
+
+Changes the measurement made to the design, all of them before the final runs: the table cell's
+spans carry no lower bound in the schema (the provider's decoder does not enforce one, and one cell
+with a span of 0 cost Haiku a whole page); a display equation whose crop shows no equation (a
+misplaced box, 26 of Haiku's 116) keeps the page reader's reading as a required proposal instead
+of an unexplained "not an equation"; the page read has its own timeout (180 s) and resolution
+setting. Effort `low` and 200 dpi stay the defaults (neither `medium` nor 150 dpi was measurably
+better on these pages).
+
+**Decision from the numbers: the flag stays off by default.** The evidence is development-set and
+synthetic; the review it asks for (105 decisions for a 30-page scan) is the cost that was not
+measured as time; Opus at about $3.2 for 30 pages exceeds the default job cap. Offering it as an
+opt-in with the main model is supported by the numbers; a held-out measurement on scans decides
+the default.
 
 ## Consequences
 

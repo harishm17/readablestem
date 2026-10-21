@@ -38,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "section", help="a dev-v2 section id, such as chemistry-atoms-first/1-4-measurements"
     )
+    parser.add_argument("--image", action="store_true", help="section is the path of a picture")
     parser.add_argument("--pages", type=int, nargs="+", help="0-based pages to read (default all)")
     parser.add_argument("--model", required=True, help="the page reader (IMAGE_PAGES_MODEL)")
     parser.add_argument("--effort", default=None, help="thinking effort of the page reader")
