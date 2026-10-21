@@ -76,6 +76,16 @@ def test_two_readings_that_agree_lift_a_cheap_answer_over_the_bar_without_a_seco
     assert page_checks(fix) == {equation_step.PAGE_READING: True}
 
 
+def test_agreement_does_not_lift_when_the_setting_is_off():
+    """Without the lift the cheap answer keeps the confidence it had; the agreement is still
+    recorded as a check."""
+    client = by_model(cheap=out("x = 5", 0.8))
+    settings = make_settings(page_math_agreement_lift=False)
+    fix = transcribe(element(page_latex="x=5"), PNG, client=client, settings=settings)
+    assert fix.confidence == pytest.approx(0.8)
+    assert page_checks(fix) == {equation_step.PAGE_READING: True}
+
+
 def test_agreement_is_by_symbols_not_by_spelling():
     client = by_model(cheap=out(r"v_{\text{avg}} = \frac{d}{t}", 0.8))
     fix = run(client, element(page_latex=r"v_{avg}=\frac{d}{t}", text="vavg = d t"))

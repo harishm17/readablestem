@@ -1,0 +1,318 @@
+{
+ "a": "fresh-off",
+ "b": "fresh-on",
+ "metrics": {
+  "exact_lenient (primary)": {
+   "a": 0.5931372549019608,
+   "b": 0.6100217864923747,
+   "diff": 0.01688453159041392,
+   "low": 0.0049896475705306035,
+   "high": 0.03017469638044213,
+   "p": 0.02685546875
+  },
+  "symbols, credited (secondary)": {
+   "a": 0.6187363834422658,
+   "b": 0.6465141612200436,
+   "diff": 0.02777777777777779,
+   "low": 0.012974519485776177,
+   "high": 0.04619912767130402,
+   "p": 0.00279
+  },
+  "detection recall": {
+   "a": 0.829520697167756,
+   "b": 0.8376906318082789,
+   "diff": 0.008169934640522847,
+   "low": 0.0021551144166882565,
+   "high": 0.015242364425150328,
+   "p": 0.01318359375
+  },
+  "detection precision": {
+   "a": 0.8277173913043478,
+   "b": 0.843664289632474,
+   "diff": 0.015946898328126125,
+   "low": -0.0049854649918780565,
+   "high": 0.03564187276781846,
+   "p": 0.510185
+  },
+  "wrong, not asked, per 100 gold": {
+   "a": 13.83442265795207,
+   "b": 14.978213507625272,
+   "diff": 1.143790849673202,
+   "low": -0.42757124619163983,
+   "high": 3.3637612492067626,
+   "p": 0.267578125
+  },
+  "cost per PDF page (USD)": {
+   "a": 0.02869111279069768,
+   "b": 0.030170225116279075,
+   "diff": 0.0014791123255813964,
+   "low": 0.0002725789973552731,
+   "high": 0.0027399052101190475,
+   "p": 0.04089
+  },
+  "flag recall (symbols-wrong aligned equations that were a decision)": {
+   "a": 0.4332493702770781,
+   "b": 0.3684210526315789,
+   "diff": -0.06482831764549918,
+   "low": -0.14408806804991758,
+   "high": -0.01933713271468542,
+   "p": 0.329376220703125
+  },
+  "flag precision (decisions on aligned equations that were symbols-wrong)": {
+   "a": 0.669260700389105,
+   "b": 0.6129032258064516,
+   "diff": -0.05635747458265339,
+   "low": -0.13194006996595012,
+   "high": 0.0002821745285335364,
+   "p": 0.1092529296875
+  },
+  "required decisions per PDF page, all kinds": {
+   "a": 6.116279069767442,
+   "b": 5.244186046511628,
+   "diff": -0.8720930232558137,
+   "low": -1.2891566265060241,
+   "high": -0.48809523809523814,
+   "p": 0.000555
+  },
+  "  of which on an aligned equation": {
+   "a": 2.988372093023256,
+   "b": 2.5232558139534884,
+   "diff": -0.4651162790697674,
+   "low": -0.8048780487804876,
+   "high": -0.1744186046511631,
+   "p": 0.009735107421875
+  }
+ },
+ "buckets": {
+  "bucket correct": {
+   "a": 0.5931372549019608,
+   "b": 0.6100217864923747
+  },
+  "bucket scorer": {
+   "a": 0.020152505446623094,
+   "b": 0.03104575163398693
+  },
+  "bucket span": {
+   "a": 0.08278867102396514,
+   "b": 0.06753812636165578
+  },
+  "bucket recognition": {
+   "a": 0.12418300653594772,
+   "b": 0.12309368191721133
+  },
+  "bucket no_proposal": {
+   "a": 0.009259259259259259,
+   "b": 0.005991285403050109
+  },
+  "bucket undetected": {
+   "a": 0.170479302832244,
+   "b": 0.16230936819172112
+  },
+  "  of which credited split/merged": {
+   "a": 0.0016339869281045752,
+   "b": 0.0016339869281045752
+  }
+ },
+ "breakdown": {
+  "A": {
+   "undetected": {
+    "single symbol in running text": 78,
+    "display equation": 16,
+    "longer inline expression": 45,
+    "2 or 3 symbols in running text": 34,
+    "typed in a figure": 112,
+    "typed in a table": 28
+   },
+   "span": {
+    "cut too long (extra symbols)": 92,
+    "cut too short": 58,
+    "both": 2
+   }
+  },
+  "B": {
+   "undetected": {
+    "single symbol in running text": 77,
+    "longer inline expression": 38,
+    "2 or 3 symbols in running text": 28,
+    "typed in a figure": 115,
+    "typed in a table": 29,
+    "display equation": 11
+   },
+   "span": {
+    "cut too long (extra symbols)": 91,
+    "cut too short": 33
+   }
+  }
+ },
+ "transitions": {
+  "helped": 50,
+  "hurt": 19,
+  "exact_a": 1089,
+  "exact_b": 1120
+ },
+ "flows": {
+  "helped: undetected -> correct": 15,
+  "helped: span -> correct": 23,
+  "helped: scorer -> correct": 1,
+  "helped: recognition -> correct": 7,
+  "helped: no_proposal -> correct": 4,
+  "hurt: correct -> scorer": 3,
+  "hurt: correct -> span": 10,
+  "hurt: correct -> undetected": 2,
+  "hurt: correct -> recognition": 4
+ },
+ "helped": [
+  {
+   "id": "arxiv/2212.05955/eq-023",
+   "flow": "span -> correct",
+   "page": 20,
+   "typed_in": "text",
+   "gold": "\\mu : \\mathbb{R}^d \\to \\mathbb{R}^d",
+   "a": "\\mathbb{R}^{d} \\rightarrow \\mathbb{R}^{d}",
+   "b": "\\mu : \\mathbb{R}^{d} \\rightarrow \\mathbb{R}^{d}",
+   "b_text": "\u00b5 : \u211dd \u2192\u211dd"
+  },
+  {
+   "id": "arxiv/2504.19306/eq-017",
+   "flow": "undetected -> correct",
+   "page": 2,
+   "typed_in": "text",
+   "gold": "\\breve{{\\bf D}}^{-1}",
+   "a": null,
+   "b": "\\breve{\\mathbf{D}}^{-1}",
+   "b_text": "\u02d8\ud835\udc03\u22121"
+  },
+  {
+   "id": "arxiv/2504.19306/eq-023",
+   "flow": "recognition -> correct",
+   "page": 2,
+   "typed_in": "text",
+   "gold": "\\max_{1 \\leq k \\leq n} \\|\\breve{\\mathbf{C}}_0(k)\\|^2",
+   "a": "\\max_{1\\leq k\\leq n} \\left\\|\\bar{\\mathbf{C}}_0(k)\\right\\|^2",
+   "b": "\\max_{1\\leq k\\leq n}\\|\\breve{\\mathbf{C}}_0(k)\\|^2",
+   "b_text": "max1\u2264k\u2264n \u2225\u02d8\ud835\udc020(k)\u22252"
+  },
+  {
+   "id": "arxiv/2407.08602/eq-003",
+   "flow": "no_proposal -> correct",
+   "page": 6,
+   "typed_in": "text",
+   "gold": "D",
+   "a": null,
+   "b": "D",
+   "b_text": "D"
+  },
+  {
+   "id": "arxiv/2210.13562/eq-076",
+   "flow": "scorer -> correct",
+   "page": 27,
+   "typed_in": "text",
+   "gold": "H = \\begin{pmatrix} 1,& 0 & \\ldots, & 0 \\end{pmatrix}",
+   "a": "H = \\begin{pmatrix} 1, & 0 & \\dots, & 0 \\end{pmatrix}",
+   "b": "H = \\begin{pmatrix} 1, & 0 & \\ldots, & 0 \\end{pmatrix}",
+   "b_text": "H = 1, 0 . . . , 0 \ufffd \ufffd"
+  },
+  {
+   "id": "arxiv/2410.04138/eq-210",
+   "flow": "span -> correct",
+   "page": 11,
+   "typed_in": "text",
+   "gold": "\\overline{\\hat{d}_r(r)}",
+   "a": "\\hat{d}_r(r)",
+   "b": "\\overline{\\hat{d}_r(r)}",
+   "b_text": "\u02c6dr(r)"
+  },
+  {
+   "id": "arxiv/2502.04553/eq-026",
+   "flow": "undetected -> correct",
+   "page": 11,
+   "typed_in": "text",
+   "gold": "10^{-8}",
+   "a": null,
+   "b": "10^{-8}",
+   "b_text": "10\u22128"
+  },
+  {
+   "id": "arxiv/2411.04352/eq-014",
+   "flow": "recognition -> correct",
+   "page": 16,
+   "typed_in": "text",
+   "gold": "\\bm{r}_0",
+   "a": "\\mathbf{r}_0",
+   "b": "\\boldsymbol{r}_0",
+   "b_text": "\ud835\udc2b0"
+  },
+  {
+   "id": "arxiv/2407.08602/eq-005",
+   "flow": "no_proposal -> correct",
+   "page": 6,
+   "typed_in": "text",
+   "gold": "M",
+   "a": null,
+   "b": "M",
+   "b_text": "M"
+  },
+  {
+   "id": "arxiv/2501.00140/eq-000",
+   "flow": "span -> correct",
+   "page": 9,
+   "typed_in": "text",
+   "gold": "H\\in \\mathbb L[0,\\infty)",
+   "a": "H \\in \\mathbb{L}[0,\\infty) \\ \\textit{and let } A \\textit{ be a}",
+   "b": "H \\in \\mathbb{L}[0, \\infty)",
+   "b_text": "H \u2208\ud835\udd43[0, \u221e)"
+  }
+ ],
+ "hurt": [
+  {
+   "id": "arxiv/2406.19702/eq-098",
+   "flow": "correct -> span",
+   "page": 17,
+   "typed_in": "text",
+   "gold": "_d(p,p)",
+   "a": "{}_{d}(p,p)",
+   "b": "\\text{VARMA}_{d}(p,p)",
+   "b_text": "VARMAd(p, p)"
+  },
+  {
+   "id": "arxiv/2411.07613/eq-008",
+   "flow": "correct -> recognition",
+   "page": 5,
+   "typed_in": "text",
+   "gold": "\\frac{d}{dt} \\Sigma(t) = D - (A \\Sigma(t) + \\Sigma(t) A^{\\intercal}).",
+   "a": "\\frac{d}{dt}\\Sigma(t) = D - (A\\Sigma(t) + \\Sigma(t)A^{\\intercal}).",
+   "b": "\\frac{d}{dt}\\Sigma(t) = D - (A\\Sigma(t) + \\Sigma(t)A^{\\mathsf{T}}).",
+   "b_text": "dt\u03a3(t) = D \u2212(A\u03a3(t) + \u03a3(t)A\u22ba) d"
+  },
+  {
+   "id": "arxiv/2411.07613/eq-117",
+   "flow": "correct -> scorer",
+   "page": 18,
+   "typed_in": "text",
+   "gold": "\\| D^{1/2} M \\Sigma_*^{1/2}\\|_{\\text{Fro}} = 1",
+   "a": "\\|D^{1/2}M\\Sigma_*^{1/2}\\|_{\\text{Fro}} = 1",
+   "b": "\\left\\|D^{1/2}M\\Sigma_{*}^{1/2}\\right\\|_{\\text{Fro}} = 1",
+   "b_text": "\u2225D1/2M\u03a3\u22171/2\u2225Fro = 1"
+  },
+  {
+   "id": "arxiv/2309.01229/eq-016",
+   "flow": "correct -> undetected",
+   "page": 5,
+   "typed_in": "figure",
+   "gold": "H_x",
+   "a": "H_x",
+   "b": null,
+   "b_text": null
+  },
+  {
+   "id": "arxiv/2307.16839/eq-049",
+   "flow": "correct -> span",
+   "page": 20,
+   "typed_in": "text",
+   "gold": "\\Omega_{12}^2\\ll\\Gamma_3(\\Gamma_2 + \\Gamma_3)",
+   "a": "\\Omega_{12}^2 \\ll \\Gamma_3(\\Gamma_2+\\Gamma_3)",
+   "b": "(\\Omega_{12}^2 \\ll \\Gamma_3(\\Gamma_2+\\Gamma_3))",
+   "b_text": "\u2126122 \u226a\u03933(\u03932+\u03933)"
+  }
+ ]
+}
