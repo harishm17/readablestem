@@ -72,15 +72,17 @@ mathematics is. Layout's rules stay as the fallback and as the check.
 4. **Two readings** (`equation_step`, `page_math_reconcile.compare`). The crop of every
    reconciled span goes through the existing equation step unchanged. Its LaTeX is compared
    with the page pass's LaTeX as normalised symbol streams (`eval.equations_symbols`, the
-   same normalisation the eval's secondary scorer uses). If they agree, the fix may be
+   same normalisation the eval's secondary scorer uses, with the weight of letters left out:
+   the page pass reads a bold vector as a plain letter and the text-layer style check owns
+   that question). If they agree, the fix may be
    accepted when its existing checks pass too (agreement never overrides a failed text-layer
    check). If they disagree, the main model reads the crop once more, as escalation works
    today; if its answer matches neither reading the fix is a required review flag. A
    layout-only span gets its confidence multiplied by `PAGE_MATH_UNCONFIRMED_FACTOR`. The
    design proposed 0.9; on the development set that sent 16 equations to a person for being
    unconfirmed and 14 of them were right, so the default is 1.0 (the mechanism stays, off).
-5. **Cost.** One haiku call per page (about $0.001 to $0.003 with the image and the text
-   layer), plus the main-model escalations that disagreements cause. Target for the whole
+5. **Cost.** One haiku call per page (measured $0.0016 to $0.0020 at effort medium with the
+   image and the text layer), plus the main-model escalations that disagreements cause. Target for the whole
    pipeline: at most about $0.017 per page on the development sets. Page-pass calls are
    recorded like every model call (`DocumentStats`, the eval's `--answers` recording), count
    against the job's dollar caps and its call cap (one call per page).
@@ -100,6 +102,20 @@ detection recall and precision, span fidelity, unflagged wrong per 100, review l
 equations, cost per page, and a bucket breakdown (spans, recognition, scorer). Flag precision
 and recall are measured on dev: of the equations the new rules send to a person, how many
 were wrong, and of the wrong ones, how many were sent.
+
+## Result on the development sets (2026-10-21)
+
+Measured on 114 dev-v2 pages and the original development set, flag off against on
+(docs/eval-page-math.md): the primary `exact_lenient` does not move (0.486 to 0.482, interval
+-1.9 to +0.9 points), the symbols-correct score by +0.5 points, detection precision falls by
+about 8 points (the pass places inline pieces the answer key does not count); the share of
+symbols-wrong equations that reach a person goes from 41% to 58%, the wrong ones nobody is asked
+about fall from 4.8 to 3.5 per 100 gold, at about the same decisions per page and $0.0016 more
+per page. The gain is the second reading, not the spans: at this commit layout's rules already
+cut the exercise numbers and systems the pass was meant to fix, and the pass cannot anchor what
+the text layer does not hold in order (nested fractions, stacked nuclides, brace paths). It stays
+off; a fresh held-out set (about 17 sections or more, paired) decides whether to turn it on for
+the review screen alone.
 
 ## Consequences
 
