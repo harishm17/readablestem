@@ -220,7 +220,9 @@ def result_outcome(result: DocumentResult) -> tuple[JobStatus, str | None]:
     Nothing to convert is a failure: the upload probe's own code when every analysed page
     is certainly handwritten or scanned (`page_type.refusal_code` on the stored page
     types; for a result without them, "scanned" when every page was only a picture of a
-    page), "no_content" when the result has no elements at all. Otherwise the job is
+    page; not when the image page pass ran, `result.image_pages`: such a PDF was let in to
+    be read, and the pages it could not read are kept as images), "no_content" when the
+    result has no elements at all. Otherwise the job is
     done, with a code when it is incomplete: the spend cap that stopped model work
     ("budget_<scope>"), else "pages_not_converted" when pages or handwriting were kept as
     images. A page the probe could not be sure of (a full-page picture with a short
@@ -231,7 +233,9 @@ def result_outcome(result: DocumentResult) -> tuple[JobStatus, str | None]:
     analysed = {page.page for page in result.stats.per_page}
     image_only = set(result.image_only_pages)
     typed = {t.page for t in result.page_types}
-    if result.page_types and analysed <= typed:
+    if result.image_pages is not None:
+        pass  # scans were let in and read (ADR 0007): whatever stayed an image is a decision
+    elif result.page_types and analysed <= typed:
         refused = refusal_code([t for t in result.page_types if t.page in analysed])
         if refused is not None and refused != "no_content":
             return JobStatus.FAILED, refused

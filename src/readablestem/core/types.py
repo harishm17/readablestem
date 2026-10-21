@@ -107,14 +107,13 @@ def default_review(status: Status | str | None) -> Review:
 
 # `Element.reasons` of what was read from an image of a scanned or handwritten page (ADR 0007,
 # `pipeline.image_page`): every element of such a page, the figure that stands for the whole
-# page's picture (the output's "show the original" toggle), an equation whose box could not be
+# page's picture (the output's "show the original" toggle: a figure element with no fix, which
+# the steps leave alone, since there is nothing to decide), an equation whose box could not be
 # used, and an inline equation (it has no region of its own, so no crop is made for it).
 IMAGE_PAGE_REASON = "image page"
 IMAGE_PAGE_ORIGINAL_REASON = "image page original"
 IMAGE_PAGE_NO_BOX_REASON = "image page box unusable"
 IMAGE_PAGE_NO_CROP_REASON = "image page inline"
-# `Fix.reason` of the original-page figure's fix: there is nothing to decide about it.
-IMAGE_PAGE_ORIGINAL_FIX_REASON = "image_page_original"
 
 # `Fix.reason` of a heading fix that is not a heading: its text is the same as the heading
 # directly above it (a box title repeated under the section's own heading), so it is

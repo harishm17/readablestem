@@ -22,6 +22,9 @@ Besides counting pages it refuses, before any quota is spent:
   is read first and the check stops at the first typed page, so only such documents
   pay for the drawings and the handwriting analysis, which has a time budget
   (`page_type.INK_BUDGET_S`): a page not analysed in time never refuses the upload.
+  With `image_pages` after the page limit (`python -m readablestem.web.pdf_probe MAX_PAGES
+  image_pages`, `FEATURE_IMAGE_PAGES` on) a document of scanned or handwritten pages is
+  accepted: the conversion reads them from an image of the page (ADR 0007).
 
 The review screen uses the same child, with the same memory cap, for two more things
 (`web.page_images` is the caller):
@@ -91,8 +94,15 @@ def looks_like_pdf(data: bytes) -> bool:
     return PDF_MAGIC in data[:MAGIC_WINDOW]
 
 
-def probe(data: bytes, *, max_pages: int) -> int:
-    """Return the page count or raise ProbeRejected (in-process; see module docstring)."""
+# What `document_refusal` says of a document whose every page is a scan or handwriting: with
+# `FEATURE_IMAGE_PAGES` on, the conversion reads such pages from an image of the page
+# (ADR 0007), so these are let through. A blank document is still refused.
+IMAGE_PAGE_REFUSALS = frozenset({"scanned", "scanned_ocr", "handwritten", "handwritten_no_text"})
+
+
+def probe(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> int:
+    """Return the page count or raise ProbeRejected (in-process; see module docstring).
+    `allow_image_pages`: a document of scanned or handwritten pages is accepted."""
     if not data:
         raise ProbeRejected("empty")
     if not looks_like_pdf(data):
@@ -117,13 +127,13 @@ def probe(data: bytes, *, max_pages: int) -> int:
             raise ProbeRejected("damaged" if doc.is_repaired else "no_pages")
         if pages > max_pages:
             raise ProbeRejected("too_many_pages", pages=pages)
-        _check_pages(doc)
+        _check_pages(doc, allow_image_pages=allow_image_pages)
     finally:
         doc.close()
     return pages
 
 
-def _check_pages(doc: pymupdf.Document) -> None:
+def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> None:
     """Refuse oversized pages and documents with nothing to convert (module docstring)."""
     from readablestem.pipeline.page_type import document_refusal
 
@@ -136,7 +146,7 @@ def _check_pages(doc: pymupdf.Document) -> None:
         raise
     except Exception:  # a page MuPDF cannot read would fail the conversion as well
         raise ProbeRejected("unreadable") from None
-    if reason is not None:
+    if reason is not None and not (allow_image_pages and reason in IMAGE_PAGE_REFUSALS):
         raise ProbeRejected(reason)
 
 
@@ -481,9 +491,13 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(json.dumps({"ok": True, "sizes": sizes}) + "\n")
         return 0
     max_pages = int(args[0]) if args else 1
+    images = len(args) > 1 and args[1] == "image_pages"
     data = sys.stdin.buffer.read()
     try:
-        answer: dict[str, object] = {"ok": True, "pages": probe(data, max_pages=max_pages)}
+        answer: dict[str, object] = {
+            "ok": True,
+            "pages": probe(data, max_pages=max_pages, allow_image_pages=images),
+        }
     except ProbeRejected as exc:
         answer = {"ok": False, "code": exc.code}
         if exc.pages is not None:

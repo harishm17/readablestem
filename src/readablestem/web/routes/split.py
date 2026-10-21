@@ -337,6 +337,8 @@ class Panel:
     suggestion: Suggestion | None = None
     region_url: str | None = None  # the item with the page around it
     region_alt: str = ""
+    # Text read from an image of a page: the page tools with this paragraph open to change.
+    change_href: str | None = None
     show_on_page: str | None = None
     prev_href: str | None = None
     prev_label: str = ""
@@ -792,6 +794,13 @@ class SplitBuilder:
         elif fix.kind is Kind.HEADING and element is not None:
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
             panel.region_alt = f"{item.label} in the PDF, with the lines around it."
+        elif fix.kind is Kind.PARAGRAPH and element is not None:
+            panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
+            panel.region_alt = f"{item.label} in the PDF, as it is on the page."
+            if page:
+                panel.change_href = review_url(
+                    self.job_id, page=page, anchor="page-tools", tools=True, change=element.id
+                )
         elif fix.kind is Kind.TABLE:
             if element is not None:
                 panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"

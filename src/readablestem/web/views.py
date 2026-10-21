@@ -58,7 +58,7 @@ KIND_LABELS = {
     Kind.FIGURE: "Figure",
     Kind.TABLE: "Table",
     Kind.HEADING: "Heading",
-    Kind.PARAGRAPH: "Paragraph",
+    Kind.PARAGRAPH: "Text",  # (a fix of this kind: text read from an image of a page)
     Kind.LIST_ITEM: "List item",
 }
 
@@ -263,6 +263,7 @@ DECISION_NOUNS = {
     Kind.FIGURE: ("figure", "figures"),
     Kind.TABLE: ("table", "tables"),
     Kind.HEADING: ("heading", "headings"),
+    Kind.PARAGRAPH: ("piece of text", "pieces of text"),
 }
 
 

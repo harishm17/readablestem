@@ -194,7 +194,9 @@ def _start_parts(
                 )
                 out.status = 413
                 break
-            pages = inspect_pdf_isolated(cut, max_pages=s.max_pages_per_job)
+            pages = inspect_pdf_isolated(
+                cut, max_pages=s.max_pages_per_job, allow_image_pages=s.feature_image_pages
+            )
             filename = part_filename(name, part.label)
             job_id = store_job(
                 ctx.factory,

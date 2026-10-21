@@ -211,9 +211,7 @@ def test_ids_orders_and_the_original_page_come_in_reading_order():
     original = built.elements[0]
     assert original.kind is Kind.FIGURE and IMAGE_PAGE_ORIGINAL_REASON in original.reasons
     assert original.bbox == BOX
-    fix = built.fixes[original.id]
-    assert (fix.status, fix.review, fix.reason) == (Status.ACCEPTED, "none", "image_page_original")
-    assert not fix.optional_note
+    assert original.id not in built.fixes  # nothing to decide about it
 
 
 # ------------------------------------------------------------------------- equations

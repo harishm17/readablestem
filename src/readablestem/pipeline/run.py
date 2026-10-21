@@ -779,7 +779,8 @@ class _Run:
         scanned page) as done."""
         self.eq_scale = equation_scale.scaler(elements)
         for kind, stage in _STAGE_OF.items():
-            members = [e.id for e in elements if e.kind is kind]
+            # (a converted page's own picture is cropped, not sent anywhere)
+            members = [e.id for e in elements if e.kind is kind and not image_page.is_original(e)]
             self.stage_totals[kind] = len(members)
             self.stage_done[kind] = {i for i in members if i in self.fixes}
             if members:
@@ -799,7 +800,11 @@ class _Run:
         work = [
             e
             for e in elements
-            if (e.kind in _MODEL_KINDS or image_page.wants_crop(e, self.fixes))
+            if (
+                e.kind in _MODEL_KINDS
+                or image_page.is_original(e)
+                or image_page.wants_crop(e, self.fixes)
+            )
             and not image_page.no_crop(e, self.fixes)
         ]
         with _span(self.tracer, "page", page=page, elements=len(elements), tasks=len(work)):
@@ -829,7 +834,8 @@ class _Run:
             png = layout.crop(self.pdf_bytes, element)
         except Exception as exc:
             log.warning("crop failed: %s", type(exc).__name__)
-            if element.kind in _MODEL_KINDS:  # (a prose block's crop is only a convenience)
+            # (a prose block's crop, and a converted page's picture, are only conveniences)
+            if element.kind in _MODEL_KINDS and not image_page.is_original(element):
                 self.fixes[element.id] = _failed(element, "crop_error")
                 self.step_done(element)
             return
@@ -837,8 +843,8 @@ class _Run:
         # sharp for that size (T3-15); the model is sent the same crop as ever, and the
         # review screen shows this one. Any other crop is as it was.
         self.crops[element.id] = self.sharp_equation(element) or png
-        if element.id in self.fixes:  # decided before any model work: a scanned page
-            return
+        if element.id in self.fixes or image_page.is_original(element):
+            return  # decided before any model work: a scanned page, a converted page's picture
         if self.stop.scope is not None:  # still cropped: the output shows the original
             self.fixes[element.id] = _failed(element, self.stop.reason())
             self.step_done(element)

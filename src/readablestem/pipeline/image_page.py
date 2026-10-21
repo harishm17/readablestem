@@ -97,7 +97,6 @@ IMAGE_PAGE_REASON = types.IMAGE_PAGE_REASON
 ORIGINAL_REASON = types.IMAGE_PAGE_ORIGINAL_REASON
 NO_BOX_REASON = types.IMAGE_PAGE_NO_BOX_REASON
 NO_CROP_REASON = types.IMAGE_PAGE_NO_CROP_REASON
-ORIGINAL_FIX_REASON = types.IMAGE_PAGE_ORIGINAL_FIX_REASON
 # Kept-page reasons (`page_type`) the pass reads. `unread_page` (a page with some typed text)
 # and handwriting on a typed page are not scans or notebooks and stay as they were.
 READ_REASONS = frozenset({"scanned_page", "handwritten_page"})
@@ -744,7 +743,8 @@ def _add_figure(block: Block, builder: _Builder) -> None:
 
 def _original_figure(builder: _Builder) -> Element:
     """The figure for the whole page, the original behind the conversion (the output's "show
-    the original page" toggle). Read first in the page, no decision."""
+    the original page" toggle). First in the page. It has no fix: there is nothing to decide
+    about it, and the steps leave it alone (`is_original`)."""
     element_id = builder.new_id()
     element = Element(
         id=element_id,
@@ -754,21 +754,7 @@ def _original_figure(builder: _Builder) -> Element:
         order=0,
         reasons=[ORIGINAL_REASON],
     )
-    builder.fixes[element_id] = Fix(
-        element_id=element_id,
-        kind=Kind.FIGURE,
-        status=Status.ACCEPTED,
-        confidence=1.0,
-        figure=FigureFix(figure_type="other", alt=original_alt(builder.page)),
-        reason=ORIGINAL_FIX_REASON,
-        review="none",
-    )
     return element
-
-
-def original_alt(page: int) -> str:
-    """Alt text of the original page's picture ("the page" is 0-based here)."""
-    return f"Original image of page {page + 1}, for comparison with the converted text above."
 
 
 def build(page: int, output: ImagePageOutput, *, box: BBox, png: bytes | None) -> Built | None:
@@ -842,6 +828,11 @@ def tier_headings(fixes: Sequence[Fix], elements: Sequence[Element]) -> None:
 
 
 # ------------------------------------------------------------------------------ pages
+
+
+def is_original(element: Element) -> bool:
+    """The figure that stands for a converted page's own picture."""
+    return ORIGINAL_REASON in element.reasons
 
 
 def wants_crop(element: Element, fixes: Mapping[str, Fix]) -> bool:

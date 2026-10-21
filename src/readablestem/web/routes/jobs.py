@@ -681,6 +681,7 @@ def _place_files(
                 data,
                 max_pages=s.source_page_limit,
                 timeout_s=min(INSPECT_TIMEOUT_S, remaining),
+                allow_image_pages=s.feature_image_pages,
             )
             if len(data) > s.upload_limit_bytes:  # the PDF made from a Word file can be big
                 raise UploadRejected("too_large")
