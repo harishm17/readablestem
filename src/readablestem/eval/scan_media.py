@@ -49,7 +49,9 @@ class ScannedMedia:
         self.degradations[f"{first['book_slug']}/{first['page_slug']}"] = made
         return scanned
 
-    def gold_words(self, page_records: list[dict]) -> list[str] | None:
+    def gold_words(
+        self, page_records: list[dict], *, include_math: bool = True
+    ) -> list[str] | None:
         """The words of the page as printed, mathematics out (the prose answer key); None
         for an authored document, which has no printable page to take them from."""
         inner = self._inner
@@ -59,7 +61,9 @@ class ScannedMedia:
         source = render.page_source_from_records(
             page_records, inner.fetcher, authors=render.book_authors(inner.gold_dir, book)
         )
-        return prose_wer.gold_words(render.printable_html(source, lambda _url: ""))
+        return prose_wer.gold_words(
+            render.printable_html(source, lambda _url: ""), include_math=include_math
+        )
 
     def close(self) -> None:
         self._inner.close()

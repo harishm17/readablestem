@@ -1773,6 +1773,9 @@ def _scan_metrics(items: Sequence[dict], gold_equations: int) -> dict:
     prose = [i["prose"] for i in items if "prose" in i]
     if prose:
         out["prose_wer"] = prose_wer.pooled(prose)
+        out["prose_only_wer"] = prose_wer.pooled(
+            [i["prose_only"] for i in items if "prose_only" in i]
+        )
     if pages := image_pages_eval.metrics(items, gold_equations):
         out["image_pages"] = pages
     return out
@@ -1996,6 +1999,12 @@ def _document_section(
     if gold_words is not None and (answer_key := gold_words(page)) is not None:
         # scanned inputs: the prose answer key is the page's own text, mathematics out
         item["prose"] = prose_wer.score(answer_key, prose_wer.predicted_words(result)).as_dict()
+        # ... and the words of the prose alone (formulas out of both sides; three letters up)
+        prose_key = gold_words(page, include_math=False) or []
+        item["prose_only"] = prose_wer.score(
+            prose_wer.prose_only(prose_key),
+            prose_wer.prose_only(prose_wer.predicted_words(result, include_math=False)),
+        ).as_dict()
     item["verifier"] = vm.page_summary(result.fixes)
     item["verifier_cost_usd"] = sum(f.verifier_cost_usd for f in result.fixes)
     item["verifier_requests"] = sum(vm.requests_sent(f) for f in result.fixes)

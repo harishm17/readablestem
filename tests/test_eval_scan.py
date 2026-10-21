@@ -11,6 +11,7 @@ from readablestem.core.types import (
     DocumentResult,
     DocumentStats,
     Element,
+    EquationFix,
     Fix,
     HeadingFix,
     Kind,
@@ -112,23 +113,24 @@ def test_words_fold_case_ligatures_quotes_and_punctuation():
     ]
 
 
-def test_gold_words_leave_out_the_mathematics_and_the_markup():
+def test_gold_words_keep_or_leave_out_the_mathematics_and_always_the_markup_and_footer():
     html = (
         "<html><head><title>T</title><style>p{}</style></head><body><main>"
-        "<h2>Speed</h2><p>The speed <math><mi>v</mi><mo>=</mo><mn>5</mn></math> is "
+        "<h2>Speed</h2><p>The speed <math><semantics><mi>v</mi><mo>=</mo><mn>5</mn>"
+        "<annotation>v=5</annotation></semantics></math> is 10<sup>3</sup> "
         "<b>constant</b>.</p><ul><li>one</li><li>two</li></ul>"
-        "<table><tr><td>a</td><td>b</td></tr></table></main></body></html>"
+        "<table><tr><td>a</td><td>b</td></tr></table></main>"
+        "<footer><p>Access for free</p></footer></body></html>"
     )
     assert prose_wer.gold_words(html) == [
+        "speed", "the", "speed", "v", "5", "is", "10", "3", "constant", "one", "two", "a", "b",
+    ]  # fmt: skip
+    assert prose_wer.gold_words(html, include_math=False) == [
+        "speed", "the", "speed", "is", "10", "constant", "one", "two", "a", "b",
+    ]  # fmt: skip
+    assert prose_wer.prose_only(["speed", "is", "10", "3", "kg", "constant"]) == [
         "speed",
-        "the",
-        "speed",
-        "is",
         "constant",
-        "one",
-        "two",
-        "a",
-        "b",
     ]
 
 
@@ -179,9 +181,9 @@ def element(eid: str, kind: Kind, order: int, **kw) -> Element:
     return Element(id=eid, kind=kind, page=0, bbox=(0, 0, 1, 1), order=order, **kw)
 
 
-def test_the_predicted_words_are_the_prose_in_reading_order():
+def test_the_predicted_words_are_the_prose_in_reading_order_with_or_without_formulas():
     elements = [
-        element("p1-e1", Kind.PARAGRAPH, 2, text="The speed ⟦p1-e9⟧ is constant."),
+        element("p1-e1", Kind.PARAGRAPH, 2, text="The speed \u27e6p1-e9\u27e7 is constant."),
         element("p1-e0", Kind.HEADING, 1, text="Old heading"),
         element("p1-e2", Kind.FIGURE, 3, caption="Figure 1 A cart"),
         element("p1-e3", Kind.TABLE, 4, caption="Table 1 Speeds"),
@@ -191,12 +193,20 @@ def test_the_predicted_words_are_the_prose_in_reading_order():
             5,
             text="Access for free at openstax.org. Physics (OpenStax), CC BY 4.0. Page 3 of 14",
         ),
-        element("p1-e9", Kind.EQUATION, 6, display="inline"),
+        element("p1-e9", Kind.EQUATION, 6, display="inline", parent_id="p1-e1"),
+        element("p1-e8", Kind.EQUATION, 7, display="block"),
     ]
     grid = TableGrid(
         rows=1,
         cols=2,
-        cells=[TableCell(row=0, col=0, text="t"), TableCell(row=0, col=1, text="9", latex="9")],
+        cells=[
+            TableCell(row=0, col=0, text="t"),
+            TableCell(row=0, col=1, text="9", latex="9", mathml="<math><mn>9</mn></math>"),
+        ],
+    )
+    inline = EquationFix(latex="v", mathml="<math><mi>v</mi></math>", speech="v", display="inline")
+    block = EquationFix(
+        latex="a=b", mathml="<math><mi>a</mi><mo>=</mo><mi>b</mi></math>", speech=""
     )
     fixes = [
         Fix(
@@ -211,6 +221,8 @@ def test_the_predicted_words_are_the_prose_in_reading_order():
             status=Status.NEEDS_REVIEW,
             table=TableFix(grid=grid),
         ),
+        Fix(element_id="p1-e9", kind=Kind.EQUATION, status=Status.ACCEPTED, equation=inline),
+        Fix(element_id="p1-e8", kind=Kind.EQUATION, status=Status.ACCEPTED, equation=block),
     ]
     result = DocumentResult(
         pipeline_version="t",
@@ -219,17 +231,10 @@ def test_the_predicted_words_are_the_prose_in_reading_order():
         stats=DocumentStats(pages=1, cost_usd=0, latency_ms=0, model_calls=0),
     )
     assert prose_wer.predicted_words(result) == [
-        "motion",
-        "the",
-        "speed",
-        "is",
-        "constant",
-        "figure",
-        "1",
-        "a",
-        "cart",
-        "t",
-        "table",
-        "1",
-        "speeds",
-    ]
+        "motion", "the", "speed", "v", "is", "constant", "figure", "1", "a", "cart",
+        "t", "9", "table", "1", "speeds", "a", "b",
+    ]  # fmt: skip
+    assert prose_wer.predicted_words(result, include_math=False) == [
+        "motion", "the", "speed", "is", "constant", "figure", "1", "a", "cart", "t", "table",
+        "1", "speeds",
+    ]  # fmt: skip

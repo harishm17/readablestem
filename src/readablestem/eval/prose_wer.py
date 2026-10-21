@@ -31,6 +31,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from html.parser import HTMLParser
 
+import defusedxml.ElementTree as DET
+
 from readablestem.core.types import INLINE_MARKER_RE, DocumentResult, Kind
 
 _WORD = re.compile(r"[^\W_]+(?:['\u2019][^\W_]+)*", re.UNICODE)
@@ -38,8 +40,13 @@ RUNNING_FOOTER = re.compile(
     r"Access for free at openstax\.org\.[^\n]*?\(OpenStax\),[^\n]*?Page\s*\d+\s*of\s*\d+",
     re.IGNORECASE,
 )
-_SKIP_TAGS = {"math", "script", "style", "svg", "head", "title"}
+# `footer`: the attribution block the printed page ends with is a running footer by the
+# prompt's own rule ("leave out the running header and footer"), so it is not in the key.
+_SKIP_TAGS = {"script", "style", "svg", "head", "title", "annotation", "annotation-xml", "footer"}
+_MATH_TAGS = {"math", "sup", "sub"}
 _VOID = {"br", "hr", "img", "meta", "link", "input"}
+_BLOCKS = {"p", "li", "div", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "caption"}
+MIN_PROSE_LETTERS = 3
 
 
 def words(text: str) -> list[str]:
@@ -49,24 +56,33 @@ def words(text: str) -> list[str]:
     return [w.lower() for w in _WORD.findall(text)]
 
 
-class _Prose(HTMLParser):
-    """The text of an HTML document outside `math`, `script`, `style`, `svg` and `head`."""
+def prose_only(tokens: Iterable[str]) -> list[str]:
+    """The words of the prose measure: three letters or more. Numbers, units and variables
+    (the content of formulas, which OpenStax writes sometimes as MathML and sometimes as text
+    with superscripts) are left out, so the two ways of writing a formula cannot differ."""
+    return [t for t in tokens if sum(c.isalpha() for c in t) >= MIN_PROSE_LETTERS]
 
-    def __init__(self) -> None:
+
+class _Text(HTMLParser):
+    """The text of an HTML document. Outside `script`, `style`, `svg`, `head` and the
+    annotations of MathML; with `include_math` False also outside `math`, `sup`, `sub`."""
+
+    def __init__(self, include_math: bool) -> None:
         super().__init__(convert_charrefs=True)
         self.parts: list[str] = []
         self._skip = 0
+        self._skipped = _SKIP_TAGS | (set() if include_math else _MATH_TAGS)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag in _SKIP_TAGS and tag not in _VOID:
+        if tag in self._skipped and tag not in _VOID:
             self._skip += 1
-        elif not self._skip and tag in {"p", "li", "div", "h1", "h2", "h3", "h4", "h5", "h6", "tr"}:
+        elif not self._skip and tag in _BLOCKS:
             self.parts.append(" ")
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in _SKIP_TAGS and self._skip:
+        if tag in self._skipped and self._skip:
             self._skip -= 1
-        elif not self._skip and tag in {"td", "th"}:
+        elif not self._skip and tag in {"td", "th", "mi", "mo", "mn", "mtext"}:
             self.parts.append(" ")
 
     def handle_data(self, data: str) -> None:
@@ -74,34 +90,58 @@ class _Prose(HTMLParser):
             self.parts.append(data)
 
 
-def gold_words(printable_html: str) -> list[str]:
-    """The words of a printable page, mathematics out (the answer key)."""
-    parser = _Prose()
+def gold_words(printable_html: str, *, include_math: bool = True) -> list[str]:
+    """The words of a printable page (the answer key): with the content of its formulas
+    (MathML and the text it writes with superscripts), or without."""
+    parser = _Text(include_math)
     parser.feed(printable_html)
     parser.close()
     return words(" ".join(parser.parts))
 
 
-def predicted_text(result: DocumentResult) -> str:
-    """The prose the document says, in reading order: headings, paragraphs and list items
-    with each inline formula taken out, figure and table captions, and the cells of tables
-    (those of a fix's grid when it has one), but not alt text (it is a description, not a
-    printed word), and not the running footer."""
+def _mathml_text(mathml: str) -> str:
+    try:
+        root = DET.fromstring(mathml)
+    except Exception:  # a proposal the sanitiser would refuse: no words
+        return ""
+    return " ".join(t for t in root.itertext() if t.strip())
+
+
+def predicted_text(result: DocumentResult, *, include_math: bool = True) -> str:
+    """What the document says, in reading order: headings, paragraphs and list items, figure
+    and table captions, the cells of tables (those of a fix's grid when it has one), not alt
+    text (a description, not a printed word) and not the running footer. With `include_math`
+    each formula's MathML text stands where it is (inline, display, in a cell), as the answer
+    key's does; without, formulas are left out."""
     fixes = {f.element_id: f for f in result.fixes}
+    equations = {
+        e.id: fixes[e.id].equation.mathml
+        for e in result.elements
+        if e.kind is Kind.EQUATION and e.id in fixes and fixes[e.id].equation is not None
+    }
+
+    def inline(match: re.Match[str]) -> str:
+        return f" {_mathml_text(equations.get(match.group(1), ''))} " if include_math else " "
+
     parts: list[str] = []
     for element in sorted(result.elements, key=lambda e: e.order):
+        fix = fixes.get(element.id)
         if element.kind in (Kind.HEADING, Kind.PARAGRAPH, Kind.LIST_ITEM):
-            fix = fixes.get(element.id)
             if element.kind is Kind.HEADING and fix is not None and fix.heading is not None:
                 text = fix.heading.text
             else:
                 text = element.text or ""
-            parts.append(INLINE_MARKER_RE.sub(" ", text))
+            parts.append(INLINE_MARKER_RE.sub(inline, text))
+        elif element.kind is Kind.EQUATION and element.parent_id is None and include_math:
+            parts.append(_mathml_text(equations.get(element.id, "")))
         elif element.kind is Kind.TABLE:
-            fix = fixes.get(element.id)
             grid = fix.table.grid if fix is not None and fix.table is not None else element.table
             if grid is not None:
-                parts.append(" ".join(c.text for c in grid.cells if not c.latex))
+                for cell in grid.cells:
+                    if cell.mathml and include_math:
+                        parts.append(_mathml_text(cell.mathml))
+                    elif not cell.latex or include_math:
+                        parts.append(cell.text)
             if element.caption:
                 parts.append(element.caption)
         elif element.kind is Kind.FIGURE and element.caption:
@@ -109,8 +149,8 @@ def predicted_text(result: DocumentResult) -> str:
     return RUNNING_FOOTER.sub(" ", "\n".join(parts))
 
 
-def predicted_words(result: DocumentResult) -> list[str]:
-    return words(predicted_text(result))
+def predicted_words(result: DocumentResult, *, include_math: bool = True) -> list[str]:
+    return words(predicted_text(result, include_math=include_math))
 
 
 def edit_distance(a: Sequence[str], b: Sequence[str]) -> int:
