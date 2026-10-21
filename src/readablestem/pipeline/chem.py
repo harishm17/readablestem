@@ -679,29 +679,33 @@ def arrows_as_operators(root: ET.Element) -> None:
             node.tag = node.tag.rsplit("}", 1)[0] + "}mo" if "}" in node.tag else "mo"
 
 
-def merge_element_symbols(root: ET.Element) -> None:
-    r"""Put each element symbol in one token, in place: `\mathrm{Na^+}` is `N`, `msup(a, +)`
-    in the converter's output, and a screen reader that reads the MathML says "N a to the
-    power plus" about the ion and cannot tell it from two variables. An upright capital
-    followed by an upright lowercase letter (or by a script whose base is one) that spell an
-    element become one `mi` ("Na"), and the script, if there is one, hangs on the symbol.
-    Nothing else is touched: `Hz`, `km` and italic letters stay as they were."""
+def group_element_symbols(root: ET.Element) -> None:
+    r"""Make a charge or a count belong to its element symbol, in place. `\mathrm{Na^+}` is `N`
+    and `msup(a, +)` in the converter's output: the charge hangs on the `a`, and a reader that
+    follows the MathML says "N a to the power plus" and cannot tell the ion from two variables.
+    An upright capital followed by a script whose base is the upright lowercase letter that
+    spells an element with it becomes `msup(mrow(N, a), +)`: the letters stay what they were
+    (one `mi` each, as published MathML and the scorers have them), and the script is on the
+    symbol. A symbol with no script is left alone, and so are `Hz`, `km` and italic letters."""
     for parent in root.iter():
         kids = list(parent)
         i = 0
         while i + 1 < len(kids):
             first, second = kids[i], kids[i + 1]
-            if not _upright_letter(first, upper=True):
-                i += 1
-                continue
-            base = second if _local(second) == "mi" else (second[0] if len(second) else None)
             if (
-                base is not None
-                and _upright_letter(base, upper=False)
-                and (second is base or _local(second) in {"msub", "msup", "msubsup"})
-                and (first.text or "") + (base.text or "") in ELEMENTS
+                _upright_letter(first, upper=True)
+                and _local(second) in {"msub", "msup", "msubsup"}
+                and len(second)
+                and _upright_letter(second[0], upper=False)
+                and (first.text or "") + (second[0].text or "") in ELEMENTS
             ):
-                base.text = (first.text or "") + (base.text or "")
+                base = second[0]
+                symbol = ET.Element(
+                    second.tag.rsplit("}", 1)[0] + "}mrow" if "}" in second.tag else "mrow"
+                )
+                symbol.extend([first, base])
+                second.remove(base)
+                second.insert(0, symbol)
                 parent.remove(first)
                 kids.pop(i)
                 continue

@@ -71,11 +71,30 @@ def _symbols_in(text: str) -> list[str] | None:
     return out or None
 
 
+def _upright_letter(node: ET.Element) -> bool:
+    return node.tag == "mi" and len(_text(node)) == 1 and node.get("mathvariant") == "normal"
+
+
+def _flat_pair(kids: list[ET.Element], i: int) -> bool:
+    """An element symbol of two letters written as two upright `mi` in a row ("N", "a")."""
+    return (
+        i + 1 < len(kids)
+        and _upright_letter(kids[i])
+        and _upright_letter(kids[i + 1])
+        and _text(kids[i]).isupper()
+        and _text(kids[i + 1]).islower()
+        and _text(kids[i]) + _text(kids[i + 1]) in ELEMENTS
+    )
+
+
 def is_element(node: ET.Element) -> bool:
     """An upright element symbol: an `mi` that is upright (`mathvariant="normal"`, or
-    longer than one letter) and names an element, or an `mtext` that does. Italic letters
-    are variables."""
+    longer than one letter) and names an element, an `mrow` of the two letters of one (what
+    carries a charge or a count, `group_element_symbols`), or an `mtext` that does. Italic
+    letters are variables."""
     text = _text(node)
+    if node.tag == "mrow":
+        return len(node) == 2 and _flat_pair(list(node), 0)
     if node.tag == "mi":
         upright = node.get("mathvariant") == "normal" or len(text) > 1
         return upright and text in ELEMENTS
@@ -203,6 +222,8 @@ def is_chem_row(kids: list[ET.Element]) -> bool:
     for i, node in enumerate(kids):
         if _scripted_species(node) or _bracketed(kids, i) or _split_bracket(kids, i) is not None:
             return True
+        if _flat_pair(kids, i):
+            return True
         if _is_species_token(node):
             species += 1
             if i > 0 and (_is_species_token(kids[i - 1]) or _scripted_species(kids[i - 1])):
@@ -230,6 +251,7 @@ def _ends_species(node: ET.Element) -> bool:
         or _scripted_species(node)
         or _is_closing(node)
         or _is_charge_script(node)
+        or (_upright_letter(node) and _text(node).islower())  # the tail of "Cl" as two letters
     )
 
 
@@ -402,6 +424,8 @@ def read_at(kids: list[ET.Element], i: int, speak: Speak) -> tuple[list[str], in
         ):
             scripted[-1] += ","  # "N a plus, plus C l minus": a charge, then the sign
         return scripted, 1
+    if _flat_pair(kids, i):
+        return [_letters(_text(node) + _text(kids[i + 1]))], 2
     if _is_species_token(node):
         return _species_words(node), 1
     arrow = _over_arrow(node) or _arrow_words(node)

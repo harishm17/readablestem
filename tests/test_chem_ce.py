@@ -206,23 +206,27 @@ def test_a_subscript_after_a_bracket_belongs_to_the_group_in_the_mathml():
 
 def test_a_subscript_after_a_parenthesis_in_a_formula_belongs_to_the_group():
     root = parse(r"\mathrm{Al_2(SO_4)_3}")
-    groups = [n for n in root.iter() if local(n) == "msub" and local(n[0]) == "mrow"]
-    assert len(groups) == 1
-    assert "".join(groups[0][0].itertext()) == "(SO4)"
+    groups = [n for n in root.iter() if local(n) == "msub" and "".join(n[0].itertext()) == "(SO4)"]
+    assert len(groups) == 1 and local(groups[0][0]) == "mrow"
     assert "".join(groups[0][1].itertext()) == "3"
 
 
-def test_a_converted_ce_species_has_element_symbols_as_tokens():
+def test_a_charge_or_count_hangs_on_the_whole_element_symbol():
+    # The converter hangs it on the lowercase letter: N, msup(a, +). It belongs to "Na".
     root = parse(ce_to_latex("Na+"))
     (msup,) = [n for n in root.iter() if local(n) == "msup"]
+    assert local(msup[0]) == "mrow" and [local(c) for c in msup[0]] == ["mi", "mi"]
     assert "".join(msup[0].itertext()) == "Na" and "".join(msup[1].itertext()) == "+"
     root = parse(ce_to_latex("CaCl2"))
+    (msub,) = [n for n in root.iter() if local(n) == "msub"]
+    assert "".join(msub[0].itertext()) == "Cl" and "".join(msub[1].itertext()) == "2"
+    # A symbol with no script stays two upright letters, as published MathML has it.
     tokens = ["".join(n.itertext()) for n in root.iter() if local(n) in {"mi", "mn"}]
-    assert tokens == ["Ca", "Cl", "2"]
+    assert tokens == ["C", "a", "C", "l", "2"]
 
 
-def test_symbols_that_are_not_elements_are_not_merged():
-    root = parse(r"\mathrm{Hz}\ \mathrm{km}")
+def test_symbols_that_are_not_elements_are_not_grouped():
+    root = parse(r"\mathrm{Hz_2}\ \mathrm{km^2}")
     tokens = ["".join(n.itertext()) for n in root.iter() if local(n) == "mi"]
     assert tokens == ["H", "z", "k", "m"]
 

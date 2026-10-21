@@ -557,12 +557,53 @@ the 121 PDFs of `scripts/layout_identity.py` changes except nuclide paragraphs a
 order (headings, figures, tables, lists, kept pages are identical; the "scripts flattened" notice
 goes where a nuclide was raised text).
 
+### Chemistry in running text and on display lines (2026-10-21)
+
+Formulas, ions and reactions are mathematics, so in a paragraph or a list item they are inline
+equations, and a line that is one reaction is a display equation (`pipeline/chem.py`; the full
+description, the decisions, the measurements and the limits are in [chemistry.md](chemistry.md)).
+Raised and lowered text that is not chemistry (units, footnote marks, a letter subscript) stays
+raised text (next section).
+
+- **Words** (`_chem_words`). The row is cut into words at a blank, at a gap of 0.25 of the glyph
+  size (TeX sets no space after a script: `Cl-and`) and around an arrow glyph, which is a word of
+  its own together with the dash that is its shaft (`−→`). Each word carries the script kind of its
+  characters (`_script_glyphs`, so only the scripts of upright text count).
+- **A formula** (`chem.label_word`): the letters read as element symbols, and there is evidence
+  only chemistry has: a lowered number on an element or a bracket (`H2O`, `Al2(SO4)3`), a raised
+  charge (`Na+`, `SO4 2-`, a number then a sign), or a state symbol (`NaCl(aq)`). Sentence marks and
+  a pair of parentheses around the whole formula are cut off (`(NaHCO3).` is `NaHCO3`); a bracket
+  around it is kept (`[H3O+]`, a concentration). Not a formula: `cm3`, `m2`, `Kw` (a letter
+  subscript), `K-1` (a raised sign then a number is an exponent), a footnote mark (`Nature1`), a
+  word. Plain letters and digits that a PDF set at one size (`H2O` with no lowered 2) are never
+  marked: the text layer cannot tell them from a word.
+- **A reaction** (`chem.reactions`): an arrow (`→ ⟶ ⇌ ⇄ ↔ ←`, `−→`) with species on each side, the
+  species, the `+` and the coefficients taken as far as they go, and at least one formula in all;
+  words that read as elements but carry no evidence (`HCl`, `NaOH`) count only inside a reaction.
+  A trailing number belongs to the sentence. Several arrows in a row are one reaction.
+- **Where it applies**. `_inline_runs` adds the formulas and reactions of a row to its maths runs
+  (`_with_chemistry`; a run that overlaps one, such as the arrow that used to stand alone, is taken
+  into it). `_classify_row` makes a row a display equation line when the whole row is one reaction
+  (`_reaction_row`: the ink outside it is at most the punctuation that ends it), so the net ionic
+  equations of a LaTeX page are display equations and not a paragraph with an arrow cut out of it.
+- **Spaces**. An inline equation that stands against its neighbours with a visible gap and no blank
+  glyph between them (the text after `SO42-` in TeX output) gets a space on that side
+  (`_gap_before`, `_gap_after`); `releases ⟦e1⟧ions` read as one word before.
+- Measured on the 121 PDFs of `scripts/layout_identity.py`: 96 are identical, and the 25 that differ
+  are the chemistry sections and the authored chemistry material, one slide whose reaction line was
+  a heading and is now an equation, and two spaces in a physics section's "Simplify:" line.
+  Nothing in physics, algebra, statistics, the slides or the Word material gains a false formula.
+
 ### Raised and lowered text in prose (backlog T2-4, T2-5)
 
 Text sets formulas, ions, units and nuclides with scripts that the text layer flattens:
-H2O, Na+, SO4 2-, g/cm3, 226Ra. A paragraph or list item or heading now keeps them as
+H2O, Na+, SO4 2-, g/cm3, 226Ra. A paragraph or list item or heading keeps them as
 `Element.script_runs` (`ScriptRun(start, end, kind="sup"|"sub")`, offsets into `text`), which
 the assembler writes as `<sup>` and `<sub>` (docs/output.md "Raised and lowered text").
+**Since 2026-10-21 formulas, ions and nuclides in a paragraph or list item are inline equations
+instead** (the section above and "Nuclides" below); units, footnote marks, letter subscripts and
+anything in a heading or a table cell stay raised or lowered text, which is what the rest of
+this section describes.
 
 - **Which glyphs** (`_script_glyphs`): smaller than the row's text (`SCRIPT_RATIO`) and off
   its baseline by 4 % of the row size (`SCRIPT_OFFSET`: Word and LibreOffice lower a subscript
@@ -591,7 +632,9 @@ the assembler writes as `<sup>` and `<sub>` (docs/output.md "Raised and lowered 
   maths. `H2` was an inline equation, `SO4` was not, and half a formula reached the model
   ("2O3", "34-"); now a run that only such scripts made is dropped. Inside a run that is
   maths for another reason (an arrow, a relation, an italic variable with an operator: `2H2 + O2
-  -> 2H2O`, `E = mc2`) the scripts stay part of it.
+  -> 2H2O`, `E = mc2`) the scripts stay part of it. A formula or an ion is maths for its own
+  reason, found by `pipeline/chem.py` (the section "Chemistry in running text" above), so `H2` and
+  `SO4` are no longer dropped, they are inline equations.
 - **Stacked scripts** (`_merge_baselines`, `_insert_script`, `_stack_position`): a lowered and
   a raised script one over the other (the 4 and the 2- of SO4 2-, the 6 and the 14 of a
   nuclide) arrive as two fragments, and the lowered one used to start a paragraph of its own

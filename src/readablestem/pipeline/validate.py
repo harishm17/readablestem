@@ -59,7 +59,7 @@ from latex2mathml.tokenizer import PATTERN as _LATEX2MATHML_TOKEN
 from readablestem.core.latex_groups import group_delimited_scripts
 from readablestem.core.mathchars import bake_bold_variants
 from readablestem.core.types import Check
-from readablestem.pipeline.chem import arrows_as_operators, merge_element_symbols
+from readablestem.pipeline.chem import arrows_as_operators, group_element_symbols
 
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 
@@ -512,7 +512,7 @@ def safe_latex_to_mathml(latex: str, display: str = "block") -> str:
     root.set("display", display)
     _unescape_text_specials(root)
     bake_bold_variants(root)
-    merge_element_symbols(root)
+    group_element_symbols(root)
     arrows_as_operators(root)
     try:
         return serialize_mathml(root)
