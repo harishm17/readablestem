@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "task": "equations",
-  "date": "2026-10-14",
+  "date": "2026-10-21",
   "pipeline_version": "0.5.0",
   "prompt_versions": {
-    "equation": "equation-df0e12f1"
+    "equation": "equation-68ebbbf9"
   },
   "models": {
     "main": "claude-opus-5-5",
@@ -28,50 +28,55 @@
   "stopped_reason": null,
   "metrics": {
     "exact_strict": 0.4,
-    "exact_lenient": 0.7333333333333333,
+    "exact_lenient": 0.7666666666666667,
     "exact_lenient_ci95": [
-      0.5555203815871325,
-      0.8581733675241899
+      0.5907167369328042,
+      0.8820761191944214
     ],
-    "mean_teds": 0.8697279160573463,
+    "mean_teds": 0.8671047046106055,
     "proposal_rate": 1.0,
     "secondary_stream_v2": {
       "label": "stream v2 (secondary; the primary scorer is exact_lenient)",
-      "exact": 0.9,
-      "mean_similarity": 0.9812943479324688
+      "exact": 0.9666666666666667,
+      "mean_similarity": 0.9994535519125682
+    },
+    "secondary_symbols": {
+      "label": "symbols (secondary; tables flattened; the primary scorer is exact_lenient)",
+      "exact": 0.9666666666666667,
+      "mean_similarity": 0.9990990990990991
     },
     "by_status": {
       "accepted": {
         "n": 28,
         "share": 0.9333333333333333,
         "exact_lenient": 0.7857142857142857,
-        "mean_teds": 0.8821064406736874
+        "mean_teds": 0.8792958569807509
       },
       "needs_review": {
         "n": 2,
         "share": 0.06666666666666667,
-        "exact_lenient": 0.0,
+        "exact_lenient": 0.5,
         "mean_teds": 0.6964285714285714
       }
     },
     "by_route": {
       "cheap": {
-        "n": 11,
-        "share": 0.36666666666666664,
+        "n": 12,
+        "share": 0.4,
         "exact_lenient": 1.0,
-        "mean_teds": 0.893939393939394
+        "mean_teds": 0.9027777777777778
       },
       "main": {
         "n": 17,
         "share": 0.5666666666666667,
         "exact_lenient": 0.5882352941176471,
-        "mean_teds": 0.8681473028462975
+        "mean_teds": 0.8635181061755783
       },
       "escalated": {
-        "n": 2,
-        "share": 0.06666666666666667,
-        "exact_lenient": 0.5,
-        "mean_teds": 0.75
+        "n": 1,
+        "share": 0.03333333333333333,
+        "exact_lenient": 1.0,
+        "mean_teds": 0.5
       }
     },
     "by_display": {
@@ -79,12 +84,12 @@
         "n": 17,
         "share": 0.5666666666666667,
         "exact_lenient": 0.5882352941176471,
-        "mean_teds": 0.8681473028462975
+        "mean_teds": 0.8635181061755783
       },
       "inline": {
         "n": 13,
         "share": 0.43333333333333335,
-        "exact_lenient": 0.9230769230769231,
+        "exact_lenient": 1.0,
         "mean_teds": 0.8717948717948718
       }
     },
@@ -93,96 +98,93 @@
         "threshold": 0.5,
         "kept": 30,
         "coverage": 1.0,
-        "accuracy": 0.7333333333333333,
-        "mean_teds": 0.8697279160573463
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8671047046106055
       },
       {
         "threshold": 0.55,
         "kept": 30,
         "coverage": 1.0,
-        "accuracy": 0.7333333333333333,
-        "mean_teds": 0.8697279160573463
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8671047046106055
       },
       {
         "threshold": 0.6,
         "kept": 30,
         "coverage": 1.0,
-        "accuracy": 0.7333333333333333,
-        "mean_teds": 0.8697279160573463
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8671047046106055
       },
       {
         "threshold": 0.65,
         "kept": 30,
         "coverage": 1.0,
-        "accuracy": 0.7333333333333333,
-        "mean_teds": 0.8697279160573463
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8671047046106055
       },
       {
         "threshold": 0.7,
         "kept": 30,
         "coverage": 1.0,
-        "accuracy": 0.7333333333333333,
-        "mean_teds": 0.8697279160573463
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8671047046106055
       },
       {
         "threshold": 0.75,
         "kept": 30,
         "coverage": 1.0,
-        "accuracy": 0.7333333333333333,
-        "mean_teds": 0.8697279160573463
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8671047046106055
       },
       {
         "threshold": 0.8,
         "kept": 30,
         "coverage": 1.0,
-        "accuracy": 0.7333333333333333,
-        "mean_teds": 0.8697279160573463
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8671047046106055
       },
       {
         "threshold": 0.85,
         "kept": 28,
         "coverage": 0.9333333333333333,
         "accuracy": 0.7857142857142857,
-        "mean_teds": 0.8821064406736874
+        "mean_teds": 0.8792958569807509
       },
       {
         "threshold": 0.9,
-        "kept": 17,
-        "coverage": 0.5666666666666667,
-        "accuracy": 0.7647058823529411,
-        "mean_teds": 0.8760364556379736
+        "kept": 16,
+        "coverage": 0.5333333333333333,
+        "accuracy": 0.75,
+        "mean_teds": 0.868288734115347
       },
       {
         "threshold": 0.95,
-        "kept": 7,
-        "coverage": 0.23333333333333334,
-        "accuracy": 0.7142857142857143,
-        "mean_teds": 0.8722943722943723
+        "kept": 6,
+        "coverage": 0.2,
+        "accuracy": 0.6666666666666666,
+        "mean_teds": 0.8510101010101011
       }
     ],
     "review_load": {
       "required": 2,
-      "optional": 1,
+      "optional": 0,
       "required_per_item": 0.0667,
-      "optional_per_item": 0.0333,
+      "optional_per_item": 0.0,
       "sections": 3,
       "required_per_section": 0.6667,
-      "optional_per_section": 0.3333,
+      "optional_per_section": 0.0,
       "required_by_reason": {
-        "below_accept": 1,
-        "style_cosmetic": 1
+        "below_accept": 2
       },
-      "optional_by_reason": {
-        "style_cosmetic": 1
-      },
+      "optional_by_reason": {},
       "flags": {
         "units": 30,
         "required_units": 2,
-        "required_units_wrong": 2,
-        "wrong": 8,
-        "wrong_required": 2,
-        "flag_precision": 1.0,
-        "flag_recall": 0.25
+        "required_units_wrong": 1,
+        "wrong": 7,
+        "wrong_required": 1,
+        "flag_precision": 0.5,
+        "flag_recall": 0.14285714285714285
       },
       "scorer_gaps": [
         "openstax/physics/2-2-speed-and-velocity/eq-003",
@@ -194,11 +196,11 @@
       "flags_excluding_scorer_gaps": {
         "units": 25,
         "required_units": 1,
-        "required_units_wrong": 1,
-        "wrong": 3,
-        "wrong_required": 1,
-        "flag_precision": 1.0,
-        "flag_recall": 0.3333333333333333
+        "required_units_wrong": 0,
+        "wrong": 2,
+        "wrong_required": 0,
+        "flag_precision": 0.0,
+        "flag_recall": 0.0
       },
       "wrong_not_required": [
         {
@@ -215,10 +217,8 @@
         },
         {
           "id": "openstax/physics/2-2-speed-and-velocity/eq-007",
-          "review": "optional",
-          "reasons": [
-            "style_cosmetic"
-          ],
+          "review": "none",
+          "reasons": [],
           "scorer_gap": false
         },
         {
@@ -261,10 +261,10 @@
         "would_flag_wrong_excluding_scorer_gaps": 0
       },
       "cheap_stage": {
-        "ran": 1,
-        "answered": 1,
+        "ran": 0,
+        "answered": 0,
         "would_flag": 0,
-        "mean_p_meaning": 0.0
+        "mean_p_meaning": null
       },
       "p_meaning": {
         "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-001": 0.0,
@@ -296,27 +296,27 @@
         "openstax/physics/2-3-position-vs-time-graphs/eq-008": 0.0,
         "openstax/physics/2-3-position-vs-time-graphs/eq-009": 0.0
       },
-      "cost_usd": 0.0223186,
-      "per_equation_usd": 0.00074395,
-      "requests": 29
+      "cost_usd": 0.0241913,
+      "per_equation_usd": 0.00080638,
+      "requests": 28
     }
   },
   "cost": {
-    "total_usd": 0.08192133,
-    "pipeline_usd": 0.08192133,
-    "per_item_usd": 0.002730711,
+    "total_usd": 0.09916049,
+    "pipeline_usd": 0.09916049,
+    "per_item_usd": 0.0033053496666666667,
     "per_item_unit": "equation",
-    "model_calls": 32,
-    "verifier_usd": 0.0223186,
-    "verifier_per_item_usd": 0.0007439533333333334,
-    "verifier_requests": 29,
-    "budget_spent_usd": 0.08192133000000001,
-    "budget_calls": 32,
-    "dropped_usd": 1.3877787807814457e-17
+    "model_calls": 31,
+    "verifier_usd": 0.0241913,
+    "verifier_per_item_usd": 0.0008063766666666667,
+    "verifier_requests": 28,
+    "budget_spent_usd": 0.08113089,
+    "budget_calls": 31,
+    "dropped_usd": 0.0
   },
   "latency_ms": {
-    "p50": 1603.5,
-    "p95": 2817.45,
+    "p50": 1519.0,
+    "p95": 3737.8500000000004,
     "n": 30,
     "basis": "sum of model-call latencies per item (excludes rendering)"
   },
@@ -324,45 +324,45 @@
     "by_step": {
       "equation/claude-haiku-5-5": {
         "calls": 13.0,
-        "input": 26928.0,
-        "cached": 25493.0,
-        "written": 0.0,
-        "output": 537.0,
-        "usd": 0.000667,
-        "steady_usd": 0.000667
+        "input": 38121.0,
+        "cached": 33864.0,
+        "written": 2822.0,
+        "output": 539.0,
+        "usd": 0.001104,
+        "steady_usd": 0.00078
       },
       "equation/claude-opus-5-5": {
-        "calls": 19.0,
-        "input": 40690.0,
-        "cached": 37259.0,
-        "written": 0.0,
-        "output": 1888.0,
-        "usd": 0.058936,
-        "steady_usd": 0.058936
+        "calls": 18.0,
+        "input": 54086.0,
+        "cached": 47974.0,
+        "written": 2822.0,
+        "output": 1850.0,
+        "usd": 0.073865,
+        "steady_usd": 0.060319
       }
     },
-    "steady_cost_usd": 0.059603,
+    "steady_cost_usd": 0.061099,
     "answers_file_hits": 0,
-    "answers_file_misses": 32,
-    "live_cost_usd": 0.059603,
+    "answers_file_misses": 31,
+    "live_cost_usd": 0.074969,
     "replayed_cost_usd": 0.0,
     "second_check": {
       "by_step": {
         "check/claude-sonnet-5-5": {
-          "calls": 29.0,
-          "input": 36865.0,
-          "cached": 31523.0,
-          "written": 0.0,
-          "output": 533.0,
-          "usd": 0.022319,
-          "steady_usd": 0.022319
+          "calls": 28.0,
+          "input": 35663.0,
+          "cached": 29349.0,
+          "written": 1087.0,
+          "output": 515.0,
+          "usd": 0.024191,
+          "steady_usd": 0.021691
         }
       },
-      "steady_cost_usd": 0.022319,
-      "answers_file_hits": 0,
-      "answers_file_misses": 29,
-      "live_cost_usd": 0.022319,
-      "replayed_cost_usd": 0.0
+      "steady_cost_usd": 0.021691,
+      "answers_file_hits": 24,
+      "answers_file_misses": 4,
+      "live_cost_usd": 0.006162,
+      "replayed_cost_usd": 0.01803
     }
   }
 }

@@ -322,6 +322,7 @@ script-heavy paragraphs: 400 of the 2,750 recorded real-world dev requests were 
 | Part 1 after: the authored document (live, with the shadow second check, 0.174 of it unneeded) and the 11 OpenStax sections | 1.503 |
 | **Part 1 total** (cap 6.00; 3.0 with every replay free) | **2.850** |
 | The side-effect check: replays only | 0 |
+| `latest-equations.json` and `latest-document.json` re-recorded for the new equation prompt (the CI gate was stale); the figure answers replayed | 0.145 |
 
 The development set only; the held-out sections and the sealed check part were not run or read
 for this work (the recorded held-out results were read to describe the problem and nothing was
