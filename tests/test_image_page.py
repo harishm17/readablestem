@@ -543,3 +543,15 @@ def test_only_scanned_and_handwritten_kept_pages_are_read():
         3: "handwriting_on_page",
     }
     assert image_page.kept_reads(kept) == [0, 1]
+
+
+def test_a_cell_with_a_span_of_zero_does_not_cost_the_page():
+    # The provider's decoder does not enforce bounds: Haiku once wrote col_span 0.
+    odd = cell("x", "none", col_span=0, row_span=-1)
+    built = build(
+        block("table", rows=[{"cells": [cell("h", "col"), cell("g", "col")]}, {"cells": [odd]}]),
+        block("paragraph", runs=[text("Still here.")]),
+    )
+    fix = built.fixes[by_kind(built, Kind.TABLE)[0].id]
+    assert fix.table is not None and fix.table.grid.cells
+    assert all(c.row_span >= 1 and c.col_span >= 1 for c in fix.table.grid.cells)

@@ -99,7 +99,9 @@ Each block has these fields. Fields that do not apply to a block's kind are left
 
 `rows` lists every row from top to bottom; each row is a list of `cells` from left to right.
 A cell has `text` (exactly as printed, plain Unicode; `""` for an empty cell), `latex` (empty
-unless the whole cell is mathematics that plain text cannot show, then math-mode LaTeX),
+unless the cell holds mathematics that plain text cannot show: a superscript, subscript,
+fraction or root, even with words or units around it; then the whole cell as math-mode LaTeX,
+words in `\text{...}`, and `text` its plain reading),
 `header` (`col` for a cell that labels the cells below it, `row` for one that labels the cells
 to its right, `none` for a data cell) and `row_span`, `col_span` (1 for an ordinary cell). A
 merged cell is one entry in the row where it starts, with its span; do not add entries for the

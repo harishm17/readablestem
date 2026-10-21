@@ -137,6 +137,30 @@ class Run(BaseModel):
     value: str = Field(description="The words as written, or the formula as LaTeX.")
 
 
+class Cell(BaseModel):
+    """One printed cell of a table. Unlike `table_step.CellOutput` it has no `ge` bound on
+    the spans: the provider's decoder does not enforce bounds, and one cell with a span of 0
+    must not cost the whole page (`_grid_rows` makes every span at least 1)."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    text: str = Field(description="The cell's text exactly as printed; empty for an empty cell.")
+    latex: str = Field(
+        description="Math-mode LaTeX for the whole cell when it holds mathematics; else empty."
+    )
+    header: Literal["col", "row", "none"] = Field(
+        description="col: labels the cells below it; row: labels the cells to its right."
+    )
+    row_span: int = Field(description="Rows the cell covers (1 for an ordinary cell).")
+    col_span: int = Field(description="Columns the cell covers (1 for an ordinary cell).")
+
+
+class Row(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    cells: list[Cell] = Field(description="The row's cells, left to right.")
+
+
 class Block(BaseModel):
     """One piece of the page. Fields that do not apply to its kind are empty."""
 
@@ -155,7 +179,7 @@ class Block(BaseModel):
     label: str = Field(description="An equation's printed number, such as (2.4); else empty.")
     description: str = Field(description="A figure's short description; else empty.")
     caption: str = Field(description="A figure's or table's printed caption; else empty.")
-    rows: list[table_step.RowOutput] = Field(description="A table's rows; else empty.")
+    rows: list[Row] = Field(description="A table's rows; else empty.")
 
 
 class ImagePageOutput(BaseModel):
@@ -199,6 +223,7 @@ def build_request(settings: Settings, png: bytes) -> VisionRequest:
         max_output_tokens=MAX_OUTPUT_TOKENS,
         image_detail="high",
         effort=settings.anthropic_effort_image_pages or DEFAULT_EFFORT,
+        timeout_s=max(settings.model_timeout_s, settings.image_pages_timeout_s),
     )
 
 
@@ -643,10 +668,31 @@ def _add_equation(block: Block, builder: _Builder) -> None:
     builder.fixes[element_id] = fix
 
 
+def _grid_rows(rows: list[Row]) -> list[table_step.RowOutput]:
+    """The model's rows as the table step's, every span at least 1."""
+    return [
+        table_step.RowOutput(
+            cells=[
+                table_step.CellOutput(
+                    text=c.text,
+                    latex=c.latex,
+                    header=c.header,
+                    row_span=max(1, c.row_span),
+                    col_span=max(1, c.col_span),
+                )
+                for c in row.cells
+            ]
+        )
+        for row in rows
+    ]
+
+
 def _add_table(block: Block, builder: _Builder) -> None:
     box, _ = builder.bbox(block)
     caption = _clean_literal(block.caption) or None
-    output = table_step.TableOutput(is_data_table=True, caption=caption or "", rows=block.rows)
+    output = table_step.TableOutput(
+        is_data_table=True, caption=caption or "", rows=_grid_rows(block.rows)
+    )
     grid = table_step.grid_from_output(output, caption=caption)
     element_id = builder.new_id()
     element = Element(

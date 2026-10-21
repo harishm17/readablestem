@@ -49,6 +49,9 @@ class VisionRequest:
     # Claude only: the thinking effort for this request (`output_config.effort`). None: the
     # client's own setting for the model (`Settings.anthropic_effort_for`).
     effort: str | None = None
+    # Seconds one send may take, when this step needs longer than `Settings.model_timeout_s`
+    # (the image page pass writes a whole page: ADR 0007). None: the client's own setting.
+    timeout_s: float | None = None
 
 
 class VisionClient(Protocol):

@@ -326,6 +326,9 @@ class Settings(BaseSettings):
     # `image_pages_model` None: the main model.
     feature_image_pages: bool = False
     image_pages_model: str | None = None
+    # Seconds the model may take to write one page (a dense page is a few thousand tokens;
+    # `model_timeout_s` is for a crop's short answer).
+    image_pages_timeout_s: float = Field(default=180.0, gt=0)
     # Write each converted equation's stored speech text (`pipeline.speech`, the reading
     # shown on the review screen) as the `alttext` attribute of its <math>. OFF until a
     # person has checked it with NVDA + MathCAT (and ideally JAWS and VoiceOver): some
