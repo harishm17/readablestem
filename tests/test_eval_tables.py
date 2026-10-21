@@ -374,3 +374,24 @@ def test_a_raised_mark_in_a_header_does_not_make_the_headers_wrong():
     assert T.header_exact(marked, gold) is True
     other = [*marked[:1], T.Cell(0, 1, text="Relative Range^([1])", header="col"), *marked[2:]]
     assert T.kind_exact(other, gold, "col") is False  # a different word still counts
+
+
+def test_the_marks_of_latex_in_a_formula_header_are_not_compared():
+    # A header the model reads as maths has the text of its LaTeX (d_i, v_w (m/s)); the PDF's own
+    # text, and so the gold's, has the letters (di, vw (m/s)).
+    gold = gold_of(
+        "<table><tr><th scope='col'>Medium</th><th scope='col'>v<sub>w</sub> (m/s)</th>"
+        "<th scope='col'>d<sub>i</sub></th></tr><tr><td>Air</td><td>331</td><td>2</td></tr></table>"
+    )
+    read_as_maths = [
+        T.Cell(0, 0, text="Medium", header="col"),
+        T.Cell(0, 1, text="v_w (m/s)", header="col"),
+        T.Cell(0, 2, text="d_{i}", header="col"),
+        T.Cell(1, 0, text="Air"),
+        T.Cell(1, 1, text="331"),
+        T.Cell(1, 2, text="2"),
+    ]
+    assert T.kind_exact(read_as_maths, gold, "col") is True
+    wrong = [*read_as_maths[:2], T.Cell(0, 2, text="d_o", header="col"), *read_as_maths[3:]]
+    assert T.kind_exact(wrong, gold, "col") is False
+    assert T.header_text("10^-18") == "10-18"

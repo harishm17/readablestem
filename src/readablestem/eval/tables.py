@@ -147,6 +147,7 @@ def norm(text: str | None) -> str:
 # Raised text the grid read from the PDF marks "^(...)" (a footnote mark "^([1])"): its
 # characters are compared, the mark is not, as gold's text drops the raise.
 _RAISED = re.compile(r"\^\(([^()]*)\)")
+_SCRIPT_MARKS = re.compile(r"[_^{}]")
 # Exponent markup a text cell may carry (10^{-18}, 10^-18): not compared.
 _EXPONENT_MARKS = str.maketrans("", "", "^{}")
 # A fraction written across: "1/3", and ⅓ (a fraction slash after NFKC), are gold
@@ -472,8 +473,12 @@ def header_text(text: str | None) -> str:
     """A header cell's text for the header numbers: `norm`, with a raised mark the grid
     read from the PDF writes "^([1])" compared as its characters ("[1]"), as gold's
     text drops the raise ("Relative Strength<sup>[1]</sup>"). Nothing else changes, so
-    table-bench's predictions (which carry no such mark) score as before."""
-    return _RAISED.sub(r"\1", norm(text))
+    table-bench's predictions (which carry no such mark) score as before. A formula header
+    the model reads as maths writes its text with the marks of the LaTeX it came from
+    (`d_i`, `v_w (m/s)`, `10^-18`), where the PDF's own text has the letters and digits
+    (`di`, `vw (m/s)`, `10-18`): the marks `_ ^ { }` are not compared (2026-10-21: the cause of
+    most of the tables the model lost column-header exactness on, docs/tables.md)."""
+    return _SCRIPT_MARKS.sub("", _RAISED.sub(r"\1", norm(text)))
 
 
 def header_texts(cells: Iterable[Cell], kind: HeaderKind | None = None) -> Counter[str]:
