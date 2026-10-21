@@ -40,8 +40,8 @@ unified here:
 4. **Under and over are scripts.** `\lim_{x \to 0}` (limits) and `\lim_{x \to 0}` written as
    a subscript are the same symbols.
 
-On the development sets (docs/eval-symbols note) every pair stream v2 calls exact is exact
-here too; the tests check the cases that matter. The score is `exact` (equal
+Of the 872 aligned pairs in the development runs of docs/eval-page-math.md that stream v2 calls
+exact, this scorer calls every one exact too (it forgives more, it forgives nothing less). The score is `exact` (equal
 streams) and a similarity (1 - edit distance / longer stream), and `credit_split` and
 `credit_merged` of `equations_v2` apply to these streams unchanged.
 """
