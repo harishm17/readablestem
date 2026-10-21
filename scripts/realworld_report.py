@@ -248,20 +248,27 @@ def main() -> int:
                 "wrong, not asked, per 100 gold",
             ):
                 est, ci = stats.paired_difference(a, b, METRICS[name])
+                _, ci_reg = stats.paired_difference(a, b, METRICS[name], level=0.975)
                 flip = stats.sign_flip(a, b, METRICS[name])
                 diff_rows.append(
                     [
                         f"ReadableSTEM minus {other}", name, str(len(common)),
-                        interval_text(est, ci), fmt(flip.p, 3),
+                        interval_text(est, ci), interval_text(est, ci_reg), fmt(flip.p, 3),
                     ]
                 )  # fmt: skip
                 result.setdefault("paired", []).append(
                     {
                         "other": other, "metric": name, "papers": len(common), "estimate": est,
-                        "low": ci.low, "high": ci.high, "sign_flip_p": flip.p,
+                        "low": ci.low, "high": ci.high, "low_975": ci_reg.low,
+                        "high_975": ci_reg.high, "sign_flip_p": flip.p,
                     }
                 )  # fmt: skip
-        print(table(["difference", "metric", "papers", "estimate [95%]", "sign-flip p"], diff_rows))
+        print(
+            table(
+                ["difference", "metric", "papers", "estimate [95%]", "[97.5%, k=2]", "sign-flip p"],
+                diff_rows,
+            )
+        )
     # buckets
     print()
     summaries = {label: buckets.summarize(its, gold) for label, its in items.items()}

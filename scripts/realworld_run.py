@@ -29,6 +29,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -111,6 +112,9 @@ def cmd_estimate(args: argparse.Namespace) -> int:
 
 
 def cmd_rs(args: argparse.Namespace) -> int:
+    # No second automated check: it is shadow-only (it changes no output) and costs model calls,
+    # and the registered OpenStax run had none either.
+    os.environ["CLAUDE_SECOND_CHECK"] = "off"
     from readablestem.cli import eval_cli
     from readablestem.cli.main import build_parser
 
@@ -169,6 +173,14 @@ def answers_cost(path: Path) -> float:
 # ---------------------------------------------------------------------------------- chatbots
 
 
+def chat_order(part: str) -> list[str]:
+    """Paper ids in the registered order for arms run on a part of the papers only: by the
+    SHA-256 of seed, "chat-order" and the id."""
+    seed = json.loads(next(DATA.glob("order-*.json")).read_text())["seed"]
+    ids = [p["id"] for p in papers(part)]
+    return sorted(ids, key=lambda i: hashlib.sha256(f"{seed}|chat-order|{i}".encode()).hexdigest())
+
+
 def pdfs_of(part: str, only: list[str] | None = None) -> dict[str, Path]:
     found = {}
     for paper in papers(part):
@@ -184,6 +196,8 @@ def cmd_chat(args: argparse.Namespace) -> int:
     arm = chatbot.ARM_BY_ID[args.arm]
     require_registration(args.part, arm.id, False)
     only = args.papers.split(",") if args.papers else None
+    if args.first:
+        only = chat_order(args.part)[: args.first]
     pdfs = pdfs_of(args.part, only)
     out = runs_dir(args.part) / "chat" / "systems"
     pages = sum(chatbot.pdf_page_count(p) for p in pdfs.values())
@@ -274,6 +288,7 @@ def main() -> int:
             p.add_argument("--max-usd", type=float, required=True)
             p.add_argument("--workers", type=int, default=2)
             p.add_argument("--papers", help="comma-separated arXiv ids (default: all of the part)")
+            p.add_argument("--first", type=int, help="the first N papers of the registered order")
             p.add_argument("--note", default="")
         p.set_defaults(func=func)
     args = parser.parse_args()
