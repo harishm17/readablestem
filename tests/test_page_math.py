@@ -320,10 +320,10 @@ def test_with_no_plan_layout_is_what_it_was():
 
 def plan_for(pdf: bytes, build) -> reconcile.PageMathHook:
     rows = collect(pdf).rows[0]
-    return reconcile.PageMathHook(MathMLPlan(rows, build(rows)))
+    return reconcile.PageMathHook(plan_of(rows, build(rows)))
 
 
-def MathMLPlan(rows, spans) -> MathPlan:  # noqa: N802 (reads as a constructor in the tests)
+def plan_of(rows, spans) -> MathPlan:
     return MathPlan({0: PagePlan(rows, spans)})
 
 
@@ -435,7 +435,7 @@ def test_a_failed_page_leaves_layout_alone_and_a_changed_page_is_skipped():
     assert [
         e.bbox for e in layout.analyze(pdf, page_math=reconcile.PageMathHook(failed)).elements
     ] == [e.bbox for e in base]
-    stale_rows = [PageRow(r.id, r.text + "!", r.chars + (0,)) for r in rows]
+    stale_rows = [PageRow(r.id, r.text + "!", (*r.chars, 0)) for r in rows]
     stale = reconcile.PageMathHook(MathPlan({0: PagePlan(stale_rows, [])}))
     assert [e.bbox for e in layout.analyze(pdf, page_math=stale).elements] == [e.bbox for e in base]
     assert stale.stats.pages_stale == 1
