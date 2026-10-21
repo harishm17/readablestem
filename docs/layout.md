@@ -552,7 +552,7 @@ starts within two font sizes to its right, another maths row sits under that one
 middle is level with the two; `_math_neighbours` then takes the brace row into the system, so the
 crop shows the brace and the text reads it first (`_equation_block`). Measured on dev-v2 with the
 layout alone: Elementary Algebra 5.2 has 80 instead of 53 of its 101 gold equations cut as the
-answer key has them (text layer within 0.99), the rest of the set moves by one; nothing else in
+answer key has them (text layer within 0.99), no other section moves by more than two; nothing else in
 the 121 PDFs of `scripts/layout_identity.py` changes except nuclide paragraphs and the brace text
 order (headings, figures, tables, lists, kept pages are identical; the "scripts flattened" notice
 goes where a nuclide was raised text).
