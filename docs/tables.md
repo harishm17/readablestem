@@ -231,7 +231,9 @@ falls in the table's box); now each is one TABLE element.
 **These numbers are optimistic.** The arbitration was developed on these same pages, so
 expect lower precision and recall on new documents. Before `FEATURE_TABLES` is turned on,
 check it on a private set of 3-5 real course PDFs kept out of git (the challenge's
-recommendation); `FEATURE_TABLES` stays off until then.
+recommendation); `FEATURE_TABLES` stays off until then. The 2026-10-21 measurement of what turning
+it on does, and what still blocks it, is at the end of this page ("Tables on, on the development
+sets").
 
 **Benchmark** (table-bench: 170 tables from OpenStax pages printed in three CSS styles,
 grid, booktabs and no rules, plus a LaTeX and a Word page; its own matcher: a prediction
@@ -263,7 +265,9 @@ local` (docs/eval.md, "Tables").
   grid to see and is dropped.
 - **Two tables in one box** (or a table and a plot) stay one table.
 - **Maths in cells** is flattened to characters in the local grid (only superscripts are
-  kept, as superscript characters).
+  kept, as superscript characters). With `FEATURE_TABLES` off the table is a picture and the
+  formulas in its cells are lost (102 of the 335 gold equations of the dev chemistry sections);
+  with it on the table step reads them (59% found there), see the end of this page.
 - **Without the model file**, booktabs tables with spanning headers or maths cells can
   get a column too many (PyMuPDF splits "Specific heat (J/kg K)" or "p = mv").
 - **Prose layout grids** (one column, or a term and its definition in two columns) keep
@@ -589,3 +593,130 @@ itself is described in docs/web.md "The table card" and "Rough edges"):
   cell's edit checks (`web.edit_check.check_cell_edit`, against the PDF's text in that cell). It
   is a model call from the review, so it is spend capped like the conversion's (docs/web.md,
   "What the model costs here").
+
+
+## Tables on, on the development sets (2026-10-21): measured, and the decision
+
+Production runs with `FEATURE_TABLES` off: a detected data table is kept as a picture of the
+table with a required decision (`table_not_rebuilt`), and the formulas in its cells are lost
+(2.7% of the registered held-out gold, 102 of 335 equations of the development chemistry
+sections: the "A2" bucket of the 2026-10-20 analysis). This is what the flag does on the
+development sets, measured for this decision. Nothing on the held-out set was run.
+
+**Recommendation: keep it off for now.** On the numbers below it is a net gain for a reader, and
+three things still stand in the way (below). They are small, and they are not mine to settle
+here (a private set of real course PDFs, the production spend caps, one gate floor).
+
+### The tables task, model against no model
+
+`eval pipeline --task tables`, the 45 documents of the table gold (OpenStax *Physics* and
+*Statistics* printed in three styles, plus six authored documents; 197 data tables, 675 PDF
+pages). Model mode: claude-haiku-5-5, escalating to claude-opus-5-5, recorded once ($2.26 at list
+price). Local mode is the same run with no model, which is what production does with the flag
+off (the table stays a picture, so the grid is only scored). The detection is the same code in
+both.
+
+| | no model (flag off) | model (flag on) |
+|---|---|---|
+| tables found: recall / precision | 0.909 / 0.984 | 0.909 / 0.984 |
+| TEDS (all gold tables; found tables only) | 0.866 (0.954) | **0.882 (0.970)** |
+| TEDS of the structure alone, found tables | 0.971 | 0.990 |
+| column headers exact | **0.843** | 0.792 |
+| header texts exact (all headers, rows too) | 0.812 | 0.442 |
+| cells right (of 5,616 gold cells) | 98.3% | **99.4%** |
+| wrong cells | 188 | 112 |
+| formula cells (706): letters and digits right / MathML right | 0.824 / 0.000 | 0.826 / **0.581** |
+| tables a person must decide on | 184 of 184 (kept as images) | **55 of 183** (0.30 a table, 0.081 a PDF page) |
+| equation-style flags: precision / recall (found tables wrong or not) | n/a | 0.44 / 0.68 |
+| tables wrong and nobody asked | 0 (all asked) | 11 of 179 |
+| cost | $0 | **$0.0123 a table** ($0.0034 a PDF page of these table-dense documents) |
+
+By style (TEDS): grid 0.969, booktabs 0.858, no rules 0.779, authored 0.940; the lower rows are
+detection (recall 0.889 and 0.815), not the model: TEDS of the found tables is 0.97, 0.97 and
+0.96 on the three. Headers: the model proposes row headers on an identifying first column, valid
+markup the OpenStax gold does not have (77 tables), which is most of the fall in exact headers; the
+column headers fall from 0.843 to 0.792.
+
+The gate (`eval gate --current ...`): every floor passes (recall 0.909 >= 0.86, precision 0.984 >=
+0.93, model TEDS 0.8815 >= 0.88, column headers 0.792 >= 0.75) **except
+`table_wrong_cells_not_flagged`: 2 against a floor of 0**; the real-document floors are skipped (no
+private set). Of the 11 tables wrong and not asked, 9 differ from the gold only in the header
+convention and 2 have one wrong cell: the last line of a wrapped cell lost by the grid and the
+model together (both agree, so nothing flags it), the failure the 2026-10-09 run described.
+
+### The document task, five chemistry sections
+
+Five dev-v2 sections with tables (1.4, 12.3, 16.3, 17.3, 2.3: 14 data tables, 43 PDF pages), the
+same recorded equation and figure answers, tables off then on (`FEATURE_TABLES=true`, 36 table
+calls, $0.51). The new document-task metric (`eval/table_maths.py`, `table_cell_maths` in the
+report) counts the `<math>` elements of the gold's data tables and pairs them one to one, by the
+symbols scorer, with the `<math>` elements in the output's table cells.
+
+| 5 sections, 43 pages | tables off | tables on |
+|---|---|---|
+| formulas in the gold's table cells found in a cell (102 gold) | **0** | **60 (59%)**; 19 also exact on the primary scorer |
+| by section (gold) | | 16.3: 37 of 37; 2.3: 19 of 27; 17.3: 4 of 26; 1.4: 0 of 11; 12.3: 0 of 1 |
+| equations: found, matched, primary score | 94 matched, 0.108 | the same, equation for equation |
+| headings, figures (every page) | | identical |
+| required decisions per PDF page (of which tables) | 1.395 (21) | **1.186 (12)** |
+| cost per PDF page | $0.0137 | $0.0256 (+$0.0119) |
+
+The same sections and eight more with tables (the layout tables of two algebra books, the
+authored lecture, glossary and structure documents; 13 documents, 169 pages) were converted with
+the fake client with the flag on and off: the elements, headings, figures and review reasons are
+identical, apart from the table fixes themselves. Layout does not read the flag (docs/layout.md,
+step 0), so nothing outside a table can change.
+
+What the dev numbers do not show: the sections are table-dense chemistry, so +$0.0119 a page is
+an upper end (a page with no table costs the same either way); 17.3's and 1.4's formula cells
+are mostly units and scientific-notation powers the table step writes as text; and a model
+outage with the flag on writes the local grid with no header cells (the fake client does it:
+`html.table_no_headers`), a decision for a person, not a table a reader can use.
+
+### What blocks it
+
+1. **The real-document check.** The arbitration of what is a table was tuned on four lab manuals
+   and the 0.95 precision and 0.85 recall floors for real course PDFs have never been measured:
+   `private-inputs/tables/` does not exist (this page, "Numbers"; docs/eval.md, "Real documents").
+   The first line of this page's own rule: `FEATURE_TABLES` stays off until 3 to 5 real course
+   PDFs are labelled and measured.
+2. **One floor of the gate: `wrong cells not flagged` is 2, the floor 0.** The cause is known (a
+   wrapped cell's last line lost by the grid and the model alike); a join of the continuation
+   line in `tables.fill`, or a check against the text layer that the grid is not the only
+   witness of, would close it. Without it, about 1 table in 90 reaches the reader with a wrong cell
+   nobody was asked about.
+3. **Spend caps.** On, the worst-case reservation of a table call is $0.53, so `MAX_USD_PER_PAGE`
+   must be at least $2.20 and `MAX_USD_PER_JOB` at least $2.60 (docs/deploy.md; `ops launch-check`
+   says so). The measured cost is $0.0123 a table, 40 times less than the reservation; the caps
+   are a deployment decision.
+4. Smaller: the column-header exactness (0.843 to 0.792) and the row-header convention; a table
+   step that reads chemistry cells in `\ce` is refused (the table prompt, `models/prompts/table.md`,
+   does not teach it; `table_step` does not call `equation_step.expand_ce`: 60 of 102 cell
+   formulas were found anyway as `\text{...}` LaTeX); a model outage leaves a header-less
+   local grid.
+
+### If it were turned on
+
+The change is the setting, not code: `FEATURE_TABLES=true` and the two caps above in the
+deployment environment (`deploy/deploy.env.example`; `Settings.feature_tables` stays `False` by
+default, so a checkout, the tests and every other deployment behave as before). Nothing else needs
+to move; the tests of the step with the flag on (`tests/test_steps_table.py`, "a conversion with
+the flag on") already cover it. What to look at in the first week: the share of tables that need a
+decision (0.30 expected), `table_not_rebuilt` gone, `local_grid` (a model outage), and the review
+screen's table card.
+
+How to repeat (needs a key; $2.3 for the tables task, $0.5 for the sections, at list price):
+
+```
+uv run readablestem eval pipeline --task tables --mode local --out tables-local.json
+uv run readablestem eval pipeline --task tables --mode model --provider anthropic --max-usd 3 \
+  --concurrency 2 --answers tables.jsonl --out tables-model.json
+uv run readablestem eval gate --current tables-model.json
+FEATURE_TABLES=true uv run readablestem eval pipeline --task document --set dev-v2 --provider anthropic \
+  --max-usd 1.2 --answers A.jsonl --sections 1-4-measurements 12-3-the-second 16-3-standard 17-3-rate 2-3-atomic
+```
+
+Spend of this measurement (list price, from the answer files; cap $4): the tables task in model
+mode $2.26 (249 calls for 183 tables), the table calls of the five document sections $0.51 (36
+calls); total **$2.77**. The equation and figure answers those sections replay are the chemistry
+work's (docs/chemistry.md, "Spend").

@@ -1,5 +1,25 @@
 # Changelog
 
+## Chemistry (2026-10-21, branch feat/chemistry)
+
+- Formulas, ions, state symbols and reactions in running text are inline equations, and a line
+  that is one reaction is a display equation (`pipeline/chem.py`, `layout._with_chemistry`,
+  `_reaction_row`; docs/chemistry.md, docs/layout.md). Raised and lowered text that is not
+  chemistry (units, footnote marks, a letter subscript) stays `<sup>`/`<sub>`.
+- The equation prompt asks for mhchem (`\ce{...}`) for chemical species; a tested subset is written
+  out as plain LaTeX before the checks (`equation_step.expand_ce`), the rest is refused and the
+  picture stays with a decision. `clean_latex` is unchanged (the proof applies it to recorded
+  chatbot answers).
+- A subscript or superscript after `(...)` or `[...]` belongs to the group (`[A]_0`, `Al_2(SO_4)_3`,
+  also in maths: `(a+b)^2`), a charge or count hangs on the whole two-letter element symbol, and a
+  long arrow is an operator (`validate.safe_latex_to_mathml`; docs/output.md, "Chemistry").
+- Speech for chemistry (`pipeline/speech_chem.py`): "H 3 O plus", "S O 4 2 minus", "aqueous",
+  "reacts to form", "is in equilibrium with", "the concentration of H 3 O plus".
+- Evaluation: `scripts/dev_chem.py` (a content score that does not depend on the gold's spelling),
+  `table_cell_maths` in the document task's report (formulas in the gold's table cells found in
+  the output's cells). Tables: measured on, and left off with the blockers listed
+  (docs/tables.md, "Tables on, on the development sets").
+
 ## Page math pass, secondary equation scores, `\right.` (2026-10-21, branch feat/page-math)
 
 - Two layout fixes: a stray opening brace at the end of a sentence goes with its system, and

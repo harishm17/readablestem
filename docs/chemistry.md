@@ -129,3 +129,159 @@ its number and its sign, a `+` after a charge or a state symbol follows a comma 
 as a second charge. Names are not substituted ("sulfate"): a reading must not say more than the
 page. A concentration is read only for a bracket around a formula; `[A]` stays "open bracket A
 close bracket" because `[3]` and `[x]` are not concentrations.
+
+## What it did on the development sets
+
+Twelve documents of dev-v2: the eleven *Chemistry: Atoms First* sections (70 pages, 335 gold
+equations) and the authored chemistry document (9 pages, 108 gold equations), 443 gold
+equations on 79 PDF pages. Before is commit `c190b3e` (this branch's base), after is this work;
+the same models (claude-opus-5-5, claude-haiku-5-5), thresholds and settings, the equation prompt
+with its new "Chemistry" section being the one change to what the model is asked. Every model
+answer was recorded once and the "after" numbers were scored again from the recording with the
+final converter (`--answers`, `--answers-offline`: no model call for a scoring change). Tables
+are off, as in production. Scored by the repository's scorers (`scripts/dev_buckets.py`) and by
+`scripts/dev_chem.py`.
+
+| 12 documents, 443 gold equations | before | after |
+|---|---|---|
+| primary `exact_lenient`, end to end | 0.093 | 0.108 |
+| symbols scorer with credit (secondary) | 0.370 | 0.363 |
+| detection recall | 0.634 | 0.720 |
+| detection recall, gold class `chem_formula` / `chem_charge` / `chem_equation` / `nuclide` | 60% / 57% / 59% / 84% | 78% / 73% / 71% / 84% |
+| detection precision (gold-aligned predictions) | 0.530 | 0.474 |
+| predictions the gold has no equation for | 249 | 354 |
+| required decisions per PDF page | 1.405 | 1.392 |
+| equation flags: precision / recall | 0.585 / 0.205 | 0.590 / 0.146 |
+| cost per PDF page | $0.0171 | $0.0169 |
+| prose chemistry script runs (gold, 205) read as `<sub>`/`<sup>` / as inline math | 157 / 21 | 3 / 176 |
+
+By the source of the gold, with `content`, the score that does not depend on how the gold spells
+a formula (`scripts/dev_chem.py`: the text of the MathML token by token, hyphen, minus and en dash
+one thing, every arrow one thing, the element that holds it and the upright style ignored):
+
+| | OpenStax sections, 335 gold | authored document, 108 gold |
+|---|---|---|
+| | before / after | before / after |
+| aligned to a predicted equation | 210 (62.7%) / 211 (63.0%) | 71 (65.7%) / 108 (100%) |
+| primary | 31 (9.3%) / 44 (13.1%) | 10 (9.3%) / 4 (3.7%) |
+| symbols scorer, with credit | 154 (46.0%) / 151 (45.1%) | 10 (9.3%) / 10 (9.3%) |
+| **content right** | 168 (50.1%) / 166 (49.6%) | 63 (58.3%) / **104 (96.3%)** |
+| content wrong, and a person is asked | 14 / 16 (of 42 / 45 wrong) | 7 / 3 (of 8 / 4 wrong) |
+
+What the numbers say, and what they do not:
+
+- **The authored document is where the work shows**: its formulas and ions in sentences and its
+  reactions on lines of their own were `H<sub>2</sub>O` and a paragraph with an arrow cut out;
+  every one of the 108 is now an equation and 104 read right. Its primary and symbols scores do
+  not rise, and the primary falls: its gold was made by the converter as it was (one upright
+  `mi` per letter, a bracket's subscript on the bracket, an arrow as an `mi`) and the model's
+  chemistry is now written the OpenStax way (an `mtext` per run of element symbols, scripts on the
+  group, an arrow as an operator). Both scorers compare the shape of the MathML, so they call the
+  better MathML wrong against a gold that has the old shape; `content` compares what is written.
+- **On the OpenStax sections the system was already near what these scores can see**: their
+  equations are set in a maths font, so layout already found them, and the model already wrote
+  `\text{...}` as OpenStax does. Content right is 50.1% before and 49.6% after, within the noise
+  of 335 equations. The primary rises by 13 equations, from the arrow being an operator and the
+  charge shapes, and 4 equations of a rate law lose it because OpenStax writes `[A]^m` with the
+  exponent on the bracket and the grouping fix puts it on the group (the grouping is what a
+  reader needs, section "Writing it").
+- **What is left on the OpenStax sections is not chemistry in sentences**: of the 335, 102 are
+  formulas in the cells of the tables, 92 of them undetected (a table is one element, and with
+  tables off a picture), which is 74% of what is undetected. 32 more are lone `×` signs the gold
+  counts as equations. That is Part 2 of this work (docs/tables.md, "Tables on").
+- **New predictions the gold does not count**: 105 more equations (a formula in a sentence is a
+  prose script run in the gold, which `prose_classes` scores: 155 more of its 205 chemistry runs
+  are now inline maths). A random sample of 70 of the 125 new unmatched predictions was read by
+  hand: all 70 are chemical formulas, ions or concentrations (two have a span a little off:
+  `CH3CH2OCOCH3 = 0` takes the relation, `NaHCO3(s) ∆` takes the heat mark). The equation prompt
+  and layout do not make it more costly: the formulas are read by the cheap model.
+- **Review load is flat** (1.405 to 1.392 required decisions per page) because the cheap model's
+  formula reads pass the text-layer checks. Equations wrong in the symbols and nobody asked per
+  100 gold rise from 21.0 to 30.5 on the symbols scorer, which is the authored document's 37 new
+  aligned equations that the scorer calls wrong for their spelling; on `content` the equations
+  that are wrong and not asked are 28 / 1 (OpenStax / authored) before and 29 / 1 after.
+- The model answers in `\ce` for 192 of 268 equations of the authored document (72%); 297 of
+  301 distinct `\ce` answers of the dev sections convert, the 4 left are a two-part arrow label,
+  `HE` (the gold's own typo), a nuclide with no symbol and a cut-off answer: each a failed fix with
+  a required decision.
+
+`scripts/dev_chem.py` and the commands to repeat this (they need an API key and about $3 at list
+price; the replays are free):
+
+```
+uv run readablestem eval pipeline --task document --set dev-v2 --provider anthropic --max-usd 2.5 \
+  --answers A.jsonl --sections chemistry-atoms-first latex-chemistry --items after.jsonl --out after.json
+uv run python scripts/dev_chem.py --gold data/dev-v2/dev before=before.jsonl after=after.jsonl
+uv run python scripts/dev_buckets.py --gold data/dev-v2/dev before=before.jsonl after=after.jsonl
+```
+
+## Speech, checked by hand
+
+24 chemistry equations of the development gold (a seeded draw: 8 OpenStax-shaped MathML of every
+kind the sections have, and authored ones in the converter's older shape), read by
+`mathml_to_speech`. What was found, and fixed, as the list was read: an ion saved with its charge
+on the lowercase letter read "capital Z n to the power 2 plus" and `2Ag⁺` read "2 amperes g"
+(`speech_chem._split_pair`); `HSO₃⁻` read "H S O 3 superscript minus" (OpenStax puts the charge on
+an empty base); a concentration in brackets read "open bracket N O close bracket" next to
+"the concentration of C l 2"; `2e⁻` read "2e to the power minus"; the cell-notation bars read
+"box drawings light vertical". All are in `tests/test_speech_chem.py`. Left as they are:
+
+- a state symbol with conditions, `(aq, 1 M)`, reads "open parenthesis a q comma 1 capital M
+  close parenthesis" (the state is not picked out of it);
+- a standard potential `E°(Cu²⁺/Cu)` reads as maths with a chemical subscript ("capital E sub
+  C u 2 plus /Cu end sub degrees"), clumsy and correct;
+- an aligned block of half-reactions reads "row 1: row 1:" (a label row of the table reading,
+  not chemistry);
+- two-letter symbols are spelled "C u"; the ion names ("sulfate") are never said.
+
+Twenty of the 24, as read (the rest are in the tests):
+
+| Page | Spoken |
+|---|---|
+| ¹³₂₈Al, ²₄He, ⁷₃Li | aluminum 28, atomic number 13; helium 4, atomic number 2; lithium 7, atomic number 3 |
+| H₂SO₄ | H 2 S O 4 |
+| Fe₂O₃ | F e 2 O 3 |
+| Cu²⁺(aq) + 2e⁻ ⟶ Cu(s) | C u 2 plus aqueous, plus 2 e minus reacts to form C u solid |
+| 2H⁺(aq) + 2e⁻ ⟶ H₂(g) | 2 H plus aqueous, plus 2 e minus reacts to form H 2 gas |
+| Cl₂(g) + 2e⁻ ⟶ 2Cl⁻(aq) | C l 2 gas, plus 2 e minus reacts to form 2 C l minus aqueous |
+| Mg(OH)₂(s) + 2HCl(aq) ⟶ MgCl₂(aq) + 2H₂O(l) | M g open parenthesis O H close parenthesis 2 solid, plus 2 H C l aqueous, reacts to form M g C l 2 aqueous, plus 2 H 2 O liquid |
+| N₂(g) + 3H₂(g) ⇌ 2NH₃(g) | N 2 gas, plus 3 H 2 gas, is in equilibrium with 2 N H 3 gas |
+| 2H₂O₂(aq) ⟶ 2H₂O(l) + O₂(g) | 2 H 2 O 2 aqueous, reacts to form 2 H 2 O liquid, plus O 2 gas |
+| ZnCO₃(s) →(Δ) ZnO(s) + CO₂(g) | Z n C O 3 solid, reacts, with heat, to form Z n O solid, plus C O 2 gas |
+| Zn(s) + Cu²⁺(aq) ⟶ Zn²⁺(aq) + Cu(s) | Z n solid, plus C u 2 plus aqueous, reacts to form Z n 2 plus aqueous, plus C u solid |
+| Cu(s) + 2Ag⁺(aq) ⟶ Cu²⁺(aq) + 2Ag(s) | C u solid, plus 2 A g plus aqueous, reacts to form C u 2 plus aqueous, plus 2 A g solid |
+| [H₃O⁺] = [OH⁻] = 1.0 × 10⁻⁷ M | the concentration of H 3 O plus equals the concentration of O H minus equals … |
+| rate = k[OCl⁻]²[I⁻] | rate equals k the concentration of O C l minus squared the concentration of I minus |
+| HSO₃⁻(aq) + OH⁻(aq) ⇌ SO₃²⁻(aq) + H₂O(l) | H S O 3 minus aqueous, plus O H minus aqueous, is in equilibrium with S O 3 2 minus aqueous, plus H 2 O liquid |
+| Pt(s) \| H₂(g, 1 atm) \| H⁺(aq, 1 M) ‖ Ag⁺(aq, 1 M) \| Ag(s) | P t solid, vertical bar H 2 open parenthesis g comma 1 atm close parenthesis vertical bar H plus open parenthesis a q comma 1 capital M close parenthesis double vertical bar … |
+| [Cu(NH₃)₄]²⁺ | open bracket C u open parenthesis N H 3 close parenthesis 4 close bracket 2 plus |
+| Na⁺ + Cl⁻ → NaCl | N a plus, plus C l minus reacts to form N a C l |
+
+## What does not work yet
+
+- **A reaction with a label over the arrow** (`CaCO₃(s) →Δ CaO(s)`) set as TeX does: the label is a
+  small row above the arrow and the text layer starts a line with it, so the reaction is cut in
+  three (3 equations of the authored document). OpenStax's MathML sets the label in the same
+  line and works.
+- **Formulas that the PDF set at one size** and **formulas in a table cell** (the cell text is
+  flat; docs/tables.md).
+- **Two-part arrow labels** (`->[above][below]`), `<=>>`, a precipitate mark, a state symbol with
+  a concentration in `\ce`: refused, the picture stays with a decision.
+- **The primary and symbols scorers reward the spelling of the gold**, so a change that is right
+  for a reader (the group a bracket's script belongs to, an arrow as an operator) can lower them
+  on gold made by the older converter; `scripts/dev_chem.py` has a score that does not.
+- **Real screen readers were not run.** The reading is the review screen's string; what NVDA with
+  MathCAT or VoiceOver says about this MathML (`mtext` element symbols in OpenStax's shape,
+  grouped scripts) is the manual test of docs/mathml-alttext.md and was not done.
+
+## Spend (list price, from the answer files)
+
+| What | USD |
+|---|---|
+| Part 1 baseline, the 12 documents (batch: half this was paid) | 1.347 |
+| Part 1 after: the authored document (live, with the shadow second check, 0.174 of it unneeded) and the 11 OpenStax sections | 1.503 |
+| **Part 1 total** (cap 6.00; 3.0 with every replay free) | **2.850** |
+
+The development set only; the held-out sections and the sealed check part were not run or read
+for this work (the recorded held-out results were read to describe the problem and nothing was
+tuned on them).
