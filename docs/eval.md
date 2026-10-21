@@ -538,6 +538,16 @@ in the offline `FakeVisionClient` with no recorded answers: every call is refuse
 real cost, so a fake run checks the plumbing and nothing else (all scores are 0).
 `--fake --max-usd X` caps the fake's simulated cost, which exercises the budget stop.
 
+`--sections BOOK/PAGE ...` keeps only the equations, figures or pages whose "book/page" id
+contains one of the strings (`--sections latex-matrices 5-2-solve`): a slice of a set for a run
+that has to stay small, applied before `--every` and `--limit`; the report's `dataset` records
+it. `FEATURE_PAGE_MATH=true` runs the document task with the page math pass (ADR 0006); its
+cost is `cost.page_math_usd` and the pass's counts are in each item's `page_math`.
+Results on the development sets and the scripts that compare runs (`scripts/dev_buckets.py`,
+`scripts/dev_spans.py`): [eval-page-math.md](eval-page-math.md). The second secondary equation
+score (`secondary_symbols`) and what the secondary scores say about the held-out run:
+[eval-secondary-metrics.md](eval-secondary-metrics.md).
+
 `--section-workers N` (document task, default 1) converts N sections at once. It shortens a
 live run, which waits on a hosted model, and gives the same items in the same order (a
 budget stop still ends the run at the first section it stopped, in section order, although

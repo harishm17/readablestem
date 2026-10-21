@@ -15,7 +15,7 @@ primary one; the other two are secondary, labelled as such in the report, and ne
 |---|---|---|
 | `exact_lenient` (primary) | `eval/equations.py` | `mi`/`mn`/`mtext` as one token type, trailing sentence punctuation |
 | stream v2 (secondary) | `eval/equations_v2.py`, `secondary_stream_v2` | every token split into atoms, so a signed number (`-5` in one `<mn>`, or `-` and `5`), operators and units packed into `<mtext>`, and `mo`/`mtext`/`mi`/`mn` are one thing; look-alike dashes, mu, primes, degree signs and decimal points; split and merged equations credited (`credit_split`, `credit_merged`) |
-| symbols (secondary, new) | `eval/equations_symbols.py`, `secondary_symbols` | all of the above, plus: tables flattened (row-major stream of the non-empty cells, so spacer columns and one-cell-per-row systems equal the same lines in an array); a script is a marker not a container (`[H3O+]_0` with the subscript on the whole bracket equals the subscript on the closing bracket); under and over are scripts; bars and angle brackets with other code points |
+| symbols (secondary, new) | `eval/equations_symbols.py`, `secondary_symbols` | all of the above, plus: tables flattened (row-major stream of the non-empty cells, so spacer columns and one-cell-per-row systems equal the same lines in an array); a script is a marker not a container (`[H3O+]_0` with the subscript on the whole bracket equals the subscript on the closing bracket); under and over are scripts; a fraction with no bar (`\binom`) is a stack, as the answer key's brackets around a one-column table; bars and angle brackets with other code points |
 
 What the new scorer keeps wrong: a dropped or added sign, a wrong digit or letter, a different
 order, `a/b` against `a b`, `x^{ab}` against `x^a b`, a subscript against a superscript, a
@@ -67,8 +67,8 @@ ratio estimator, seed 7; approximate and narrow with so few clusters, as in PROO
 | ReadableSTEM minus Opus chatbot | Difference | 95% interval |
 |---|---|---|
 | primary | -0.118 | -0.180 to -0.050 |
-| stream v2 with credit | -0.131 | -0.204 to -0.033 |
-| symbols with credit | -0.112 | -0.196 to +0.026 |
+| stream v2 with credit | -0.131 | -0.203 to -0.032 |
+| symbols with credit | -0.112 | -0.197 to +0.023 |
 
 ## What this says
 

@@ -158,14 +158,19 @@ def summarize(items: list[dict], gold: dict[str, dict]) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--gold", type=Path, required=True)
-    parser.add_argument("runs", nargs="+", metavar="LABEL=ITEMS.jsonl")
+    parser.add_argument(
+        "runs",
+        nargs="+",
+        metavar="LABEL=ITEMS.jsonl[,MORE.jsonl]",
+        help="a run; several files are pooled",
+    )
     parser.add_argument("--sections", nargs="*", default=(), help="only these book/page ids")
     args = parser.parse_args()
     gold = {r["id"]: r for r in pe.load_gold(args.gold) if r.get("kind") == "equation"}
     columns: dict[str, dict] = {}
     for spec in args.runs:
         label, _, path = spec.partition("=")
-        items = rows_of(Path(path))
+        items = [row for part in path.split(",") for row in rows_of(Path(part))]
         if args.sections:
             items = [i for i in items if any(s in i["id"] for s in args.sections)]
         columns[label] = summarize(items, gold)

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Proposed**, behind `FEATURE_PAGE_MATH` (default off) |
+| Status | **Proposed**, behind `FEATURE_PAGE_MATH` (default off); measured on the development sets only (docs/eval-page-math.md) |
 | Date | 2026-10-21 |
 | Decider | Harish |
 
@@ -41,25 +41,34 @@ mathematics is. Layout's rules stay as the fallback and as the check.
    the semantics: an exercise or item number is never part of an equation; a system or an
    aligned derivation is one block; an inline fraction is one expression; a lone variable in
    a sentence is inline maths; prose commentary beside steps is not part of the equation.
-   claude-haiku-5-5, effort `low` or `medium` (`PAGE_MATH_EFFORT`; measured on a dev slice).
-2. **Verification** (`page_math.verify`). Every quote must equal the row's text at its
-   anchor (same normalisation as layout's `_clean`: control characters out, whitespace
-   collapsed); otherwise the quote is searched in the row (the occurrence nearest the stated
-   offset) and used where found; otherwise the expression is dropped. Nothing the page pass
-   says becomes output text: the document's text still comes from the text layer, and the
-   MathML still comes from the equation step reading a crop. The pass only chooses spans and
-   offers a second reading.
+   claude-haiku-5-5 at effort `medium` (`ANTHROPIC_EFFORT_PAGE_MATH`; `low` was measured on a
+   development slice and cuts the answer key's spans right about 0.20 of the time against 0.32
+   for `medium`, for $0.001 against $0.0016 a page).
+2. **Verification** (`page_math.verify`, then `page_math_reconcile._consistent`). Every quote
+   must equal the row's text at its anchor (same normalisation as layout's `_clean`: control
+   characters out, whitespace collapsed); otherwise the quote is searched in the row (the
+   occurrence nearest the stated offset, compatibility forms and blanks ignored) and used
+   where found; otherwise the expression is dropped. A block span must also be *consistent*:
+   its LaTeX and the text it quotes have the same letters, digits and Greek letters (Dice
+   similarity 0.8 of the two symbol bags), because a reading that says more or less than the
+   quote means the quote cut the expression short. Nothing the page pass says becomes output
+   text: the document's text still comes from the text layer, and the MathML still comes from
+   the equation step reading a crop. The pass only chooses spans and offers a second reading.
 3. **Reconciliation with layout** (`pipeline/page_math_reconcile.py`, applied inside
    layout's page analysis through a small hook; layout is analysed twice when the flag is on,
-   the second time with the verified plan). A verified expression replaces the layout
-   regions it overlaps: a row is cut at the anchor's offsets, exercise and equation numbers
+   the second time with the verified plan). A verified expression replaces layout's cut only
+   where it is safe to: a row is cut at the anchor's offsets, exercise and equation numbers
    are cut off into their own rows (an equation number goes through layout's existing
    `equation_label` machinery), a block expression becomes one display region over its rows
-   (a system is one region, however layout would have stacked the lines; the leftovers go
-   back through layout's own rules), an inline expression becomes an inline run at its
-   offsets (single variables included). Layout regions and runs the page pass did not
-   confirm stay, marked `layout only` (lower confidence, below). With the flag off, or when
-   the call fails, nothing changes.
+   *where layout found no display equation there, or where the span covers every row of the
+   regions it overlaps* (a system layout split, a determinant it left a row out of; rows with
+   no letter or digit, the brackets, are taken in). A block span that would split a layout
+   region, or leave in a shared row a piece layout reads as maths, is refused and layout's cut
+   stays: on the development set the splits cost more than they gained (aligned derivations,
+   which the answer key keeps whole). An inline expression becomes an inline run at its
+   offsets (single variables included; glued word endings such as the "th" of "nth" go with
+   it). Layout regions and runs the page pass did not confirm stay, marked `layout`. With the
+   flag off, or when the call fails, nothing changes.
 4. **Two readings** (`equation_step`, `page_math_reconcile.compare`). The crop of every
    reconciled span goes through the existing equation step unchanged. Its LaTeX is compared
    with the page pass's LaTeX as normalised symbol streams (`eval.equations_symbols`, the
@@ -67,14 +76,14 @@ mathematics is. Layout's rules stay as the fallback and as the check.
    accepted when its existing checks pass too (agreement never overrides a failed text-layer
    check). If they disagree, the main model reads the crop once more, as escalation works
    today; if its answer matches neither reading the fix is a required review flag. A
-   layout-only span gets confidence multiplied by `PAGE_MATH_UNCONFIRMED_FACTOR` (0.9),
-   enough to keep a borderline answer for a person but not to abstain.
+   layout-only span gets its confidence multiplied by `PAGE_MATH_UNCONFIRMED_FACTOR`. The
+   design proposed 0.9; on the development set that sent 16 equations to a person for being
+   unconfirmed and 14 of them were right, so the default is 1.0 (the mechanism stays, off).
 5. **Cost.** One haiku call per page (about $0.001 to $0.003 with the image and the text
    layer), plus the main-model escalations that disagreements cause. Target for the whole
    pipeline: at most about $0.017 per page on the development sets. Page-pass calls are
    recorded like every model call (`DocumentStats`, the eval's `--answers` recording), count
-   against the job's dollar caps, and do not count against the per-job call cap (like the
-   second check).
+   against the job's dollar caps and its call cap (one call per page).
 
 **Failure behaviour.** Fail open: a refused, invalid or over-budget page pass, a stale plan
 or an exception while applying it leaves that page exactly as layout alone would have it.
