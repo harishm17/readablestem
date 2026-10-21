@@ -39,6 +39,11 @@
   with 0.5.0 (equation pictures are now read, and have no text to match):
   [docs/remeasurement-2026-10-21.md](docs/remeasurement-2026-10-21.md).
 
+- Real-world evaluation set (arXiv papers, the authors' LaTeX as the answer key, a registered held-out split and a
+  fresh split) and what it showed: [docs/eval-realworld.md](docs/eval-realworld.md). From it: the LaTeX allowlist accepts
+  `\arg` (as an operator name), `\substack`, `\succsim`, `\colon`, `\coloneqq`, `\triangleq`, `\trianglelefteq`,
+  `\gtrapprox`, `\intercal`, `\rightsquigarrow`, `\leadsto`; the page math pass has two new settings,
+  `PAGE_MATH_MAX_OUTPUT_TOKENS` (4096) and `PAGE_MATH_AGREEMENT_LIFT` (true), defaults unchanged; the pass stays off.
 - Page math pass (off: `FEATURE_PAGE_MATH`, [ADR 0006](docs/decisions/0006-page-math-pass.md)):
   one cheap-model call per page proposes where the equations are, quoting the PDF's text layer;
   every quote is verified against the text layer, verified spans are laid over layout's own

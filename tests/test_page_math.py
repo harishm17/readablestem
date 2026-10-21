@@ -215,6 +215,15 @@ def test_the_request_carries_the_text_layer_as_fenced_context_not_in_the_instruc
     assert request.effort == page_math.DEFAULT_EFFORT
 
 
+def test_the_output_limit_is_a_setting_with_the_old_value_as_default():
+    rows = [row("L0", "x = 5")]
+    png = b"\x89PNG\r\n\x1a\n"
+    request, _ = page_math.build_request(settings(), rows, png)
+    assert request.max_output_tokens == page_math.MAX_OUTPUT_TOKENS == 4096
+    wide = Settings(_env_file=None, page_math_max_output_tokens=12288)  # type: ignore[call-arg]
+    assert page_math.build_request(wide, rows, png)[0].max_output_tokens == 12288
+
+
 def test_a_page_with_an_answer_has_verified_spans_and_the_call():
     rows = [row("L0", "the speed v = 5 m/s here")]
     client = StandIn(

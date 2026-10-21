@@ -877,14 +877,17 @@ def _compare_readings(
     page: list[str],
     *,
     asked_main_first: bool,
+    lift: bool = True,
 ) -> None:
     """Record how the final reading stands against the page pass's, and flag it when the
-    crop's readings and the page's do not meet (module constants)."""
+    crop's readings and the page's do not meet (module constants). `lift`: agreement raises
+    the confidence (`Settings.page_math_agreement_lift`)."""
     agrees = _agrees(candidate, page)
     if agrees is None:
         return
     if agrees:
-        _lift(candidate)
+        if lift:
+            _lift(candidate)
         candidate.checks.append(Check(name=PAGE_READING, passed=True))
         return
     if reread is not None:
@@ -1025,7 +1028,7 @@ def transcribe(
     reread: _Candidate | None = None
     page = _page_stream(element)  # the page pass's reading of this span, when it has one
     first_agrees = _agrees(first, page)
-    if first_agrees:
+    if first_agrees and settings.page_math_agreement_lift:
         _lift(first)
     if cheap_start and (_needs_escalation(candidate, settings) or first_agrees is False):
         reread = attempt(settings.main_model, escalation=True)
@@ -1059,7 +1062,14 @@ def transcribe(
             )
         )
     if page is not None:
-        _compare_readings(candidate, first, reread, page, asked_main_first=not cheap_start)
+        _compare_readings(
+            candidate,
+            first,
+            reread,
+            page,
+            asked_main_first=not cheap_start,
+            lift=settings.page_math_agreement_lift,
+        )
     elif element.page_status == "layout" and candidate.confidence is not None:
         # Layout found this span by its geometry rules and the page pass, which read the
         # page, did not: a little less sure (`Settings.page_math_unconfirmed_factor`).
