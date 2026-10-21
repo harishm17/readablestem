@@ -105,6 +105,16 @@ def default_review(status: Status | str | None) -> Review:
         return "none"
 
 
+# `Element.reasons` of what was read from an image of a scanned or handwritten page (ADR 0007,
+# `pipeline.image_page`): every element of such a page, the figure that stands for the whole
+# page's picture (the output's "show the original" toggle: a figure element with no fix, which
+# the steps leave alone, since there is nothing to decide), an equation whose box could not be
+# used, and an inline equation (it has no region of its own, so no crop is made for it).
+IMAGE_PAGE_REASON = "image page"
+IMAGE_PAGE_ORIGINAL_REASON = "image page original"
+IMAGE_PAGE_NO_BOX_REASON = "image page box unusable"
+IMAGE_PAGE_NO_CROP_REASON = "image page inline"
+
 # `Fix.reason` of a heading fix that is not a heading: its text is the same as the heading
 # directly above it (a box title repeated under the section's own heading), so it is
 # written as bold text (`heading_step`).
@@ -120,7 +130,7 @@ class Check(BaseModel):
     code: str | None = None  # category when it fails, e.g. "unknown_command"
 
 
-Step = Literal["equation", "figure", "judge", "table", "check", "page_math"]
+Step = Literal["equation", "figure", "judge", "table", "check", "page_math", "image_page"]
 
 Outcome = Literal[
     "ok", "refused", "invalid_output", "timeout", "api_error", "budget_exceeded", "skipped"
@@ -487,6 +497,12 @@ class Element(BaseModel):
     page_status: Literal["span", "layout"] | None = Field(
         default=None, exclude_if=lambda v: v is None
     )
+    # Elements read from an image of a scanned or handwritten page (ADR 0007): how sure the
+    # page reader said it was of this block. None for every element that came from a text
+    # layer. The review tier of such an element's fix follows it (`pipeline.image_page`).
+    image_confidence: Literal["high", "medium", "low"] | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
     # Tables: the grid layout built from the PDF's own words and lines (source "local").
     table: TableGrid | None = None
     # Paragraphs: program code. `text` keeps its line breaks and the indentation it was
@@ -647,6 +663,8 @@ NOTICE_CODES = frozenset(
         "hidden_text_ignored",  # invisible or covered words on a typed page, left out
         # Review edits (T3-16): a page the reviewer left out of the student file.
         "page_omitted",
+        # A scanned or handwritten page converted from an image of it (ADR 0007).
+        "image_page_converted",
     }
 )
 
@@ -786,6 +804,44 @@ class PageMathSummary(BaseModel):
     stopped_by: str | None = None  # a spend cap that ended the pass early
 
 
+class ImagePageRecord(BaseModel):
+    """What the image page pass did for one page (ADR 0007). Content-free: a code, counts,
+    cost. `outcome` is "converted" or why the page stayed an image: a `ModelCall.outcome`
+    code ("refused", "invalid_output", "timeout", "api_error", "budget_exceeded"), "empty"
+    (no usable block), "no_image" (the page could not be drawn) or "error"."""
+
+    page: int = Field(ge=0)  # 0-based
+    outcome: str
+    model: str = ""
+    calls: int = 0
+    cost_usd: float = 0.0
+    latency_ms: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    blocks: int = 0
+    # The blocks by kind ("paragraph": 4) as the model gave them, and what became of them.
+    by_kind: dict[str, int] = Field(default_factory=dict)
+    illegible: int = 0  # "[illegible]" markers in the page's text
+    low_confidence: int = 0  # blocks the model called medium or low
+    kept_as_image: int = 0  # blocks whose LaTeX, grid or box could not be used
+    required: int = 0  # required decisions the page's blocks start with
+    optional: int = 0  # optional notes the page's blocks start with
+
+
+class ImagePagesSummary(BaseModel):
+    """The image page pass for a document (ADR 0007). Content-free; `cost_usd` is also in
+    `DocumentStats.cost_usd`."""
+
+    pages: int = 0  # pages the model was asked about
+    converted: int = 0
+    fell_back: int = 0  # pages kept as images after the model was asked (or could not be)
+    calls: int = 0
+    cost_usd: float = 0.0
+    blocks: int = 0
+    stopped_by: str | None = None  # a spend cap that ended the pass early
+    per_page: list[ImagePageRecord] = Field(default_factory=list)
+
+
 class DocumentResult(BaseModel):
     """Everything the pipeline produced for one PDF. Crop images are kept separately."""
 
@@ -827,6 +883,8 @@ class DocumentResult(BaseModel):
     omitted: list[OmittedPage] = Field(default_factory=list, exclude_if=lambda v: not v)
     # The page math pass (ADR 0006); None when the flag was off, and left out of the JSON.
     page_math: PageMathSummary | None = Field(default=None, exclude_if=lambda v: v is None)
+    # The image page pass (ADR 0007); None when the flag was off, and left out of the JSON.
+    image_pages: ImagePagesSummary | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @property
     def omitted_pages(self) -> list[int]:
@@ -891,6 +949,8 @@ class ConversionOptions(BaseModel):
     notation_memory: bool = False
     # A page math pass places each page's equations (ADR 0006).
     page_math: bool = False
+    # Scanned and handwritten pages are read from an image of the page (ADR 0007).
+    image_pages: bool = False
     # The document is an exam or graded assessment: figure alt text describes what is
     # shown and never the result (prompt `figure_exam.md`), and the long description and
     # data table, which give values and trends, are not asked for even when
@@ -907,6 +967,7 @@ class ConversionOptions(BaseModel):
             colour=settings.feature_colour,
             notation_memory=settings.feature_notation_memory,
             page_math=settings.feature_page_math,
+            image_pages=settings.feature_image_pages,
         )
 
 

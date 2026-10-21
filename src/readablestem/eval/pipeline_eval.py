@@ -66,8 +66,9 @@ from readablestem.core.budget import BudgetExceeded, JobBudget
 from readablestem.core.types import Check, ConversionOptions, Element, Fix, Kind, ModelCall, Status
 from readablestem.eval import equations_symbols as sym
 from readablestem.eval import equations_v2 as v2
+from readablestem.eval import image_pages as image_pages_eval
 from readablestem.eval import judge as judge_mod
-from readablestem.eval import prose_classes
+from readablestem.eval import prose_classes, prose_wer
 from readablestem.eval import verifier_metrics as vm
 from readablestem.eval.equations import (
     EquationScore,
@@ -1761,7 +1762,31 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "page_errors": _page_errors(items),
         "review_load": document_review_load(items),
         "second_check": vm.document_metrics(items),
+        **_scan_metrics(items, gold),
     }
+
+
+def _scan_metrics(items: Sequence[dict], gold_equations: int) -> dict:
+    """The image page pass's numbers and the prose word error rate, when the run has them
+    (`eval.image_pages`, `eval.prose_wer`); nothing for a run on typed pages."""
+    out: dict = {}
+    prose = [i["prose"] for i in items if "prose" in i]
+    if prose:
+        out["prose_wer"] = prose_wer.pooled(prose)
+        out["prose_only_wer"] = prose_wer.pooled(
+            [i["prose_only"] for i in items if "prose_only" in i]
+        )
+        out["prose_bag"] = prose_wer.bag_pooled([i["prose_bag"] for i in items if "prose_bag" in i])
+    scored = [i["headings_scored"] for i in items if "headings_scored" in i]
+    if scored:
+        scored_headings = heading_metrics(scored)
+        out["headings"] = {
+            k: scored_headings[k]
+            for k in ("gold_headings", "predicted_headings", "matched", "precision", "recall", "f1")
+        } | {"level_accuracy": scored_headings["level_accuracy"]}
+    if pages := image_pages_eval.metrics(items, gold_equations):
+        out["image_pages"] = pages
+    return out
 
 
 def _supported_extras(items: Sequence[dict], matched: int, pred: int) -> dict:
@@ -1940,6 +1965,8 @@ def _document_section(
         return item, None
     result = output.result
     stopped = next((r for f in result.fixes if (r := budget_reason(f))), None)
+    if stopped is None and result.image_pages is not None and result.image_pages.stopped_by:
+        stopped = f"budget_{result.image_pages.stopped_by}"  # scans left unread by a cap
     if stopped:  # a half-converted page would score as misses; drop it and stop
         return None, stopped
     fixes = {f.element_id: f for f in result.fixes}
@@ -1958,6 +1985,8 @@ def _document_section(
     headings = predicted_headings(result.fixes)
     heading_item = heading_page_item(_page_id(page), _of_kind(page, "heading"), headings)
     item["heading_flags"] = heading_flags(heading_item, headings)
+    if result.image_pages is not None or getattr(cfg.media, "gold_words", None) is not None:
+        item["headings_scored"] = heading_item  # scanned inputs: the headings task's scorer
     calls = [c for f in result.fixes for c in f.calls]
     item.update(_calls_summary(calls))
     item["cost_split"] = _equation_cost_split(result.fixes, cfg.settings.main_model)
@@ -1969,6 +1998,22 @@ def _document_section(
         item["page_math_cost_usd"] = pass_.cost_usd
         item["cost_usd"] += pass_.cost_usd
         item["model_calls"] += pass_.calls
+    if result.image_pages is not None:
+        # The image page pass (ADR 0007) is a model call of the pipeline's: its cost is in the
+        # item's cost, and apart as `image_pages_cost_usd`.
+        item["image_pages"] = image_pages_eval.item_for(result, item["pairs"])
+        item["image_pages_cost_usd"] = result.image_pages.cost_usd
+        item["cost_usd"] += result.image_pages.cost_usd
+        item["model_calls"] += result.image_pages.calls
+    gold_words = getattr(cfg.media, "gold_words", None)
+    if gold_words is not None and (answer_key := gold_words(page)) is not None:
+        # scanned inputs: the prose answer key is the page's own text, mathematics out
+        item["prose"] = prose_wer.score(answer_key, prose_wer.predicted_words(result)).as_dict()
+        # ... and the words of the prose alone (formulas out of both sides; three letters up)
+        prose_key = gold_words(page, include_math=False) or []
+        prose_pred = prose_wer.prose_only(prose_wer.predicted_words(result, include_math=False))
+        item["prose_only"] = prose_wer.score(prose_wer.prose_only(prose_key), prose_pred).as_dict()
+        item["prose_bag"] = prose_wer.bag_score(prose_wer.prose_only(prose_key), prose_pred)
     item["verifier"] = vm.page_summary(result.fixes)
     item["verifier_cost_usd"] = sum(f.verifier_cost_usd for f in result.fixes)
     item["verifier_requests"] = sum(vm.requests_sent(f) for f in result.fixes)
@@ -2080,6 +2125,8 @@ def _cost(task: str, items: Sequence[dict], budget: JobBudget | None) -> dict:
         out["pdf_pages"] = pdf_pages
         out["per_pdf_page_usd"] = step_cost / pdf_pages if pdf_pages else None
         out["verifier_per_pdf_page_usd"] = verifier_cost / pdf_pages if pdf_pages else None
+        if any("image_pages" in i for i in items):  # the image page pass ran (ADR 0007)
+            out["image_pages_usd"] = sum(i.get("image_pages_cost_usd", 0.0) for i in items)
         page_math_cost = sum(i.get("page_math_cost_usd", 0.0) for i in items)
         if any("page_math" in i for i in items):  # the page math pass ran (ADR 0006)
             out["page_math_usd"] = page_math_cost

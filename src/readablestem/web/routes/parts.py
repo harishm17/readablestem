@@ -55,6 +55,7 @@ from readablestem.web.uploads import (
     ExtractFailed,
     UploadRejected,
     extract_part_isolated,
+    inspect_pdf_detail,
     inspect_pdf_isolated,
     safe_filename,
 )
@@ -174,6 +175,7 @@ def _start_parts(
         data, name, total = bytes(row.content), row.filename, row.pages
         done = {p for p in (row.done_pages or []) if isinstance(p, int)}
         course, exam, mode = row.course_id, bool(row.exam_mode), row.retention_mode
+        asked_images = bool(row.image_pages) and s.feature_image_pages
     try:
         parts = ranges.parse_parts(text, total=total, limit=s.max_pages_per_job, taken=done)
     except ranges.PartsError as exc:
@@ -194,7 +196,12 @@ def _start_parts(
                 )
                 out.status = 413
                 break
-            pages = inspect_pdf_isolated(cut, max_pages=s.max_pages_per_job)
+            if asked_images:  # the choice made with the upload, for the parts that have such pages
+                pages, found = inspect_pdf_detail(
+                    cut, max_pages=s.max_pages_per_job, allow_image_pages=True
+                )
+            else:
+                pages, found = inspect_pdf_isolated(cut, max_pages=s.max_pages_per_job), 0
             filename = part_filename(name, part.label)
             job_id = store_job(
                 ctx.factory,
@@ -206,6 +213,7 @@ def _start_parts(
                 mode,
                 course_id=course,
                 exam=exam,
+                image_pages=asked_images and found > 0,
                 part_group=upload_id,
                 part_label=part.label,
             )

@@ -52,7 +52,11 @@
   <li>Equations are the hard part. A symbol, sign or relation that differs from the PDF's text layer
     is sent to review. An error that agrees with the text layer, or a PDF with no usable text layer,
     can still pass.</li>
-  <li>Scans, handwriting and drawings are kept as images and flagged.</li>
+  <li>Scans and handwriting are converted only on request, by a model reading the page's picture,
+    with every converted equation and table left for a person to check and the original page kept
+    (about 6 in 10 equations exactly right on development pages made into scans, about 2 in 3 on nine
+    real papers made into scans; handwriting checked by eye on four pages). Without the request, and
+    for drawings, such pages are kept as images and flagged.</li>
   <li>Tables are off by default and have been checked on a local benchmark and the sample, not on a
     broad set of real course PDFs.</li>
   <li>Figure alt text is short. It does not replace a long description for a complex diagram.</li>

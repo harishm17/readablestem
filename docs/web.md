@@ -72,6 +72,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `MAX_LARGE_UPLOAD_MB` (30), `MAX_SOURCE_PAGES` (300) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (Cloud Run takes at most 32 MiB). Equal to the limits above, they turn the feature off: such files are refused |
 | `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
+| `FEATURE_IMAGE_PAGES`, `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE` ($0.25), `IMAGE_PAGES_MAX_USD_PER_JOB` ($7.50), `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI` | Scanned and handwritten pages read from an image of the page (ADR 0007, "Scanned and handwritten pages on request" below). The flag only offers the upload option; the model is the main one unless `IMAGE_PAGES_MODEL` says otherwise; a job that asked may spend `IMAGE_PAGES_USD_PER_PAGE` a page, at most `IMAGE_PAGES_MAX_USD_PER_JOB`, when that is more than `MAX_USD_PER_JOB` and `MAX_USD_PER_PAGE` allow |
 | `DECISIONS_FIGURE_VERIFY`, `DECISIONS_EQUATION_SHADOW`, `DECISIONS_CANARY` (and thresholds) | The second automated check (ADR 0005): an optional note on accepted figures, a shadow on equations, a daily drift canary in the cron (docs/steps.md, docs/operations.md). All on by default |
 | `MODEL_PROVIDER`, `OPENAI_API_KEY`, `MAIN_MODEL`, `CHEAP_MODEL` | Which provider answers (`openai`, the default) and its key and models |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (`claude-opus-5-5`, `claude-haiku-5-5`), the workspace id an organisation-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
@@ -415,6 +416,32 @@ With JavaScript, `app.js` checks the chosen file's size and type as soon as it i
 (the same field error, in a polite live region) and refuses to send a wrong one; while a
 good one is sent it says "Uploading notes.pdf. Keep this tab open." and a second click
 does nothing. The server checks everything again.
+
+### Scanned and handwritten pages on request (ADR 0007, `FEATURE_IMAGE_PAGES`)
+
+With the flag on, the upload form has a checkbox, "Convert scanned or handwritten pages (slower;
+every converted equation and table needs your check)", beside the exam box. It is the owner's
+choice for that upload (`Job.image_pages`, and `PendingUpload.image_pages` for a large file, applied
+to each of its parts that has such pages); the flag only offers it.
+
+- **The probe.** Only when the box is ticked is the probe told so (`pdf_probe MAX_PAGES
+  image_pages`): it then lets a PDF of scans or handwriting through and counts the pages
+  `page_type` calls scanned or handwritten (`page_type.image_page_count`, the same classifier layout
+  uses; typed pages are told from their text alone, so only a page that is not clearly typed pays
+  for the ink analysis). A file with none is not refused and not changed: the request does not
+  apply, and the job is made as if the box were not ticked. Without the box a PDF of only scans
+  or handwriting is refused as before, and the message (`upload_error_message`) says to upload it
+  again with the box ticked when the server offers it.
+- **Quota.** Pages count against the daily quota as for any document (`intake.store_job`),
+  open-tier accounts included.
+- **Spend.** A job that asked has the dollar cap `max(MAX_USD_PER_JOB limited by MAX_USD_PER_PAGE,
+  min(IMAGE_PAGES_MAX_USD_PER_JOB, pages x IMAGE_PAGES_USD_PER_PAGE))` (`worker.job_caps`, also
+  used for re-reads), since the main model reads a page for $0.10 to $0.13 against $0.02 for a typed
+  one. Every call still reserves its worst case against the daily cap and, for an open-tier account,
+  the open pool (`OPEN_TIER_DAILY_SPEND_CAP_USD`), so the pool bounds the cost whatever the job's cap;
+  `ops.limits.largest_reservation_usd` counts a page read when the feature is offered.
+- **The run.** `notation.conversion_options` gives the converter `image_pages` from the job, never
+  from the flag: a job that did not ask never has its scans read, whatever the server offers.
 
 ### Word and PowerPoint files (`web/office_convert.py`, T3-30)
 

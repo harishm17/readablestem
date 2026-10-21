@@ -35,6 +35,7 @@ from readablestem.models.pricing import (
 )
 from readablestem.pipeline.equation_step import EquationOutput
 from readablestem.pipeline.figure_step import FigureOutput
+from readablestem.pipeline.image_page import ImagePageOutput
 from readablestem.pipeline.table_step import TableOutput
 
 PNG = PNG_SIGNATURE + b"tiny test image"
@@ -382,6 +383,29 @@ def test_a_fallback_that_served_the_request_is_charged_for_every_attempt():
                 ],
             },
         ),
+        (
+            ImagePageOutput,
+            {
+                "blocks": [
+                    {
+                        "kind": "paragraph",
+                        "x0": 100,
+                        "y0": 100,
+                        "x1": 900,
+                        "y1": 160,
+                        "confidence": "high",
+                        "level": 0,
+                        "marker": "",
+                        "runs": [{"kind": "text", "value": "Speed is distance over time."}],
+                        "latex": "",
+                        "label": "",
+                        "description": "",
+                        "caption": "",
+                        "rows": [],
+                    }
+                ]
+            },
+        ),
     ],
 )
 def test_each_step_schema_goes_out_as_a_json_schema_and_comes_back_validated(schema, payload):
@@ -391,6 +415,25 @@ def test_each_step_schema_goes_out_as_a_json_schema_and_comes_back_validated(sch
     assert parsed == schema.model_validate(payload)
     sent = wire.body()["output_config"]["format"]["schema"]
     assert sent["type"] == "object" and sent["additionalProperties"] is False
+
+
+def test_a_request_can_ask_for_a_longer_timeout_than_the_clients():
+    # The image page pass writes a whole page (ADR 0007): its sends are given more time.
+    seen: list[float] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request.extensions["timeout"]["read"])
+        return httpx2.Response(200, json=message_body())
+
+    settings = make_settings(model_timeout_s=60)
+    client = AnthropicVisionClient(
+        settings,
+        make_budget(),
+        http_client=httpx2.Client(transport=httpx2.MockTransport(handler)),
+    )
+    client.run(make_request(), Out)
+    client.run(make_request(timeout_s=240.0), Out)
+    assert seen == [60.0, 240.0]
 
 
 def test_the_original_schema_still_checks_what_the_transformed_one_cannot():

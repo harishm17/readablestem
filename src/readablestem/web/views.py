@@ -263,6 +263,7 @@ DECISION_NOUNS = {
     Kind.FIGURE: ("figure", "figures"),
     Kind.TABLE: ("table", "tables"),
     Kind.HEADING: ("heading", "headings"),
+    Kind.PARAGRAPH: ("piece of text", "pieces of text"),
 }
 
 
