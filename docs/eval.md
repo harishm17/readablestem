@@ -543,6 +543,8 @@ contains one of the strings (`--sections latex-matrices 5-2-solve`): a slice of 
 that has to stay small, applied before `--every` and `--limit`; the report's `dataset` records
 it. `FEATURE_PAGE_MATH=true` runs the document task with the page math pass (ADR 0006); its
 cost is `cost.page_math_usd` and the pass's counts are in each item's `page_math`.
+The real-world set (arXiv papers compiled by their authors, gold from the authors' own LaTeX, a registered
+held-out split; `scripts/realworld_*.py`): [eval-realworld.md](eval-realworld.md).
 Results on the development sets and the scripts that compare runs (`scripts/dev_buckets.py`,
 `scripts/dev_spans.py`): [eval-page-math.md](eval-page-math.md). The second secondary equation
 score (`secondary_symbols`) and what the secondary scores say about the held-out run:

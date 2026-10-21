@@ -56,7 +56,7 @@ def load_buckets_module():
 # Columns of the per-paper count vectors.
 COLUMNS = (
     "gold", "exact", "symbols_credit", "matched", "pred", "wrong_unasked", "unsupported",
-    "cost", "pages", "required", "sym_wrong", "sym_wrong_flagged", "extra",
+    "cost", "pages", "required", "sym_wrong", "sym_wrong_flagged", "extra", "required_all",
 )  # fmt: skip
 COL = {name: i for i, name in enumerate(COLUMNS)}
 
@@ -86,6 +86,7 @@ def paper_counts(item: dict) -> list[float]:
     vec[COL["sym_wrong"]] = len(sym_wrong)
     vec[COL["sym_wrong_flagged"]] = sum(p.get("review") == "required" for p in sym_wrong)
     vec[COL["extra"]] = len(item["unmatched"])
+    vec[COL["required_all"]] = item["review"]["required_decisions"]
     return vec
 
 
@@ -104,9 +105,12 @@ METRICS = {
     "detection recall": ratio_of("matched", "gold"),
     "detection precision": ratio_of("matched", "pred"),
     "wrong, not asked, per 100 gold": ratio_of("wrong_unasked", "gold", 100.0),
-    "unsupported predictions per prediction": ratio_of("unsupported", "pred"),
+    # "unsupported" per prediction (the document task's text_layer_supported) needs the text of
+    # the region an equation was cut from, which a chatbot's output has not:
+    # scripts/realworld_invented.py reads every arm's output by one rule instead.
     "cost per PDF page (USD)": ratio_of("cost", "pages"),
-    "required decisions per PDF page": ratio_of("required", "pages"),
+    "required decisions per PDF page, all kinds": ratio_of("required_all", "pages"),
+    "  of which on an aligned equation": ratio_of("required", "pages"),
 }
 
 
@@ -268,6 +272,9 @@ def main() -> int:
     parser.add_argument("--part", choices=["dev", "heldout"], required=True)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--examples", type=int, default=0)
+    parser.add_argument(
+        "--exclude", nargs="*", default=(), help="drop these papers from every arm (sensitivity)"
+    )
     parser.add_argument("--tag", default="rs", help="ReadableSTEM's run folder under runs/PART")
     args = parser.parse_args()
     runs = ROOT / "runs" / args.part
@@ -278,7 +285,8 @@ def main() -> int:
     for label, rel in ARMS.items():
         path = runs / (rel.replace("rs/", f"{args.tag}/") if rel.startswith("rs/") else rel)
         if path.is_file():
-            items[label] = [json.loads(line) for line in path.read_text().splitlines() if line]
+            rows_in = [json.loads(line) for line in path.read_text().splitlines() if line]
+            items[label] = [r for r in rows_in if not any(e in r["id"] for e in args.exclude)]
     result: dict = {"part": args.part, "arms": {}}
     print(f"## {args.part}: " + ", ".join(f"{k}: {len(v)} papers" for k, v in items.items()))
     # pooled metrics with cluster intervals

@@ -37,7 +37,12 @@
     "low": 0.01833356489479259,
     "high": 0.02894993145145038
    },
-   "required decisions per PDF page": {
+   "required decisions per PDF page, all kinds": {
+    "point": 4.543859649122807,
+    "low": 3.31032956972841,
+    "high": 5.89724341936037
+   },
+   "  of which on an aligned equation": {
     "point": 2.1052631578947367,
     "low": 1.4017094017094016,
     "high": 2.9026762148734666
@@ -79,7 +84,12 @@
     "low": 0.07560476923076923,
     "high": 0.09725261538461538
    },
-   "required decisions per PDF page": {
+   "required decisions per PDF page, all kinds": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   },
+   "  of which on an aligned equation": {
     "point": 0.0,
     "low": 0.0,
     "high": 0.0
@@ -121,7 +131,12 @@
     "low": 0.002075619897360704,
     "high": 0.002397433597175771
    },
-   "required decisions per PDF page": {
+   "required decisions per PDF page, all kinds": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   },
+   "  of which on an aligned equation": {
     "point": 0.0,
     "low": 0.0,
     "high": 0.0
@@ -638,24 +653,6 @@
    "gold_latex": "p_{\\text{out}} = p_{ij}",
    "pred_latex": "p_{out} = p_{ij}",
    "pdf_text": "pout = pij"
-  },
-  {
-   "bucket": "recognition",
-   "id": "arxiv/2305.06353/eq-129",
-   "page": 10,
-   "display": "block",
-   "gold_latex": "\\bigg| \\mathbb{P}\\bigg\\{ n \\rho_n^{1/2} \\big( {\\Sigma}_U^{(n)}(k) \\big)^{-1/2} \\widetilde W^{\\top} \\big( ( \\widehat U W )_{i*} - U_{i*} \\big) \\in \\mathcal{A} \\bigg\\} - \\mathbb{P} \\{ G \\in \\mathcal{A}\\} \\bigg| \\leq \\frac{C \\log(n\\rho_n)}{(n\\rho_n)^{1/2}}",
-   "pred_latex": "\\left|\\mathbb{P}\\left\\{n\\rho_n^{1/2}\\big(\\Sigma_U^{(n)}(k)\\big)^{-1/2}\\widetilde{W}^\\top\\big((\\widehat{U}W)_{i*}-U_{i*}\\big)\\in\\mathcal{A}\\right\\}-\\mathbb{P}\\{G\\in\\mathcal{A}\\}\\right|\\leq\\frac{C\\log(n\\rho_n)}{(n\\rho_n)^{1/2}}",
-   "pdf_text": "\ufffd\ufffd\ufffd\ufffd\u2119 \ufffd n\u03c11/n2 \u03a3(n) \ufffd \ufffd\u22121/2\ufffd U (k) W \u22a4\ufffd (\ufffdUW)i\u2217\u2212Ui\u2217 \u2208\ud835\udc9c \u2212\u2119{G \u2208\ud835\udc9c} \ufffd \ufffd \ufffd\ufffd\ufffd\ufffd\u2264C log(n\u03c1n) (n\u03c1n)1/2"
-  },
-  {
-   "bucket": "span",
-   "id": "arxiv/2503.07628/eq-014",
-   "page": 6,
-   "display": "inline",
-   "gold_latex": "\\boldsymbol{g}: \\Gamma_N \\to \\mathbb{R}^2",
-   "pred_latex": "\\Gamma_N \\rightarrow \\mathbb{R}^2",
-   "pdf_text": "\u0393N \u2192\u211d2"
   }
  ]
 }
