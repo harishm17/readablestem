@@ -114,8 +114,8 @@ about fall from 4.8 to 3.5 per 100 gold, at about the same decisions per page an
 per page. The gain is the second reading, not the spans: at this commit layout's rules already
 cut the exercise numbers and systems the pass was meant to fix, and the pass cannot anchor what
 the text layer does not hold in order (nested fractions, stacked nuclides, brace paths). It stays
-off; a fresh held-out set (about 17 sections or more, paired) decides whether to turn it on for
-the review screen alone.
+off; a fresh held-out set (about 17 sections or more, paired) decides whether to turn it on. A
+variant that only compares readings and never changes spans was not built or measured.
 
 ## Consequences
 
