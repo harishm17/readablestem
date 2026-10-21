@@ -69,6 +69,10 @@ Checks (content-free codes; docs/tables.md):
   spacing within each cell differs ("12 345" for "12345", a word broken at the end of a
   line), it is a note (`whitespace_differs`). With no PDF words to compare:
   `no_pdf_text`;
+- `table.edge_text` (only when layout left text at the table's edge, `REASON_EDGE_TEXT`:
+  a line of the table's size right under its box, starting where a column starts): the grid
+  and the crop both lack it, so no reading can agree or differ about it: a person decides
+  (`text_at_edge`, never escalated);
 - `table.math` (error): in a grid read from the PDF, no cell holds maths its text gives
   flat (`flattened_maths`: an accent, a stacked fraction; `assemble_tables.flattened_cells`);
   every maths cell's LaTeX passes `validate.check_latex`,
@@ -150,7 +154,7 @@ from readablestem.pipeline.equation_step import (
     text_layer_symbols_differ,
 )
 from readablestem.pipeline.signs import compare_signs
-from readablestem.pipeline.tables import REASON_ROW_CONTINUED, REASON_ROW_SPLIT
+from readablestem.pipeline.tables import REASON_EDGE_TEXT, REASON_ROW_CONTINUED, REASON_ROW_SPLIT
 from readablestem.pipeline.validate import (
     LatexConversionError,
     check_latex,
@@ -175,7 +179,9 @@ NOTE_CODES = frozenset(
     {"whitespace_differs", "style_cosmetic", "row_headers_dropped", "written_as_text"}
 )
 # Failed checks a second reading cannot change: they never escalate.
-NO_ESCALATION_CODES = frozenset({"whitespace_differs", "no_pdf_text", "row_headers_dropped"})
+NO_ESCALATION_CODES = frozenset(
+    {"whitespace_differs", "no_pdf_text", "row_headers_dropped", "text_at_edge"}
+)
 # `grid_problems` codes about the grid itself; the others are about its headers.
 STRUCTURE_PROBLEMS = frozenset({"no_cells", "cell_out_of_bounds", "cells_overlap", "grid_hole"})
 # Placing cells marks each slot it covers; a well-formed grid marks each slot once, so
@@ -871,6 +877,10 @@ def table_checks(grid: TableGrid, element: Element) -> list[Check]:
     checks.append(
         Check(name="table.cell_text", passed=text_code is None, severity="warning", code=text_code)
     )
+    if REASON_EDGE_TEXT in element.reasons:
+        checks.append(
+            Check(name="table.edge_text", passed=False, severity="warning", code="text_at_edge")
+        )
     maths = [c for c in grid.cells if c.latex]
     if not maths:
         return checks

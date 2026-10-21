@@ -96,6 +96,9 @@ MIN_ALIGNMENT = 0.75  # share of a column's cells that line up (left, right or c
 ALIGN_TOL = 2.0  # cells line up when their edges (or centres) are this close
 CURVE_SHARE = 0.05  # one curve covering this share of the box makes it a drawing
 IMAGE_SHARE = 0.2  # raster images covering this share of the box make it a picture
+EDGE_GAP = 0.5  # x the table's text size: how close under the box a cut line sits
+EDGE_SIZE_TOLERANCE = 0.6  # pt: the line's glyphs are the table's size, within this
+EDGE_COLUMN_TOLERANCE = 3.0  # pt: it starts where a column of the grid starts, within this
 CAPTION_MAX_GAP = 36.0  # furthest a "Table N" caption may sit from its table (as figures)
 LAYOUT_CELL_CHARS = 60  # mean text length of a prose column in a layout grid
 WORD_GRID_WORDS = 3  # a grid of terms: no cell longer than this (words) ...
@@ -166,6 +169,10 @@ REASON_TERMS = "grid of terms"  # claimed, not data: written as a list (`is_term
 # of the next page's table, and that table's first row is the end of it.
 REASON_ROW_SPLIT = "last row continues on the next page"
 REASON_ROW_CONTINUED = "first row ends the last row of the page before"
+# A line of the table's own size, outside its box, right under it and starting where a column
+# starts: probably the rest of a cell the box ended a line too early (`_edge_text`). The grid
+# and a model that reads the crop both miss it, so the table step asks a person.
+REASON_EDGE_TEXT = "text at the table's edge outside its box"
 
 # Verdicts of `judge` (codes, safe to log and count).
 TABLE = "table"
@@ -1932,7 +1939,58 @@ def find_with_judgements(
         table.lines |= _claimed_lines(view, table.bbox)
         table.paths = _claimed_paths(paths, table.bbox)
         table.at_top = _at_top(view, table)
+    inside = set().union(*(table.lines for table in tables)) if tables else set()
+    for table in tables:
+        if _edge_text(view, table, inside):
+            table.reasons.append(REASON_EDGE_TEXT)
     return tables, judged
+
+
+def _edge_text(view: _PageView, table: PageTable, claimed: set[int]) -> bool:
+    """Is there a line no table or caption claimed, of the table's own text size, just under
+    its box and starting where one of its columns starts? The box of an unruled table can end a
+    line early and leave the last line of a wrapped cell outside it; the grid then lacks the
+    words and so does the crop the model reads, so nothing downstream sees the loss. Text
+    above is not looked at (a title or a heading is not a cell), nor is a line of another size
+    (a heading), one that starts off the columns (a note), one that runs on across the columns
+    (a paragraph that follows the table closely) or one a line's gap further down."""
+    size = _median_size(view, table.bbox)
+    glyphs = [ch for chars in view.glyphs_in(table.bbox) for ch in chars if not ch.blank]
+    edges: dict[float, float] = {}  # where the text of a column starts -> where its cells end
+    for cell in table.grid.cells:
+        if cell.bbox is None:
+            continue
+        cx0, cy0, cx1, cy1 = cell.bbox
+        inside = [
+            ch.x0
+            for ch in glyphs
+            if cx0 <= (ch.x0 + ch.x1) / 2 <= cx1 and cy0 <= (ch.y0 + ch.y1) / 2 <= cy1
+        ]
+        if inside:
+            start = min(inside)
+            edges[start] = max(edges.get(start, cx1), cx1)
+    if not edges:
+        return False
+    x0, _, x1, bottom = table.bbox
+    for i, line in enumerate(view.lines):
+        if i in claimed or line.vertical:
+            continue
+        lx0, ly0, lx1, _ = line.bbox
+        ink = [ch for ch in line.chars if not ch.blank]
+        if not ink or not 0.0 <= ly0 - bottom <= EDGE_GAP * size:
+            continue
+        if lx1 < x0 or lx0 > x1:
+            continue
+        if any(abs(ch.size - size) > EDGE_SIZE_TOLERANCE for ch in ink):
+            continue
+        first = min(ink, key=lambda ch: ch.x0).x0
+        # It stays in its column: a line that runs on across the columns is a paragraph.
+        if any(
+            abs(first - start) <= EDGE_COLUMN_TOLERANCE and lx1 <= end + EDGE_COLUMN_TOLERANCE
+            for start, end in edges.items()
+        ):
+            return True
+    return False
 
 
 def _overlaps(a: BBox, b: BBox) -> bool:
