@@ -356,6 +356,7 @@ _ARROWS: list[tuple[str, str | None]] = [
     ("<-", "\\longleftarrow"),
 ]
 _COEFFICIENT = re.compile(r"(\d+(?:\.\d+)?)(?:/(\d+))?")
+_GREEK = re.compile(r"\\(alpha|beta|gamma|nu)(?![A-Za-z])")
 _STATE = re.compile(r"\((?:aq|s|l|g)\)")
 _LABEL_CHARS = re.compile(r"^[A-Za-z0-9 .,\\]+$")
 _SIGNS = "+−–-"
@@ -388,8 +389,8 @@ def _prefix_number(s: str, i: int) -> tuple[str, int] | None:
     if i < len(s) and s[i] == "{":
         inner, j = _read_braced(s, i)
         inner = inner.replace("−", "-")
-        return (inner, j) if re.fullmatch(r"[+-]?\d+", inner) else None
-    match = re.match(r"[+-]?\d+", s[i:])
+        return (inner, j) if re.fullmatch(r"[+-]?\d+|[A-Z]", inner) else None
+    match = re.match(r"[+-]?\d+|[A-Z](?![a-z])", s[i:])
     return (match.group(0), i + match.end()) if match else None
 
 
@@ -412,7 +413,7 @@ def _nuclide_prefix(s: str, i: int) -> tuple[str, int] | None:
                     return None
                 sub = number[0]
             j = number[1]
-    if (sup is None and sub is None) or j >= len(s) or not s[j].isalpha():
+    if (sup is None and sub is None) or j >= len(s) or not (s[j].isalpha() or s[j] == "\\"):
         return None
     return "{}" + (f"^{_group(sup)}" if sup else "") + (f"_{_group(sub)}" if sub else ""), j
 
@@ -422,7 +423,7 @@ def _caret(s: str, i: int) -> tuple[str, int]:
     if i + 1 < len(s) and s[i + 1] == "{":
         inner, j = _read_braced(s, i + 1)
         inner = inner.replace("−", "-").replace("–", "-")
-        if not re.fullmatch(r"[0-9A-Za-z+-]+", inner):
+        if not re.fullmatch(r"[0-9A-Za-z+*-]+", inner):
             raise CeError("unreadable superscript")
         return "^" + _group(inner), j
     match = _CARET_CHARGE.match(s, i)
@@ -485,11 +486,16 @@ def _species_latex(s: str, i: int) -> tuple[str, int]:
             if len(two) == 2 and "a" <= two[1] <= "z" and two in ELEMENTS:
                 letters.append(two)
                 i += 2
-            elif c in ELEMENTS:
-                letters.append(c)
+            elif c in ELEMENTS or (c in "XY" and prefix and not body and not letters):
+                letters.append(c)  # X and Y: the generic symbol of a nuclide, ^{A}_{Z}X
                 i += 1
             else:
                 raise CeError("not an element symbol")
+            atoms += 1
+            base = True
+        elif c == "\\" and (greek := _GREEK.match(s, i)) and not body and not letters:
+            put("\\" + greek.group(1) + " ")  # a particle: alpha, beta, gamma, nu
+            i = greek.end()
             atoms += 1
             base = True
         elif c in "enp" and not body and not letters:
@@ -580,6 +586,11 @@ def _arrow_label(s: str, i: int) -> tuple[str | None, int]:
     return "\\text{" + raw + "}", close + 1
 
 
+def _is_species_latex(piece: str) -> bool:
+    """Is the last thing written a species (not a plus, an arrow or a coefficient)?"""
+    return piece not in {"+", ","} and not piece.startswith(("\\long", "\\xr", "\\xl", "\\over"))
+
+
 def ce_to_latex(source: str) -> str:
     r"""Plain LaTeX for the body of one `\ce{...}`. Raises `CeError` for anything outside the
     subset in the module docstring. The result uses only commands the LaTeX check allows."""
@@ -614,10 +625,15 @@ def ce_to_latex(source: str) -> str:
             out.append(c)
             i += 1
             continue
+        state = _STATE.match(s, i)
+        if state and out and _is_species_latex(out[-1]):
+            out[-1] += "\\text{" + state.group(0) + "}"
+            i = state.end()
+            continue
         match = _COEFFICIENT.match(s, i)
         if match:
             after = s[match.end() : match.end() + 1]
-            if after == "" or after.isspace() or after.isalpha() or after in "([":
+            if after == "" or after.isspace() or after.isalpha() or after in "([^_\\":
                 whole, frac = match.group(1), match.group(2)
                 out.append(f"\\frac{{{whole}}}{{{frac}}}" if frac else whole)
                 i = match.end()

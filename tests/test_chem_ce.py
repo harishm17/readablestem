@@ -83,6 +83,21 @@ NS = "{http://www.w3.org/1998/Math/MathML}"
             r"{}^{238}_{92}\text{U} \longrightarrow {}^{234}_{90}\text{Th} + {}^4_2\text{He}",
         ),
         ("n", r"\text{n}"),
+        # particles, generic nuclides, an excited mark, a coefficient before a nuclide
+        (r"^{4}_{2}\alpha", r"{}^4_2\alpha"),
+        (r"^{0}_{0}\gamma", r"{}^0_0\gamma"),
+        (r"\gamma + \gamma", r"\gamma + \gamma"),
+        (r"^{A}_{Z}X", r"{}^A_Z\text{X}"),
+        (
+            r"^{87}_{38}Sr^{*} -> ^{87}_{38}Sr + \gamma",
+            r"{}^{87}_{38}\text{Sr}^* \longrightarrow {}^{87}_{38}\text{Sr} + \gamma",
+        ),
+        (
+            r"^{235}_{92}U + ^{1}_{0}n -> 3^{1}_{0}n",
+            r"{}^{235}_{92}\text{U} + {}^1_0\text{n} \longrightarrow 3 {}^1_0\text{n}",
+        ),
+        # a state symbol after a space belongs to the species before it
+        (r"H2PO4- (aq) + OH-(aq)", r"\text{H}_2\text{PO}_4^-\text{(aq)} + \text{OH}^-\text{(aq)}"),
     ],
 )
 def test_ce_subset(ce, latex):
