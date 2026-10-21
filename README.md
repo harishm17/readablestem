@@ -168,17 +168,16 @@ again (the PDFs were printed again, so their bytes differ; text and gold are the
 | Heading F1 | 0.961 | 0.963 | 0.932 | 0.914 |
 | Figure descriptions the judge passes | 0.971 | 0.957 | 0.804 | 0.833 |
 | Equations with an added symbol (aligned) | 0.087 | 0.013 | 0.020 | 0.017 |
-| Equations with no gold partner and no match in the PDF | 0.027 | **0.234** | 0.294 | 0.226 |
+| Equations with no gold partner and no match in the PDF (registered rule) | 0.027 | **0.234** | 0.294 | 0.226 |
+| Same, rows checked one at a time (secondary) | 0.011 | 0.208 | 0.288 | 0.224 |
+| Same, only equations with a text layer in the PDF (rule / rows) | not split | 0.035 / 0.015 | not split | not split |
 | Required decisions per PDF page | 1.76 | 1.33 | 0 | 0 |
 | Cost per PDF page (median) | $0.0125 | $0.0104 | $0.0477 | $0.0015 |
 
 By the registered method, ReadableSTEM minus the Opus chatbot on the primary score is -0.025 (99%
 interval -0.069 to +0.020, sign-flip p = 0.39): no difference this set can detect, where the
 registered run had -0.118 (-0.199 to -0.025). The change of ReadableSTEM itself on these sections is
-+0.093 (95% +0.039 to +0.144, sign-flip p = 0.023). What got worse: equations with no gold partner
-and no match in the PDF went from 0.027 to 0.234 (mostly multi-row derivations that are read as one
-equation now and that the rule cannot match to the PDF's symbol order; a reading of three sections,
-not an audit), and the share of wrong equations a person is asked about fell (flag recall 0.34 to
++0.093 (95% +0.039 to +0.144, sign-flip p = 0.023). What got worse: equations with no gold partner and no match in the PDF went from 0.027 to 0.234 by the registered rule (0.011 to 0.208 with the rows of a derivation checked one at a time). An audit of 30 of them (seeded, by section) found no wrong or invented reading: 25 were correct readings the check cannot support (22 are pictures of equations, which the 0.5.0 layout now reads and 0.4.0 left as figures, so the PDF holds no text for them; 3 are derivations whose rows are not one run of the text layer) and 5 were spans that swallowed neighbouring text. The comparable number is the equations that have a text layer: 0.035 (0.015 by rows) against 0.027 (0.011) registered. The check asks whether an equation without an answer-key partner can be found in the PDF's text; it cannot tell a right reading of a picture from a wrong one. The share of wrong equations a person is asked about fell (flag recall 0.34 to
 0.21, precision 0.79 to 0.89). Chemistry is as before (0.04). Recorded spend $9.23. The same recipe
 on the development sets (one run each, `docs/eval-page-math.md`): Haiku 0.514 against 0.486 on 114
 pages, Opus 0.586 and ReadableSTEM 0.597 on 49, a tie on maths sections and the chatbots ahead on

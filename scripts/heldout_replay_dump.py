@@ -61,6 +61,10 @@ def main() -> int:
 
     def wrapped(*args, **kwargs):
         arm = original(*args, **kwargs)
+        for outcome in arm.outcomes:  # the items of every run, for diagnosis
+            (dump / f"items.{outcome.task}.run{outcome.repeat}.json").write_text(
+                json.dumps(outcome.items)
+            )
         (dump / "html.json").write_text(
             json.dumps({f"{r}|{s}": h for (r, s), h in arm.html.items()})
         )

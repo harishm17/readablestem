@@ -88,7 +88,10 @@ chatbot arms (registered run). Intervals are the registered ones (cluster bootst
 | Invented: prose sentences (includes text the tool writes) | 0.079 | 0.084 [0.057, 0.122] | 0.040 | 0.037 |
 | Invented: numbers | 0 of 3,672 | 0 of 3,906 | 5 of 3,088 | 5 of 3,058 |
 | Invented: aligned equations with an added symbol | 0.087 | **0.013** (31/2,447) | 0.020 | 0.017 |
-| Invented: equations with no gold partner and no match in the PDF | 0.027 (14/521) | **0.234** (124/529) [0.035, 0.442] | 0.294 | 0.226 |
+| Invented: equations with no gold partner and no match in the PDF (registered rule; see "What got worse") | 0.027 (14/521) | **0.234** (124/529) [0.035, 0.442] | 0.294 | 0.226 |
+| Same, rows of a derivation or system checked one at a time (secondary, `row_support`) | 0.011 (6/521) | 0.208 (110/529) | 0.288 | 0.224 |
+| Same, only equations that have a text layer in the PDF (rule / rows) | not split | 0.035 / 0.015 (14 / 6 of 399) | not split | not split |
+| Same, only equations that are pictures (no text layer to match: rule / rows) | none (read as figures in 0.4.0) | 0.846 / 0.800 (110 / 104 of 130) | not split | not split |
 | Heading F1 / level right | 0.961 / 1.000 | 0.963 / 1.000 | 0.932 / 0.341 | 0.914 / 0.508 |
 | Figure judge pass / factual errors | 0.971 / 0 of 138 | 0.957 [0.868, 1.0] / 0 of 138 | 0.804 / 3 of 134 | 0.833 / 12 of 133 |
 | Required decisions per PDF page | 1.76 | 1.33 | 0 | 0 |
@@ -121,16 +124,57 @@ by the converter, as on the development set); College Physics is 0.831 against 0
 ### What got worse, and what the numbers do not say
 
 - **Equations with no gold partner and no match in the PDF: 0.027 to 0.234** (14 to 124 of about
-  525). This is the invented-content check, and it moved the wrong way by a lot. Looking at the
-  flagged units of three sections (`readablestem eval invented score --units`), most are multi-row
-  derivations that the 0.5.0 rules now read as one equation: the model writes the rows one after
-  another, while the PDF's text layer orders their symbols differently, so no run of the PDF's
-  symbols matches ("18 p + 6 q + 15 p + 5 q 18 p + 15 p + 6 q + 5 q"; "5 13 + ( 4 4 ) 5 13 + 1 1 ..."),
-  which the rule counts as unsupported. That reading is from three sections and is not an audit;
-  the rule's precision is unaudited, as the report says. What it does show is that "invented" for
-  equations with no partner is not comparable between the 0.4.0 run (which cut those derivations into
-  pieces) and this one. The rate for aligned equations, the one that checks a symbol added to
-  an answer, improved from 0.087 to 0.013.
+  525) with the registered rule; **0.011 to 0.208** with the rows of a derivation checked one at a
+  time. This is the invented-content check and it moved the wrong way by a lot. The cause is not
+  a change of the rule (its code is unchanged) and not, on the evidence of an audit, more invented
+  equations: **the 0.5.0 layout now classifies pictures of equations as equations.** In 0.4.0 an
+  equation that is a picture in the PDF (a worked solution, a system, a determinant, a Lewis
+  structure) was a figure, so it was described, not read, and the check never saw it. Now the model
+  reads it, and the PDF holds no text for it: the check can only report it as unsupported. Of the 62
+  unsupported equations per run, 55 are pictures; per run 65 of the 264 equations without a gold
+  partner (25%) are pictures, and 85% of those are unsupported, against 3.5% (7 of 199) of the
+  equations that have a text layer, which is the same kind of equation the registered 0.027
+  (7 of 261 per run) was made of. The 83 pictures per run that moved from figure to equation are
+  4-3 (27), 4-6 (36), 7-3 (11), 1-5 (6), 3-1 (2) and 2-4 (1).
+  - **The audit** (30 of the 124 unsupported units, seeded, stratified by section, proportional
+    allocation with one at least per section: 4-3 and 4-6 twelve each, 1-5 three, 3-1 two, 7-3
+    one; each with the section and page, the model's reading, the text layer of the region and a
+    crop of the page region, looked at one by one). **(a) correct reading, metric artifact: 25.**
+    22 are pictures read correctly (e.g. the systems and the solution steps of 4-3, `5 + (-5) = 0`)
+    and 3 have a text layer but the rows of the derivation are not one run of it (the text layer
+    puts other text between them or orders them differently: `18p + 6q + 15p + 5q` over
+    `18p + 15p + 6q + 5q`; `0n + 5` over `0`; the fractions of 3-1). **(b) span problem: 5**, all
+    pictures: the element swallowed neighbouring text (Lewis structure with its captions, a
+    sentence with a sign matrix, two merged multi-item pictures, a right-hand commentary column).
+    **(c) a wrong or invented reading: 0** (with 30 draws, an upper bound of about 10% at 95% for
+    the share of the 124). The sample is mostly 4-3 and 4-6 because that is where the pictures are;
+    the classification of all 124 by whether the layout holds text for the element is: 110 pictures,
+    14 with a text layer.
+  - **The fix to the check** is a secondary count beside the rule, never in place of it
+    (`row_support` in `src/readablestem/eval/invented/score.py`, tests
+    `tests/test_eval_invented_rows.py`): an equation is read row by row (the outermost table rows,
+    plus anything outside the table), each row of four symbols or more is looked for in the
+    PDF's symbol stream with the rule's window and ratio, and the equation is supported when 80% of
+    its symbols sit in found rows. Rows shorter than four symbols cannot be checked (a matrix row of
+    three digits is found somewhere on any page of numbers; a first version that counted them
+    rescued determinant pictures by chance, and a test now pins that). It was written from the
+    audit's examples and the recorded re-measurement, not from the held-out answer key. It rescues
+    4 of the 7 text-layer equations per run and 3 pictures whose text is also in the PDF (a
+    sentence and a sign matrix, a pair of equations that the page also prints), and leaves the
+    other 3 text-layer equations unsupported (one- and two-symbol steps).
+  - **What the metric captures and what it does not:** it asks whether an equation the tool wrote,
+    with no partner in the answer key, can be found in the text layer of the PDF, so it flags
+    equations the tool made up from text that is not there; it cannot support a correct reading of
+    a picture (there is no text), and it cannot tell a wrong picture reading from a right one, so
+    on pages with equation pictures it measures how many equations are pictures more than
+    how many are invented. The chatbot arms read the same pictures and their rates carry the same
+    artifact (0.294 and 0.226 by the rule, 0.288 and 0.224 by rows); their text-layer and picture
+    cases were not split (their HTML carries no layout ids). Read against the registered 0.027, the
+    comparable number for this run is the text-layer one, 0.035 by the rule and 0.015 by rows
+    (14 and 6 of 399 over two runs), against 0.027 and 0.011 for the registered run, not 0.234. An
+    audit of whether the picture readings are right is the 30 above, nothing more; the aligned
+    equations (a gold partner, symbol-level check) are the measure of readings against the answer
+    key, and improved from 0.087 to 0.013.
 - **Equation flag recall fell** (0.34 to 0.21) while precision rose (0.79 to 0.89): there are
   fewer required decisions per page (1.76 to 1.33), and `below_accept` is the biggest reason
   (204 fixes). The share of wrong equations that nobody is asked about is about the same (22.4 per
@@ -138,7 +182,7 @@ by the converter, as on the development set); College Physics is 0.831 against 0
 - **Chemistry is unchanged** (0.041 for ReadableSTEM and for the chatbot, symbols 0.65 against 0.13): the
   primary scorer cannot give a perfect transcriber credit on the answer key's chemistry markup.
 - **Not measured again**: seconds per page (`--section-workers 3`), axe-core (deviation 1), the open
-  parsers, the chatbot arms, the invented-content audit, whether a wrong equation changes the meaning.
+  parsers, the chatbot arms, a full audit of the invented-content rule (30 units were read, above), whether a wrong equation changes the meaning.
 
 ## The same chatbot comparison on the development sets
 

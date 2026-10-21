@@ -8,6 +8,11 @@
   result: [docs/remeasurement-2026-10-21.md](docs/remeasurement-2026-10-21.md); the README keeps
   the registered numbers beside it.
 
+- Invented-content check: a secondary count `unsupported_by_rows` (rows of a derivation checked
+  one at a time) beside the unchanged rule, and an audit of why the unsupported-equation rate rose
+  with 0.5.0 (equation pictures are now read, and have no text to match):
+  [docs/remeasurement-2026-10-21.md](docs/remeasurement-2026-10-21.md).
+
 - Page math pass (off: `FEATURE_PAGE_MATH`, [ADR 0006](docs/decisions/0006-page-math-pass.md)):
   one cheap-model call per page proposes where the equations are, quoting the PDF's text layer;
   every quote is verified against the text layer, verified spans are laid over layout's own

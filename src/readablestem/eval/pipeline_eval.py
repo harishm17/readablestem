@@ -1426,6 +1426,9 @@ def document_page_item(
                 "piece_of": gold[pieces[pi]]["id"] if pi in pieces else None,
                 "text_layer_supported": _text_layer_supported(element, fix, reason),
                 "pred_text": (element.text or "")[:300],
+                "pred_latex": fix.equation.latex if fix is not None and fix.equation else None,
+                "review": fix.review if fix is not None else None,
+                "tier_reasons": triage.tier_reasons(fix) if fix is not None else [],
                 **_page_pass_fields(element, fix),
             }
         )
