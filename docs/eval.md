@@ -937,6 +937,12 @@ are in "Content features after integration" below. The scorer was checked agains
 research benchmark first (below). Code: `eval/tables.py`; the design is in the author's
 private research notes, which are not in this repository.
 
+2026-10-21: the model mode was run again with claude-haiku-5-5 and claude-opus-5-5 (183 tables,
+$2.26) and the document task with the flag on and off; the numbers, the gate result and the
+decision are in [tables.md](tables.md), "Tables on, on the development sets". The document task's
+report has a `table_cell_maths` block (formulas of the gold's table cells found in the output's
+cells; `eval/table_maths.py`), and the chemistry measurements are in [chemistry.md](chemistry.md).
+
 ### Gold
 
 | Set | Where | Licence | Documents | Data tables | Layout tables |
