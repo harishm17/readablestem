@@ -43,8 +43,8 @@ _NAMED_OPERATORS = re.compile(r"\\(arg)(?![A-Za-z])")
 
 def prepare(latex: str) -> str:
     r"""What the converter has to be given for a few author-level commands that it does not know:
-    `\ensuremath{X}` and `\textcolor{c}{X}` are `X`, `\mathop` is `\operatorname`; `\arg` is an operator name;
-    `\limits` and spacing that only moves things are dropped. Nothing else is changed."""
+    `\ensuremath{X}` and `\textcolor{c}{X}` are `X`, `\mathop` is `\operatorname` and
+    `\arg` is an operator name; `\limits` and spacing that only moves things are dropped. Nothing else is changed."""
     text = latex
     for name in _UNWRAP:
         text = _unwrap(text, name, 1)
