@@ -183,6 +183,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "once spacing is ignored, so this was accepted as it is.",
     ("table.cell_text", "no_pdf_text"): "The PDF stores no text for this table to compare "
     "the cells with, so check every value against the image.",
+    ("table.edge_text", "text_at_edge"): "There is text right under this table, in the same "
+    "size and lined up with one of its columns, that is not in a cell: probably the rest of a "
+    "wrapped cell, so check the last row against the image.",
     ("table.math", "invalid_latex"): "The maths in a cell could not be converted, so that "
     "cell shows plain text instead: check it against the image.",
     ("table.math", "flattened_maths"): "Some cells of the grid read from the PDF hold maths "
