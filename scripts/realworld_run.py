@@ -1,0 +1,284 @@
+"""Real-world set, step 3: run the arms on a part (dev or held-out) and keep their answers.
+
+    R="uv run --env-file .env python scripts/realworld_run.py"
+    $R estimate   --part dev
+    $R rs         --part dev --max-usd 4 --note "..."
+    $R chat       --part dev --arm chatbot-haiku-purdue --max-usd 1
+    $R chat-items --part dev --arm chatbot-haiku-purdue
+
+Arms: `rs` is ReadableSTEM at its current settings (provider anthropic, the settings' main and
+cheap models, page math pass off, no second check) through the document task (`eval pipeline
+--task document`, reached through the CLI's own code with this set's media); `chat` is the chatbot
+recipe of the proof (`proof.chatbot.record_arms`: the PDF, a 150 dpi PNG of every page and the
+verbatim Purdue sentence, no system prompt). Every model answer is recorded under ROOT/runs and a
+rerun replays it for free (`--answers`); nothing is asked twice.
+
+The held-out part: runs only when `data/realworld/REGISTRATION.sha256` is present and every file it
+lists still has the recorded hash (the registration, the manifests, the order), when the gold on
+disk matches the manifest, and when that arm has not been recorded on the held-out part before (a
+marker file is written when the run finishes). `--offline` replays an existing recording and
+spends nothing.
+
+Each live run appends to `data/realworld/spend-log.jsonl` (the estimate it was given, its cap, what
+it cost, from the recorded answers). Keys come from the environment (ANTHROPIC_API_KEY).
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+from readablestem.eval import pipeline_eval as pe
+from readablestem.eval.realworld_media import RealWorldMedia
+from readablestem.proof import chatbot
+from readablestem.proof import systems as S
+
+ROOT = Path.home() / ".cache" / "readablestem" / "realworld"
+REPO = Path(__file__).resolve().parent.parent
+DATA = REPO / "data" / "realworld"
+SPEND_LOG = DATA / "spend-log.jsonl"
+# Per PDF page, list price, used only to size a run before it is paid for (from the OpenStax
+# held-out runs, 2026-10-14 and 2026-10-21); the real figure is measured and logged.
+ESTIMATE_PER_PAGE = {"rs": 0.020, "chatbot-haiku-purdue": 0.003, "chatbot-opus-purdue": 0.060}
+
+
+def gold_dir(part: str) -> Path:
+    return ROOT / "gold" / part
+
+
+def runs_dir(part: str) -> Path:
+    return ROOT / "runs" / part
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def manifest(part: str) -> dict:
+    return json.loads((gold_dir(part) / "manifest.json").read_text(encoding="utf-8"))
+
+
+def verify_gold(part: str) -> None:
+    """The gold and the cut PDFs on disk are the ones the manifest names."""
+    m = manifest(part)
+    for paper in m["papers"]:
+        slug = paper["id"].replace("/", "_")
+        if sha256(gold_dir(part) / f"{slug}.jsonl") != paper["gold_sha256"]:
+            raise SystemExit(f"gold of {paper['id']} differs from the manifest")
+        if sha256(gold_dir(part) / "pdfs" / f"{slug}.pdf") != paper["extract_pdf_sha256"]:
+            raise SystemExit(f"PDF of {paper['id']} differs from the manifest")
+
+
+def require_registration(part: str, arm: str, offline: bool) -> None:
+    if part != "heldout":
+        return
+    reg = DATA / "REGISTRATION.sha256"
+    if not reg.is_file():
+        raise SystemExit("the held-out part is not registered (data/realworld/REGISTRATION.sha256)")
+    for line in reg.read_text().splitlines():
+        digest, _, name = line.partition("  ")
+        if sha256(DATA / name) != digest:
+            raise SystemExit(f"registered file {name} has changed since registration")
+    marker = runs_dir(part) / f"{arm}.recorded"
+    if marker.is_file() and not offline:
+        raise SystemExit(f"{arm} was already recorded on the held-out part: replay with --offline")
+
+
+def papers(part: str) -> list[dict]:
+    return manifest(part)["papers"]
+
+
+def log_spend(entry: dict) -> None:
+    entry = {"when": dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"), **entry}
+    with SPEND_LOG.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, sort_keys=True) + "\n")
+
+
+def cmd_estimate(args: argparse.Namespace) -> int:
+    m = manifest(args.part)
+    pages = m["n_pages"]
+    print(f"{args.part}: {m['n_papers']} papers, {pages} pages, {m['n_equations']} equations")
+    for arm, per_page in ESTIMATE_PER_PAGE.items():
+        print(f"  {arm:24s} ${pages * per_page:6.2f}  (at ${per_page}/page)")
+    return 0
+
+
+# ------------------------------------------------------------------------------ ReadableSTEM
+
+
+def cmd_rs(args: argparse.Namespace) -> int:
+    from readablestem.cli import eval_cli
+    from readablestem.cli.main import build_parser
+
+    verify_gold(args.part)
+    require_registration(args.part, "rs", args.offline)
+    out_dir = runs_dir(args.part) / args.tag
+    out_dir.mkdir(parents=True, exist_ok=True)
+    answers = out_dir / "answers.jsonl"
+    report = out_dir / "report.json"
+    items = out_dir / "items.jsonl"
+    argv = [
+        "eval", "pipeline", "--task", "document", "--provider", "anthropic",
+        "--answers", str(answers), "--items", str(items), "--out", str(report),
+        "--section-workers", "3", "--cache", str(out_dir / "cache"),
+        "--max-usd", str(args.max_usd),
+    ]  # fmt: skip
+    if args.offline:
+        argv.append("--answers-offline")
+    ns = build_parser().parse_args(argv)
+    before = answers_cost(answers)
+    code = eval_cli._run_pipeline(
+        ns,
+        gold_dir(args.part),
+        report,
+        gold_label=f"realworld ({args.part})",
+        media_cls=RealWorldMedia,
+        cache_dir=out_dir / "cache",
+        openstax_cache=out_dir / "cache",
+    )
+    spent = answers_cost(answers) - before
+    if code == 0 and not args.offline:
+        log_spend(
+            {
+                "part": args.part, "arm": "rs", "tag": args.tag,
+                "estimate_usd": round(manifest(args.part)["n_pages"] * ESTIMATE_PER_PAGE["rs"], 2),
+                "cap_usd": args.max_usd, "actual_usd": round(spent, 4), "note": args.note,
+            }
+        )  # fmt: skip
+        if args.part == "heldout":
+            (runs_dir(args.part) / "rs.recorded").write_text(dt.date.today().isoformat())
+    print(f"spent this start: ${spent:.4f}")
+    return code
+
+
+def answers_cost(path: Path) -> float:
+    """What the answers in the file cost at list price (each answer paid once)."""
+    if not path.is_file():
+        return 0.0
+    total = 0.0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            total += float((json.loads(line).get("call") or {}).get("cost_usd") or 0.0)
+    return total
+
+
+# ---------------------------------------------------------------------------------- chatbots
+
+
+def pdfs_of(part: str, only: list[str] | None = None) -> dict[str, Path]:
+    found = {}
+    for paper in papers(part):
+        if only and paper["id"] not in only:
+            continue
+        slug = paper["id"].replace("/", "_")
+        found[f"arxiv/{slug}"] = gold_dir(part) / "pdfs" / f"{slug}.pdf"
+    return found
+
+
+def cmd_chat(args: argparse.Namespace) -> int:
+    verify_gold(args.part)
+    arm = chatbot.ARM_BY_ID[args.arm]
+    require_registration(args.part, arm.id, False)
+    only = args.papers.split(",") if args.papers else None
+    pdfs = pdfs_of(args.part, only)
+    out = runs_dir(args.part) / "chat" / "systems"
+    pages = sum(chatbot.pdf_page_count(p) for p in pdfs.values())
+    estimate = pages * ESTIMATE_PER_PAGE[arm.id]
+    print(
+        f"{arm.id}: {len(pdfs)} papers, {pages} pages, estimate ${estimate:.2f}, "
+        f"cap ${args.max_usd}"
+    )
+    before = chatbot.recorded_cost(out, [arm.id])
+    summary = chatbot.record_arms(
+        pdfs, out, arms=[arm], max_usd=args.max_usd, client=chatbot.make_client(arm.provider),
+        workers=args.workers, runs=1,
+    )  # fmt: skip
+    spent = chatbot.recorded_cost(out, [arm.id]) - before
+    print(json.dumps(summary))
+    log_spend(
+        {
+            "part": args.part, "arm": arm.id, "papers": len(pdfs), "pages": pages,
+            "estimate_usd": round(estimate, 2), "cap_usd": args.max_usd,
+            "actual_usd": round(spent, 4), "refused_by_cap": summary["refused_by_cap"],
+            "note": args.note,
+        }
+    )  # fmt: skip
+    if args.part == "heldout" and not summary["refused_by_cap"]:
+        (runs_dir(args.part) / f"{arm.id}.recorded").write_text(dt.date.today().isoformat())
+    return 0
+
+
+def chat_items(part: str, arm_id: str) -> list[dict]:
+    """The document task's item of every paper the arm answered (a paper it was not run on has
+    no item; a paper whose run failed is scored as found nothing)."""
+    arms = S.load_arms_dir(runs_dir(part) / "chat" / "systems")
+    runs = arms.get(arm_id, {})
+    records = pe.load_gold(gold_dir(part))
+    items = []
+    for unit in pe.group_pages(records):
+        section = pe._page_id(unit)
+        if section not in runs:
+            continue
+        run = runs[section][0]
+        output = run.read()
+        item = S.equation_item(section, pe._of_kind(unit, "equation"), output)
+        item["pdf_pages"] = run.pdf_pages
+        item["cost_usd"] = run.cost_usd
+        item["status"] = run.status
+        item["seconds"] = float(run.meta.get("seconds") or 0.0)
+        item["review"] = pe.load_counts([])  # a chatbot asks nobody about anything
+        items.append(item)
+    return items
+
+
+def cmd_chat_items(args: argparse.Namespace) -> int:
+    items = chat_items(args.part, args.arm)
+    out = runs_dir(args.part) / "chat" / f"{args.arm}.items.jsonl"
+    out.write_text("".join(json.dumps(i) + "\n" for i in items), encoding="utf-8")
+    for item in items:
+        print(
+            item["id"],
+            item["status"],
+            f"${item['cost_usd']:.4f}",
+            item["matched"],
+            "/",
+            item["n_gold"],
+        )
+    print(f"wrote {out}")
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    sub = parser.add_subparsers(dest="command", required=True)
+    for name, func in (
+        ("estimate", cmd_estimate),
+        ("rs", cmd_rs),
+        ("chat", cmd_chat),
+        ("chat-items", cmd_chat_items),
+    ):
+        p = sub.add_parser(name)
+        p.add_argument("--part", choices=["dev", "heldout"], required=True)
+        if name == "rs":
+            p.add_argument("--max-usd", type=float, required=True)
+            p.add_argument("--tag", default="rs")
+            p.add_argument("--offline", action="store_true")
+            p.add_argument("--note", default="")
+        if name in ("chat", "chat-items"):
+            p.add_argument("--arm", choices=sorted(chatbot.ARM_BY_ID), required=True)
+        if name == "chat":
+            p.add_argument("--max-usd", type=float, required=True)
+            p.add_argument("--workers", type=int, default=2)
+            p.add_argument("--papers", help="comma-separated arXiv ids (default: all of the part)")
+            p.add_argument("--note", default="")
+        p.set_defaults(func=func)
+    args = parser.parse_args()
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
