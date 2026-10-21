@@ -314,7 +314,9 @@ class Settings(BaseSettings):
     feature_page_math: bool = False
     page_math_model: str | None = None
     # A layout span the page pass did not confirm has its equation confidence scaled by this.
-    page_math_unconfirmed_factor: float = Field(default=0.9, gt=0, le=1)
+    # 1.0 (no change) because, on dev slice A, 16 aligned equations fell under the accept bar
+    # for it and 14 of them were right (docs/eval-page-math.md); set below 1 to try it.
+    page_math_unconfirmed_factor: float = Field(default=1.0, gt=0, le=1)
     # Write each converted equation's stored speech text (`pipeline.speech`, the reading
     # shown on the review screen) as the `alttext` attribute of its <math>. OFF until a
     # person has checked it with NVDA + MathCAT (and ideally JAWS and VoiceOver): some

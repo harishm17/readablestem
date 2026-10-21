@@ -780,6 +780,9 @@ class PageMathSummary(BaseModel):
     inline: int = 0  # inline spans placed
     numbers: int = 0  # exercise or item numbers cut off
     labels: int = 0  # equation numbers cut off
+    refused: int = 0  # display spans that would split a layout region: layout's cut is kept
+    inconsistent: int = 0  # spans whose LaTeX and quoted text disagree
+    absorbed: int = 0  # bracket rows taken into a placed region
     stopped_by: str | None = None  # a spend cap that ended the pass early
 
 

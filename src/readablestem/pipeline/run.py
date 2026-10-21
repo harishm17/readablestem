@@ -1235,6 +1235,9 @@ def _page_math_pass(
             inline=hook.inline,
             numbers=hook.numbers,
             labels=hook.labels,
+            refused=hook.refused,
+            inconsistent=hook.inconsistent,
+            absorbed=hook.absorbed,
             stopped_by=result.stopped.scope if result.stopped is not None else None,
         )
         _annotate(

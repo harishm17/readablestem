@@ -70,6 +70,51 @@ anchor per row, in reading order, each quoting the part of that row that belongs
 entry (usually the whole row). If you cannot quote an expression from the rows (it is only
 in the image, a picture of an equation), leave it out: it is handled elsewhere.
 
+## Examples
+
+Rows, then the entries you would report. (Row ids and glyphs are only for illustration.)
+
+    L3 | 12.
+    L4 | Solve the system.
+    L5 | { 𝑥−4𝑦= −4
+    L6 | −3𝑥+ 4𝑦= 0
+
+`12.` is an exercise number: its own entry, never inside the equation. The two lines of the
+system are ONE block entry with two anchors (not one entry per line), and "Solve the system."
+is not part of it:
+
+    {"anchors": [{"line": "L3", "start": 0, "quote": "12."}], "display": "inline",
+     "role": "exercise_or_item_number", "latex": "12."}
+    {"anchors": [{"line": "L5", "start": 0, "quote": "{ 𝑥−4𝑦= −4"},
+                 {"line": "L6", "start": 0, "quote": "−3𝑥+ 4𝑦= 0"}], "display": "block",
+     "role": "math", "latex": "\\left\\{\\begin{array}{l} x-4y=-4 \\\\ -3x+4y=0 \\end{array}\\right."}
+
+A display fraction arrives as rows: the numerator, the line that holds the equals sign and the
+equation number, the denominator. All three rows are one entry, and the number is its own entry:
+
+    L10 | 𝑣−𝑣0
+    L11 | 𝑎 = (2.4)
+    L12 | 𝑡
+
+    {"anchors": [{"line": "L10", "start": 0, "quote": "𝑣−𝑣0"},
+                 {"line": "L11", "start": 0, "quote": "𝑎 ="},
+                 {"line": "L12", "start": 0, "quote": "𝑡"}], "display": "block", "role": "math",
+     "latex": "a = \\frac{v - v_0}{t}"}
+    {"anchors": [{"line": "L11", "start": 4, "quote": "(2.4)"}], "display": "inline",
+     "role": "equation_number", "latex": "(2.4)"}
+
+Mathematics inside a sentence, a lone variable included, is one inline entry each; the words
+around it are not part of it:
+
+    L20 | The car moves at 𝑣 = 5.0 m/s for 𝑡 = 2 s, so its speed 𝑣 is small.
+
+    {"anchors": [{"line": "L20", "start": 17, "quote": "𝑣 = 5.0 m/s"}], "display": "inline",
+     "role": "math", "latex": "v = 5.0\\ \\text{m/s}"}
+    {"anchors": [{"line": "L20", "start": 33, "quote": "𝑡 = 2 s"}], "display": "inline",
+     "role": "math", "latex": "t = 2\\ \\text{s}"}
+    {"anchors": [{"line": "L20", "start": 54, "quote": "𝑣"}], "display": "inline",
+     "role": "math", "latex": "v"}
+
 ## Fields
 
 - `display`: `block` for an equation on lines of its own, `inline` for one inside a

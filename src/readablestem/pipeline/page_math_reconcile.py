@@ -114,6 +114,7 @@ class HookStats:
     skipped: int = 0
     inconsistent: int = 0  # spans whose LaTeX and quoted text disagree: left to layout
     absorbed: int = 0  # bracket and rule rows with no symbols taken into a placed region
+    refused: int = 0  # block spans that would split a layout region: layout's cut is kept
 
     def as_dict(self) -> dict[str, int]:
         return dict(self.__dict__)
@@ -183,12 +184,12 @@ class PageMathHook:
         blocks = [i for i, s in enumerate(spans) if s.role == "math" and s.display == "block"]
         block_rows = {seg.row for i in blocks for seg in spans[i].segments}
         for i, span in enumerate(spans):
+            if i in blocks:
+                continue
             for seg in span.segments:
                 lo, hi = chars(seg)
                 row = objects[seg.row]
-                if span.role == "math" and span.display == "block":
-                    cuts.setdefault(id(row), []).append(_Cut(lo, hi, "math", i))
-                elif span.role in ("exercise_or_item_number", "equation_number"):
+                if span.role in ("exercise_or_item_number", "equation_number"):
                     # Only where it numbers maths: a row layout reads as maths, or one that
                     # holds a block span. A list marker is layout's own business.
                     if row.marker is None and (row.kind == "math" or seg.row in block_rows):
@@ -200,6 +201,10 @@ class PageMathHook:
                     inline.append((seg.row, lo, hi, span.latex))
                 else:
                     nonmath.append((seg.row, lo, hi))
+        for i in self._screen_blocks(blocks, spans, by_id, objects, text_rows, rules, cuts):
+            for seg in spans[i].segments:
+                lo, hi = chars(seg)
+                cuts.setdefault(id(objects[seg.row]), []).append(_Cut(lo, hi, "math", i))
 
         # Cut the rows.
         pieces_of: dict[
@@ -284,6 +289,69 @@ class PageMathHook:
         self.stats.pages_applied += 1
         return out
 
+    def _screen_blocks(
+        self,
+        blocks: list[int],
+        spans: list[Span],
+        by_id: dict[str, PageRow],
+        objects: dict[str, Any],
+        text_rows: list[Any],
+        rules: list[Any],
+        carve: dict[int, list[_Cut]],
+    ) -> list[int]:
+        """The block spans that may replace layout's own cut, by the rule of ADR 0006:
+
+        a span stands where layout found no display equation (prose swallowed it, or nothing
+        was read), and where it covers every row of the regions it overlaps (a system layout
+        split, a determinant it left a row out of) or leaves of them only rows with no letter
+        or digit (a bracket). It does not stand where it would leave a row with symbols of a
+        region it only partly covers (it would split an equation layout kept whole; on the
+        development set that cost more than it gained), nor where it would leave, in a row it
+        shares, a piece layout reads as maths."""
+        # Layout's regions on the rows as they are: a trial, the marks are taken off again.
+        layout._equation_regions(text_rows, rules)
+        region_of = {id(r): r.region for r in text_rows if r.region is not None}
+        for row in text_rows:
+            row.region = None
+        taken: dict[int, list[tuple[int, int]]] = {
+            key: [(c.lo, c.hi) for c in cuts] for key, cuts in carve.items()
+        }
+        accepted: list[int] = []
+        for i in blocks:
+            touched = [
+                (
+                    objects[seg.row],
+                    by_id[seg.row].chars[seg.start],
+                    by_id[seg.row].chars[seg.end - 1] + 1,
+                )
+                for seg in spans[i].segments
+            ]
+            ids = {id(row) for row, _, _ in touched}
+            regions = {
+                id(region): region for row, _, _ in touched if (region := region_of.get(id(row)))
+            }
+            split = any(
+                id(row) not in ids and any(c.c.isalnum() for c in row.ink)
+                for region in regions.values()
+                for row in region.rows
+            )
+            mathy = False
+            for row, lo, hi in touched:
+                for start, end in _gaps(len(row.chars), [*taken.get(id(row), []), (lo, hi)]):
+                    piece = row.chars[start:end]
+                    if not any(not c.blank and c.c not in ",.;:" for c in piece):
+                        continue
+                    trial = layout._Row(piece, column=row.column)
+                    layout._classify_row(trial)
+                    mathy = mathy or trial.kind == "math"
+            if split or mathy:
+                self.stats.refused += 1
+                continue
+            for row, lo, hi in touched:
+                taken.setdefault(id(row), []).append((lo, hi))
+            accepted.append(i)
+        return accepted
+
     def _absorb_brackets(self, rows: list[Any], regions: list[Any]) -> None:
         """Rows of a matrix's or determinant's brackets (glyphs with no letter or digit in
         them, which the model's quotes leave out) that sit against a placed region belong to
@@ -302,6 +370,19 @@ class PageMathHook:
 
     def summary(self) -> Counter[str]:
         return Counter(self.stats.as_dict())
+
+
+def _gaps(length: int, taken: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    """The stretches of `0:length` that no `(lo, hi)` of `taken` covers."""
+    out: list[tuple[int, int]] = []
+    cursor = 0
+    for lo, hi in sorted(taken):
+        if lo > cursor:
+            out.append((cursor, lo))
+        cursor = max(cursor, hi)
+    if cursor < length:
+        out.append((cursor, length))
+    return out
 
 
 def _cut_row(row: Any, cuts: list[_Cut]) -> list[tuple[int, Any, str, int]]:

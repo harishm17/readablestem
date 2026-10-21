@@ -61,7 +61,9 @@ MIN_PAGE_CHARS = 4
 DEFAULT_CONCURRENCY = 4
 # Sentence punctuation left off the end of an inline span.
 _TRAILING = ",.;:"
-DEFAULT_EFFORT = "low"
+# Measured on dev slice A (docs/eval-page-math.md): the model's own spans match the answer key's
+# at 0.20 (low) against 0.32 (medium) by fidelity, for 0.001 and 0.0016 dollars a page.
+DEFAULT_EFFORT = "medium"
 
 
 # ----------------------------------------------------------------------------- rows

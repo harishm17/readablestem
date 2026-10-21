@@ -151,15 +151,28 @@ def test_a_page_reading_that_does_not_convert_is_no_reading():
 # ----------------------------------------------------------------------------- layout only
 
 
-def test_a_layout_only_span_is_a_little_less_sure():
-    """0.9 alone is accepted; 0.9 x 0.9 is under the 0.85 bar, so it waits for a decision."""
+def test_a_layout_only_span_keeps_its_confidence_by_default():
     client = by_model(cheap=out("x = 5", 0.9))
     fix = run(client, element(page_latex=None, status="layout"))
-    assert fix.confidence == pytest.approx(0.9 * SETTINGS.page_math_unconfirmed_factor)
+    assert SETTINGS.page_math_unconfirmed_factor == 1.0
+    assert fix.confidence == pytest.approx(0.9) and fix.status == Status.ACCEPTED
+
+
+def test_a_layout_only_span_is_a_little_less_sure_when_the_factor_is_set():
+    """0.9 alone is accepted; 0.9 x 0.9 is under the 0.85 bar, so it waits for a decision."""
+    client = by_model(cheap=out("x = 5", 0.9))
+    settings = make_settings(page_math_unconfirmed_factor=0.9)
+    fix = transcribe(
+        element(page_latex=None, status="layout"), PNG, client=client, settings=settings
+    )
+    assert fix.confidence == pytest.approx(0.81)
     assert fix.status == Status.NEEDS_REVIEW
 
 
 def test_a_confident_layout_only_span_is_still_accepted():
     client = by_model(cheap=out("x = 5", 0.98))
-    fix = run(client, element(page_latex=None, status="layout"))
+    settings = make_settings(page_math_unconfirmed_factor=0.9)
+    fix = transcribe(
+        element(page_latex=None, status="layout"), PNG, client=client, settings=settings
+    )
     assert fix.status == Status.ACCEPTED
