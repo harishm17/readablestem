@@ -1,0 +1,51 @@
+{
+ "part": "dev",
+ "seed": "realworld-2026-10-21",
+ "papers": [
+  {
+   "id": "2410.17311",
+   "title": "Multi-Point Hermite Methods for the N-Body Problem",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:NA",
+   "style": "research",
+   "pages_chosen": [
+    7,
+    8,
+    9,
+    11
+   ],
+   "equations": 97,
+   "display": 8,
+   "pdf_sha256": "1425e68a97b3d9a7bcf75caa4530e5b28830201de94a837339ecd97d5f3c483c",
+   "source_sha256": "e461c157df17a97cdb7f98fe77bc5b587bc775f1a8eb30d528435bcc19193449",
+   "extract_pdf_sha256": "f7ed3877ee5859a4d6a16003ee3d84dd9ec9d143ec1a1213aa5e465e8e2b3036",
+   "gold_sha256": "21dca6f8b6499e09b5c7f62ea956cee1120c78e58b661d679ba059c27e0dcbe1"
+  },
+  {
+   "id": "2503.02792",
+   "title": "Les Houches lectures on Theoretical Ecology: High-dimensional models and extreme events",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:cond-mat:stat-mech",
+   "style": "tutorial",
+   "pages_chosen": [
+    4,
+    5,
+    6,
+    7,
+    11,
+    18
+   ],
+   "equations": 125,
+   "display": 14,
+   "pdf_sha256": "fad30467406ab49faa19b87632a0588224cccbdffe6a628ce8cff32ee2d00399",
+   "source_sha256": "89022c7c6ceb0a2ef0a84f01e33f2ac26450eafc9b42e0f114abe9f4a4803f7e",
+   "extract_pdf_sha256": "0a76ee27b7f8776f60d12257d224cd91f504980bbec37d4e811aa355c2b61af4",
+   "gold_sha256": "58a8691f45b52bab1681c778c093ea305f580243568bc246a82d6dcf7da82f4d"
+  }
+ ],
+ "n_papers": 2,
+ "n_equations": 222,
+ "n_pages": 10
+}

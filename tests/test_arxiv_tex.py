@@ -307,3 +307,11 @@ def test_gold_records_are_in_reading_order_with_pages():
     assert all(r["mathml"].startswith("<math") and r["license_name"] == "CC BY 4.0" for r in rows)
     latex = [r["latex"] for r in rows]
     assert latex.index("y = 2x") < latex.index("a^2 + b^2 = c^2")
+
+
+def test_author_level_commands_are_prepared_for_the_converter():
+    assert "ensuremath" not in ag.prepare("\\ensuremath{x} + y")
+    assert ag.prepare("\\textcolor{red}{a}").strip() == "a"
+    assert "\\operatorname{arg}" in ag.prepare("\\arg\\min_y")
+    assert "\\operatorname{max}" in ag.prepare("\\mathop{max}_x")
+    ag.to_mathml("\\ensuremath{x}^2 \\nolimits + \\arg\\max_y f", display=False)

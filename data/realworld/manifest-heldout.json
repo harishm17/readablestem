@@ -1,0 +1,29 @@
+{
+ "part": "heldout",
+ "seed": "realworld-2026-10-21",
+ "papers": [
+  {
+   "id": "2504.05959",
+   "title": "Old and New Results on Alphabetic Codes",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "cs:cs:DS",
+   "style": "tutorial",
+   "pages_chosen": [
+    7,
+    11,
+    16,
+    22
+   ],
+   "equations": 113,
+   "display": 5,
+   "pdf_sha256": "cbab8381d90ed928b20f0249766d37664fe14f2b7acf566d5909500ddcdca4ec",
+   "source_sha256": "643054e68a0211e360fa1d87afbb6e262f8dad80f284ddea1e82d19258a6c65e",
+   "extract_pdf_sha256": "b5656b6a9e60008843cebee9cc975b4b10f5a541d9d0ebc43a1f3f263967d01d",
+   "gold_sha256": "dca4880b6af2a5225cd309cc64d661a75c8110a2709d4a8cd4580fee29231183"
+  }
+ ],
+ "n_papers": 1,
+ "n_equations": 113,
+ "n_pages": 4
+}

@@ -1,0 +1,110 @@
+{
+ "seed": "realworld-2026-10-21",
+ "order_sha256": "b4f647581a0f21b14a55333b53e8cdf58b471378e61dd67b3e868e0b959df7c1",
+ "candidates": [
+  {
+   "id": "2410.12364",
+   "style": "tutorial",
+   "set": "math:math:PR",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "3"
+  },
+  {
+   "id": "2405.01454",
+   "style": "research",
+   "set": "physics:physics:data-an",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "2"
+  },
+  {
+   "id": "2406.00853",
+   "style": "tutorial",
+   "set": "stat:stat:TH",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "http_404",
+   "detail": "https://arxiv.org/pdf/2406.00853"
+  },
+  {
+   "id": "2410.17311",
+   "style": "research",
+   "set": "math:math:NA",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    7,
+    8,
+    9,
+    11
+   ],
+   "pdf_pages": 24,
+   "pdf_sha256": "1425e68a97b3d9a7bcf75caa4530e5b28830201de94a837339ecd97d5f3c483c",
+   "source_sha256": "e461c157df17a97cdb7f98fe77bc5b587bc775f1a8eb30d528435bcc19193449",
+   "main_tex": "template.tex",
+   "equations": 371,
+   "unconvertible": 2,
+   "usable_pages": 5,
+   "macro_failures": [],
+   "anchors": 3181
+  },
+  {
+   "id": "2504.05959",
+   "style": "tutorial",
+   "set": "cs:cs:DS",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    7,
+    11,
+    16,
+    22
+   ],
+   "pdf_pages": 44,
+   "pdf_sha256": "cbab8381d90ed928b20f0249766d37664fe14f2b7acf566d5909500ddcdca4ec",
+   "source_sha256": "643054e68a0211e360fa1d87afbb6e262f8dad80f284ddea1e82d19258a6c65e",
+   "main_tex": "main.tex",
+   "equations": 702,
+   "unconvertible": 2,
+   "usable_pages": 16,
+   "macro_failures": [],
+   "anchors": 5329
+  },
+  {
+   "id": "2501.02633",
+   "style": "research",
+   "set": "physics:physics:flu-dyn",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2503.02792",
+   "style": "tutorial",
+   "set": "physics:cond-mat:stat-mech",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    4,
+    5,
+    6,
+    7,
+    11,
+    18
+   ],
+   "pdf_pages": 26,
+   "pdf_sha256": "fad30467406ab49faa19b87632a0588224cccbdffe6a628ce8cff32ee2d00399",
+   "source_sha256": "89022c7c6ceb0a2ef0a84f01e33f2ac26450eafc9b42e0f114abe9f4a4803f7e",
+   "main_tex": "LectureNotes-preprint.tex",
+   "equations": 329,
+   "unconvertible": 0,
+   "usable_pages": 7,
+   "macro_failures": [],
+   "anchors": 4631
+  }
+ ]
+}

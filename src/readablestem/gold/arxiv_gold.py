@@ -36,12 +36,61 @@ class GoldError(ValueError):
     pass
 
 
+_UNWRAP = ("ensuremath", "mathbin", "mathrel", "mathord")
+_DROP_COMMANDS = re.compile(r"\\(?:nolimits|limits|hfill|middle(?![A-Za-z])|color\{[^{}]*\})\s*")
+_NAMED_OPERATORS = re.compile(r"\\(arg)(?![A-Za-z])")
+
+
+def prepare(latex: str) -> str:
+    r"""What the converter has to be given for a few author-level commands that it does not know:
+    `\ensuremath{X}` and `\textcolor{c}{X}` are `X`, `\mathop` is `\operatorname`; `\arg` is an operator name;
+    `\limits` and spacing that only moves things are dropped. Nothing else is changed."""
+    text = latex
+    for name in _UNWRAP:
+        text = _unwrap(text, name, 1)
+    text = _unwrap(text, "textcolor", 2)
+    text = re.sub(r"\\mathop(?![A-Za-z])", r"\\operatorname", text)
+    text = _DROP_COMMANDS.sub(" ", text)
+    text = re.sub(r"\\vspace\*?\{[^{}]*\}|\\hspace\*?\{[^{}]*\}", " ", text)
+    return _NAMED_OPERATORS.sub(r"\\operatorname{\1}", text)
+
+
+def _unwrap(text: str, name: str, nargs: int) -> str:
+    """`\name{a}{b}` with `nargs` groups becomes the last group."""
+    out: list[str] = []
+    i = 0
+    pattern = re.compile(r"\\" + name + r"(?![A-Za-z])\s*")
+    while True:
+        m = pattern.search(text, i)
+        if m is None:
+            out.append(text[i:])
+            return "".join(out)
+        out.append(text[i : m.start()])
+        pos = m.end()
+        last = None
+        for _ in range(nargs):
+            group = tex.read_group(text, pos)
+            if group is None:
+                last = None
+                break
+            last, pos = group
+            pos = pos  # next group follows immediately
+            while pos < len(text) and text[pos] == " ":
+                pos += 1
+        if last is None:
+            out.append(m.group(0))
+            i = m.end()
+        else:
+            out.append(" " + last + " ")
+            i = pos
+
+
 def to_mathml(latex: str, display: bool) -> str:
     """MathML as the pipeline writes it for LaTeX; raises `GoldError` when it is not sound."""
     if _UNRESOLVED.search(latex):
         raise GoldError("unresolved reference in the equation")
     try:
-        mathml = safe_latex_to_mathml(clean_latex(latex), "block" if display else "inline")
+        mathml = safe_latex_to_mathml(clean_latex(prepare(latex)), "block" if display else "inline")
     except Exception as exc:  # LatexConversionError and whatever the converter raises
         raise GoldError(str(exc)) from None
     if _LEFTOVER.search(mathml) or "<merror" in mathml:
