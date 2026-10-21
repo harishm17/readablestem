@@ -35,6 +35,13 @@ import defusedxml.ElementTree as DET
 
 from readablestem.core.types import INLINE_MARKER_RE, DocumentResult, Kind
 
+# An element that is the printed page's attribution block or running footer (the answer key
+# leaves the `footer` element out, and a reader that transcribes the block is not penalised for
+# it: it is on the page). OpenStax's wording is what `render.attribution_lines` prints.
+ATTRIBUTION = re.compile(
+    r"openstax|licensed under|creative commons|\bcc by\b|printable page|original page:",
+    re.IGNORECASE,
+)
 _WORD = re.compile(r"[^\W_]+(?:['\u2019][^\W_]+)*", re.UNICODE)
 RUNNING_FOOTER = re.compile(
     r"Access for free at openstax\.org\.[^\n]*?\(OpenStax\),[^\n]*?Page\s*\d+\s*of\s*\d+",
@@ -126,6 +133,10 @@ def predicted_text(result: DocumentResult, *, include_math: bool = True) -> str:
     parts: list[str] = []
     for element in sorted(result.elements, key=lambda e: e.order):
         fix = fixes.get(element.id)
+        if element.kind in (Kind.PARAGRAPH, Kind.LIST_ITEM) and ATTRIBUTION.search(
+            element.text or ""
+        ):
+            continue
         if element.kind in (Kind.HEADING, Kind.PARAGRAPH, Kind.LIST_ITEM):
             if element.kind is Kind.HEADING and fix is not None and fix.heading is not None:
                 text = fix.heading.text

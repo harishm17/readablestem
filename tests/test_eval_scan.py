@@ -238,3 +238,18 @@ def test_the_predicted_words_are_the_prose_in_reading_order_with_or_without_form
         "motion", "the", "speed", "is", "constant", "figure", "1", "a", "cart", "t", "table",
         "1", "speeds",
     ]  # fmt: skip
+
+
+def test_the_attribution_block_and_the_running_footer_are_not_prose():
+    elements = [
+        element("p1-e0", Kind.PARAGRAPH, 0, text="Speed is distance over time."),
+        element("p1-e1", Kind.PARAGRAPH, 1, text='"Speed" from Physics by A. Author, OpenStax.'),
+        element("p1-e2", Kind.LIST_ITEM, 2, text="Licensed under Creative Commons (CC BY 4.0)."),
+        element("p1-e3", Kind.PARAGRAPH, 3, text="Original page: https://example.org/speed"),
+    ]
+    result = DocumentResult(
+        pipeline_version="t",
+        elements=elements,
+        stats=DocumentStats(pages=1, cost_usd=0, latency_ms=0, model_calls=0),
+    )
+    assert prose_wer.predicted_words(result) == ["speed", "is", "distance", "over", "time"]

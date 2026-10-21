@@ -48,14 +48,21 @@ def rows(report: dict) -> dict[str, object]:
         "detection precision": m["detection_precision"],
         "prose WER (all words, formulas included)": pick(m, "prose_wer", "wer"),
         "prose WER (words of 3+ letters, formulas out)": pick(m, "prose_only_wer", "wer"),
-        "required decisions per PDF page": load["required_per_pdf_page"],
-        "optional notes per PDF page": load["optional_per_pdf_page"],
+        "required decisions per PDF page (equations, tables, figures, headings)": load[
+            "required_per_pdf_page"
+        ],
+        "required decisions per converted page (all blocks)": pages.get(
+            "required_per_converted_page"
+        ),
+        "optional notes per converted page (all blocks)": pages.get("optional_per_converted_page"),
         "equations wrong, matched, asked about: precision": pick(flags, "all", "precision"),
         "... recall": pick(flags, "all", "recall"),
         "wrong equations not asked, per 100 gold": pick(
             flags, "all", "wrong_not_asked_per_100_gold"
         ),
-        "wrong inline not asked, per 100 gold": pick(flags, "inline", "wrong_not_asked_per_100_gold"),
+        "wrong inline not asked, per 100 gold": pick(
+            flags, "inline", "wrong_not_asked_per_100_gold"
+        ),
         "display: second reading agreed / disagreed": f"{second.get('agreed')} / {second.get('disagreed')}",
         "display: agreed and wrong": second.get("agreed_wrong"),
         "pages read / kept as image": f"{pages.get('converted')} / {pages.get('fell_back')}",
