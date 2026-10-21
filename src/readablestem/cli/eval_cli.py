@@ -481,6 +481,7 @@ def _run_pipeline(
             gold_dir=gold_dir,
             limit=getattr(args, "limit", None),
             every=getattr(args, "every", None),
+            sections=tuple(getattr(args, "sections", None) or ()),
             client_label=label,
             gold_label=gold_label,
             concurrency=args.concurrency,
@@ -1211,6 +1212,13 @@ def register(
         type=_positive_int,
         help="equations and figures: every Nth item, from the first (a spread over the set "
         "where --limit takes only its start); with --limit, the first N of those",
+    )
+    pipeline.add_argument(
+        "--sections",
+        nargs="+",
+        metavar="BOOK/PAGE",
+        help="only the equations, figures or pages whose book/page id contains one of these "
+        "strings (a slice of a set; applied before --every and --limit)",
     )
     pipeline.add_argument("--items", type=Path, help="also write per-item rows as JSONL")
     pipeline.add_argument("--date", type=_iso_date, default=today, help="run date to record")

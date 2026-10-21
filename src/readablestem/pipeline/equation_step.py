@@ -80,7 +80,7 @@ from readablestem.core.types import Check, Element, EquationFix, Fix, Kind, Mode
 from readablestem.models import router
 from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.models.prompts import load_prompt
-from readablestem.pipeline import equation_images, layout, notation_memory
+from readablestem.pipeline import equation_images, layout, notation_memory, page_math
 from readablestem.pipeline.signs import compare_signs
 from readablestem.pipeline.speech import SpeechError, mathml_to_speech
 from readablestem.pipeline.text_layer_compare import compare_case, numbers_differ
@@ -111,6 +111,18 @@ SKIP_ESCALATION_FROM = 0.80
 # MathML, and a decision costs a person more than the call it replaces. Set False to keep the
 # status rules as they were (the answer then needs a decision).
 ACCEPT_SINGLE_READING = True
+# The page math pass's second reading (ADR 0006; `Element.page_latex`). Agreement of the crop's
+# reading with it lifts a usable answer whose checks all pass to this confidence, so a cheap
+# answer that two independent readings share is not asked of the main model again; a
+# disagreement is asked of the main model once (as an unsure answer is) and, when the main
+# model's reading matches neither the crop's first reading nor the page's, is a required
+# decision. A main-model reading that the page pass contradicts has no one left to ask: it is
+# a required decision too when `FLAG_MAIN_DISAGREES` (the dev-set measurement decides).
+PAGE_AGREE_CONFIDENCE = 0.9
+PAGE_READING = "equation.page_reading"
+PAGE_READING_OVERRULED = "equation.page_reading_overruled"
+PAGE_READING_CODE = "page_reading_mismatch"
+FLAG_MAIN_DISAGREES = True
 SHORT_INLINE_CHARS = 25  # inline candidates up to this many text-layer chars start cheap
 MAX_OUTPUT_TOKENS = 2048  # LaTeX up to 2000 chars plus reasoning tokens
 # A model that thinks within its own allowance (claude: `pricing.Price.thinking_tokens`)
@@ -801,6 +813,73 @@ def _escalation_outcome(
     return "same" if _same_reading(first, escalated) else "changed"
 
 
+def _page_stream(element: Element) -> list[str] | None:
+    """The symbol stream of the page pass's reading of this span; None without one (the
+    flag is off, layout found the span alone, or the LaTeX does not convert)."""
+    if element.page_status != "span" or not element.page_latex:
+        return None
+    return page_math.latex_stream(element.page_latex)
+
+
+def _agrees(candidate: _Candidate, page: list[str] | None) -> bool | None:
+    """Does the candidate's reading say what the page pass's does? None when either side
+    has no reading to compare."""
+    if page is None or not candidate.usable or candidate.mathml is None:
+        return None
+    if candidate.output is None or not candidate.output.is_equation:
+        return None
+    stream = page_math.mathml_stream(candidate.mathml)
+    return None if stream is None else stream == page
+
+
+def _lift(candidate: _Candidate) -> None:
+    """Two readings agree: raise the confidence to `PAGE_AGREE_CONFIDENCE`, unless a check
+    other than a note failed (agreement never overrides the text-layer checks)."""
+    failed = [c for c in candidate.checks if not c.passed and c.code not in NOTE_CODES]
+    if (
+        candidate.confidence is not None
+        and candidate.usable
+        and not failed
+        and candidate.confidence < PAGE_AGREE_CONFIDENCE
+    ):
+        candidate.confidence = PAGE_AGREE_CONFIDENCE
+
+
+def _compare_readings(
+    candidate: _Candidate,
+    first: _Candidate,
+    reread: _Candidate | None,
+    page: list[str],
+    *,
+    asked_main_first: bool,
+) -> None:
+    """Record how the final reading stands against the page pass's, and flag it when the
+    crop's readings and the page's do not meet (module constants)."""
+    agrees = _agrees(candidate, page)
+    if agrees is None:
+        return
+    if agrees:
+        _lift(candidate)
+        candidate.checks.append(Check(name=PAGE_READING, passed=True))
+        return
+    if reread is not None:
+        same = (
+            first.mathml is not None
+            and reread.mathml is not None
+            and page_math.mathml_stream(first.mathml) == page_math.mathml_stream(reread.mathml)
+        )
+        if same or _agrees(first, page):
+            # The main model read the crop as the cheap model did (the page pass was the odd
+            # one out), or the cheap reading is the page's: the answer stands as it would have.
+            candidate.checks.append(Check(name=PAGE_READING_OVERRULED, passed=True))
+            return
+    elif not asked_main_first or not FLAG_MAIN_DISAGREES:
+        return
+    candidate.checks.append(
+        Check(name=PAGE_READING, passed=False, severity="warning", code=PAGE_READING_CODE)
+    )
+
+
 def _prefer(main: _Candidate, cheap: _Candidate) -> _Candidate:
     """The main model's answer wins unless only the cheap one is usable (or the main
     call produced nothing, for example during an outage)."""
@@ -919,7 +998,11 @@ def transcribe(
     calls = list(candidate.calls)
     cheap_start = first_model != settings.main_model
     reread: _Candidate | None = None
-    if cheap_start and _needs_escalation(candidate, settings):
+    page = _page_stream(element)  # the page pass's reading of this span, when it has one
+    first_agrees = _agrees(first, page)
+    if first_agrees:
+        _lift(first)
+    if cheap_start and (_needs_escalation(candidate, settings) or first_agrees is False):
         reread = attempt(settings.main_model, escalation=True)
         calls += reread.calls
         candidate = _prefer(reread, candidate)
@@ -950,6 +1033,12 @@ def transcribe(
                 code=NO_TEXT_LAYER_CODE,
             )
         )
+    if page is not None:
+        _compare_readings(candidate, first, reread, page, asked_main_first=not cheap_start)
+    elif element.page_status == "layout" and candidate.confidence is not None:
+        # Layout found this span by its geometry rules and the page pass, which read the
+        # page, did not: a little less sure (`Settings.page_math_unconfirmed_factor`).
+        candidate.confidence *= settings.page_math_unconfirmed_factor
     if layout.REASON_HALF_FRACTION in element.reasons:
         candidate.checks.append(
             Check(

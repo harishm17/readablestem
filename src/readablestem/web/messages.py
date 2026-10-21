@@ -100,6 +100,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.text_layer_style", "style_cosmetic"): "A letter's style differs from the PDF "
     "only where it does not change the meaning (a bold subscript or digit, or a style such "
     "as double-struck that the PDF's text cannot show), so this was accepted as it is.",
+    ("equation.page_reading", "page_reading_mismatch"): "Reading the crop and reading the "
+    "whole page gave different answers, and a second look at the crop agreed with neither, so "
+    "compare this equation with the page symbol by symbol.",
     ("equation.no_text_layer", "no_text_layer"): "This equation is a picture, so the PDF holds "
     "no text to check the transcription against: compare it with the picture symbol by "
     "symbol.",

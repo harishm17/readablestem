@@ -289,7 +289,9 @@ def verify(output: PageMathOutput | None, rows: Sequence[PageRow]) -> tuple[list
                 row.text,
                 start,
                 end,
-                inline=expression.display == "inline" and len(expression.anchors) == 1,
+                inline=expression.display == "inline"
+                and expression.role == "math"
+                and len(expression.anchors) == 1,
             )
             if end <= start:
                 ok = False
@@ -306,9 +308,22 @@ def verify(output: PageMathOutput | None, rows: Sequence[PageRow]) -> tuple[list
         candidates.append(
             Span(tuple(segments), expression.display, expression.role, expression.latex)
         )
-    spans = _resolve_overlaps(candidates, stats)
+    spans = [_retrimmed(span, by_id) for span in _resolve_overlaps(candidates, stats)]
+    spans = [s for s in spans if s.segments]
     stats.verified = len(spans)
     return spans, stats
+
+
+def _retrimmed(span: Span, rows: dict[str, PageRow]) -> Span:
+    """The span with blanks trimmed off its segments again (cutting a number off the front
+    leaves the space after it) and any segment left empty dropped."""
+    segments: list[Segment] = []
+    inline = span.display == "inline" and span.role == "math" and len(span.segments) == 1
+    for seg in span.segments:
+        start, end = _trim(rows[seg.row].text, seg.start, seg.end, inline=inline)
+        if end > start:
+            segments.append(Segment(seg.row, start, end))
+    return Span(tuple(segments), span.display, span.role, span.latex)
 
 
 def _overlap(a: Segment, b: Segment) -> bool:
@@ -316,42 +331,39 @@ def _overlap(a: Segment, b: Segment) -> bool:
 
 
 def _resolve_overlaps(candidates: list[Span], stats: PageStats) -> list[Span]:
-    """Numbers and look-alikes first (they carve out of maths), then maths in the order given."""
+    """Numbers and look-alikes first (they carve out of maths), then maths in the order given;
+    a maths span overlapping an earlier one is dropped."""
     carve = [s for s in candidates if s.role != "math"]
+    carved = [seg for span in carve for seg in span.segments]
     kept: list[Span] = list(carve)
-    taken = [seg for span in carve for seg in span.segments]
+    taken: list[Segment] = []  # the maths kept so far
     for span in candidates:
         if span.role != "math":
             continue
         segments: list[Segment] = []
         dropped = False
         for seg in span.segments:
-            for other in taken:
+            for other in carved:
                 if not _overlap(seg, other):
                     continue
                 if other.start <= seg.start < other.end:  # a number at the front
                     seg = Segment(seg.row, other.end, seg.end)
                 elif other.start < seg.end <= other.end:  # at the back
                     seg = Segment(seg.row, seg.start, other.start)
-                elif seg.start < other.start and other.end < seg.end:  # inside: unusable
+                else:  # inside: nothing sensible is left
                     dropped = True
+                    break
                 if seg.end <= seg.start:
                     dropped = True
-                if dropped:
                     break
             if dropped:
                 break
             segments.append(seg)
-        if dropped or not segments:
+        if dropped or not segments or any(_overlap(a, b) for a in segments for b in taken):
             stats.overlapped += 1
             continue
-        cut = Span(tuple(segments), span.display, span.role, span.latex)
-        clash = any(_overlap(a, b) for a in cut.segments for b in taken)
-        if clash:
-            stats.overlapped += 1
-            continue
-        taken.extend(cut.segments)
-        kept.append(cut)
+        taken.extend(segments)
+        kept.append(Span(tuple(segments), span.display, span.role, span.latex))
     kept.sort(key=lambda s: (_row_number(s.segments[0].row), s.segments[0].start))
     return kept
 
@@ -450,3 +462,29 @@ def run(
             plan.pages[number] = page_plan
     result.calls = plan.calls
     return result
+
+
+# -------------------------------------------------------------------- two readings
+
+
+def latex_stream(latex: str) -> list[str] | None:
+    """The normalised symbol stream of a LaTeX reading (`eval.equations_symbols`, the
+    stream the eval's secondary scorer compares); None if it does not convert."""
+    from readablestem.eval import equations_symbols as symbols
+    from readablestem.eval.equations import MathMLError
+
+    try:
+        return symbols.symbols_of_latex(latex)
+    except (MathMLError, ValueError, RecursionError):
+        return None
+
+
+def mathml_stream(mathml: str) -> list[str] | None:
+    """The same stream for MathML (the equation step's reading)."""
+    from readablestem.eval import equations_symbols as symbols
+    from readablestem.eval.equations import MathMLError
+
+    try:
+        return symbols.symbols_of(mathml)
+    except (MathMLError, ValueError, RecursionError):
+        return None

@@ -107,7 +107,33 @@ def summarize(runs: list[list[dict]]) -> dict:
     keys = per_run[0]
     out = {k: sum(r[k] for r in per_run) / len(per_run) for k in keys}
     out["runs"] = len(per_run)
+    counts = [section_counts(items) for items in runs]
+    out["sections"] = {
+        section: {
+            key: sum(c[section][key] for c in counts) / len(counts) for key in counts[0][section]
+        }
+        for section in counts[0]
+    }
     out["per_run_primary"] = [r["primary_end_to_end_exact_lenient"] for r in per_run]
+    return out
+
+
+def section_counts(items: list[dict]) -> dict[str, dict[str, int]]:
+    """Per section: gold equations and how many are right under each reading (primary,
+    stream v2 with credit, symbols with credit), for the cluster bootstrap."""
+    out: dict[str, dict[str, int]] = {}
+    for item in items:
+        pairs = item["pairs"]
+        v2_ids = {p["gold_id"] for p in pairs if p["exact_stream_v2"]}
+        v2_ids |= set(item["stream_credited"]["split"]) | set(item["stream_credited"]["merged"])
+        sym_ids = {p["gold_id"] for p in pairs if p["exact_symbols"]}
+        sym_ids |= set(item["symbols_credited"]["split"]) | set(item["symbols_credited"]["merged"])
+        out[item["id"]] = {
+            "gold": item["n_gold"],
+            "primary": sum(p["exact_lenient"] for p in pairs),
+            "stream_v2_credit": len(v2_ids),
+            "symbols_credit": len(sym_ids),
+        }
     return out
 
 

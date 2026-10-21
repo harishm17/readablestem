@@ -1271,11 +1271,12 @@ def _convert(
         try:
             _send(stage_progress, "layout")
             collector = page_math_reconcile.PageMathHook() if options.page_math else None
+            # (`page_math` only when asked for: stand-ins for `analyze` take no such argument)
             doc = layout.analyze(
                 pdf_bytes,
                 pages=pages,
                 max_pages=settings.max_pages_per_job,
-                page_math=collector,
+                **({} if collector is None else {"page_math": collector}),
             )
             page_math_summary: PageMathSummary | None = None
             if collector is not None:

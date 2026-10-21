@@ -241,6 +241,11 @@ def load_gold(gold_dir: Path) -> list[dict]:
     return list(iter_gold_records(gold_dir))
 
 
+def _in_sections(record: dict, sections: Sequence[str]) -> bool:
+    name = f"{record.get('book_slug', '')}/{record.get('page_slug', '')}"
+    return any(part in name for part in sections)
+
+
 def group_pages(records: Iterable[dict]) -> list[list[dict]]:
     """Records grouped by (book, page), pages in first-seen order."""
     pages: dict[tuple[str, str], list[dict]] = {}
@@ -271,13 +276,21 @@ def manifest_sha256(gold_dir: Path) -> str:
 
 
 def select_units(
-    task: str, records: list[dict], limit: int | None, every: int | None = None
+    task: str,
+    records: list[dict],
+    limit: int | None,
+    every: int | None = None,
+    sections: Sequence[str] = (),
 ) -> list[Any]:
     """What one task iterates over: equation or figure records, or pages of records.
 
     `limit` counts those units: equations, figures, or pages (headings, document). `every`
-    keeps every Nth unit from the first, before `limit` is applied.
+    keeps every Nth unit from the first, before `limit` is applied. `sections` keeps the
+    equations, figures or pages whose "book/page" id contains any of the strings (a slice of
+    a set, for a run that must stay small); it is applied first.
     """
+    if sections:
+        records = [r for r in records if _in_sections(r, sections)]
     units: list[Any]
     if task == "equations":
         units = [r for r in records if r.get("kind") == "equation"]
@@ -414,6 +427,7 @@ class EvalConfig:
     gold_dir: Path
     limit: int | None = None
     every: int | None = None  # every Nth unit (`select_units`)
+    sections: tuple[str, ...] = ()  # only these "book/page" ids (substrings; `select_units`)
     client_label: str = "openai"  # "fake" for FakeVisionClient runs
     gold_label: str | None = None  # how to show gold_dir in the report (no home paths)
     concurrency: int = 4  # document task: convert_pdf's thread pool
@@ -2039,6 +2053,7 @@ def build_report(
             "manifest_sha256": manifest_sha256(cfg.gold_dir),
             "limit": cfg.limit,
             **({"every": cfg.every} if cfg.every else {}),
+            **({"sections": list(cfg.sections)} if cfg.sections else {}),
             "unit": {"equations": "equation", "figures": "figure"}.get(task, "page"),
             "selection_sha256": hashlib.sha256("\n".join(planned_ids).encode()).hexdigest(),
         },
@@ -2064,7 +2079,7 @@ def run_pipeline_eval(cfg: EvalConfig) -> EvalRun:
     """
     if cfg.task not in RUNNERS:
         raise ValueError(f"unknown task {cfg.task!r}; expected one of {', '.join(TASKS)}")
-    units = select_units(cfg.task, load_gold(cfg.gold_dir), cfg.limit, cfg.every)
+    units = select_units(cfg.task, load_gold(cfg.gold_dir), cfg.limit, cfg.every, cfg.sections)
     planned = unit_ids(cfg.task, units)
     # All inputs before the first model call (see the module docstring): a RenderError
     # raises here, with nothing spent. Then the browser goes, before any step runs.
