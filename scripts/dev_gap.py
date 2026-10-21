@@ -58,7 +58,6 @@ def main() -> None:
             f"{len(ours_right - theirs_right)}"
         )
         buckets: collections.Counter[str] = collections.Counter()
-        shown = 0
         examples = []
         for g in sorted(mine):
             pair = ours.get(g)
@@ -67,9 +66,7 @@ def main() -> None:
             if bucket != "correct" and len(examples) < 400:
                 examples.append((g, bucket, pair))
         wrong = sum(v for k, v in buckets.items() if k != "correct")
-        print(
-            f"== {label}: the chatbot is exactly right on {len(mine)}; the pipeline is not on {wrong}"
-        )
+        print(f"== {label}: the chatbot is right on {len(mine)}; the pipeline is not on {wrong}")
         for name, n in buckets.most_common():
             print(f"   {name:12s} {n:4d}")
         # spread the examples over the buckets
@@ -92,7 +89,6 @@ def main() -> None:
             if pair:
                 print("   span  :", (pair.get("pred_text") or "")[:100])
             print("   chat  :", (theirs.get("pred_latex") or "")[:140])
-            shown += 1
 
 
 if __name__ == "__main__":
