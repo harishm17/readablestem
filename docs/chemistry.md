@@ -64,9 +64,10 @@ text and on display lines"); in short:
 
 Precision, measured. On the 121 PDFs of `scripts/layout_identity.py` (the repository's fixtures,
 the development set, the authored material and the development pages printed into the cache),
-96 are identical before and after. The 25 that differ are the chemistry sections and the
-authored chemistry document, one lecture slide whose reaction line was a heading and is now an
-equation, and two spaces in an algebra "Simplify:" line. No physics, algebra, statistics, slide or
+96 are identical before and after. The 25 that differ are the chemistry sections (21 prints), the
+authored chemistry document, the Word lecture (it has formulas and ions in its sentences), one
+lecture slide whose reaction line was a heading and is now an equation, and a space after
+"Simplify:" in the two prints of an algebra section. No physics, algebra, statistics, slide or
 Word text gained a formula that is not one.
 
 ## Writing it: `\ce`
