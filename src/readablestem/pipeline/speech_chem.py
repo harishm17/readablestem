@@ -87,6 +87,24 @@ def _flat_pair(kids: list[ET.Element], i: int) -> bool:
     )
 
 
+def _split_pair(kids: list[ET.Element], i: int) -> ET.Element | None:
+    """The older shape of an ion with a two-letter symbol: `N` then `msup(a, +)`, the charge on
+    the lowercase letter. A scripted species made of the pair and the script, or None."""
+    if i + 1 >= len(kids) or not _upright_letter(kids[i]) or not _text(kids[i]).isupper():
+        return None
+    script = kids[i + 1]
+    if script.tag not in _SCRIPTS or not len(script) or not _upright_letter(script[0]):
+        return None
+    if not _text(script[0]).islower() or _text(kids[i]) + _text(script[0]) not in ELEMENTS:
+        return None
+    symbol = ET.Element("mrow")
+    symbol.extend([kids[i], script[0]])
+    synthetic = ET.Element(script.tag)
+    synthetic.append(symbol)
+    synthetic.extend(list(script)[1:])
+    return synthetic
+
+
 def is_element(node: ET.Element) -> bool:
     """An upright element symbol: an `mi` that is upright (`mathvariant="normal"`, or
     longer than one letter) and names an element, an `mrow` of the two letters of one (what
@@ -226,7 +244,7 @@ def is_chem_row(kids: list[ET.Element]) -> bool:
     for i, node in enumerate(kids):
         if _scripted_species(node) or _bracketed(kids, i) or _split_bracket(kids, i) is not None:
             return True
-        if _flat_pair(kids, i):
+        if _flat_pair(kids, i) or _split_pair(kids, i) is not None:
             return True
         symbols = _formula_text(node)
         if symbols is not None and len(symbols) >= 2:
@@ -259,6 +277,12 @@ def _ends_species(node: ET.Element) -> bool:
         or _is_closing(node)
         or _is_charge_script(node)
         or (_upright_letter(node) and _text(node).islower())  # the tail of "Cl" as two letters
+        or (
+            node.tag in _SCRIPTS
+            and len(node) > 0
+            and _upright_letter(node[0])
+            and _text(node[0]).islower()
+        )  # the tail of "Zn" with its charge: msup(n, 2+)
     )
 
 
@@ -431,6 +455,11 @@ def read_at(kids: list[ET.Element], i: int, speak: Speak) -> tuple[list[str], in
         ):
             scripted[-1] += ","  # "N a plus, plus C l minus": a charge, then the sign
         return scripted, 1
+    split = _split_pair(kids, i)
+    if split is not None:
+        words = scripted_words(split, speak)
+        if words is not None:
+            return words, 2
     if _flat_pair(kids, i):
         return [_letters(_text(node) + _text(kids[i + 1]))], 2
     if _is_species_token(node):

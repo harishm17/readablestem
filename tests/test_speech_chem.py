@@ -111,6 +111,12 @@ MATHML = "<math xmlns='http://www.w3.org/1998/Math/MathML'>{}</math>"
             "<mi>k</mi><msup><mrow><mo>[</mo><mtext>NO</mtext><mo>]</mo></mrow><mn>2</mn></msup>",
             "k the concentration of N O squared",
         ),
+        # an ion saved by an earlier version: the charge on the lowercase letter of the symbol
+        (
+            '<mn>2</mn><mi mathvariant="normal">A</mi><msup><mi mathvariant="normal">g</mi>'
+            "<mo>+</mo></msup><mo>(</mo><mi>a</mi><mi>q</mi><mo>)</mo>",
+            "2 A g plus aqueous",
+        ),
         # the cell notation bars
         ("<mtext>Pt</mtext><mo>│</mo><mtext>Cu</mtext>", "vertical bar"),
     ],
