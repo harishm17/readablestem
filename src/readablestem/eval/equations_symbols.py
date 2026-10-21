@@ -41,8 +41,8 @@ unified here:
    a subscript are the same symbols.
 
 Of the 872 aligned pairs in the development runs of docs/eval-page-math.md that stream v2 calls
-exact, this scorer calls every one exact too (it forgives more, it forgives nothing less). The score is `exact` (equal
-streams) and a similarity (1 - edit distance / longer stream), and `credit_split` and
+exact, this scorer calls every one exact too (it forgives more, nothing less). The score is
+`exact` (equal streams) and a similarity (1 - edit distance / longer stream), and `credit_split` and
 `credit_merged` of `equations_v2` apply to these streams unchanged.
 """
 
