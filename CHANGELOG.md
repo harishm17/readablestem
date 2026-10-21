@@ -1,5 +1,22 @@
 # Changelog
 
+## Scanned and handwritten pages read from an image (2026-10-21, branch feat/scanned-pages)
+
+- Behind `FEATURE_IMAGE_PAGES` (off; [ADR 0007](docs/decisions/0007-image-pages.md)), pages
+  `page_type` calls scanned or handwritten are read by one vision call each into headings,
+  paragraphs, list items, display and inline equations, figures and tables. Every block is a review
+  item (equations and tables always required, prose optional when the reader was sure and nothing
+  was illegible), display equations are read again from the crop of their box, the output page
+  starts with a notice and a "Show the original page" disclosure, and a page the model cannot read
+  stays a kept image as before. Per-page cost is on the result (`image_pages`). With the flag off
+  nothing changes. Development-set measurement per model: [docs/eval-image-pages.md](docs/eval-image-pages.md).
+- The review screen lists text read from an image (accept, or keep as the picture; words are changed
+  with "Change the words"). The upload probe lets a PDF of scans through when the flag is on.
+- Eval: `eval pipeline --scanned` turns every page of the document task into the image-only PDF
+  of a degraded scan (`eval/scan.py`), plus a prose word error rate (`eval/prose_wer.py`) and the
+  image page numbers (`eval/image_pages.py`); `scripts/image_pages_probe.py` and
+  `scripts/image_pages_table.py`. A model request can carry its own timeout (`VisionRequest.timeout_s`).
+
 ## Page math pass, secondary equation scores, `\right.` (2026-10-21, branch feat/page-math)
 
 - Two layout fixes: a stray opening brace at the end of a sentence goes with its system, and
