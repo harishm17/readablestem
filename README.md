@@ -15,8 +15,10 @@ review screen is for.
 
 The site is at readablestem.com.
 
-**What it is not.** It is not a compliance checker. It is not an OCR engine for scans or
-handwriting (those pages are kept as images and flagged). It is not a general PDF-to-Markdown
+**What it is not.** It is not a compliance checker. It is not an OCR engine: scans and
+handwriting are converted only when you ask, by reading each page's picture with a model, so
+every converted equation and table is for a person to check and the original page stays in the
+file; without that request those pages are kept as images and flagged. It is not a general PDF-to-Markdown
 converter, and it does not work from Word, LaTeX or PowerPoint sources: it starts from the
 PDF.
 
@@ -150,6 +152,30 @@ are one recording on Claude: model output varies run to run (the two document ru
 0.007 on equations, the two Opus chatbot runs by 0.007), and the OpenAI models the
 registration names were not used.
 
+### Scanned and handwritten pages, converted on request (2026-10-21)
+
+Behind an option on the upload form ("Convert scanned or handwritten pages", offered when the
+server sets `FEATURE_IMAGE_PAGES`), each scanned or handwritten page is read from its picture by
+one call to the main model (`claude-opus-5-5`); its equations are read again from a cut of their
+place on the page, every equation and table is a decision for the instructor, and the original page
+is kept in the file for checking. The numbers, which are not the ones above (different documents and
+a different job; [docs/eval-image-pages.md](docs/eval-image-pages.md), [ADR 0007](docs/decisions/0007-image-pages.md)):
+
+- **Development pages made into scans** (36 pages of six development documents, degraded
+  by [`eval/scan.py`](src/readablestem/eval/scan.py)): 0.59 of the equations exactly right end to
+  end (0.83 on the symbols score), the same as the same pages as typed PDFs; words of the prose
+  wrong 3 to 5 % of the time; $0.106 a page. Handwriting was looked at on four public-domain pages
+  by eye only: the main model read them well, and a cheaper model misread two section numbers with
+  full confidence.
+- **Real papers as scans, never used to build the feature** (the real-world held-out set, 9 of 15
+  papers because the $9 spending cap for the run was reached; 42 pages, 1,147 equations, registered
+  before the run): 0.66 exactly right (0.69 on the symbols score) against 0.62 (0.66) for the typed
+  PDFs of the same papers, a difference inside the noise, with 5 wrong equations in every 100 not
+  asked about (10 for the typed PDFs); $0.136 a page.
+- It is slower (about 20 to 30 seconds a page), it costs four to six times a typed page, and a
+  model can misread handwriting and small symbols; the measurement is on synthetic scans, nine
+  papers and eight real pages, with no measurement of how long checking takes.
+
 ### Re-measurement on the same sections, 2026-10-21 (not a blind result)
 
 The current system (pipeline 0.5.0 and later changes, `docs/remeasurement-2026-10-21.md`) was run
@@ -262,7 +288,9 @@ Method, definitions and every table: [docs/eval.md](docs/eval.md).
   descriptions are built but off by default.
 - **Tables** are detected and rebuilt with header cells behind a feature flag that is off by
   default, until they have been checked on real documents.
-- **Pages it cannot read** (scans, handwriting) are kept as images with a note, not guessed at.
+- **Scans and handwriting** can be converted on request (an upload option, slower, every converted
+  equation and table checked by a person, the original kept); without the request they are kept as
+  images with a note, not guessed at.
 
 ## How it works
 
@@ -363,7 +391,11 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
   the whole pipeline, and about 23 of every 100 equations are wrong and not flagged for review. A symbol, sign or relation that differs from the PDF's text layer is
   sent to review, but an error that agrees with the text layer, or a PDF with no usable text
   layer, can still pass.
-- **Scans, handwriting and drawings** are kept as images and flagged, not converted.
+- **Scans and handwriting** are converted only on request (an upload option): a model reads the
+  page's picture and can misread handwriting and small symbols, so every converted equation and table
+  is for a person to check and the original page stays in the file; the accuracy is measured on synthetic
+  scans, nine papers and eight real pages ([docs/eval-image-pages.md](docs/eval-image-pages.md)).
+  Without the request, and for drawings, such pages are kept as images and flagged.
 - **Tables** are off by default and have been checked on a local benchmark and the sample,
   not on a broad set of real course PDFs.
 - **Figure alt text is short.** It describes; it does not replace a long description for a

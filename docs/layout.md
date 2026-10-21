@@ -991,8 +991,9 @@ model call and 0 decisions: "Finished. The accessible HTML is ready." OCR'd scan
 into the same hole, and the app's own advice for scans ("run OCR and upload again")
 produced exactly those files. There is **no handwriting or scan conversion by default**
 (decided 2026-10-09): such pages are kept as page images, marked "Not converted", with a
-decision. Behind `FEATURE_IMAGE_PAGES` (default off; [ADR 0007](decisions/0007-image-pages.md),
-measured in [eval-image-pages.md](eval-image-pages.md)) a page the types below call
+decision. On request, per upload (the box "Convert scanned or handwritten pages", offered by
+`FEATURE_IMAGE_PAGES`, default off; [ADR 0007](decisions/0007-image-pages.md), measured in
+[eval-image-pages.md](eval-image-pages.md)) a page the types below call
 `scan_no_text`, `scan_ocr`, `handwritten` or `handwritten_ocr` (kept reasons `scanned_page` and
 `handwritten_page`, nothing else) is read from an image of the page instead, every block of it
 is a review item, and the page keeps its original: see "Pages read from an image" below. A page
@@ -1189,9 +1190,10 @@ that may be a row of machine-drawn curves, see below) and a page whose ink was n
 analysed never refuse: the conversion keeps them as images with a decision. The worker
 fails a result with the same rule (`worker.result_outcome`).
 
-### Pages read from an image (`FEATURE_IMAGE_PAGES`, ADR 0007)
+### Pages read from an image (on request, ADR 0007)
 
-With the flag on, the kept pages with the reasons `scanned_page` and `handwritten_page` (not
+For a conversion that has the option on (a job whose owner ticked the box; `ConversionOptions.image_pages`,
+or the whole run for the CLI and the eval with `FEATURE_IMAGE_PAGES`), the kept pages with the reasons `scanned_page` and `handwritten_page` (not
 `unread_page`, not handwriting on a typed page) are read by `pipeline/image_page.py`: one vision
 call per page, the page at 200 dpi, long side at most 2,576 px (`IMAGE_PAGES_DPI`), the main model
 unless `IMAGE_PAGES_MODEL` says otherwise, effort `ANTHROPIC_EFFORT_IMAGE_PAGES` (default low), up
@@ -1219,9 +1221,11 @@ with no fix (`IMAGE_PAGE_ORIGINAL_REASON`). A page the model cannot read (refuse
 invalid, no usable block, a spend cap) stays in `kept_pages` and is kept as its image. Each page
 has a record in `DocumentResult.image_pages` (outcome, model, calls, tokens, dollars, blocks by
 kind, markers, decisions and notes), its cost is in `DocumentStats` and its notice
-`image_page_converted` (optional) on the job page. With the flag on the upload probe lets a PDF
-of scans through (`pdf_probe MAX_PAGES image_pages`) and `worker.result_outcome` does not fail
-one for being only scans.
+`image_page_converted` (optional) on the job page. When the box is ticked the upload probe lets a
+PDF of scans through and counts its scanned and handwritten pages (`pdf_probe MAX_PAGES
+image_pages`, `page_type.image_page_count`), and `worker.result_outcome` does not fail the result for
+being only scans; the job's spend allowance is wider ([web.md](web.md), "Scanned and handwritten
+pages on request").
 
 **What is not detected** (the text reaches the HTML, or the content is lost as before):
 

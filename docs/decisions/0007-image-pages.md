@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Proposed**, behind `FEATURE_IMAGE_PAGES` (default off); measured on the development sets only ([eval-image-pages.md](../eval-image-pages.md)) |
+| Status | **Accepted 2026-10-21** as an opt-in per upload with the main model, default off (the offer is `FEATURE_IMAGE_PAGES`); measured on the development sets and once on the real-world held-out papers ([eval-image-pages.md](../eval-image-pages.md)) |
 | Date | 2026-10-21 |
 | Decider | Harish |
 | Revisits | the 2026-10-09 decision in `pipeline/page_type.py` and docs/layout.md ("There is no handwriting or scan conversion": such pages are kept as page images, marked "Not converted") |
@@ -32,9 +32,11 @@ result is good enough to switch on. It does not assume it is.
 
 For the pages `page_type` classifies as scanned or handwritten (reasons `scanned_page` and
 `handwritten_page`, nothing else: not `unread_page`, not handwriting on a typed page), and
-only with `FEATURE_IMAGE_PAGES` on, read the page with **one vision call**, validate what
+only when the conversion asked for it (in the web app the upload option "Convert scanned or
+handwritten pages", offered by `FEATURE_IMAGE_PAGES`, ticked by the document's owner; for the CLI
+and the eval the flag), read the page with **one vision call**, validate what
 comes back, and put it into the document as ordinary elements with review flags that say it has
-no text layer behind it. With the flag off, or when anything below fails, the page is kept as
+no text layer behind it. Without the request, or when anything below fails, the page is kept as
 its image exactly as before.
 
 1. **One call per page** (`pipeline/image_page.py`, prompt `models/prompts/image_page.md`).
@@ -102,13 +104,14 @@ its image exactly as before.
    per page (`DocumentResult.image_pages.per_page`: model, calls, dollars, blocks, review load,
    outcome), is in `DocumentStats.cost_usd` and counts against the job's dollar and call caps
    like every call. The upload probe, which refuses a PDF whose every page is a certain scan
-   or handwriting (`page_type.document_refusal`), lets such a PDF through when the flag is
-   on.
+   or handwriting (`page_type.document_refusal`), lets such a PDF through when the owner ticked
+   the upload option, and counts its scanned and handwritten pages (a file with none is not affected).
 
 ## Measuring it
 
-Development material only; the held-out set is not used for anything here, and the sealed check
-part of dev-v2 is not opened.
+Development material only for the design and the choice of model; the sealed check part of
+dev-v2 is not opened. The real-world held-out papers were used once afterwards, as scans, for the
+decision to offer the option (see "Result"), registered before that run.
 
 - **Synthetic scans.** The dev-v2 and `data/gold` pages that have an answer key are printed as
   they are for the existing document task, rendered at 300 dpi, degraded the way scanners
@@ -150,28 +153,57 @@ of an unexplained "not an equation"; the page read has its own timeout (180 s) a
 setting. Effort `low` and 200 dpi stay the defaults (neither `medium` nor 150 dpi was measurably
 better on these pages).
 
-**Decision from the numbers: the flag stays off by default.** The evidence is development-set and
-synthetic; the review it asks for (105 decisions for a 30-page scan) is the cost that was not
-measured as time; Opus at about $3.2 for 30 pages exceeds the default job cap. Offering it as an
-opt-in with the main model is supported by the numbers; a held-out measurement on scans decides
-the default.
+**Decision from the development numbers: the flag stays off by default**, and offering it as an
+opt-in with the main model is supported by them; a held-out measurement on scans was to decide
+whether more than that. It was made once, on the real-world held-out papers, registered before
+the run (`data/image-pages/PREREGISTRATION-HELDOUT-SCANS.md`): partial (9 of 15 papers, the $9
+cap), 0.664 of the equations exactly right against 0.619 for the typed pipeline on the same
+papers (symbols 0.693 against 0.664), $0.136 a page, 1.7 decisions a page. Not worse than typed,
+at four times the cost of a typed page: enough for an opt-in, not a reason for a default.
 
 ## Consequences
 
-TODO(Harish): this section is for the author to write or confirm (architecture rule 8). What
-the design implies, as the implementer sees it:
+**Decided 2026-10-21 (Harish; the coordinator carried the decision): ship scanned and handwritten
+pages as an opt-in per upload, read by the main model, default off.**
 
+- **What ships.** An upload checkbox, "Convert scanned or handwritten pages (slower; every converted
+  equation and table needs your check)", offered where the server sets `FEATURE_IMAGE_PAGES` and
+  used only for a PDF the probe finds scanned or handwritten pages in. The document's owner makes
+  the choice (`Job.image_pages`); no document is ever converted this way unasked. The reader is
+  the main model (`claude-opus-5-5`) unless `IMAGE_PAGES_MODEL` says otherwise. Pages count against the
+  daily quota like any page, open-tier accounts included. A job that asked may spend
+  `IMAGE_PAGES_USD_PER_PAGE` ($0.25) a page of the document, at most `IMAGE_PAGES_MAX_USD_PER_JOB`
+  ($7.50), inside the daily cap and the open-tier pool ($4 a day), which still bound the cost.
+- **Review stays required where nothing can confirm a reading.** Every display equation and every
+  table is a required decision; prose, headings and figure descriptions are optional notes only
+  when the reader was sure and nothing is `[illegible]`; each converted page starts with a notice
+  and keeps its original in the file. Without a text layer to check against, a person is the only
+  check, and a model that reads handwriting can misread a symbol with full confidence (measured: a
+  cheaper model read two section numbers wrong and called them `high`).
+- **Why opt-in and not default.** A page costs four to six times a typed page ($0.11 to $0.14
+  against $0.02 to $0.03), takes 20 to 30 seconds and asks a person to check every display equation
+  and table. The measurement is on synthetic scans, nine real papers and eight real pages: not
+  worse than the typed pipeline on equations, and nothing on how long checking takes. Someone with
+  scanned lecture notes who wants them readable, and will check them, is served; someone who
+  uploads a PDF of scans by mistake is not charged for it.
+- **Why the main model.** The only reader that matched the typed pipeline on equations on the
+  development pages, read handwriting without a confident misread, and cut boxes good enough for
+  the second reading to read what the page reader meant. The cheap model is cheaper by a factor of
+  thirty and costs about twelve points of symbols-correct equations.
 - **Easier.** A scanned or handwritten page can become text a screen reader reads, with every
   doubtful part in front of a person; the instructor gets one place (the page notice and its
-  original) to check against.
+  original) to check against. The refusal of a PDF of only scans now says how to ask.
 - **Harder.** Every converted page is a model call with no text layer to catch an invented
   word: the review tiers are the only guard, and a page full of confident, wrong prose is an
-  optional note a person can skip. One more prompt, one more schema, one more place a student
-  can read a model's guess as a fact. Review load rises with the number of equations and
-  tables on these pages, since none of them can be accepted without a decision.
-- **Not decided here.** The default for `FEATURE_IMAGE_PAGES`, which model reads, and whether
-  agreed inline formulas may stay optional; those wait for the numbers above and for a
-  held-out measurement that includes scans.
-- **When to revisit.** If a held-out scanned set shows more silent wrong words than the review
-  tiers can catch, or if the hidden-layer pages (`scan_ocr`) turn out to be better read from
-  their OCR layer after all, switch the flag off and keep the pages as images.
+  optional note a person can skip. Inline formulas ride with their paragraph, so a wrong one
+  in a confident paragraph is not asked about (about 5 in 100 equations on the held-out papers,
+  fewer than the typed pipeline leaves unasked, but not none). One more prompt, schema, setting
+  group, upload option and migration; the public copy has to say what it can and cannot do (README,
+  limits, site pages: updated with this decision).
+- **Not decided here.** Whether the conversion should ever be the default; whether inline formulas
+  should become required decisions; whether a display equation the two readers agree on may become
+  an optional note (agreement says little when one model reads twice); a measurement of reviewers.
+- **When to revisit.** If reviewers accept wrong equations from these pages, if the opt-in is used
+  mostly by mistake or its cost per page rises, or if a cheaper reader closes the gap on equations
+  and on handwriting, change the model or the allowance; if a held-out scan set shows more silent
+  wrong words than the notes can catch, withdraw the option.

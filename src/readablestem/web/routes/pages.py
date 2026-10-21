@@ -97,6 +97,7 @@ def privacy(request: Request) -> Response:
         # What the content features send and keep, only when they are on.
         "tables_on": ctx.settings.feature_tables,
         "notation_on": ctx.settings.feature_notation_memory,
+        "image_pages_on": ctx.settings.feature_image_pages,
         "microsoft_on": ctx.settings.ms_sign_in_enabled,
         # Word and PowerPoint uploads are taken (T3-30): the page says how they are handled.
         "office_on": bool(office_convert.input_kinds(ctx.settings)),
@@ -126,6 +127,7 @@ def limits(request: Request) -> Response:
         # Which content features are on, so the page describes what this server does.
         "tables_on": settings.feature_tables,
         "colour_on": settings.feature_colour,
+        "image_pages_on": settings.feature_image_pages,
         "office_on": bool(office_convert.input_kinds(settings)),
         # The daily page limit of invited people; the open tier's is in every page's context.
         "invited_page_quota": settings.per_user_daily_page_quota,
