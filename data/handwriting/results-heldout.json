@@ -1,0 +1,300 @@
+{
+ "budget_spent_usd": 1.5808030999999998,
+ "complete": true,
+ "cost_per_pdf_page_usd": 0.06586679583333334,
+ "detection_precision": 1.0,
+ "detection_recall": 0.9804878048780488,
+ "dropped_usd": 0.0,
+ "equation_flags": {
+  "all": {
+   "asked": 194,
+   "matched": 201,
+   "precision": 0.4381443298969072,
+   "recall": 1.0,
+   "wrong": 85,
+   "wrong_not_asked": 0,
+   "wrong_not_asked_per_100_gold": 0.0
+  },
+  "all_symbols": {
+   "asked": 194,
+   "matched": 201,
+   "precision": 0.42783505154639173,
+   "recall": 1.0,
+   "wrong": 83,
+   "wrong_not_asked": 0,
+   "wrong_not_asked_per_100_gold": 0.0
+  },
+  "display": {
+   "asked": 17,
+   "matched": 17,
+   "precision": 0.35294117647058826,
+   "recall": 1.0,
+   "wrong": 6,
+   "wrong_not_asked": 0,
+   "wrong_not_asked_per_100_gold": 0.0
+  },
+  "inline": {
+   "asked": 177,
+   "matched": 184,
+   "precision": 0.4463276836158192,
+   "recall": 1.0,
+   "wrong": 79,
+   "wrong_not_asked": 0,
+   "wrong_not_asked_per_100_gold": 0.0
+  },
+  "inline_symbols": {
+   "asked": 177,
+   "matched": 184,
+   "precision": 0.4350282485875706,
+   "recall": 1.0,
+   "wrong": 77,
+   "wrong_not_asked": 0,
+   "wrong_not_asked_per_100_gold": 0.0
+  }
+ },
+ "gold_equations": 205,
+ "image_pages": {
+  "blocks_per_page": 6.541666666666667,
+  "by_kind": {
+   "equation": 17,
+   "heading": 12,
+   "list_item": 35,
+   "paragraph": 93
+  },
+  "converted": 24,
+  "cost_per_page_usd": 0.0624965125,
+  "cost_usd": 1.4999163,
+  "fell_back": 0,
+  "illegible": 0,
+  "kept_as_image": 0,
+  "low_confidence_share": 0.8471337579617835,
+  "optional_per_converted_page": 0.8333333333333334,
+  "pages": 24,
+  "required_per_converted_page": 5.708333333333333,
+  "seconds_per_page": 10.629958333333333
+ },
+ "note": "Aggregates only; the labels, the ink and the answers are not committed (CC BY-NC-SA 4.0 source). Rebuilt with scripts/handwriting_eval.py report.",
+ "part": "heldout",
+ "primary_exact_lenient": 0.5658536585365853,
+ "primary_interval": [
+  0.5145631067961165,
+  0.6182795698924731
+ ],
+ "second_reading": {
+  "agreed": 14,
+  "agreed_wrong": 3,
+  "disagreed": 3,
+  "disagreed_wrong": 3,
+  "display_matched": 17,
+  "no_second_reading": 0
+ },
+ "silent_wrong_strict": 0,
+ "silent_wrong_symbols": 0,
+ "stopped_reason": null,
+ "strata": {
+  "all": {
+   "all": {
+    "exact_lenient": 0.5658536585365853,
+    "found": 201,
+    "n": 205,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5756097560975609
+   }
+  },
+  "length": {
+   "16-40 tokens": {
+    "exact_lenient": 0.6153846153846154,
+    "found": 12,
+    "n": 13,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6153846153846154
+   },
+   "3-7 tokens": {
+    "exact_lenient": 0.6274509803921569,
+    "found": 51,
+    "n": 51,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6470588235294118
+   },
+   "8-15 tokens": {
+    "exact_lenient": 0.5390070921985816,
+    "found": 138,
+    "n": 141,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5460992907801419
+   }
+  },
+  "paper": {
+   "plain": {
+    "exact_lenient": 0.5416666666666666,
+    "found": 120,
+    "n": 120,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5583333333333333
+   },
+   "ruled": {
+    "exact_lenient": 0.6,
+    "found": 81,
+    "n": 85,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6
+   }
+  },
+  "pen": {
+   "black": {
+    "exact_lenient": 0.5416666666666666,
+    "found": 68,
+    "n": 72,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5416666666666666
+   },
+   "blue": {
+    "exact_lenient": 0.5643564356435643,
+    "found": 101,
+    "n": 101,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5742574257425742
+   },
+   "graphite": {
+    "exact_lenient": 0.625,
+    "found": 32,
+    "n": 32,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.65625
+   }
+  },
+  "role": {
+   "block": {
+    "exact_lenient": 0.5714285714285714,
+    "found": 52,
+    "n": 56,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5892857142857143
+   },
+   "inline": {
+    "exact_lenient": 0.5637583892617449,
+    "found": 149,
+    "n": 149,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5704697986577181
+   }
+  },
+  "unit": {
+   "hw-heldout-01": {
+    "exact_lenient": 0.6666666666666666,
+    "found": 18,
+    "n": 18,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6666666666666666
+   },
+   "hw-heldout-02": {
+    "exact_lenient": 0.5333333333333333,
+    "found": 15,
+    "n": 15,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5333333333333333
+   },
+   "hw-heldout-03": {
+    "exact_lenient": 0.6428571428571429,
+    "found": 14,
+    "n": 14,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.7142857142857143
+   },
+   "hw-heldout-04": {
+    "exact_lenient": 0.65,
+    "found": 20,
+    "n": 20,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.65
+   },
+   "hw-heldout-05": {
+    "exact_lenient": 0.5,
+    "found": 18,
+    "n": 18,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5
+   },
+   "hw-heldout-06": {
+    "exact_lenient": 0.631578947368421,
+    "found": 19,
+    "n": 19,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6842105263157895
+   },
+   "hw-heldout-07": {
+    "exact_lenient": 0.38461538461538464,
+    "found": 13,
+    "n": 13,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.38461538461538464
+   },
+   "hw-heldout-08": {
+    "exact_lenient": 0.47058823529411764,
+    "found": 13,
+    "n": 17,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.47058823529411764
+   },
+   "hw-heldout-09": {
+    "exact_lenient": 0.5,
+    "found": 22,
+    "n": 22,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5
+   },
+   "hw-heldout-10": {
+    "exact_lenient": 0.75,
+    "found": 12,
+    "n": 12,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.75
+   },
+   "hw-heldout-11": {
+    "exact_lenient": 0.47368421052631576,
+    "found": 19,
+    "n": 19,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.47368421052631576
+   },
+   "hw-heldout-12": {
+    "exact_lenient": 0.6111111111111112,
+    "found": 18,
+    "n": 18,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6111111111111112
+   }
+  }
+ },
+ "symbols_exact": 0.5756097560975609,
+ "symbols_exact_credit": 0.5756097560975609,
+ "symbols_interval_uncredited": [
+  0.5196078431372549,
+  0.6344086021505376
+ ],
+ "units": "12 of 12",
+ "unmatched_predicted": 0
+}

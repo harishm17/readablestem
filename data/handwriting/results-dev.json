@@ -1,0 +1,244 @@
+{
+ "budget_spent_usd": 0.5059092,
+ "complete": true,
+ "cost_per_pdf_page_usd": 0.05059092,
+ "detection_precision": 0.9864864864864865,
+ "detection_recall": 0.9733333333333334,
+ "dropped_usd": 0.0,
+ "equation_flags": {
+  "all": {
+   "asked": 72,
+   "matched": 73,
+   "precision": 0.4027777777777778,
+   "recall": 1.0,
+   "wrong": 29,
+   "wrong_not_asked": 0,
+   "wrong_not_asked_per_100_gold": 0.0
+  },
+  "all_symbols": {
+   "asked": 72,
+   "matched": 73,
+   "precision": 0.3333333333333333,
+   "recall": 1.0,
+   "wrong": 24,
+   "wrong_not_asked": 0,
+   "wrong_not_asked_per_100_gold": 0.0
+  },
+  "display": {
+   "asked": 12,
+   "matched": 12,
+   "precision": 0.4166666666666667,
+   "recall": 1.0,
+   "wrong": 5,
+   "wrong_not_asked": 0,
+   "wrong_not_asked_per_100_gold": 0.0
+  },
+  "inline": {
+   "asked": 60,
+   "matched": 61,
+   "precision": 0.4,
+   "recall": 1.0,
+   "wrong": 24,
+   "wrong_not_asked": 0,
+   "wrong_not_asked_per_100_gold": 0.0
+  },
+  "inline_symbols": {
+   "asked": 60,
+   "matched": 61,
+   "precision": 0.36666666666666664,
+   "recall": 1.0,
+   "wrong": 22,
+   "wrong_not_asked": 0,
+   "wrong_not_asked_per_100_gold": 0.0
+  }
+ },
+ "gold_equations": 75,
+ "image_pages": {
+  "blocks_per_page": 6.4,
+  "by_kind": {
+   "equation": 12,
+   "heading": 5,
+   "list_item": 20,
+   "paragraph": 27
+  },
+  "converted": 10,
+  "cost_per_page_usd": 0.04276876,
+  "cost_usd": 0.4276876,
+  "fell_back": 0,
+  "illegible": 1,
+  "kept_as_image": 0,
+  "low_confidence_share": 0.875,
+  "optional_per_converted_page": 0.6,
+  "pages": 10,
+  "required_per_converted_page": 5.8,
+  "seconds_per_page": 9.216
+ },
+ "note": "Aggregates only; the labels, the ink and the answers are not committed (CC BY-NC-SA 4.0 source). Rebuilt with scripts/handwriting_eval.py report.",
+ "part": "dev",
+ "primary_exact_lenient": 0.5866666666666667,
+ "primary_interval": [
+  0.4927536231884058,
+  0.6627906976744186
+ ],
+ "second_reading": {
+  "agreed": 10,
+  "agreed_wrong": 4,
+  "disagreed": 2,
+  "disagreed_wrong": 1,
+  "display_matched": 12,
+  "no_second_reading": 0
+ },
+ "silent_wrong_strict": 0,
+ "silent_wrong_symbols": 0,
+ "stopped_reason": null,
+ "strata": {
+  "all": {
+   "all": {
+    "exact_lenient": 0.5866666666666667,
+    "found": 73,
+    "n": 75,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6533333333333333
+   }
+  },
+  "length": {
+   "16-40 tokens": {
+    "exact_lenient": 0.0,
+    "found": 0,
+    "n": 1,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.0
+   },
+   "3-7 tokens": {
+    "exact_lenient": 0.5714285714285714,
+    "found": 41,
+    "n": 42,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6190476190476191
+   },
+   "8-15 tokens": {
+    "exact_lenient": 0.625,
+    "found": 32,
+    "n": 32,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.71875
+   }
+  },
+  "paper": {
+   "plain": {
+    "exact_lenient": 0.543859649122807,
+    "found": 55,
+    "n": 57,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5964912280701754
+   },
+   "ruled": {
+    "exact_lenient": 0.7222222222222222,
+    "found": 18,
+    "n": 18,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.8333333333333334
+   }
+  },
+  "pen": {
+   "black": {
+    "exact_lenient": 0.5333333333333333,
+    "found": 15,
+    "n": 15,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6
+   },
+   "blue": {
+    "exact_lenient": 0.5869565217391305,
+    "found": 44,
+    "n": 46,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6739130434782609
+   },
+   "graphite": {
+    "exact_lenient": 0.6428571428571429,
+    "found": 14,
+    "n": 14,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6428571428571429
+   }
+  },
+  "role": {
+   "block": {
+    "exact_lenient": 0.625,
+    "found": 31,
+    "n": 32,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.75
+   },
+   "inline": {
+    "exact_lenient": 0.5581395348837209,
+    "found": 42,
+    "n": 43,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5813953488372093
+   }
+  },
+  "unit": {
+   "hw-dev-01": {
+    "exact_lenient": 0.5333333333333333,
+    "found": 15,
+    "n": 15,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6
+   },
+   "hw-dev-02": {
+    "exact_lenient": 0.7222222222222222,
+    "found": 18,
+    "n": 18,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.8333333333333334
+   },
+   "hw-dev-03": {
+    "exact_lenient": 0.4166666666666667,
+    "found": 11,
+    "n": 12,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5833333333333334
+   },
+   "hw-dev-04": {
+    "exact_lenient": 0.6428571428571429,
+    "found": 14,
+    "n": 14,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.6428571428571429
+   },
+   "hw-dev-05": {
+    "exact_lenient": 0.5625,
+    "found": 15,
+    "n": 16,
+    "silent_wrong_strict": 0,
+    "silent_wrong_symbols": 0,
+    "symbols": 0.5625
+   }
+  }
+ },
+ "symbols_exact": 0.6533333333333333,
+ "symbols_exact_credit": 0.6533333333333333,
+ "symbols_interval_uncredited": [
+  0.5774647887323944,
+  0.7530864197530864
+ ],
+ "units": "5 of 5",
+ "unmatched_predicted": 1
+}

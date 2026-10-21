@@ -299,7 +299,8 @@ no cost (`--answers-offline`).
   how well the pass reads a degraded print, not a real book. The eight real pages say it can read
   real ones; they are eight.
 - Handwriting is measured only by eye on four pages. There is no handwriting answer key and no
-  claim here about a word or symbol error rate on handwriting.
+  claim here about a word or symbol error rate on handwriting. (Measured afterwards, on real ink with
+  an answer key: [eval-handwriting.md](eval-handwriting.md).)
 - One run per arm, 36 pages, six documents; no interval. The Haiku-to-Opus gap on equations is
   large enough to take seriously, the Sonnet-to-Haiku one is not.
 - The held-out check is nine of fifteen papers, one run, one seed, with no heading gold and a prose
