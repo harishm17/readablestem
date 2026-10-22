@@ -64,6 +64,7 @@ from readablestem.config import Settings
 from readablestem.core import triage
 from readablestem.core.budget import BudgetExceeded, JobBudget
 from readablestem.core.types import Check, ConversionOptions, Element, Fix, Kind, ModelCall, Status
+from readablestem.eval import equations_chem as chem_score
 from readablestem.eval import equations_symbols as sym
 from readablestem.eval import equations_v2 as v2
 from readablestem.eval import image_pages as image_pages_eval
@@ -1386,6 +1387,11 @@ def document_page_item(
             if proposal is not None
             else sym.missing_symbols(gold[gi]["mathml"])
         )
+        chem = (
+            chem_score.score_chem(proposal.mathml, gold[gi]["mathml"])
+            if proposal is not None
+            else chem_score.missing_chem(gold[gi]["mathml"])
+        )
         matched.append(
             {
                 "gold_id": gold[gi]["id"],
@@ -1400,6 +1406,9 @@ def document_page_item(
                 "stream_similarity": stream.similarity,
                 "exact_symbols": symbols.exact,
                 "symbols_similarity": symbols.similarity,
+                # The chemistry scorer (eval.equations_chem): meaningful for chemistry gold only.
+                "exact_chem": chem.exact,
+                "chem_similarity": chem.similarity,
                 **_page_pass_fields(element, fix),
                 # How far the predicted span's own text layer is from the gold equation (span
                 # fidelity, whatever the model then read), and that text, for examples.
@@ -1408,6 +1417,7 @@ def document_page_item(
                 "review": fix.review if fix is not None else None,
                 "tier_reasons": triage.tier_reasons(fix) if fix is not None else [],
                 "pred_latex": proposal.latex if proposal is not None else None,
+                "pred_mathml": proposal.mathml if proposal is not None else None,
                 **_shadow_pair(fix),
             }
         )
