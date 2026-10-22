@@ -1,0 +1,162 @@
+[
+ {
+  "set": "stat:stat:AP",
+  "from": "2024-07-01",
+  "until": "2025-06-30",
+  "records": 2459,
+  "accepted_licence": 1181,
+  "new": 1181
+ },
+ {
+  "set": "stat:stat:CO",
+  "from": "2023-01-01",
+  "until": "2025-06-30",
+  "records": 2278,
+  "accepted_licence": 969,
+  "new": 884
+ },
+ {
+  "set": "stat:stat:OT",
+  "from": "2019-01-01",
+  "until": "2025-06-30",
+  "records": 907,
+  "accepted_licence": 279,
+  "new": 251
+ },
+ {
+  "set": "cs:cs:CY",
+  "from": "2025-01-01",
+  "until": "2025-06-30",
+  "records": 2345,
+  "accepted_licence": 1149,
+  "new": 1123
+ },
+ {
+  "set": "cs:cs:GL",
+  "from": "2016-01-01",
+  "until": "2025-06-30",
+  "records": 124,
+  "accepted_licence": 36,
+  "new": 36
+ },
+ {
+  "set": "cs:cs:DM",
+  "from": "2023-01-01",
+  "until": "2025-06-30",
+  "records": 3030,
+  "accepted_licence": 1230,
+  "new": 1227
+ },
+ {
+  "set": "cs:cs:SE",
+  "from": "2025-04-01",
+  "until": "2025-06-30",
+  "records": 1210,
+  "accepted_licence": 583,
+  "new": 565
+ },
+ {
+  "set": "econ:econ:GN",
+  "from": "2023-01-01",
+  "until": "2025-06-30",
+  "records": 2350,
+  "accepted_licence": 1063,
+  "new": 1023
+ },
+ {
+  "set": "econ:econ:TH",
+  "from": "2019-01-01",
+  "until": "2025-06-30",
+  "records": 2522,
+  "accepted_licence": 789,
+  "new": 776
+ },
+ {
+  "set": "q-bio:q-bio:GN",
+  "from": "2019-01-01",
+  "until": "2025-06-30",
+  "records": 1470,
+  "accepted_licence": 534,
+  "new": 528
+ },
+ {
+  "set": "q-bio:q-bio:PE",
+  "from": "2019-01-01",
+  "until": "2025-06-30",
+  "records": 5674,
+  "accepted_licence": 1516,
+  "new": 1442
+ },
+ {
+  "set": "q-bio:q-bio:BM",
+  "from": "2019-01-01",
+  "until": "2025-06-30",
+  "records": 2716,
+  "accepted_licence": 878,
+  "new": 848
+ },
+ {
+  "set": "q-bio:q-bio:OT",
+  "from": "2016-01-01",
+  "until": "2025-06-30",
+  "records": 819,
+  "accepted_licence": 251,
+  "new": 245
+ },
+ {
+  "set": "eess:eess:SY",
+  "from": "2024-01-01",
+  "until": "2025-06-30",
+  "records": 9643,
+  "accepted_licence": 3351,
+  "new": 3287
+ },
+ {
+  "set": "eess:eess:SP",
+  "from": "2024-07-01",
+  "until": "2025-06-30",
+  "records": 6390,
+  "accepted_licence": 2104,
+  "new": 1959
+ },
+ {
+  "set": "physics:physics:app-ph",
+  "from": "2023-01-01",
+  "until": "2025-06-30",
+  "records": 7029,
+  "accepted_licence": 3024,
+  "new": 2961
+ },
+ {
+  "set": "physics:physics:med-ph",
+  "from": "2019-01-01",
+  "until": "2025-06-30",
+  "records": 5108,
+  "accepted_licence": 1514,
+  "new": 1443
+ },
+ {
+  "set": "physics:physics:bio-ph",
+  "from": "2023-01-01",
+  "until": "2025-06-30",
+  "records": 2969,
+  "accepted_licence": 1297,
+  "new": 1045
+ },
+ {
+  "set": "math:math:OC",
+  "from": "2025-04-01",
+  "until": "2025-06-30",
+  "records": 1795,
+  "accepted_licence": 680,
+  "new": 550
+ },
+ {
+  "set": "q-fin:q-fin:GN",
+  "from": "2019-01-01",
+  "until": "2025-06-30",
+  "records": 1050,
+  "accepted_licence": 277,
+  "new": 241
+ }
+]
