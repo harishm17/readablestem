@@ -63,6 +63,15 @@ def rescored_chat_items(part: str, label: str) -> list[dict]:
     return module.chat_items(part, CHAT_ARM_IDS[label])
 
 
+def apply_reading(item: dict, reading: str) -> dict:
+    """ReadableSTEM's item as the registered scorer made it (`registered`), or as an HTML reader
+    counts it (`cells`): the maths cells of a rebuilt table are equations (`pe.with_table_maths`).
+    A chatbot's item and a page with no maths cell are the same either way."""
+    if reading == "cells" and "table_maths_reading" in item:
+        return item | item["table_maths_reading"]
+    return item
+
+
 def load_buckets_module():
     spec = importlib.util.spec_from_file_location(
         "dev_buckets", REPO / "scripts" / "dev_buckets.py"
@@ -304,6 +313,20 @@ def main() -> int:
     )
     parser.add_argument("--tag", default="rs", help="ReadableSTEM's run folder under runs/PART")
     parser.add_argument(
+        "--extra-arm",
+        action="append",
+        default=[],
+        metavar="LABEL=TAG",
+        help="another ReadableSTEM run (runs/PART/TAG) as an arm, to be compared with --tag's",
+    )
+    parser.add_argument(
+        "--reading",
+        choices=["registered", "cells"],
+        default="registered",
+        help="`cells`: ReadableSTEM's table cells with maths count as equations, as the "
+        "chatbots' HTML is read",
+    )
+    parser.add_argument(
         "--rescore-chat",
         action="store_true",
         help="score the chatbot arms again from their recorded answers with the current code",
@@ -320,7 +343,15 @@ def main() -> int:
             rows_in = [json.loads(line) for line in path.read_text().splitlines() if line]
             if args.rescore_chat and label in CHAT_ARM_IDS:
                 rows_in = rescored_chat_items(args.part, label)
+            rows_in = [apply_reading(r, args.reading) for r in rows_in]
             items[label] = [r for r in rows_in if not any(e in r["id"] for e in args.exclude)]
+    for spec in args.extra_arm:
+        label, _, tag = spec.partition("=")
+        path = runs / tag / "items.jsonl"
+        rows_in = [
+            apply_reading(json.loads(line), args.reading) for line in path.read_text().splitlines()
+        ]
+        items[label] = [r for r in rows_in if not any(e in r["id"] for e in args.exclude)]
     result: dict = {"part": args.part, "arms": {}}
     print(f"## {args.part}: " + ", ".join(f"{k}: {len(v)} papers" for k, v in items.items()))
     # pooled metrics with cluster intervals

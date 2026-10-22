@@ -151,6 +151,7 @@ def main() -> int:
     parser.add_argument("--part", choices=["dev", "heldout", "fresh", "fresh2"], default="dev")
     parser.add_argument("--rs", default="rs", help="ReadableSTEM's run folder under runs/PART")
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--reading", choices=["registered", "cells"], default="registered")
     parser.add_argument(
         "--rescore-chat",
         action="store_true",
@@ -179,6 +180,7 @@ def main() -> int:
         if args.rescore_chat and name in ("Haiku", "Opus"):
             rows = report.rescored_chat_items(args.part, f"Chatbot, {name}")
         for item in rows:
+            item = report.apply_reading(item, args.reading) if name == "ReadableSTEM" else item
             pairs = {p["gold_id"]: p for p in item["pairs"]}
             for gid in [*pairs, *item["missed_gold_ids"]]:
                 outcome[name][gid] = {"pair": pairs.get(gid)}
@@ -239,8 +241,9 @@ def silent_errors(args: argparse.Namespace, gold: dict[str, dict], buckets) -> s
     """ReadableSTEM's wrong equations that nobody is asked about, by kind. A render-and-compare
     check can only help where the symbols are right and the structure is not: the symbol bag
     (letters, digits, operators and structure markers) is equal, the order or nesting differs."""
+    report = _load("realworld_report")
     items = [
-        json.loads(line)
+        report.apply_reading(json.loads(line), args.reading)
         for line in (ROOT / "runs" / args.part / args.rs / "items.jsonl").read_text().splitlines()
     ]
     count: Counter[str] = Counter()

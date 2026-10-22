@@ -66,7 +66,13 @@ output by `proof/systems.equation_item`), over every gold equation, **with the s
 the branch's base; it is not changed.**
 
 - **Primary: `exact_lenient`, end to end** (detection and transcription together; an undetected equation is wrong), pooled over
-  gold equations.
+  gold equations, in two readings of what ReadableSTEM wrote, **both registered and both reported**:
+  **A, as registered before** (equations that are elements of their own, `document_page_item`): the maths in a cell of a table the
+  table step rebuilt is not one of them. **B, cells counted** (`pipeline_eval.with_table_maths`, stored beside A in every
+  ReadableSTEM item): each maths cell of a rebuilt table is one inline equation, as a reader of the output HTML counts it, and as the chatbots' HTML is
+  read (every `<math>` in it). Reading A cannot credit ReadableSTEM for a formula it wrote correctly in a table, which the report of the analysis shows is
+  a measurement artefact, not a product defect; B is the like-for-like reading. The chatbots are scored the same way under both. **Reading A is the
+  headline of the verdict (section 5); B is stated beside it, and the report says in words if the two verdicts differ.**
 - Secondary: symbols credited; detection recall and precision; **wrong equations nobody is asked about, per 100 gold**
   (aligned, not `exact_lenient`, not a required decision: the silent errors); the decisions asked per PDF page; cost
   per PDF page; the failures by mechanism (`scripts/rw_gap_table.py`).
@@ -79,7 +85,7 @@ the branch's base; it is not changed.**
 95% cluster bootstraps over the 15 papers (`proof/stats.cluster_bootstrap`, 10,000 resamples, seed 0), paired for
 differences, and the sign-flip test on per-paper differences.
 
-1. **Registered tests** (primary): ReadableSTEM after minus chatbot-Haiku, and minus chatbot-Opus, with a 97.5% interval
+1. **Registered tests** (primary, reading A and reading B): ReadableSTEM after minus chatbot-Haiku, and minus chatbot-Opus, with a 97.5% interval
    (Bonferroni, k = 2). "Beats" is written only if both differences are positive, both 97.5% intervals exclude 0 and
    both sign-flip p are below 0.025. Otherwise the report says "higher by point estimate" or "no difference this set can detect", or
    "lower".

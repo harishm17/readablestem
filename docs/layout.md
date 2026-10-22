@@ -547,7 +547,12 @@ Modern Sans):
 
 Found by the error analysis of the real-world set ([eval-equation-rootcause.md](eval-equation-rootcause.md)):
 a paper page is mostly `$x$` in running text, in a font the OpenStax prints never use. What the
-layout learned from it, all from the text layer and the glyph boxes, no model call:
+layout learned from it, all from the text layer and the glyph boxes, no model call. The rules that
+come from what a TeX author types (italic variables, bold letters with an index, the edges: parentheses, units,
+citations, word spaces) apply to PDFs typeset by TeX only (`_TEX_MADE`, from `page_type.producer_hint`): an
+OpenStax print from Chromium, where emphasis is italic and the unit is inside the maths, is read as before
+(`scripts/layout_identity.py` on 126 PDFs: 111 identical, the rest explained in
+[eval-equation-rootcause.md](eval-equation-rootcause.md) section 7). Captions, ellipsis lists and `:=` apply to every producer.
 
 - **Italic variables** (`_italic_variables`, evidence `italic variable in prose`). mathptmx, mathpazo,
   Charter and newtx set the Latin letters of a formula in the text family's italic, so a lone `S`,
@@ -568,7 +573,8 @@ layout learned from it, all from the text layer and the glyph boxes, no model ca
   formulas). A list with an ellipsis (`i = 1, ..., S`) is one formula, a map `H : R -> S` is one (a colon
   between two runs, the second with an arrow or a membership sign: `_join_signatures`).
   On the 25 development papers 27 of 31 formulas cut inside a pair of parentheses had the pair
-  outside the author's maths, and 37 of 40 that ended in an upright unit had the unit outside.
+  outside the author's maths, and of the formulas that ended in an upright unit 37 were span failures
+  against 2 that were exact.
 - **Figure captions** are cut like paragraphs (`_attach_captions`): `Element.caption` stays plain text,
   `Element.caption_marked` has an inline marker where each formula was, and each formula is an
   equation element whose `parent_id` is the figure (id right after the figure's). `assemble` writes the

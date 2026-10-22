@@ -63,7 +63,16 @@ from typing import Any, Protocol
 from readablestem.config import Settings
 from readablestem.core import triage
 from readablestem.core.budget import BudgetExceeded, JobBudget
-from readablestem.core.types import Check, ConversionOptions, Element, Fix, Kind, ModelCall, Status
+from readablestem.core.types import (
+    Check,
+    ConversionOptions,
+    Element,
+    EquationFix,
+    Fix,
+    Kind,
+    ModelCall,
+    Status,
+)
 from readablestem.eval import equations_symbols as sym
 from readablestem.eval import equations_v2 as v2
 from readablestem.eval import image_pages as image_pages_eval
@@ -1949,6 +1958,67 @@ def _collect_sections(
     return items, None
 
 
+def with_table_maths(
+    elements: Sequence[Element], fixes: dict[str, Fix]
+) -> tuple[list[Element], dict[str, Fix]]:
+    """The elements and fixes with the maths cells of every rebuilt table as inline equations
+    of their own, placed right after their table.
+
+    The document task's equation scorer sees equations that are elements of their own. A table
+    the table step rebuilt is one TABLE element whose cells hold MathML, so the formulas in its
+    cells are not equations to the scorer, while a reader of the output HTML (and the chatbots'
+    HTML is read that way) finds them. This is that reading for ReadableSTEM: each cell with
+    validated MathML is one inline equation, asked about when its table is."""
+    ordered = sorted(elements, key=lambda e: e.order)
+    out: list[Element] = []
+    extra: dict[str, Fix] = {}
+    shift = 0
+    for element in ordered:
+        out.append(element.model_copy(update={"order": element.order + shift}))
+        fix = fixes.get(element.id)
+        if element.kind is not Kind.TABLE or fix is None or fix.table is None:
+            continue
+        for k, cell in enumerate(c for c in fix.table.grid.cells if c.latex and c.mathml):
+            shift += 1
+            new_id = f"{element.id}-m{k}"
+            out.append(
+                Element(
+                    id=new_id,
+                    kind=Kind.EQUATION,
+                    page=element.page,
+                    bbox=cell.bbox or element.bbox,
+                    order=element.order + shift,
+                    text=cell.text or None,
+                    display="inline",
+                    parent_id=element.id,
+                )
+            )
+            extra[new_id] = Fix(
+                element_id=new_id,
+                kind=Kind.EQUATION,
+                status=fix.status,
+                confidence=fix.confidence,
+                equation=EquationFix(
+                    latex=cell.latex or "", mathml=cell.mathml or "", speech="", display="inline"
+                ),
+                review=fix.review,
+            )
+    return out, {**fixes, **extra}
+
+
+_TABLE_READING_KEYS = (
+    "n_pred",
+    "pairs",
+    "missed_gold_ids",
+    "matched",
+    "unmatched",
+    "unmatched_by_reason",
+    "split_gold_ids",
+    "symbols_credited",
+    "stream_credited",
+)
+
+
 def _document_section(
     cfg: EvalConfig, page: list[dict], pdf: bytes
 ) -> tuple[dict | None, str | None]:
@@ -1982,6 +2052,18 @@ def _document_section(
     )
     for pair in item["pairs"]:
         pair["scorer_gap"] = pair["gold_id"] in cfg.scorer_gaps
+    if any(
+        f.table is not None and any(c.mathml for c in f.table.grid.cells) for f in fixes.values()
+    ):
+        # The same page read as an HTML reader does: the maths cells of its tables count as
+        # equations (`with_table_maths`). Kept beside the registered reading, not instead of it.
+        elements_c, fixes_c = with_table_maths(result.elements, fixes)
+        reading = document_page_item(
+            _page_id(page), _of_kind(page, "equation"), elements_c, fixes_c, [], []
+        )
+        for pair in reading["pairs"]:
+            pair["scorer_gap"] = pair["gold_id"] in cfg.scorer_gaps
+        item["table_maths_reading"] = {k: reading[k] for k in _TABLE_READING_KEYS if k in reading}
     item["review"] = load_counts(result.fixes)
     item["figures"] = document_figures(result)
     headings = predicted_headings(result.fixes)

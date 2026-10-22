@@ -18,8 +18,9 @@ from readablestem.pipeline.layout import analyze
 BODY = 11.0
 
 
-def one_page(fill) -> bytes:
+def one_page(fill, producer: str = "pdfTeX-1.40.25") -> bytes:
     doc = pymupdf.open()
+    doc.set_metadata({"producer": producer})
     fill(doc.new_page(width=612, height=792))
     return doc.tobytes()
 
@@ -178,3 +179,16 @@ def test_the_unit_exponent_of_upright_text_is_still_text():
         )
 
     assert inline(analyze(one_page(fill)).elements) == []
+
+
+def test_italic_letters_in_a_chromium_print_are_emphasis_not_maths():
+    def fill(page):
+        line(
+            page,
+            100,
+            ("Let us consider ", "helv"),
+            ("S", "heit"),
+            (" species, characterized by their abundances in the community.", "helv"),
+        )
+
+    assert inline(analyze(one_page(fill, producer="Skia/PDF m120")).elements) == []

@@ -356,6 +356,11 @@ _SUPERSCRIPT_FLAG = 1
 _MONO_FLAG = 8
 
 _LOCK = threading.RLock()  # PyMuPDF is not thread-safe: one PyMuPDF call at a time
+# The document being analysed was typeset by TeX (`page_type.producer_hint`): the conventions
+# below that come from what a TeX author types (an italic letter is `$x$`, the maths stops
+# before a unit or a parenthesis of the sentence) apply only then. Set by `_analyze_document`
+# under `_LOCK`; a Chromium print of MathML or a Word file is read as before.
+_TEX_MADE = False
 # Run the table detector only on pages that could hold a table (`tables.may_hold_table`).
 # The result is the same either way; switched off, only to check that.
 TABLE_PREFILTER = True
@@ -431,6 +436,8 @@ def analyze(
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
             finally:
+                global _TEX_MADE
+                _TEX_MADE = False
                 doc.close()
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store quotes PDF content
@@ -2464,7 +2471,7 @@ def _bold_variable(chars: list[_Char], at: int) -> bool:
     """Is the glyph at `at` a lone bold Latin letter, a vector in a text font (`\\mathbf{v}_2` set
     in Times Bold)? Its script is an index, not the count of "H2O"."""
     base = chars[at]
-    return base.bold and base.c.isalpha() and (at == 0 or chars[at - 1].blank)
+    return _TEX_MADE and base.bold and base.c.isalpha() and (at == 0 or chars[at - 1].blank)
 
 
 def _script_base(chars: list[_Char], info: _CharInfo, start: int, end: int, size: float) -> bool:
@@ -3046,6 +3053,8 @@ _OPERAND_START = frozenset("([{\u2202\u2207\u221a\u222b\u2211\u220f\u221e")
 
 def _word_space_between_operands(chars: list[_Char], info: _CharInfo, i: int) -> bool:
     """Is the blank at `i` a word space between the end of one operand and the start of another?"""
+    if not _TEX_MADE:
+        return False
     before = next((k for k in range(i - 1, -1, -1) if not chars[k].blank), None)
     after = next((k for k in range(i + 1, len(chars)) if not chars[k].blank), None)
     if before is None or after is None or info.script[before] or info.script[after]:
@@ -3164,13 +3173,13 @@ def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tupl
             else:
                 end -= 1
             changed = True
-        elif end - start > 1 and text[-1] in "([{":
+        elif _TEX_MADE and end - start > 1 and text[-1] in "([{":
             end -= 1  # "K (see below)": the run never ends with a bracket it opens
             changed = True
-        elif end - start > 2 and _sentence_parentheses(text):
+        elif _TEX_MADE and end - start > 2 and _sentence_parentheses(text):
             start, end = start + 1, end - 1  # "(x = 0.9)": the pair is the sentence's
             changed = True
-        elif (cut := _tail_outside_maths(chars, info, start, end)) is not None:
+        elif _TEX_MADE and (cut := _tail_outside_maths(chars, info, start, end)) is not None:
             end = cut  # "t = 915 s", "x = 5 [8]": a unit and a citation are text
             changed = True
     return start, end
@@ -3351,6 +3360,8 @@ def _italic_variables(
     own: Sequence[ScriptKind | None],
 ) -> bool:
     """Is the run `chars[start:end]` made of italic variables standing in upright prose?"""
+    if not _TEX_MADE:
+        return False
     letters = [i for i in range(start, end) if own[i] is None and info.classes[i] == "L"]
     if not letters or not all(chars[i].italic for i in letters):
         return False
@@ -8216,6 +8227,8 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any
     types: dict[int, page_type.PageTypeResult] = {}
     budget = page_type.InkBudget()
     producer = page_type.producer_hint(doc)
+    global _TEX_MADE
+    _TEX_MADE = producer == "tex"
     for number in selected:
         frags[number], paths[number], types[number] = _read_page(doc[number], budget, producer)
         if _kept_whole(types[number]):

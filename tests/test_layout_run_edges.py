@@ -3,8 +3,10 @@
 The author's math mode stops at the dollar sign: the parentheses of "(x = 0.9)", the unit of
 "t = 915 s" and the citation of "x = 5 [8]" are the sentence's, not the formula's. On the 25
 development papers 27 of the 31 formulas the layout cut inside a pair of parentheses had the
-pair outside the author's maths (the 4 others were tuples, "(a, b)"), and 37 of 40 that ended in
-an upright unit had the unit outside. The formula keeps what is inside; the words stay text.
+pair outside the author's maths (the 4 others were tuples, "(a, b)"), and of the formulas that
+ended in an upright unit 37 were span failures against 2 that were exact. The formula keeps
+what is inside; the words stay text. These are a TeX author's conventions: they apply to PDFs
+typeset by TeX (`page_type.producer_hint`), not to a Chromium print of MathML.
 """
 
 from __future__ import annotations
@@ -17,8 +19,9 @@ from readablestem.pipeline.layout import analyze
 BODY = 11.0
 
 
-def one_page(fill) -> bytes:
+def one_page(fill, producer: str = "pdfTeX-1.40.25") -> bytes:
     doc = pymupdf.open()
+    doc.set_metadata({"producer": producer})
     fill(doc.new_page(width=612, height=792))
     return doc.tobytes()
 
@@ -135,3 +138,19 @@ def test_a_defining_colon_equals_stays_in_the_formula():
     assert found("Given n, we define x := 5 + y for the length of the run in the experiment.") == [
         "x := 5 + y"
     ]
+
+
+def test_the_conventions_of_a_tex_author_do_not_apply_to_other_producers():
+    def fill(page):
+        line(
+            page,
+            100,
+            ("We then set the damping to (x = 0.9) for all of the runs in this study.", "helv"),
+        )
+
+    texts = [
+        e.text
+        for e in analyze(one_page(fill, producer="Skia/PDF m120")).elements
+        if e.kind == Kind.EQUATION
+    ]
+    assert texts == ["(x = 0.9)"]
