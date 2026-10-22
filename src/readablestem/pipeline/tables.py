@@ -1382,8 +1382,9 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
     drawing = _drawing(view, box, grid.size)
     own = proposal.source != "detector"
     # Rules round the box and a "Table N" line just above or below it: the document calls it
-    # a table, whatever the glyphs say about its columns (wrapped text, bullets in cells).
-    captioned = ruled and _has_caption(view, box)
+    # a table, whatever the glyphs say about its columns (wrapped text, bullets in cells). A
+    # box made here from rules alone (the span between two callouts) needs columns too.
+    captioned = ruled and (not own or grid.weak) and _has_caption(view, box)
     if own and (_pictured(view, box, grid.size) or grid.size < SMALL_TEXT * view.body_size):
         verdict.verdict = "figure"  # a chart's frame and labels: no ML box vouches for a table
     elif _toc(grid, 3 if own else 4):
