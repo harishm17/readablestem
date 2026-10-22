@@ -2334,7 +2334,13 @@ def _word_lengths(
             i += 1
             continue
         j = i
-        while j < len(chars) and classes[j] == "L" and script[j] == script[i]:
+        while (
+            j < len(chars)
+            and classes[j] == "L"
+            and script[j] == script[i]
+            # TeX sets "ln" upright and the variable after it in italic: two words, not one
+            and (not _TEX_MADE or chars[j].italic == chars[i].italic)
+        ):
             j += 1
         italic_variables = upright and j - i <= 3 and all(c.italic for c in chars[i:j])
         word = "".join(c.c for c in chars[i:j]).lower()
@@ -2467,6 +2473,17 @@ def _script_glyphs(
     return raw, kinds
 
 
+def _power_of_ten(chars: list[_Char], last: int, script: int) -> bool:
+    """Is the raised glyph at `script` the exponent of "10", whose last digit is at `last`
+    ($10^{-6}$, $6 \\times 10^3$)? In a TeX paper that is maths, not the unit exponent of "cm3"."""
+    if not _TEX_MADE or chars[last].c != "0" or last < 1 or chars[last - 1].c != "1":
+        return False
+    before = chars[last - 2].c if last >= 2 else " "
+    if before.isalnum() or before in ".,":
+        return False  # "210", "0.10": not the number ten
+    return chars[script].baseline < chars[last].baseline - 0.2 * chars[last].size
+
+
 def _bold_variable(chars: list[_Char], at: int) -> bool:
     """Is the glyph at `at` a lone bold Latin letter, a vector in a text font (`\\mathbf{v}_2` set
     in Times Bold)? Its script is an index, not the count of "H2O"."""
@@ -2482,7 +2499,11 @@ def _script_base(chars: list[_Char], info: _CharInfo, start: int, end: int, size
         before -= 1  # an earlier script of the same word
     if before >= 0 and not chars[before].blank and chars[start].x0 - chars[before].x1 <= reach:
         base = chars[before]
-        if _text_char(base) and not _bold_variable(chars, before):
+        if (
+            _text_char(base)
+            and not _bold_variable(chars, before)
+            and not _power_of_ten(chars, before, start)
+        ):
             return True
         if base.c in ")]":
             return _bracket_base(chars, info, before)
@@ -3331,6 +3352,15 @@ def _inline_evidence(
         return ["signed number"]
     if _italic_variables(chars, info, start, end, own):
         return ["italic variable in prose"]
+    if any(
+        chars[k].c == "0"
+        and info.script[k + 1]
+        and own[k + 1] is None
+        and _power_of_ten(chars, k, k + 1)
+        for k in range(start, end - 1)
+        if own[k] is None
+    ):
+        return ["power of ten"]
     text = "".join(chars[i].c for i in range(start, end))
     if _MARKUP.search(text):
         return []  # "<a><b/></a>" in a paragraph about XML is not a comparison
@@ -3362,7 +3392,13 @@ def _italic_variables(
     """Is the run `chars[start:end]` made of italic variables standing in upright prose?"""
     if not _TEX_MADE:
         return False
-    letters = [i for i in range(start, end) if own[i] is None and info.classes[i] == "L"]
+    # The letters of a maths word ("ln" in "ln X") are upright and say nothing against the
+    # italic of the variables beside them; a run of nothing but them is not evidence.
+    letters = [
+        i
+        for i in range(start, end)
+        if own[i] is None and info.classes[i] == "L" and not info.maths_words[i]
+    ]
     if not letters or not all(chars[i].italic for i in letters):
         return False
     row_letters = [c for c in chars if c.c.isalpha()]

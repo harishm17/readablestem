@@ -192,3 +192,40 @@ def test_italic_letters_in_a_chromium_print_are_emphasis_not_maths():
         )
 
     assert inline(analyze(one_page(fill, producer="Skia/PDF m120")).elements) == []
+
+
+def test_a_maths_word_and_an_italic_variable_are_one_expression():
+    def fill(page):
+        line(
+            page,
+            100,
+            ("The slope of ", "helv"),
+            ("ln", "helv"),
+            ("X", "heit"),
+            (" against the other quantity is steady over the range of the data.", "helv"),
+        )
+
+    assert inline(analyze(one_page(fill)).elements) == ["lnX"]
+
+
+def _with_exponent(base: str, exponent: str, after: str, producer: str = "pdfTeX-1.40.25") -> bytes:
+    def fill(page):
+        text = f"The resolution is about {base}"
+        page.insert_text((72, 100), text, fontsize=BODY, fontname="helv")
+        x = 72 + pymupdf.get_text_length(text, fontname="helv", fontsize=BODY)
+        page.insert_text((x, 96), exponent, fontsize=7.4, fontname="helv")
+        x += pymupdf.get_text_length(exponent, fontname="helv", fontsize=7.4)
+        page.insert_text((x, 100), after, fontsize=BODY, fontname="helv")
+
+    return one_page(fill, producer)
+
+
+def test_a_power_of_ten_is_maths_in_a_tex_paper():
+    after = " metres in the lab, a value that we measured many times over the year."
+    found = inline(analyze(_with_exponent("10", "3", after)).elements)
+    assert found == ["103"]
+
+
+def test_the_exponent_of_a_unit_is_still_text():
+    after = " of water in the tank, a value that we measured many times over the year."
+    assert inline(analyze(_with_exponent("cm", "3", after)).elements) == []
