@@ -373,7 +373,7 @@ open-tier pool. Why this and not the alternatives:
   so $0.15 would have stopped a dense document half way; $0.25 leaves room and is still a
   tenth of what the daily open-tier pool ($4) allows per day.
 
-**Open for the author** (ADR 0007, "Consequences"): whether inline formulas stay part of their
+**Open for the author** (ADR 0007, "Consequences"; decided afterwards, see "Update: maths always required": every inline formula is asked about): whether inline formulas stay part of their
 paragraph's item (on the papers this leaves 5 wrong per 100 gold equations unasked, fewer than
 the typed pipeline's 10, and asks 1.7 things a page instead of 6.4); whether a display equation the
 two readers agree on may become an optional note (agreement is no evidence when the same model reads
@@ -425,3 +425,31 @@ for a stretch its reading left out and read again (one extra request, no decisio
 page is unchanged. The silent wrong equations are the same count, 15 inline formulas, as
 before: a typed page's inline formula is not a decision, and about 6 in 100 gold equations are inline
 formulas wrong by the symbols score and not asked about.
+
+## Update: maths always required (2026-10-22)
+
+The handwriting measurement found the reader's `high` untrustworthy (the fresh set's two silent wrong
+equations were `high` blocks) and the owner decided ([ADR 0007](decisions/0007-image-pages.md), point 12;
+[eval-handwriting.md](eval-handwriting.md), "Maths always required"): on a page read from an image, every
+block that holds maths is a required decision whatever the model's confidence
+(`IMAGE_PAGES_MATHS_ALWAYS_REQUIRED`, on). Typed born-digital pages and the typed equation step are not
+touched, and plain prose blocks keep their tiers. This is where the cost lands. Replayed at $0 from the
+recorded answers (`--answers-offline`, nothing sent), off and on:
+
+| | Typed scans, 36 development pages (the update above's reader) | Scanned papers, held-out recording (59 pages read, 15 papers) |
+|---|---|---|
+| required decisions / page, off to on | 3.58 to **6.44** | 2.00 to **5.69** |
+| optional notes / page, off to on | 10.19 to 7.33 | 7.92 to 4.22 |
+| silent wrong equations, symbols / strict, off to on | 15 / 30 to **0 / 0** | 46 / 78 to **0 / 0** |
+| inline formulas asked about / matched, off to on | 0 of 114 to 114 of 114 | 253 of 1,142 to 1,142 of 1,142 |
+| primary `exact_lenient` | 0.597 and 0.597 | 0.578 and 0.578 |
+
+The silent wrong equations of these sets were inline formulas in confident paragraphs (about 6 in 100 gold
+equations on the typed scans, above); they are now all asked about, so the count is 0 by construction and
+verified. The price is review: a typed scan of 36 pages goes from 129 to 232 required decisions (about 3
+more a page; a 30-page scanned document from about 107 to about 193) and a scanned paper from 2.0 to 5.7 a
+page. That is what "you check every item" costs on printed pages the reader reads well; an owner who wants
+the earlier load back switches the setting off, and then the silent wrong equations above are back. The
+papers' recording is the first run's (image page prompt `image_page-632b4d29`, the equation step's recorded
+answers for an older prompt, recovery not asked): its primary is not comparable with the tables above,
+only between its two arms, which are equal (`scripts/image_page_maths_replay.py`).

@@ -953,9 +953,10 @@ class _Renderer:
         if IMAGE_PAGE_ORIGINAL_REASON in element.reasons:
             return self.image_page_note(element)
         fix = self.fixes.get(element.id)
+        caption_text = element.caption_marked or element.caption
         caption = (
-            f"<figcaption>{self.rich(element.caption)}</figcaption>"
-            if element.caption and element.caption.strip()
+            f"<figcaption>{self.rich(caption_text)}</figcaption>"
+            if caption_text and caption_text.strip()
             else ""
         )
         proposal = fix.figure if fix is not None else None
@@ -1087,7 +1088,7 @@ def _placed_equations(
         elif element.kind is Kind.HEADING:
             texts.append(renderer.heading_parts(element)[1])
         elif element.kind is Kind.FIGURE:
-            texts.append(element.caption or "")
+            texts.append(element.caption_marked or element.caption or "")
     found = {m.group(1) for text in texts for m in INLINE_MARKER_RE.finditer(text)}
     return found & equation_ids
 

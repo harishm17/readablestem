@@ -453,7 +453,7 @@ def _tail(text: str, limit: int) -> str:
 
 def _inline_context(element: Element, parent: Element) -> str | None:
     """A window of the parent paragraph centred on this equation's marker."""
-    text = parent.text or ""
+    text = parent.text or parent.caption_marked or ""
     marker = inline_marker(element.id)
     at = text.find(marker)
     if at == -1:
@@ -501,7 +501,8 @@ def context_texts(elements: list[Element]) -> dict[str, str | None]:
         if element.kind not in _MODEL_KINDS:
             continue
         parent = by_id.get(element.parent_id or "")
-        if parent is not None and parent.text and inline_marker(element.id) in parent.text:
+        parent_text = parent.text or parent.caption_marked if parent is not None else None
+        if parent is not None and parent_text and inline_marker(element.id) in parent_text:
             context = _inline_context(element, parent)
             if context is not None:
                 result[element.id] = context
@@ -633,12 +634,14 @@ def _text_pass(
     return text
 
 
-def _heading_fixes(elements: list[Element], tracer: Tracer) -> list[Fix]:
+def _heading_fixes(elements: list[Element], tracer: Tracer, settings: Settings) -> list[Fix]:
     headings = [e for e in elements if e.kind is Kind.HEADING]
     with _span(tracer, "headings", count=len(headings)) as span:
         try:
             fixes = list(heading_step.heading_fixes(elements))
-            image_page.tier_headings(fixes, elements)
+            image_page.tier_headings(
+                fixes, elements, maths_required=settings.image_pages_maths_always_required
+            )
         except Exception as exc:
             log.warning("heading step failed: %s", type(exc).__name__)
             fixes = [_failed(e, "internal_error") for e in headings]
@@ -1329,6 +1332,7 @@ def _image_pages_pass(
                     check_omission=settings.image_pages_omission_check,
                     verdicts=read.verdicts,
                     accept_agreed=settings.image_pages_accept_agreed,
+                    maths_required=settings.image_pages_maths_always_required,
                 )
             except Exception as exc:  # the page stays an image: a bad answer is not worth more
                 log.warning("image page build failed: %s", type(exc).__name__)
@@ -1449,7 +1453,7 @@ def _convert(
 
             def text_and_headings() -> None:
                 made.append(_text_pass(pdf_bytes, elements, page_list, doc.lang, options, tracer))
-                for fix in _heading_fixes(made[0].elements, tracer):
+                for fix in _heading_fixes(made[0].elements, tracer, settings):
                     run.fixes.setdefault(fix.element_id, fix)  # a kept page's fix wins
 
             _process(run, elements, page_list, cached, text_and_headings)

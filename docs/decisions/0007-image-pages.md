@@ -148,6 +148,23 @@ its image exactly as before.
     removes about one decision in 140 and no silent wrong equation, and is off. This does not change the
     consequence in point 5: agreement of two readings by one model lowers no tier.
 
+12. **Maths always required** (decided by the owner 2026-10-22,
+    `Settings.image_pages_maths_always_required` / `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED`, on). On a page read
+    from an image, every block that holds maths is a required decision whatever the page reader's
+    confidence: a display equation (always, point 3), and a paragraph, list item or heading with any
+    formula in it. The option's promise is "you check every item", and the reader's `high` is not
+    trustworthy on handwriting (two silent wrong equations of the fresh held-out set were `high` blocks;
+    [eval-handwriting.md](../eval-handwriting.md)). The reason a person sees is
+    `image_page.maths_always_checked` ("This was read from an image and holds maths, and every such block
+    is checked, however sure the reader was ..."). Prose-only blocks keep the tiers of point 3; typed
+    pages, which this pass never reads, and the typed equation step are untouched; a second reading's
+    agreement (point 11) cannot lift such a block out. Measured by replay at $0: silent wrong equations 0
+    by construction and verified on every set (the typed scans had 15 and the scanned papers 46 by the
+    symbols score); required decisions a page 5.79 to 5.96 on the fresh handwriting set, 3.58 to 6.44 on
+    the typed development scans and 2.00 to 5.69 on the scanned papers
+    ([eval-image-pages.md](../eval-image-pages.md), "Update: maths always required"). It settles the open
+    question of the "Consequences" about inline formulas riding with their paragraph.
+
 ## Measuring it
 
 Development material only for the design and the choice of model; the sealed check part of

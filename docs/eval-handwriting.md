@@ -31,6 +31,14 @@ no decision on the 10 development pages and 0.04 a page on the clean held-out pa
 flag in 23), and changes neither the primary score nor the silent wrong equations (0 and 0). It
 does not touch the 35 display expressions read as inline maths.
 
+**The ceiling, stated plainly.** Most of the "wrong" equations on this answer key are not the
+reader's mistakes: two thirds are ink (or a label) that one reading cannot settle, about a quarter are a
+notation the label chose (`\overline` for `\bar`, `\binom` for a matrix), and real misreads of clear ink
+are 3% to 11% of the wrong ones (3, 10 and 2 equations on the development, first held-out and fresh
+parts). The same model reading each expression alone, from the clean ink with no page and no scan, scores
+0.61 to 0.64, the same as the page reading, so the primary score on this answer key tops out near 0.65
+for this model whatever is done to the page, the picture or the prompt. See "Root causes and fixes".
+
 **Updated the next day (2026-10-22): root causes, fixes and a fresh held-out set** ("Root causes
 and fixes" below). Two thirds of the wrong equations are ink a reader cannot settle from the page,
 about a quarter are a notation the label did not use, and the model reading each expression alone from
@@ -450,6 +458,35 @@ or `low` 0.85 and 0.85, decisions 5.71 and 5.79, display set as display 30% and 
 wrong equations does not (0 and 2). The fixed pipeline's 2 silent equations are 1.0 per 100 gold
 equations.
 
+### Maths always required (2026-10-22, decided by the owner; ADR 0007, point 12)
+
+The confidence labels cannot be trusted to leave a block with maths unasked (above), and the option's
+promise is "you check every item", so on a page read from an image **every block that holds maths is a
+required decision whatever the reader's confidence**: a display equation (already always required), and a
+paragraph, list item or heading with any formula in it (`IMAGE_PAGES_MATHS_ALWAYS_REQUIRED`, on). Prose-only
+blocks keep their tiers; typed born-digital pages are never read by this pass and the typed equation step
+is untouched. A second reading's agreement cannot lift such a block out (acceptance, off anyway, is a no-op
+while this is on). The review card says why: "This was read from an image and holds maths, and every such
+block is checked, however sure the reader was ...". Measured by replay of the recorded answers, at $0
+(`handwriting_accuracy.py run --offline --env IMAGE_PAGES_MATHS_ALWAYS_REQUIRED=...`; the typed and paper
+sets: docs/eval-image-pages.md, "Update: maths always required"):
+
+| Set (pages) | Silent wrong equations, symbols / strict, off to on | Required decisions / page, off to on | Optional notes / page, off to on |
+|---|---|---|---|
+| handwriting, development (10) | 0 / 0 to 0 / 0 | 5.90 to 5.90 | 0.50 to 0.50 |
+| handwriting, first held-out (24; replay with today's code) | 0 / 0 to 0 / 0 | 5.92 to 6.08 | 0.71 to 0.54 |
+| **handwriting, fresh (24)** | **2 / 2 to 0 / 0** | 5.79 to 5.96 | 0.67 to 0.50 |
+
+Silent wrong equations are 0 by construction, and the replay verifies it on every set (the count of wrong
+equations whose item is not a required decision is 0 in every "on" arm). On handwriting the price is small,
+0.17 decisions a page on both held-out parts (the `high` blocks: 4 text blocks of 142 on the fresh set),
+because the reader already calls 85% of handwritten blocks `medium` or `low`; the development part has no
+`high` block with maths. The primary and every reading are unchanged (a decision is not a reading). The
+first held-out row is a replay with today's code on the first run's recorded answers (its display lines
+promoted and their crops not recorded, recovery not asked), so its "off" figure is 5.92, not the 5.71 of
+the first measurement. The cost lands on pages where the reader is confident, the typed scans: 3.58 to
+6.44 a page on the 36 development pages and 2.00 to 5.69 on the scanned papers (docs/eval-image-pages.md).
+
 ### What this changes and what it does not
 
 - **Fixed:** display equations on their own line are display equations (a third to nearly all); a reader
@@ -466,10 +503,10 @@ equations.
 - **For the owner:** advertising "handwriting" on this evidence is the earlier caveat made sharper:
   about 59% of messy touchscreen expressions read right, about 40% need correcting, 5.8 decisions a page
   are required, and the claim that none can go unnoticed does not hold (1% of equations were wrong and
-  not asked about). A policy that makes every block holding handwritten maths a required decision would
-  make the count of silent wrong equations 0 by construction at the cost of the `high` blocks (4 text
-  blocks of 142 on the fresh set, 0.17 a page); it is not measured here, and it would also ask about
-  every typed paragraph with a formula on a typed scan (the reader calls 99% of those `high`).
+  not asked about). The policy that makes every block holding maths a required decision (the section above,
+  decided by the owner after this measurement) makes the count of silent wrong equations 0 by
+  construction at the cost of the `high` blocks: 0.17 decisions a page on handwriting, and a large one
+  on typed scans, where the reader calls 99% of blocks `high`.
 - **For the equation step's owner (not changed here):** the display equations' crops are read with the
   equation prompt, which inherits the same ambiguity, and the crop-against-page comparison it uses to
   lift confidence ("agree": 19% wrong on the fresh set) is not evidence of being right on handwriting.

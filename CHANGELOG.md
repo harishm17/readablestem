@@ -32,6 +32,45 @@
   re-made. Unresolved: lists of relations (2 of 25), bar charts with few bars taken for tables by the
   layout model, bold description lists stay lists.
 
+## Equations on real papers: root causes and fixes (2026-10-21, branch fix/equation-rootcause)
+
+- Root-cause analysis of the 12.4-point gap to the chatbot recipe on the 25 development papers
+  ([docs/eval-equation-rootcause.md](docs/eval-equation-rootcause.md); `scripts/rw_gap_table.py`): short
+  variables set in an italic text font (3.9 points), maths in table cells (2.9), in captions (1.7), the edge of an inline span
+  (3.6), `\bm` read as `\mathbf` (0.6). Reading the equations it found is not where it loses.
+- Fixes, from the text layer and the glyph boxes, no prompt change (`equation-68ebbbf9`, the eval gate and the `latest-*`
+  reports untouched): an italic letter in upright prose is a variable; a bold letter with an index is a vector; a figure's caption is cut
+  like a paragraph (`Element.caption_marked`, inline equations whose parent is the figure); the parentheses of the sentence, a unit after a number, a citation
+  and a trailing bracket are not part of an inline formula; a word space between operands ends it; an ellipsis list, `:=` and `H : A -> B` are one;
+  a parenthesis or hyphen the run's text layer lacks, which the padded crop showed and the model wrote, is dropped; `\mathbf` is `\boldsymbol`
+  where the PDF's font is bold italic. The TeX author's conventions apply to PDFs typeset by TeX only; 111 of the 126 PDFs of
+  `scripts/layout_identity.py` are identical.
+- Measurement: the converter changed under the gold (28 papers' gold no longer rebuilds), so a ReadableSTEM run of today and the chatbots' stored items were scored by two
+  converters; `realworld_report.py --rescore-chat` reads the chatbot answers again with today's code. Every ReadableSTEM item also keeps a second reading in which the maths
+  cells of a rebuilt table count as equations, as the chatbots' HTML is read (`pipeline_eval.with_table_maths`); the registered reading is unchanged. The scorer is not
+  changed: two notation artefacts (styled letters, upright words) are counted for every arm in `scripts/rw_scorer_sensitivity.py` (about 1.5 points, the same for ReadableSTEM and Haiku).
+- Results: development (tuned on it) 0.553 to 0.680, level with Haiku, the silent errors 12.0 to 8.8 per 100 gold. On 15 fresh papers, registered before any
+  system ran (`data/realworld/PREREGISTRATION-FRESH2.md`): the fixes are worth +0.068 [+0.031, +0.116] (0.558 to 0.626), the silent errors do not rise (9.76 to 8.42, limit +0.5), ReadableSTEM is level with Haiku (0.626 against 0.622)
+  and 5.6 points below Opus (0.682; 97.5% interval -0.109 to +0.007). The registered claim "clearly beats the chatbot recipe" is not met; it leaves 8.4 silent errors per 100 gold against 16.3 and 13.7. Spend $13.55 of $18.
+  Unresolved: table cells (the table branch's), formulas that wrap or are typed apart, `\text` against the authors' `\mathrm` (the scorer's artefact is 4 points for the chatbots, 1.5 for ReadableSTEM, on this set).
+
+## Maths always required on image pages (2026-10-22, branch fix/image-page-maths-required)
+
+- Decision (owner): on a page read from an image (scanned or handwritten, the opt-in pass), every block
+  that holds maths is a required review item whatever the page reader's confidence: a display equation
+  (always was), and a paragraph, list item or heading with any formula in it
+  (`IMAGE_PAGES_MATHS_ALWAYS_REQUIRED`, default on; `image_page._prose_fix`, `image_page.tier_headings`;
+  review sentence for `image_page.maths_always_checked` in `web/messages.py`; ADR 0007 point 12).
+  Prose-only blocks keep their tiers; typed pages and the typed equation step are untouched; an agreed
+  second reading cannot lift such a block out.
+- Measured by replay at $0: silent wrong equations 0 by construction, verified on handwriting development,
+  first held-out and fresh (2 to 0 on fresh), on the 36 typed development scans (15 to 0) and on the
+  scanned papers' held-out recording (46 to 0). Required decisions a page: handwriting fresh 5.79 to 5.96,
+  first held-out replay 5.92 to 6.08, development 5.90 to 5.90; typed scans 3.58 to 6.44; scanned papers
+  2.00 to 5.69. That is the price of "you check every item" on pages where the reader is confident.
+- docs/eval-handwriting.md also states the ceiling plainly: most "wrong" equations are ambiguous ink or the
+  label's notation, and reading each expression alone scores 0.61 to 0.64.
+
 ## Handwriting accuracy: root causes, display lines, omission recovery (2026-10-22, branch fix/handwriting-accuracy)
 
 - Root causes of the 43% wrong equations of the handwriting held-out set, from the recorded answers
