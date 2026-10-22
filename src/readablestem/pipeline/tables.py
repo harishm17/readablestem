@@ -125,6 +125,10 @@ STACK_GAP = 3.0  # x font size: furthest apart two rules of one booktabs table m
 BLOCK_ROW_GAP = 1.3  # x font size: widest white gap between two lines of one text block
 TITLE_ROW_WORDS = 6  # a title row of a group of rows has no more words than this
 HEADER_GAP = 3.5  # x font size: widest white gap under a header row of a block
+RUNNING_WIDTH = 0.6  # share of a framed box's width that a line of running text covers
+PAGE_CENTRE = 0.06  # a lone gutter this close to the page's middle (x its width) is a page's columns
+PAGE_SPAN = 0.7  # ... when the text spans this much of the page's width
+TEXT_TABLE_LINES = 4  # lines a box found from text alone needs, without a "Table N" caption
 BLOCK_MIN_LINES = 3  # lines with text in two or more cells that make a block of text columns
 PROSE_WORDS = 6  # a cell of this many words is a line of running text, not a label or a term
 FRAME_MIN_WIDTH = 100.0  # pt: a rule shorter than this does not frame a table
@@ -1397,14 +1401,21 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
                 _text_block_dropped(grid, view.width, _has_caption(view, box)) or TABLE
             )
         elif proposal.source == SOURCE_FRAME:
+            # Read without the drawn column rules, which a grid of cells in the box would
+            # otherwise carry through its paragraphs, cutting their lines into cells.
             if (
-                _running_text(grid, box)
+                _running_text(_text_grid(view, box, []), box)
                 or grid.lines < BLOCK_MIN_LINES
                 or grid.grid_lines < FRAME_GRID_SHARE * grid.lines
             ):
                 verdict.verdict = "no_grid"  # rules around paragraphs, or around one line
-            elif _numbered(grid):
-                verdict.verdict = "numbered"
+            else:
+                # Not the page-column test: a table of paragraphs has columns of prose.
+                dropped = _text_block_dropped(
+                    grid, view.width, _has_caption(view, box), columns_of_prose=True
+                )
+                if dropped:
+                    verdict.verdict = dropped
         if verdict.verdict != TABLE:
             verdict.reasons.clear()
     return verdict
@@ -1417,6 +1428,7 @@ _ENUMERATION = re.compile(
     r"|\[[^\]]{1,12}\]"  # [3], [JP14], [ABC+20]: a reference
     r"|[-\u2013\u2014*+>\u2022\u00b7\u25e6\u25aa])$"  # a bullet, a dash, a prompt
 )
+_BARE_TAG = re.compile(r"^\d{1,3}\.\d{1,3}$")
 _EQUATION_TAG = re.compile(r"^\([A-Za-z]{0,6}\d{0,3}(?:[.-]\d{1,3})*[a-z]?\)$")
 
 
@@ -1627,15 +1639,21 @@ def _pictured(view: _PageView, box: BBox, size: float) -> bool:
 
 
 def _running_text(grid: _Grid, box: BBox) -> bool:
-    """Two lines of running text in the box: a single cell of eight words or more across
-    most of its width (a table's cells are split by their column gutters first)."""
+    """Two lines of running text in the box: a single cell of eight words or more that runs
+    across two column gutters or more (or most of the box's width, when it has fewer): a
+    paragraph in a box, not one column's cell."""
     width = max(box[2] - box[0], 1.0)
     per_line = Counter(s.line for s in grid.segs)
+
+    def across(seg: _Seg) -> bool:
+        crossed = sum(seg.x0 < c < seg.x1 for c in grid.cuts)
+        return crossed >= 2 or seg.x1 - seg.x0 >= RUNNING_WIDTH * width
+
     return (
         sum(
             1
             for s in grid.segs
-            if per_line[s.line] == 1 and len(s.text.split()) >= 8 and s.x1 - s.x0 >= 0.6 * width
+            if per_line[s.line] == 1 and len(s.text.split()) >= 8 and across(s)
         )
         >= 2
     )
@@ -1670,7 +1688,9 @@ def _numbered(grid: _Grid) -> bool:
     )  # (a) ... (b) ... side by side: subfigure captions
 
 
-def _text_block_dropped(grid: _Grid, page_width: float, captioned: bool = False) -> str | None:
+def _text_block_dropped(
+    grid: _Grid, page_width: float, captioned: bool = False, *, columns_of_prose: bool = False
+) -> str | None:
     """Why lines of text in aligned columns are not a table, as a `DROPPED` code, or None.
     Aligned columns are everywhere in a document: the two text columns of a page, numbered
     equations, a bibliography, the line numbers of an algorithm, a matrix. What separates
@@ -1688,18 +1708,37 @@ def _text_block_dropped(grid: _Grid, page_width: float, captioned: bool = False)
             or statistics.mean(m.x1 - m.x0 for m in members) >= PROSE_WIDTH * page_width
         )
     ]
-    if len(prose) >= 2:
+    if len(prose) >= 2 and not columns_of_prose:
         return "page_text"
+    if len(grid.cuts) == 1 and not columns_of_prose and grid.segs:
+        # One gutter in the middle of the page, across the width of its text: the two text
+        # columns of a page, one of them short here.
+        left = min(m.x0 for m in grid.segs)
+        right = max(m.x1 for m in grid.segs)
+        if (
+            abs(grid.cuts[0] - page_width / 2) <= PAGE_CENTRE * page_width
+            and right - left >= PAGE_SPAN * page_width
+        ):
+            return "page_text"
     if captioned:
         return None  # "Table 3: ..." under it: the document says it is one
+    if grid.lines < TEXT_TABLE_LINES:
+        return "no_grid"  # three lines of cells are as likely a fraction, a limit, a formula
     if any("@" in m.text for m in grid.segs):
         return "no_words"  # a block of authors and their addresses
-    maths = len({m.line for m in grid.segs if any(ch in _RELATION for ch in m.text)})
-    if maths >= MATH_SHARE * len({m.line for m in grid.segs}):
+    cells_per_line = Counter(m.line for m in grid.segs)
+    rows = [line for line, n in cells_per_line.items() if n >= 2]
+    maths = {m.line for m in grid.segs if any(ch in _RELATION for ch in m.text)}
+    if len(maths & set(rows)) >= MATH_SHARE * max(len(rows), 1):
         return "no_words"
     last = max(columns, default=0)
     tags = [m.text for m in columns.get(last, [])]
     if any(_EQUATION_TAG.match(t) for t in tags) and not any(len(t.split()) > 2 for t in tags):
+        return "numbered"
+    # OpenStax numbers its equations "17.41", with no brackets: the last cell of two lines or
+    # more, beside lines of maths.
+    bare = [t for t in tags if _BARE_TAG.match(t)]
+    if len(bare) >= 2 and len(bare) == len(tags) and maths:
         return "numbered"
     if _numbered(grid):
         return "numbered"
