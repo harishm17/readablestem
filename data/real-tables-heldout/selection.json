@@ -1,0 +1,203 @@
+{
+ "seed": "tables-heldout-2026-10-21",
+ "accepted": [
+  {
+   "id": "2302.07336",
+   "title": "Survey of physics reasoning on uncertainty concepts in experiments: an assessment of measurement uncertainty for introductory physics labs",
+   "licence": "CC BY 4.0",
+   "pdf_pages": 20,
+   "tables": 12,
+   "pdf_sha256": "7403dab50d3b18e3a9eb0d363954d632aa3f13f8ef6734af3bebc6c2244a9353"
+  },
+  {
+   "id": "2312.15334",
+   "title": "Cheat sites and artificial intelligence usage in online introductory physics courses: what is the extent and what effect does it have on assessments?",
+   "licence": "CC BY 4.0",
+   "pdf_pages": 11,
+   "tables": 4,
+   "pdf_sha256": "6ad70cfafc0bb86575fb012ee742f1f22192bc3934df55bea9b5f77d9ad3cd44"
+  },
+  {
+   "id": "2405.19435",
+   "title": "Bringing Lecture-Tutorials Online: An Analysis of A New Strategy to Teach Planet Formation in the Undergraduate Classroom",
+   "licence": "CC BY 4.0",
+   "pdf_pages": 11,
+   "tables": 6,
+   "pdf_sha256": "bddf731ebae278787792de67b53aa72857b5fe9e3461b8eb8c9abd5735a4da4b"
+  },
+  {
+   "id": "2305.15484",
+   "title": "Taking introductory physics in studio, lecture, or online format: what difference does it make in subsequent courses, and for whom?",
+   "licence": "CC BY 4.0",
+   "pdf_pages": 8,
+   "tables": 4,
+   "pdf_sha256": "e2d442d0f789e61288ae363ee3744c2877145e05d87c72257181d0183c838ee3"
+  },
+  {
+   "id": "2504.13112",
+   "title": "Hadamard product in deep learning: Introduction, Advances and Challenges",
+   "licence": "CC BY 4.0",
+   "pdf_pages": 30,
+   "tables": 4,
+   "pdf_sha256": "f89c696e5956a10ef85382cf9a5b58ccc647dcd061a658180a3a0e26f1f293ba"
+  },
+  {
+   "id": "2311.16525",
+   "title": "On the effectiveness of the early introduction of modern physics in school curriculum: the case of the structure of atom versus wave-particle duality",
+   "licence": "CC BY 4.0",
+   "pdf_pages": 14,
+   "tables": 4,
+   "pdf_sha256": "aa51ab37bc1ca029866460cc7061e8f7ec3e672733e414be96e6989618137856"
+  },
+  {
+   "id": "2304.11221",
+   "title": "Can an AI-tool grade assignments in an introductory physics course?",
+   "licence": "CC BY 4.0",
+   "pdf_pages": 16,
+   "tables": 4,
+   "pdf_sha256": "758c3517a06970a3dc350a1e9a57f330ac061bc40258dcf7c7dcc70c98ce1791"
+  }
+ ],
+ "skipped": [
+  {
+   "id": "2502.15703",
+   "reason": "fewer_than_3_tables",
+   "detail": "1 of 1"
+  },
+  {
+   "id": "2505.22479",
+   "reason": "no_main_tex",
+   "detail": ""
+  },
+  {
+   "id": "2412.03595",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 1"
+  },
+  {
+   "id": "2308.00713",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2301.12127",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2207.07063",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2407.04758",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2505.20151",
+   "reason": "fewer_than_3_tables",
+   "detail": "1 of 4"
+  },
+  {
+   "id": "2302.09045",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2301.09788",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2505.13042",
+   "reason": "fewer_than_3_tables",
+   "detail": "1 of 2"
+  },
+  {
+   "id": "2401.02506",
+   "reason": "fewer_than_3_tables",
+   "detail": "2 of 2"
+  },
+  {
+   "id": "2311.11134",
+   "reason": "fewer_than_3_tables",
+   "detail": "2 of 2"
+  },
+  {
+   "id": "2303.01067",
+   "reason": "fewer_than_3_tables",
+   "detail": "1 of 1"
+  },
+  {
+   "id": "2206.12144",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2308.03593",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2304.05582",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2404.00059",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2410.00040",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2409.19675",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2308.01455",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2312.07511",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 1"
+  },
+  {
+   "id": "2404.12862",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 1"
+  },
+  {
+   "id": "1711.06139",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2406.00853",
+   "reason": "http_404",
+   "detail": "https://arxiv.org/pdf/2406.00853"
+  },
+  {
+   "id": "2309.15908",
+   "reason": "fewer_than_3_tables",
+   "detail": "1 of 1"
+  },
+  {
+   "id": "2201.10048",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2412.08254",
+   "reason": "source_is_pdf",
+   "detail": ""
+  }
+ ]
+}

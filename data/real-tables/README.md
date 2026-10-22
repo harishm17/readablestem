@@ -49,3 +49,10 @@ downsampled to 72 dpi to keep the file small (text, vector graphics, page frames
 <https://arxiv.org/abs/2401.00649>, <https://arxiv.org/abs/2412.19752>,
 <https://arxiv.org/abs/2505.03022>, <https://arxiv.org/abs/2409.08224>,
 <https://arxiv.org/abs/2407.13734>.
+
+## Status after the first measurement
+
+The first run (2026-10-21) found 14 of 25 tables (`result-2026-10-21.json`) and missed the recall
+floor. The detector was then changed on these documents, so this is a **development set**: after the
+changes precision 1.000 (23 of 23) and full-extent recall 0.920 (23 of 25),
+`result-2026-10-21-after-fixes.json`. The held-out measurement is `data/real-tables-heldout/`.
