@@ -133,6 +133,8 @@ FRAME_MAX_HEIGHT = 0.8  # share of the page a framed table may take
 PROSE_WIDTH = 0.25 # share of the page width a column's cells average to be running text
 SCRIPT_CELL = 0.8  # x the text size: smaller cells are scripts or labels of a symbol
 SMALL_TEXT = 0.7  # x the page's text size: lettering this small in a box made here is a diagram
+PICTURE_REACH = 30.0  # pt around a box made here in which curves make it part of a plot
+PICTURE_NEAR = 3  # curves reaching that far
 PICTURE_MARKS = 4  # small curves in a box made here (a legend's markers, scatter dots)
 PICTURE_FILLS = 12  # filled shapes in a box that make it a chart (bars), not a table
 PICTURE_SHARE = 0.05  # raster images covering this share of a box made here make it a picture
@@ -1560,6 +1562,16 @@ def _pictured(view: _PageView, box: BBox, size: float) -> bool:
     `_drawing` test: its model has seen the page."""
     x0, y0, x1, y1 = box
     area = max((x1 - x0) * (y1 - y0), 1.0)
+    near = sum(
+        1
+        for c in view.curves
+        if c[2] >= x0 - PICTURE_REACH
+        and c[0] <= x1 + PICTURE_REACH
+        and c[3] >= y0 - PICTURE_REACH
+        and c[1] <= y1 + PICTURE_REACH
+    )
+    if near >= PICTURE_NEAR:
+        return True  # a legend inside a plot: the plotted lines run past it
     marks = 0
     for c in view.curves:
         if x0 - 1 <= (c[0] + c[2]) / 2 <= x1 + 1 and y0 - 1 <= (c[1] + c[3]) / 2 <= y1 + 1:

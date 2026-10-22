@@ -6,8 +6,9 @@
 
 `select` walks the candidates of the real-world corpus pool (`data/realworld`, OAI records
 with their licences) that nothing has used (not visited by the real-world builder, in none of
-its manifests, not in `data/real-tables`), keeping those whose title or comments say lecture,
-tutorial, introduction, introductory, primer, course or guide, in the order of
+its manifests, not in `data/real-tables`), keeping those whose title says lecture, tutorial, primer, introduction,
+introductory, course notes, notes on, a guide, guide to, handbook, textbook, for beginners or first look,
+in the order of
 SHA-256(seed:id). For each it downloads the PDF and the source (the polite way: one request
 every few seconds), and accepts the first `n` that pass the gates written in the README:
 a main TeX file, 6 to 250 PDF pages, and at least three data tables (a `tabular` with two or
@@ -38,7 +39,8 @@ from readablestem.gold import tabulars as tab  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 POOL = ROOT / "data" / "realworld"
 KEYWORDS = re.compile(
-    r"lecture|tutorial|introduction|introductory|primer|course|guide",
+    r"\b(lectures?|tutorials?|primer|introduction|introductory|course notes|notes on|guide to"
+    r"|a guide|handbook|textbook|for beginners|first look)\b",
     re.IGNORECASE,
 )
 MIN_TABLES = 3
@@ -63,7 +65,7 @@ def candidates(seed: str) -> list[dict]:
     keep = [
         c
         for c in pool["candidates"]
-        if c["id"] not in taken and KEYWORDS.search(c["title"] + " " + (c.get("comments") or ""))
+        if c["id"] not in taken and KEYWORDS.search(c["title"])
     ]
     keep.sort(key=lambda c: hashlib.sha256(f"{seed}:{c['id']}".encode()).hexdigest())
     return keep

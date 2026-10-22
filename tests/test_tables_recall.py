@@ -84,7 +84,6 @@ def scored(file: str, page: int) -> dict:
 # that was found, as the control that fixes cannot cost a table that was there.
 MISSED = [
     ("2401.00649.pdf", 1),  # a list of acronyms, ruled above and below
-    ("2412.19752.pdf", 1),  # three notation lists, unruled
     ("2412.19752.pdf", 2),  # two notation lists in one detector box
     ("2505.03022.pdf", 17),  # two ruled columns of long text under "Table 2:"
     ("2409.08224.pdf", 4),  # ruled above and below, long wrapped text: fragments
@@ -99,6 +98,16 @@ def test_the_real_tables_the_first_measurement_missed_are_found(file, page):
     result = scored(file, page)
     assert result["full"] == result["labelled"] > 0, result
     assert result["true"] == result["predicted"], result  # and nothing else on the page
+
+
+def test_the_notation_lists_with_words_in_them_are_found_the_ones_of_relations_are_not():
+    # Four unruled lists on a page: abbreviations and sets with their meanings, two of
+    # relations (`X_n ~ f(n)  if X_n / f(n) -> 1`). The second pair is lines of symbols in
+    # two aligned columns, which is also how a displayed system of equations looks, and
+    # the page guard (`_text_block_dropped`) leaves them as text.
+    result = scored("2412.19752.pdf", 1)
+    assert result["labelled"] == 4 and result["full"] == 2, result
+    assert result["true"] == result["predicted"] == 2, result
 
 
 @pytest.mark.parametrize(("file", "page"), FOUND)
