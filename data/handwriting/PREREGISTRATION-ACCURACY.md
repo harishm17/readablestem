@@ -94,3 +94,16 @@ writer population; typed words around the ink; synthetic scanning; the label is 
 not a reading of the ink; the model may have seen the data; the changes were chosen after looking
 at the development and first held-out answers (the fresh set is the only clean confirmation); the
 first held-out set was used for the error analysis and so is no longer clean.
+
+## Addendum 1 (2026-10-22, written after the control run and before any call of the new arm)
+
+The control run was stopped by its cap ($2.20): 10 of 12 units finished (20 of 24 pages, 161 of 192
+gold equations; one page of unit 10 ended in an `api_error`, so 19 of 20 pages were converted). It
+spent $1.77 on those units, of which $0.61 went to two page reads billed at about four times their
+list rate (the refusal fallback's dearer billing the first write-up also met: 9,877 input tokens and
+about 1,000 output tokens priced at $0.30 a page), so the cap of $2.20 was set on $0.066 a page and the
+run came in at $0.088. By this registration nothing is re-run to finish: the control is reported on
+the 10 units it finished, and the new arm is compared with it on the units both finished (paired) as
+well as on all the units the new arm finishes (criteria 1 and 3 are about the new arm alone). The
+new arm's cap is raised from $3.20 to $3.60 for the same reason, before its first call; nothing else
+changes.
