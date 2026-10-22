@@ -7,7 +7,7 @@
 `select` walks the candidates of the real-world corpus pool (`data/realworld`, OAI records
 with their licences) that nothing has used (not visited by the real-world builder, in none of
 its manifests, not in `data/real-tables`), keeping those whose title or comments say lecture,
-tutorial, introduction, primer, course, notes, guide, survey or overview, in the order of
+tutorial, introduction, introductory, primer, course or guide, in the order of
 SHA-256(seed:id). For each it downloads the PDF and the source (the polite way: one request
 every few seconds), and accepts the first `n` that pass the gates written in the README:
 a main TeX file, 6 to 250 PDF pages, and at least three data tables (a `tabular` with two or
@@ -38,7 +38,7 @@ from readablestem.gold import tabulars as tab  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 POOL = ROOT / "data" / "realworld"
 KEYWORDS = re.compile(
-    r"lecture|tutorial|introduction|introductory|primer|course|notes|guide|survey|overview",
+    r"lecture|tutorial|introduction|introductory|primer|course|guide",
     re.IGNORECASE,
 )
 MIN_TABLES = 3

@@ -114,13 +114,15 @@ DOUBLE_RULE = 4.0  # two rules this close are one double rule
 COLUMN_RULE_LINES = 2.2  # x font size: a column rule is at least about two lines long
 GUTTER_PT = 3.0  # narrowest white gap between two columns of text
 WORD_GUTTER_PT = 2.5  # narrowest strip between two columns that no word crosses (see `_word_gutters`)
-WORD_GUTTER_LINES = 6  # a box needs this many lines of text before such a strip counts
+WORD_GUTTER_LINES = 10  # a box needs this many lines of text before such a strip counts
 WORD_GUTTER_FLUSH = 0.6  # share of the lines whose text ends and begins at the strip's edges
 WORD_GUTTER_CROSSING = 0.1  # share of the lines a word may cross it on (a spanning title)
 SCRIPT_SIZE = 0.85  # x the line's largest glyph: smaller glyphs may be scripts (as layout)
 RAISED = 0.2  # x the full-size glyph: a smaller one with its baseline this far up is raised
 STACK_GAP = 3.0  # x font size: furthest apart two rules of one booktabs table may be
 BLOCK_ROW_GAP = 1.3  # x font size: widest white gap between two lines of one text block
+TITLE_ROW_WORDS = 6  # a title row of a group of rows has no more words than this
+HEADER_GAP = 3.5  # x font size: widest white gap under a header row of a block
 BLOCK_MIN_LINES = 3  # lines with text in two or more cells that make a block of text columns
 PROSE_WORDS = 6  # a cell of this many words is a line of running text, not a label or a term
 FRAME_MIN_WIDTH = 100.0  # pt: a rule shorter than this does not frame a table
@@ -1483,18 +1485,37 @@ def _text_blocks(view: _PageView) -> list[Proposal]:
             out.append(Proposal(box, [], 0, SOURCE_TEXT))
         block.clear()
 
+    held: list[list[_Seg]] = []  # title rows waiting for a row of cells to follow them
     for members in ordered:
         members.sort(key=lambda m: m.x0)
         size = statistics.median(m.size for m in members)
-        above = max((m.y1 for m in block[-1]), default=-1e9) if block else None
-        if above is not None and min(m.y0 for m in members) - above > BLOCK_ROW_GAP * size:
+        last = (held or block)[-1] if (held or block) else None
+        above = max(m.y1 for m in last) if last else None
+        gap = min(m.y0 for m in members) - above if above is not None else 0.0
+        # A header row has more white under it than the rows have between them.
+        header = len(block) == 1 and not held and len(block[0]) >= 2 and gap <= HEADER_GAP * size
+        if above is not None and gap > BLOCK_ROW_GAP * size and not header:
+            held.clear()
             close()
         if len(members) >= 2 or (block and _starts_a_column(members[0], block)):
+            block.extend(held)
+            held.clear()
             block.append(members)
+        elif block and _is_title_row(members[0], block):
+            held.append(members)  # "Gases at 0 C" over a group of rows: the table goes on
         else:
+            held.clear()
             close()
     close()
     return out
+
+
+def _is_title_row(seg: _Seg, block: list[list[_Seg]]) -> bool:
+    """A short cell on a line of its own that starts where the first column does: the title
+    of a group of rows (a table of media: "Gases", "Liquids", "Solids"). It joins the block
+    when a row of cells follows it."""
+    left = min(m.x0 for line in block for m in line)
+    return abs(seg.x0 - left) <= ALIGN_TOL and len(seg.text.split()) <= TITLE_ROW_WORDS
 
 
 def _starts_a_column(seg: _Seg, block: list[list[_Seg]]) -> bool:
@@ -1522,10 +1543,11 @@ def _has_caption(view: _PageView, box: BBox) -> bool:
     return False
 
 
-def _wordy(text: str) -> bool:
-    """A word or words: letters make up at least half of it and it has at least two."""
+def _wordy(text: str, letters_needed: int = 2) -> bool:
+    """A word or words: letters make up at least half of it and it has at least
+    `letters_needed`."""
     letters = sum(c.isalpha() for c in text)
-    return letters >= 2 and letters >= 0.5 * sum(not c.isspace() for c in text)
+    return letters >= letters_needed and letters >= 0.5 * sum(not c.isspace() for c in text)
 
 
 _RELATION = frozenset("=\u2264\u2265<>\u2192\u2208\u2209\u2260\u2248\u223c\u2211\u222b\u2282\u2286")
@@ -1648,7 +1670,9 @@ def _text_block_dropped(grid: _Grid, page_width: float, captioned: bool = False)
     if _numbered(grid):
         return "numbered"
     if any(
-        len(members) >= 2 and sum(_wordy(m.text) for m in members) >= 0.6 * len(members)
+        len(members) >= 2
+        and len({m.text for m in members}) >= 2  # a column of "kg" is a unit, not words
+        and sum(_wordy(m.text, 3) for m in members) >= 0.6 * len(members)
         for members in columns.values()
     ):
         return None
