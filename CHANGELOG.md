@@ -1,5 +1,34 @@
 # Changelog
 
+## Chemistry accuracy: the primary score was a measure of markup (2026-10-21, branch fix/chemistry-accuracy)
+
+- Finding (docs/chemistry.md, "Accuracy"): of the 443 gold equations of the twelve development
+  chemistry documents, 65.9% are written right by ReadableSTEM and the primary score (`exact_lenient`)
+  says 10.8%. 244 equations that say the right chemistry are wrong on the primary only for how the
+  gold spells it (token packing, script grouping, upright against italic against `mtext`, arrow
+  length, box-drawing bars, numbers cut in two, a parenthesis of the sentence inside the gold); on
+  the authored document 107 of 108 are right in chemistry and 4 on the primary. What is really
+  missing is detection: 94 formulas in table cells (tables off), 22 lone `×` the gold counts as
+  equations, 7 neighbours. 7 equations cannot be read from the printed page (it lacks the atomic
+  number the gold has).
+- New secondary scorer `eval/equations_chem.py` (`exact_chem`, `pred_mathml` in the document task's
+  pairs), for chemistry gold only; the primary, the gate and the committed reports are unchanged.
+  `scripts/dev_chem_classes.py` puts every chemistry gold equation in an outcome class, for
+  ReadableSTEM and the recorded chatbot arms (`scripts/dev_chatbot.py --expand-ce` writes the
+  chatbots' `\ce{...}` out for scoring).
+- Fixes: a label set over a TeX arrow (`\xrightarrow{\Delta}`) no longer cuts the reaction in
+  three (`layout._label_over_arrow`, `chem.ARROW_LABELS`); `\ce{->[above][below]}` is read
+  (`\xrightarrow[below]{above}`); a bare `\middle|` of cell notation no longer makes the
+  converter refuse the equation (`chem.tidy_cell_notation`, in `expand_ce`). Development replay (769
+  of 773 requests from the recording, $0.009): chemically right 286 to 292 of 443, primary 48 to 48.
+  The layout is identical on 125 of 126 PDFs (the authored chemistry document is the one that
+  differs). No prompt changed.
+- Held-out: five fresh sections of OpenStax Chemistry (377 equations), pre-registered before the
+  run (docs/eval-chemistry-heldout.md): primary 0.135, chemically right 0.552 at the base commit and
+  0.560 on this branch; $1.47.
+- Not changed, with the evidence: the degree sign (`∘` for `°`, +10 on the primary, but the real-world
+  gold is made by the same converter), state symbols as three tokens, the registered primary scorer.
+
 ## Omission check for scanned and handwritten pages (2026-10-21, branch feat/image-page-omission)
 
 - A page read from an image whose reader left writing out now says so: the page picture's ink is

@@ -81,7 +81,7 @@ from readablestem.models import router
 from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.models.prompts import load_prompt
 from readablestem.pipeline import equation_images, layout, notation_memory, page_math
-from readablestem.pipeline.chem import CeError, convert_ce_commands
+from readablestem.pipeline.chem import CeError, convert_ce_commands, tidy_cell_notation
 from readablestem.pipeline.signs import compare_signs
 from readablestem.pipeline.speech import SpeechError, mathml_to_speech
 from readablestem.pipeline.text_layer_compare import compare_case, numbers_differ
@@ -217,7 +217,10 @@ def expand_ce(latex: str) -> str:
     chemical species) written out as plain LaTeX (`pipeline.chem`). A `\ce` outside the
     converted subset is left as it is, so the LaTeX check refuses it (`unknown_command`) and
     the equation goes to the main model or to a person: nothing is guessed. Not part of
-    `clean_latex`, which the proof also applies to the chatbot arms' LaTeX as recorded."""
+    `clean_latex`, which the proof also applies to the chatbot arms' LaTeX as recorded. The
+    bare `\middle|` the model writes for the phase boundary of a cell is made a bar here too
+    (`chem.tidy_cell_notation`), for the same reason."""
+    latex = tidy_cell_notation(latex)
     if "\\ce" not in latex:
         return latex
     try:

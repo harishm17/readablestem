@@ -1665,7 +1665,9 @@ def _merge_baselines(
                     continue
                 frag = rest
                 gap = frag.x0 - current.x1
-            if -0.5 * current.size <= gap <= 4 * max(current.size, frag.size) and not crosses:
+            if (-0.5 * current.size <= gap <= 4 * max(current.size, frag.size) and not crosses) or (
+                gap < 0 and not crosses and _label_over_arrow(current, frag)
+            ):
                 current = _join_rows(current, frag)
             else:
                 rows.append(current)
@@ -1675,6 +1677,28 @@ def _merge_baselines(
     for row in rows:
         row.column = _column_of(row.bbox, gutter)
     return _attach_big_operators(_attach_scripts(rows))
+
+
+def _label_over_arrow(current: _Row, frag: _Row) -> bool:
+    """Does `frag` start with a reaction arrow that has a label over it, the label being the
+    small glyphs `current` ends with? TeX sets `\\xrightarrow{\\Delta}` with the label raised
+    over the arrow: the text layer has one line end at the label and the next start at the
+    arrow, and the two overlap by the width of the label. Without this the reaction is cut in
+    three (docs/chemistry.md, "Accuracy"). Only a label no larger than a script, ending the
+    row, with the arrow starting under it."""
+    ink = frag.ink
+    head = next((i for i, c in enumerate(ink) if c.c in chem.ARROW_HEADS), None)
+    if head is None or head > 1 or any(c.c not in _CHEM_DASHES for c in ink[:head]):
+        return False
+    label: list[_Char] = []
+    for c in reversed(current.ink):
+        if c.size > SCRIPT_RATIO * current.size:
+            break
+        label.append(c)
+    if not label:
+        return False
+    x0, x1 = min(c.x0 for c in label), max(c.x1 for c in label)
+    return x0 - 0.5 * current.size <= frag.x0 <= x1 + 0.2 * current.size
 
 
 def _attach_scripts(rows: list[_Row]) -> list[_Row]:
