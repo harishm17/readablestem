@@ -115,6 +115,7 @@ COLUMN_RULE_LINES = 2.2  # x font size: a column rule is at least about two line
 GUTTER_PT = 3.0  # narrowest white gap between two columns of text
 WORD_GUTTER_PT = 2.5  # narrowest strip between two columns that no word crosses (see `_word_gutters`)
 WORD_GUTTER_LINES = 6  # a box needs this many lines of text before such a strip counts
+WORD_GUTTER_FLUSH = 0.6  # share of the lines whose text ends and begins at the strip's edges
 WORD_GUTTER_CROSSING = 0.1  # share of the lines a word may cross it on (a spanning title)
 SCRIPT_SIZE = 0.85  # x the line's largest glyph: smaller glyphs may be scripts (as layout)
 RAISED = 0.2  # x the full-size glyph: a smaller one with its baseline this far up is raised
@@ -124,6 +125,7 @@ BLOCK_MIN_LINES = 3  # lines with text in two or more cells that make a block of
 PROSE_WORDS = 6  # a cell of this many words is a line of running text, not a label or a term
 FRAME_MIN_WIDTH = 100.0  # pt: a rule shorter than this does not frame a table
 FRAME_MAX_RULES = 12  # rules of one extent on a page that are looked at together
+FRAME_GRID_SHARE = 0.3  # share of a framed box's lines with text in two columns (callouts have few)
 FRAME_WHOLE_RULES = 3  # a stack of this many rules (top, header, bottom) is one table as a whole
 FRAME_MAX_HEIGHT = 0.8  # share of the page a framed table may take
 PROSE_WIDTH = 0.25 # share of the page width a column's cells average to be running text
@@ -135,7 +137,6 @@ PICTURE_SHARE = 0.05  # raster images covering this share of a box made here mak
 MATH_SHARE = 0.5  # share of the cells with a relation or operator that makes a block maths
 TURN_MIN_CHARS = 60  # a page needs this much text to be turned
 TURN_SHARE = 0.6  # share of its characters set sideways, one way, to turn the page
-OWN_MARGIN = 1.2  # a box made here replaces the detector's only if this much larger
 EXTENT_TOL = 3.0  # pt: rules with ends this close have one extent
 
 # The page test before detection (`may_hold_table`): a gap counts from this wide (x font
@@ -213,6 +214,7 @@ DROPPED = (
     "numbered",
     "no_words",
     "split",
+    "container",
 )
 
 # "Table 2.3 Speeds", "TABLE 4: ...", "Tab. 1 ...", but not "Table 2 shows that ..." (as
@@ -1121,9 +1123,12 @@ def _word_gutters(words: Sequence[_Word], lines: int, x0: float, x1: float) -> l
     """x positions in the middle of the white strips between columns of text whose gap
     is narrower than a cell gap: a table's justified cells (TeX's `p{}` columns) leave a
     column padding of 4 pt, below `SEGMENT_GAP`, so every line reads as one cell. A strip
-    counts when it is at least `WORD_GUTTER_PT` wide and no word crosses it on more than
-    `WORD_GUTTER_CROSSING` of the lines (a title across the columns). Prose has none:
-    the spaces of a justified paragraph do not line up through six lines."""
+    counts when it is at least `WORD_GUTTER_PT` wide, no word crosses it on more than
+    `WORD_GUTTER_CROSSING` of the lines (a title across the columns), and the text on both
+    sides of it is flush against it on `WORD_GUTTER_FLUSH` of the lines (justified text ends
+    and begins at the same x; a gap inside a cell, or the free space left by a column of
+    short words, has no text at its edges). Prose has none: the spaces of a justified
+    paragraph do not line up through six lines."""
     if lines < WORD_GUTTER_LINES:
         return []
     allowed = int(WORD_GUTTER_CROSSING * lines)
@@ -1132,7 +1137,11 @@ def _word_gutters(words: Sequence[_Word], lines: int, x0: float, x1: float) -> l
     depth = 0
     for (x, step), (following, _) in pairwise(events):
         depth += step
-        if depth <= allowed and following - x >= WORD_GUTTER_PT and x0 < x and following < x1:
+        if depth > allowed or following - x < WORD_GUTTER_PT or not x0 < x < following < x1:
+            continue
+        left = len({w.line for w in words if x - 2.0 <= w.x1 <= x + 0.5})
+        right = len({w.line for w in words if following - 0.5 <= w.x0 <= following + 2.0})
+        if min(left, right) >= WORD_GUTTER_FLUSH * lines:
             found.append((x + following) / 2)
     return found
 
@@ -1230,12 +1239,16 @@ def _text_grid(view: _PageView, box: BBox, column_rules: list[float]) -> _Grid:
     cuts += drawn
     cuts.sort()
     cuts = [x for i, x in enumerate(cuts) if i == 0 or x - cuts[i - 1] > 2.0]
-    if not cuts:
-        # Justified cells: the strips between the columns are narrower than a cell gap.
-        soft = [x for x in _word_gutters(words, len(lines), text_x0, text_x1) if x not in drawn]
-        if soft:
-            segs, words, crossings = _segments(lines, column_rules, soft)
-            cuts = soft
+    # Justified cells: some strips between columns are narrower than a cell gap.
+    wrapped = any(len(seg.text.split()) >= PROSE_WORDS + 2 for seg in segs)
+    soft = [
+        x
+        for x in (_word_gutters(words, len(lines), text_x0, text_x1) if wrapped or not cuts else [])
+        if x not in drawn and all(abs(x - c) > 2.0 for c in cuts)
+    ]
+    if soft:
+        segs, words, crossings = _segments(lines, column_rules, [*cuts, *soft])
+        cuts = sorted([*cuts, *soft])
     columns = _assign_columns(segs, cuts)
     by_line: dict[int, set[int]] = {}
     for seg in segs:
@@ -1352,7 +1365,7 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
         verdict.verdict = "labels"
     elif drawing and not (grid.strong and grid.grid_lines >= 0.5 * grid.lines):
         verdict.verdict = "figure"
-    elif grid.strong or (ruled and grid.weak) or ruled_cells:
+    elif grid.strong or (ruled and grid.weak and not own) or ruled_cells:
         verdict.verdict = TABLE
         if ruled:
             verdict.reasons.append(REASON_RULED)
@@ -1365,7 +1378,11 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
                 _text_block_dropped(grid, view.width, _has_caption(view, box)) or TABLE
             )
         elif proposal.source == SOURCE_FRAME:
-            if _running_text(grid, box) or grid.lines < BLOCK_MIN_LINES:
+            if (
+                _running_text(grid, box)
+                or grid.lines < BLOCK_MIN_LINES
+                or grid.grid_lines < FRAME_GRID_SHARE * grid.lines
+            ):
                 verdict.verdict = "no_grid"  # rules around paragraphs, or around one line
             elif _numbered(grid):
                 verdict.verdict = "numbered"
@@ -2296,13 +2313,16 @@ def _find_in(
     if not proposals:
         return [], []
     judged = [(p, judge(p, view)) for p in proposals]
+    judged += _joined_frames(judged, view)
     _split_stacked(judged)
+    _mark_containers(judged)
     kept: list[tuple[Proposal, Judgement]] = []
 
-    def standing(pj: tuple[Proposal, Judgement]) -> float:
-        # The larger of two overlapping boxes stays; one made here must be clearly larger
-        # than the detector's (a fragment of the table) to take its place and its grid.
-        return -_area(pj[1].bbox) / (OWN_MARGIN if pj[0].source != "detector" else 1.0)
+    def standing(pj: tuple[Proposal, Judgement]) -> tuple[int, float]:
+        # The detector's boxes first, the larger of two overlapping ones staying; a box found
+        # here only where no detector box is (it has no grid of its own, and no model vouched
+        # for it).
+        return (pj[0].source != "detector", -_area(pj[1].bbox))
 
     for proposal, judgement in sorted(judged, key=standing):
         if judgement.verdict != TABLE:
@@ -2337,6 +2357,73 @@ def _find_in(
         if _edge_text(view, table, inside):
             table.reasons.append(REASON_EDGE_TEXT)
     return tables, judged
+
+
+def _mark_containers(judged: list[tuple[Proposal, Judgement]]) -> None:
+    """A box found here that holds another table, narrower than itself and under 60% of its
+    area, is the outline of a callout or a worked example with the table inside it (OpenStax
+    prints its examples so): the inner box is the table."""
+    boxes = [j for _, j in judged if j.verdict == TABLE]
+    for proposal, judgement in judged:
+        if proposal.source == "detector" or judgement.verdict != TABLE:
+            continue
+        outer = judgement.bbox
+        for inner in boxes:
+            box = inner.bbox
+            if (
+                inner is not judgement
+                and _area(box) < 0.6 * _area(outer)
+                and _area(_intersection(box, outer)) >= 0.9 * _area(box)
+                and (box[0] > outer[0] + EXTENT_TOL or box[2] < outer[2] - EXTENT_TOL)
+            ):
+                judgement.verdict = "container"
+                break
+
+
+def _joined_frames(
+    judged: list[tuple[Proposal, Judgement]], view: _PageView
+) -> list[tuple[Proposal, Judgement]]:
+    """A table whose rules run between its rows (or between groups of rows) is a stack of
+    spans between rules, each its own box. Spans of one extent that follow each other with
+    no space between, at least two of them tables and the rest slivers (a header row on its
+    own) or short of the evidence of a table of their own (a last row or two), are one table:
+    the box of the stack, judged like the others. A span of text between two tables is none
+    of these, and breaks the chain."""
+    frames = sorted(
+        ((p, j) for p, j in judged if p.source == SOURCE_FRAME),
+        key=lambda pj: (round(pj[0].bbox[0]), pj[0].bbox[1]),
+    )
+    out: list[tuple[Proposal, Judgement]] = []
+    chain: list[tuple[Proposal, Judgement]] = []
+
+    def close() -> None:
+        tables_ = [pj for pj in chain if pj[1].verdict == TABLE]
+        if len(tables_) >= 2:
+            box = (
+                min(pj[0].bbox[0] for pj in chain),
+                min(pj[0].bbox[1] for pj in chain),
+                max(pj[0].bbox[2] for pj in chain),
+                max(pj[0].bbox[3] for pj in chain),
+            )
+            whole = Proposal(box, [], 0, SOURCE_FRAME)
+            out.append((whole, judge(whole, view)))
+        chain.clear()
+
+    for proposal, judgement in frames:
+        sliver = judgement.verdict == "no_grid" and judgement.grid_lines <= 1
+        cells = judgement.verdict == "no_grid" and judgement.columns >= 2 and judgement.grid_lines >= 2
+        if judgement.verdict != TABLE and not sliver and not cells:
+            close()
+            continue
+        if chain:
+            last = chain[-1][0].bbox
+            same = abs(last[0] - proposal.bbox[0]) <= EXTENT_TOL
+            same = same and abs(last[2] - proposal.bbox[2]) <= EXTENT_TOL
+            if not (same and 0 <= proposal.bbox[1] - last[3] <= EXTENT_TOL):
+                close()
+        chain.append((proposal, judgement))
+    close()
+    return out
 
 
 def _split_stacked(judged: list[tuple[Proposal, Judgement]]) -> None:
