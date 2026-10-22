@@ -1,5 +1,37 @@
 # Changelog
 
+## Table recall on real documents (2026-10-21, branch fix/table-recall)
+
+- On the five real documents of `data/real-tables` the detector found 14 of 25 tables (recall 0.560
+  against a floor of 0.85, precision 1.000). Traced table by table (docs/tables.md, "Recall on real
+  documents"): the layout model proposes ruled, shaded or header-marked grids only, so unruled lists
+  and tables ruled only above and below were never proposed (or came as fragments); justified columns
+  were one cell wide for the 0.8 em cell gap; a ruled box of prose under "Table 2:" was called layout
+  because the caption was attached after that decision; a page of sideways text was never looked at; a
+  page with over 30,000 drawn items got no proposals at all.
+- Fixes in `pipeline/tables.py`: boxes made from the page's lines and rules (rule frames, text blocks)
+  go through the same arbitration, the detector's boxes first; columns from strips no word crosses;
+  captions count (Roman numerals "TABLE II.", a ruled box under a caption is a table, `is_layout_grid`
+  after captions); a page of sideways text is analysed turned upright (`TableGrid.turned`, and
+  `layout.crop` cuts the picture upright); a text cell grid as a structure (so a table found without
+  the model file is not dropped); a numbered equation or reaction at the edge of a table's box is cut
+  off it; guards against charts, page columns, references, numbered or bulleted lines, algorithm boxes,
+  equations, callout boxes and front matter. No model call, no prompt change, no setting: the spend
+  caps and `ops launch-check` are as before.
+- Measured (free): real-document development set precision 1.000 (23 of 23), recall 0.920 (23 of 25);
+  OpenStax tables task recall 0.909 to 0.980 and precision 0.984 to 0.985, TEDS 0.866 to 0.936; dev-v2
+  recall 0.774 to 0.925, chemistry tables found 32 to 38 of 42; the gate passes. A fresh held-out set of seven
+  CC BY papers (`data/real-tables-heldout/`, registered before any run) was run once: precision 0.914,
+  full-extent recall 0.744, **both floors missed**, no better than the code before (0.912, 0.744): its
+  misses were Roman-numeral captions, bulleted cells and charts boxed by the layout model, none of
+  which the development set had shown. Those were fixed afterwards and the set then gives 0.951 and
+  0.923, which is a development number.
+- New: `gold/tabulars.py`, `scripts/tables_label.py` and `scripts/tables_heldout.py` (place a paper's
+  LaTeX tables on its PDF and build a labelled set), `tests/test_tables_recall.py`,
+  `data/real-tables-heldout/`, result files for both sets. `data/eval/latest-tables-local.json` is
+  re-made. Unresolved: lists of relations (2 of 25), bar charts with few bars taken for tables by the
+  layout model, bold description lists stay lists.
+
 ## Chemistry accuracy: the primary score was a measure of markup (2026-10-21, branch fix/chemistry-accuracy)
 
 - Finding (docs/chemistry.md, "Accuracy"): of the 443 gold equations of the twelve development

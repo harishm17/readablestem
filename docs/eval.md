@@ -1067,9 +1067,15 @@ commit them or their labels.
 lecture notes, textbook and tutorial extracts, 64 pages, 25 labelled tables, with the floors and
 the licences in its README. Run it with `--real-dir data/real-tables`, free and without a model
 (about four minutes). First measured 2026-10-21: precision 1.000 (14 of 14), full-extent recall
-0.560 (14 of 25), so the recall floor is missed (docs/tables.md, "The blockers"). The committed
-`latest-tables-*` reports are made without it. A private `private-inputs/tables/` of your own
-course PDFs is still the better test (lab-manual worksheets are not among the five).
+0.560 (14 of 25): the recall floor was missed. It is a development set now (the detector was
+tuned on it, docs/tables.md "Recall on real documents"): after the fixes precision 1.000 (23 of 23)
+and recall 0.920 (23 of 25). `data/real-tables-heldout/` is a fresh set of seven CC BY papers, 58
+pages, 39 labelled tables, registered (documents, labels, floors, selection rule) before any
+detection ran on it and run once: precision 0.914, full-extent recall 0.744, both under the floors
+(docs/tables.md has the table-by-table account). The committed `latest-tables-*` reports are made
+without a real-document directory; check the floors on them with `eval gate --current <a run made
+with --real-dir>`. A private `private-inputs/tables/` of your own course PDFs is still the better
+test (lab-manual worksheets are not among the twelve papers).
 
 ### Gate
 

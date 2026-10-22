@@ -75,7 +75,17 @@ rules above.
 1. **Propose.** PyMuPDF Layout (`pymupdf-layout`, ONNX layout models in the wheel) with
    `page.find_tables(union=True, refine=True)`, under layout's PyMuPDF lock. It returns
    boxes in display coordinates (on a page with `/Rotate` too) and PyMuPDF's own refined
-   grid for each box.
+   grid for each box. Boxes made from the page's own lines and rules (`own_proposals`) go
+   through the same arbitration: *rule frames* (the span between two rules of one extent, a
+   booktabs table's top, header and bottom rules, or the double rules round a table of text) and
+   *text blocks* (runs of lines with text in aligned cells: an unruled list of symbols and their
+   meanings, a table set without rules). They exist for what the layout model does not propose:
+   unruled lists, fragments of a table ruled only above and below whose cells are justified
+   paragraphs, and every page with more than `MAX_DETECTOR_ITEMS` drawn items, where the model
+   is not run. A page whose text reads sideways (a landscape table on a portrait page with no
+   `/Rotate`: `_page_turn`) is analysed turned upright and the results turned back
+   (`TableGrid.turned` says how far the table's picture must be turned to read it; `layout.crop`
+   does). See "Recall on real documents" at the end of this page for why each exists.
 2. **Arbitrate** (`judge`). On four real lab manuals the detector alone had a precision
    of 0.68: it also boxes vector figures, tables of contents, equations and bullet lists.
    Each box is first trimmed of a `"Table N"` caption the detector boxed with it, then
@@ -91,7 +101,20 @@ rules above.
    ascending page number), a list (most cells start with a bullet), diagram labels (no
    cell longer than two letters or digits), a figure (curves or raster images in it,
    unless the text grid covers half its lines), or "no grid". Rules that run through
-   words (graph paper) are not evidence. When two kept boxes overlap, the larger stays.
+   words (graph paper) are not evidence. When two kept boxes overlap, the larger stays; the
+   detector's boxes first, so a box made here never replaces one (but a box made here that
+   holds a smaller table of its own is a callout's outline and yields to it, and the
+   detector's box that holds two text blocks of its own is two lists, `_split_stacked`).
+   Added by the real-document work: a ruled box with a "Table N" caption just above or
+   below it (Roman numerals too: "TABLE II.") is a table whatever its columns look like, and
+   a ruled two-column box of prose under a caption is data (`is_layout_grid` is decided after
+   the captions are attached); columns of justified text, whose padding is narrower than a
+   cell gap, come from the strips no word crosses (`_word_gutters`); a numbered equation or
+   reaction at the top or bottom of a box is cut off it (`_without_captions`); and a box made
+   here is dropped as a chart (curves, scatter dots, bars, small lettering), page text (two
+   prose columns, or one gutter in the middle of the page), references, numbered or bulleted
+   lines, algorithm lines, equations (lines of relations, equation numbers), authors and
+   addresses, a block of bare numbers (a matrix) or running text in a box (`_text_block_dropped`).
 3. **Structure.** Up to three grids compete: the **drawn cell grid** (the lattice of the
    rules, cells merged where a rule is missing; only for a table ruled on all four
    sides), **SLANet-plus** (PaddlePaddle's table-structure model, run as RapidTable does,
@@ -99,7 +122,13 @@ rules above.
    refined grid** (not for an extended box: it stops where the detector did). The one
    that fits the glyphs best wins (`misfit`: text with no wide gap in it that a grid
    splits between cells, or puts side by side in one cell); on a tie, the drawn grid,
-   then SLANet-plus (the better recogniser in the benchmark), then PyMuPDF.
+   then SLANet-plus (the better recogniser in the benchmark), then PyMuPDF. A fourth, the
+   **text cell grid** (`_text_slots`: columns between the gutters, a row for each line with text
+   in the first column, the wrapped end of a cell stays in its row, header rows above the first
+   rule between rows), is the structure of a box found from the text, where on a tie it beats a
+   model's reading (SLANet-plus joined neighbouring rows of a list), and of last resort for any
+   box that no other structure fits, so a table the model file is missing for is no longer
+   dropped when its box was grown past the detector's.
 4. **Fill.** Each cell's text is the PDF's own words, never OCR: a word goes to the cell
    its box falls in (by the medians of the cells' edges, so one badly placed cell box
    does not matter). A subscript stays in its word, an accent drawn above a letter
@@ -257,10 +286,11 @@ local` (docs/eval.md, "Tables").
 
 ### Known misses
 
-- **Tables the detector never proposes** stay on the old path. Seen: a table of numbers
-  set without any rules (`tests/fixtures/layout/latex/tables.tex`, Table 3, pinned as a
-  strict xfail so an upgrade that finds it shows up), booktabs-style blank tables in a
-  dvips manual, label-value pairs joined by leader lines.
+- **Tables the detector never proposes** are now proposed from the page's own lines and rules
+  when they are lists or tables set in aligned columns or between rules ("Recall on real
+  documents"). Still missed: lists of relations (`X_n ~ f(n)  if ... -> 1`, 2 of 25 on the real-document
+  development set), an unruled table of bare numbers with no caption (a matrix looks the same), and
+  label-value pairs joined by leader lines.
 - **A sparse table** whose body has text in only one column, between two rules, has no
   grid to see and is dropped.
 - **Two tables in one box** (or a table and a plot) stay one table.
@@ -316,6 +346,10 @@ exception's class name), never text. MuPDF's own messages are counted and droppe
   the detected tables are kept as images with a required decision.
 - `tests/test_tables_model.py`: the checked download, the command, the Docker step, the
   licence files and the vendored pre- and post-processing.
+- `tests/test_tables_recall.py`: the real-document misses one by one (pages of `data/real-tables`),
+  unruled lists and what must stay text (page columns, numbered equations, references, algorithm
+  lines, matrices), a table set sideways, Roman-numeral captions, a caption over a ruled box, a
+  numbered reaction above a table.
 
 ## The table step
 
@@ -752,7 +786,9 @@ papers was labelled, so how many real tables 17 is cannot be said.
    long text that `judge` took for layout (`layout_grid`: a term-and-description grid), and 2 ruled
    tables of long wrapped text with shaded quotes that came out as fragments. Nothing was tuned on
    this set: after reading these numbers it is a development set, not a held-out one, and the
-   floors stay unmet. Per-table outcome counts: `data/real-tables/result-2026-10-21.json`;
+   floors stay unmet (second measurement, after the detector was changed on it: precision 1.000,
+   recall 0.920 here, and a fresh held-out set that misses both floors: "Recall on real
+   documents", at the end of this page). Per-table outcome counts: `data/real-tables/result-2026-10-21.json`;
    repeat: `readablestem eval pipeline --task tables --mode local --real-dir data/real-tables`
    (free, about four minutes).
 2. **The gate floor: closed.** `wrong cells not flagged` 2 to 0, as in "The tables task" above: a
@@ -771,7 +807,8 @@ papers was labelled, so how many real tables 17 is cannot be said.
    (`tests/test_steps_table.py`). Nothing recorded changes (the prompt hash is the same,
    `table-b3769ce7`; the recorded answers replay as before).
 5. Smaller, open: the row-header convention (77 tables); a model outage leaves a header-less
-   local grid; detection of unruled lists, rotated pages and long wrapped text (item 1).
+   local grid. Detection of unruled lists, rotated pages and long wrapped text (item 1) was worked
+   on in "Recall on real documents".
 
 ### The decision
 
@@ -810,3 +847,165 @@ mode $2.26 (249 calls for 183 tables), the table calls of the five document sect
 calls); the real-world dev run $0.81 (2026-10-21, second measurement, above); total **$3.58** of the $4 and
 $4 caps. The equation and figure answers those sections replay are the chemistry
 work's (docs/chemistry.md, "Spend").
+
+## Recall on real documents (2026-10-21, branch `fix/table-recall`)
+
+The first real-document measurement ("The blockers", item 1 above) found precision 1.000 and
+full-extent recall 0.560 (14 of 25) on `data/real-tables`, against a floor of 0.85. This is where each
+of the 11 misses was dropped, the root causes behind them, what was changed, and what it did. No
+model is called anywhere in it: detection is free, nothing was spent, and the spend caps
+(`FEATURE_TABLES=true`, `MAX_USD_PER_PAGE=2.20`, `MAX_USD_PER_JOB=4.70`) still pass `ops launch-check`
+(`launch_blockers=0`); the only cost effect is that more tables are found and rebuilt (about
+$0.012 to $0.033 each, "The tables task" and "On real papers" above). Time: `layout.analyze` on the
+64 pages of `data/real-tables` took 0.49 s a page before and 0.52 s after, on the 58 held-out pages
+1.05 s and 1.08 s (one CPU, this box): the page-level geometry costs 2 to 5%.
+
+### Where each miss was dropped
+
+Traced with `judge`'s verdicts on the proposals the detector made for each page (the stage that
+dropped it, and why):
+
+| Table | Stage | Cause |
+|---|---|---|
+| acronym list (2401.00649, page 1) | not proposed | unruled two-column list: the layout model looks for ruled, shaded or header-marked grids. (The earlier note "ruled above and below" was wrong: the page has no rules by the list) |
+| notation lists 1 to 4 (2412.19752, page 1) | not proposed | the same |
+| notation lists 5 and 6 (page 2) | arbitrated: one box for both | the detector boxed the two lists as one table of 7 columns; their columns are not shared, so no common gutter, verdict "no grid" |
+| "Table 2: Elements of an object" (2505.03022, page 17) | arbitrated: layout grid | `is_layout_grid` (a ruled two-column box of prose) was decided in `_build`, before the caption "Table 2:" was attached, so the caption never counted |
+| lab study Table 4 (2409.08224, page 4) | proposed in fragments | ruled only above and below (double rules and a header rule), cells of justified text: the detector proposed two fragments (a 12-cell sliver and a 2-cell one), neither a table |
+| lab study Table 5 (page 6) | arbitrated: no grid | the whole table was proposed (135 cells), but the glyph gaps between its justified columns (3 to 7 pt) are narrower than the 0.8 em that separates cells, so every line read as one cell, one column |
+| table of balls (2505.03022, page 24) | page never looked at | text set sideways on an upright page (no `/Rotate`): every line is "vertical", `glyphs_in` leaves vertical lines out and the prefilter saw no text |
+
+The same trace on the real-world dev papers found one more: 2410.12036 page 0 has a ruled table and
+a figure of 35,000 drawn items, over `MAX_DETECTOR_ITEMS`, so the detector was not run on it.
+
+### Root causes
+
+1. **The layout model proposes ruled, shaded or header-marked grids, and the arbitration only checks
+   what it proposes.** Nothing proposes an unruled list or table, a table ruled only above and below
+   whose cells are paragraphs, or anything on a page the cost guard skips. Seven of the 11 misses.
+2. **Columns were read from glyph gaps alone, with a fixed 0.8 em.** TeX's `p{}` columns are
+   justified with a 4 pt padding, which is not a cell gap; the lines read as one cell and the
+   table was "no grid". Two misses.
+3. **A caption was not evidence.** `is_layout_grid` was decided before the "Table N" caption was
+   attached, and the caption pattern had no Roman numerals ("TABLE II.", the APS and IEEE
+   style).
+4. **Text direction was not looked at.** A page of sideways text is invisible to every stage. One miss.
+5. **Thresholds tuned on four lab manuals.** The 0.8 em gap, the 60-character prose test and the
+   "first column is a label" assumption fit worksheets; lecture notes and papers differ.
+
+### What was changed
+
+- **Own proposals** (`own_proposals`): rule frames and text blocks (above, "How a page's tables are
+  found"), judged like the detector's. The detector's boxes are kept first, so what was found
+  before is found as before; a box made here never replaces one.
+- **Word gutters** (`_word_gutters`): strips no word crosses (at least 2.5 pt wide, flush against text
+  on both sides on 60% of at least 10 lines) are column gaps.
+- **Captions count** (`is_layout_grid` after `_attach_captions`; Roman numerals; a ruled box under
+  a "Table N" line is a table, also with bullets in its cells or one column of wrapped text).
+- **Sideways pages** (`_page_turn`, `_find_turned`, `TableGrid.turned`, `layout.crop`).
+- **A text cell grid** (`_text_slots`) as a structure.
+- **Guards that keep the new proposals precise**, each from a false table seen on real pages:
+  charts (curves, scatter dots, bars, lettering under 0.7 of the page's), legends inside plots, page
+  text columns, references, numbered or bulleted lines, algorithm boxes, equations and their numbers,
+  authors and addresses, matrices, callout boxes (an outline that holds a smaller table yields to it;
+  a paragraph in a box is not a row), and a bold-term list stays a list (LaTeX `description`).
+  The reaction or equation above a table ("2NO + Cl2 -> 2NOCl  17.39", OpenStax numbers its
+  equations with no brackets) is cut off the table's box (`_without_captions`).
+
+### Numbers
+
+All free, deterministic, from `readablestem eval pipeline --task tables --mode local`.
+
+| | before (origin/main) | after |
+|---|---|---|
+| real documents, development set (`data/real-tables`; tuned on): precision | 1.000 (14/14) | **1.000** (23/23) |
+| same: full-extent recall | 0.560 (14/25) | **0.920** (23/25; Wilson 0.75 to 0.98) |
+| OpenStax tables task (197 gold tables, 45 documents): recall | 0.909 | **0.980** |
+| same: precision (3 false tables, the same three) | 0.984 | **0.985** |
+| same: TEDS (all gold) / found tables / column headers exact | 0.866 / 0.954 / 0.843 | **0.936 / 0.955 / 0.898** |
+| same, by style: no rules / booktabs recall | 0.815 / 0.889 | **0.963 / 0.981** |
+| dev-v2 tables task (31 documents, 53 gold tables, 42 chemistry): recall / precision | 0.774 / 0.911 | **0.925 / 0.907** |
+| dev-v2 chemistry tables found | 32 of 42 | **38 of 42** |
+| real-world dev papers (25 papers, 114 pages): tables found, by eye all real | 17 | 18 |
+| same: pages with a table that holds gold equations, found | 14 of 15 | **15 of 15** |
+
+(The gate, `eval gate --current <run with --real-dir data/real-tables> --baseline
+data/eval/baseline-tables-local.json`: PASS, every floor and every regression check. The one
+"false table" added to dev-v2's chemistry count by the new code is a 2 x 7 table found whose
+text the scorer cannot match to its gold, not a table that is not there.)
+
+The 2 misses left on the development set are the two notation lists of relations
+(`X_n ~ f(n)  if X_n/f(n) -> 1`): lines of symbols in two aligned columns look like a displayed
+system of equations, which is what the page guard (`_text_block_dropped`) exists to leave as text.
+
+**False tables among the boxes made here** (own proposals only, on 25 development papers and 124
+papers no real-world split uses, up to 40 to 60 pages each, 233 boxes; the labels of a table are its
+source `tabular`, found in the PDF by `gold/tabulars.py`, and the 66 boxes with no matching
+`tabular` were looked at one by one): 222 are tables (167 matched a `tabular`; 55 were tables whose
+source the matcher could not place: tables made of maths, or of macros), 11 are not (5%): front
+matter (article info beside an abstract), an equation beside its explanation, code, a plot's
+tick labels and legend, a table of contents with a text column. None is a rule frame (77 boxes).
+
+### Held out: a fresh set, run once
+
+`data/real-tables-heldout/`: seven CC BY papers with tables (physics education studies, one
+deep-learning survey: the lecture notes and tutorials the rule asked for were few among what nothing
+had used), 58 pages, 39 labelled tables, registered with its floors (precision 0.95, recall 0.85)
+and its selection rule before detection ran on it (commit `ce1f86e`). Run once with the code
+that followed that commit (`aee6915`), reported as it came out:
+
+| | origin/main | `fix/table-recall`, as registered | after follow-up fixes (not held out) |
+|---|---|---|---|
+| precision | 0.912 (31/34) | **0.914** (32/35; Wilson 0.78 to 0.97) | 0.951 (39/41) |
+| full-extent recall | 0.744 (29/39) | **0.744** (29/39; 0.59 to 0.85) | 0.923 (36/39) |
+| any-extent recall | 0.795 | 0.821 | 1.000 |
+
+**Both registered floors are missed**, and the registered run is no better than the code
+before it: the held-out set holds almost none of what the development set taught the detector
+(no unruled list, no sideways page), and its tables fail for other reasons. Per table, the registered
+run's 10 misses and partial finds (`data/real-tables-heldout/result-2026-10-21.json` has all of them):
+
+- **Five tables of 2302.07336 (Tables I, II, IV, VII, X) and two of 2311.16525 (Tables I and II).**
+  The first five are ruled tables of long wrapped text under a "TABLE II." caption: the caption
+  pattern had no Roman numerals, so the box was a "layout grid" (two columns of prose), or had no
+  columns to see ("no grid"). The two of 2311.16525 are ruled tables whose cells are bulleted
+  ("o Revolving electrons"): the arbitration called them lists.
+- **Three partial finds** (two are boxes a few points larger than the label, a rule or a caption
+  line, so under 75% of the box lies in the table), **three false tables** (two bar charts and a scatter plot with axes, boxed by the layout model: its rules, ticks
+  and labels look like a ruled grid; the strict chart test only ran on boxes made here).
+
+These causes were read off the held-out result, so fixing them is not held-out evidence: after the
+fixes below, the same set gives precision 0.951 and recall 0.923, and that number is a development
+number. What was changed: Roman numerals in `TABLE_CAPTION`; a ruled box with a caption just above
+or below it is a table whatever the glyph evidence for its columns (bullets, one column of wrapped
+text), for the detector's boxes and for boxes made here that have columns; the chart test (bars,
+scatter dots) applies to the detector's boxes too. On the OpenStax task and the dev-v2 set these
+changed nothing (recall 0.980, precision 0.985; 0.925 and 0.907). The 2 remaining false tables are bar
+charts with fewer than twelve bars; the partial finds are boxes a few lines too short or too long.
+
+### What is not fixed
+
+- Lists of relations, set as two aligned columns (2 of the 25), are left as text; so are lines of
+  symbols in aligned columns generally, unless a "Table N" caption says so.
+- A two-column "term, description" list set in bold (LaTeX `description`, a glossary) stays a list: it
+  looks the same as a notation `tabular` in plain type, and the bold is the only difference.
+- Bar charts with few bars, and plots drawn as ruled grids, can still be taken for a table by the
+  detector's model.
+- A table whose first column is empty on most lines (grouped rows) in a box found from text is read
+  as a table of wrapped cells (`_text_slots` joins a line with no first-column text to the row above).
+- The rotated-page fix handles whole pages of sideways text turned 90 degrees either way; a sideways
+  table on a page that also has upright paragraphs is not turned (the share of sideways text must be 60%).
+- Held-out precision and recall were measured on seven papers and 39 tables: wide intervals, and
+  both floors missed as registered.
+
+How to repeat (free; about four minutes each):
+
+```
+uv run readablestem eval pipeline --task tables --mode local --real-dir data/real-tables --out dev.json
+uv run readablestem eval pipeline --task tables --mode local --real-dir data/real-tables-heldout --out held.json
+uv run readablestem eval pipeline --task tables --set dev-v2 --part dev --mode local --out devv2.json
+uv run readablestem eval gate --current dev.json --baseline data/eval/baseline-tables-local.json
+```
+
+`scripts/tables_label.py` and `scripts/tables_heldout.py` (with `gold/tabulars.py`) place a paper's
+LaTeX tables on its PDF pages and build a labelled set like the held-out one.
