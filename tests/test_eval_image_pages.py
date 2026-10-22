@@ -31,7 +31,9 @@ def converted(equation: str = "v = \\frac{d}{t}"):
             "equation": lambda r: {"is_equation": True, "latex": equation, "confidence": 0.9},
         }
     )
-    settings = Settings(_env_file=None, feature_image_pages=True)  # type: ignore[call-arg]
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None, feature_image_pages=True, image_pages_recover_omissions=False
+    )
     return run.convert_pdf(scan_pdf(), settings=settings, client=client).result
 
 

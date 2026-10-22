@@ -113,6 +113,15 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "symbol here and used the context to settle some, so compare it with the original page.",
     ("image_page.read_confidence", "read_low"): "Part of this was hard to read, so compare "
     "it with the original page and correct what is wrong.",
+    ("image_page.second_reading", "second_reading_differs"): "The line was read a second time "
+    "from a picture of it alone and the two readings differ, so compare this with the original "
+    "page symbol by symbol.",
+    ("image_page.second_reading", "second_reading_agrees_unsure"): "The line was read a second "
+    "time from a picture of it alone and the readings agree, but that reading was not sure of "
+    "every symbol either, so compare this with the original page.",
+    ("image_page.second_reading", "second_reading_agrees"): "The line was read a second time "
+    "from a picture of it alone and both readings agree; the page is still the only thing "
+    "that can confirm them.",
     ("image_page.illegible", "illegible"): "Some of this could not be read and is marked "
     "[illegible]: look at the original page and write what it says.",
     ("image_page.inline_math", "inline_math_invalid"): "A formula in this text could not be "

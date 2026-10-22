@@ -136,6 +136,7 @@ from readablestem.pipeline import (
     heading_step,
     html_checks,
     image_page,
+    image_page_check,
     layout,
     page_math,
     page_math_reconcile,
@@ -1307,6 +1308,14 @@ def _image_pages_pass(
     }
     with _span(tracer, "image_pages", pages=len(pages)) as span:
         result = image_page.run(recording, settings, renders, concurrency=concurrency)
+        if (
+            settings.image_pages_omission_check
+            and settings.image_pages_recover_omissions
+            and result.stopped is None
+        ):
+            image_page.recover_omissions(recording, settings, result, concurrency=concurrency)
+        if settings.image_pages_second_reading and result.stopped is None:
+            image_page.second_readings(recording, settings, result, concurrency=concurrency)
         built: dict[int, image_page.Built] = {}
         for number, read in sorted(result.reads.items()):
             if read.output is None:
@@ -1318,6 +1327,8 @@ def _image_pages_pass(
                     box=boxes.get(number, LETTER_BOX),
                     png=read.png,
                     check_omission=settings.image_pages_omission_check,
+                    verdicts=read.verdicts,
+                    accept_agreed=settings.image_pages_accept_agreed,
                 )
             except Exception as exc:  # the page stays an image: a bad answer is not worth more
                 log.warning("image page build failed: %s", type(exc).__name__)
@@ -1543,4 +1554,6 @@ def _convert(
         result.prompt_versions["page_math"] = page_math.PROMPT_VERSION
     if image_summary is not None:
         result.prompt_versions["image_page"] = image_page.PROMPT_VERSION
+        if settings.image_pages_second_reading:
+            result.prompt_versions["image_page_crops"] = image_page_check.PROMPT_VERSION
     return PipelineOutput(result=result, crops=run.crops, checks=checks)

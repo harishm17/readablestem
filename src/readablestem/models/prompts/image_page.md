@@ -30,7 +30,10 @@ Each block has these fields. Fields that do not apply to a block's kind are left
     top-level item, 2 for an item nested under another. The marker is not part of `runs`.
   - `equation`: a displayed equation, a system of equations, an aligned derivation, a matrix
     or a determinant, on lines of its own. All the rows of one belong to one block. `latex` is
-    its LaTeX. `label` is the equation's printed number ("(2.4)"), or `""`. A derivation
+    its LaTeX. `label` is the equation's printed number or marker ("(2.4)", "3.", "(b)"), or
+    `""`. A line that holds only a formula is an `equation`, handwritten or printed,
+    centred or at the margin, with or without a number or marker beside it; a numbered line
+    like "3. [formula]" is an `equation` with label "3.", not a `list_item`. A derivation
     written as several steps one under another is one block when it is one chain of equal
     signs, and several blocks when each line is a separate statement.
   - `figure`: a picture, graph, diagram, circuit, sketch, photograph. `description` is two
@@ -94,6 +97,14 @@ Each block has these fields. Fields that do not apply to a block's kind are left
 7. Handwriting: read the maths as the author meant it; a letter written like a Greek letter is
    that Greek letter when the context is physical or mathematical. If a symbol is truly
    ambiguous, write your best reading and call the block `medium` or `low`.
+8. Write the letters as drawn. A letter drawn as a plain letter stays plain: `R`, not
+   `\mathbb{R}`, unless the strokes are double-struck; `\mathrm`, `\mathcal` and `\mathbb`
+   are for letters that are drawn upright, in script or double-struck. Take the case of a
+   letter from its height against its neighbours and from the formula around it; one variable
+   keeps one case through a formula.
+9. Copy every mark that is drawn: superscripts and subscripts (and a script on a script),
+   accents (`\hat`, `\tilde`, `\vec`), primes, brackets, bars and dots. A bar over one or
+   more symbols is `\overline{...}`.
 
 ## Tables
 

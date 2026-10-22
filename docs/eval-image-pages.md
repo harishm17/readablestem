@@ -32,7 +32,7 @@ reasons and the open risks are at the end.
 | Output: notice, "Show the original page", about note, rejected text as a picture | `pipeline/assemble.py` |
 | Review of the text of an image page; upload of scans; job outcome | `web/review.py`, `web/routes/review.py`, `web/routes/split.py`, templates, `web/pdf_probe.py`, `web/uploads.py`, `web/worker.py` |
 | The upload option (per document): the checkbox, the probe's count of scanned and handwritten pages, `Job.image_pages` (migration `c4e7a2b9d150`), the job's spend allowance, large files in parts | `web/templates/app.html`, `web/routes/jobs.py`, `web/routes/parts.py`, `web/pdf_probe.py`, `web/uploads.py`, `pipeline/page_type.py` (`image_page_count`), `web/intake.py`, `web/pending.py`, `web/worker.py` (`job_caps`), `web/notation.py` (`conversion_options`), `ops/limits.py` |
-| Settings | `FEATURE_IMAGE_PAGES` (the offer), `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE`, `IMAGE_PAGES_MAX_USD_PER_JOB`, `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`, `IMAGE_PAGES_OMISSION_CHECK`; `VisionRequest.timeout_s` |
+| Settings | `FEATURE_IMAGE_PAGES` (the offer), `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE`, `IMAGE_PAGES_MAX_USD_PER_JOB`, `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`, `IMAGE_PAGES_OMISSION_CHECK`, `IMAGE_PAGES_RECOVER_OMISSIONS`, `IMAGE_PAGES_SECOND_READING`, `IMAGE_PAGES_ACCEPT_AGREED`; `VisionRequest.timeout_s` |
 | Eval: scans, prose word error rate, image page numbers | `eval/scan.py`, `eval/scan_media.py`, `eval/prose_wer.py`, `eval/image_pages.py`; `eval pipeline --scanned [--scan-seed]` |
 | Held-out check | `data/image-pages/PREREGISTRATION-HELDOUT-SCANS.md` (+ `.sha256`), `scripts/realworld_scanned.py` |
 | Dev scripts | `scripts/image_pages_probe.py` (read pages live, or a picture), `scripts/image_pages_table.py` (reports side by side) |
@@ -381,3 +381,47 @@ twice, and 49 agreed development equations and 19 agreed held-out ones were wron
 score); how much review a 30-page scan may ask of an instructor (about 105 decisions on the
 development pages, about 50 on the papers); and a measurement of reviewers, which this work does
 not make.
+
+## Update (2026-10-22): the reader after the handwriting fixes
+
+[eval-handwriting.md](eval-handwriting.md), "Root causes and fixes", changed the image page reader:
+a paragraph or list item that holds one formula and no words is a display equation (marker as its
+number), the stretches of ink the first reading left out are read from a picture of just that part
+(`IMAGE_PAGES_RECOVER_OMISSIONS`), a second reading of `medium` lines with a formula exists but is
+off (`IMAGE_PAGES_SECOND_READING`, `IMAGE_PAGES_ACCEPT_AGREED`), and the prompt (`image_page-7a9e3a80`)
+says display lines are equations, plain letters stay plain, every drawn mark is copied and a bar
+over symbols is `\overline`. This checks that it did not lose anything on the typed scans: the six
+development documents above (36 pages), the same synthetic scans, `claude-opus-5-5` at effort low
+and 200 dpi, run once with `scripts/typed_scans_check.py`; the control is the unchanged pipeline
+(`origin/main` at `f206326`, prompt `image_page-632b4d29`) on the same pages, **re-run today with
+today's equation step**, because the equation step's recorded answers above are for an earlier
+equation prompt (`equation-df0e12f1`; the chemistry change merged in between). Development material
+only: the held-out and check parts were not used. One run of each, no interval.
+
+| | Control (unchanged) | After the fixes |
+|---|---|---|
+| pages read / converted | 36 / 36 | 36 / 36 |
+| **equations right end to end, primary `exact_lenient`** | 0.597 | 0.597 |
+| symbols (credit) | 0.834 | 0.834 |
+| detection recall / precision | 0.897 / 0.622 | 0.901 / 0.644 |
+| heading F1 / relative level right | 0.961 / 0.662 | 0.961 / 0.716 |
+| prose WER, all words / 3+ letters | 0.051 / 0.034 | 0.058 / 0.038 |
+| required decisions / optional notes per page | 3.50 / 10.19 | 3.58 / 10.19 |
+| blocks `medium` or `low` | 1.0% | 0.4% |
+| silent wrong equations (inline, not asked), symbols / strict | 15 / 30 | 15 / 30 |
+| display equation blocks / paragraphs | 113 / 200 | 119 / 197 |
+| page read: $ per page / whole pipeline | 0.095 / 0.106 | 0.093 / 0.107 |
+| seconds per page | 20.8 | 20.5 |
+
+Nothing regressed beyond what one stochastic run each can show: the primary and symbols scores are
+the same, headings are the same or better, detection is a little better, and the prose word error
+rate is 0.7 points higher on all words and 0.4 on words of 3 letters or more (the two runs read the
+same pages with different words wrong; this document says above that a few points between arms are
+inside the noise of one run of a stochastic model on 36 pages). The pass asks 3 more questions in 36 pages (129 required
+decisions against 126): six more display equation blocks (three fewer paragraphs: lines that were
+one formula, and the prompt's rule), and still none for inline formulas (they are accepted with their
+paragraph and the reader calls 99% of typed blocks `high`). One page was flagged
+for a stretch its reading left out and read again (one extra request, no decision left). The cost per
+page is unchanged. The silent wrong equations are the same count, 15 inline formulas, as
+before: a typed page's inline formula is not a decision, and about 6 in 100 gold equations are inline
+formulas wrong by the symbols score and not asked about.
