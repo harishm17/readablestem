@@ -373,7 +373,7 @@ What it says, as measured:
 
 1. **The primary number is mostly a measure of markup.** 65.9% of the gold equations are written
    right by ReadableSTEM (89 to 92% of the 319 it found and aligned: 292 of 319) while the primary
-   says 10.8%. On the authored document 107 of 108 are right in chemistry (before the work: 53)
+   says 10.8%. On the authored document 107 of 108 are right in chemistry (before the work: 63)
    and the primary says 4. The chemistry work did raise the content (before 55.8%, now 65.9%), and
    the primary could not see it: it moved by 7 equations because the OpenStax shape (arrow as an
    operator) happens to match the primary's rule, and it moved the authored document the wrong
@@ -478,8 +478,20 @@ unreadable labels still refused, `\middle` in cell notation, with `\left` left a
 
 ### Held-out
 
-`docs/eval-chemistry-heldout.md` (pre-registered before the run). The registered held-out set's
-chemistry sections were not re-run or re-scored for this work.
+`docs/eval-chemistry-heldout.md` (pre-registered before the run; five sections of OpenStax
+Chemistry, 377 gold equations, not used before; one run). The registered held-out set's chemistry
+sections were not re-run or re-scored for this work.
+
+| 377 gold equations | baseline (`f206326`) | this branch |
+|---|---|---|
+| primary `exact_lenient`, end to end | 0.135 | 0.135 |
+| chemically right (chem scorer or an earlier rung) | 0.552 (208) | 0.560 (211) |
+| symbols scorer | 0.531 | 0.536 |
+| of the aligned, chemically right | 81.6% | 82.7% |
+| not found: lone `×` / table cell / other | 66 / 39 / 16 | 66 / 39 / 16 |
+
+The same shape as the development sets (primary 0.135, chemically right 0.56); the fixes add 3
+equations because the sections have no TeX label over an arrow.
 
 ### Numbers under both scorers
 
