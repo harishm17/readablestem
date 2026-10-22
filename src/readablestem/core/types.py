@@ -489,6 +489,9 @@ class Element(BaseModel):
     list_ordered: bool | None = None
     list_level: int | None = None
     caption: str | None = None  # figures: nearby "Figure N ..." text, if found
+    # Figures whose caption has inline maths: the caption with an inline marker where each
+    # formula was (`parent_id` of those equations is the figure). `caption` stays plain text.
+    caption_marked: str | None = Field(default=None, exclude_if=lambda v: v is None)
     # Equations: letters of `text` the PDF draws, not bold, in a font known to have a bold
     # face (Computer Modern, Times, ...), sorted, no repeats. Such a letter is known to be
     # plain, so a bold reading of it (a scalar read as a vector) is a real difference.

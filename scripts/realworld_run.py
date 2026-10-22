@@ -76,7 +76,11 @@ def verify_gold(part: str) -> None:
             raise SystemExit(f"PDF of {paper['id']} differs from the manifest")
 
 
-REGISTRATIONS = {"heldout": "REGISTRATION.sha256", "fresh": "REGISTRATION-fresh.sha256"}
+REGISTRATIONS = {
+    "heldout": "REGISTRATION.sha256",
+    "fresh": "REGISTRATION-fresh.sha256",
+    "fresh2": "REGISTRATION-fresh2.sha256",
+}
 
 
 def require_registration(part: str, arm: str, offline: bool) -> None:
@@ -97,7 +101,7 @@ def require_registration(part: str, arm: str, offline: bool) -> None:
 def registered_arm(args: argparse.Namespace) -> str:
     """The name a registered run is recorded under: `rs` on the held-out part, the tag on the
     fresh part (two arms of one registration)."""
-    return args.tag if args.part == "fresh" else "rs"
+    return args.tag if args.part in ("fresh", "fresh2") else "rs"
 
 
 def papers(part: str) -> list[dict]:
@@ -128,6 +132,10 @@ def cmd_rs(args: argparse.Namespace) -> int:
     os.environ["CLAUDE_SECOND_CHECK"] = "off"
     if args.page_math:
         os.environ["FEATURE_PAGE_MATH"] = "true"
+    if args.tables:
+        os.environ["FEATURE_TABLES"] = "true"
+    if args.notation_memory:
+        os.environ["FEATURE_NOTATION_MEMORY"] = "true"
     if args.no_agreement_lift:
         os.environ["PAGE_MATH_AGREEMENT_LIFT"] = "false"
     if args.page_math_tokens:
@@ -306,7 +314,7 @@ def cmd_tally(args: argparse.Namespace) -> int:
     run's answers (`--seed-answers-from`) holds copies of them: each answer is counted once,
     under the first run that holds it (`rs` first, then by tag)."""
     rows = []
-    for part in ("dev", "heldout", "fresh"):
+    for part in ("dev", "heldout", "fresh", "fresh2"):
         counted: set[str] = set()
         for tag_dir in sorted(
             runs_dir(part).glob("*/answers.jsonl"),
@@ -349,12 +357,16 @@ def main() -> int:
     ):
         p = sub.add_parser(name)
         if name != "tally":
-            p.add_argument("--part", choices=["dev", "heldout", "fresh"], required=True)
+            p.add_argument("--part", choices=["dev", "heldout", "fresh", "fresh2"], required=True)
         if name == "rs":
             p.add_argument("--max-usd", type=float, required=True)
             p.add_argument("--tag", default="rs")
             p.add_argument("--offline", action="store_true")
             p.add_argument("--page-math", action="store_true", help="FEATURE_PAGE_MATH on")
+            p.add_argument("--tables", action="store_true", help="FEATURE_TABLES on")
+            p.add_argument(
+                "--notation-memory", action="store_true", help="FEATURE_NOTATION_MEMORY on"
+            )
             p.add_argument("--page-math-tokens", type=int, help="PAGE_MATH_MAX_OUTPUT_TOKENS")
             p.add_argument("--no-agreement-lift", action="store_true")
             p.add_argument(

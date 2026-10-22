@@ -452,7 +452,7 @@ def _tail(text: str, limit: int) -> str:
 
 def _inline_context(element: Element, parent: Element) -> str | None:
     """A window of the parent paragraph centred on this equation's marker."""
-    text = parent.text or ""
+    text = parent.text or parent.caption_marked or ""
     marker = inline_marker(element.id)
     at = text.find(marker)
     if at == -1:
@@ -500,7 +500,8 @@ def context_texts(elements: list[Element]) -> dict[str, str | None]:
         if element.kind not in _MODEL_KINDS:
             continue
         parent = by_id.get(element.parent_id or "")
-        if parent is not None and parent.text and inline_marker(element.id) in parent.text:
+        parent_text = parent.text or parent.caption_marked if parent is not None else None
+        if parent is not None and parent_text and inline_marker(element.id) in parent_text:
             context = _inline_context(element, parent)
             if context is not None:
                 result[element.id] = context

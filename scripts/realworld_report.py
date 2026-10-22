@@ -275,7 +275,7 @@ def examples(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--part", choices=["dev", "heldout", "fresh"], required=True)
+    parser.add_argument("--part", choices=["dev", "heldout", "fresh", "fresh2"], required=True)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--examples", type=int, default=0)
     parser.add_argument(
