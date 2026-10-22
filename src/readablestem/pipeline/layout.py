@@ -322,6 +322,9 @@ _BOLD_FONT = re.compile(
     re.IGNORECASE,
 )
 _ITALIC_FONT = re.compile(r"italic|oblique|cmti|cmsl|sfti|-it$|,it|ital", re.IGNORECASE)
+# Bold italic: `\boldsymbol` and `\bm` (CMMIB, newtx's bmi, Nimbus MediItal, ...), against `\mathbf`
+# (CMBX, upright). The text layer gives both as a bold letter; the equation step restores it.
+_BOLD_ITALIC_FONT = re.compile(r"cmmib|bmi\d*$|bold-?ital|bold-?obl|medi-?ital|bdit", re.IGNORECASE)
 # Regular-weight text and maths fonts known to have a bold face that PDFs name as bold
 # (CMBX, Times-Bold, DejaVuSerif-Bold, ...), or OpenType maths fonts that write bold as
 # Unicode maths bold. A letter drawn in one of them, not bold, is known to be plain, so
@@ -353,6 +356,11 @@ _SUPERSCRIPT_FLAG = 1
 _MONO_FLAG = 8
 
 _LOCK = threading.RLock()  # PyMuPDF is not thread-safe: one PyMuPDF call at a time
+# The document being analysed was typeset by TeX (`page_type.producer_hint`): the conventions
+# below that come from what a TeX author types (an italic letter is `$x$`, the maths stops
+# before a unit or a parenthesis of the sentence) apply only then. Set by `_analyze_document`
+# under `_LOCK`; a Chromium print of MathML or a Word file is read as before.
+_TEX_MADE = False
 # Run the table detector only on pages that could hold a table (`tables.may_hold_table`).
 # The result is the same either way; switched off, only to check that.
 TABLE_PREFILTER = True
@@ -428,6 +436,8 @@ def analyze(
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
             finally:
+                global _TEX_MADE
+                _TEX_MADE = False
                 doc.close()
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store quotes PDF content
@@ -935,6 +945,8 @@ class _Char:
         style = _letter_style(self.font) if self.c.isascii() and self.c.isalpha() else None
         if style is not None and (self.c.isupper() or not style[1]):
             return styled_char(self.c, style[0])
+        if self.c.isascii() and self.c.isalpha() and _bold_italic(self.font):
+            return styled_char(self.c, "bold-italic")
         return styled_char(self.c, "bold") if self.bold else self.c
 
     @property
@@ -944,6 +956,11 @@ class _Char:
         if not self.c.isalpha() or self.bold or char_variant(self.c) not in (None, "italic"):
             return False
         return bool(_REGULAR_FACE.match(self.font.split("+", 1)[-1].replace(" ", "")))
+
+
+@lru_cache(maxsize=1024)
+def _bold_italic(font: str) -> bool:
+    return bool(_BOLD_ITALIC_FONT.search(font.split("+", 1)[-1]))
 
 
 @lru_cache(maxsize=1024)
@@ -2329,18 +2346,30 @@ def _word_lengths(
     lengths = [0] * len(chars)
     maths_word = [False] * len(chars)
     upright = any(k == "L" and not c.italic for k, c in zip(classes, chars, strict=True))
+    longest = _longest_italic_run(chars, classes, script)
     if not upright and any(c.c in _ROW_RELATIONS for c in chars):
-        upright = _longest_italic_run(chars, classes, script) <= 3
+        upright = longest <= 3
+    # An italic sentence with a function name in it ("... for all 1 <= k <= K", log(n) upright)
+    # has italic words, not variables: a short English word beside a longer italic one is text.
+    italic_text = longest > 3
     i = 0
     while i < len(chars):
         if classes[i] != "L":
             i += 1
             continue
         j = i
-        while j < len(chars) and classes[j] == "L" and script[j] == script[i]:
+        while (
+            j < len(chars)
+            and classes[j] == "L"
+            and script[j] == script[i]
+            # TeX sets "ln" upright and the variable after it in italic: two words, not one
+            and (not _TEX_MADE or chars[j].italic == chars[i].italic)
+        ):
             j += 1
         italic_variables = upright and j - i <= 3 and all(c.italic for c in chars[i:j])
         word = "".join(c.c for c in chars[i:j]).lower()
+        if italic_variables and italic_text and j - i > 1 and word in hyphens.words():
+            italic_variables = False
         for k in range(i, j):
             lengths[k] = 1 if italic_variables else j - i
             maths_word[k] = word in _MATH_WORDS
@@ -2468,6 +2497,24 @@ def _script_glyphs(
     return raw, kinds
 
 
+def _power_of_ten(chars: list[_Char], last: int, script: int) -> bool:
+    """Is the raised glyph at `script` the exponent of "10", whose last digit is at `last`
+    ($10^{-6}$, $6 \\times 10^3$)? In a TeX paper that is maths, not the unit exponent of "cm3"."""
+    if not _TEX_MADE or chars[last].c != "0" or last < 1 or chars[last - 1].c != "1":
+        return False
+    before = chars[last - 2].c if last >= 2 else " "
+    if before.isalnum() or before in ".,":
+        return False  # "210", "0.10": not the number ten
+    return chars[script].baseline < chars[last].baseline - 0.2 * chars[last].size
+
+
+def _bold_variable(chars: list[_Char], at: int) -> bool:
+    """Is the glyph at `at` a lone bold Latin letter, a vector in a text font (`\\mathbf{v}_2` set
+    in Times Bold)? Its script is an index, not the count of "H2O"."""
+    base = chars[at]
+    return _TEX_MADE and base.bold and base.c.isalpha() and (at == 0 or chars[at - 1].blank)
+
+
 def _script_base(chars: list[_Char], info: _CharInfo, start: int, end: int, size: float) -> bool:
     """Does the group of script glyphs `chars[start:end]` belong to upright text?"""
     reach = SCRIPT_BASE_GAP * size
@@ -2476,7 +2523,11 @@ def _script_base(chars: list[_Char], info: _CharInfo, start: int, end: int, size
         before -= 1  # an earlier script of the same word
     if before >= 0 and not chars[before].blank and chars[start].x0 - chars[before].x1 <= reach:
         base = chars[before]
-        if _text_char(base):
+        if (
+            _text_char(base)
+            and not _bold_variable(chars, before)
+            and not _power_of_ten(chars, before, start)
+        ):
             return True
         if base.c in ")]":
             return _bracket_base(chars, info, before)
@@ -2798,9 +2849,16 @@ def _inline_runs(
                 and chars[i - 1].c.isdigit()
                 and chars[i + 1].c.isdigit()
             )
-            inside = between_digits or (c == "," and depth > 0)
+            inside = (
+                between_digits
+                or (c == "," and (depth > 0 or _ellipsis_comma(chars, i)))
+                or (c in _ELLIPSIS_CHARS and _in_ellipsis(chars, i))
+                or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
+            )
             accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
-            if chars[i].blank and _between_formulas(chars, i):
+            if chars[i].blank and (
+                _between_formulas(chars, i) or _word_space_between_operands(chars, info, i)
+            ):
                 break
             if info.mathy(i) or chars[i].blank or inside or accent:
                 i += 1
@@ -2811,7 +2869,28 @@ def _inline_runs(
             reasons = _inline_evidence(chars, info, start, end, kinds)
             if reasons:
                 runs.append((start, end, reasons))
-    return _with_chemistry(row, kinds, _with_nuclides(row, kinds, runs))
+    return _with_chemistry(row, kinds, _with_nuclides(row, kinds, _join_signatures(chars, runs)))
+
+
+_SIGNATURE_ARROWS = frozenset("\u2192\u21a6\u27f6\u27fc\u2208\u2282\u2286")
+
+
+def _join_signatures(
+    chars: list[_Char], runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """The maps "H : R^d -> R^p" and "f : A -> B" are one formula: two runs with only a colon
+    (and spaces) between them, the second holding an arrow or a membership sign, are joined.
+    A colon after a word ("Note: x = 1") is not between two runs."""
+    joined: list[tuple[int, int, list[str]]] = []
+    for run in runs:
+        if joined:
+            start, end, reasons = joined[-1]
+            between = [c.c for c in chars[end : run[0]] if not c.blank]
+            if between == [":"] and any(c.c in _SIGNATURE_ARROWS for c in chars[run[0] : run[1]]):
+                joined[-1] = (start, run[1], [*reasons, *(r for r in run[2] if r not in reasons)])
+                continue
+        joined.append(run)
+    return joined
 
 
 NUCLIDE_REASON = "nuclide with numbers before its symbol"
@@ -3009,6 +3088,79 @@ def _reaction_row(row: _Row, info: _CharInfo) -> bool:
     return all(ch in ",.;:" for ch in outside)
 
 
+# TeX sets nothing between two operands of a formula ("f(x) (y)" has no space), so a visible
+# gap there is a word space of the sentence, and the formula ends before it: "eps(k) (i = 1)" is
+# two formulas, as the author typed them. A thin space ("dx \\, dy", 0.17 em) is narrower.
+WORD_SPACE = 0.25  # x font size: the narrowest gap that is a word space
+_OPERAND_END = frozenset(")]}'\u2032!\u221e")
+_OPERAND_START = frozenset("([{\u2202\u2207\u221a\u222b\u2211\u220f\u221e")
+
+
+def _word_space_between_operands(chars: list[_Char], info: _CharInfo, i: int) -> bool:
+    """Is the blank at `i` a word space between the end of one operand and the start of another?"""
+    if not _TEX_MADE:
+        return False
+    before = next((k for k in range(i - 1, -1, -1) if not chars[k].blank), None)
+    after = next((k for k in range(i + 1, len(chars)) if not chars[k].blank), None)
+    if before is None or after is None or info.script[before] or info.script[after]:
+        return False
+    a, b = chars[before], chars[after]
+    if a.c.isdigit() and b.c.isalpha():
+        return False  # "8.5 m/s": a number and its unit are one quantity
+    ends = a.c.isalnum() or a.c in _OPERAND_END
+    starts = b.c.isalnum() or b.c in _OPERAND_START
+    return ends and starts and b.x0 - a.x1 >= WORD_SPACE * max(a.size, b.size)
+
+
+_ELLIPSES = frozenset("\u2026\u22ef\u22ee\u22f1")
+_ELLIPSIS_CHARS = _ELLIPSES | frozenset(".\u00b7")
+
+
+def _in_ellipsis(chars: list[_Char], i: int) -> bool:
+    """Is the glyph at `i` one of an ellipsis: a single ellipsis character, or a dot (or a
+    centred dot) in a group of three, set side by side, with a comma on one side of the group?"""
+    if chars[i].c in _ELLIPSES:
+        return True
+    lo = hi = i
+    while (lo > 0 and chars[lo - 1].c in ".\u00b7") or (
+        lo > 1 and chars[lo - 1].blank and chars[lo - 2].c in ".\u00b7"
+    ):
+        lo -= 1
+    while (hi + 1 < len(chars) and chars[hi + 1].c in ".\u00b7") or (
+        hi + 2 < len(chars) and chars[hi + 1].blank and chars[hi + 2].c in ".\u00b7"
+    ):
+        hi += 1
+    group = [c for c in chars[lo : hi + 1] if not c.blank]
+    if len(group) != 3:
+        return False
+    before = next((chars[k].c for k in range(lo - 1, -1, -1) if not chars[k].blank), "")
+    after = next((chars[k].c for k in range(hi + 1, len(chars)) if not chars[k].blank), "")
+    return before == "," or after == ","
+
+
+def _ellipsis_comma(chars: list[_Char], i: int) -> bool:
+    """Is the comma at `i` next to an ellipsis ("i = 1, ..., S", "1, 2, ..., n")? Authors type
+    such a list as one formula; a bare comma between two formulas ends the first."""
+
+    def dots(indexes: Iterable[int]) -> bool:
+        seen = 0
+        for k in indexes:
+            if chars[k].blank:
+                if seen:
+                    break
+                continue
+            if chars[k].c in _ELLIPSES:
+                return True
+            if chars[k].c not in ".\u00b7":
+                break
+            seen += 1
+        return seen >= 3 or (seen > 0 and any(chars[k].c in "\u00b7" for k in indexes))
+
+    ahead = dots(range(i + 1, min(len(chars), i + 8)))
+    behind = dots(range(i - 1, max(-1, i - 8), -1))
+    return ahead or behind
+
+
 def _between_formulas(chars: list[_Char], i: int) -> bool:
     """Is the blank at `i` the space the page's text puts between two formulas?
 
@@ -3066,7 +3218,56 @@ def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tupl
             else:
                 end -= 1
             changed = True
+        elif _TEX_MADE and end - start > 1 and text[-1] in "([{":
+            end -= 1  # "K (see below)": the run never ends with a bracket it opens
+            changed = True
+        elif _TEX_MADE and end - start > 2 and _sentence_parentheses(text):
+            start, end = start + 1, end - 1  # "(x = 0.9)": the pair is the sentence's
+            changed = True
+        elif _TEX_MADE and (cut := _tail_outside_maths(chars, info, start, end)) is not None:
+            end = cut  # "t = 915 s", "x = 5 [8]": a unit and a citation are text
+            changed = True
     return start, end
+
+
+def _sentence_parentheses(text: str) -> bool:
+    """Does one pair of parentheses enclose the whole run, with no comma at its top level?
+    A tuple, "(a, b)", is maths; "(x = 0.9)" is a formula in a parenthesis of the sentence."""
+    if text[0] != "(" or text[-1] != ")":
+        return False
+    depth = 0
+    for k, c in enumerate(text):
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+            if depth == 0 and k < len(text) - 1:
+                return False  # "(a + b)(c + d)", "(x + 1)^2": the first pair closes early
+        elif c == "," and depth == 1:
+            return False
+    return depth == 0
+
+
+_CITATION_TAIL = re.compile(r"\[\d(?:[\d,\u2013\-\s]*\d)?\]$")
+
+
+def _tail_outside_maths(chars: list[_Char], info: _CharInfo, start: int, end: int) -> int | None:
+    """Where the run should end, when it ends in what the author writes outside the dollar
+    signs: the upright unit of a number ("915 s", "9.8 m"), or a numbered citation ("[8]")
+    after a space. None when it ends in neither."""
+    text = "".join(c.c for c in chars[start:end])
+    cite = _CITATION_TAIL.search(text)
+    if cite is not None and cite.start() > 0 and text[cite.start() - 1].isspace():
+        return start + cite.start()
+    last = end - 1
+    if not (chars[last].c.isalpha() and info.classes[last] == "L" and not chars[last].italic):
+        return None
+    if info.script[last] or chars[last].math or last - 1 < start or not chars[last - 1].blank:
+        return None
+    back = next((k for k in range(last - 1, start - 1, -1) if not chars[k].blank), None)
+    if back is None or not chars[back].c.isdigit():
+        return None
+    return back + 1
 
 
 def _article(chars: list[_Char], info: _CharInfo, start: int, end: int, blank: int) -> bool:
@@ -3173,6 +3374,17 @@ def _inline_evidence(
         if own[i] is None and own[i + 1] is None
     ):
         return ["signed number"]
+    if _italic_variables(chars, info, start, end, own):
+        return ["italic variable in prose"]
+    if any(
+        chars[k].c == "0"
+        and info.script[k + 1]
+        and own[k + 1] is None
+        and _power_of_ten(chars, k, k + 1)
+        for k in range(start, end - 1)
+        if own[k] is None
+    ):
+        return ["power of ten"]
     text = "".join(chars[i].c for i in range(start, end))
     if _MARKUP.search(text):
         return []  # "<a><b/></a>" in a paragraph about XML is not a comparison
@@ -3182,6 +3394,71 @@ def _inline_evidence(
             if any(c.isalnum() for c in left) and any(c.isalnum() for c in right):
                 return ["relation between operands"]
     return []
+
+
+# A run of italic letters in upright prose is a variable (`S`, `N_i`, `K(t)`): LaTeX sets the Latin
+# letters of a formula in the text family's italic when the maths font only has the Greek and the
+# symbols (mathptmx, mathpazo, Charter, newtx), so no glyph is in a maths font. Emphasis is words:
+# a group of more than three letters, a short English word ("not"), a whole italic phrase, or a
+# label ("(a)") is text.
+_ITALIC_GROUP_LETTERS = 3
+_LABEL_RUN = re.compile(r"^\(?[A-Za-z]\)$|^[A-Za-z]\)$")  # "(a)", "a)"
+_FIGURE_PART = re.compile(r"^\d+\([A-Za-z](?:[,\u2013-][A-Za-z])*\)$")  # "6(a)", "5(d,e)"
+
+
+def _italic_variables(
+    chars: list[_Char],
+    info: _CharInfo,
+    start: int,
+    end: int,
+    own: Sequence[ScriptKind | None],
+) -> bool:
+    """Is the run `chars[start:end]` made of italic variables standing in upright prose?"""
+    if not _TEX_MADE:
+        return False
+    # The letters of a maths word ("ln" in "ln X") are upright and say nothing against the
+    # italic of the variables beside them; a run of nothing but them is not evidence.
+    letters = [
+        i
+        for i in range(start, end)
+        if own[i] is None and info.classes[i] == "L" and not info.maths_words[i]
+    ]
+    if not letters or not all(chars[i].italic for i in letters):
+        return False
+    row_letters = [c for c in chars if c.c.isalpha()]
+    if not row_letters or sum(c.italic for c in row_letters) * 2 > len(row_letters):
+        return False  # an italic phrase: its single letters are words ("a", "I")
+    group: list[int] = []
+    for i in [*letters, -1]:
+        if group and (i < 0 or i != group[-1] + 1 or info.script[i] != info.script[group[0]]):
+            word = "".join(chars[k].c for k in group).lower()
+            if len(group) > _ITALIC_GROUP_LETTERS or (
+                len(group) > 1 and not info.script[group[0]] and word in hyphens.words()
+            ):
+                return False
+            group = []
+        if i >= 0:
+            group.append(i)
+    for i in letters:  # "-49 m": a number, a space and an italic letter is a quantity
+        if i > start and chars[i - 1].blank and not chars[i].c.isdigit():
+            back = next((k for k in range(i - 1, start - 1, -1) if not chars[k].blank), None)
+            if back is not None and chars[back].c.isdigit() and not info.script[back]:
+                return False
+    before = next((k for k in range(start - 1, -1, -1) if not chars[k].blank), None)
+    after = next((k for k in range(end, len(chars)) if not chars[k].blank), None)
+    if before is not None and chars[before].c.isdigit() and not info.script[before]:
+        return False  # "-49 m", a number, a space and an italic letter: a quantity with its unit
+    if any(k is not None and chars[k].c.isalpha() and chars[k].italic for k in (before, after)):
+        return False  # the edge of a longer italic stretch
+    text = "".join(c.c for c in chars[start:end] if not c.blank)
+    if (
+        before is not None
+        and after is not None
+        and chars[before].c == "("
+        and chars[after].c == ")"
+    ):
+        return False  # the run was trimmed out of "(a)": a label
+    return not (_LABEL_RUN.match(text) or _FIGURE_PART.match(text))  # "(a) Use", "Fig. 6(a)"
 
 
 # ============================================================================ bold letters
@@ -5130,6 +5407,9 @@ class _Figure:
     paths: int = 0  # vector paths in it
     labels: list[_Row] = field(default_factory=list)
     caption: str | None = None
+    # The caption cut into text and inline maths (`_paragraph_pieces`), when it has any maths.
+    caption_pieces: list[str | _Inline] | None = None
+    caption_size: float | None = None
     xref: int = 0  # the image of a figure that is one raster image (0: inline, or several)
     flat_scripts: bool = False  # its caption has raised or lowered text, written flat
     equation: bool = False  # a picture of an equation (`_equation_pictures`)
@@ -6226,6 +6506,7 @@ class _Block:
     score: float | None = None
     reasons: list[str] = field(default_factory=list)
     caption: str | None = None
+    caption_pieces: list[str | _Inline] | None = None  # figures: the caption's text and maths
     marker: _Marker | None = None  # list items: the marker of the first row
     origin: float = 0.0  # list items: left edge of their column's text (`_column_origins`)
     label: str | None = None  # display equations: the equation number beside them
@@ -7083,6 +7364,10 @@ def _attach_captions(blocks: list[_Block], figures: list[_Figure]) -> None:
         figures[f_index].flat_scripts = any(
             kind for row in blocks[c_index].rows for kind in _script_kinds(row)
         )
+        pieces = _paragraph_pieces(blocks[c_index])
+        if any(isinstance(piece, _Inline) for piece in pieces):
+            figures[f_index].caption_pieces = pieces
+            figures[f_index].caption_size = blocks[c_index].font_size
         used_captions.add(c_index)
     for index, block in enumerate(blocks):
         if block.kind == "caption":
@@ -7367,6 +7652,8 @@ def _page_blocks(
                 figure.bbox,
                 text=labels or None,
                 caption=figure.caption,
+                caption_pieces=figure.caption_pieces,
+                font_size=figure.caption_size,
                 reasons=figure.reasons,
                 flat_scripts=figure.flat_scripts,
             )
@@ -8000,6 +8287,8 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any
     types: dict[int, page_type.PageTypeResult] = {}
     budget = page_type.InkBudget()
     producer = page_type.producer_hint(doc)
+    global _TEX_MADE
+    _TEX_MADE = producer == "tex"
     for number in selected:
         frags[number], paths[number], types[number] = _read_page(doc[number], budget, producer)
         if _kept_whole(types[number]):
@@ -8487,28 +8776,25 @@ def _to_elements(
                 )
                 for child_id, inline in children:
                     elements.append(
-                        Element(
-                            id=child_id,
-                            kind=Kind.EQUATION,
-                            page=page.number,
-                            bbox=_rounded(inline.bbox),
-                            order=len(elements),
-                            text=inline.text or None,  # None: a picture, no text layer
-                            font_size=inline.font_size,
-                            score=inline.score,
-                            reasons=inline.reasons,
-                            display="inline",
-                            parent_id=element_id,
-                            regular_letters=inline.regular,
-                            page_latex=inline.page_latex,
-                            page_status=inline.page_status,
-                        )
+                        _inline_element(child_id, inline, page.number, element_id, elements)
                     )
                 continue
             kind = Kind(block.kind)
             heading_text, heading_runs = (
                 script_marks.split(block.marked) if block.marked else (None, [])
             )
+            caption_children: list[tuple[str, _Inline]] = []
+            caption_marked = None
+            if kind is Kind.FIGURE and block.caption_pieces:
+                parts = []
+                for piece in block.caption_pieces:
+                    if isinstance(piece, _Inline):
+                        child_id = next(ids)
+                        caption_children.append((child_id, piece))
+                        parts.append(inline_marker(child_id))
+                    else:
+                        parts.append(piece)
+                caption_marked = " ".join(script_marks.strip_marks("".join(parts)).split())
             elements.append(
                 Element(
                     id=element_id,
@@ -8525,13 +8811,40 @@ def _to_elements(
                     display="block" if kind == Kind.EQUATION else None,
                     equation_label=block.label if kind == Kind.EQUATION else None,
                     caption=block.caption,
+                    caption_marked=caption_marked,
                     regular_letters=block.regular if kind == Kind.EQUATION else None,
                     page_latex=block.page_latex if kind == Kind.EQUATION else None,
                     page_status=block.page_status if kind == Kind.EQUATION else None,
                     table=block.table if kind == Kind.TABLE else None,
                 )
             )
+            for child_id, inline in caption_children:
+                elements.append(
+                    _inline_element(child_id, inline, page.number, element_id, elements)
+                )
     return elements
+
+
+def _inline_element(
+    child_id: str, inline: _Inline, page: int, parent_id: str, elements: list[Element]
+) -> Element:
+    """The equation element of an inline formula of `parent_id` (a paragraph or a caption)."""
+    return Element(
+        id=child_id,
+        kind=Kind.EQUATION,
+        page=page,
+        bbox=_rounded(inline.bbox),
+        order=len(elements),
+        text=inline.text or None,  # None: a picture, no text layer
+        font_size=inline.font_size,
+        score=inline.score,
+        reasons=inline.reasons,
+        display="inline",
+        parent_id=parent_id,
+        regular_letters=inline.regular,
+        page_latex=inline.page_latex,
+        page_status=inline.page_status,
+    )
 
 
 # ============================================================================ glyphs

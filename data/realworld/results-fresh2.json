@@ -1,0 +1,888 @@
+{
+ "part": "fresh2",
+ "arms": {
+  "ReadableSTEM": {
+   "exact_lenient (primary)": {
+    "point": 0.6259914582062233,
+    "low": 0.5197454075059589,
+    "high": 0.7410927799288128
+   },
+   "symbols, credited (secondary)": {
+    "point": 0.6638194020744357,
+    "low": 0.565508836352681,
+    "high": 0.7654840629970101
+   },
+   "detection recall": {
+    "point": 0.762660158633313,
+    "low": 0.6720771989702947,
+    "high": 0.8525265696351277
+   },
+   "detection precision": {
+    "point": 0.8662508662508662,
+    "low": 0.8007189475790316,
+    "high": 0.9351851851851852
+   },
+   "wrong, not asked, per 100 gold": {
+    "point": 8.419768151311775,
+    "low": 5.838865280894987,
+    "high": 10.832894673722565
+   },
+   "cost per PDF page (USD)": {
+    "point": 0.03900655321428572,
+    "low": 0.02548561059734449,
+    "high": 0.0557985606724285
+   },
+   "flag recall (symbols-wrong aligned equations that were a decision)": {
+    "point": 0.449438202247191,
+    "low": 0.2999858757062148,
+    "high": 0.5988715671168313
+   },
+   "flag precision (decisions on aligned equations that were symbols-wrong)": {
+    "point": 0.5063291139240507,
+    "low": 0.37755102040816324,
+    "high": 0.6020408163265306
+   },
+   "required decisions per PDF page, all kinds": {
+    "point": 4.285714285714286,
+    "low": 2.7259926543577526,
+    "high": 6.166666666666667
+   },
+   "  of which on an aligned equation": {
+    "point": 2.257142857142857,
+    "low": 1.5142757936507938,
+    "high": 3.0757867132867127
+   }
+  },
+  "Chatbot, Opus": {
+   "exact_lenient (primary)": {
+    "point": 0.6815131177547284,
+    "low": 0.589587235071711,
+    "high": 0.7824773864008729
+   },
+   "symbols, credited (secondary)": {
+    "point": 0.7272727272727273,
+    "low": 0.632696454275002,
+    "high": 0.819822408615512
+   },
+   "detection recall": {
+    "point": 0.8181818181818182,
+    "low": 0.7365283442362835,
+    "high": 0.8976028298344396
+   },
+   "detection precision": {
+    "point": 0.8481973434535104,
+    "low": 0.7836020347480047,
+    "high": 0.9113932609272429
+   },
+   "wrong, not asked, per 100 gold": {
+    "point": 13.666870042708968,
+    "low": 8.92215575078656,
+    "high": 18.004915045428877
+   },
+   "cost per PDF page (USD)": {
+    "point": 0.08618982857142858,
+    "low": 0.07279053069105693,
+    "high": 0.10335415793650794
+   },
+   "flag recall (symbols-wrong aligned equations that were a decision)": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   },
+   "flag precision (decisions on aligned equations that were symbols-wrong)": {
+    "point": null,
+    "low": null,
+    "high": null
+   },
+   "required decisions per PDF page, all kinds": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   },
+   "  of which on an aligned equation": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   }
+  },
+  "Chatbot, Haiku": {
+   "exact_lenient (primary)": {
+    "point": 0.6217205613178768,
+    "low": 0.48595343477784636,
+    "high": 0.7507136190899635
+   },
+   "symbols, credited (secondary)": {
+    "point": 0.6577181208053692,
+    "low": 0.5144251487415452,
+    "high": 0.7906242878754511
+   },
+   "detection recall": {
+    "point": 0.7846247712019524,
+    "low": 0.6368179624825605,
+    "high": 0.91128465062507
+   },
+   "detection precision": {
+    "point": 0.9037245256500351,
+    "low": 0.8644176535367722,
+    "high": 0.9386984914893243
+   },
+   "wrong, not asked, per 100 gold": {
+    "point": 16.290420988407565,
+    "low": 12.130893730701176,
+    "high": 20.299540733740503
+   },
+   "cost per PDF page (USD)": {
+    "point": 0.002254928571428572,
+    "low": 0.001892857567799847,
+    "high": 0.002724679003267974
+   },
+   "flag recall (symbols-wrong aligned equations that were a decision)": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   },
+   "flag precision (decisions on aligned equations that were symbols-wrong)": {
+    "point": null,
+    "low": null,
+    "high": null
+   },
+   "required decisions per PDF page, all kinds": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   },
+   "  of which on an aligned equation": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   }
+  },
+  "RS before": {
+   "exact_lenient (primary)": {
+    "point": 0.5576571079926784,
+    "low": 0.45430088910731836,
+    "high": 0.672102179746884
+   },
+   "symbols, credited (secondary)": {
+    "point": 0.5960951799877975,
+    "low": 0.49941149322519834,
+    "high": 0.7000841940909358
+   },
+   "detection recall": {
+    "point": 0.736424649176327,
+    "low": 0.630741017699289,
+    "high": 0.8371845263346438
+   },
+   "detection precision": {
+    "point": 0.8797376093294461,
+    "low": 0.8278799513255561,
+    "high": 0.9358033385498173
+   },
+   "wrong, not asked, per 100 gold": {
+    "point": 9.762050030506407,
+    "low": 5.9360045662100465,
+    "high": 14.199905433993449
+   },
+   "cost per PDF page (USD)": {
+    "point": 0.03891302035714286,
+    "low": 0.02572977071566902,
+    "high": 0.055453386626564544
+   },
+   "flag recall (symbols-wrong aligned equations that were a decision)": {
+    "point": 0.5183673469387755,
+    "low": 0.3721664032512983,
+    "high": 0.6844937731041165
+   },
+   "flag precision (decisions on aligned equations that were symbols-wrong)": {
+    "point": 0.635,
+    "low": 0.5389600668792286,
+    "high": 0.7244934930493936
+   },
+   "required decisions per PDF page, all kinds": {
+    "point": 4.928571428571429,
+    "low": 3.3478109903381648,
+    "high": 6.712126400996263
+   },
+   "  of which on an aligned equation": {
+    "point": 2.857142857142857,
+    "low": 1.927509590792839,
+    "high": 3.8
+   }
+  }
+ },
+ "paired": [
+  {
+   "other": "Chatbot, Opus",
+   "metric": "exact_lenient (primary)",
+   "papers": 15,
+   "estimate": -0.05552165954850519,
+   "low": -0.10324833219877466,
+   "high": -0.0019357456046082127,
+   "low_975": -0.10916291498457142,
+   "high_975": 0.006647713771682757,
+   "sign_flip_p": 0.115234375
+  },
+  {
+   "other": "Chatbot, Opus",
+   "metric": "symbols, credited (secondary)",
+   "papers": 15,
+   "estimate": -0.06345332519829161,
+   "low": -0.1101442055294381,
+   "high": -0.010826832027622663,
+   "low_975": -0.11597165965688272,
+   "high_975": -0.0025014660035339946,
+   "sign_flip_p": 0.0770263671875
+  },
+  {
+   "other": "Chatbot, Opus",
+   "metric": "detection recall",
+   "papers": 15,
+   "estimate": -0.05552165954850519,
+   "low": -0.11351813214234062,
+   "high": 0.009133167180664124,
+   "low_975": -0.1206526072718728,
+   "high_975": 0.01990408302661649,
+   "sign_flip_p": 0.2352294921875
+  },
+  {
+   "other": "Chatbot, Opus",
+   "metric": "wrong, not asked, per 100 gold",
+   "papers": 15,
+   "estimate": -5.247101891397193,
+   "low": -8.939287752837386,
+   "high": -0.8447999041269906,
+   "low_975": -9.416643582312885,
+   "high_975": -0.13713964113456245,
+   "sign_flip_p": 0.048828125
+  },
+  {
+   "other": "Chatbot, Haiku",
+   "metric": "exact_lenient (primary)",
+   "papers": 15,
+   "estimate": 0.004270896888346476,
+   "low": -0.058167720075584774,
+   "high": 0.08854138843902884,
+   "low_975": -0.06611646208070004,
+   "high_975": 0.1019760834926705,
+   "sign_flip_p": 0.7757568359375
+  },
+  {
+   "other": "Chatbot, Haiku",
+   "metric": "symbols, credited (secondary)",
+   "papers": 15,
+   "estimate": 0.006101281269066505,
+   "low": -0.06501216664456703,
+   "high": 0.09137453497498957,
+   "low_975": -0.07409855118786693,
+   "high_975": 0.10543587872738716,
+   "sign_flip_p": 0.8795166015625
+  },
+  {
+   "other": "Chatbot, Haiku",
+   "metric": "detection recall",
+   "papers": 15,
+   "estimate": -0.021964612568639352,
+   "low": -0.1040544775795942,
+   "high": 0.07964695971405798,
+   "low_975": -0.1142869674185464,
+   "high_975": 0.09645922874379528,
+   "sign_flip_p": 0.8145751953125
+  },
+  {
+   "other": "Chatbot, Haiku",
+   "metric": "wrong, not asked, per 100 gold",
+   "papers": 15,
+   "estimate": -7.87065283709579,
+   "low": -10.6497117339813,
+   "high": -4.819256074577642,
+   "low_975": -11.15065329461543,
+   "high_975": -4.326895088029068,
+   "sign_flip_p": 0.00048828125
+  },
+  {
+   "other": "RS before",
+   "metric": "exact_lenient (primary)",
+   "papers": 15,
+   "estimate": 0.06833435021354484,
+   "low": 0.03456171454040418,
+   "high": 0.10938687059337963,
+   "low_975": 0.03113755198536649,
+   "high_975": 0.11620077993249774,
+   "sign_flip_p": 0.001708984375
+  },
+  {
+   "other": "RS before",
+   "metric": "symbols, credited (secondary)",
+   "papers": 15,
+   "estimate": 0.0677242220866382,
+   "low": 0.03410387661269744,
+   "high": 0.10847211854081644,
+   "low_975": 0.030502318113950343,
+   "high_975": 0.11488930212502182,
+   "sign_flip_p": 0.001953125
+  },
+  {
+   "other": "RS before",
+   "metric": "detection recall",
+   "papers": 15,
+   "estimate": 0.02623550945698605,
+   "low": -0.013656591701284422,
+   "high": 0.06841588754480359,
+   "low_975": -0.019686195166580645,
+   "high_975": 0.07533403426791284,
+   "sign_flip_p": 0.2578125
+  },
+  {
+   "other": "RS before",
+   "metric": "wrong, not asked, per 100 gold",
+   "papers": 15,
+   "estimate": -1.3422818791946316,
+   "low": -4.39501975766534,
+   "high": 1.148731293831795,
+   "low_975": -4.909482758620687,
+   "high_975": 1.510989010989011,
+   "sign_flip_p": 0.6337890625
+  }
+ ],
+ "buckets": {
+  "ReadableSTEM": {
+   "bucket correct": 0.6259914582062233,
+   "bucket scorer": 0.028065893837705917,
+   "bucket span": 0.051250762660158634,
+   "bucket recognition": 0.04820012202562538,
+   "bucket no_proposal": 0.009151921903599756,
+   "bucket undetected": 0.237339841366687,
+   "  of which credited split/merged": 0.005491153142159854
+  },
+  "Chatbot, Opus": {
+   "bucket correct": 0.6815131177547284,
+   "bucket scorer": 0.043319097010372176,
+   "bucket span": 0.01586333129957291,
+   "bucket recognition": 0.07565588773642465,
+   "bucket no_proposal": 0.0018303843807199512,
+   "bucket undetected": 0.18181818181818182,
+   "  of which credited split/merged": 0.0012202562538133007
+  },
+  "Chatbot, Haiku": {
+   "bucket correct": 0.6217205613178768,
+   "bucket scorer": 0.03355704697986577,
+   "bucket span": 0.010982306284319707,
+   "bucket recognition": 0.11714460036607688,
+   "bucket no_proposal": 0.0012202562538133007,
+   "bucket undetected": 0.2153752287980476,
+   "  of which credited split/merged": 0.0006101281269066504
+  },
+  "RS before": {
+   "bucket correct": 0.5576571079926784,
+   "bucket scorer": 0.02928615009151922,
+   "bucket span": 0.06833435021354485,
+   "bucket recognition": 0.0701647345942648,
+   "bucket no_proposal": 0.010982306284319707,
+   "bucket undetected": 0.26357535082367295,
+   "  of which credited split/merged": 0.005491153142159854
+  }
+ },
+ "strata": {
+  "ReadableSTEM": {
+   "display": {
+    "inline": [
+     1555,
+     981,
+     1173
+    ],
+    "block": [
+     84,
+     45,
+     77
+    ]
+   },
+   "length": {
+    "longer": [
+     1065,
+     661,
+     846
+    ],
+    "single symbol": [
+     574,
+     365,
+     404
+    ]
+   },
+   "paper style": {
+    "tutorial": [
+     943,
+     602,
+     739
+    ],
+    "research": [
+     696,
+     424,
+     511
+    ]
+   },
+   "environment": {
+    "inline": [
+     1555,
+     981,
+     1173
+    ],
+    "single-line display": [
+     45,
+     26,
+     44
+    ],
+    "align-like": [
+     39,
+     19,
+     33
+    ]
+   },
+   "typed in": {
+    "text": [
+     1310,
+     947,
+     1130
+    ],
+    "figure": [
+     48,
+     18,
+     24
+    ],
+    "table": [
+     196,
+     32,
+     45
+    ],
+    "algorithm": [
+     50,
+     28,
+     38
+    ],
+    "sidewaystable": [
+     35,
+     1,
+     13
+    ]
+   }
+  },
+  "Chatbot, Opus": {
+   "display": {
+    "inline": [
+     1555,
+     1074,
+     1268
+    ],
+    "block": [
+     84,
+     43,
+     73
+    ]
+   },
+   "length": {
+    "longer": [
+     1065,
+     706,
+     918
+    ],
+    "single symbol": [
+     574,
+     411,
+     423
+    ]
+   },
+   "paper style": {
+    "tutorial": [
+     943,
+     687,
+     829
+    ],
+    "research": [
+     696,
+     430,
+     512
+    ]
+   },
+   "environment": {
+    "inline": [
+     1555,
+     1074,
+     1268
+    ],
+    "single-line display": [
+     45,
+     26,
+     41
+    ],
+    "align-like": [
+     39,
+     17,
+     32
+    ]
+   },
+   "typed in": {
+    "text": [
+     1310,
+     965,
+     1128
+    ],
+    "figure": [
+     48,
+     23,
+     30
+    ],
+    "table": [
+     196,
+     84,
+     123
+    ],
+    "algorithm": [
+     50,
+     26,
+     35
+    ],
+    "sidewaystable": [
+     35,
+     19,
+     25
+    ]
+   }
+  },
+  "Chatbot, Haiku": {
+   "display": {
+    "inline": [
+     1555,
+     976,
+     1206
+    ],
+    "block": [
+     84,
+     43,
+     80
+    ]
+   },
+   "length": {
+    "longer": [
+     1065,
+     655,
+     904
+    ],
+    "single symbol": [
+     574,
+     364,
+     382
+    ]
+   },
+   "paper style": {
+    "tutorial": [
+     943,
+     621,
+     779
+    ],
+    "research": [
+     696,
+     398,
+     507
+    ]
+   },
+   "environment": {
+    "inline": [
+     1555,
+     976,
+     1206
+    ],
+    "single-line display": [
+     45,
+     24,
+     45
+    ],
+    "align-like": [
+     39,
+     19,
+     35
+    ]
+   },
+   "typed in": {
+    "text": [
+     1310,
+     906,
+     1121
+    ],
+    "figure": [
+     48,
+     13,
+     13
+    ],
+    "table": [
+     196,
+     63,
+     104
+    ],
+    "algorithm": [
+     50,
+     37,
+     48
+    ],
+    "sidewaystable": [
+     35,
+     0,
+     0
+    ]
+   }
+  },
+  "RS before": {
+   "display": {
+    "inline": [
+     1555,
+     873,
+     1130
+    ],
+    "block": [
+     84,
+     41,
+     77
+    ]
+   },
+   "length": {
+    "longer": [
+     1065,
+     588,
+     845
+    ],
+    "single symbol": [
+     574,
+     326,
+     362
+    ]
+   },
+   "paper style": {
+    "tutorial": [
+     943,
+     537,
+     731
+    ],
+    "research": [
+     696,
+     377,
+     476
+    ]
+   },
+   "environment": {
+    "inline": [
+     1555,
+     873,
+     1130
+    ],
+    "single-line display": [
+     45,
+     24,
+     44
+    ],
+    "align-like": [
+     39,
+     17,
+     33
+    ]
+   },
+   "typed in": {
+    "text": [
+     1310,
+     864,
+     1120
+    ],
+    "figure": [
+     48,
+     5,
+     7
+    ],
+    "table": [
+     196,
+     16,
+     29
+    ],
+    "algorithm": [
+     50,
+     28,
+     38
+    ],
+    "sidewaystable": [
+     35,
+     1,
+     13
+    ]
+   }
+  }
+ },
+ "breakdown": {
+  "ReadableSTEM": {
+   "undetected": {
+    "single symbol in running text": 79,
+    "2 or 3 symbols in running text": 34,
+    "longer inline expression": 72,
+    "typed in a table": 151,
+    "display equation": 7,
+    "typed in a figure": 24,
+    "typed in a sidewaystable": 22
+   },
+   "span": {
+    "cut too short": 59,
+    "cut too long (extra symbols)": 25
+   }
+  },
+  "Chatbot, Opus": {
+   "undetected": {
+    "single symbol in running text": 88,
+    "2 or 3 symbols in running text": 45,
+    "display equation": 11,
+    "typed in a figure": 18,
+    "longer inline expression": 53,
+    "typed in a table": 73,
+    "typed in a sidewaystable": 10
+   },
+   "span": {
+    "cut too short": 11,
+    "cut too long (extra symbols)": 15
+   }
+  },
+  "Chatbot, Haiku": {
+   "undetected": {
+    "single symbol in running text": 97,
+    "typed in a figure": 35,
+    "2 or 3 symbols in running text": 70,
+    "longer inline expression": 20,
+    "display equation": 4,
+    "typed in a table": 92,
+    "typed in a sidewaystable": 35
+   },
+   "span": {
+    "cut too short": 14,
+    "cut too long (extra symbols)": 4
+   }
+  },
+  "RS before": {
+   "undetected": {
+    "single symbol in running text": 101,
+    "2 or 3 symbols in running text": 41,
+    "longer inline expression": 53,
+    "typed in a figure": 41,
+    "typed in a table": 167,
+    "display equation": 7,
+    "typed in a sidewaystable": 22
+   },
+   "span": {
+    "cut too short": 58,
+    "cut too long (extra symbols)": 51,
+    "both": 3
+   }
+  }
+ },
+ "examples": [
+  {
+   "bucket": "recognition",
+   "id": "arxiv/2405.20573/eq-033",
+   "page": 4,
+   "display": "inline",
+   "gold_latex": "\\boldsymbol{\\Theta}^S",
+   "pred_latex": "\\mathbf{\\Theta}^{S}",
+   "pdf_text": "\ud835\udeafS"
+  },
+  {
+   "bucket": "span",
+   "id": "arxiv/2405.15050/eq-121",
+   "page": 9,
+   "display": "inline",
+   "gold_latex": "\\widetilde{V}_{T + 1}^k(\\cdot) \\leftarrow \\frac{1}{1 - \\gamma}",
+   "pred_latex": "\\widetilde{V}_{T+1}^{k}(\\cdot) \\leftarrow \\frac{1}{1-\\gamma}, V_{T+1}^{k}(\\cdot) \\leftarrow \\frac{1}{1-\\gamma}.",
+   "pdf_text": "\ufffdV k T+1(\u00b7) \u2190 1\u22121\u03b3, V kT+1(\u00b7) \u21901 1\u2212\u03b3."
+  },
+  {
+   "bucket": "undetected",
+   "id": "arxiv/2405.15050/eq-087",
+   "page": 5,
+   "display": "inline",
+   "gold_latex": "\\widehat{P}_t(s' | s, a) \\leftarrow N_t(s, a, s')/ N_t(s, a), ~~\\forall (s, a) \\in \\mathcal{S} \\times \\mathcal{A}",
+   "pred_latex": null,
+   "pdf_text": null
+  },
+  {
+   "bucket": "no_proposal",
+   "id": "arxiv/2412.09655/eq-082",
+   "page": 25,
+   "display": "inline",
+   "gold_latex": "i",
+   "pred_latex": null,
+   "pdf_text": "-i"
+  },
+  {
+   "bucket": "scorer",
+   "id": "arxiv/2412.05104/eq-055",
+   "page": 15,
+   "display": "block",
+   "gold_latex": "\\begin{aligned} U^{\\otimes N} \\left| + \\right\\rangle^{\\otimes N} &= U \\left| + \\right\\rangle \\otimes ... \\otimes U \\left| + \\right\\rangle \\\\ &= \\left( \\frac{1}{\\sqrt{2}} ( \\left| 0 \\right\\rangle + e^{i\\varphi} \\left| 1 \\right\\rangle) \\right)^{\\otimes N}. \\end{aligned}",
+   "pred_latex": "\\begin{array}{rcl} U^{\\otimes N} \\left|+\\right\\rangle^{\\otimes N} & = & U \\left|+\\right\\rangle \\otimes ... \\otimes U \\left|+\\right\\rangle \\\\ & = & \\left( \\frac{1}{\\sqrt{2}} \\left( \\left|0\\right\\rangle + e^{i\\varphi} \\left|1\\right\\rangle \\right) \\right)^{\\otimes N}. \\end{array}",
+   "pdf_text": "U \u2297N |+\u27e9\u2297N = U |+\u27e9\u2297... \u2297U |+\u27e9 \ufffd1 \ufffd\u2297N = \u221a2(|0\u27e9+ ei\u03c6 |1\u27e9) ."
+  },
+  {
+   "bucket": "recognition",
+   "id": "arxiv/2407.04005/eq-087",
+   "page": 14,
+   "display": "block",
+   "gold_latex": "\\boldsymbol{c}(\\omega) = \\frac{1}{\\sqrt{2}} \\boldsymbol{C}_1 (\\boldsymbol{\\Gamma}^2_1 + \\omega^2 \\boldsymbol{I})^{-1/2} \\boldsymbol{\\Sigma}_1.\\\\",
+   "pred_latex": "\\boldsymbol{c}(\\omega) = \\frac{1}{\\sqrt{2}}\\boldsymbol{C}_1(\\mathbf{\\Gamma}_1^2 + \\omega^2\\boldsymbol{I})^{-1/2}\\mathbf{\\Sigma}_1.",
+   "pdf_text": "1 \ud835\udc84(\u03c9) = \u221a2\ud835\udc6a1(\ud835\udeaa12 + \u03c92\ud835\udc70)\u22121/2\ud835\udeba1."
+  },
+  {
+   "bucket": "span",
+   "id": "arxiv/2412.09655/eq-011",
+   "page": 9,
+   "display": "inline",
+   "gold_latex": "k",
+   "pred_latex": "k'",
+   "pdf_text": "k"
+  },
+  {
+   "bucket": "undetected",
+   "id": "arxiv/2412.05104/eq-074",
+   "page": 15,
+   "display": "inline",
+   "gold_latex": "\\varphi",
+   "pred_latex": null,
+   "pdf_text": null
+  },
+  {
+   "bucket": "no_proposal",
+   "id": "arxiv/2405.15050/eq-124",
+   "page": 9,
+   "display": "inline",
+   "gold_latex": "\\bm{w}^k_{u + 1} \\leftarrow \\Lambda_k^{-1} \\sum_{\\tau = 1}^{t_k - 1} \\bm\\varphi(s_\\tau, a_\\tau) (V^k_{u + 1}(s_{\\tau + 1}) - \\min_{s'} \\widetilde{V}_{u + 1}^k(s')))",
+   "pred_latex": null,
+   "pdf_text": "\ud835\udc98ku+1 \u2190\u039b\u22121 \u03c4=1 \u03d5(s\u03c4, a\u03c4)(V ku+1(s\u03c4+1) \u2212mins\u2032 \ufffdV ku+1(s\u2032))). \ufffdtk\u22121 k\ufffd"
+  },
+  {
+   "bucket": "scorer",
+   "id": "arxiv/2501.03732/eq-066",
+   "page": 22,
+   "display": "inline",
+   "gold_latex": "D_{\\operatorname{DCLF}}",
+   "pred_latex": "D_{\\text{DCLF}}",
+   "pdf_text": "DDCLF"
+  },
+  {
+   "bucket": "recognition",
+   "id": "arxiv/2405.20573/eq-009",
+   "page": 4,
+   "display": "inline",
+   "gold_latex": "\\boldsymbol{\\Lambda}=\\rm{diag}(\\lambda_1, \\dots, \\lambda_D)",
+   "pred_latex": "\\mathbf{\\Lambda} = \\operatorname{diag}(\\lambda_1, \\ldots, \\lambda_{\\mathrm{D}})",
+   "pdf_text": "\ud835\udeb2 = diag(\u03bb1, . . . , \u03bbD)"
+  },
+  {
+   "bucket": "span",
+   "id": "arxiv/2412.09655/eq-024",
+   "page": 9,
+   "display": "inline",
+   "gold_latex": "\\operatorname{CTCS}(n+1)",
+   "pred_latex": "n+1",
+   "pdf_text": "n + 1"
+  }
+ ]
+}

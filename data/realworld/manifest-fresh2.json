@@ -1,0 +1,319 @@
+{
+ "part": "fresh2",
+ "seed": "realworld-fresh-2026-10-21",
+ "papers": [
+  {
+   "id": "1812.06627",
+   "title": "Extra pearls in graph theory",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:HO",
+   "style": "tutorial",
+   "pages_chosen": [
+    67,
+    74,
+    77,
+    78
+   ],
+   "equations": 91,
+   "display": 0,
+   "pdf_sha256": "884810a1ae7fb2efdad53ab6c86969c6b5c90f8730661851a5a9cd284394d696",
+   "source_sha256": "04ce62d3602f3d649908b7cc4d2008627dee98bf05a4339d8ec5ec032e760653",
+   "extract_pdf_sha256": "896b691695098fab11294413416f0683e064bbb367609b31eceacb26b292ca53",
+   "gold_sha256": "9f0cc77cf9c183c1a6ea4fbb67842711e33ce9b1e34e4076cc41388ebe7ad078"
+  },
+  {
+   "id": "2212.03448",
+   "title": "Geometric Visualizations of Single and Entangled Qubits",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:ed-ph",
+   "style": "tutorial",
+   "pages_chosen": [
+    5,
+    8,
+    11,
+    18
+   ],
+   "equations": 55,
+   "display": 4,
+   "pdf_sha256": "74b435b9902349863d1a7cdd7f203bd1740f07f5c4c6a7f55d5f2f8fd6175656",
+   "source_sha256": "257d0a569b835dea3e3189264b038e77314df7f509dec944a243cc517e12e0d4",
+   "extract_pdf_sha256": "3aff6685fe2e2f86df1905710f184b722b47216028cc76d2b3a6e6635cb1cb7c",
+   "gold_sha256": "affd532dacaa09571b5f7ab1240bb79faad38c8c08efa506fe2717bded4bb14c"
+  },
+  {
+   "id": "2401.05368",
+   "title": "Mathematical intuition, deep learning, and Robbins' problem",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:HO",
+   "style": "research",
+   "pages_chosen": [
+    5,
+    6,
+    9,
+    16,
+    17,
+    28
+   ],
+   "equations": 109,
+   "display": 4,
+   "pdf_sha256": "94d4333b91c361b7cccd519cba4a174fe98d91ecf40d42f17e36a57910d7031e",
+   "source_sha256": "dfa1508b13679d773cb43a5197d6397d3e77fa690d10f064be9a6d2dd07e37a3",
+   "extract_pdf_sha256": "f57af959d3739899d9996d166d7ff163bf28c379a583249f02f35c7b0727c95e",
+   "gold_sha256": "2bdc1826455daa618619bc5bc25fdd5db90f795832422be22e111401d640b052"
+  },
+  {
+   "id": "2403.17966",
+   "title": "A review of Pythagorean triples from both classical and modern viewpoints",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:HO",
+   "style": "tutorial",
+   "pages_chosen": [
+    3,
+    4,
+    5,
+    6,
+    10,
+    11
+   ],
+   "equations": 128,
+   "display": 6,
+   "pdf_sha256": "e2c535c1108acb518219e882f140e256e368f3b436904bc634fcd3f0251f1a1e",
+   "source_sha256": "a2e40f90889d2a7a0642d5454d81acdb245bc6890163c06953e46b7d072acbf3",
+   "extract_pdf_sha256": "7ac68ccae36984830e936e6a793fe7d72fd6a21ede669ac1741ef739fe69a0c0",
+   "gold_sha256": "c9dea397921842853af250c807bccff6aba9d414a9f0bf6e95b422a45f517c1e"
+  },
+  {
+   "id": "2405.15050",
+   "title": "Reinforcement Learning for Infinite-Horizon Average-Reward Linear MDPs via Approximation by Discounted-Reward MDPs",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ML",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    4,
+    5,
+    9,
+    10
+   ],
+   "equations": 178,
+   "display": 5,
+   "pdf_sha256": "2fc9c78f12d7975e4bdb8a50a5da71ae33734d7b8bb7b8278e8096fd52a07963",
+   "source_sha256": "d96adaaad8ef5337bb7b099f3e581038450af6bb6c206e410588cd75c8cce4f7",
+   "extract_pdf_sha256": "1e75dfac4a63548b86cc7f1bf5a73961895009cc0d1e631f616947076ff914ac",
+   "gold_sha256": "61f73bc5e3f803d3de4906970aa16fef1f4a6b82a243eafd7b3cd69e8e7dfa1a"
+  },
+  {
+   "id": "2405.20573",
+   "title": "Enhancing Generative Molecular Design via Uncertainty-guided Fine-tuning of Variational Autoencoders",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "q-bio:q-bio:QM",
+   "style": "research",
+   "pages_chosen": [
+    4,
+    7,
+    8,
+    13
+   ],
+   "equations": 136,
+   "display": 3,
+   "pdf_sha256": "55ee147493c62f5edd9f3aa2e8f66cb45735406c7c45c7741a74cbc4853c2eb3",
+   "source_sha256": "9e642d605b0a882b45c6e8a387b45cd3ad141939953c8c441e79f382bc3b54d0",
+   "extract_pdf_sha256": "32f149efe02af4df6cbc60594d0194aea321347ddd7b6382c95402e5bbc1a501",
+   "gold_sha256": "ac923309969d49eb94722b19836653ac10e6212c2e0806c4ad42f1c1065d9874"
+  },
+  {
+   "id": "2407.04005",
+   "title": "Stochastic Processes: From Classical to Quantum",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:PR",
+   "style": "tutorial",
+   "pages_chosen": [
+    6,
+    13,
+    14,
+    17
+   ],
+   "equations": 129,
+   "display": 21,
+   "pdf_sha256": "41120cc070d92500c1e99104d232e82b3fb958d302203e94b0753df325ee7f41",
+   "source_sha256": "32b033e2073e1e7b8b417d76fce61cbb99268712d4e4788109e35497e7ebeffe",
+   "extract_pdf_sha256": "546ef63ce5ece115d06df6c4ae5fbaf9f0d109133dca46e804fe16bc4a94a4bb",
+   "gold_sha256": "5ab35e1e38d47725a2cd5337293b161ffe09702ed9441686f9b1276de1d07c06"
+  },
+  {
+   "id": "2408.13659",
+   "title": "ReactZyme: A Benchmark for Enzyme-Reaction Prediction",
+   "licence": "CC0 1.0",
+   "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/",
+   "set": "q-bio:q-bio:QM",
+   "style": "research",
+   "pages_chosen": [
+    3,
+    4,
+    7,
+    20
+   ],
+   "equations": 76,
+   "display": 0,
+   "pdf_sha256": "2d02588872ca911b7733522c2605ad2c5c9412322cb0a96b265645f07518bd9f",
+   "source_sha256": "3590a1f2ac731791e9f615d883d09e735afc42809ceeb6890c65dd8200f679d6",
+   "extract_pdf_sha256": "067581872972013c3d706ab369b4cc1c5bce74db49341c69edaa3bcbcb25b8a2",
+   "gold_sha256": "4c5714f3f74cdc8a6ae8283234a3973175dbeb3cb9db2eb0a74f01c18fa7ffa8"
+  },
+  {
+   "id": "2412.05104",
+   "title": "How many lives does Schrödinger's cat have?",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:ed-ph",
+   "style": "tutorial",
+   "pages_chosen": [
+    8,
+    15,
+    16,
+    17,
+    19
+   ],
+   "equations": 187,
+   "display": 23,
+   "pdf_sha256": "eaf0f2f6bd45781ed7936429315a7f2ea9c35541f4b3b3a64d099f555d015a78",
+   "source_sha256": "d203c11850e89e46b9bf157cc4599f4bc344aeb3a4824acf3920b0d2586b0546",
+   "extract_pdf_sha256": "39a7113a323d6f762730479276e598b40fa5a2fa19a4d0df9b3c408563e38670",
+   "gold_sha256": "94b4148f6cb6a8ade85703c57cf48d4ee2175a97c1de4dae9e689ceb1aa5ccab"
+  },
+  {
+   "id": "2412.09655",
+   "title": "The Critical Beta-splitting Random Tree III: The exchangeable partition representation and the fringe tree",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:PR",
+   "style": "tutorial",
+   "pages_chosen": [
+    2,
+    9,
+    24,
+    25,
+    31
+   ],
+   "equations": 102,
+   "display": 8,
+   "pdf_sha256": "5715893ed91a1777297e5233929738e35abe60da0d2f7679f69a97e9b8f6635e",
+   "source_sha256": "19383e5960028e33701e669e8b0789885db046bd66990d293a6a92db54076e7f",
+   "extract_pdf_sha256": "6bfac0e07d1b671bc68f186c0a3da75db32286f7d86b688322cf3f7920eda607",
+   "gold_sha256": "526f2a770b841d6a8fe5e5c9ad8cc799d16aedc7f38e377224b35cb44c64d569"
+  },
+  {
+   "id": "2501.03732",
+   "title": "Goodness-of-fit tests for spatial point processes: A review",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ME",
+   "style": "tutorial",
+   "pages_chosen": [
+    6,
+    22,
+    23,
+    26,
+    28,
+    29
+   ],
+   "equations": 179,
+   "display": 1,
+   "pdf_sha256": "580fce80ebde5d69b8b092b9524bd783d91b1c2047eecd841e649f66b56522a4",
+   "source_sha256": "3ab6ca180544232cd433525e8ba2305031554e0942e12767276a06113c78ee6d",
+   "extract_pdf_sha256": "eabb0e0e9abaf461b39e5ffd54e5a3c103f189b9662cfd7ecff9b558dd00b664",
+   "gold_sha256": "e4d8b459b28570ea9bf43a9f1121599e7309c5280a46357bd516e9526aae9276"
+  },
+  {
+   "id": "2503.02921",
+   "title": "Applications of Entropy in Data Analysis and Machine Learning: A Review",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:PR",
+   "style": "tutorial",
+   "pages_chosen": [
+    6,
+    10,
+    14,
+    15,
+    20
+   ],
+   "equations": 72,
+   "display": 5,
+   "pdf_sha256": "869b94ffcdd028b95416ee989f6855b6e4ab5418cfc92a1b95b7b605d7a10125",
+   "source_sha256": "02743ef173330c4857b77a4125beefc04182babefd353b765e8cbf519bd67004",
+   "extract_pdf_sha256": "bd49fd740547bbf95153c76e3a73f1ce06ee71d94188723bee63db52bcc892f7",
+   "gold_sha256": "3f386891c0332b1d3ae40b4a8950412a8b9c921423d9d1254d06f6ec55e90091"
+  },
+  {
+   "id": "2503.08264",
+   "title": "Massively Parallel Expectation Maximization For Approximate Posteriors",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ML",
+   "style": "research",
+   "pages_chosen": [
+    7,
+    8,
+    9,
+    25
+   ],
+   "equations": 47,
+   "display": 4,
+   "pdf_sha256": "3e4c04f61e158594c069c7710cb760cbe5ed8c80c95e8e0820d5bd869b5cae97",
+   "source_sha256": "c687a2245d87ad73d99ce7c2eb629d5d41f616385da6f1e5ef41607d4ff55495",
+   "extract_pdf_sha256": "779982bf45ac7c6b9343835333aef9d9843310454b114f449b4d669e5c2b3e10",
+   "gold_sha256": "63281657d2addcf78c35df10452d9e6ba03e07bbf2001998f999f7c6fef8d2ee"
+  },
+  {
+   "id": "2504.00755",
+   "title": "Efficient computation of high-dimensional penalized piecewise constant hazard random effects models",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ME",
+   "style": "research",
+   "pages_chosen": [
+    11,
+    15,
+    16,
+    17
+   ],
+   "equations": 81,
+   "display": 0,
+   "pdf_sha256": "bfd948f7b53f81dc7ce3ba30331088d768e28abc4abd66e88fb5d717d0b6d87c",
+   "source_sha256": "d3e09a3e186a9cf61ca6a1c3658875ae1fff84525b3d9a26cc976f62c967d520",
+   "extract_pdf_sha256": "3637b4a6aa61a819539f75aa0df5bfb2cbcd710811992b3f2fce7e3ad1a608d6",
+   "gold_sha256": "a2ecc3c0bac26510623086d7c5ea57135f2af0c09bfa6dee28b5c87ff20cfc33"
+  },
+  {
+   "id": "2504.12173",
+   "title": "Computational Exploration of Inclined Magnetic Fields and Variable Thermal Flux Effects on the Flow of Dusty Hybrid Nanofluid around Stretching/Shrinking Wedge",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:flu-dyn",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    7,
+    8,
+    14
+   ],
+   "equations": 69,
+   "display": 0,
+   "pdf_sha256": "6e700375c3b1878473bde46a39eb0ae834cd24aaf6eee92f47c16c065574f5d6",
+   "source_sha256": "4b825a4a9b21039a53787a75d1b52741fb66470fb44f9d916d51c4447ef875e6",
+   "extract_pdf_sha256": "90d2c299660a7fac80e404145aa0cb06da4fd90a4843fe937fc4943822d18412",
+   "gold_sha256": "c1fa9d2b9951effefd26f1232388c0e5e8dd1353953d2b1426db7d160f562184"
+  }
+ ],
+ "n_papers": 15,
+ "n_equations": 1639,
+ "n_pages": 70
+}

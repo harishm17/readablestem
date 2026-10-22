@@ -248,6 +248,136 @@ def clean_latex(latex: str) -> str:
     return escape_percent_signs(text)
 
 
+_OPEN_PAREN = r"(?:\\left\s*\(|\()"
+_CLOSE_PAREN = r"(?:\\right\s*\)|\))"
+_WRAPPED = re.compile(rf"^{_OPEN_PAREN}(.*?){_CLOSE_PAREN}$", re.S)
+_SPACING = r"(?:\\[,;:! ]|\s|~)*"
+_LEADING_OPEN = re.compile(rf"^{_OPEN_PAREN}{_SPACING}")
+_TRAILING_OPEN = re.compile(rf"{_SPACING}{_OPEN_PAREN}{_SPACING}$")
+_LEADING_CLOSE = re.compile(rf"^{_CLOSE_PAREN}{_SPACING}")
+_TRAILING_CLOSE = re.compile(rf"{_SPACING}{_CLOSE_PAREN}$")
+
+
+def _top_level_comma(text: str) -> bool:
+    depth = 0
+    for c in text:
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif c == "," and depth == 0:
+            return True
+    return False
+
+
+def _encloses(inner: str) -> bool:
+    """Do the brackets of `inner` pair up without going below zero (one pair encloses it)?"""
+    depth = 0
+    for c in inner:
+        depth += c in "([{"
+        depth -= c in ")]}"
+        if depth < 0:
+            return False
+    return depth == 0
+
+
+def drop_neighbour_brackets(latex: str, text_layer: str | None) -> str:
+    r"""`latex` without a parenthesis the run's text layer does not have.
+
+    An inline run's crop is padded by 2 pt, which takes in half of the parenthesis next to the
+    formula ("(x = 0.9)" in a sentence), and the reading then writes `(x = 0.9)`, `x = 0.9\ (`
+    or `x_1)`. The text layer of the run says what the run holds, so a parenthesis at an edge of
+    the reading that has no counterpart there is the sentence's. A pair that encloses the whole
+    reading goes when the text layer has neither; one with a comma at its top level is a tuple
+    and stays; an unmatched one at an edge goes when the text layer has fewer than the reading."""
+    if not text_layer:
+        return latex
+    out = latex.strip()
+    opens_in_text, closes_in_text = text_layer.count("("), text_layer.count(")")
+    if not opens_in_text and not closes_in_text:
+        wrapped = _WRAPPED.match(out)
+        if wrapped and not _top_level_comma(wrapped.group(1)):
+            inner = wrapped.group(1).strip()
+            if inner and _encloses(inner.replace("\\left", "").replace("\\right", "")):
+                return inner
+    for _ in range(2):
+        opens = len(re.findall(_OPEN_PAREN, out))
+        closes = len(re.findall(_CLOSE_PAREN, out))
+        if opens > closes and opens > opens_in_text:
+            trimmed = _TRAILING_OPEN.sub("", out, count=1)
+            if trimmed == out:
+                trimmed = _LEADING_OPEN.sub("", out, count=1)
+        elif closes > opens and closes > closes_in_text:
+            trimmed = _TRAILING_CLOSE.sub("", out, count=1)
+            if trimmed == out:
+                trimmed = _LEADING_CLOSE.sub("", out, count=1)
+        else:
+            break
+        if trimmed == out or not trimmed.strip():
+            break
+        out = trimmed
+    return out
+
+
+_GAP = r"(?:\\[,;:! ]|\s|~)*"
+_DASHES = "-\u2212\u2013\u2010\u2011"
+_TEXT_DASH = r"\\text\{\s*[-\u2013\u2212]+\s*\}"
+_TRAILING_DASH = re.compile(rf"{_GAP}(?:{_TEXT_DASH}|-)\s*$")
+_LEADING_DASH = re.compile(rf"^\s*{_TEXT_DASH}{_GAP}")
+_TRAILING_CDOT = re.compile(rf"{_GAP}\\cdot\s*$")
+
+
+def drop_neighbour_marks(latex: str, text_layer: str | None) -> str:
+    r"""`latex` without a hyphen or a centred dot at an edge that the run's text layer lacks.
+
+    The padded crop of "(k-1)-regular" shows the start of the hyphen, and the reading is
+    `(k-1)\text{-}`. It has one dash more than the text layer of the run, `(k -1)`, so the one
+    at the edge is the sentence's. A bare sign at the start of a reading stays (it may be the
+    formula's own); a dash the text layer has stays."""
+    if not text_layer:
+        return latex
+    out = latex.strip()
+    for pattern, marks, count in (
+        (_TRAILING_DASH, _DASHES, lambda t: t.count("-")),
+        (_LEADING_DASH, _DASHES, lambda t: t.count("-")),
+        (_TRAILING_CDOT, "\u00b7\u22c5\u2219", lambda t: t.count("\\cdot")),
+    ):
+        in_text = sum(text_layer.count(c) for c in marks)
+        while count(out) > in_text and (match := pattern.search(out)):
+            trimmed = out[: match.start()] + out[match.end() :]
+            if not trimmed.strip():
+                break
+            out = trimmed.strip()
+    return out
+
+
+_MATHBF_LETTER = re.compile(r"\\mathbf\s*\{\s*([A-Za-z])\s*\}")
+
+
+def restyle_bold_italic(latex: str, text_layer: str | None) -> str:
+    r"""`\mathbf{x}` written `\boldsymbol{x}` for a letter the PDF draws in a bold italic font.
+
+    A crop shows a bold vector as bold; whether it is upright (`\mathbf`, CMBX) or italic
+    (`\boldsymbol`, `\bm`, CMMIB) is small, and every reading says `\mathbf`. The layout
+    step writes the text layer's bold-italic letters as bold-italic code points, so the
+    letter's face is known. A letter drawn in both faces is left as the model wrote it."""
+    if not text_layer or "\\mathbf" not in latex:
+        return latex
+    faces: dict[str, set[str]] = {}
+    for ch in text_layer:
+        variant = char_variant(ch)
+        if variant in ("bold", "bold-italic"):
+            faces.setdefault(base_char(ch), set()).add(variant)
+
+    def swap(match: re.Match[str]) -> str:
+        letter = match.group(1)
+        return (
+            f"\\boldsymbol{{{letter}}}" if faces.get(letter) == {"bold-italic"} else match.group(0)
+        )
+
+    return _MATHBF_LETTER.sub(swap, latex)
+
+
 # Spacing a model may leave before a sentence mark: blanks, ~, \, \; \: \! \  and quads.
 _TRAILING_SPACING = re.compile(r"(?:\s|~|\\[,;:! ]|\\q?quad(?![A-Za-z]))+$")
 
@@ -688,9 +818,11 @@ def _evaluate(
     candidate = _Candidate(output, calls, confidence=output.confidence)
     if not output.is_equation:
         return candidate
-    candidate.latex = clean_latex(expand_ce(output.latex))
+    candidate.latex = restyle_bold_italic(clean_latex(expand_ce(output.latex)), element.text)
     if display == "inline":
         candidate.latex = strip_trailing_punctuation(candidate.latex)
+        candidate.latex = drop_neighbour_brackets(candidate.latex, element.text)
+        candidate.latex = drop_neighbour_marks(candidate.latex, element.text)
     candidate.mathml, candidate.checks = _convert(candidate.latex, display)
     if candidate.mathml is None:
         return candidate

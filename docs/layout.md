@@ -543,6 +543,47 @@ Modern Sans):
   letters, or has a relation sign and no longer italic run: "at" in `v = v₀ + at` is
   not the English word. Beamer captions have no number ("Figure: ...") and still attach.
 
+### Inline formulas in LaTeX papers (2026-10-21)
+
+Found by the error analysis of the real-world set ([eval-equation-rootcause.md](eval-equation-rootcause.md)):
+a paper page is mostly `$x$` in running text, in a font the OpenStax prints never use. What the
+layout learned from it, all from the text layer and the glyph boxes, no model call. The rules that
+come from what a TeX author types (italic variables, bold letters with an index, the edges: parentheses, units,
+citations, word spaces) apply to PDFs typeset by TeX only (`_TEX_MADE`, from `page_type.producer_hint`): an
+OpenStax print from Chromium, where emphasis is italic and the unit is inside the maths, is read as before
+(`scripts/layout_identity.py` on 126 PDFs: 111 identical, the rest explained in
+[eval-equation-rootcause.md](eval-equation-rootcause.md) section 7). Captions, ellipsis lists and `:=` apply to every producer.
+
+- **Italic variables** (`_italic_variables`, evidence `italic variable in prose`). mathptmx, mathpazo,
+  Charter and newtx set the Latin letters of a formula in the text family's italic, so a lone `S`,
+  `N_i` or `K(t)` has no glyph in a maths font. A run of italic letters (at most three letters in a
+  group, a group that is not a short English word, so "not" and "for all" stay words) standing in
+  upright prose, whose neighbours are not italic letters, is a variable. Not variables: an italic
+  phrase (a theorem set in italics, where `a` and `I` are words and a short word beside a longer
+  italic one is text, `_word_lengths`), a label (`(a)`, `a)`), a reference to a part of a figure
+  (`6(a)`, `5(d,e)`), a number and a space and an italic letter (`-49 m`, a quantity with its unit).
+- **A bold letter with an index** is a vector set in a text font (`v` in Times Bold with a lowered `2`);
+  its script is an index, not the count of `H2O` (`_bold_variable`).
+- **Where a formula starts and ends** (`_trim_run`, `_inline_runs`). The author's maths stops at the dollar
+  sign, so the parentheses of the sentence around a whole formula (`(x = 0.9)`; a tuple, which has a
+  comma at its top level, keeps them), the upright unit after a number (`915 s`), a numbered
+  citation after a space (`[8]`) and an opening bracket that the formula does not close are not part
+  of it. A visible gap of at least `WORD_SPACE` (0.25 em) between two operands ends the formula (TeX
+  sets nothing between operands, so the gap is a word space of the sentence: "eps(k) (i = 1)" is two
+  formulas). A list with an ellipsis (`i = 1, ..., S`) is one formula, a map `H : R -> S` is one (a colon
+  between two runs, the second with an arrow or a membership sign: `_join_signatures`).
+  On the 25 development papers 27 of 31 formulas cut inside a pair of parentheses had the pair
+  outside the author's maths, and of the formulas that ended in an upright unit 37 were span failures
+  against 2 that were exact.
+- **Figure captions** are cut like paragraphs (`_attach_captions`): `Element.caption` stays plain text,
+  `Element.caption_marked` has an inline marker where each formula was, and each formula is an
+  equation element whose `parent_id` is the figure (id right after the figure's). `assemble` writes the
+  maths into the `<figcaption>`; the equation step reads them as any inline equation. Table captions
+  are not cut this way (the table step owns them).
+- **Bold italic.** `CMMIB`, newtx's `bmi`, Nimbus `MediItal` and `BoldItalic` fonts give bold-italic code
+  points in the equation's text layer (`_Char.styled`), so the equation step can tell `\boldsymbol{x}` from
+  `\mathbf{x}` (docs/steps.md "Letter-style check").
+
 ### A stray opening brace (2026-10-21)
 
 OpenStax also prints "Solve the system by substitution. {" with the brace the last glyph of the
