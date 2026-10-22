@@ -15,7 +15,7 @@ import pytest
 from readablestem.core.types import Kind
 from readablestem.pipeline import table_model, tables
 from readablestem.pipeline.layout import analyze, release
-from test_tables_detect import PROSE, grid_table, no_model, pdf, write  # noqa: F401
+from test_tables_detect import PENDULUM, PROSE, grid_table, no_model, pdf, write  # noqa: F401
 
 REAL = Path(__file__).parent.parent / "data" / "real-tables"
 
@@ -228,3 +228,41 @@ def test_an_unruled_table_with_a_header_of_words_over_numbers_is_a_table():
 
     found = data_tables(pdf(fill))
     assert len(found) == 1 and len(rows_of(found[0])) == 5
+
+
+# ------------------------------------------------------------ a table set sideways on a page
+
+
+def test_a_table_set_sideways_on_an_upright_page_is_read_upright():
+    # A `sidewaystable` printed without /Rotate: every line of the page is vertical, so the
+    # detector, the rows and the columns all saw nothing (the page was never looked at).
+    from readablestem.pipeline import layout
+
+    with pymupdf.open(REAL / "2505.03022.pdf") as source:
+        one = pymupdf.open()
+        one.insert_pdf(source, from_page=24, to_page=24)
+        data = one.tobytes()
+    assert one[0].rotation == 0
+    [table] = data_tables(data)
+    grid = table.table
+    assert grid.turned == 90 and grid.caption == "Table 4: Summary of Balls"
+    first = {c.text for c in grid.cells if c.row == 0}
+    assert {"Dataset", "Ball", "Variable: X1", "Obs"} <= first
+    assert "0.772" in {c.text for c in grid.cells}
+    # The box is in the page's own frame (tall and narrow), the picture is turned upright.
+    x0, y0, x1, y1 = table.bbox
+    assert y1 - y0 > 2 * (x1 - x0)
+    png = layout.crop(data, table)
+    pixmap = pymupdf.Pixmap(png)
+    assert pixmap.width > 2 * pixmap.height
+    layout.release(data)
+
+
+def test_a_few_sideways_labels_do_not_turn_a_page():
+    def fill(page):
+        write(page, 72, 150, "An ordinary page of text with a table below it and a label beside.")
+        grid_table(page, PENDULUM)
+        page.insert_text((40, 400), "a figure label set sideways", fontsize=10, rotate=90)
+
+    found = data_tables(pdf(fill))
+    assert len(found) == 1 and found[0].table.turned == 0

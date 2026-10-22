@@ -433,6 +433,12 @@ def analyze(
             pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store quotes PDF content
 
 
+def _zoom(zoom: float, turn: int) -> pymupdf.Matrix:
+    """The scale of a crop, and the turn clockwise (0, 90 or 270 degrees) that reads it."""
+    matrix = pymupdf.Matrix(zoom, zoom)
+    return matrix.prerotate(turn) if turn else matrix
+
+
 def crop(
     pdf_bytes: bytes,
     element: Element,
@@ -470,10 +476,12 @@ def crop(
                 raise ValueError("element region is empty or outside the page")
             # MuPDF rounds the clip outwards to whole pixels, so leave one pixel of headroom.
             zoom = min(dpi / 72.0, (max_side_px - 1) / max(clip.width, clip.height))
-            pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
+            # A table set sideways on an upright page is cut turned, so it reads upright.
+            turn = element.table.turned if element.table is not None else 0
+            pixmap = page.get_pixmap(matrix=_zoom(zoom, turn), clip=clip, alpha=False)
             if max(pixmap.width, pixmap.height) > max_side_px:  # defensive; rounding only
                 zoom *= (max_side_px - 1) / max(pixmap.width, pixmap.height)
-                pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
+                pixmap = page.get_pixmap(matrix=_zoom(zoom, turn), clip=clip, alpha=False)
             if tag_dpi:
                 pixmap.set_dpi(round(zoom * 72), round(zoom * 72))
             return pixmap.tobytes("png")

@@ -124,13 +124,17 @@ BLOCK_MIN_LINES = 3  # lines with text in two or more cells that make a block of
 PROSE_WORDS = 6  # a cell of this many words is a line of running text, not a label or a term
 FRAME_MIN_WIDTH = 100.0  # pt: a rule shorter than this does not frame a table
 FRAME_MAX_RULES = 12  # rules of one extent on a page that are looked at together
+FRAME_WHOLE_RULES = 3  # a stack of this many rules (top, header, bottom) is one table as a whole
 FRAME_MAX_HEIGHT = 0.8  # share of the page a framed table may take
 PROSE_WIDTH = 0.25 # share of the page width a column's cells average to be running text
+SCRIPT_CELL = 0.8  # x the text size: smaller cells are scripts or labels of a symbol
 SMALL_TEXT = 0.7  # x the page's text size: lettering this small in a box made here is a diagram
 PICTURE_MARKS = 4  # small curves in a box made here (a legend's markers, scatter dots)
 PICTURE_FILLS = 12  # filled shapes in a box that make it a chart (bars), not a table
 PICTURE_SHARE = 0.05  # raster images covering this share of a box made here make it a picture
 MATH_SHARE = 0.5  # share of the cells with a relation or operator that makes a block maths
+TURN_MIN_CHARS = 60  # a page needs this much text to be turned
+TURN_SHARE = 0.6  # share of its characters set sideways, one way, to turn the page
 OWN_MARGIN = 1.2  # a box made here replaces the detector's only if this much larger
 EXTENT_TOL = 3.0  # pt: rules with ends this close have one extent
 
@@ -208,6 +212,7 @@ DROPPED = (
     "page_text",
     "numbered",
     "no_words",
+    "split",
 )
 
 # "Table 2.3 Speeds", "TABLE 4: ...", "Tab. 1 ...", but not "Table 2 shows that ..." (as
@@ -565,6 +570,8 @@ def may_hold_table(
     the repository: tests/test_tables_prefilter.py) and many with none (columns of text, a
     callout box with a list in it), which the arbitration then drops as before.
     """
+    if _page_turn(lines):
+        return True  # the lines of a turned page are read in its turned frame (`_find_turned`)
     view = _PageView.of(page, lines, paths)
     rows, columns = _positions(y for _, _, y in view.hsegs), _positions(x for _, _, x in view.vsegs)
     cells = rows >= 3 and columns >= 3
@@ -695,6 +702,7 @@ class _Seg:
     size: float
     line: int  # index of its visual line in the box
     columns: tuple[int, ...] = ()
+    bold: bool = False
 
 
 @dataclass
@@ -977,7 +985,8 @@ def _segments(
             ink = [c for c in group if not c.blank]
             if ink:
                 size = statistics.median(c.size for c in ink)
-                segs.append(_Seg(*_ink_box(ink), _spaced(group), size, index))
+                bold = all(getattr(c, "bold", False) for c in ink)
+                segs.append(_Seg(*_ink_box(ink), _spaced(group), size, index, bold=bold))
     return segs, words, crossings
 
 
@@ -1138,12 +1147,14 @@ def _assign_columns(segs: list[_Seg], cuts: list[float]) -> int:
     return len(edges) + 1
 
 
-def _alignment(segs: list[_Seg]) -> float:
+def _alignment(segs: list[_Seg], size: float = 0.0) -> float:
     """Share of cells that line up with the others in their column (left, right or
-    centre, whichever fits most), over columns with two or more cells."""
+    centre, whichever fits most), over columns with two or more cells. Cells set in
+    lettering smaller than `SCRIPT_CELL` of `size` (the text of a limit or an arrow, set
+    over it) belong to the cell beside them, not to a column of their own."""
     by_column: dict[int, list[_Seg]] = {}
     for seg in segs:
-        if len(seg.columns) == 1:
+        if len(seg.columns) == 1 and seg.size >= SCRIPT_CELL * size:
             by_column.setdefault(seg.columns[0], []).append(seg)
     total = aligned = 0
     for members in by_column.values():
@@ -1233,7 +1244,7 @@ def _text_grid(view: _PageView, box: BBox, column_rules: list[float]) -> _Grid:
     grid_lines = sum(1 for cols in by_line.values() if len(cols) >= 2)
     texts = [" ".join(s.text for s in segs if s.line == i) for i in range(len(lines))]
     return _Grid(
-        segs, words, len(lines), columns, grid_lines, _alignment(segs), size, crossings, texts, cuts
+        segs, words, len(lines), columns, grid_lines, _alignment(segs, size), size, crossings, texts, cuts
     )
 
 
@@ -1301,7 +1312,9 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
     only when they do not run through the words."""
     size = _median_size(view, proposal.bbox)
     snapped = _snap(view, _without_captions(view, proposal.bbox), size)
-    box = _extend(view, snapped, size)
+    # A span between two rules is what it is: grown along the column rules that end at its
+    # edges it would take in the tables above and below it.
+    box = snapped if proposal.source == SOURCE_FRAME else _extend(view, snapped, size)
     if box != snapped:
         box = _snap(view, box, size)
     # Grown by a row or a column, not just to a border a few points away.
@@ -1348,7 +1361,9 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
         if extended:
             verdict.reasons.append(REASON_EXTENDED)
         if proposal.source == SOURCE_TEXT:
-            verdict.verdict = _text_block_dropped(grid, view.width) or TABLE
+            verdict.verdict = (
+                _text_block_dropped(grid, view.width, _has_caption(view, box)) or TABLE
+            )
         elif proposal.source == SOURCE_FRAME:
             if _running_text(grid, box) or grid.lines < BLOCK_MIN_LINES:
                 verdict.verdict = "no_grid"  # rules around paragraphs, or around one line
@@ -1380,8 +1395,8 @@ def own_proposals(view: _PageView) -> list[Proposal]:
 def _rule_frames(view: _PageView) -> list[Proposal]:
     """The span of rules of one extent: a booktabs table's top, header and bottom rules, or
     the double rules that frame a table of text, each stack read as one rule. Every two
-    neighbouring rules are a box, and so is the whole stack when no "Table N" caption sits
-    between its rules (a second table under the first)."""
+    neighbouring rules are a box, and so is the whole of a stack of three (a table's top,
+    header and bottom rules) when no "Table N" caption sits between them."""
     rules = [r for r in _chains(view.hsegs, (-1e9, 1e9)) if r[2] - r[1] >= FRAME_MIN_WIDTH]
     groups: list[list[tuple[float, float, float]]] = []
     for rule in sorted(rules):
@@ -1404,13 +1419,13 @@ def _rule_frames(view: _PageView) -> list[Proposal]:
         if not 2 <= len(distinct) <= FRAME_MAX_RULES:
             continue
         spans = list(pairwise(distinct))
-        if len(distinct) > 2:
+        if len(distinct) == FRAME_WHOLE_RULES:  # top, header and bottom: one booktabs table
             spans.append((distinct[0], distinct[-1]))
         for top, bottom in spans:
             if bottom[0] - top[0] > FRAME_MAX_HEIGHT * view.height:
                 continue
             box = (min(top[1], bottom[1]), top[0], max(top[2], bottom[2]), bottom[0])
-            if len(distinct) > 2 and (top, bottom) == spans[-1] and _captions_between(view, box):
+            if len(distinct) == FRAME_WHOLE_RULES and (top, bottom) == spans[-1] and _captions_between(view, box):
                 continue
             out.append(Proposal(box, [], 0, SOURCE_FRAME))
     return out
@@ -1476,6 +1491,20 @@ def _starts_a_column(seg: _Seg, block: list[list[_Seg]]) -> bool:
     )
 
 
+def _has_caption(view: _PageView, box: BBox) -> bool:
+    """A "Table N" line just above or below the box (within `CAPTION_MAX_GAP`), over it."""
+    for line in view.lines:
+        if line.vertical:
+            continue
+        lx0, ly0, lx1, ly1 = line.bbox
+        if min(lx1, box[2]) - max(lx0, box[0]) <= 0:
+            continue
+        gap = max(ly0 - box[3], box[1] - ly1)
+        if 0 <= gap <= CAPTION_MAX_GAP and TABLE_CAPTION.match(_line_text(line).strip()):
+            return True
+    return False
+
+
 def _wordy(text: str) -> bool:
     """A word or words: letters make up at least half of it and it has at least two."""
     letters = sum(c.isalpha() for c in text)
@@ -1539,6 +1568,15 @@ def _running_text(grid: _Grid, box: BBox) -> bool:
     )
 
 
+def _bold_terms(grid: _Grid) -> bool:
+    """Is the first column set in bold, term after term? LaTeX's `description` list sets
+    its labels so, and a textbook's glossary; a `tabular` of notation is plain. An unruled
+    list of bold terms with their prose descriptions is a list, as a ruled box of them is
+    (`is_layout_grid`); the same list in plain type is what a table of notation looks like."""
+    first = [m for m in grid.segs if m.columns == (0,)]
+    return len(first) >= 2 and sum(m.bold for m in first) >= 0.7 * len(first)
+
+
 def _numbered(grid: _Grid) -> bool:
     """A first column of numbers or letters in sequence ("1:", "(a)", "[3]") before text of
     several words: the lines of an algorithm, a numbered list, a bibliography. Or a
@@ -1559,7 +1597,7 @@ def _numbered(grid: _Grid) -> bool:
     )  # (a) ... (b) ... side by side: subfigure captions
 
 
-def _text_block_dropped(grid: _Grid, page_width: float) -> str | None:
+def _text_block_dropped(grid: _Grid, page_width: float, captioned: bool = False) -> str | None:
     """Why lines of text in aligned columns are not a table, as a `DROPPED` code, or None.
     Aligned columns are everywhere in a document: the two text columns of a page, numbered
     equations, a bibliography, the line numbers of an algorithm, a matrix. What separates
@@ -1579,6 +1617,8 @@ def _text_block_dropped(grid: _Grid, page_width: float) -> str | None:
     ]
     if len(prose) >= 2:
         return "page_text"
+    if captioned:
+        return None  # "Table 3: ..." under it: the document says it is one
     if any("@" in m.text for m in grid.segs):
         return "no_words"  # a block of authors and their addresses
     maths = sum(any(ch in _RELATION for ch in m.text) for m in grid.segs)
@@ -2237,11 +2277,26 @@ def find_with_judgements(
     budget: DetectorBudget | None = None,
 ) -> tuple[list[PageTable], list[tuple[Proposal, Judgement]]]:
     """`find`, plus every proposal with its judgement (for the evaluation)."""
+    turn = _page_turn(lines)
+    if turn:
+        return _find_turned(page, lines, paths, turn, clean=clean, budget=budget)
+    return _find_in(page, lines, paths, clean=clean, budget=budget)
+
+
+def _find_in(
+    page: pymupdf.Page,
+    lines: Sequence[LineLike],
+    paths: Sequence[PathLike],
+    *,
+    clean: Callable[[str], str],
+    budget: DetectorBudget | None,
+) -> tuple[list[PageTable], list[tuple[Proposal, Judgement]]]:
     view = _PageView.of(page, lines, paths)
     proposals = [*propose(page, budget), *own_proposals(view)]
     if not proposals:
         return [], []
     judged = [(p, judge(p, view)) for p in proposals]
+    _split_stacked(judged)
     kept: list[tuple[Proposal, Judgement]] = []
 
     def standing(pj: tuple[Proposal, Judgement]) -> float:
@@ -2282,6 +2337,179 @@ def find_with_judgements(
         if _edge_text(view, table, inside):
             table.reasons.append(REASON_EDGE_TEXT)
     return tables, judged
+
+
+def _split_stacked(judged: list[tuple[Proposal, Judgement]]) -> None:
+    """The detector boxes two unruled lists set one under the other as one table, its
+    columns the union of both lists'. When two or more tables found here from the text lie
+    inside such a box and hold most of it, they are the tables and the box is not."""
+    own = [j for p, j in judged if p.source == SOURCE_TEXT and j.verdict == TABLE]
+    for proposal, judgement in judged:
+        if proposal.source != "detector" or judgement.verdict != TABLE:
+            continue
+        if REASON_RULED in judgement.reasons:
+            continue
+        box = judgement.bbox
+        parts = [
+            j
+            for j in own
+            if _area(_intersection(j.bbox, box)) >= 0.9 * _area(j.bbox) and _area(j.bbox) < _area(box)
+        ]
+        if len(parts) >= 2 and sum(_area(j.bbox) for j in parts) >= 0.6 * _area(box):
+            judgement.verdict = "split"
+
+
+# ------------------------------------------------------------- a page whose text is set sideways
+
+
+@dataclass(frozen=True, slots=True)
+class _TurnedChar:
+    c: str
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    size: float
+    blank: bool
+    bold: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _TurnedLine:
+    chars: Sequence[_TurnedChar]
+    bbox: BBox
+    vertical: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _TurnedPath:
+    bbox: BBox
+    kind: str
+    curved: bool
+    filled: bool
+
+
+def _page_turn(lines: Sequence[LineLike]) -> int:
+    """90 or 270 when the text of the page reads upwards or downwards (a landscape table
+    on a portrait page that has no /Rotate: `sidewaystable`, a page printed landscape and
+    saved as it is), else 0. How far to turn the page clockwise to read it. Needs a page
+    whose text is mostly set that way, so the sideways label of a figure does not turn it."""
+    up = down = total = 0
+    for line in lines:
+        ink = [c for c in line.chars if not c.blank]
+        total += len(ink)
+        if len(ink) < 2 or not line.vertical:
+            continue
+        first, last = ink[0], ink[-1]
+        dx = (last.x0 + last.x1 - first.x0 - first.x1) / 2
+        dy = (last.y0 + last.y1 - first.y0 - first.y1) / 2
+        if abs(dy) <= abs(dx):
+            continue  # upside down, or not a line of text
+        if dy < 0:
+            up += len(ink)
+        else:
+            down += len(ink)
+    if total < TURN_MIN_CHARS:
+        return 0
+    if up >= TURN_SHARE * total:
+        return 90
+    if down >= TURN_SHARE * total:
+        return 270
+    return 0
+
+
+def _turner(turn: int, width: float, height: float) -> tuple[Callable, Callable]:
+    """(forward, back) maps of a point of the page as displayed to the page turned
+    clockwise by `turn` degrees (`width`, `height`: the page as displayed)."""
+    if turn == 90:
+        return (lambda x, y: (height - y, x)), (lambda x, y: (y, height - x))
+    return (lambda x, y: (y, width - x)), (lambda x, y: (width - y, x))
+
+
+def _map_box(box: BBox, move: Callable) -> BBox:
+    (a, b), (c, d) = move(box[0], box[1]), move(box[2], box[3])
+    return min(a, c), min(b, d), max(a, c), max(b, d)
+
+
+def _find_turned(
+    page: pymupdf.Page,
+    lines: Sequence[LineLike],
+    paths: Sequence[PathLike],
+    turn: int,
+    *,
+    clean: Callable[[str], str],
+    budget: DetectorBudget | None,
+) -> tuple[list[PageTable], list[tuple[Proposal, Judgement]]]:
+    """`_find_in` on the page turned upright: the lines and paths are turned to match (the
+    indices stay, so the lines a table claims are the same ones), the detector and the
+    structure model are run on a copy of the page given the extra /Rotate, and what comes
+    back is turned again into the page's own frame. The grid says how far the picture of
+    the table has to be turned to read it (`TableGrid.turned`)."""
+    rect = page.rect
+    forward, back = _turner(turn, rect.width, rect.height)
+    turned_lines = [
+        _TurnedLine(
+            [
+                _TurnedChar(
+                    c.c,
+                    *_map_box((c.x0, c.y0, c.x1, c.y1), forward),
+                    c.size,
+                    c.blank,
+                    getattr(c, "bold", False),
+                )
+                for c in line.chars
+            ],
+            _map_box(line.bbox, forward),
+            not _reads_along(line, turn),
+        )
+        for line in lines
+    ]
+    swap = {"hrule": "vrule", "vrule": "hrule"}
+    turned_paths = [
+        _TurnedPath(_map_box(p.bbox, forward), swap.get(p.kind, p.kind), p.curved, p.filled)
+        for p in paths
+    ]
+    with _pdf_lock():
+        copy = pymupdf.open()
+        try:
+            copy.insert_pdf(page.parent, from_page=page.number, to_page=page.number)
+            sideways = copy[0]
+            sideways.set_rotation((page.rotation + turn) % 360)
+        except Exception:
+            copy.close()
+            raise
+    try:
+        found, judged = _find_in(sideways, turned_lines, turned_paths, clean=clean, budget=budget)
+    finally:
+        with _pdf_lock():
+            copy.close()
+    for table in found:
+        table.bbox = _rounded(_map_box(table.bbox, back))
+        table.grid = table.grid.model_copy(
+            update={
+                "turned": turn,
+                "cells": [
+                    c.model_copy(update={"bbox": _rounded(_map_box(c.bbox, back))})
+                    if c.bbox is not None
+                    else c
+                    for c in table.grid.cells
+                ],
+            }
+        )
+    for _, judgement in judged:
+        judgement.bbox = _map_box(judgement.bbox, back)
+    return found, judged
+
+
+def _reads_along(line: LineLike, turn: int) -> bool:
+    """Does this line read in the direction the page's text does (so it is horizontal once
+    the page is turned)?"""
+    ink = [c for c in line.chars if not c.blank]
+    if len(ink) < 2 or not line.vertical:
+        return False
+    dy = (ink[-1].y0 + ink[-1].y1 - ink[0].y0 - ink[0].y1) / 2
+    dx = (ink[-1].x0 + ink[-1].x1 - ink[0].x0 - ink[0].x1) / 2
+    return abs(dy) > abs(dx) and (dy < 0) == (turn == 90)
 
 
 def _edge_text(view: _PageView, table: PageTable, claimed: set[int]) -> bool:
@@ -2391,7 +2619,7 @@ def _build(
         paths=set(),
         reasons=[*judgement.reasons, best[3]],
         column_edges=_column_edges(best[2]),
-        layout_grid=is_layout_grid(best[2]),
+        layout_grid=is_layout_grid(best[2]) and (proposal.source != SOURCE_TEXT or _bold_terms(text)),
     )
 
 

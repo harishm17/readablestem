@@ -265,6 +265,10 @@ class TableGrid(BaseModel):
     caption: str | None = None
     is_data: bool = True
     source: Literal["model", "local"] = "local"
+    # Degrees clockwise to turn the picture of the table to read it: 90 or 270 for a table set
+    # sideways on an upright page (`pipeline.tables._page_turn`), 0 otherwise. Boxes stay in
+    # the page frame.
+    turned: Literal[0, 90, 270] = 0
 
 
 # Codes `grid_problems` can return, in the order it returns them.
