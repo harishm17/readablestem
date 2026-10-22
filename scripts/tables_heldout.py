@@ -6,9 +6,9 @@
 
 `select` walks the candidates of the real-world corpus pool (`data/realworld`, OAI records
 with their licences) that nothing has used (not visited by the real-world builder, in none of
-its manifests, not in `data/real-tables`), keeping those whose title says lecture, tutorial, primer, introduction,
-introductory, course notes, notes on, a guide, guide to, handbook, textbook, for beginners or first look,
-in the order of
+its manifests, not in `data/real-tables`), keeping those whose title says lecture, tutorial,
+primer, introduction, introductory, course notes, notes on, a guide, guide to, handbook, textbook,
+for beginners or first look, in the order of
 SHA-256(seed:id). For each it downloads the PDF and the source (the polite way: one request
 every few seconds), and accepts the first `n` that pass the gates written in the README:
 a main TeX file, 6 to 250 PDF pages, and at least three data tables (a `tabular` with two or
@@ -24,17 +24,16 @@ import hashlib
 import json
 import re
 import sys
-import time
 from pathlib import Path
 
 import httpx
 import pymupdf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import realworld_build as rb  # noqa: E402
+import realworld_build as rb
 
-from readablestem.gold import arxiv_tex as tex  # noqa: E402
-from readablestem.gold import tabulars as tab  # noqa: E402
+from readablestem.gold import arxiv_tex as tex
+from readablestem.gold import tabulars as tab
 
 ROOT = Path(__file__).resolve().parent.parent
 POOL = ROOT / "data" / "realworld"
@@ -62,11 +61,7 @@ def used_ids() -> set[str]:
 def candidates(seed: str) -> list[dict]:
     pool = json.loads((Path.home() / ".cache/readablestem/realworld/pool.json").read_text())
     taken = used_ids()
-    keep = [
-        c
-        for c in pool["candidates"]
-        if c["id"] not in taken and KEYWORDS.search(c["title"])
-    ]
+    keep = [c for c in pool["candidates"] if c["id"] not in taken and KEYWORDS.search(c["title"])]
     keep.sort(key=lambda c: hashlib.sha256(f"{seed}:{c['id']}".encode()).hexdigest())
     return keep
 
@@ -86,15 +81,25 @@ def read_tables(folder: Path) -> tuple[list[tab.Tabular], list[list[tuple]]]:
 
 def cmd_select(args: argparse.Namespace) -> int:
     accepted, skipped = [], []
-    with httpx.Client(headers={"User-Agent": "readablestem-eval/1.0 (research; CC BY corpus)"}) as client:
+    with httpx.Client(
+        headers={"User-Agent": "readablestem-eval/1.0 (research; CC BY corpus)"}
+    ) as client:
         for record in candidates(args.seed):
             if len(accepted) >= args.n:
                 break
             folder = args.cache / record["id"]
             try:
-                rb.download(client, f"https://arxiv.org/pdf/{record['id']}", folder / "paper.pdf", args.pause)
+                rb.download(
+                    client,
+                    f"https://arxiv.org/pdf/{record['id']}",
+                    folder / "paper.pdf",
+                    args.pause,
+                )
                 eprint = rb.download(
-                    client, f"https://arxiv.org/e-print/{record['id']}", folder / "e-print.bin", args.pause
+                    client,
+                    f"https://arxiv.org/e-print/{record['id']}",
+                    folder / "e-print.bin",
+                    args.pause,
                 )
                 if not (folder / "src").is_dir():
                     rb.unpack(eprint, folder / "src")
@@ -155,7 +160,14 @@ def cmd_build(args: argparse.Namespace) -> int:
                 u["page"] == t["page"] and _overlap(u["bbox"], t["bbox"]) > 0.8 for u in unique
             ):
                 unique.append(t)
-        keep = sorted({p for t in unique for q in (t["page"] - 1, t["page"], t["page"] + 1) if 0 <= (p := q) < len(words)})
+        keep = sorted(
+            {
+                p
+                for t in unique
+                for q in (t["page"] - 1, t["page"], t["page"] + 1)
+                if 0 <= (p := q) < len(words)
+            }
+        )
         keep = keep[: args.max_pages]
         source = pymupdf.open(folder / "paper.pdf")
         cut = pymupdf.open()
@@ -172,14 +184,20 @@ def cmd_build(args: argparse.Namespace) -> int:
                 "pages": list(range(len(keep))),
                 "source_pages": keep,
                 "tables": [
-                    {"page": index[t["page"]], "bbox": t["bbox"]} for t in unique if t["page"] in index
+                    {"page": index[t["page"]], "bbox": t["bbox"]}
+                    for t in unique
+                    if t["page"] in index
                 ],
             }
         )
     (args.out / "labels.json").write_text(
         json.dumps({"schema_version": 1, "documents": documents}, indent=1)
     )
-    print(json.dumps({"documents": len(documents), "tables": sum(len(d["tables"]) for d in documents)}))
+    print(
+        json.dumps(
+            {"documents": len(documents), "tables": sum(len(d["tables"]) for d in documents)}
+        )
+    )
     return 0
 
 

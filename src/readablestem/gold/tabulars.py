@@ -131,9 +131,7 @@ def find_tabulars(body: str) -> list[Tabular]:
             i = bracket[1]
         spec_group = tex.read_group(inner, tex._skip_ws(inner, i))
         spec, i = spec_group if spec_group else ("", i)
-        rows = [
-            [c.strip() for c in _split_top(r, "&")] for r in _split_top(inner[i:], "\\\\")
-        ]
+        rows = [[c.strip() for c in _split_top(r, "&")] for r in _split_top(inner[i:], "\\\\")]
         rows = [r for r in rows if any(plain(c) for c in r)]
         table = Tabular(env, spec, rows, m.start(), "\\includegraphics" in inner)
         table.tokens = [t for r in rows for c in r for t in tokens_of(plain(c))]

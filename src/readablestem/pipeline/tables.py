@@ -113,7 +113,9 @@ THIN_IMAGE = 1.6  # an image this thin is a rule (as RULE_THICKNESS in layout)
 DOUBLE_RULE = 4.0  # two rules this close are one double rule
 COLUMN_RULE_LINES = 2.2  # x font size: a column rule is at least about two lines long
 GUTTER_PT = 3.0  # narrowest white gap between two columns of text
-WORD_GUTTER_PT = 2.5  # narrowest strip between two columns that no word crosses (see `_word_gutters`)
+WORD_GUTTER_PT = (
+    2.5  # narrowest strip between two columns that no word crosses (see `_word_gutters`)
+)
 WORD_GUTTER_LINES = 10  # a box needs this many lines of text before such a strip counts
 WORD_GUTTER_FLUSH = 0.6  # share of the lines whose text ends and begins at the strip's edges
 WORD_GUTTER_CROSSING = 0.1  # share of the lines a word may cross it on (a spanning title)
@@ -130,7 +132,7 @@ FRAME_MAX_RULES = 12  # rules of one extent on a page that are looked at togethe
 FRAME_GRID_SHARE = 0.3  # share of a framed box's lines with text in two columns (callouts have few)
 FRAME_WHOLE_RULES = 3  # a stack of this many rules (top, header, bottom) is one table as a whole
 FRAME_MAX_HEIGHT = 0.8  # share of the page a framed table may take
-PROSE_WIDTH = 0.25 # share of the page width a column's cells average to be running text
+PROSE_WIDTH = 0.25  # share of the page width a column's cells average to be running text
 SCRIPT_CELL = 0.8  # x the text size: smaller cells are scripts or labels of a symbol
 SMALL_TEXT = 0.7  # x the page's text size: lettering this small in a box made here is a diagram
 PICTURE_REACH = 30.0  # pt around a box made here in which curves make it part of a plot
@@ -138,7 +140,7 @@ PICTURE_NEAR = 3  # curves reaching that far
 PICTURE_MARKS = 4  # small curves in a box made here (a legend's markers, scatter dots)
 PICTURE_FILLS = 12  # filled shapes in a box that make it a chart (bars), not a table
 PICTURE_SHARE = 0.05  # raster images covering this share of a box made here make it a picture
-MATH_SHARE = 0.5  # share of the cells with a relation or operator that makes a block maths
+MATH_SHARE = 0.6  # share of the lines with a relation or operator that makes a block maths
 TURN_MIN_CHARS = 60  # a page needs this much text to be turned
 TURN_SHARE = 0.6  # share of its characters set sideways, one way, to turn the page
 EXTENT_TOL = 3.0  # pt: rules with ends this close have one extent
@@ -1261,7 +1263,16 @@ def _text_grid(view: _PageView, box: BBox, column_rules: list[float]) -> _Grid:
     grid_lines = sum(1 for cols in by_line.values() if len(cols) >= 2)
     texts = [" ".join(s.text for s in segs if s.line == i) for i in range(len(lines))]
     return _Grid(
-        segs, words, len(lines), columns, grid_lines, _alignment(segs, size), size, crossings, texts, cuts
+        segs,
+        words,
+        len(lines),
+        columns,
+        grid_lines,
+        _alignment(segs, size),
+        size,
+        crossings,
+        texts,
+        cuts,
     )
 
 
@@ -1278,7 +1289,11 @@ def _toc(grid: _Grid, min_lines: int = 4) -> bool:
     if len(numbers) < 0.7 * grid.lines or not titles:
         return False
     letters = sum(c.isalpha() for s in titles for c in s.text)
-    mean_len = statistics.mean(len(s.text) for s in titles)
+    # A title is the longest cell before the number ("E.1" and "Linear cost per reset").
+    longest: dict[int, int] = {}
+    for s in titles:
+        longest[s.line] = max(longest.get(s.line, 0), len(s.text))
+    mean_len = statistics.mean(longest.values())
     values = [int(s.text) for s in sorted(numbers, key=lambda s: s.y0) if s.text.isdigit()]
     ascending = len(values) >= 3 and all(a <= b for a, b in pairwise(values))
     return ascending and mean_len >= 15 and letters >= 0.6 * sum(len(s.text) for s in titles)
@@ -1395,11 +1410,11 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
     return verdict
 
 
-# ----------------------------------------------------------- proposals made here, not by the detector
+# ------------------------------------------------------ proposals made here, not by the detector
 
 _ENUMERATION = re.compile(
     r"^(?:\(?[A-Za-z]\)|\(?\d{1,3}(?:\.\d{1,3})*[.)]?|\(?[ivxlc]{1,5}[.)]|\d{1,3}:"
-    r"|\[[A-Za-z0-9+,. -]{1,12}\]"  # [3], [JP14]: a reference
+    r"|\[[^\]]{1,12}\]"  # [3], [JP14], [ABC+20]: a reference
     r"|[-\u2013\u2014*+>\u2022\u00b7\u25e6\u25aa])$"  # a bullet, a dash, a prompt
 )
 _EQUATION_TAG = re.compile(r"^\([A-Za-z]{0,6}\d{0,3}(?:[.-]\d{1,3})*[a-z]?\)$")
@@ -1448,7 +1463,11 @@ def _rule_frames(view: _PageView) -> list[Proposal]:
             if bottom[0] - top[0] > FRAME_MAX_HEIGHT * view.height:
                 continue
             box = (min(top[1], bottom[1]), top[0], max(top[2], bottom[2]), bottom[0])
-            if len(distinct) == FRAME_WHOLE_RULES and (top, bottom) == spans[-1] and _captions_between(view, box):
+            if (
+                len(distinct) == FRAME_WHOLE_RULES
+                and (top, bottom) == spans[-1]
+                and _captions_between(view, box)
+            ):
                 continue
             out.append(Proposal(box, [], 0, SOURCE_FRAME))
     return out
@@ -1559,9 +1578,10 @@ _RELATION = frozenset("=\u2264\u2265<>\u2192\u2208\u2209\u2260\u2248\u223c\u2211
 
 def _pictured(view: _PageView, box: BBox, size: float) -> bool:
     """A chart or drawing in a box nothing but the geometry proposed: any curve (a plotted
-    line, an arrow) or twelve small ones (scatter dots), a raster image covering `PICTURE_SHARE` of it, or `PICTURE_FILLS` filled
-    shapes (the bars of a histogram, a heat map). The detector's boxes get the weaker
-    `_drawing` test: its model has seen the page."""
+    line, an arrow), a few small ones (scatter dots, a legend's markers) or curves running
+    past it (a legend inside a plot), a raster image covering `PICTURE_SHARE` of it, or
+    `PICTURE_FILLS` filled shapes (the bars of a histogram, a heat map). The detector's boxes
+    get the weaker `_drawing` test: its model has seen the page."""
     x0, y0, x1, y1 = box
     area = max((x1 - x0) * (y1 - y0), 1.0)
     near = sum(
@@ -1641,7 +1661,7 @@ def _numbered(grid: _Grid) -> bool:
     labels = [m.text for m in grid.segs if m.columns == (0,)]
     others = [m for m in grid.segs if m.columns and m.columns[0] != 0]
     return (
-        len(labels) >= 3
+        len(labels) >= 2
         and sum(bool(_ENUMERATION.match(t)) for t in labels) >= 0.7 * len(labels)
         and bool(others)
         and sum(_wordy(m.text) for m in others) >= 0.5 * len(others)
@@ -1674,8 +1694,8 @@ def _text_block_dropped(grid: _Grid, page_width: float, captioned: bool = False)
         return None  # "Table 3: ..." under it: the document says it is one
     if any("@" in m.text for m in grid.segs):
         return "no_words"  # a block of authors and their addresses
-    maths = sum(any(ch in _RELATION for ch in m.text) for m in grid.segs)
-    if maths >= MATH_SHARE * len(grid.segs):
+    maths = len({m.line for m in grid.segs if any(ch in _RELATION for ch in m.text)})
+    if maths >= MATH_SHARE * len({m.line for m in grid.segs}):
         return "no_words"
     last = max(columns, default=0)
     tags = [m.text for m in columns.get(last, [])]
@@ -2449,7 +2469,9 @@ def _joined_frames(
 
     for proposal, judgement in frames:
         sliver = judgement.verdict == "no_grid" and judgement.grid_lines <= 1
-        cells = judgement.verdict == "no_grid" and judgement.columns >= 2 and judgement.grid_lines >= 2
+        cells = (
+            judgement.verdict == "no_grid" and judgement.columns >= 2 and judgement.grid_lines >= 2
+        )
         if judgement.verdict != TABLE and not sliver and not cells:
             close()
             continue
@@ -2478,7 +2500,8 @@ def _split_stacked(judged: list[tuple[Proposal, Judgement]]) -> None:
         parts = [
             j
             for j in own
-            if _area(_intersection(j.bbox, box)) >= 0.9 * _area(j.bbox) and _area(j.bbox) < _area(box)
+            if _area(_intersection(j.bbox, box)) >= 0.9 * _area(j.bbox)
+            and _area(j.bbox) < _area(box)
         ]
         if len(parts) >= 2 and sum(_area(j.bbox) for j in parts) >= 0.6 * _area(box):
             judgement.verdict = "split"
@@ -2717,8 +2740,11 @@ def _build(
     if not extended:  # PyMuPDF's grid stops where the detector's box did
         candidates.append((REASON_PYMUPDF, proposal.slots, proposal.header_rows))
     cells = _text_slots(view, box, text)
-    if cells is not None and not proposal.slots:  # a box with no grid of its own: compete
-        candidates.append((REASON_TEXT_CELLS, *cells))
+    if cells is not None and not proposal.slots:
+        # A box found from the lines of text (no grid of its own): their rows and columns
+        # are the evidence it was found by, so on a tie they beat a model's reading, which
+        # joins neighbouring rows of a list; the drawn cells, when there are any, still win.
+        candidates.insert(1 if ruled is not None else 0, (REASON_TEXT_CELLS, *cells))
     best: tuple[int, int, TableGrid, str] | None = None
     for attempt in range(2):
         for rank, (reason, slots, header_rows) in enumerate(candidates):
@@ -2744,7 +2770,8 @@ def _build(
         paths=set(),
         reasons=[*judgement.reasons, best[3]],
         column_edges=_column_edges(best[2]),
-        layout_grid=is_layout_grid(best[2]) and (proposal.source != SOURCE_TEXT or _bold_terms(text)),
+        layout_grid=is_layout_grid(best[2])
+        and (proposal.source != SOURCE_TEXT or _bold_terms(text)),
     )
 
 
@@ -2889,15 +2916,21 @@ def _text_slots(view: _PageView, box: BBox, text: _Grid) -> tuple[list[Slot], in
         taken: set[int] = set()
         for seg in (s for line in members for s in by_line[line]):
             lo, hi = seg.columns[0], seg.columns[-1]
-            if hi > lo and not taken & set(range(lo, hi + 1)) and not any(
-                lo <= c <= hi
-                for other in members
-                for o in by_line[other]
-                if o is not seg
-                for c in o.columns
+            if (
+                hi > lo
+                and not taken & set(range(lo, hi + 1))
+                and not any(
+                    lo <= c <= hi
+                    for other in members
+                    for o in by_line[other]
+                    if o is not seg
+                    for c in o.columns
+                )
             ):
                 taken |= set(range(lo, hi + 1))
-                slots.append(Slot(r, lo, 1, hi - lo + 1, (xs[lo], edges[r], xs[hi + 1], edges[r + 1])))
+                slots.append(
+                    Slot(r, lo, 1, hi - lo + 1, (xs[lo], edges[r], xs[hi + 1], edges[r + 1]))
+                )
         for c in range(text.columns):
             if c not in taken:
                 slots.append(Slot(r, c, 1, 1, (xs[c], edges[r], xs[c + 1], edges[r + 1])))
@@ -2925,6 +2958,7 @@ def _text_header_rows(
         gap = (bottoms[rows[k - 1][-1]], tops[rows[k][0]])
         if any(gap[0] - 1.0 <= y <= gap[1] + 1.0 for y in rules):
             return k
+
     def values(row: list[int]) -> bool:
         return any(_QUANTITY.match(s.text) for line in row for s in by_line[line])
 

@@ -13,8 +13,7 @@ import pymupdf
 import pytest
 
 from readablestem.core.types import Kind
-from readablestem.pipeline import table_model, tables
-from readablestem.pipeline.layout import analyze, release
+from readablestem.pipeline.layout import analyze
 from test_tables_detect import PENDULUM, PROSE, grid_table, no_model, pdf, write  # noqa: F401
 
 REAL = Path(__file__).parent.parent / "data" / "real-tables"
@@ -32,8 +31,14 @@ def data_tables(data: bytes):
 
 ELEMENTS = [
     ["Element", "Description"],
-    ["add_coloring", "Lets the user change the coloring of the plot; it takes one value for every point"],
-    ["draw_networkx", "Used for the plotting of the graph, for the final summary page and the legend"],
+    [
+        "add_coloring",
+        "Lets the user change the coloring of the plot; it takes one value for every point",
+    ],
+    [
+        "draw_networkx",
+        "Used for the plotting of the graph, for the final summary page and the legend",
+    ],
     ["eps", "The ball radius used in the construction of the plot, of its edges and its balls"],
 ]
 
@@ -74,9 +79,7 @@ def found_on(file: str, page: int) -> list[tuple[int, tuple[float, float, float,
 def scored(file: str, page: int) -> dict:
     from readablestem.eval import tables as eval_tables
 
-    labelled = [
-        (page, t["bbox"]) for t in real_labels()[file]["tables"] if t["page"] == page
-    ]
+    labelled = [(page, t["bbox"]) for t in real_labels()[file]["tables"] if t["page"] == page]
     return eval_tables.score_real_document(found_on(file, page), labelled)
 
 
@@ -183,7 +186,7 @@ COLUMN_PROSE = (
 def two_text_columns(page):
     import textwrap
 
-    for column, x in enumerate((72.0, 320.0)):
+    for x in (72.0, 320.0):
         lines = textwrap.wrap(COLUMN_PROSE, 44)
         for k, text in enumerate(lines):
             page.insert_text((x, 120 + 13 * k), text, fontsize=10)
