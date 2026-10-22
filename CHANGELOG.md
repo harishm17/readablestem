@@ -1,5 +1,20 @@
 # Changelog
 
+## Handwriting answer key and one measurement (2026-10-21, branch feat/handwriting-eval)
+
+- A handwriting evaluation set built from real human ink (Google's MathWriting, CC BY-NC-SA 4.0, so
+  not committed): 34 scanned-looking pages, 280 expressions (display on their own
+  lines, inline inside typed sentences), gold in the document task's format. The repository holds
+  the builder (`src/readablestem/eval/handwriting_set.py`, `scripts/handwriting_eval.py fetch|build|
+  verify|run|report`) and `data/handwriting/manifest.json` (identifiers and hashes), the
+  registration (`data/handwriting/PREREGISTRATION.md`) and the attribution.
+- Measured once with the production image page pass (`claude-opus-5-5`, nothing tuned): held-out
+  primary 0.566 [0.515, 0.618] on 205 equations, 0 silent wrong equations, $0.066 a page, $2.09
+  spent; the registered rule (primary at least 0.50, silent wrong 0) is met. Findings the rule does
+  not capture: 43% of equations wrong, 85% of blocks `medium` or `low` (5.7 required decisions a
+  page), 35 of 56 display expressions read as inline maths, one page silently lost four equations
+  (docs/eval-handwriting.md). No product code, prompt or setting changed.
+
 ## Tables on in production (2026-10-21, branch feat/tables-on)
 
 - Decision: `FEATURE_TABLES=true`, `MAX_USD_PER_PAGE=2.20`, `MAX_USD_PER_JOB=4.70` for the Claude

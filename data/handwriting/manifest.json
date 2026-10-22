@@ -1,0 +1,2525 @@
+{
+ "fonts": {
+  "DejaVuSerif-Bold.ttf": "3f704f75238454f68a8202e5098cb0687887480dd63d3dc20b34bdbdfa9d9f3f",
+  "DejaVuSerif.ttf": "a52c2a69dfc93d0b511b98c1019a57eb3d6a62d328bdf1387f00851b02e3a315"
+ },
+ "parts": {
+  "dev": {
+   "n_display": 32,
+   "n_expressions": 75,
+   "n_pages": 10,
+   "n_units": 5,
+   "part": "dev",
+   "source_split": "valid",
+   "units": [
+    {
+     "expressions": [
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-01/eq-000",
+       "inkml_sha256": "fd41208b979f36270eeb341f8a2da7e9adb603b165863a8b59f9e53e64c36df3",
+       "page": 1,
+       "sample_id": "b0ab3e819322ce72",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-01/eq-001",
+       "inkml_sha256": "99c7091727984f1de0e6348848a6fa4b9d6a5f9f66ce6917ad10b52f4753d020",
+       "page": 1,
+       "sample_id": "5a06a7bc717cf1a1",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-01/eq-002",
+       "inkml_sha256": "cd1528eb245dc8c3b40dfb2cbe073462608ced22145199f30f672b8ee02ced02",
+       "page": 1,
+       "sample_id": "be2f9c0385ea41e1",
+       "tokens": 5
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-01/eq-003",
+       "inkml_sha256": "e65d639e65a8d8d3ec07a5d3e1bfc8570ab4067e442c60f433ffdebf8b12c122",
+       "page": 1,
+       "sample_id": "a5f15782a8ee68fb",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-01/eq-004",
+       "inkml_sha256": "f69366d2d2c51366ac31330d9609613e1c6361a61b4d0f9381b1bb05e0b7f681",
+       "page": 1,
+       "sample_id": "fd91ddfbedde687a",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-01/eq-005",
+       "inkml_sha256": "c628fbe7344d72778759f573b85ee401f1a3d6c47823fe6a24e6c29de0c33f5e",
+       "page": 1,
+       "sample_id": "00e00364101abad0",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-01/eq-006",
+       "inkml_sha256": "7e6e778077310b6ac6aad17229aee94ecf5347f8a7c6cd9b1895b1dffd0e4b70",
+       "page": 1,
+       "sample_id": "90074ff3e73940b0",
+       "tokens": 3
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-01/eq-007",
+       "inkml_sha256": "6306492905f46a16c28388f1add0fedb79938219e531792600b9ef51784ca00f",
+       "page": 1,
+       "sample_id": "bfa4897e60bda668",
+       "tokens": 6
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-01/eq-008",
+       "inkml_sha256": "9abd437ebf8787f89724fd79bc1b4c738d041b210603fe6f567c7dab7b2fe679",
+       "page": 2,
+       "sample_id": "647c4e2d5f1f33ea",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-01/eq-009",
+       "inkml_sha256": "1701af7250fde4ea1bac83ab2cdacd7e59da36d078403da6e92f8d49ff1ebf12",
+       "page": 2,
+       "sample_id": "aa59698c4ec46b84",
+       "tokens": 3
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-01/eq-010",
+       "inkml_sha256": "c8d65ef63be6e993612ce8930c800229e38fae1e76b7e310ce0d8af06b99d0c3",
+       "page": 2,
+       "sample_id": "e61e8cccb79adae3",
+       "tokens": 6
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-01/eq-011",
+       "inkml_sha256": "35bab409991ba774b841af6bcfaa4082490c87ee3439de6f0aec6af6665c50a3",
+       "page": 2,
+       "sample_id": "8ba420589854fb6c",
+       "tokens": 15
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-01/eq-012",
+       "inkml_sha256": "d8b5188472d92c648fa913dcc3b976fccabe1d8583b46893f36d33b90cbb134e",
+       "page": 2,
+       "sample_id": "0e745d8b02b102ff",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-01/eq-013",
+       "inkml_sha256": "ad13e9c7fa12c223f3290e2f239e0a95025d832b61f9a2631a4d04a5e7ae5a5a",
+       "page": 2,
+       "sample_id": "df18ea13d96d8db0",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-01/eq-014",
+       "inkml_sha256": "4612e28af01659e5ea3e00b4e10ce99b406aa374c4f1dc88482f12d1242e14be",
+       "page": 2,
+       "sample_id": "a098802291c0a79e",
+       "tokens": 5
+      }
+     ],
+     "gold_sha256": "a4b87d4e4a21f6c5e2911fc654031c08ea3b2afd3564618bdecafc1fde574311",
+     "pages": 2,
+     "pdf_sha256": "c381f32732b846eb13fc909dae260ff3e3f10c24d90bc4fc09f16d342cecebef",
+     "pen": "black",
+     "ruled": false,
+     "scan_dpi": [
+      157,
+      156
+     ],
+     "unit": "hw-dev-01"
+    },
+    {
+     "expressions": [
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-000",
+       "inkml_sha256": "cc6c413a929cd08cea0ccba8857e0d0443f5542c8109de21c52e33f5a976eb07",
+       "page": 1,
+       "sample_id": "8a53c90a5785475b",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-001",
+       "inkml_sha256": "9d05f9207359e453970ae8364aade9f2c7471f00ea0918da6a2ab2d03d30f9c3",
+       "page": 1,
+       "sample_id": "06ae75010c7b6ad6",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-002",
+       "inkml_sha256": "9ce5ed73cc3bdb942d61565058f98a35a267516b9d47dd042d0dbffa15248ea2",
+       "page": 1,
+       "sample_id": "94b03038498461a6",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-003",
+       "inkml_sha256": "6c01da57d30dff7c1d0091f69ddb5c75ae0eb283b22ad748b4ffb7e5ef4d6faf",
+       "page": 1,
+       "sample_id": "d8e80e3551dcedc4",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-004",
+       "inkml_sha256": "7984066278b985d8fc797f541a14898a80dd68fc8e506f38829d91684d1920f6",
+       "page": 1,
+       "sample_id": "30eb07fa4fa03d14",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-005",
+       "inkml_sha256": "37fd6929283f038e157db418a4eb0f65d4c4770fbfc373484cd1eb578e368544",
+       "page": 1,
+       "sample_id": "9e2071a02f237c90",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-006",
+       "inkml_sha256": "7b1306934b4364d378bf6c619df862bb2e94a28d9d00e3212b5b34825d12a76b",
+       "page": 1,
+       "sample_id": "184532bfb83d870d",
+       "tokens": 3
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-007",
+       "inkml_sha256": "3228b98f3a6abe9e0f7186d3c871d2083d1759d905395b6860fb0a6801fd3987",
+       "page": 1,
+       "sample_id": "66fcb05f7f5c9afe",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-008",
+       "inkml_sha256": "dedf206031eb67310e417d1373f3b3475bbaa1f5b8887cf9cb912e3ec3ffe4f8",
+       "page": 1,
+       "sample_id": "ee9a041e62bfa32d",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-009",
+       "inkml_sha256": "b0ae7a501c6c9e71c971b06a759f7d7ea5a58693ad80169e702cb7773c48c75a",
+       "page": 1,
+       "sample_id": "ae305ca110b9052a",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-010",
+       "inkml_sha256": "2e43b28494caf67a2f8b68d0768c92904ef12703dbde8e772beec4e41e753d04",
+       "page": 1,
+       "sample_id": "9b859aeb2d7dc132",
+       "tokens": 12
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-02/eq-011",
+       "inkml_sha256": "1199b71b1949366b56cca5307a9e960a7e11dbb37c78c0b53cb019c8b2d953c8",
+       "page": 1,
+       "sample_id": "380072a81f076984",
+       "tokens": 14
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-012",
+       "inkml_sha256": "b1a4f869bcb768c3d6892a2831bf7dc25513906fd7e7115d64caedac59e42cd3",
+       "page": 2,
+       "sample_id": "2edaccab2f73b294",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-013",
+       "inkml_sha256": "d2641ac1703a079ea91dcff3679c6e922ed0b073b073543a9da5755a03ea1ccd",
+       "page": 2,
+       "sample_id": "141476b26d15bca3",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-02/eq-014",
+       "inkml_sha256": "50a2c43a44d05d7e2e865686a7c36cb5730b2e85adba67893768036452078185",
+       "page": 2,
+       "sample_id": "c6744f6e14c8a10a",
+       "tokens": 5
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-02/eq-015",
+       "inkml_sha256": "c68db092c597650a2484d533372831984919112edd715e673c30d956882b6904",
+       "page": 2,
+       "sample_id": "f6656518a7ca1b1e",
+       "tokens": 8
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-02/eq-016",
+       "inkml_sha256": "eec5336925c711ddd9d9b317c8fa185f96a3b36d4b3d496ed08409128487f1df",
+       "page": 2,
+       "sample_id": "248c653042028139",
+       "tokens": 3
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-02/eq-017",
+       "inkml_sha256": "5e93dd52a70f1d56e087f1676a18fef28d4243cc75fb9c799336228e8a981ad5",
+       "page": 2,
+       "sample_id": "2db74499b591830f",
+       "tokens": 15
+      }
+     ],
+     "gold_sha256": "c1b1285b1d46a107173e7d9271c577d2ecccc70865ecf7bee8f27be87f82d821",
+     "pages": 2,
+     "pdf_sha256": "a3d72fdc5dd0f27b3d0dd757f4c21685ea21bbb0ae0d97da291c30297bc6c2bc",
+     "pen": "blue",
+     "ruled": true,
+     "scan_dpi": [
+      189,
+      154
+     ],
+     "unit": "hw-dev-02"
+    },
+    {
+     "expressions": [
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-03/eq-000",
+       "inkml_sha256": "6d1b7f46dacf024fa725541baec14e320cae7ca9e44fe41ea748f31e709d96ba",
+       "page": 1,
+       "sample_id": "2831258ae8f3746a",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-03/eq-001",
+       "inkml_sha256": "2eb4572b5bc00908e58e6d1dfac4dbd230c30e643d23e75989e2df514e43be69",
+       "page": 1,
+       "sample_id": "ef110c5dd5d221f8",
+       "tokens": 6
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-03/eq-002",
+       "inkml_sha256": "55be05afd27183b2806dd765965246b9a9fad5b5c8086b89ded65f1d763aed63",
+       "page": 1,
+       "sample_id": "6043227f1bbb0960",
+       "tokens": 5
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-03/eq-003",
+       "inkml_sha256": "a065128445a5c602bbf3ebc151987e9cb896d10b905178eca6e698f155f2a846",
+       "page": 1,
+       "sample_id": "9987e072d7da093b",
+       "tokens": 4
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-03/eq-004",
+       "inkml_sha256": "1bf363fbb05057eeb7a64ec944cc32fc5d5794e312366a81d3b0dfa3b2ba73a7",
+       "page": 1,
+       "sample_id": "42401d5306e44053",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-03/eq-005",
+       "inkml_sha256": "51598e6b7031d0d1ef50ebd18ecc2aacf046070fe4e68c9524ea97bc2aa96e52",
+       "page": 2,
+       "sample_id": "58b2ae4b7277e5ed",
+       "tokens": 3
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-03/eq-006",
+       "inkml_sha256": "409934df54a2bd8e5d59183b2cd83df6f1925e11f838b48f59ba555218793cac",
+       "page": 2,
+       "sample_id": "3b9380555b6495e1",
+       "tokens": 7
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-03/eq-007",
+       "inkml_sha256": "8f9201fc0d37c4281786345efcb206486487b30e164d54215a1285ec5ee028fb",
+       "page": 2,
+       "sample_id": "e8a6a4b4bcafcf7e",
+       "tokens": 7
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-03/eq-008",
+       "inkml_sha256": "34e781dc2e975f73377361a8b878c01db9273562cf4657f4e8d08ec44588ef40",
+       "page": 2,
+       "sample_id": "aafa6264e2704814",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-03/eq-009",
+       "inkml_sha256": "72f8f2f849ba902ae8d5874ebe532796481499a29f6a2642fd6d92c094fc7dfe",
+       "page": 2,
+       "sample_id": "83fff002c5f20078",
+       "tokens": 4
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-03/eq-010",
+       "inkml_sha256": "2c5a9902c949c4609e855133d466fcba23b828cfbb39e9f7f6c829a7355341cc",
+       "page": 2,
+       "sample_id": "d890acc33d9f02c4",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-03/eq-011",
+       "inkml_sha256": "913b764399f539671e1ca4dee384b4ec6bb1a8fa5963b3e36394be1e5d27a407",
+       "page": 2,
+       "sample_id": "7490903d6f1543f4",
+       "tokens": 16
+      }
+     ],
+     "gold_sha256": "9692d7cd8a1585f5363e20694417da08dbb25879d0bfa19b344059972f1fbb6a",
+     "pages": 2,
+     "pdf_sha256": "dbf14d0cba7b3127494b143084985ab0d7839f18bd399d6ef5a25538b590bad2",
+     "pen": "blue",
+     "ruled": false,
+     "scan_dpi": [
+      198,
+      193
+     ],
+     "unit": "hw-dev-03"
+    },
+    {
+     "expressions": [
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-04/eq-000",
+       "inkml_sha256": "7d400683f0156dd4cbeffaa881bafe688cdea42b30f48d01d553caab356b4bdf",
+       "page": 1,
+       "sample_id": "f17026a17cd015e3",
+       "tokens": 4
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-04/eq-001",
+       "inkml_sha256": "deb57054f3015edf91e2101ed655631300fae284a40b09be63f1b37ac73c2ada",
+       "page": 1,
+       "sample_id": "674982c13d11b49e",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-04/eq-002",
+       "inkml_sha256": "fe1cf03c85f42f37dfd3865e6a893e57b02a021bcd5d9288880bb8138b379469",
+       "page": 1,
+       "sample_id": "353db7c0a33d0e11",
+       "tokens": 6
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-04/eq-003",
+       "inkml_sha256": "086010270aa82aee51f2feed6ca8978c0e63716d84beccc55b512114be0e2007",
+       "page": 1,
+       "sample_id": "d14609ef4ed6677b",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-04/eq-004",
+       "inkml_sha256": "a981ae0a50fe0d0041dd046146a24e7268427ac84648b43a72f8c41dd8279ee6",
+       "page": 1,
+       "sample_id": "830f034300b0b6ee",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-04/eq-005",
+       "inkml_sha256": "f6484312046488bc55624b8fceede06618e0d50e233a49318da689729790ec83",
+       "page": 2,
+       "sample_id": "58284d2233522c25",
+       "tokens": 4
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-04/eq-006",
+       "inkml_sha256": "b18eaa0f7ff1272ab071aa947429f7aa54f8b05a280d28fd8a6938fddf5c6e4d",
+       "page": 2,
+       "sample_id": "fe938af2c772a57a",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-04/eq-007",
+       "inkml_sha256": "7b5874d0068a9614cc6f5b2ef85cdb329b3915ee67e5b448312b0d422f0162db",
+       "page": 2,
+       "sample_id": "3137c805d194867e",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-04/eq-008",
+       "inkml_sha256": "8ffa13f692dbed9dd7dbb9c9e780e70473aa40a01350bde776d00fdc81831d3f",
+       "page": 2,
+       "sample_id": "a02e4200a08cb9e7",
+       "tokens": 3
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-04/eq-009",
+       "inkml_sha256": "c7ef0c017eb9059c311cc7ffb4ca51752238af9658a2ff00306c74b1ec5f813f",
+       "page": 2,
+       "sample_id": "f1b6c44da10f8eaa",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-04/eq-010",
+       "inkml_sha256": "f616f9a59c518487507084b86364fae74577ed954e3ba6db623112e7e8cb8105",
+       "page": 2,
+       "sample_id": "09ce2bc2798752e7",
+       "tokens": 3
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-04/eq-011",
+       "inkml_sha256": "571f12525e648fd747bbf5fcad09f4c65f95742091c2065db355425f51d252c0",
+       "page": 2,
+       "sample_id": "1433c7fcdd34f39c",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-04/eq-012",
+       "inkml_sha256": "f4f76ce987d2fb88594abf282010ad9c9da6268349771e182b3c9f919eab28de",
+       "page": 2,
+       "sample_id": "16f4781cade7f9c6",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-04/eq-013",
+       "inkml_sha256": "4ec1b30280866b4a53145f4eaca8a817675b5853ab9b65453f6048f99a6d8dbb",
+       "page": 2,
+       "sample_id": "15577f3fa349f3f6",
+       "tokens": 5
+      }
+     ],
+     "gold_sha256": "54250a729aeda7d37c8300a9fb88c9b9517fb861b35ccc0dc6b0be407d57bd06",
+     "pages": 2,
+     "pdf_sha256": "eaaaddd50c3cffe5b99ce5c688395b4f12c9e8cfcdaaf7e9da09e3f3baf1cbab",
+     "pen": "graphite",
+     "ruled": false,
+     "scan_dpi": [
+      163,
+      196
+     ],
+     "unit": "hw-dev-04"
+    },
+    {
+     "expressions": [
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-05/eq-000",
+       "inkml_sha256": "2e35fa660f8b1576cfb14fa6bac49bdf5672db08253802de9ab42562db58812c",
+       "page": 1,
+       "sample_id": "a3cb284cc6aee494",
+       "tokens": 3
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-05/eq-001",
+       "inkml_sha256": "6c86e6c36737595181538eac74d4f3da14884c6c0d9319a95f0ba8366a0a6adb",
+       "page": 1,
+       "sample_id": "51dff5165115ff08",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-05/eq-002",
+       "inkml_sha256": "1272f7684d9b7faf45886d7d983d995995da4944099b46c2d195102aa84dd86b",
+       "page": 1,
+       "sample_id": "15840770ff6a5698",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-05/eq-003",
+       "inkml_sha256": "d8ad3e39c9289accf8d7d57b2f67656ac5ec06ead5f66707933a9637ee44e559",
+       "page": 1,
+       "sample_id": "01c8b6bf03461430",
+       "tokens": 6
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-05/eq-004",
+       "inkml_sha256": "a6646fa5e9b09e7a2b869e43e0e5863b7bc26e3eed45abebf95ae9cfdde00934",
+       "page": 1,
+       "sample_id": "bba45f69b14b69dc",
+       "tokens": 3
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-05/eq-005",
+       "inkml_sha256": "b41f8fa044a60e467a836af244602fad30eab617ae4ad1d4e7c90c79e222c074",
+       "page": 1,
+       "sample_id": "e01152c6b09d062f",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-05/eq-006",
+       "inkml_sha256": "c5f7669d57aef109a22fb2524fccfd2fb80337b7c7688af10593ae8d129ac08d",
+       "page": 1,
+       "sample_id": "691a256d18cc8765",
+       "tokens": 10
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-05/eq-007",
+       "inkml_sha256": "bcbbf02c952cec9d22a1422ab2c3101be9c10f7db616e255b7f56fc4d87c539d",
+       "page": 1,
+       "sample_id": "679c710c87b7f0f4",
+       "tokens": 6
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-05/eq-008",
+       "inkml_sha256": "c0857f29ebb8189a8e33c27d16de4f69e303a8c3633a8391872d7e11ceb8aab3",
+       "page": 2,
+       "sample_id": "e1b74fc5e3870bc8",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-05/eq-009",
+       "inkml_sha256": "10f1192d673e65f7c97dd4bec623c3908ac33fbe3ea9e4139729390a2dfaafe0",
+       "page": 2,
+       "sample_id": "edb14cd19a4ca411",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-05/eq-010",
+       "inkml_sha256": "bca2e38223bfe9770c8464b7497893ce5f07421f1f6f65139f77e4a08b4a467f",
+       "page": 2,
+       "sample_id": "1917f8d2963d2447",
+       "tokens": 5
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-05/eq-011",
+       "inkml_sha256": "d7d86e253e1b1e47073a5acd3a677526750c4e1ac8acc10c03f17de49d42e486",
+       "page": 2,
+       "sample_id": "6b8f94b02bcba14e",
+       "tokens": 4
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-05/eq-012",
+       "inkml_sha256": "f2b543fa14aa2daec5dd3fbce7d629705d007b5aa2fd508e813f534265e83bfb",
+       "page": 2,
+       "sample_id": "a5f0ec0e6bd2dc17",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-05/eq-013",
+       "inkml_sha256": "bdd5c4f9bf3c5482d943c4a36192d2a75abf9be3954db3fc44b27d17bfcee851",
+       "page": 2,
+       "sample_id": "ad4fc07a7fe9be08",
+       "tokens": 3
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-dev-05/eq-014",
+       "inkml_sha256": "022af75d066662e9d6565a56c4dfa7fb24dc9eb8c10477cc5dd708b08ef652d0",
+       "page": 2,
+       "sample_id": "0cf675f280d390de",
+       "tokens": 5
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-dev-05/eq-015",
+       "inkml_sha256": "4062b490c88a935b7ebb9d525efd286d1ee290fda7812472a5c61824cfa80fbb",
+       "page": 2,
+       "sample_id": "bf35791f12724386",
+       "tokens": 3
+      }
+     ],
+     "gold_sha256": "01ee7da48d90147e52194450a651c04510e833ac3cfd3d691222716a88f9e591",
+     "pages": 2,
+     "pdf_sha256": "ba04884cf7f5eb3931b4d7ff93c181c1945f767d8417040633f5c62ebc8be6ff",
+     "pen": "blue",
+     "ruled": false,
+     "scan_dpi": [
+      155,
+      153
+     ],
+     "unit": "hw-dev-05"
+    }
+   ]
+  },
+  "heldout": {
+   "n_display": 56,
+   "n_expressions": 205,
+   "n_pages": 24,
+   "n_units": 12,
+   "part": "heldout",
+   "source_split": "test",
+   "units": [
+    {
+     "expressions": [
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-000",
+       "inkml_sha256": "62a6e8da1e1abbfde6d1855f903a40ebe4d88d6661e8ce57145a19e12d9a53e9",
+       "page": 1,
+       "sample_id": "5554f67f05e9c9b0",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-001",
+       "inkml_sha256": "28ea71e3ccf48428c985139d2a0975630153bcf8c2be5686928fbcbbec64b7f6",
+       "page": 1,
+       "sample_id": "ff9e6abec8571b91",
+       "tokens": 4
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-01/eq-002",
+       "inkml_sha256": "94ef4cead48979f3b0a3b8651585a7dbc41b3301e2480e2e734a6503dd0eb7e9",
+       "page": 1,
+       "sample_id": "2748bf48005fa236",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-003",
+       "inkml_sha256": "ea96bf60c28a0caade26ebc0402eaba31cc71795333683d8b79a07b5c964c7ab",
+       "page": 1,
+       "sample_id": "8ec79750a9c09276",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-004",
+       "inkml_sha256": "53c76efc8c5b62a711449c49ca7a45922f0896d22af886a03dcffbc149ba7c8f",
+       "page": 1,
+       "sample_id": "957e968e0ceaefc0",
+       "tokens": 13
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-01/eq-005",
+       "inkml_sha256": "8be72496680b3e11fdfea540a187e5595ddfface18920bc75d89673b07d5bedd",
+       "page": 1,
+       "sample_id": "5b13b04a45abf289",
+       "tokens": 14
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-006",
+       "inkml_sha256": "c215e9a7c6f766221526426c1079420579651e4504ca9df4944ea895d0565782",
+       "page": 1,
+       "sample_id": "f5293eb8db875d0c",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-007",
+       "inkml_sha256": "238f9d5d8ab6123b7f78525971ae19b81afcab64e8659fd762042849f130c96c",
+       "page": 1,
+       "sample_id": "90cf3deed3fc34d8",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-008",
+       "inkml_sha256": "d0b3598036596f7acb72f65c8703e235786ca433dcca789ee27c4f9d2f942998",
+       "page": 1,
+       "sample_id": "e2c1afc1612dd654",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-009",
+       "inkml_sha256": "94535f08ea015d614a615fa8d3e42094c13c3dc9753a6356c9d8178717cf03ec",
+       "page": 1,
+       "sample_id": "54aead3767af6c58",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-010",
+       "inkml_sha256": "6add9f23b2dc9beb2a435a337d11126a452fbb824dc84375dd6086a4491c8be5",
+       "page": 2,
+       "sample_id": "03c1e5d37f7dc43d",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-01/eq-011",
+       "inkml_sha256": "fabd2142bad683fd0c0beea15fab1560d09b95f9c4f842db9d848a60da407d24",
+       "page": 2,
+       "sample_id": "c4d6fdef0af40877",
+       "tokens": 21
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-01/eq-012",
+       "inkml_sha256": "4a88e9e2b7ac259b77f2286c513b08f9763c19f74100e6cda380747534e4d40b",
+       "page": 2,
+       "sample_id": "4b63ff781047749d",
+       "tokens": 14
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-013",
+       "inkml_sha256": "f585997534aa4396ac852e21bd9ca1b1d41d7c8bad61a03d7325713e588ba460",
+       "page": 2,
+       "sample_id": "27592191eef7aac8",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-014",
+       "inkml_sha256": "208ff3e5250840ad1014628eedc5a1158a8960719506946e7a775f772c839bd4",
+       "page": 2,
+       "sample_id": "2ac64ed2d98ad4d5",
+       "tokens": 15
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-015",
+       "inkml_sha256": "f568b6b3f1602f1b06ec81262670773dd8ca21df253845219add5deec9c08b42",
+       "page": 2,
+       "sample_id": "5e03c7c55ea53a17",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-016",
+       "inkml_sha256": "d307bf555344b2c6131733a219611b413b38e11fae5996948108ce68209254ca",
+       "page": 2,
+       "sample_id": "d0c30894a80ac77e",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-01/eq-017",
+       "inkml_sha256": "e5b1e1da58edbfc0d6971755d7e7665464f63fa9df5e13945645e9843c99dc02",
+       "page": 2,
+       "sample_id": "030a0f18b6fcb87b",
+       "tokens": 12
+      }
+     ],
+     "gold_sha256": "ab5cb133566aa2f9fc15ae2eba9948f4f3c8095c9e2be0e2375d43fd3b350120",
+     "pages": 2,
+     "pdf_sha256": "12e7debc0df7bdd6b0826a48870abba3760908f12ee2d2a9cd3e34d2aaabb7a7",
+     "pen": "black",
+     "ruled": true,
+     "scan_dpi": [
+      155,
+      194
+     ],
+     "unit": "hw-heldout-01"
+    },
+    {
+     "expressions": [
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-02/eq-000",
+       "inkml_sha256": "bc1ddc4765fcb7d97bc43dd9d9cbebdd77afdebd8190924e89a1b4089b20088e",
+       "page": 1,
+       "sample_id": "9d7504b122874c74",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-02/eq-001",
+       "inkml_sha256": "38650fb43697f77488b9277a8f4c426fa6c1f3dceaaec5e6de4e84751f46d42b",
+       "page": 1,
+       "sample_id": "aba3febdce1217df",
+       "tokens": 8
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-02/eq-002",
+       "inkml_sha256": "76d37c88d99dc17ec755de6da5bb9f0c6e15c8324be384f413e97fc6dd60abf7",
+       "page": 1,
+       "sample_id": "fcc22e1317a683b2",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-02/eq-003",
+       "inkml_sha256": "b71ffa9316a1b2eb24834a781fed9ce0987c35ce0941dd0173d63c7c1146c6ec",
+       "page": 1,
+       "sample_id": "395ee537f6454f6d",
+       "tokens": 15
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-02/eq-004",
+       "inkml_sha256": "367ec2a3e3ca04514954bfc7b6dbc2499867bd655a36983834fe64782eb28b57",
+       "page": 1,
+       "sample_id": "a405ed541fa30dc4",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-02/eq-005",
+       "inkml_sha256": "7c546290c14becb01fe6d587bf722849373dec4b2eb313963297530c02fad2fb",
+       "page": 1,
+       "sample_id": "975277f0b4bff3af",
+       "tokens": 12
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-02/eq-006",
+       "inkml_sha256": "b6bf9f309721f169000594fa03f1213416b4c800d2167ccdf24427117e0ae15c",
+       "page": 2,
+       "sample_id": "1712d6b259f1e83d",
+       "tokens": 16
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-02/eq-007",
+       "inkml_sha256": "1eaf08957424b6965eedb50008896ac7f9b8349ca8f4a302e8b6e8a5f76b1f42",
+       "page": 2,
+       "sample_id": "e7bfdede71170586",
+       "tokens": 14
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-02/eq-008",
+       "inkml_sha256": "6016a9f089c8f07f39accf78d19ec7f5ec03510a7095af07bd85efc98f3570e7",
+       "page": 2,
+       "sample_id": "734b02394fa00c84",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-02/eq-009",
+       "inkml_sha256": "fa019d2e12310ebf6be56f35d16331fe6675aefddf26174bb103c659bd588e86",
+       "page": 2,
+       "sample_id": "eb75e6b493b06eec",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-02/eq-010",
+       "inkml_sha256": "5d784aa8956c609060c5c7a4e9f45af4092d321b7e45050406881affdc969ade",
+       "page": 2,
+       "sample_id": "c284e3cc8ed9f1c9",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-02/eq-011",
+       "inkml_sha256": "00f664f9d6ac367a3f1cf8af925876662ca413049f7eec8c7ef274217ba4be1a",
+       "page": 2,
+       "sample_id": "655a762d939f5061",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-02/eq-012",
+       "inkml_sha256": "23fec42756bb48d9fceb699f61f8e9b215a4a50af0025eba53159e7a71bd123f",
+       "page": 2,
+       "sample_id": "df9c16f2f4c8bdf7",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-02/eq-013",
+       "inkml_sha256": "1df5268a97b3d183588951b01b446493ba90b56963552243e27866854c8907e5",
+       "page": 2,
+       "sample_id": "c0f5a36762f5abaf",
+       "tokens": 13
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-02/eq-014",
+       "inkml_sha256": "38c87e85f1e5a30fd14f8f4caa99273fa5fd2787460943271c0313f75042f1f5",
+       "page": 2,
+       "sample_id": "da860fb7bcbaba89",
+       "tokens": 8
+      }
+     ],
+     "gold_sha256": "1aba382f645ed24831c3d39d9a45604ac4f4b57d32441cbc6e20a11b54491b0c",
+     "pages": 2,
+     "pdf_sha256": "1f3ce8ab538c7f23ee7a3489a6c40ec2b5f16236d0b3e48f517a0a3e2206c1e0",
+     "pen": "black",
+     "ruled": false,
+     "scan_dpi": [
+      198,
+      152
+     ],
+     "unit": "hw-heldout-02"
+    },
+    {
+     "expressions": [
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-03/eq-000",
+       "inkml_sha256": "d4e4f347fd305b85e5c7ec11546b258b3935ee331ddf0ae3043fc43521806792",
+       "page": 1,
+       "sample_id": "e8d0caaf1afaf0cd",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-03/eq-001",
+       "inkml_sha256": "8f72494eaec8303387beaccd286a73d50b16782675194bd4b365914c36bc05a5",
+       "page": 1,
+       "sample_id": "3ed648a1dc8ff4da",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-03/eq-002",
+       "inkml_sha256": "1eb46c7a440e7b70577bbf1a0c8dbced37305ae8df580762cb31a25d1c726a09",
+       "page": 1,
+       "sample_id": "42f4087d3d891de6",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-03/eq-003",
+       "inkml_sha256": "40dc0bb96ece439afaf563e4be0e6eb806996864ee9b7fc5d3f2b42c6db3d82c",
+       "page": 1,
+       "sample_id": "4afd2b13ca51b1e7",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-03/eq-004",
+       "inkml_sha256": "39fa96f2d0177d3761c4a8cb61281b8fcba05ae258c492c9499dd971e27392a0",
+       "page": 1,
+       "sample_id": "5c25a22451cde96d",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-03/eq-005",
+       "inkml_sha256": "607b2e24350edaf5b157f0e2ac950c4f95a9f5f4135a58e752cc8c112a9bb317",
+       "page": 1,
+       "sample_id": "3f7d7001bac677d9",
+       "tokens": 4
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-03/eq-006",
+       "inkml_sha256": "c68466705f312bb635c8cf72e90121edadf0268c032db66b1dcd2beb947f7829",
+       "page": 1,
+       "sample_id": "02c9daf282f5a1e3",
+       "tokens": 18
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-03/eq-007",
+       "inkml_sha256": "6dc16b47f654d3120b1014a9f4690fd33a1bf2cad6768ca8f35fc760c7c4f611",
+       "page": 2,
+       "sample_id": "9923cd1658b53395",
+       "tokens": 16
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-03/eq-008",
+       "inkml_sha256": "8ecdc2a3f22eb7b65b6f6493a62d81e3a985fc910b78be1281b54ffcd810797f",
+       "page": 2,
+       "sample_id": "3c05c30a2647b85b",
+       "tokens": 10
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-03/eq-009",
+       "inkml_sha256": "1f8b31fef7ce06e29ce8be29fec5669af2353121a8da346c170332ed1a35636d",
+       "page": 2,
+       "sample_id": "0199f657babdf636",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-03/eq-010",
+       "inkml_sha256": "83a1dd2b01aefa756299784b07f3648dae77b6dcd66f97a902b61e647d622b5f",
+       "page": 2,
+       "sample_id": "f88bf6086f892ff7",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-03/eq-011",
+       "inkml_sha256": "9722b3a2f957c7708d6eacea449e8ef87fe9c30e43c024e96cc913aae0976ee0",
+       "page": 2,
+       "sample_id": "dbec810e662bd5b1",
+       "tokens": 10
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-03/eq-012",
+       "inkml_sha256": "aa5beb714e2be09269a1e7b110e97082d14b48ee2596888d115a922f1daad9a2",
+       "page": 2,
+       "sample_id": "55183f8f070c9b58",
+       "tokens": 6
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-03/eq-013",
+       "inkml_sha256": "dc1e7ba7e6a7034e008e1811eb95d10bb5f6440292b6c3ad9d541bb21535b876",
+       "page": 2,
+       "sample_id": "c551fe30fec09afb",
+       "tokens": 12
+      }
+     ],
+     "gold_sha256": "d5402120e50a83fba81183de359a49f4cdffe54300cb7496edf4366930392dbe",
+     "pages": 2,
+     "pdf_sha256": "957a53efd7eed488029f066f70e043f5dcdfa9a05ea4d6f1993f1c8f8e6a92da",
+     "pen": "graphite",
+     "ruled": false,
+     "scan_dpi": [
+      169,
+      166
+     ],
+     "unit": "hw-heldout-03"
+    },
+    {
+     "expressions": [
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-000",
+       "inkml_sha256": "85423a7e3f66f5eb988d1d68a5e1d1747be78f6991662bd26c3e4d607a228000",
+       "page": 1,
+       "sample_id": "11cd9dd6252ad06b",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-001",
+       "inkml_sha256": "bb911701f4d59b31cd74be35a8c77bd74a383fcd898b4c1cb50067ce89481047",
+       "page": 1,
+       "sample_id": "a89a06c59f0c80da",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-002",
+       "inkml_sha256": "11c65e6524c4f75ecc292dd7d5f80b8c16844ec9a074d204595e1e4b3a20e299",
+       "page": 1,
+       "sample_id": "dbaf67a06e4ae9aa",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-003",
+       "inkml_sha256": "873e969469c7e07d9d0d959922dcaad221252fd2d2ebbf8b472e72964b7daca5",
+       "page": 1,
+       "sample_id": "509b4fe0e73f8e81",
+       "tokens": 8
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-04/eq-004",
+       "inkml_sha256": "1f566d96782fab3ec40bc348ed520c6f1567bfb97d7329283c67f635e49f5a78",
+       "page": 1,
+       "sample_id": "b64830ccd4043464",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-005",
+       "inkml_sha256": "1507a445670c4d92ee4461f2ad74dff7f56acc845ec2e54d3caf54bea826e171",
+       "page": 1,
+       "sample_id": "175258181988267d",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-006",
+       "inkml_sha256": "56338aa41924e8f9e51b2037a88f91e297aeb278890fe54d79dc01f2726071fa",
+       "page": 1,
+       "sample_id": "cf76f4fdae539eeb",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-007",
+       "inkml_sha256": "fd3fc4235573ce27e3ab383826fb359dec07ce484aea015d3d6d7ccc481e82a0",
+       "page": 1,
+       "sample_id": "79c75d1181eaa334",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-008",
+       "inkml_sha256": "3425decb4030029591c84518b246a36f5f0b86b0216418e09f7cd1ffdf005f10",
+       "page": 1,
+       "sample_id": "faa1f2da57149ee3",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-009",
+       "inkml_sha256": "412c73620e7488d061e9503b710691ffe2b47156577d9351349eafe36344fcfb",
+       "page": 1,
+       "sample_id": "7f74824c6f21c716",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-010",
+       "inkml_sha256": "67ec67cd48017356d166cfac1c7577c83f0e408566e57f943f87d0a28676608a",
+       "page": 1,
+       "sample_id": "1de6f3d57c7dd88e",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-011",
+       "inkml_sha256": "86ec3837d32fc39cb24901e03c5b0f45b96b1f7ce8a533de4e051cc327d01b40",
+       "page": 2,
+       "sample_id": "feca4993d5a38320",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-012",
+       "inkml_sha256": "5df68078c8aca6c691747a8f770b45b14a288780f4ff2e10fb52d25988245324",
+       "page": 2,
+       "sample_id": "5cda322d7c94d158",
+       "tokens": 10
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-04/eq-013",
+       "inkml_sha256": "530597c196e57cb1ae42ada748d3632b8292e1dd51a6aa42afb57e00da464382",
+       "page": 2,
+       "sample_id": "cbd4addf6b570e52",
+       "tokens": 12
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-04/eq-014",
+       "inkml_sha256": "8c011a2456c98bc6c088c3f23637bbf95f52631591af319eec0ade3d3d9076a2",
+       "page": 2,
+       "sample_id": "83518978ac0a9ad8",
+       "tokens": 5
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-015",
+       "inkml_sha256": "75c9ec3a2a4a224fdbabc44aa0cae6852c6fe420f830cf5ee417357bcfc52e4a",
+       "page": 2,
+       "sample_id": "36aa27bd68df6be2",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-016",
+       "inkml_sha256": "c825aa9e7efc3228a462bcdaedc46801657c49ead1852d445c0af1be81dda015",
+       "page": 2,
+       "sample_id": "c66be0815e80d52e",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-017",
+       "inkml_sha256": "ad52d3bcb52e9788672b1b490ec71d6a3a3aa31a0295f2f6bbd2f2e971937db5",
+       "page": 2,
+       "sample_id": "aa4ee522c2ea77c1",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-018",
+       "inkml_sha256": "b8bda609b2bac06b1fe8711f702eea885d879bc8d6f861e56316703d8adc0b7d",
+       "page": 2,
+       "sample_id": "4a19d0eae02bdb72",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-04/eq-019",
+       "inkml_sha256": "96cce7a5b7aaae06ef9fdb958ee29e1ec1c20d364ddd167701d6093751964b0d",
+       "page": 2,
+       "sample_id": "0fafcff79c28b378",
+       "tokens": 8
+      }
+     ],
+     "gold_sha256": "93a3ed1431e92f0ae9ee7a747c710debb1b23f50f6631b89d939df52ab1adfce",
+     "pages": 2,
+     "pdf_sha256": "ec7f1832df4e2acd3515d6224d08a58840748f9d139bd1288676c6a7317e52e0",
+     "pen": "blue",
+     "ruled": true,
+     "scan_dpi": [
+      170,
+      179
+     ],
+     "unit": "hw-heldout-04"
+    },
+    {
+     "expressions": [
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-000",
+       "inkml_sha256": "ce912f74194807882de0f9f25d672854cf16a80a8f0730e74ba560636b8d102b",
+       "page": 1,
+       "sample_id": "25268ae84bdb6b4c",
+       "tokens": 5
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-001",
+       "inkml_sha256": "f76714b520ad4f615c5f2090ec7fe9ecdba2bdcbb04de4b9ab378e08413f754d",
+       "page": 1,
+       "sample_id": "9016b83d2247dc6e",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-002",
+       "inkml_sha256": "85e929f4c431d2d5933eaf9189052d232677b2ce80a429a5bfa101a14faa8489",
+       "page": 1,
+       "sample_id": "ea2c811c413d3898",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-003",
+       "inkml_sha256": "ce926e35ec5da61e473065ac3b82494d1549afe5963965769119a8d2a161dfde",
+       "page": 1,
+       "sample_id": "666bf092220a8878",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-004",
+       "inkml_sha256": "9402b73a138c313da4aaf3b5360501a8f37176c1a43ca0cecc29f8a412b19d60",
+       "page": 1,
+       "sample_id": "e7a6cd433073ed90",
+       "tokens": 5
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-005",
+       "inkml_sha256": "d680aee88d10c4c6c4a97465a4ed149da354f5a883763dacd7f58da61e87785e",
+       "page": 1,
+       "sample_id": "9e407ff16e7a7bb7",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-05/eq-006",
+       "inkml_sha256": "3f820c7759fca3fc78a9dc3577038d324453dbbf8fb2069ae9394ae77de8ddf4",
+       "page": 1,
+       "sample_id": "7f0fba8c33f335bd",
+       "tokens": 17
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-007",
+       "inkml_sha256": "31d50ef486777e5e1de7185e7c42183e245a92ad3ed635a03afde4ede5c6e878",
+       "page": 1,
+       "sample_id": "42cc7a0d6c117f45",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-008",
+       "inkml_sha256": "d5d6c2cd87e7d9b2b981d48ec06460eadc437ce9fc4bae229bd01076ea6045f4",
+       "page": 1,
+       "sample_id": "21e79377e95842c9",
+       "tokens": 14
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-009",
+       "inkml_sha256": "381c35f6d51b089f7ef07c60662aab187a2971382b90b224f9b4cc6b0ca9be0d",
+       "page": 2,
+       "sample_id": "51c706b056e40c67",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-010",
+       "inkml_sha256": "111b9c737464faa64164e579fc52649184fe9602f10f251efe510b50c4d1f47e",
+       "page": 2,
+       "sample_id": "bfda504f311e7a33",
+       "tokens": 11
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-05/eq-011",
+       "inkml_sha256": "41953a4097b0749faee80a6d058f0322e8c5f690968c7d26c7a6114378395a09",
+       "page": 2,
+       "sample_id": "e08c046ff99a708e",
+       "tokens": 16
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-012",
+       "inkml_sha256": "ec33584656b4288ebaefe1e51bb534738ef12ff81e9d082d12b56094829f4461",
+       "page": 2,
+       "sample_id": "435b91ac8db3c4d6",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-013",
+       "inkml_sha256": "a71d7270c52a30b50f1394caac8b774dc1a4dea4a113f8698aa0373b6a2be655",
+       "page": 2,
+       "sample_id": "42962c6664dde46c",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-014",
+       "inkml_sha256": "278d52ecbab710ebc198b18800e63648d33fa7598d095d5aef88545bc7905c36",
+       "page": 2,
+       "sample_id": "12155339f1507c09",
+       "tokens": 5
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-05/eq-015",
+       "inkml_sha256": "b351235456183e6b576a6700f01b3da49969e0df036741f92542a38e4e10910c",
+       "page": 2,
+       "sample_id": "61d10a9fcd0ca4ad",
+       "tokens": 12
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-05/eq-016",
+       "inkml_sha256": "593491cf6e8dd775d714bdde543d23c253485a084552b61cb89dbd932859a170",
+       "page": 2,
+       "sample_id": "1711c11ce23595c3",
+       "tokens": 8
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-05/eq-017",
+       "inkml_sha256": "3d413ebc2bdf4dd152018478d50f4301ebd9a93c433e2ae2a545033b88a00e97",
+       "page": 2,
+       "sample_id": "5c353aa9389fd02d",
+       "tokens": 4
+      }
+     ],
+     "gold_sha256": "dd1db7511da191761b7fa0c4f6b12d492c64468af233f145fa3665947c20b162",
+     "pages": 2,
+     "pdf_sha256": "95cf318a737837549827ef2b8e3323ebac15745c49a4fe3aadcbca766e710c1a",
+     "pen": "blue",
+     "ruled": true,
+     "scan_dpi": [
+      170,
+      183
+     ],
+     "unit": "hw-heldout-05"
+    },
+    {
+     "expressions": [
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-000",
+       "inkml_sha256": "eec8bd6769b9c852fdabc283ffac9e15b270a1629aeae021250647b0cf2267e8",
+       "page": 1,
+       "sample_id": "cc7df10ad2b8905a",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-001",
+       "inkml_sha256": "bd099c350c257cccf87b22a8dc2fde87548be7c7714b4de319541fd66a62b8ed",
+       "page": 1,
+       "sample_id": "8b4573463088e5c2",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-002",
+       "inkml_sha256": "867bf957444eb92667254ae5be5bb4658cb46f3372620e03f2473e011d37981d",
+       "page": 1,
+       "sample_id": "17ddf096f50644fd",
+       "tokens": 11
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-06/eq-003",
+       "inkml_sha256": "186ffe2dfa36ebd0f1f833b528b794f84a41c3465d217a9521bef7bc4282f5b5",
+       "page": 1,
+       "sample_id": "9411995d42ea93db",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-004",
+       "inkml_sha256": "9b6f08a74298c57e0eec37854f583c4dcf4c1de370f4d3ef0c180195e58a1391",
+       "page": 1,
+       "sample_id": "b95f3dc982137648",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-005",
+       "inkml_sha256": "1ace9d1a8889d90e6af86cd2dd072e8ccbc585805c099802c53247ffc0874136",
+       "page": 1,
+       "sample_id": "5a3bba21009820f8",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-006",
+       "inkml_sha256": "626a10d1b520432ddb8dd74cbaffd4718377d29ca18894c267eec53fd6132f81",
+       "page": 1,
+       "sample_id": "a4610173f78116b9",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-007",
+       "inkml_sha256": "54f88b3998422ad4ab3b47619e0dd720e3064fa36aa1568a8f70b5922739a72e",
+       "page": 1,
+       "sample_id": "a83667c45d5aaa75",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-008",
+       "inkml_sha256": "7688bd45dab30e80974344b14bba0e73208c3003cb2d58259978e395781903bd",
+       "page": 1,
+       "sample_id": "9b9737eb07b21474",
+       "tokens": 4
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-009",
+       "inkml_sha256": "abe2b292ae3a94642f4219a0dd045e123e55972c22c4964d6da708a1208a8b31",
+       "page": 2,
+       "sample_id": "870b01e4feedd585",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-010",
+       "inkml_sha256": "4f9cdb33b2b49a221852db4f6e033546c11d3c6b1d32ef0cce6c8379fe144816",
+       "page": 2,
+       "sample_id": "af8f0cba5e790d6b",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-011",
+       "inkml_sha256": "3205d33fb102a164b769c0661a5559c62b720b6689c4bdb034c160196445c1be",
+       "page": 2,
+       "sample_id": "c6a493c1ef250acc",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-012",
+       "inkml_sha256": "65326c1b360f84761f19eec689660c9935f3396f920962c2cd8c274d0b9a5687",
+       "page": 2,
+       "sample_id": "2b6607fe6ef42f99",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-013",
+       "inkml_sha256": "555a9167a7ffae87d70f32755a04bf0990929c22de862be73ad6792b12523b62",
+       "page": 2,
+       "sample_id": "fdc34c0f5933cbd5",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-06/eq-014",
+       "inkml_sha256": "b3144f865560df9543d22491d0ec14758ceba94ae0b2082082d520adc55f7f69",
+       "page": 2,
+       "sample_id": "4015ee6687d7b519",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-015",
+       "inkml_sha256": "9ed12c79343113376d0b7578c4bc3ee4f6f19a4f7625ff1a960987e8767bff83",
+       "page": 2,
+       "sample_id": "60190d6462802698",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-06/eq-016",
+       "inkml_sha256": "2c9b0fc6edc36f412c1cdf650bd5fbcd837ce4940cfeb30e80d3b726f82135ff",
+       "page": 2,
+       "sample_id": "1067afd5a52b0b9d",
+       "tokens": 10
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-06/eq-017",
+       "inkml_sha256": "9bb3b41c900616131462839a4111ec1217e442dbf7482f8bd8abc73e04f860ce",
+       "page": 2,
+       "sample_id": "6aa0efcc0e5ff608",
+       "tokens": 13
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-06/eq-018",
+       "inkml_sha256": "a367945a03b3ad78d10f1fcd2c1c789ec910a8c3e8bb4700071dfc9608cd4066",
+       "page": 2,
+       "sample_id": "bdd02c071f28d883",
+       "tokens": 9
+      }
+     ],
+     "gold_sha256": "298ad4dd2c5b4138d69845984734760b51c997a73189a2a29ab7e0db2e14d53f",
+     "pages": 2,
+     "pdf_sha256": "8d5d3d1e8f6c67f00558516eb656462a5fdbd25ae6bc3d50f35c7c513e43f5f6",
+     "pen": "blue",
+     "ruled": false,
+     "scan_dpi": [
+      163,
+      200
+     ],
+     "unit": "hw-heldout-06"
+    },
+    {
+     "expressions": [
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-07/eq-000",
+       "inkml_sha256": "90ad24b2dc61673e0c130e9487dd5b11cb155baef44234c676b2273cf1302f6d",
+       "page": 1,
+       "sample_id": "a03ef44cf397c55f",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-07/eq-001",
+       "inkml_sha256": "0fab8db8ee24301a6861f617733a3a9e874e28071c06db4be78100d259e0497b",
+       "page": 1,
+       "sample_id": "d53f77f1ad146310",
+       "tokens": 13
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-07/eq-002",
+       "inkml_sha256": "1ff732e74a8e35660c53793689e37e4cd8a9188c84589d7933ef02c64e2997a8",
+       "page": 1,
+       "sample_id": "4f9534fefb13c348",
+       "tokens": 16
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-07/eq-003",
+       "inkml_sha256": "942d05de466e790eb8e568a3ec28fad81cde2ec1a923da738298f3cd244f027f",
+       "page": 1,
+       "sample_id": "846754dfc8b16bf5",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-07/eq-004",
+       "inkml_sha256": "496294e8429b491151925b2f1d640bf9e16659c8142f6f13484067efd1cf0666",
+       "page": 1,
+       "sample_id": "5b7b96d4a6970ce3",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-07/eq-005",
+       "inkml_sha256": "06dcabf11c3800f51ffcfd4a4e40a912134d9c54c89e89b3f0fae656bdc300cb",
+       "page": 2,
+       "sample_id": "a6ddb408e19429db",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-07/eq-006",
+       "inkml_sha256": "73e0cf0ec7f5f5c6f7841feb0fb300b731d7fd67e63cfb5ea425ca955be6cf14",
+       "page": 2,
+       "sample_id": "39d5af8ccb51045d",
+       "tokens": 4
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-07/eq-007",
+       "inkml_sha256": "fdb9ee5cb01bdbb76b7c3eb75714579b50e455d90dbf22ac4019bb0a43d58312",
+       "page": 2,
+       "sample_id": "bc551651aec156c1",
+       "tokens": 15
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-07/eq-008",
+       "inkml_sha256": "ff43a277cfea35587086ba7ccea3fe7c009276225deffa8ecabfa98611a33871",
+       "page": 2,
+       "sample_id": "eaba99a40d175572",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-07/eq-009",
+       "inkml_sha256": "6d33f90ae2fb8dee3a9b3457eb2c3351f1deae2e0672a7498fb9b9715ae11fd0",
+       "page": 2,
+       "sample_id": "9389888b640e9866",
+       "tokens": 15
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-07/eq-010",
+       "inkml_sha256": "c08f4d24005fe51fb63730eb5f9eef15e8f189204cb4ca5ddd165ad2eddeaee1",
+       "page": 2,
+       "sample_id": "b3e08eb02c98240a",
+       "tokens": 14
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-07/eq-011",
+       "inkml_sha256": "4c8fb180e01af24e67d0bdea4aa35351c3073d1f5189cfb004d98d33588a1e1f",
+       "page": 2,
+       "sample_id": "eb77ebc3179a8096",
+       "tokens": 13
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-07/eq-012",
+       "inkml_sha256": "972403ae60547dfe4833946c7ca8fe84200e0fdf03b4f9e863ada293e22a9501",
+       "page": 2,
+       "sample_id": "2927af5cb8c9a6e9",
+       "tokens": 4
+      }
+     ],
+     "gold_sha256": "bad9cb40992016a9363d852a81ccdca67a62698036d87521402bca75a9a87469",
+     "pages": 2,
+     "pdf_sha256": "5727fb8443d6341f3e170959d582e207838aa13622dfd7357cb7335f9456d2bb",
+     "pen": "blue",
+     "ruled": false,
+     "scan_dpi": [
+      187,
+      162
+     ],
+     "unit": "hw-heldout-07"
+    },
+    {
+     "expressions": [
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-08/eq-000",
+       "inkml_sha256": "15a93b3b168257f346c75c4e77a7c36f884fdd6be25184868b12cc783eaccec7",
+       "page": 1,
+       "sample_id": "8352c2acbe0d6067",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-08/eq-001",
+       "inkml_sha256": "b1b78a28e202f90b8c2e2f62a9da776de3be3d4075bfd033ebbfbc0c16725676",
+       "page": 1,
+       "sample_id": "58e0042f2e3d3aee",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-08/eq-002",
+       "inkml_sha256": "43858387e51109a28f18c33dd93272a390e42ea9ebf72e09d84dc31ce74d3b6d",
+       "page": 1,
+       "sample_id": "266fa5763f3fd2ba",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-08/eq-003",
+       "inkml_sha256": "08132750e5eb7f66b360c463a26670653d923644dbc8f1e92cb17c1bde11d553",
+       "page": 1,
+       "sample_id": "8e8e3ba858103474",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-08/eq-004",
+       "inkml_sha256": "cc83b807147a17bf56c05424d09f0f404eddfce4e26788e2e922ebe79f3d4568",
+       "page": 1,
+       "sample_id": "bcbb096de8d1e56d",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-08/eq-005",
+       "inkml_sha256": "8161c36b1aad40d3229abbf6fb25180fbed692bc20661abda70afb3b0dd9d081",
+       "page": 1,
+       "sample_id": "b13889d176de9798",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-08/eq-006",
+       "inkml_sha256": "fb059ff023c8645fadfa20e4ac3e831ab4871b15dc75b7bebf0e6a2f571a3a4b",
+       "page": 1,
+       "sample_id": "87c8aa4a3761075b",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-08/eq-007",
+       "inkml_sha256": "807b8f578290c8f721c9d3966b273bef1d90370f3c5d680599e33b45014b6caf",
+       "page": 1,
+       "sample_id": "fc8ee800105cd21f",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-08/eq-008",
+       "inkml_sha256": "009b5c525159bc0a48a6365501fd502366ad120a0141f4a0f8712d4e9529cc6b",
+       "page": 1,
+       "sample_id": "d85d3564f9fdeb7b",
+       "tokens": 17
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-08/eq-009",
+       "inkml_sha256": "3fd8aafb00ec0b6b8e09dfe4c19676f6fdba4d3cf1fdfec1906af1ac10b76ce6",
+       "page": 1,
+       "sample_id": "e602ba1775e1958a",
+       "tokens": 5
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-08/eq-010",
+       "inkml_sha256": "0fc13fe446109221ea0b43febef955802cf752637cd5fb7fd2f4934fa30c861c",
+       "page": 1,
+       "sample_id": "c456b336cd93d3d3",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-08/eq-011",
+       "inkml_sha256": "dfc7f4d1aaa9cb60d44dd8a8d24b5671e6133a57344833eab0984b684f6d5749",
+       "page": 2,
+       "sample_id": "428180f590560980",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-08/eq-012",
+       "inkml_sha256": "06f9eb7ec150e47122bc2f8fabeffe826dac788bb288d76f8848c28bcfb4298a",
+       "page": 2,
+       "sample_id": "be1d0edb0222e783",
+       "tokens": 5
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-08/eq-013",
+       "inkml_sha256": "2ff10f8384b4cfa3f33f89cd99d68bbdfac601121ebbd0eb3c690861dac6d595",
+       "page": 2,
+       "sample_id": "5e77d1483b2d2429",
+       "tokens": 13
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-08/eq-014",
+       "inkml_sha256": "474e4c4e776badde5d1a11ae4e319a29464cc622a9099b5d9c56910624763e9d",
+       "page": 2,
+       "sample_id": "47d227ff597d1e2b",
+       "tokens": 11
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-08/eq-015",
+       "inkml_sha256": "63619fba723679c9c495caea411547cf39fc5e24f68c45582caeca8b9ef54eef",
+       "page": 2,
+       "sample_id": "f587e39ed0be7cca",
+       "tokens": 12
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-08/eq-016",
+       "inkml_sha256": "637cf3c949002748c48b2ccb2a76954eba2980071cd1d4799acc5bb2f7252aaa",
+       "page": 2,
+       "sample_id": "1224d67e9dec0eab",
+       "tokens": 16
+      }
+     ],
+     "gold_sha256": "7517319406fa944505823b1ab2a97f79103a2075d9ba0746c1646dbb249be051",
+     "pages": 2,
+     "pdf_sha256": "f487fea3590d3755c79fa66cd00a807209e44b693876b1e8ef40b06e74e90c65",
+     "pen": "black",
+     "ruled": true,
+     "scan_dpi": [
+      171,
+      197
+     ],
+     "unit": "hw-heldout-08"
+    },
+    {
+     "expressions": [
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-000",
+       "inkml_sha256": "2e3d6fd3eeb4e74f51bc28c6e88f53888218304364fedb43387fea60e7829366",
+       "page": 1,
+       "sample_id": "6ad50ae380f4322e",
+       "tokens": 16
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-001",
+       "inkml_sha256": "3edb7a469d5be20600ab00290677e0e30ac387d6511ca36d4630e237baabc601",
+       "page": 1,
+       "sample_id": "6349523071dc537a",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-002",
+       "inkml_sha256": "c12dc6507c65dc85bbdb12fb69435a2729515ba03ef51ff9cd76a8cccf0f32dc",
+       "page": 1,
+       "sample_id": "b4f2da3c7ace46c3",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-003",
+       "inkml_sha256": "74119d86804d15b38c8f09c3a902d1c714bbe4c70827bfde9b572d28b11c66e4",
+       "page": 1,
+       "sample_id": "6cfd3fece2950537",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-004",
+       "inkml_sha256": "d18f9a39bce6b1570f92d0c3741e9ee684a85c765e0eaaeee68734766fcb4702",
+       "page": 1,
+       "sample_id": "5326766c784854fa",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-005",
+       "inkml_sha256": "6a04e3774705be8adadf82d10a384dd0aedee4c97622d53376b295afce3406dc",
+       "page": 1,
+       "sample_id": "9465ba134929cdf3",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-006",
+       "inkml_sha256": "3181294122e44950ccfbc11ba14262584bcb647c39d701b1625485a2681ed6d8",
+       "page": 1,
+       "sample_id": "cab2833a2228e8f7",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-007",
+       "inkml_sha256": "84208173ff30cc83cb1132ae5f62829beb9d12776d9b24545b9bcf78bef829f4",
+       "page": 1,
+       "sample_id": "eeb605abb30e8e65",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-008",
+       "inkml_sha256": "c1000bdd0ba95f0c37702e057eddba06c722745b7e52daae00372b68a0ccb868",
+       "page": 1,
+       "sample_id": "ea861056719aee54",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-009",
+       "inkml_sha256": "ed18d80e273dc102fc2856497aa78b36be29dd13d1373216a18791738250ff06",
+       "page": 1,
+       "sample_id": "5c644e396cb44081",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-010",
+       "inkml_sha256": "ed07eb0818451ea727f7ca6af578252360e73c0877d97b3eae0b618a9c0ad721",
+       "page": 1,
+       "sample_id": "e02c3d384e6d8e9b",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-011",
+       "inkml_sha256": "26d7000b9402fd2749002e5e62b9ca70737da94c55d1b0aabf0027b8e69e38e4",
+       "page": 1,
+       "sample_id": "134583cae9c84060",
+       "tokens": 14
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-012",
+       "inkml_sha256": "b5046a0e3da9d14977fc72439a11374ec1687e581ece06e1b5a52307e5a74f96",
+       "page": 1,
+       "sample_id": "6eef8b6a79681d25",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-013",
+       "inkml_sha256": "2c82a44318b447c3bddcc5d0b50df445a695a357d41a840ef2aa18522dad45b8",
+       "page": 2,
+       "sample_id": "f11facb1c5f83265",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-014",
+       "inkml_sha256": "8f3b0614ba6f00c0efd1d8a2ca39b3e13f050b6ec44a62209bdf961ac9c0f383",
+       "page": 2,
+       "sample_id": "2e2995bd120fa467",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-015",
+       "inkml_sha256": "06550b412cd45968559e8d91c777a9d78db1f08d0b73fb468ec2caec0f2c7a51",
+       "page": 2,
+       "sample_id": "8a66f089c942086b",
+       "tokens": 10
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-09/eq-016",
+       "inkml_sha256": "621e57b162b3a0718ece06d6d805cee6ebb6c39938e6d5b0df95545f1a2a62db",
+       "page": 2,
+       "sample_id": "30157fc71064b98e",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-017",
+       "inkml_sha256": "bb3f380b3df20ccfdf4fb4c9eb320177d8961ec65b15436a8eee6aa52bae249f",
+       "page": 2,
+       "sample_id": "37163408eaedcc8b",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-018",
+       "inkml_sha256": "a1321058158c20853344de70afeb9fd9b6b8e8dd2eebb0047d138082e5e48398",
+       "page": 2,
+       "sample_id": "326992ca300710bf",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-019",
+       "inkml_sha256": "6375b27e26f341796c593e368271e00154b0e0af081ff744ab195f393096ad4a",
+       "page": 2,
+       "sample_id": "924c0d1079f50500",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-09/eq-020",
+       "inkml_sha256": "c1037082d3eec1d2de80ac3d0d0f6a7041c8bf8d556b47ec8d341dac4f75ba24",
+       "page": 2,
+       "sample_id": "0017bb5822bcba69",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-09/eq-021",
+       "inkml_sha256": "9d0e26c11dda9c45b184ab1bba6e1cbb64f64538dc4bcb0c7c02decb24903224",
+       "page": 2,
+       "sample_id": "ac985295b434109a",
+       "tokens": 17
+      }
+     ],
+     "gold_sha256": "bdbea57f2a0db83b66490bb3db2f8937715024f0296da6eb873c9ffb0d410080",
+     "pages": 2,
+     "pdf_sha256": "2d15f5ebed075468e91c83ea5c34f2ac600320a24d5bd840d24b1254f5c06a41",
+     "pen": "black",
+     "ruled": false,
+     "scan_dpi": [
+      150,
+      197
+     ],
+     "unit": "hw-heldout-09"
+    },
+    {
+     "expressions": [
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-10/eq-000",
+       "inkml_sha256": "07f731f1517519f5d53b982d51ffab57aeddbfc373dbb67dda8348ff659a6638",
+       "page": 1,
+       "sample_id": "f6dd891a7372ce0e",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-10/eq-001",
+       "inkml_sha256": "4098c920fcf18a9f6a1997cc5aeb36f9806600747e80c5c3fa90f93dbd89c0ad",
+       "page": 1,
+       "sample_id": "c63f6bf6b65051f8",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-10/eq-002",
+       "inkml_sha256": "7f8bfa2e65f45bfd4b879b477fb04253980ed13eb986cd71fd98ae6f219e9f55",
+       "page": 1,
+       "sample_id": "088ad06ff214d28e",
+       "tokens": 5
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-10/eq-003",
+       "inkml_sha256": "92f45baeb9de25fe143d56ec86c3935ed08404381925be56b811fe3325e23eab",
+       "page": 1,
+       "sample_id": "1a53b23c9b74b593",
+       "tokens": 14
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-10/eq-004",
+       "inkml_sha256": "d5b806e783575e2b669db0c05ec27aa29b3150dbbee128cef0239018c9ad4833",
+       "page": 1,
+       "sample_id": "18575019b822813d",
+       "tokens": 9
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-10/eq-005",
+       "inkml_sha256": "df014501bcfa4bb69f9868a7d91cc7e8ecee78aad6197af4d38cc7ed8b6880a6",
+       "page": 1,
+       "sample_id": "29f0614dca65166a",
+       "tokens": 10
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-10/eq-006",
+       "inkml_sha256": "77410ec6595f864b1677bb93ff5da832711d165ae9f84bf853f40fe79a5420bb",
+       "page": 2,
+       "sample_id": "b51bed533fd6fdd8",
+       "tokens": 10
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-10/eq-007",
+       "inkml_sha256": "ba5788b1024f5861137bc730d2da03fba20ade87f101887e05f3a32ea7e1ffa6",
+       "page": 2,
+       "sample_id": "a64d03a9b473476e",
+       "tokens": 14
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-10/eq-008",
+       "inkml_sha256": "119565b41132049a89ce383787ee39f0a72c8f69aedf338f3271e39ca0cbac3f",
+       "page": 2,
+       "sample_id": "7422eb20f17ddef6",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-10/eq-009",
+       "inkml_sha256": "37134e617db1431f081c952c3c29907750d9709f9450105c7b033d1941d500c4",
+       "page": 2,
+       "sample_id": "80b9eb87393e5014",
+       "tokens": 12
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-10/eq-010",
+       "inkml_sha256": "ddf7828377bac85cc1df42bca0167295cabc5e95ae4fc1074094611143588f57",
+       "page": 2,
+       "sample_id": "335f2b602f108102",
+       "tokens": 8
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-10/eq-011",
+       "inkml_sha256": "4fc89949a29c62b0c74bd5e019470be65377e202ebc1ca3a4609ee4079eb829e",
+       "page": 2,
+       "sample_id": "21242454877f3bcf",
+       "tokens": 16
+      }
+     ],
+     "gold_sha256": "671b9dbc67fa7bd81d675290a5f4b375914926232b8a68fb919ab9680ff27160",
+     "pages": 2,
+     "pdf_sha256": "f498f3ebf1f0fa9ce09055e62c60d238e237e753e68f9a6e7d0e46040ff81b3a",
+     "pen": "blue",
+     "ruled": true,
+     "scan_dpi": [
+      188,
+      200
+     ],
+     "unit": "hw-heldout-10"
+    },
+    {
+     "expressions": [
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-000",
+       "inkml_sha256": "8f5455be35ab64a9642665ee204917efdd8d9fa353c483694514d3d61b43bcfb",
+       "page": 1,
+       "sample_id": "2ffca8a5f463c295",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-001",
+       "inkml_sha256": "e1f7caf1b68e3315df2a0e7d499ebeea54c825aebafaa63ebb9d1937ec624bac",
+       "page": 1,
+       "sample_id": "74912c4b60f9151e",
+       "tokens": 5
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-11/eq-002",
+       "inkml_sha256": "754373042014412311db96bfc716acaa897b0888ef78f7a70a7b8e44d3634fff",
+       "page": 1,
+       "sample_id": "82e9543d2fa22611",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-003",
+       "inkml_sha256": "2d214595d849ca4379976608facadbda82ed1d80e8d683260a2c2dbf13c258a3",
+       "page": 1,
+       "sample_id": "f4fb7747e7e14392",
+       "tokens": 14
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-004",
+       "inkml_sha256": "db33189a322de4e34c3e4a443c0eabe71cb55ae013e37e07e3cfde4a2c4d4028",
+       "page": 1,
+       "sample_id": "2d4b9c2d406f187c",
+       "tokens": 12
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-11/eq-005",
+       "inkml_sha256": "8ccd3e9c62d8cfa3ae28ed98561b01444efeae13015c6f5295e1226bd8f80132",
+       "page": 1,
+       "sample_id": "7698594a2f824c3c",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-006",
+       "inkml_sha256": "43d6063f792f528a5e724c37c1c6c82b299676a7451662ba299a944160b63303",
+       "page": 1,
+       "sample_id": "e571561f092f3288",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-007",
+       "inkml_sha256": "5166a9007af8c56a71693f1c433d7242fff2e381f5d705905e7c189d794a7705",
+       "page": 1,
+       "sample_id": "fb79bf9dfe6ef896",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-008",
+       "inkml_sha256": "ca8e1ddde9abac96753b3def80d6e31a611f3a3162783e25352dc724f504ae30",
+       "page": 2,
+       "sample_id": "58b0bfe3dacfa15c",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-009",
+       "inkml_sha256": "28fbef72c2a64de63756c6bd9a60ee1afa7c5b9f9fec2f4d2ad7114dd9c0655c",
+       "page": 2,
+       "sample_id": "e8adb71e59da10b6",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-010",
+       "inkml_sha256": "7c0dfbf8e2a94b8ec6903e950018db0e79888acd7bd56b5720d5f0294bc96104",
+       "page": 2,
+       "sample_id": "2eace9b32dfbd829",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-011",
+       "inkml_sha256": "29c6eeca2a645c5fbb2e2239c2d3c451c09ced5a2adb7517e667cea6a38b2436",
+       "page": 2,
+       "sample_id": "73f9b33e32b1d51a",
+       "tokens": 11
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-11/eq-012",
+       "inkml_sha256": "7e1bf68673e501bbddfe3fea6c2067533e599b0d49247414025f9160d994585b",
+       "page": 2,
+       "sample_id": "482b7248b959e748",
+       "tokens": 11
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-11/eq-013",
+       "inkml_sha256": "a282615dd1ace53cf9f4de4cef8511d967d7541ffae1832bfdb1916fa133c9de",
+       "page": 2,
+       "sample_id": "0f784fea5cd5b693",
+       "tokens": 21
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-014",
+       "inkml_sha256": "a4d22d45807d3721e556a24bc90b263a462bbc6b4f114013d0c6cb8dddf0455e",
+       "page": 2,
+       "sample_id": "0b600c55f732df38",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-015",
+       "inkml_sha256": "614b62098a3dec1b8d1443604404908bec04df43d62468f113e5f1e6770ed64a",
+       "page": 2,
+       "sample_id": "d533dd65ac8b699d",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-016",
+       "inkml_sha256": "ad6c9c15327a8b9c1cc928ef06170a4fc63e946a781413a1ace7a6faecfd13b9",
+       "page": 2,
+       "sample_id": "bf62fdc2d93db340",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-11/eq-017",
+       "inkml_sha256": "26d344430c04a276f5199a0a238da2ac4e3c60de95432ea96f74b2d1111b869f",
+       "page": 2,
+       "sample_id": "24db05195ad7dd10",
+       "tokens": 3
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-11/eq-018",
+       "inkml_sha256": "bd8deaf1b9fb10023a56ab34a8c78a9fc41b55d090a592b276449ca7bab4186a",
+       "page": 2,
+       "sample_id": "1518579c04b65dfc",
+       "tokens": 13
+      }
+     ],
+     "gold_sha256": "d08d04d60bd836d97ecdf268836b21a529b70f59e83b98597a5ea5daa4b2fc00",
+     "pages": 2,
+     "pdf_sha256": "dc4f00d8a27edbf358f765ad32c0b65d93e385bb01da46afc4656ae1b9058bc7",
+     "pen": "blue",
+     "ruled": false,
+     "scan_dpi": [
+      193,
+      150
+     ],
+     "unit": "hw-heldout-11"
+    },
+    {
+     "expressions": [
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-000",
+       "inkml_sha256": "d862bedd0e8cbcf1c3658e44a9461ba10115ce632dd05760ed31cb673c0627b4",
+       "page": 1,
+       "sample_id": "e2fe7bb3307566f8",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-001",
+       "inkml_sha256": "d7197ca79f1913447de3e9db2b042e2cc29c53cfeb4f1df565e7e93cbfb9aa61",
+       "page": 1,
+       "sample_id": "f0795614063dcb89",
+       "tokens": 11
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-002",
+       "inkml_sha256": "45b35a34cc23216d1adc3587bc9df4de935dcd1be4acc36692fcf698675f6060",
+       "page": 1,
+       "sample_id": "074a0235b8369cb1",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-003",
+       "inkml_sha256": "26075db200c8a697fb38d18f6038a1f3548f261a4b5f27112064da5959bfe4d5",
+       "page": 1,
+       "sample_id": "71b8bf5d8b8a9cef",
+       "tokens": 5
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-004",
+       "inkml_sha256": "091fae9fd57570a768aedc8ff5acd11e8dce09592c26d2c440b0cca2e6011c06",
+       "page": 1,
+       "sample_id": "5a9b886aca00cc80",
+       "tokens": 8
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-005",
+       "inkml_sha256": "f951f3fe348090d6708ed677a8297070a4957b2d550b9c97d1289798f30fb7a6",
+       "page": 1,
+       "sample_id": "48048f70a2cab8ec",
+       "tokens": 12
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-12/eq-006",
+       "inkml_sha256": "3dea77da02406821c1a47b4aa52f12b48b52ead70c7080be38a88e38bd479a04",
+       "page": 1,
+       "sample_id": "5d89ae07b808d0f4",
+       "tokens": 9
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-007",
+       "inkml_sha256": "70cf32ccb4596d557f64712b3c6beb6fd1f3e9ce056b689598a2ecfe948d3da7",
+       "page": 1,
+       "sample_id": "ddd8005a92495aa5",
+       "tokens": 15
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-008",
+       "inkml_sha256": "bfadfb27264ecbdede58f1adcabee54a39915e861d1d5502288ddb17f8b4a1c9",
+       "page": 1,
+       "sample_id": "dcd7dfbca029ffd4",
+       "tokens": 6
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-12/eq-009",
+       "inkml_sha256": "9da4b1413c2cecaccf7e5925e4461a4e4d67d29cfbe85fe74352d93644cd8113",
+       "page": 2,
+       "sample_id": "63308ebe9d9aa005",
+       "tokens": 11
+      },
+      {
+       "display": "block",
+       "id": "handwriting/hw-heldout-12/eq-010",
+       "inkml_sha256": "a184713c997248667195c1209e30cad6c0e6e0a69ce7835397a3c5096ae87678",
+       "page": 2,
+       "sample_id": "2fa6acd525dd62ac",
+       "tokens": 6
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-011",
+       "inkml_sha256": "0bb53416b5d17a207f30b1ae7f8e3110b920921d7ee7671f276b12a30d21232e",
+       "page": 2,
+       "sample_id": "f6fec9906e39d215",
+       "tokens": 5
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-012",
+       "inkml_sha256": "06643693c2ac643b3282519c824e960fdeb7ff042232a113f38e1376d115eb7b",
+       "page": 2,
+       "sample_id": "3f45dd77028713f2",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-013",
+       "inkml_sha256": "2f759d2a93817b4f4558889c1c08510197253b5189493d5c0f2cdf1a7944d9fe",
+       "page": 2,
+       "sample_id": "6a1d3b487c271676",
+       "tokens": 13
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-014",
+       "inkml_sha256": "3b7db2380806e19e3e776f39d77c9af277049a4f898971d84f5da23b60031cea",
+       "page": 2,
+       "sample_id": "3801bbd3ce575d0e",
+       "tokens": 10
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-015",
+       "inkml_sha256": "8e7e8835fdda86913bcd74962396c7fe79f91ce10e1fec906a32316726be1c7a",
+       "page": 2,
+       "sample_id": "0ca27ade4c47aafe",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-016",
+       "inkml_sha256": "d2de93c481e3972b191ff0660de6f0b0deb0981b085bdd606192a9725dab1959",
+       "page": 2,
+       "sample_id": "41e14723ae98a817",
+       "tokens": 7
+      },
+      {
+       "display": "inline",
+       "id": "handwriting/hw-heldout-12/eq-017",
+       "inkml_sha256": "9eac8c296de323078b4099aa9336196f04cf7d7a9bff4c9970b9249ffabe3e81",
+       "page": 2,
+       "sample_id": "49d53ae85310b020",
+       "tokens": 9
+      }
+     ],
+     "gold_sha256": "caaa0cdccab329f1781d7ea060ce74a23fe9f3d6ac292adcac526f33bfddc03e",
+     "pages": 2,
+     "pdf_sha256": "7efe1325e53f14cb9e40c36d70cf41c1ee26ddb9ff0c42fda28932550724153a",
+     "pen": "graphite",
+     "ruled": false,
+     "scan_dpi": [
+      155,
+      182
+     ],
+     "unit": "hw-heldout-12"
+    }
+   ]
+  }
+ },
+ "recipe": {
+  "blocks_per_page": 7,
+  "page_px": [
+   2550,
+   3300
+  ],
+  "pages_per_unit": 2,
+  "pool_size": 500
+ },
+ "scan_seed": 20261021,
+ "seed": "handwriting-2026-10-21",
+ "source": {
+  "archive_sha256": "f1977f120b0efa8abf715ac544b0596b213b099133da99b5e64f946730929269",
+  "archive_url": "https://storage.googleapis.com/mathwriting_data/mathwriting-2024.tgz",
+  "license": "CC BY-NC-SA 4.0",
+  "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "name": "MathWriting (Google LLC)",
+  "url": "https://github.com/google-research/google-research/tree/master/mathwriting"
+ }
+}
