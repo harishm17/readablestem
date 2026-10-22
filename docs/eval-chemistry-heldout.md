@@ -87,3 +87,54 @@ Branch `fix/chemistry-accuracy`, commit `410dab79f94ef435e7c448b4c6274f4946bed35
 scripts and docs/chemistry.md; the held-out gold and this document are added after it and change no
 code). Baseline: `origin/main` at `f206326`.
 
+
+---
+
+## Result (2026-10-21, one run of each; nothing above this line changed after the run)
+
+Commands as registered; baseline recorded live (`$1.473`, 924 model calls, 65 PDF pages), the
+branch scored from the same answers file: **924 of 924 requests answered from the recording, no
+live call** (none of the five sections has a label set over an arrow, a `\middle` or a two-part
+label, so the branch asks the model nothing differently). Second check off. Total spend of this
+work: $1.58 of the $5 cap (this run $1.473; the development replays $0.009 plus $0.096 of an
+unwanted second check on a first, capped replay).
+
+| 377 gold equations, 5 sections | baseline (`f206326`) | branch |
+|---|---|---|
+| primary `exact_lenient`, end to end | 51 (0.135) | 51 (0.135) |
+| symbols scorer (right on the primary, stream v2 or symbols) | 200 (0.531) | 202 (0.536) |
+| **chemically right** (`exact_chem` or an earlier rung) | **208 (0.552)** | **211 (0.560)** |
+| of the 255 aligned, chemically right | 208 (81.6%) | 211 (82.7%) |
+| detection recall / precision | 0.676 / 0.367 | 0.676 / 0.367 |
+| cost per PDF page | $0.0227 | (replayed) |
+
+Outcome classes (`scripts/dev_chem_classes.py`), baseline then branch: right on the primary 51 / 51;
+artefact tokens 66 / 66, scripts 83 / 85, chem 8 / 9; not read 7 / 4; span extra 12 / 12, partial
+16 / 16, split 1 / 1; wrong reading 12 / 12; undetected: table cell 39, lone `×` 66, other 16 (both).
+
+Against the predictions: the primary is 0.135 (predicted 0.05 to 0.20); the chemistry scorer is
+4.1 times the primary (predicted at least 3); after minus baseline is +3 equations (predicted 0 to
+4); table cells are undetected (39). The three equations the branch adds are the cell notation
+whose `\middle|` the converter refused (15-1, 17-2, 4-1: 7 not read down to 4).
+
+Read by hand, the 12 "wrong reading" are not 12 wrong readings: 3 are glitches of the answer key
+(`Ca5(PO4)3OH` with the 3 after the bracket not lowered in the gold; `N` and `P` with an empty
+subscript in the gold's `NH4+` and `H2PO4-`), 1 is an excited-state star (`Co*`) the gold sets
+inline and the reading raises, 2 are the pairing taking another equation of the page (the cell
+notation paired with the "overall" line), 3 are spans that merged an equation with its neighbour
+and the equation numbers (4-2: the Fe/Cr half-reactions; 15-1: a line of the solubility
+calculation; the last also has a `14 H+` the gold lacks, not checked against the page), 2 are
+spans cut to `10^-5` (15-1: `x = ...` calculations) and 1 is `CrO4^2-` read as `PbCrO4` (a
+neighbouring word in the span). None is changed in the gold (the set is registered; the list is the evidence if the gold is ever
+corrected).
+
+What the held-out run adds to the development result: the same shape. The primary is a poor
+instrument for chemistry (13.5% against 56.0% chemically right); of the equations the system found
+83% are right; what is missing is detection: 121 of 377 (32%) are not found, 66 of them (17.5%) are
+a lone `×` the gold counts as an equation, 39 are formulas in table cells (tables off), 16 are
+neighbours merged into one prediction. The fixes of this branch matter little on these sections (3
+equations); they are for the forms the sections do not have (TeX arrows with labels).
+
+Not done: the chatbot arms on these sections (the dev script refuses sections outside the
+development part, and the Opus arm costs about $0.25 a page); the 8-gram overlap with the
+development text (needs the held-out cache).
