@@ -124,6 +124,30 @@ its image exactly as before.
    dropped line next to a block (inside the margin of error of the boxes), content whose ink
    the boxes cover, and a page whose blocks have no usable box (it is not judged).
 
+9. **A line that holds only a formula is a display equation** (added 2026-10-22,
+   `image_page.lone_formula`; [eval-handwriting.md](../eval-handwriting.md), "Root causes and fixes").
+   On handwriting the reader set 35 of 56 display equations as list items or paragraphs with one
+   formula run in them ("3." and an equation), so they were read and set as inline maths. A
+   paragraph or list item with one valid formula and no words is now an equation block, the
+   marker its number, its box without the marker (and the prompt says so). Display equations keep
+   their tier (required, with a read of the crop and a comparison with the page reading). It adds no
+   required decision: the paragraph was `medium` and required already.
+10. **Recovery of left-out writing** (2026-10-22, `image_page.recover_omissions`,
+    `IMAGE_PAGES_RECOVER_OMISSIONS`, on). A stretch of ink the omission check finds (point 8) is cut
+    out of the page picture and read with the same prompt; the blocks that come back join the page in
+    reading order, so the stretch is converted (with its own confidence and decision) and no longer
+    flagged. A stretch that gives nothing stays flagged. A request only for a page the check flags.
+11. **Second reading of lines with maths, off by default** (2026-10-22,
+    `pipeline/image_page_check.py`, `IMAGE_PAGES_SECOND_READING`, `IMAGE_PAGES_ACCEPT_AGREED`). Each
+    `medium` paragraph or list item that holds a formula is cut out and read alone, several lines to a
+    request (`image_page_crops` prompt); the verdict (formulas the same by their symbols, words the
+    same by their letters, the second reading's own confidence) is a check on the block's fix. With
+    acceptance on, a block whose readings agree, the second sure of every symbol, is an optional note
+    instead of a required decision. Measured: a difference is informative (about 20% of such blocks
+    right, against 50%), agreement is not (one model reads one ink the same wrong way), so acceptance
+    removes about one decision in 140 and no silent wrong equation, and is off. This does not change the
+    consequence in point 5: agreement of two readings by one model lowers no tier.
+
 ## Measuring it
 
 Development material only for the design and the choice of model; the sealed check part of

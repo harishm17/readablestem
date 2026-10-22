@@ -95,6 +95,7 @@ from readablestem.pipeline import (
     layout,
     table_step,
 )
+from readablestem.pipeline import image_page_check as second
 from readablestem.pipeline import image_page_omission as omission
 from readablestem.pipeline.validate import check_alt, clean_alt, has_errors
 
@@ -132,6 +133,10 @@ CONFIDENCE_VALUE = {"high": 0.95, "medium": 0.7, "low": 0.4}
 # ink inside it (never beyond what was grown).
 BOX_PAD = 12
 INK_PAD_PX = 5
+# A list marker left of a formula: a stretch of ink at most this wide, then a gap at least
+# this wide (shares of the page's width).
+MARKER_WIDTH = 0.06
+MARKER_GAP = 0.03
 
 Confidence = Literal["high", "medium", "low"]
 BlockKind = Literal["heading", "paragraph", "list_item", "equation", "figure", "table"]
@@ -215,6 +220,11 @@ class PageRead:
     calls: list[ModelCall] = field(default_factory=list)
     outcome: str = "ok"
     png: bytes | None = None
+    # What the second reading of each block that holds maths said (`image_page_check`), by the
+    # block's index in `output.blocks`.
+    verdicts: dict[int, second.Verdict] = field(default_factory=dict)
+    # Blocks added by reading the stretches the first reading left out (`recover_omissions`).
+    recovered: int = 0
 
 
 @dataclass
@@ -296,6 +306,169 @@ def run(
     return result
 
 
+def second_reading_crops(output: ImagePageOutput, png: bytes) -> list[second.Crop]:
+    """The lines to read a second time: each `medium` paragraph or list item that holds a
+    formula and has a usable box, cut out of the page picture. A block of one formula only is a
+    display equation and the equation step reads its crop; `high` and `low` blocks are not
+    asked about again (the first is an optional note already, the second always required)."""
+    try:
+        ink = Ink(png)
+    except Exception as exc:  # an unreadable picture only costs the second reading
+        log.warning("image page ink failed: %s", type(exc).__name__)
+        return []
+    crops: list[second.Crop] = []
+    for index, block in enumerate(output.blocks[:MAX_BLOCKS]):
+        if block.kind not in ("paragraph", "list_item") or block.confidence != "medium":
+            continue
+        formulas = [r.value for r in block.runs[:MAX_RUNS] if r.kind == "math" and r.value.strip()]
+        units = _units(block)
+        if not formulas or units is None or lone_formula(block) is not None:
+            continue
+        picture = second.cut(png, ink.region(units))
+        if picture is None:
+            continue
+        words = "".join(r.value for r in block.runs[:MAX_RUNS] if r.kind == "text")
+        crops.append(second.Crop(index, picture, formulas, words))
+    return crops
+
+
+def second_readings(
+    client: VisionClient,
+    settings: Settings,
+    result: PassResult,
+    *,
+    concurrency: int = DEFAULT_CONCURRENCY,
+) -> None:
+    """Read the blocks that hold maths a second time, from a picture of each (in place: each
+    read's `verdicts`, its `calls` and `result.stopped`). Fail-safe: no verdict for a block the
+    second reading could not give."""
+    work = {
+        number: second_reading_crops(read.output, read.png)
+        for number, read in sorted(result.reads.items())
+        if read.output is not None and read.png
+    }
+    work = {number: crops for number, crops in work.items() if crops}
+    if not work:
+        return
+
+    def one(number: int) -> tuple[int, second.CheckResult]:
+        return number, second.check(client, settings, work[number])
+
+    with ThreadPoolExecutor(
+        max_workers=max(1, concurrency), thread_name_prefix="imagepage2"
+    ) as pool:
+        outcomes = list(pool.map(one, sorted(work)))
+    for number, checked in outcomes:
+        read = result.reads[number]
+        read.verdicts = checked.verdicts
+        read.calls.extend(checked.calls)
+        if checked.stopped is not None:
+            result.stopped = result.stopped or checked.stopped
+
+
+RECOVERY_MARGIN = 15  # thousandths of the page a left-out stretch's picture is grown by
+
+
+def _shifted(block: Block, region: tuple[int, int, int, int]) -> Block:
+    """A block read from the picture of `region` (thousandths of the page) with its box in
+    the picture's thousandths, as a block with its box in the page's."""
+    rx0, ry0, rx1, ry1 = region
+    width, height = rx1 - rx0, ry1 - ry0
+
+    def put(value: int, origin: int, extent: int) -> int:
+        return origin + round(min(1000, max(0, value)) * extent / 1000)
+
+    return block.model_copy(
+        update={
+            "x0": put(block.x0, rx0, width),
+            "x1": put(block.x1, rx0, width),
+            "y0": put(block.y0, ry0, height),
+            "y1": put(block.y1, ry0, height),
+        }
+    )
+
+
+def recover_omissions(
+    client: VisionClient,
+    settings: Settings,
+    result: PassResult,
+    *,
+    concurrency: int = DEFAULT_CONCURRENCY,
+) -> None:
+    """Read the stretches of ink the first reading left out, from a picture of each (in place:
+    each read's `output`, `recovered` and `calls`, and `result.stopped`). The blocks that come
+    back are joined to the page in reading order, so the omission check no longer flags what
+    was read; a stretch that gives nothing stays flagged. At most `omission.PARAMS.max_regions`
+    requests a page, none for a page read completely."""
+
+    def one(
+        number: int,
+    ) -> tuple[int, ImagePageOutput | None, list[ModelCall], int, Exception | None]:
+        read = result.reads[number]
+        assert read.output is not None and read.png is not None
+        blocks = list(read.output.blocks[:MAX_BLOCKS])
+        calls: list[ModelCall] = []
+        added = 0
+        try:
+            ink = Ink(read.png)
+            regions = omitted_regions(blocks, ink)
+            for region in regions:
+                grown = (
+                    max(0, region.x0 - RECOVERY_MARGIN),
+                    max(0, region.y0 - RECOVERY_MARGIN),
+                    min(1000, region.x1 + RECOVERY_MARGIN),
+                    min(1000, region.y1 + RECOVERY_MARGIN),
+                )
+                picture = second.cut(
+                    read.png,
+                    (
+                        round(grown[0] / 1000 * ink.width),
+                        round(grown[1] / 1000 * ink.height),
+                        round(grown[2] / 1000 * ink.width),
+                        round(grown[3] / 1000 * ink.height),
+                    ),
+                    margin=0,
+                )
+                if picture is None:
+                    continue
+                parsed, call = client.run(build_request(settings, picture), ImagePageOutput)
+                calls.append(call)
+                if parsed is None:
+                    continue
+                for new in parsed.blocks[:MAX_BLOCKS]:
+                    if _units(new) is None:
+                        continue
+                    shifted = _shifted(new, grown)
+                    above = [i for i, b in enumerate(blocks) if b.y0 <= shifted.y0]
+                    blocks.insert((above[-1] if above else -1) + 1, shifted)
+                    added += 1
+        except (BudgetExceeded, ConfigError, UnknownModelError) as exc:
+            return number, None, calls, 0, exc
+        except Exception as exc:  # a failed recovery leaves the page as it was read
+            log.warning("image page recovery failed: %s", type(exc).__name__)
+            return number, None, calls, 0, None
+        return number, ImagePageOutput(blocks=blocks) if added else None, calls, added, None
+
+    work = [
+        number
+        for number, read in sorted(result.reads.items())
+        if read.output is not None and read.png and read.outcome == "ok"
+    ]
+    with ThreadPoolExecutor(
+        max_workers=max(1, concurrency), thread_name_prefix="imagepage3"
+    ) as pool:
+        outcomes = list(pool.map(one, work))
+    for number, output, calls, added, error in outcomes:
+        read = result.reads[number]
+        read.calls.extend(calls)
+        if output is not None:
+            read.output, read.recovered = output, added
+        if isinstance(error, (ConfigError, UnknownModelError)):
+            raise error
+        if isinstance(error, BudgetExceeded):
+            result.stopped = result.stopped or error
+
+
 # -------------------------------------------------------------------------- the ink
 
 
@@ -334,6 +507,29 @@ class Ink:
             min(px1, px0 + int(cols[-1]) + 1 + INK_PAD_PX),
             min(py1, py0 + int(rows[-1]) + 1 + INK_PAD_PX),
         )
+
+    def after_marker(self, pixels: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+        """`pixels` with a list marker ("1.", "(b)") at its left edge left out: when the ink
+        begins with a small cluster (at most 6% of the page's width) and a clear gap (at least
+        3%), the box starts where the ink after the gap starts. Otherwise as it was."""
+        px0, py0, px1, py1 = pixels
+        if px1 - px0 < 2 or py1 - py0 < 2:
+            return pixels
+        columns = self.mask[py0:py1, px0:px1].sum(axis=0) >= 1
+        ink = np.nonzero(columns)[0]
+        if ink.size == 0:
+            return pixels
+        first_end = int(ink[0])
+        for column in ink:
+            if column - first_end > MARKER_GAP * self.width:
+                break
+            first_end = int(column)
+        else:
+            return pixels  # no gap: the whole box is one stretch of ink
+        later = ink[ink > first_end + MARKER_GAP * self.width]
+        if first_end - int(ink[0]) > MARKER_WIDTH * self.width or later.size == 0:
+            return pixels
+        return max(px0, px0 + int(later[0]) - INK_PAD_PX), py0, px1, py1
 
 
 def _units(block: Block) -> tuple[int, int, int, int] | None:
@@ -432,9 +628,9 @@ class _Builder:
         self.next_index += 1
         return eid
 
-    def bbox(self, block: Block) -> tuple[BBox, bool]:
+    def bbox(self, block: Block, *, skip_marker: bool = False) -> tuple[BBox, bool]:
         """The block's box in points, and whether it came from a usable box (an unusable one
-        is the whole page)."""
+        is the whole page). `skip_marker` leaves a list marker at the left edge out."""
         units = _units(block)
         if units is None:
             return self.box, False
@@ -442,6 +638,8 @@ class _Builder:
         width, height = x1 - x0, y1 - y0
         if self.ink is not None:
             px0, py0, px1, py1 = self.ink.region(units)
+            if skip_marker:
+                px0, py0, px1, py1 = self.ink.after_marker((px0, py0, px1, py1))
             fx0, fy0 = px0 / self.ink.width, py0 / self.ink.height
             fx1, fy1 = px1 / self.ink.width, py1 / self.ink.height
         else:
@@ -557,19 +755,59 @@ def _tier_checks(
     return checks, confidence != "high" or bool(illegible) or bool(invalid_inline)
 
 
-def _prose_fix(element: Element, block: Block, illegible: int, invalid_inline: int) -> Fix:
+AGREED_CONFIDENCE = 0.85
+
+
+def _prose_fix(
+    element: Element,
+    block: Block,
+    illegible: int,
+    invalid_inline: int,
+    verdict: second.Verdict | None = None,
+    accept_agreed: bool = False,
+) -> Fix:
     checks, required = _tier_checks(block.confidence, illegible, invalid_inline)
+    confidence = CONFIDENCE_VALUE[block.confidence]
+    if verdict is not None:
+        agreed = verdict.agree
+        code = "second_reading_differs"
+        if agreed:
+            code = (
+                "second_reading_agrees"
+                if verdict.confidence == "high"
+                else "second_reading_agrees_unsure"
+            )
+        checks.append(
+            Check(name="image_page.second_reading", passed=agreed, severity="warning", code=code)
+        )
+        # The one place a second reading lifts a block out of the decisions: the page reader
+        # called it `medium` (not `low`, not illegible, every formula valid), the line read
+        # alone said the same and was sure of every symbol, and the owner turned this on.
+        if (
+            accept_agreed
+            and agreed
+            and verdict.confidence == "high"
+            and block.confidence == "medium"
+            and not illegible
+            and not invalid_inline
+        ):
+            required, confidence = False, AGREED_CONFIDENCE
     return Fix(
         element_id=element.id,
         kind=Kind.PARAGRAPH,
         status=Status.NEEDS_REVIEW if required else Status.ACCEPTED,
-        confidence=CONFIDENCE_VALUE[block.confidence],
+        confidence=confidence,
         checks=checks,
         review="required" if required else "optional",
     )
 
 
-def _add_text_block(block: Block, builder: _Builder) -> None:
+def _add_text_block(
+    block: Block,
+    builder: _Builder,
+    verdict: second.Verdict | None = None,
+    accept_agreed: bool = False,
+) -> None:
     kind = {
         "heading": Kind.HEADING,
         "paragraph": Kind.PARAGRAPH,
@@ -610,14 +848,44 @@ def _add_text_block(block: Block, builder: _Builder) -> None:
     for eq in inline:
         builder.add(eq)
     if kind is not Kind.HEADING:  # a heading's fix comes from the heading step
-        builder.fixes[element_id] = _prose_fix(element, block, illegible, invalid)
+        builder.fixes[element_id] = _prose_fix(
+            element, block, illegible, invalid, verdict, accept_agreed
+        )
 
 
-def _add_equation(block: Block, builder: _Builder) -> None:
+def lone_formula(block: Block) -> Block | None:
+    """The display equation a paragraph or list item really is, or None. A line that holds
+    one formula and no words is an equation set on its own line, whatever marker ("1.",
+    "(b)") stands beside it; the reader often wrote it as a list item (35 of the 56 display
+    equations of the handwriting held-out set). Its marker becomes its number. The formula
+    must validate as display maths: otherwise the block stays as it was, text and all."""
+    if block.kind not in ("paragraph", "list_item"):
+        return None
+    formulas = [r.value for r in block.runs if r.kind == "math" and r.value.strip()]
+    words = "".join(r.value for r in block.runs if r.kind == "text")
+    if len(formulas) != 1 or any(c.isalnum() for c in words):
+        return None
+    latex = equation_step.clean_latex(formulas[0])
+    mathml, checks = equation_step._convert(latex, "block")
+    if not latex.strip() or mathml is None or has_errors(checks):
+        return None
+    return block.model_copy(
+        update={
+            "kind": "equation",
+            "latex": latex,
+            "label": block.marker if block.kind == "list_item" else "",
+            "marker": "",
+            "runs": [],
+            "level": 0,
+        }
+    )
+
+
+def _add_equation(block: Block, builder: _Builder, *, skip_marker: bool = False) -> None:
     latex = equation_step.clean_latex(block.latex)
     if not latex.strip():
         return
-    box, usable = builder.bbox(block)
+    box, usable = builder.bbox(block, skip_marker=skip_marker)
     mathml, checks = equation_step._convert(latex, "block")
     reading = mathml is not None and not has_errors(checks)
     element_id = builder.new_id()
@@ -816,18 +1084,24 @@ def _original_figure(builder: _Builder) -> Element:
     return element
 
 
+def omitted_regions(blocks: Sequence[Block], ink: Ink | None) -> list[omission.Region]:
+    """The stretches of ink no block accounts for (`image_page_omission`). A page with a block
+    that has no usable box cannot be judged: none."""
+    if ink is None:
+        return []
+    boxes = [_units(b) for b in blocks]
+    if not boxes or any(u is None for u in boxes):
+        return []
+    return omission.find(ink.mask, [u for u in boxes if u is not None])
+
+
 def _add_omissions(builder: _Builder, blocks: Sequence[Block]) -> None:
     """Make each stretch of ink that no block accounts for (`image_page_omission`) a figure
     element with a required decision, placed after the last block above it. A page with a
     block that has no usable box cannot be judged and is left as it is."""
-    if builder.ink is None:
-        return
-    boxes = [_units(b) for b in blocks]
-    if not boxes or any(u is None for u in boxes):
-        return
     x0, y0, x1, y1 = builder.box
     width, height = x1 - x0, y1 - y0
-    for region in omission.find(builder.ink.mask, [u for u in boxes if u is not None]):
+    for region in omitted_regions(blocks, builder.ink):
         bbox: BBox = (
             round(x0 + region.x0 / 1000 * width, 2),
             round(y0 + region.y0 / 1000 * height, 2),
@@ -876,12 +1150,16 @@ def build(
     box: BBox,
     png: bytes | None,
     check_omission: bool = True,
+    verdicts: Mapping[int, second.Verdict] | None = None,
+    accept_agreed: bool = False,
 ) -> Built | None:
     """The elements and decided fixes of one page, or None when nothing on it was usable.
 
     `box` is the page's frame in points (layout's), `png` the picture the model read (its
     ink trims the boxes and is compared with them; None leaves them as given and skips the
-    comparison), `check_omission` turns the comparison off."""
+    comparison), `check_omission` turns the comparison off. `verdicts` are the second readings
+    of blocks (by index in `output.blocks`); with `accept_agreed` a block whose two readings
+    agree, each sure of itself, is an optional note instead of a required decision."""
     try:
         ink = Ink(png) if png else None
     except Exception as exc:  # an unreadable picture only costs the trimming
@@ -891,10 +1169,14 @@ def build(
     original = _original_figure(builder)
     builder.elements.append(original.model_copy(update={"order": 0}))
     by_kind: dict[str, int] = {}
-    for block in output.blocks[:MAX_BLOCKS]:
+    for index, block in enumerate(output.blocks[:MAX_BLOCKS]):
         before = len(builder.elements)
-        if block.kind in {"heading", "paragraph", "list_item"}:
-            _add_text_block(block, builder)
+        lone = lone_formula(block)
+        if lone is not None:
+            _add_equation(lone, builder, skip_marker=bool(block.marker.strip()))
+            block = lone
+        elif block.kind in {"heading", "paragraph", "list_item"}:
+            _add_text_block(block, builder, (verdicts or {}).get(index), accept_agreed)
         elif block.kind == "equation":
             _add_equation(block, builder)
         elif block.kind == "table":
@@ -1049,6 +1331,7 @@ def record_of(read: PageRead, settings: Settings, built: Built | None) -> ImageP
             "latency_ms": sum(c.latency_ms for c in read.calls),
             "input_tokens": sum(c.input_tokens for c in read.calls),
             "output_tokens": sum(c.output_tokens for c in read.calls),
+            "recovered": read.recovered,
         }
     )
 
