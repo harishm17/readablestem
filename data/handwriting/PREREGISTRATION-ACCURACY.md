@@ -35,16 +35,15 @@ time, document task, answers recorded to a file.
   used with its `src` first on the path), image page prompt `image_page-632b4d29`. It reproduces the
   first measurement's development numbers exactly from its recorded answers (0.587, 0 silent, 5.80
   decisions a page; checked offline, no spend).
-- **New:** this branch at the commit named in the first line of
-  `REGISTRATION-ACCURACY.sha256`'s commit (`git log -1 -- data/handwriting/REGISTRATION-ACCURACY.sha256`,
-  its parent), with the packaged image page prompt (hash below) and these
-  settings: omission recovery on, second reading ON for the recording only. The **shipped
-  configuration** is the same code with the second reading off and acceptance of agreed readings
-  off (`IMAGE_PAGES_SECOND_READING` and `IMAGE_PAGES_ACCEPT_AGREED` false, the defaults). Its numbers
-  are produced by replaying the recording with the second reading off: every page and crop
-  answer is in the file, so it spends nothing and its readings are the recorded ones. The recording
-  with the second reading on, and a replay with agreed readings accepted, are secondary and are
-  labelled so.
+- **New:** this branch at commit `740c80d` (the files and hashes in
+  `REGISTRATION-ACCURACY.sha256` are that commit's), image page prompt `image_page-7a9e3a80`, second
+  reading prompt `image_page_crops-b1620b4f`, with omission recovery on and the second reading ON for
+  the recording only. The **shipped configuration** is the same code with the second reading off
+  and acceptance of agreed readings off (`IMAGE_PAGES_SECOND_READING` and `IMAGE_PAGES_ACCEPT_AGREED`
+  false, the defaults). Its numbers are produced by replaying the recording with the second reading
+  off: every page and crop answer is in the file, so it spends nothing and its readings are the
+  recorded ones. The recording with the second reading on, and a replay with agreed readings
+  accepted, are secondary and are labelled so.
 - Caps at list price: control $2.20, new $3.20. No run is repeated or re-run to finish; a cap that
   stops a run means the units that finished are scored and the rest are said so.
 - The changes (all in the registered files): a paragraph or list item that holds one formula and
@@ -54,8 +53,8 @@ time, document task, answers recorded to a file.
   agree, the second sure of every symbol, is an optional note); prompt: lines of one formula are
   equations, plain letters stay plain, every drawn mark is copied.
 
-Registered files and hashes are in `REGISTRATION-ACCURACY.sha256`; the driver refuses a live fresh run
-if one has changed. Prompt hashes: see that file (`image_page.md`, `image_page_crops.md`).
+Registered files and hashes are in `REGISTRATION-ACCURACY.sha256` (this file, the fresh manifest, both
+prompts, the image page code and the driver); the driver refuses a live fresh run if one has changed.
 
 ## What is reported
 
