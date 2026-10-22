@@ -16,7 +16,7 @@ from readablestem.core.types import IMAGE_PAGE_OMISSION_REASON, Kind
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import image_page
 from readablestem.pipeline.image_page import ImagePageOutput, PageRead, PassResult
-from test_image_page_omission import BOX, LINES, W, H, blocks_for, page, png_bytes
+from test_image_page_omission import BOX, LINES, H, W, blocks_for, page, png_bytes
 
 
 def settings(**kw: Any) -> Settings:
