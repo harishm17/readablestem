@@ -1407,7 +1407,7 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
             verdict.verdict = (
                 _text_block_dropped(grid, view.width, _has_caption(view, box)) or TABLE
             )
-        elif proposal.source == SOURCE_FRAME and not captioned:
+        elif proposal.source == SOURCE_FRAME:
             # Read without the drawn column rules, which a grid of cells in the box would
             # otherwise carry through its paragraphs, cutting their lines into cells.
             if (

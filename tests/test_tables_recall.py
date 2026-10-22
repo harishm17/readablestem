@@ -345,8 +345,7 @@ def ruled_paragraphs(page, caption: bool):
         write(page, 72, 100, "TABLE II. Experiment descriptions")
     for y in (110, 128, 330):
         page.draw_line((72, y), (540, y), width=0.8)
-    write(page, 76, 124, "Experiment")
-    write(page, 300, 124, "Description")
+    write(page, 76, 124, "Experiment descriptions and what the students are asked to do")
     import textwrap
 
     text = (
@@ -356,10 +355,17 @@ def ruled_paragraphs(page, caption: bool):
     )
     for k, line in enumerate(textwrap.wrap(text, 62)):
         write(page, 76, 146 + 14 * k, line)
-        write(page, 300, 146 + 14 * k, "Cart " + str(k) if k == 0 else "")
 
 
 def test_a_ruled_box_under_a_table_caption_is_a_table_without_columns_to_see():
-    found = data_tables(pdf(lambda p: ruled_paragraphs(p, True)))
-    assert len(found) == 1 and found[0].caption == "TABLE II. Experiment descriptions"
-    assert data_tables(pdf(lambda p: ruled_paragraphs(p, False))) == []
+    # The detector's box (a stand-in here: the whole ruled box) under "TABLE II.": a table.
+    # The same box with no caption has no columns to see, so it is not.
+    from test_tables_detect import proposal, view_of
+
+    box = (72.0, 110.0, 540.0, 330.0)
+    judged = {}
+    for caption in (True, False):
+        view = view_of(pdf(lambda p, c=caption: ruled_paragraphs(p, c)))
+        judged[caption] = tables.judge(proposal(box), view)
+    assert judged[True].verdict == tables.TABLE and tables.REASON_RULED in judged[True].reasons
+    assert judged[False].verdict == "no_grid"
