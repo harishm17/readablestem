@@ -32,7 +32,7 @@ reasons and the open risks are at the end.
 | Output: notice, "Show the original page", about note, rejected text as a picture | `pipeline/assemble.py` |
 | Review of the text of an image page; upload of scans; job outcome | `web/review.py`, `web/routes/review.py`, `web/routes/split.py`, templates, `web/pdf_probe.py`, `web/uploads.py`, `web/worker.py` |
 | The upload option (per document): the checkbox, the probe's count of scanned and handwritten pages, `Job.image_pages` (migration `c4e7a2b9d150`), the job's spend allowance, large files in parts | `web/templates/app.html`, `web/routes/jobs.py`, `web/routes/parts.py`, `web/pdf_probe.py`, `web/uploads.py`, `pipeline/page_type.py` (`image_page_count`), `web/intake.py`, `web/pending.py`, `web/worker.py` (`job_caps`), `web/notation.py` (`conversion_options`), `ops/limits.py` |
-| Settings | `FEATURE_IMAGE_PAGES` (the offer), `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE`, `IMAGE_PAGES_MAX_USD_PER_JOB`, `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`; `VisionRequest.timeout_s` |
+| Settings | `FEATURE_IMAGE_PAGES` (the offer), `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE`, `IMAGE_PAGES_MAX_USD_PER_JOB`, `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`, `IMAGE_PAGES_OMISSION_CHECK`; `VisionRequest.timeout_s` |
 | Eval: scans, prose word error rate, image page numbers | `eval/scan.py`, `eval/scan_media.py`, `eval/prose_wer.py`, `eval/image_pages.py`; `eval pipeline --scanned [--scan-seed]` |
 | Held-out check | `data/image-pages/PREREGISTRATION-HELDOUT-SCANS.md` (+ `.sha256`), `scripts/realworld_scanned.py` |
 | Dev scripts | `scripts/image_pages_probe.py` (read pages live, or a picture), `scripts/image_pages_table.py` (reports side by side) |
@@ -229,6 +229,44 @@ taken for the same nine papers.
 - **The prose** is the model's transcription, checked only against the PDF's own text layer
   (including its headers, references and figure text), so 0.92 recall is a floor on what was read:
   the omitted words are mostly running headers, reference lists and text inside figures.
+
+## The omission check (added 2026-10-21, after the held-out check)
+
+A reader that stops early leaves nothing behind that says so: the page counts as converted and its
+items are the blocks that came back. The handwriting measurement found a page whose reader returned
+one line and silently dropped four display equations ([eval-handwriting.md](eval-handwriting.md)).
+The check that closes that (ADR 0007, point 8; `pipeline/image_page_omission.py`) compares the page
+picture's ink with the regions the blocks' boxes cover and makes a stretch of writing no block is near
+a required decision on the page. No prompt change, so nothing was re-recorded: every number is a
+replay at $0 of the answers recorded above (`scripts/image_page_omission_replay.py`), the check off
+and on.
+
+| | pages | pages flagged | extra required decisions a page | primary and silent wrong equations |
+|---|---|---|---|---|
+| 36 development pages as scans (Opus) | 36 | 0 | 0 (3.50 to 3.50) | same in both arms |
+| 59 pages of the held-out papers as scans (the 42 scored and the 17 read when the cap stopped the run) | 59 | 5 | +0.085 (1.92 to 2.00) | same in both arms |
+| 8 real pages (7 converted) | 7 | 4 | +0.57 (7.71 to 8.29) | n.a. |
+
+The thresholds were set on the development pages, the handwriting development pages and the real
+pages (the held-out numbers are not a clean once: see eval-handwriting.md for what was looked at
+and when). The equation step's recorded answers for these sets are for an older prompt, so the primary
+score of a replay is not the one above, but it is the same in both arms: an omission item is a figure
+item and touches no equation.
+
+**What the five flagged held-out pages are** (by eye, after the numbers; my reading): **three real
+omissions**, a page of a two-column paper whose whole right column came back as nothing, a page for
+which the reader returned one block and no more, and a page whose first paragraph of the right
+column was skipped; **two false flags**, a page footer under a rule ("4/14") and a table whose
+caption the reader put into the table block's caption, outside its box. So 3 pages of the 59 (5%)
+had writing left out that nothing flagged until now; what that does to the held-out table above (the
+equations on those pages are counted as not found) is not re-measured here, since no answer was
+recorded again. The development pages have none: no flag, so no real omission in 36 pages.
+
+The simulated recall (made-up omissions: blocks dropped from the reader's own answers) is 0.65 on the
+development pages and 0.87 on the held-out papers for blocks that hold more than 12% of the page's
+ink, 0.23 and 0.30 for 6% to 12%, and 0.04 to 0.08 below 6%: a dropped column or half page is found,
+a dropped line next to a block is not. Details and what the check cannot catch are in
+eval-handwriting.md, "The omission check".
 
 ## Real pages (no answer key; qualitative)
 

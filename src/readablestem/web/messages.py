@@ -125,6 +125,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "equation did not show an equation (its place on the page may be off), so this is the "
     "reading from the whole page, not read again: compare it with the original page symbol by "
     "symbol.",
+    ("image_page.omitted_region", "omitted_region"): "There is writing here that nothing in "
+    "the converted page accounts for, so the reading probably left it out: look at the picture "
+    "of this part of the page, then write what it says or keep it as an image.",
     ("table.no_text_layer", "no_text_layer"): "This table was read from an image of the page, "
     "so nothing in the PDF can confirm its cells: compare every value with the original.",
     ("equation.region", "half_fraction"): "The part of the page this equation was read "

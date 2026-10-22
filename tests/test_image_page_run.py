@@ -339,3 +339,35 @@ def _png() -> bytes:
     pixmap = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 40, 20), False)
     pixmap.set_rect(pixmap.irect, (30, 30, 30))
     return pixmap.tobytes("png")
+
+
+# ----------------------------------------------------------------- what the reading left out
+
+
+def omission_fixes(result: DocumentResult) -> list:
+    return [f for f in result.fixes if any(c.code == "omitted_region" for c in f.failed_checks)]
+
+
+def test_a_reader_that_stops_after_the_first_block_leaves_a_required_item_for_the_rest():
+    first_only = {"blocks": [PAGE["blocks"][1]]}  # one paragraph near the top of the page
+    result = convert(scan_pdf(), fake=client(first_only))
+    [fix] = omission_fixes(result)
+    element = next(e for e in result.elements if e.id == fix.element_id)
+    assert (fix.kind, fix.status, fix.review) == (Kind.FIGURE, Status.NEEDS_REVIEW, "required")
+    assert element.page == 0 and element.bbox is not None
+    assert result.image_pages is not None
+    [record] = result.image_pages.per_page
+    assert record.omitted == 1 and record.required == 1 and record.optional == 1
+    assert "not converted" in result.html.lower()
+
+
+def test_a_page_the_reader_covered_has_no_omission_item():
+    assert omission_fixes(convert(scan_pdf())) == []
+
+
+def test_the_setting_turns_the_omission_check_off():
+    first_only = {"blocks": [PAGE["blocks"][1]]}
+    s = settings(feature_image_pages=True, image_pages_omission_check=False)
+    budget = JobBudget(guard=InMemorySpendGuard(cap_usd=5.0), max_usd=5.0, max_calls=100)
+    out = run.convert_pdf(scan_pdf(), settings=s, client=client(first_only, budget=budget))
+    assert omission_fixes(out.result) == []

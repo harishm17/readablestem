@@ -24,6 +24,13 @@ flags them); and 35 of the 56 expressions set as display equations came out as i
 paragraph or list item, not as display equations. The cost is $0.066 a page. Total spend $2.09 of
 the $8.00 cap.
 
+**Added afterwards (same day): the silent omission is now a required item.** A check compares the
+page picture with the regions the blocks account for and makes a stretch of writing nobody read a
+required decision ("The omission check" below). Replayed at no cost, it flags the known page, adds
+no decision on the 10 development pages and 0.04 a page on the clean held-out pages (one false
+flag in 23), and changes neither the primary score nor the silent wrong equations (0 and 0). It
+does not touch the 35 display expressions read as inline maths.
+
 ## The set
 
 Real human ink from Google's MathWriting dataset: people copying a rendered LaTeX expression on a
@@ -134,6 +141,7 @@ are not worse.
   ("Show the original page"), and nothing says to look. This is not counted as a silent wrong
   equation by the registered definition (it is unmatched, not matched and wrong). It is a silent
   omission and is the one failure here that the review design does not catch.
+  **Closed afterwards** by the omission check below: that page is now flagged.
 - **The model guesses.** It wrote `[illegible]` 0 times on 24 pages where 43% of the equations are
   wrong; its protection is the confidence label, not an admission that a symbol cannot be read.
 
@@ -163,6 +171,77 @@ ink shows, 3 ambiguous, 2 notation, 5 mistakes, among them the one clean misread
 | 09, eq 7 | `Im2\overline{A}B` | `\mathrm{Im}\,2\bar{A}B` | right; notation only |
 | 07, eq 12 | `D_{I^{+2}}` | `D_{\underline{7}+2}` | ink ambiguous |
 
+## The omission check (added afterwards, the same day)
+
+The page `hw-heldout-08` above is a page the pass called converted whose reader stopped after one
+line. The fix is not in the prompt (it did not change, so no answer was re-recorded) but in a check
+that needs no model: `pipeline/image_page_omission.py`, ADR 0007, point 8. The page picture's ink is
+compared with the regions the blocks' boxes cover, the boxes grown by 3% of the page width and 6% of
+its height because the reader's boxes sit off handwriting by up to a line; ink that no box is near,
+in a stretch of at least 2% of the page's ink and five grid rows (about 2% of the page height), is a
+figure element with a required decision (`image_page.omitted_region`: "There is writing here that
+nothing in the converted page accounts for ...") that shows the region as a picture marked "Not
+converted" until the reviewer describes it or keeps it. Rules, frames, a scanner's bar, the rim of
+the page, grain and the strips where running headers and footers sit are ignored.
+
+**How the thresholds were set.** On development material only: the 10 handwriting development
+pages, the 36 synthetic scans of printed pages and the 8 real pages of docs/eval-image-pages.md (no
+answer key; these were also looked at by eye to see what a false flag looks like). The vertical margin
+(6%) is the smallest, in steps of 20 thousandths, at which the development scans of printed pages and
+the handwriting development pages flag nothing and the real pages stop flagging for the box margin.
+Disclosure: while building the check I looked at pictures of held-out handwriting pages with the
+reader's boxes drawn on them, to see how far boxes sit off the ink (that is what showed that boxes on
+handwriting need a wide margin), and printed the number of flagged held-out pages at several settings
+(not their pictures, for the printed-page scans). No threshold was chosen to change a held-out count;
+but the held-out numbers below are not a clean "once". The thresholds are frozen as they were after
+the development work.
+
+**Measured by replay, at $0** (`scripts/image_page_omission_replay.py replay`: every set run twice
+through the real pipeline on its recorded answers, with the check off and on; no request is sent).
+
+| | pages | pages flagged | extra required decisions a page | primary, off to on | silent wrong equations (symbols / strict), off to on |
+|---|---|---|---|---|---|
+| handwriting, development | 10 | 0 | 0 (5.80 to 5.80) | 0.587 to 0.587 | 0 / 0 to 0 / 0 |
+| **handwriting, held-out** | 24 | **2** | **+0.083 (5.71 to 5.79)** | 0.566 to 0.566 | 0 / 0 to 0 / 0 |
+| printed pages as scans, development | 36 | 0 | 0 (3.50 to 3.50) | same in both arms (the equation step's recorded answers are for an older prompt) | same in both arms |
+| papers as scans, held-out (every page with a recorded answer) | 59 | 5 | +0.085 (1.92 to 2.00) | 0.578 to 0.578 | 46 / 78 to 46 / 78 |
+| 8 real pages (7 converted; no answer key) | 7 | 4 | +0.57 (7.71 to 8.29) | n.a. | n.a. |
+
+- **The known page is flagged.** `hw-heldout-08`, page 2: the region covers the lower three of the
+  four dropped display equations (the first of the four sits within the margin of error of the one
+  line that was returned). It is one more required decision on that page (8 instead of 7).
+- **False flags on clean pages.** Handwriting held-out: one page of 23 (`hw-heldout-02`: a box off its
+  line by more than the margin, so the end of a sentence's last expression lies outside it): 0.043
+  extra decisions a page on the clean pages. Handwriting development and printed-page scans
+  development: none. The real photographs and notebook pages are the hard case: 3 of 7 flagged
+  falsely (the shadow along a paper's edge; two pages whose boxes are off their ink by more than a
+  tenth of the page), 1 truly (van 't Hoff's left margin column of numbers, which the reader left
+  out). These are the pages the reader's boxes are worst on.
+- **Detection by simulation.** Dropping blocks from the reader's own answers (the last one to three,
+  and one or two from the middle; made up, the pages and the boxes are real) and asking whether the
+  page flags, by the ink in the dropped blocks (share of the page's ink). Handwriting held-out:
+  1 of 3 below 3%, 2 of 3 from 3% to 6%, 24 of 35 from 6% to 12%, 176 of 225 above 12% (0.78). Printed
+  pages development: 1 of 214, 13 of 222, 63 of 272, 126 of 194 (0.65 above 12%). Papers held-out:
+  10 of 267, 15 of 187, 53 of 177, 353 of 407 (0.87 above 12%). The check finds a dropped column or
+  stretch of lines and is nearly blind to a dropped line or short paragraph next to a block, which is
+  the price of boxes that sit off the ink. Real omissions are not made by deleting a block (a reader
+  that stops early may also read what it did read differently), so these are a ceiling on what the
+  check sees, not a rate of what it finds.
+- **It also found real omissions in the typed scans** (docs/eval-image-pages.md, "The omission
+  check").
+- **It does not catch the display equations read as inline maths** (35 of the 56 in held-out): the ink
+  is inside a paragraph's or a list item's box, so it is accounted for. Reported as asked; changing how
+  those pages are laid out is a different change and is not attempted here.
+- **Primary and silent wrong equations do not change**: an omission item is a figure item with no
+  equation in it, and replay gives the same 0.566 and 0 / 0 (held-out), 0.587 and 0 / 0 (development).
+
+**What it cannot catch.** A wrong reading (it looks at where ink is, not what it says); a dropped
+line or short paragraph next to a block (inside the margin of error of the boxes, 6% of the page
+height) or whose ink lies under a loose block's box; writing in the outer 1.5% of the page, a line or
+two in the top and bottom 6% (running headers and footers), or inside a frame drawn round text; a
+page on which a block has no usable box (not judged) or whose picture could not be read. It is not a
+transcription check: it says "something here was not read", not what.
+
 ## Decision, against the registered rule
 
 **Rule:** handwriting may be advertised if, on held-out, the primary is at least 0.50 and silent
@@ -181,7 +260,7 @@ to read the rule's pass as more than it says. Nothing here changes the rule, whi
 The "what a different design would change" the registration allows, not measured and not part of
 the decision: required inline maths would add nothing here (177 of 184 matched inline equations were
 already in asked items); a check that a page's reading ends where the page's ink ends would have
-caught the dropped half page.
+caught the dropped half page (built afterwards: the section above).
 
 ## What this does not show
 

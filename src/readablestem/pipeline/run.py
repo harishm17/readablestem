@@ -1313,7 +1313,11 @@ def _image_pages_pass(
                 continue
             try:
                 page_built = image_page.build(
-                    number, read.output, box=boxes.get(number, LETTER_BOX), png=read.png
+                    number,
+                    read.output,
+                    box=boxes.get(number, LETTER_BOX),
+                    png=read.png,
+                    check_omission=settings.image_pages_omission_check,
                 )
             except Exception as exc:  # the page stays an image: a bad answer is not worth more
                 log.warning("image page build failed: %s", type(exc).__name__)

@@ -37,6 +37,11 @@ What becomes of each block (`build`; the tiers are the table in the ADR):
 - A figure is a figure element with the model's description as alt text (optional note at
   `high`, required otherwise; an alt text that fails an error-level check is required).
 
+- Ink the blocks leave out (`image_page_omission`): the page picture is compared with the
+  regions the blocks' boxes cover, and a stretch of ink no block is near becomes a figure
+  element (`IMAGE_PAGE_OMISSION_REASON`) with a required decision (`image_page.omitted_region`),
+  because a reader that stops early says nothing about what it did not write.
+
 The page also gets one figure element for the whole page (`ORIGINAL_REASON`): the output
 writes it as the "show the original page" toggle after the page's notice.
 
@@ -65,6 +70,7 @@ from readablestem.config import ConfigError, Settings
 from readablestem.core import triage, types
 from readablestem.core.budget import BudgetExceeded
 from readablestem.core.types import (
+    IMAGE_PAGE_OMISSION_REASON,
     BBox,
     Check,
     Element,
@@ -83,7 +89,13 @@ from readablestem.core.types import (
 from readablestem.models.base import VisionClient, VisionRequest
 from readablestem.models.pricing import UnknownModelError
 from readablestem.models.prompts import load_prompt
-from readablestem.pipeline import equation_images, equation_step, layout, table_step
+from readablestem.pipeline import (
+    equation_images,
+    equation_step,
+    layout,
+    table_step,
+)
+from readablestem.pipeline import image_page_omission as omission
 from readablestem.pipeline.validate import check_alt, clean_alt, has_errors
 
 log = logging.getLogger(__name__)
@@ -413,6 +425,7 @@ class _Builder:
     kept_as_image: int = 0
     illegible: int = 0
     low_confidence: int = 0
+    omitted: int = 0
 
     def new_id(self) -> str:
         eid = f"p{self.page + 1}-e{self.next_index}"
@@ -803,11 +816,72 @@ def _original_figure(builder: _Builder) -> Element:
     return element
 
 
-def build(page: int, output: ImagePageOutput, *, box: BBox, png: bytes | None) -> Built | None:
+def _add_omissions(builder: _Builder, blocks: Sequence[Block]) -> None:
+    """Make each stretch of ink that no block accounts for (`image_page_omission`) a figure
+    element with a required decision, placed after the last block above it. A page with a
+    block that has no usable box cannot be judged and is left as it is."""
+    if builder.ink is None:
+        return
+    boxes = [_units(b) for b in blocks]
+    if not boxes or any(u is None for u in boxes):
+        return
+    x0, y0, x1, y1 = builder.box
+    width, height = x1 - x0, y1 - y0
+    for region in omission.find(builder.ink.mask, [u for u in boxes if u is not None]):
+        bbox: BBox = (
+            round(x0 + region.x0 / 1000 * width, 2),
+            round(y0 + region.y0 / 1000 * height, 2),
+            round(x0 + region.x1 / 1000 * width, 2),
+            round(y0 + region.y1 / 1000 * height, 2),
+        )
+        element_id = builder.new_id()
+        element = Element(
+            id=element_id,
+            kind=Kind.FIGURE,
+            page=builder.page,
+            bbox=bbox,
+            order=0,
+            reasons=[IMAGE_PAGE_OMISSION_REASON],
+        )
+        above = [
+            i
+            for i, e in enumerate(builder.elements)
+            if i > 0 and e.bbox is not None and e.bbox[1] <= bbox[1]
+        ]
+        builder.elements.insert((above[-1] if above else 0) + 1, element)
+        builder.fixes[element_id] = Fix(
+            element_id=element_id,
+            kind=Kind.FIGURE,
+            status=Status.NEEDS_REVIEW,
+            confidence=0.3,
+            figure=FigureFix(figure_type="other", alt=""),
+            checks=[
+                Check(
+                    name="image_page.omitted_region",
+                    passed=False,
+                    severity="warning",
+                    code="omitted_region",
+                )
+            ],
+            review="required",
+        )
+        builder.omitted += 1
+    builder.elements = [e.model_copy(update={"order": i}) for i, e in enumerate(builder.elements)]
+
+
+def build(
+    page: int,
+    output: ImagePageOutput,
+    *,
+    box: BBox,
+    png: bytes | None,
+    check_omission: bool = True,
+) -> Built | None:
     """The elements and decided fixes of one page, or None when nothing on it was usable.
 
     `box` is the page's frame in points (layout's), `png` the picture the model read (its
-    ink trims the boxes; None leaves them as given)."""
+    ink trims the boxes and is compared with them; None leaves them as given and skips the
+    comparison), `check_omission` turns the comparison off."""
     try:
         ink = Ink(png) if png else None
     except Exception as exc:  # an unreadable picture only costs the trimming
@@ -832,6 +906,11 @@ def build(page: int, output: ImagePageOutput, *, box: BBox, png: bytes | None) -
     blocks = sum(by_kind.values())
     if blocks == 0:
         return None
+    if check_omission:
+        try:
+            _add_omissions(builder, output.blocks[:MAX_BLOCKS])
+        except Exception as exc:  # the check only adds; a failure leaves the page as read
+            log.warning("image page omission check failed: %s", type(exc).__name__)
     required = sum(1 for f in builder.fixes.values() if f.review == "required")
     optional = sum(1 for f in builder.fixes.values() if f.review == "optional")
     record = ImagePageRecord(
@@ -842,6 +921,7 @@ def build(page: int, output: ImagePageOutput, *, box: BBox, png: bytes | None) -
         illegible=builder.illegible,
         low_confidence=builder.low_confidence,
         kept_as_image=builder.kept_as_image,
+        omitted=builder.omitted,
         required=required,
         optional=optional,
     )
