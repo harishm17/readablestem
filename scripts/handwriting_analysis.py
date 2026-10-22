@@ -287,13 +287,69 @@ def cmd_second(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_paired(args: argparse.Namespace) -> int:
+    """New minus control on the units both finished: the primary (`exact_lenient`) and the
+    symbols score, with a 95% cluster bootstrap over units (10,000 resamples, seed 20261021)."""
+    import random
+
+    one, two = load_rows(args.arm, args.part), load_rows(args.base, args.part)
+    units = sorted({r["unit"] for r in one} & {r["unit"] for r in two})
+    keep = set(units)
+
+    def per_unit(rows: list[dict], key: str) -> dict[str, tuple[int, int]]:
+        out: dict[str, list[int]] = {u: [0, 0] for u in units}
+        for r in rows:
+            if r["unit"] in keep:
+                out[r["unit"]][0] += bool(r.get("found") and r.get(key))
+                out[r["unit"]][1] += 1
+        return {u: (v[0], v[1]) for u, v in out.items()}
+
+    print(f"{args.part}: {args.arm} minus {args.base} on {len(units)} common units")
+    for key, label in (("ok", "primary exact_lenient"), ("ok_symbols", "symbols")):
+        a, b = per_unit(one, key), per_unit(two, key)
+        n = sum(v[1] for v in a.values())
+        diff = sum(a[u][0] for u in units) / n - sum(b[u][0] for u in units) / n
+        rng = random.Random(hwe.BOOTSTRAP_SEED)
+        stats = []
+        for _ in range(hwe.BOOTSTRAP):
+            pick = [rng.choice(units) for _ in units]
+            m = sum(a[u][1] for u in pick)
+            stats.append((sum(a[u][0] for u in pick) - sum(b[u][0] for u in pick)) / m)
+        stats.sort()
+        lo, hi = stats[int(0.025 * len(stats))], stats[int(0.975 * len(stats)) - 1]
+        ra = sum(a[u][0] for u in units) / n
+        rb = sum(b[u][0] for u in units) / n
+        print(
+            f"  {label:22} {ra:.3f} vs {rb:.3f} on {n} equations: "
+            f"difference {diff:+.3f} [{lo:+.3f}, {hi:+.3f}]"
+        )
+    return 0
+
+
+def cmd_layout(args: argparse.Namespace) -> int:
+    rows = load_rows(args.arm, args.part)
+    gold = [r for r in rows if r["gold_display"] == "block"]
+    found = [r for r in gold if r["found"]]
+    block = [r for r in found if r["pred_display"] == "block"]
+    inline = [r for r in rows if r["gold_display"] == "inline" and r["found"]]
+    wrong_way = [r for r in inline if r["pred_display"] == "block"]
+    print(
+        f"{args.part}/{args.arm}: of {len(gold)} gold display equations {len(block)} set as "
+        f"display, {len(found) - len(block)} as inline maths, {len(gold) - len(found)} not found; "
+        f"inline gold set as display: {len(wrong_way)} of {len(inline)}"
+    )
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("rows", "classes", "calibration", "second"):
+    for name in ("rows", "classes", "calibration", "second", "paired", "layout"):
         p = sub.add_parser(name)
         p.add_argument("--part", choices=hwa.PARTS, required=True)
         p.add_argument("--arm", required=True)
+        if name == "paired":
+            p.add_argument("--base", required=True, help="the arm to subtract")
         if name == "rows":
             p.add_argument("--second", action="store_true", help="replay the second reading too")
             p.add_argument("--env", action="append")
@@ -304,6 +360,8 @@ def main() -> int:
         "classes": cmd_classes,
         "calibration": cmd_calibration,
         "second": cmd_second,
+        "paired": cmd_paired,
+        "layout": cmd_layout,
     }[args.command](args)
 
 
