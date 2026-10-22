@@ -23,7 +23,9 @@ from pathlib import Path
 
 from readablestem.eval import pipeline_eval as pe
 from readablestem.eval.devset_media import DevSetMedia
+from readablestem.eval.invented import read as inv_read
 from readablestem.gold.openstax import HttpFetcher
+from readablestem.pipeline import equation_step
 from readablestem.proof import chatbot
 from readablestem.proof import systems as S
 from readablestem.proof.bundle import pdf_name
@@ -52,6 +54,20 @@ def printed_pdfs(sections: list[str], cache: Path, out_dir: Path) -> dict[str, P
     return found
 
 
+def ce_expanded(equation: inv_read.Equation) -> str | None:
+    """The chatbot's equation as MathML, with `\\ce{...}` written out as ReadableSTEM does for
+    its own answers (`equation_step.expand_ce`), then converted as the proof converts TeX."""
+    if equation.source != "tex" or "\\ce" not in equation.raw:
+        return equation.mathml
+    try:
+        mathml, _checks = equation_step._convert(
+            equation_step.clean_latex(equation_step.expand_ce(equation.raw)), equation.display
+        )
+    except Exception:  # model TeX is untrusted input: any failure is "unchecked"
+        return None
+    return mathml
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("action", choices=["record", "score"])
@@ -60,6 +76,13 @@ def main() -> int:
     parser.add_argument("--max-usd", type=float, default=0.0)
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--out-dir", type=Path, default=ROOT / ".local" / "chat-dev")
+    parser.add_argument(
+        "--expand-ce",
+        action="store_true",
+        help="score: write each mhchem `\\ce{...}` out as LaTeX first, as ReadableSTEM does for "
+        "its own answers (the proof's converter cannot read `\\ce`; this shows what the chatbot "
+        "wrote, not what the converter could read)",
+    )
     parser.add_argument("--out", type=Path, help="score: items JSONL for scripts/dev_buckets.py")
     parser.add_argument(
         "--cache", type=Path, default=Path.home() / ".cache/readablestem/dev-v2/eval-cache"
@@ -83,6 +106,7 @@ def main() -> int:
         print(json.dumps(summary))
         return 0
     arms = S.load_arms_dir(args.out_dir / "systems")
+    mathml_of = ce_expanded if args.expand_ce else None
     runs = arms.get(arm.id, {})
     items = []
     for unit in units(args.sections):
@@ -90,7 +114,7 @@ def main() -> int:
         gold = pe._of_kind(unit, "equation")
         run = next(iter(runs.get(section, [])), None)
         output = run.read() if run is not None else None
-        item = S.equation_item(section, gold, output)
+        item = S.equation_item(section, gold, output, mathml_of=mathml_of)
         item["pdf_pages"] = run.pdf_pages if run is not None else 0
         item["cost_usd"] = run.cost_usd if run is not None else 0.0
         item["status"] = run.status if run is not None else "missing"
