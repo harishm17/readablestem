@@ -106,3 +106,125 @@ def test_the_real_tables_it_found_are_still_found(file, page):
     result = scored(file, page)
     assert result["full"] == result["labelled"] > 0, result
     assert result["true"] == result["predicted"], result
+
+
+# ------------------------------------------- text set in columns, with no rules and no proposal
+
+
+def rows_of(element) -> list[list[str]]:
+    grid = element.table
+    out: list[list[str]] = [[""] * grid.cols for _ in range(grid.rows)]
+    for cell in grid.cells:
+        out[cell.row][cell.col] = cell.text
+    return out
+
+
+NOTATION = [
+    ("e.g.", "for example (exempli gratia)"),
+    ("a.s.", "almost surely"),
+    ("i.o.", "infinitely often"),
+    ("#E", "cardinality of the set E"),
+    ("N(m, s2)", "real Gaussian law with mean m and variance s2"),
+]
+
+
+def notation_list(page, *, y0=200.0, pitch=17.0, x0=90.0, x1=170.0, rows=NOTATION):
+    for k, (left, right) in enumerate(rows):
+        write(page, x0, y0 + k * pitch, left)
+        write(page, x1, y0 + k * pitch, right)
+
+
+def test_an_unruled_list_of_symbols_and_their_meanings_is_a_table():
+    # The notation list of a set of lecture notes: a `tabular` with no rules, which the
+    # layout model never proposes (it looks for ruled, shaded or header-marked grids).
+    def fill(page):
+        write(page, 72, 150, "We list here the notation we use through the lecture notes:")
+        notation_list(page)
+        write(page, 72, 330, "A paragraph follows, set across the whole width of the page.")
+
+    found = data_tables(pdf(fill))
+    assert len(found) == 1
+    assert rows_of(found[0])[0] == ["e.g.", "for example (exempli gratia)"]
+    assert len(rows_of(found[0])) == len(NOTATION)
+    box = found[0].bbox
+    assert box[1] < 192 and box[3] > 270 and box[3] < 300  # the list, not its paragraphs
+
+
+def test_a_wrapped_line_of_the_second_column_stays_in_its_row():
+    rows = [*NOTATION[:3], ("", "in particular this is a Poisson variable"), *NOTATION[3:]]
+
+    def fill(page):
+        notation_list(page, rows=rows, pitch=15.0)
+
+    found = data_tables(pdf(fill))
+    assert len(found) == 1 and len(rows_of(found[0])) == len(rows) - 1
+    assert rows_of(found[0])[2][1] == "infinitely often in particular this is a Poisson variable"
+
+
+COLUMN_PROSE = (
+    "The cart rolls down the ramp and the photogate records the time it takes to pass, "
+    "so that each group has a list of times for every release height they try. After "
+    "the first session the groups compare their times with the ones the model predicts "
+    "and they write down how large the difference is and what could have caused it. "
+    "Some groups noticed that the wheels slipped on the ramp and repeated the whole run, "
+    "which gave them times that agreed with the model much better than the first set."
+)
+
+
+def two_text_columns(page):
+    import textwrap
+
+    for column, x in enumerate((72.0, 320.0)):
+        lines = textwrap.wrap(COLUMN_PROSE, 44)
+        for k, text in enumerate(lines):
+            page.insert_text((x, 120 + 13 * k), text, fontsize=10)
+
+
+def test_two_columns_of_running_text_are_not_a_table():
+    assert data_tables(pdf(two_text_columns)) == []
+
+
+def test_numbered_equations_a_bibliography_and_algorithm_lines_are_not_tables():
+    def equations(page):
+        for k, eq in enumerate(["f(x) = a x + b", "g(x) = c x^2 + d", "h(x) = e x^3 + f"]):
+            write(page, 150, 200 + 24 * k, eq)
+            write(page, 520, 200 + 24 * k, f"({k + 1}.{k + 2})")
+
+    def references(page):
+        for k, ref in enumerate(
+            [
+                "A. Author, A first paper about a subject, Journal of Things 4 (2010).",
+                "B. Writer, A second paper about another subject, Annals of Stuff 9 (2012).",
+                "C. Person, A third paper on the same subject, Review of Matters 2 (2015).",
+            ]
+        ):
+            write(page, 72, 200 + 24 * k, f"[{k + 1}]")
+            write(page, 110, 200 + 24 * k, ref)
+
+    def algorithm(page):
+        for k, step in enumerate(["initialise the table", "for each row do", "stop when full"]):
+            write(page, 72, 200 + 14 * k, f"{k + 1}:")
+            write(page, 100, 200 + 14 * k, step)
+
+    assert data_tables(pdf(equations, references, algorithm)) == []
+
+
+def test_a_block_of_bare_numbers_is_a_matrix_not_a_table():
+    def matrix(page):
+        for r, row in enumerate([("1", "0", "3"), ("4", "5", "6"), ("7", "8", "9")]):
+            for c, value in enumerate(row):
+                write(page, 150 + 40 * c, 200 + 18 * r, value)
+
+    assert data_tables(pdf(matrix)) == []
+
+
+def test_an_unruled_table_with_a_header_of_words_over_numbers_is_a_table():
+    def fill(page):
+        for c, label in enumerate(["Height (m)", "Time (s)", "Speed (m/s)"]):
+            write(page, 100 + 110 * c, 200, label)
+        for r in range(1, 5):
+            for c, value in enumerate([0.25 * r, 0.31 * r, 1.97 * r]):
+                write(page, 100 + 110 * c, 200 + 16 * r, f"{value:.2f}")
+
+    found = data_tables(pdf(fill))
+    assert len(found) == 1 and len(rows_of(found[0])) == 5
