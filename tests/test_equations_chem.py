@@ -119,8 +119,9 @@ def test_a_thousands_comma_is_one_number_however_it_is_written():
 
 def test_a_parenthesis_the_span_took_from_the_sentence_is_dropped_on_both_sides():
     """OpenStax gold `[Al(H2O)6]3+)`: the sentence's closing parenthesis is in the math."""
-    gold = "<mo>[</mo><mi>Al</mi><mo>]</mo><msup><mi></mi><mrow><mn>3</mn><mo>+</mo></mrow></msup><mo>)</mo>"
-    pred = "<mo>[</mo><mi>Al</mi><mo>]</mo><msup><mi></mi><mrow><mn>3</mn><mo>+</mo></mrow></msup>"
+    charge = "<msup><mi></mi><mrow><mn>3</mn><mo>+</mo></mrow></msup>"
+    gold = f"<mo>[</mo><mi>Al</mi><mo>]</mo>{charge}<mo>)</mo>"
+    pred = f"<mo>[</mo><mi>Al</mi><mo>]</mo>{charge}"
     assert same(pred, gold)
     # a bracket that is closed in the equation is a bracket, however it ends
     assert not same("<mi>x</mi><mo>(</mo><mi>y</mi><mo>)</mo>", "<mi>x</mi><mo>(</mo><mi>y</mi>")

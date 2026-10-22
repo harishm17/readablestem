@@ -2,7 +2,7 @@
 """Every chemistry gold equation of a development run, put in one outcome class.
 
     uv run python scripts/dev_chem_classes.py --gold data/dev-v2/dev LABEL=items.jsonl [...]
-        [--sections SUBSTRING ...] [--list CLASS ...]
+        [--sections A,B] [--list CLASS,CLASS]
 
 Reads per-page items (`eval pipeline --task document --items FILE`, or `scripts/dev_chatbot.py
 score --out FILE`; development sets only) and the set's gold. The gold equations counted are
@@ -44,7 +44,7 @@ from readablestem.eval.equations import MathMLError
 from readablestem.pipeline.validate import safe_latex_to_mathml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import dev_chem  # noqa: E402  (the same directory)
+import dev_chem
 
 ORDER = [
     "right",
@@ -55,6 +55,7 @@ ORDER = [
     "not read",
     "span: extra",
     "span: partial",
+    "span: split",
     "wrong reading",
     "undetected: table",
     "undetected: x sign",
@@ -124,15 +125,18 @@ def classify(
     """gold id -> (class, detail), for the chemistry gold of the sections the rows cover."""
     out: dict[str, tuple[str, str]] = {}
     for row in rows:
-        if sections and not any(s in row["id"] for s in sections):
+        if sections and not any("/" + s in row["id"] for s in sections):
             continue
         by_gold = {p["gold_id"]: p for p in row["pairs"]}
         pool = Counter(pools.get(row["id"].split("/")[-1], {}))
-        for gold_id in [*by_gold, *row["missed_gold_ids"]]:
+        for gold_id in [*by_gold, *row["missed_gold_ids"], *row.get("split_gold_ids", [])]:
             if gold_id not in gold or not dev_chem.is_chemistry(gold_id):
                 continue
             g_stream = chem.chem_of(gold[gold_id]["mathml"])
             pair = by_gold.get(gold_id)
+            if pair is None and gold_id in row.get("split_gold_ids", []):
+                out[gold_id] = ("span: split", "")
+                continue
             if pair is None:
                 key = dev_chem.content(gold[gold_id]["mathml"])
                 if pool[key] > 0:
@@ -173,8 +177,8 @@ def classify(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--gold", type=Path, required=True)
-    parser.add_argument("--sections", nargs="*", default=[], help="only rows whose id has one")
-    parser.add_argument("--list", nargs="*", default=[], metavar="CLASS", help="print these")
+    parser.add_argument("--sections", default="", help="comma list: only rows whose id has one")
+    parser.add_argument("--list", default="", metavar="CLASS,...", help="print these classes")
     parser.add_argument("runs", nargs="+", metavar="LABEL=items.jsonl")
     args = parser.parse_args()
     gold = dev_chem.load_gold(args.gold)
@@ -182,7 +186,12 @@ def main() -> int:
     results = {}
     for spec in args.runs:
         label, _, path = spec.partition("=")
-        results[label] = classify(dev_chem.rows_of(Path(path)), gold, pools, args.sections)
+        results[label] = classify(
+            dev_chem.rows_of(Path(path)),
+            gold,
+            pools,
+            args.sections.split(",") if args.sections else [],
+        )
     labels = list(results)
     print(f"{'':24}" + "".join(f"| {label:>14} " for label in labels))
     for source in ("openstax", "authored", "all"):
@@ -208,7 +217,7 @@ def main() -> int:
     for label in labels:
         details = Counter(d for c, d in results[label].values() if c == "wrong reading")
         print(f"wrong reading by change, {label}:", dict(details))
-    for cls in args.list:
+    for cls in [c for c in args.list.split(",") if c]:
         for label in labels:
             for g, (c, d) in sorted(results[label].items()):
                 if c == cls:

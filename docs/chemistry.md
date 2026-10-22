@@ -86,7 +86,7 @@ recorded LaTeX, whose numbers must not move.
 | charges | `Na+`, `OH-`, `SO4^2-`, `Fe^3+`, `Fe^{3+}`, `Fe+++`, `e-` |
 | state symbols | `(aq)`, `(s)`, `(l)`, `(g)` |
 | coefficients | `2`, `0.5`, `1/2` |
-| arrows | `->`, `-->`, `<-`, `<--`, `<->`, `<=>`, with a label `->[\Delta]`, `->[heat]` |
+| arrows | `->`, `-->`, `<-`, `<--`, `<->`, `<=>`, with a label `->[\Delta]`, `->[heat]`, or two (`->[above][below]`; text, numbers, `\text{...}`, `^\circ`) |
 | bonds | `-` (between atoms), `=`, `#` |
 | nuclides | `^{14}_{6}C`, `^{0}_{-1}e`, `_{6}^{14}C` |
 | particles | `e-`, `n`, `p` |
@@ -94,7 +94,7 @@ recorded LaTeX, whose numbers must not move.
 Not supported, and refused (`CeError`, then the LaTeX check says `unknown_command`, the cheap
 model's answer goes to the main model, and a reading that still has it is a failed fix with a
 required decision, the picture kept): `<=>>` and `<<=>`, a gas or precipitate mark `^` / `v`,
-`$...$` in the body, a concentration inside a state symbol `(aq, 0.10 M)`, a two-part arrow label,
+`$...$` in the body, a concentration inside a state symbol `(aq, 0.10 M)`, a three-part arrow label,
 anything that is not a species (words, a generic letter such as `A`). The prompt says what to do
 instead: ordinary LaTeX with `\ce` only around the species inside it.
 
@@ -293,19 +293,218 @@ leaves no space glyph before (`ions` after `SO42-`) changes the context text of 
 script-heavy paragraphs: 400 of the 2,750 recorded real-world dev requests were asked again
 (about $0.23).
 
+## Accuracy: why the primary score barely moved (2026-10-21)
+
+The chemistry work above moved the primary score (`exact_lenient`, end to end) of the twelve
+development chemistry documents from 0.093 to 0.108 and left the registered held-out chemistry at
+0.041, for ReadableSTEM and for the chatbots alike, while the symbols score was 0.65 against 0.13.
+The question: is the primary number real, or the way it is measured? Method: the recorded
+development answers (no model call), every one of the 443 gold equations of the twelve documents
+put in one outcome class (`scripts/dev_chem_classes.py`), and the scorer's verdict checked against
+what the equation says. Branch `fix/chemistry-accuracy`; the replay of the recording at its base
+commit reproduces 0.108 exactly (785 of 785 requests answered from the file).
+
+### The finding: mostly a scorer artefact
+
+The primary scorer compares the shape of the MathML. The chemistry gold has two shapes, and a
+reading that says the same chemistry in a third is wrong on the primary:
+
+| Gold | Shape | Example: gold against the reading |
+|---|---|---|
+| OpenStax (335 equations, written by people) | an `mtext` per run of element symbols, `(` `aq` `)` as three tokens, `°` (U+00B0), a charge on an empty base `msup({}, +)`, numbers split in two `mn` (`0.2` `57`) | gold `H2O(l)` as `msub(mtext H, 2)`, `mtext O`, `mo (`, `mtext l`, `mo )`; the reading has `mtext (l)` and `∘` for the degree |
+| authored (108, made by the repository's converter from LaTeX) | one upright `mi` per letter, the arrow as an `mi` | gold `\mathrm{H_2O}` is `mi H`, `msub`, `mi O`; the reading `\text{H}_2\text{O}` is `mtext H`, `mtext O` |
+
+The forms that make a chemically identical reading wrong on the primary, with how many aligned
+equations each class holds (the classes are cumulative and in this order; each is a scorer that
+already existed, then the new one):
+
+| Wrong on the primary, right by... | What differs | n (of 319 aligned) |
+|---|---|---|
+| stream v2 | tokens packed otherwise (`(s)` one token or three; `kg/L` one token or two) | 75 |
+| the symbols scorer | scripts grouped otherwise (`[A]_0` on the bracket or on its closing bracket; a charge on `msup({}, +)` or `msubsup`); a table cut into cells otherwise | 39 |
+| the **chem scorer** (new) | upright against italic against `mtext` against bold letters (all 97 of the authored document's, 33 of OpenStax's); `→` against `⟶`; `│ ║` bars against `\| \|\|`; `∆` against `Δ`; `0.2` `57` against `0.257`; `96,485` against `96{,}485`; a closing parenthesis of the sentence inside the gold equation (18 gold equations, `[Al(H2O)6]^{3+})`) | 130 |
+
+The chemistry scorer is `eval/equations_chem.py` (`exact_chem` and `pred_mathml` in the document
+task's pairs, a labelled secondary beside the primary, like the symbols scorer; the primary, the
+gate and the committed reports are unchanged, and it is computed for chemistry gold only). It
+starts from the symbols stream (scripts as markers, in reading order, tables flattened) and
+forgives only the spellings in the table above; a different count, charge, element, state symbol,
+coefficient or arrow kind, a script moved between sub and super, and a missing or extra part are
+all wrong (`tests/test_equations_chem.py`, 44 tests: 15 pairs of near formulas that must stay
+wrong). Evidence that it is not too generous:
+
+- on the authored document the gold has its LaTeX source. For the 100 equations of the document
+  that the chem scorer (or an earlier rung) calls right and the primary calls wrong, the reading's
+  LaTeX and the gold's LaTeX are the same string once `\text`, `\mathrm`, spacing and the arrow
+  command are removed: 100 of 100;
+- every equation the existing `content` score of `scripts/dev_chem.py` calls right the chem scorer
+  calls right (0 exceptions); the chem scorer is stricter than `content` where it matters (it
+  keeps sub against super) and more lenient only for the three forms above (bars, numbers,
+  the sentence's parenthesis), 16 equations, all read by hand;
+- everything the symbols scorer calls right, it calls right.
+
+### Outcome classes, all 443 gold equations of the twelve documents, ReadableSTEM
+
+Three columns: before the chemistry work (`c190b3e`), the base of this branch, this branch.
+
+| Class | before | base | this branch |
+|---|---|---|---|
+| **right on the primary** | 41 (9.3%) | 48 (10.8%) | 48 (10.8%) |
+| scorer artefact: tokens (right on stream v2) | 75 | 74 | 75 |
+| scorer artefact: scripts (right on the symbols scorer) | 48 | 39 | 39 |
+| scorer artefact: chem (right on the chem scorer) | 83 | 125 | 130 |
+| **chemically right, all four** | 247 (55.8%) | 286 (64.6%) | **292 (65.9%)** |
+| input: the printed page lacks what the gold has | 7 | 7 | 7 |
+| not read (a failed fix, the picture kept) | 3 | 5 | 2 |
+| span: the reading holds the gold's symbols and more | 4 | 4 | 4 |
+| span: the reading is a part of the gold's symbols | 16 | 14 | 11 |
+| span: the gold is written as several pieces | 1 | 1 | 1 |
+| wrong reading (same span, other symbols) | 4 | 3 | 3 |
+| undetected: formula in a table cell | 95 | 94 | 94 |
+| undetected: lone `×` (the gold counts the sign as an equation) | 22 | 22 | 22 |
+| undetected: other | 44 | 7 | 7 |
+| gold | 443 | 443 | 443 |
+
+By source of the gold, this branch: OpenStax 335 = 44 right + 141 artefacts (69 tokens, 39 scripts,
+33 chem) + 150 not right (7 input, 2 not read, 4+10+1 span, 3 wrong reading, 94 table, 22 `×`, 7
+other); authored 108 = 4 right + 103 artefacts (6 + 97) + 1 span.
+
+What it says, as measured:
+
+1. **The primary number is mostly a measure of markup.** 65.9% of the gold equations are written
+   right by ReadableSTEM (89 to 92% of the 319 it found and aligned: 292 of 319) while the primary
+   says 10.8%. On the authored document 107 of 108 are right in chemistry (before the work: 53)
+   and the primary says 4. The chemistry work did raise the content (before 55.8%, now 65.9%), and
+   the primary could not see it: it moved by 7 equations because the OpenStax shape (arrow as an
+   operator) happens to match the primary's rule, and it moved the authored document the wrong
+   way (10 to 4) because the gold of that document has the old converter's shape.
+2. **What is really missing is detection, not reading.** 124 of the 443 (28%) are not found at
+   all: 94 are formulas in the cells of tables (tables are off, as in production; docs/tables.md),
+   22 are a lone `×` that the gold counts as an equation and the page prints in a sentence (not
+   chemistry, nothing to read: no equation to find; a reader hears "times" in the sentence), and 7
+   are not paired: 2 are a reaction line that the table element under it holds (17-3), 5 are
+   neighbours merged into one predicted equation or lost in the alignment (the `(a)` of an
+   `(a) ...; (b) ...` line, derivation steps).
+3. **When the system finds an equation it mostly reads it right**: of 319 aligned, 292 chemically
+   right, 3 wrong readings (read by hand: `E°cell` read as `Ecell` because the crop starts at
+   `ell`; `ΔG° = −56.2 kJ/mol` read without its left part and with the next equation merged in;
+   `average mass` read as `average`), 2 failed fixes, 7 the page cannot give (below), and 16 span
+   problems.
+4. **7 equations no reader of the PDF can get**: the printed page shows `²H` where the gold has
+   `₁²H` (the print of OpenStax's MathML dropped the empty-base subscript in running text; the
+   subscript is not in the PDF: checked on the page picture and the glyphs). The gold is not wrong
+   (the book has it); the input is. Left as they are, in their own class.
+
+### Against the chatbots
+
+The chatbot recipe was recorded on five of the chemistry sections (Haiku) and two (Opus)
+(`scripts/dev_chatbot.py`; `docs/eval-page-math.md`). The same classes, on the same sections; the
+proof's converter cannot read `\ce{...}`, which the chatbots write, so each chatbot is scored as
+recorded and with its `\ce` written out as ReadableSTEM does (`--expand-ce`; what the chatbot wrote,
+not what the proof's converter could read).
+
+| 5 sections, 217 gold | ReadableSTEM | Haiku chatbot | Haiku, `\ce` written out |
+|---|---|---|---|
+| primary right | 19 (8.8%) | 22 (10.1%) | 23 (10.6%) |
+| scorer artefacts (tokens, scripts, chem) | 64 | 85 | 86 |
+| **chemically right** | **83 (38.2%)** | **107 (49.3%)** | **109 (50.2%)** |
+| input: the page lacks it | 7 | 0 | 0 |
+| span (extra, partial, split) | 7 | 3 | 4 |
+| wrong reading | 1 | 11 | 12 |
+| undetected: table cell | 94 | 42 | 42 |
+| undetected: lone `×` | 18 | 18 | 18 |
+| undetected: other / unreadable | 7 | 36 | 32 |
+
+| 2 sections, 93 gold | ReadableSTEM | Opus chatbot | Opus, `\ce` written out |
+|---|---|---|---|
+| primary right | 1 | 0 | 1 |
+| scorer artefacts | 40 | 5 | 68 |
+| **chemically right** | **41 (44.1%)** | **5 (5.4%)** | **69 (74.2%)** |
+| span (extra, partial) | 5 | 0 | 0 |
+| wrong reading | 0 | 0 | 2 |
+| undetected: table cell | 37 | 37 | 0 |
+| undetected: other / unreadable | 1 | 42 | 13 |
+
+Read as: on the primary score all three are at 0 to 11% on these sections, for the same reason.
+The chatbots' registered chemistry score (0.041) is that and a second thing: the proof's converter
+refuses `\ce` (Opus: 0 of 36 and 5 of 57 aligned as recorded, 27 and 44 with `\ce` written out).
+On chemical content the chatbots are ahead of ReadableSTEM by 11 points (Haiku) and 30 (Opus) on
+these sections, and the whole difference is the table cells they read as equations (52 and 37
+more) and equations the layout does not find; ReadableSTEM's readings that it finds are wrong
+less often (1 against 11 wrong readings). Two to five sections: indicative only.
+
+### What was fixed
+
+| Real error | Fix | Equations on the development run |
+|---|---|---|
+| a reaction with a label over its arrow (`\xrightarrow{\Delta}` in TeX) cut in three: `CaCO3(s) ∆`, `−→`, the products | `layout._label_over_arrow` joins the line that ends in a script-size label with the line that starts at the arrow under it; `chem.ARROW_LABELS` (`∆`, `Δ`, `heat`, `light`) are part of a reaction | 3 (authored: CaCO3, KClO3, NaHCO3); the one with the electron capture (a reading cut as `+ e⁻ → ⁷₃`) is not fixed |
+| the arrow label over **and under** the arrow, `\ce{->[above][below]}`, refused (electrolysis of NaCl, 600 °C) | `chem._arrow_label` reads two labels and `\text{...}`, `^\circ`; written as `\xrightarrow[below]{above}` | 1 (OpenStax 18.2) |
+| the phase boundaries of a cell, `\middle\|` with no `\left` (cell notation), made the converter refuse the whole equation | `chem.tidy_cell_notation`, in `expand_ce` | 2 (OpenStax 16.3) |
+
+Layout check (`scripts/layout_identity.py`, no model call): 125 of the 126 PDFs of the repository's
+fixtures, development material and development pages give the same elements before and after; the
+one that differs is the authored chemistry document (329 to 317 elements).
+
+Measured by replay: the recorded answers answer 769 of 773 requests (the four others are live,
+$0.009); chemically right 286 to 292 of 443 (65.9%), the primary 48 to 48, symbols 161 to 162,
+`not read` 5 to 2, partial span 14 to 11.
+
+Replay checks and tests: `tests/test_chem_accuracy.py` (label above and below, three-part and
+unreadable labels still refused, `\middle` in cell notation, with `\left` left alone),
+`tests/test_layout_chemistry.py` (the three labelled reactions are one display line each),
+`tests/test_equations_chem.py`. No prompt changed (same hashes), so the recorded answers and
+`latest-*` stay valid.
+
+### What was looked at and not changed
+
+- **The degree sign.** The reading writes `^\circ` as `∘` (U+2218); OpenStax has `°` (U+00B0) in
+  170 of its gold equations. Mapping it would make 10 more OpenStax chemistry equations right on
+  the primary (44 to 54), and `speech.py` already says "degrees" for both. It was not made: the
+  converter is shared with every equation, and the real-world gold (made by the same converter,
+  stored with `∘`) cannot be re-made, so
+  it would lower a registered number to raise another. Open: decide with the real-world measure
+  (docs/chemistry.md, "Side effect on maths that is not chemistry", has the method).
+- **State symbols as three tokens** (`(` `l` `)`, as OpenStax) instead of the one `mtext (l)` the
+  reading has: 7 more primary matches on OpenStax (54 to 61), no difference to a reader.
+- **The rule under a half-reaction block** (OpenStax 16.3, 16.4: five equations): the gold is one
+  equation with the "overall" line under the rule, the layout makes the lines above and the line
+  below two equations. Each is read right; the gold's grain differs.
+- **Lists in a sentence** (`(a) ...; (b) ...`, `CO3^2-, F^-`): the gold is one equation per item, the
+  layout one span for the line (3 equations).
+- **The unknown symbol `HE`** (OpenStax 20.2 prints the book's typo for He): `\ce` refuses a
+  symbol that is not an element; kept, a failed fix with a decision.
+- **Formulas in table cells** (94) and **a reaction line the table element took in** (7) are the
+  table work of `docs/tables.md`, not touched here.
+
+### Held-out
+
+`docs/eval-chemistry-heldout.md` (pre-registered before the run). The registered held-out set's
+chemistry sections were not re-run or re-scored for this work.
+
+### Numbers under both scorers
+
+See the table above: primary 48 of 443 = 0.108 and chemically right 292 of 443 = 0.659 on the
+development run for this branch, against 0.108 and 0.646 at its base and 0.093 and 0.558 before the
+chemistry work. Where this document says "primary" it is `exact_lenient` as registered; "chemically
+right" is `exact_chem` or an earlier rung of the ladder (stream v2, symbols), which are the same
+scorers as the existing secondary ones.
+
+
 ## What does not work yet
 
-- **A reaction with a label over the arrow** (`CaCO₃(s) →Δ CaO(s)`) set as TeX does: the label is a
-  small row above the arrow and the text layer starts a line with it, so the reaction is cut in
-  three (3 equations of the authored document). OpenStax's MathML sets the label in the same
-  line and works.
+- **A reaction with a label over the arrow** (`CaCO₃(s) →Δ CaO(s)`) set as TeX does is one line now
+  (section "Accuracy"); a label that is not `∆`, `Δ`, `heat` or `light`, or one that is taller than
+  a script, still cuts it, and so does an electron-capture line (`+ e⁻ → ⁷₃Li`) of the authored
+  document.
 - **Formulas that the PDF set at one size** and **formulas in a table cell** (the cell text is
   flat; docs/tables.md).
-- **Two-part arrow labels** (`->[above][below]`), `<=>>`, a precipitate mark, a state symbol with
-  a concentration in `\ce`: refused, the picture stays with a decision.
+- **Three-part arrow labels**, `<=>>`, a precipitate mark, a state symbol with a concentration in
+  `\ce`: refused, the picture stays with a decision. A two-part label is read aloud as "right arrow
+  with 600 degrees Celsius below and electrolysis above", not as "reacts, with ..., to form".
 - **The primary and symbols scorers reward the spelling of the gold**, so a change that is right
   for a reader (the group a bracket's script belongs to, an arrow as an operator) can lower them
-  on gold made by the older converter; `scripts/dev_chem.py` has a score that does not.
+  on gold made by the older converter. `eval/equations_chem.py` is the score for chemistry that
+  does not ("Accuracy"); the primary stays as registered.
 - **The prompt's one `\mathrm` example** (a state symbol with a concentration) is older than the
   `\text` shape the converter now writes; changing it changes the prompt's version and with it
   every recorded answer, so it waits for the next re-recording. The table prompt

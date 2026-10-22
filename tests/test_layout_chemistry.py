@@ -195,6 +195,23 @@ def test_the_authored_chemistry_page_has_its_prose_formulas_as_inline_equations(
         assert expected in found
 
 
+def test_a_reaction_with_a_label_over_its_arrow_is_one_display_line():
+    """TeX sets `\\xrightarrow{\\Delta}` with the label raised over the arrow: the text layer
+    has the line end at the label and a second line start at the arrow, which overlap. The
+    reaction was cut in three (`CaCO3(s) ∆`, `−→Na2CO3(s) + ...`)."""
+    pdf = (REPO / "data/dev-v2/dev/authored/latex-chemistry/latex-chemistry.pdf").read_bytes()
+    blocks = [e.text or "" for e in equations(pdf, pages=[3]) if e.display == "block"]
+    heated = [t for t in blocks if "∆" in t or "Δ" in t]
+    assert len(heated) == 3  # CaCO3, KClO3 and NaHCO3
+    for text in heated:
+        assert text.count("→") == 1
+    assert any(t.startswith("CaCO3(s)") and t.endswith("CaO(s) + CO2(g)") for t in heated)
+    assert any(t.startswith("2 NaHCO3(s)") and t.endswith("CO2(g)") for t in heated)
+    # No reaction is left in pieces: no inline equation is the label or the start of the arrow
+    pieces = [e for e in equations(pdf, pages=[3]) if e.display == "inline"]
+    assert not [e for e in pieces if (e.text or "").strip().endswith(("∆", "Δ"))]
+
+
 # ------------------------------------------------------------------------- negatives
 
 

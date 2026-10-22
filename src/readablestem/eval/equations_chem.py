@@ -1,4 +1,3 @@
-# ruff: noqa: RUF001
 # (look-alike bars, arrows and deltas are what this module unifies)
 r"""Scorer "chem": is it the same chemistry, however the markup writes it? (secondary)
 
