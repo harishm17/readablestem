@@ -1,5 +1,33 @@
 # Changelog
 
+## Handwriting accuracy: root causes, display lines, omission recovery (2026-10-22, branch fix/handwriting-accuracy)
+
+- Root causes of the 43% wrong equations of the handwriting held-out set, from the recorded answers
+  (docs/eval-handwriting.md, "Root causes and fixes"; `scripts/handwriting_analysis.py`,
+  `data/handwriting/error-classes.json`): of 199 wrong equations over three parts, 65% are ink (or a label)
+  a reader cannot settle, 23% a notation the label did not use, 8% misreads of clear ink, 4% left out; a
+  model reading each expression alone from clean ink gets 61 to 64%, as the page reading does. The
+  page reader's confidence says almost nothing (`medium` is a coin flip, AUC 0.52 to 0.61).
+- Fixed: a paragraph or list item that holds one formula and no words is a display equation, its
+  marker its number (`image_page.lone_formula`; 35 of 56 display equations were set as inline maths;
+  now 56 of 57 on the fresh set), and writing the reader left out is read from a picture of just that
+  part (`image_page.recover_omissions`, `IMAGE_PAGES_RECOVER_OMISSIONS`, on) instead of only flagged.
+  The image page prompt changed (`image_page-632b4d29` to `image_page-7a9e3a80`): display lines are
+  equations, plain letters stay plain, every drawn mark is copied. The gate's `latest-*` reports are
+  unaffected (no gated task reads this prompt).
+- Added, off: a second reading of `medium` lines with a formula from a picture of the line
+  (`pipeline/image_page_check.py`, prompt `image_page_crops`, `IMAGE_PAGES_SECOND_READING`), and
+  acceptance of blocks whose two readings agree (`IMAGE_PAGES_ACCEPT_AGREED`). A difference is
+  informative, agreement is not (it would remove about 1 decision in 140 and no silent wrong equation).
+- Measured, once, on a fresh held-out set registered first (192 equations, 24 pages;
+  `data/handwriting/PREREGISTRATION-ACCURACY.md`): primary 0.589 [0.521, 0.654], paired with the
+  unchanged control on the units both finished +0.031 [-0.024, +0.083] (not detected); required
+  decisions a page 5.79 and 5.79; **silent wrong equations 2 of 192 (2 of 161 for the control), not 0:
+  the first measurement's zero did not replicate**, so the registered rule is not met. Typed scans (36
+  development pages): primary and symbols unchanged, no regression beyond the noise of one run
+  (docs/eval-image-pages.md, "Update"). Spend $10.31 of $12.
+- Nothing changed in the typed equation step, its prompt or the scorers.
+
 ## Omission check for scanned and handwritten pages (2026-10-21, branch feat/image-page-omission)
 
 - A page read from an image whose reader left writing out now says so: the page picture's ink is
