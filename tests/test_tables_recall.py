@@ -104,14 +104,16 @@ def test_the_real_tables_the_first_measurement_missed_are_found(file, page):
     assert result["true"] == result["predicted"], result  # and nothing else on the page
 
 
-def test_the_notation_lists_with_words_in_them_are_found_the_ones_of_relations_are_not():
+def test_the_notation_lists_with_words_in_them_and_the_ones_of_relations_are_all_found():
     # Four unruled lists on a page: abbreviations and sets with their meanings, two of
     # relations (`X_n ~ f(n)  if X_n / f(n) -> 1`). The second pair is lines of symbols in
-    # two aligned columns, which is also how a displayed system of equations looks, and
-    # the page guard (`_text_block_dropped`) leaves them as text.
+    # two aligned columns, which is also how a displayed system of equations looks; what
+    # sets them apart is the last cell of every line, which opens with "if"
+    # (`tables._conditions`), so the page guard leaves them to the table (docs/tables.md,
+    # "Second held-out measurement").
     result = scored("2412.19752.pdf", 1)
-    assert result["labelled"] == 4 and result["full"] == 2, result
-    assert result["true"] == result["predicted"] == 2, result
+    assert result["labelled"] == 4 and result["full"] == 4, result
+    assert result["true"] == result["predicted"] == 4, result
 
 
 @pytest.mark.parametrize(("file", "page"), FOUND)
