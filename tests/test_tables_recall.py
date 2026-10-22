@@ -311,3 +311,55 @@ def test_the_box_is_cut_below_a_numbered_equation_at_its_top_or_bottom():
     view = view_of(pdf(fill))
     _, y0, _, y1 = tables._without_captions(view, (90, 120, 520, 270))
     assert 138 < y0 < 152 and 228 < y1 < 252
+
+
+# ------------------------------------- captions in Roman numerals, and a caption's word for it
+
+ROMAN_CAPTIONS = [
+    "TABLE I. Final objectives, organized by category.",
+    "TABLE IV: Example evidentiary arguments for item 4.1",
+    "Table II. Experiment descriptions",
+    "TABLE XII. Aggregate student demographics",
+    "TABLE III Energetics of the cycle",
+]
+
+
+@pytest.mark.parametrize("text", ROMAN_CAPTIONS)
+def test_a_caption_in_roman_numerals_is_a_table_caption(text):
+    assert tables.TABLE_CAPTION.match(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Table I shows that the model fits", "Table of contents", "Table in the appendix lists"],
+)
+def test_prose_that_starts_with_the_word_is_not_a_caption(text):
+    assert not tables.TABLE_CAPTION.match(text)
+
+
+def ruled_paragraphs(page, caption: bool):
+    # Rules above and below (and under a header line) round cells of wrapped text whose
+    # columns cannot be told apart from the glyphs alone: the justified padding is narrower
+    # than a word's space.
+    if caption:
+        write(page, 72, 100, "TABLE II. Experiment descriptions")
+    for y in (110, 128, 330):
+        page.draw_line((72, y), (540, y), width=0.8)
+    write(page, 76, 124, "Experiment")
+    write(page, 300, 124, "Description")
+    import textwrap
+
+    text = (
+        "A cart is released from rest to roll down a ramp. Students are asked to determine "
+        "the acceleration of the cart and to identify the source of the greatest uncertainty "
+        "in their measurement before they compare it with the value the model predicts."
+    )
+    for k, line in enumerate(textwrap.wrap(text, 62)):
+        write(page, 76, 146 + 14 * k, line)
+        write(page, 300, 146 + 14 * k, "Cart " + str(k) if k == 0 else "")
+
+
+def test_a_ruled_box_under_a_table_caption_is_a_table_without_columns_to_see():
+    found = data_tables(pdf(lambda p: ruled_paragraphs(p, True)))
+    assert len(found) == 1 and found[0].caption == "TABLE II. Experiment descriptions"
+    assert data_tables(pdf(lambda p: ruled_paragraphs(p, False))) == []

@@ -232,7 +232,8 @@ DROPPED = (
 # "Table 2.3 Speeds", "TABLE 4: ...", "Tab. 1 ...", but not "Table 2 shows that ..." (as
 # layout's "Figure N" CAPTION).
 TABLE_CAPTION = re.compile(
-    r"^(?:Table|TABLE|Tab\.|TAB\.)\s*\d+[A-Za-z]?(?:[.\-\u2013]\d+[A-Za-z]?)*"
+    r"^(?:Table|TABLE|Tab\.|TAB\.)\s*"
+    r"(?:\d+[A-Za-z]?(?:[.\-\u2013]\d+[A-Za-z]?)*|[IVXLC]{1,6}\b)"  # 4, 2.3, 4a, or IV (APS, IEEE)
     r"(?:\s*[.:|\u2013\u2014-]\s*|\s+(?=[A-Z(\"'\u201c])|\s*$)"
 )
 # Dot leaders of a table of contents: five dots (spaced or not), ellipses, middle dots.
@@ -1380,17 +1381,20 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
     ruled_cells = ruled and len(row_rules) >= 3 and len(column_rules) >= 3
     drawing = _drawing(view, box, grid.size)
     own = proposal.source != "detector"
+    # Rules round the box and a "Table N" line just above or below it: the document calls it
+    # a table, whatever the glyphs say about its columns (wrapped text, bullets in cells).
+    captioned = ruled and _has_caption(view, box)
     if own and (_pictured(view, box, grid.size) or grid.size < SMALL_TEXT * view.body_size):
         verdict.verdict = "figure"  # a chart's frame and labels: no ML box vouches for a table
     elif _toc(grid, 3 if own else 4):
         verdict.verdict = "toc"
-    elif _bullet_list(grid):
+    elif _bullet_list(grid) and not captioned:
         verdict.verdict = "list"
     elif grid.labels_only:
         verdict.verdict = "labels"
     elif drawing and not (grid.strong and grid.grid_lines >= 0.5 * grid.lines):
         verdict.verdict = "figure"
-    elif grid.strong or (ruled and grid.weak and not own) or ruled_cells:
+    elif grid.strong or (ruled and grid.weak and not own) or ruled_cells or captioned:
         verdict.verdict = TABLE
         if ruled:
             verdict.reasons.append(REASON_RULED)
@@ -1402,7 +1406,7 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
             verdict.verdict = (
                 _text_block_dropped(grid, view.width, _has_caption(view, box)) or TABLE
             )
-        elif proposal.source == SOURCE_FRAME:
+        elif proposal.source == SOURCE_FRAME and not captioned:
             # Read without the drawn column rules, which a grid of cells in the box would
             # otherwise carry through its paragraphs, cutting their lines into cells.
             if (
