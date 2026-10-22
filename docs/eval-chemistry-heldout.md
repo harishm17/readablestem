@@ -6,6 +6,16 @@
 > `gold fetch` command below, `--out ~/.cache/readablestem/chem-heldout/gold`, and check them
 > against `data/chem-heldout/SHA256SUMS`; the run is `--gold` that folder. The run itself is the
 > one described here.
+>
+> ```
+> uv run readablestem gold fetch --book chemistry --allow-retired --date 2026-10-21 \
+>   --page 4-1-writing-and-balancing-chemical-equations --page 4-2-classifying-chemical-reactions \
+>   --page 15-1-precipitation-and-dissolution --page 17-2-galvanic-cells --page 21-3-radioactive-decay \
+>   --out ~/.cache/readablestem/chem-heldout/gold
+> uv run readablestem eval pipeline --task document --gold ~/.cache/readablestem/chem-heldout/gold \
+>   --provider anthropic --max-usd 3 --answers ANSWERS.jsonl --items after.jsonl --out after.json
+> uv run python scripts/dev_chem_classes.py --gold ~/.cache/readablestem/chem-heldout/gold after=after.jsonl
+> ```
 
 
 Written and committed **before any model call on these sections** (2026-10-21). The result is
