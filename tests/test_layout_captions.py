@@ -30,6 +30,7 @@ BODY = 11.0
 
 def figure_page(*caption: tuple[str, str]) -> bytes:
     doc = pymupdf.open()
+    doc.set_metadata({"producer": "pdfTeX-1.40.25"})
     page = doc.new_page(width=612, height=792)
     pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 300, 180), False)
     pix.set_rect(pix.irect, (200, 200, 230))
