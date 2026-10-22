@@ -91,7 +91,13 @@ def post(env, element_id: str, **fields):
 
 
 def text_fix(res: DocumentResult):
-    return next(f for f in res.fixes if f.kind is Kind.PARAGRAPH and f.review == "required")
+    return next(
+        f
+        for f in res.fixes
+        if f.kind is Kind.PARAGRAPH
+        and f.review == "required"
+        and any(c.code == "illegible" for c in f.failed_checks)
+    )
 
 
 # ------------------------------------------------------------------------- the upload
