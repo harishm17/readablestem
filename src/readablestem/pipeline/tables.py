@@ -1385,7 +1385,11 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
     # a table, whatever the glyphs say about its columns (wrapped text, bullets in cells). A
     # box made here from rules alone (the span between two callouts) needs columns too.
     captioned = ruled and (not own or grid.weak) and _has_caption(view, box)
-    if own and (_pictured(view, box, grid.size) or grid.size < SMALL_TEXT * view.body_size):
+    # A chart is a chart whoever proposed it: bars, scatter dots and a plot's lines in the
+    # box (the detector's layout model also takes a bar chart's axes for a ruled grid).
+    if _pictured(view, box, grid.size, strict=own) or (
+        own and grid.size < SMALL_TEXT * view.body_size
+    ):
         verdict.verdict = "figure"  # a chart's frame and labels: no ML box vouches for a table
     elif _toc(grid, 3 if own else 4):
         verdict.verdict = "toc"
@@ -1598,33 +1602,38 @@ _RELATION = frozenset(
 )
 
 
-def _pictured(view: _PageView, box: BBox, size: float) -> bool:
+def _pictured(view: _PageView, box: BBox, size: float, *, strict: bool = True) -> bool:
     """A chart or drawing in a box nothing but the geometry proposed: any curve (a plotted
     line, an arrow), a few small ones (scatter dots, a legend's markers) or curves running
     past it (a legend inside a plot), a raster image covering `PICTURE_SHARE` of it, or
     `PICTURE_FILLS` filled shapes (the bars of a histogram, a heat map). The detector's boxes
-    get the weaker `_drawing` test: its model has seen the page."""
+    (`strict` False) get the weaker `_drawing` test and only the last two of these: its model
+    has seen the page, but it takes a bar chart's axes for a ruled grid."""
     x0, y0, x1, y1 = box
     area = max((x1 - x0) * (y1 - y0), 1.0)
-    near = sum(
-        1
-        for c in view.curves
-        if c[2] >= x0 - PICTURE_REACH
-        and c[0] <= x1 + PICTURE_REACH
-        and c[3] >= y0 - PICTURE_REACH
-        and c[1] <= y1 + PICTURE_REACH
-    )
-    if near >= PICTURE_NEAR:
-        return True  # a legend inside a plot: the plotted lines run past it
+    if strict:
+        near = sum(
+            1
+            for c in view.curves
+            if c[2] >= x0 - PICTURE_REACH
+            and c[0] <= x1 + PICTURE_REACH
+            and c[3] >= y0 - PICTURE_REACH
+            and c[1] <= y1 + PICTURE_REACH
+        )
+        if near >= PICTURE_NEAR:
+            return True  # a legend inside a plot: the plotted lines run past it
     marks = 0
     for c in view.curves:
         if x0 - 1 <= (c[0] + c[2]) / 2 <= x1 + 1 and y0 - 1 <= (c[1] + c[3]) / 2 <= y1 + 1:
-            if max(c[2] - c[0], c[3] - c[1]) > 0.8 * size:
+            if strict and max(c[2] - c[0], c[3] - c[1]) > 0.8 * size:
                 return True
             marks += 1  # the dots of a scatter plot are small
-    if marks >= PICTURE_MARKS:
+    if marks >= (PICTURE_MARKS if strict else PICTURE_FILLS):
         return True
-    if sum(_area(_intersection(img, box)) for img in view.images) >= PICTURE_SHARE * area:
+    if (
+        strict
+        and sum(_area(_intersection(img, box)) for img in view.images) >= PICTURE_SHARE * area
+    ):
         return True
     inside = [
         f
