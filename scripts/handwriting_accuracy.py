@@ -43,6 +43,7 @@ _spec.loader.exec_module(hwe)  # the registered script, unchanged
 hw = hwe.hw
 
 FRESH_MANIFEST = REPO / "data" / "handwriting" / "manifest-fresh.json"
+REGISTRATION = REPO / "data" / "handwriting" / "REGISTRATION-ACCURACY.sha256"
 FRESH_SEED = "handwriting-fresh-2026-10-22"
 FRESH_SCAN_SEED = 20261022
 FRESH_UNITS = 12
@@ -203,6 +204,17 @@ def manifest_part(part: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))["parts"][part]
 
 
+def require_registration() -> None:
+    """A live run on the fresh part needs the registered files to hash as registered."""
+    if not REGISTRATION.is_file():
+        raise SystemExit("not registered: data/handwriting/REGISTRATION-ACCURACY.sha256 is missing")
+    for line in REGISTRATION.read_text().splitlines():
+        digest, _, name = line.partition("  ")
+        path = REPO / name
+        if not path.is_file() or hwe.sha256(path) != digest:
+            raise SystemExit(f"registered file {name} has changed since registration")
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     # The registered settings of the handwriting evaluation unless an arm changes them.
     os.environ["CLAUDE_SECOND_CHECK"] = "off"
@@ -229,6 +241,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     from readablestem.cli.main import build_parser
     from readablestem.eval.realworld_media import RealWorldMedia
 
+    if args.part == "fresh" and not args.offline:
+        require_registration()
     gold = hwe.CACHE / "gold" / args.part
     for entry in manifest_part(args.part)["units"]:
         pdf = gold / "pdfs" / f"{entry['unit']}.pdf"
@@ -271,6 +285,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             "actual_usd": round(spent, 4),
             "env": args.env or [],
             "prompt": args.prompt,
+            "code_root": str(Path(sys.modules["readablestem"].__file__ or "").parent.parent),
             "commit": subprocess.run(
                 ["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=REPO, check=False
             ).stdout.strip(),

@@ -65,9 +65,14 @@ def client(
 
 
 def convert(
-    pdf: bytes, *, fake: FakeVisionClient | None = None, on: bool = True, **kw: Any
+    pdf: bytes,
+    *,
+    fake: FakeVisionClient | None = None,
+    on: bool = True,
+    config: dict[str, Any] | None = None,
+    **kw: Any,
 ) -> DocumentResult:
-    s = settings(feature_image_pages=on)
+    s = settings(feature_image_pages=on, **(config or {}))
     budget = JobBudget(guard=InMemorySpendGuard(cap_usd=5.0), max_usd=5.0, max_calls=100)
     fake = fake or client(budget=budget)
     return run.convert_pdf(pdf, settings=s, client=fake, **kw).result
@@ -350,7 +355,9 @@ def omission_fixes(result: DocumentResult) -> list:
 
 def test_a_reader_that_stops_after_the_first_block_leaves_a_required_item_for_the_rest():
     first_only = {"blocks": [PAGE["blocks"][1]]}  # one paragraph near the top of the page
-    result = convert(scan_pdf(), fake=client(first_only))
+    result = convert(
+        scan_pdf(), fake=client(first_only), config={"image_pages_recover_omissions": False}
+    )
     [fix] = omission_fixes(result)
     element = next(e for e in result.elements if e.id == fix.element_id)
     assert (fix.kind, fix.status, fix.review) == (Kind.FIGURE, Status.NEEDS_REVIEW, "required")
@@ -371,3 +378,80 @@ def test_the_setting_turns_the_omission_check_off():
     budget = JobBudget(guard=InMemorySpendGuard(cap_usd=5.0), max_usd=5.0, max_calls=100)
     out = run.convert_pdf(scan_pdf(), settings=s, client=client(first_only, budget=budget))
     assert omission_fixes(out.result) == []
+
+
+# --------------------------------------------------- recovery and the second reading
+
+
+def test_a_reader_that_stops_early_has_the_rest_read_from_a_picture_of_it():
+    first_only = {"blocks": [PAGE["blocks"][1]]}
+    left_out = {
+        "blocks": [
+            block("paragraph", x0=0, y0=0, x1=1000, y1=1000, runs=[text("Left out of the first.")])
+        ]
+    }
+
+    seen: list[int] = []
+
+    def responder(request: Any) -> Any:
+        payload = first_only if not seen else left_out
+        seen.append(1)
+        return payload
+
+    fake = FakeVisionClient(
+        responders={"image_page": responder, "equation": equation_answer("v")},
+        budget=JobBudget(guard=InMemorySpendGuard(cap_usd=5.0), max_usd=5.0, max_calls=100),
+    )
+    result = convert(scan_pdf(), fake=fake, config={"image_pages_second_reading": False})
+    assert omission_fixes(result) == []
+    [record] = result.image_pages.per_page  # type: ignore[union-attr]
+    assert record.recovered == 1 and record.omitted == 0 and record.calls == 2
+    assert "Left out of the first." in result.html
+
+
+def test_a_second_reading_that_agrees_lets_a_medium_line_be_an_optional_note_when_asked():
+    page = {
+        "blocks": [
+            block(
+                "paragraph",
+                confidence="medium",
+                y0=100,
+                y1=160,
+                runs=[text("Since "), math("x^2 = 4"), text(" it follows.")],
+            ),
+        ]
+    }
+    second = {
+        "readings": [
+            {
+                "index": 0,
+                "confidence": "high",
+                "runs": [
+                    {"kind": "text", "value": "Since "},
+                    {"kind": "math", "value": "x^{2}=4"},
+                    {"kind": "text", "value": " it follows."},
+                ],
+            }
+        ]
+    }
+
+    def responder(request: Any) -> Any:
+        return second if request.prompt_version.startswith("image_page_crops") else page
+
+    def required(config: dict[str, Any]) -> list[str]:
+        fake = FakeVisionClient(
+            responders={"image_page": responder},
+            budget=JobBudget(guard=InMemorySpendGuard(cap_usd=5.0), max_usd=5.0, max_calls=100),
+        )
+        result = convert(
+            scan_pdf(),
+            fake=fake,
+            config={"image_pages_recover_omissions": False, **config},
+        )
+        return [f.review for f in result.fixes if f.kind is Kind.PARAGRAPH]
+
+    assert required({}) == ["required"]  # off by default: nothing changes
+    assert required({"image_pages_second_reading": True}) == ["required"]  # recorded only
+    assert required({"image_pages_second_reading": True, "image_pages_accept_agreed": True}) == [
+        "optional"
+    ]
