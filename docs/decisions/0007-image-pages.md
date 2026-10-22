@@ -107,6 +107,23 @@ its image exactly as before.
    or handwriting (`page_type.document_refusal`), lets such a PDF through when the owner ticked
    the upload option, and counts its scanned and handwritten pages (a file with none is not affected).
 
+8. **Omission check** (added 2026-10-21, `pipeline/image_page_omission.py`; numbers in
+   [eval-handwriting.md](../eval-handwriting.md), "The omission check", and
+   [eval-image-pages.md](../eval-image-pages.md), "The omission check"). One call returns one answer,
+   and an answer that stops early says nothing about what it left out: the page counts as converted
+   and the only items are the blocks that came back. The page picture has ink and the blocks have
+   boxes, so the picture is compared with the regions the boxes account for. Ink outside every
+   box, grown by 3% of the width and 6% of the height (the reader's boxes sit off handwriting by
+   up to a line), in a stretch above a size (2% of the page's ink, 5 grid rows high), is a figure
+   element with a required decision that says the reading left something out
+   (`image_page.omitted_region`; review sentence in `web/messages.py`; written as a picture marked
+   "Not converted" until the reviewer describes it or keeps it). Rules, frames, a scanner's bar and
+   rim, grain, and the strips where running headers, footers and page numbers sit are not content.
+   No model call and no prompt change (the prompt hash is unchanged, so nothing was re-recorded);
+   `IMAGE_PAGES_OMISSION_CHECK=false` turns it off. It cannot see a reading that is wrong, a
+   dropped line next to a block (inside the margin of error of the boxes), content whose ink
+   the boxes cover, and a page whose blocks have no usable box (it is not judged).
+
 ## Measuring it
 
 Development material only for the design and the choice of model; the sealed check part of

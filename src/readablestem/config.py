@@ -343,6 +343,9 @@ class Settings(BaseSettings):
     # Resolution of the page picture the model reads (long side capped at 2,576 px, where
     # Claude stops scaling a picture down).
     image_pages_dpi: int = Field(default=200, ge=72, le=400)
+    # Compare each converted page's ink with the regions its blocks account for, and make
+    # a stretch the reading left out a required decision (`pipeline.image_page_omission`).
+    image_pages_omission_check: bool = True
     # What a job that asked for its scanned and handwritten pages to be converted may spend, per
     # PDF page of the document, and at most per job. Measured with the main model: $0.106 a page
     # on the development pages, $0.136 on the real-world held-out papers (about $0.33 for the

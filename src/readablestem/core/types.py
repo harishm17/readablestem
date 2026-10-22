@@ -114,6 +114,10 @@ IMAGE_PAGE_REASON = "image page"
 IMAGE_PAGE_ORIGINAL_REASON = "image page original"
 IMAGE_PAGE_NO_BOX_REASON = "image page box unusable"
 IMAGE_PAGE_NO_CROP_REASON = "image page inline"
+# A figure element standing for a stretch of the page's ink that no block of the reading
+# accounts for (`pipeline.image_page_omission`): its region is cropped, and it is a required
+# decision that says the reading left something out.
+IMAGE_PAGE_OMISSION_REASON = "image page omission"
 
 # `Fix.reason` of a heading fix that is not a heading: its text is the same as the heading
 # directly above it (a box title repeated under the section's own heading), so it is
@@ -824,6 +828,7 @@ class ImagePageRecord(BaseModel):
     illegible: int = 0  # "[illegible]" markers in the page's text
     low_confidence: int = 0  # blocks the model called medium or low
     kept_as_image: int = 0  # blocks whose LaTeX, grid or box could not be used
+    omitted: int = 0  # regions of ink the blocks leave out: each a required decision
     required: int = 0  # required decisions the page's blocks start with
     optional: int = 0  # optional notes the page's blocks start with
 

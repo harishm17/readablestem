@@ -52,6 +52,7 @@ from readablestem import __version__
 from readablestem.config import get_settings
 from readablestem.core.types import (
     HEADING_REPEATS_ABOVE,
+    IMAGE_PAGE_OMISSION_REASON,
     IMAGE_PAGE_ORIGINAL_REASON,
     IMAGE_PAGE_REASON,
     KEPT_ORIGINAL_STATUSES,
@@ -164,6 +165,11 @@ KEPT_IMAGE_WORDS = {
         "instructor for a text version.",
     ),
 }
+# Writing on a page converted from an image that the reading left out (`image_page_omission`).
+OMITTED_NOTE = (
+    "This part of the page was not converted to text, so a screen reader cannot read it. Ask "
+    "your instructor for a text version."
+)
 # A page converted from an image of it (ADR 0007): the note at its start and the toggle that
 # shows the original. The notice is the author's wording; it assists, it does not say the
 # conversion is right.
@@ -963,6 +969,19 @@ class _Renderer:
             )
             return img if img is not None else self.original(element, alt)
 
+        if IMAGE_PAGE_OMISSION_REASON in element.reasons and not (
+            proposal is not None
+            and fix is not None
+            and fix.status not in NOT_CONVERTED
+            and (proposal.decorative or proposal.alt.strip())
+        ):
+            # Writing on a converted page that the reading left out, not yet described: its
+            # picture, said to be unconverted (the instructor's words replace this alt text).
+            alt = self.image_alt(element, f"Part of page {element.page + 1}, not converted.")
+            return self.flag_block(
+                element, "image_page_omitted", f"<figure>{picture(alt)}</figure>",
+                KEPT_IMAGE_LABEL, OMITTED_NOTE,
+            )  # fmt: skip
         if fix is not None and fix.status in NOT_CONVERTED and fix.reason in KEPT_IMAGE_WORDS:
             # A page (or handwriting) kept as an image: what it is, never "a figure".
             alt, note = KEPT_IMAGE_WORDS[fix.reason]

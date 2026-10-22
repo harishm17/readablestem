@@ -217,3 +217,46 @@ def test_every_decision_of_the_page_can_be_made_and_the_job_finishes(web):
         assert post(web, fix.element_id, action="accept").status_code in (200, 303), fix.kind
     after = result(web)
     assert not any(f.pending for f in after.fixes)
+
+
+# ------------------------------------------------------- writing the reading left out
+
+
+@pytest.fixture
+def web_left_out(tmp_path):
+    env = WebEnv(tmp_path, feature_image_pages=True)
+    pdf = scan_pdf()
+    env.converter.output = converted(pdf, {"blocks": [PAGE["blocks"][1]]})
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.pdf = pdf
+        env.job_id = job_id_from(upload(client, pdf, image_pages=True))
+        env.run_worker()
+        yield env
+
+
+def left_out_fix(res: DocumentResult):
+    return next(f for f in res.fixes if any(c.code == "omitted_region" for c in f.failed_checks))
+
+
+def test_the_review_says_what_the_reading_left_out_and_shows_the_region(web_left_out):
+    fix = left_out_fix(result(web_left_out))
+    assert fix.review == "required" and fix.pending
+    html = web_left_out.browser.get(
+        f"/jobs/{web_left_out.job_id}/review?item={fix.element_id}"
+    ).text
+    assert "nothing in the converted page accounts for" in html
+    assert f"/regions/{fix.element_id}.png" in html or f"/crops/{fix.element_id}.png" in html
+
+
+def test_keeping_the_left_out_region_as_an_image_settles_it_and_says_so_in_the_student_file(
+    web_left_out,
+):
+    fix = left_out_fix(result(web_left_out))
+    assert post(web_left_out, fix.element_id, action="reject").status_code in (200, 303)
+    after = result(web_left_out).fix_for(fix.element_id)
+    assert after is not None and after.status is Status.REJECTED and not after.pending
+    html = web_left_out.browser.get(f"/jobs/{web_left_out.job_id}/view").text
+    assert "Part of page 1, not converted." in html and "Not converted." in html

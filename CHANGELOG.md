@@ -1,5 +1,22 @@
 # Changelog
 
+## Omission check for scanned and handwritten pages (2026-10-21, branch feat/image-page-omission)
+
+- A page read from an image whose reader left writing out now says so: the page picture's ink is
+  compared with the regions the blocks' boxes cover (`pipeline/image_page_omission.py`, numpy only,
+  no model call), and a stretch of ink no block is near becomes a figure item with a required
+  decision (`image_page.omitted_region`; review sentence in `web/messages.py`; written as a picture
+  marked "Not converted" until the reviewer describes it or keeps it). `ImagePageRecord.omitted`
+  counts them; `IMAGE_PAGES_OMISSION_CHECK=false` turns the check off. The image page prompt is
+  unchanged (same hash), so no recorded answer is invalid.
+- Measured by replay at $0 (`scripts/image_page_omission_replay.py`): the handwriting page that lost
+  four display equations is flagged; development pages add no decision (handwriting 10 pages, printed
+  pages as scans 36); held-out: +0.083 required decisions a page on handwriting (one false flag in 23
+  clean pages), +0.085 on the paper scans (5 pages flagged, 3 of them real omissions: a missing column,
+  a page with one block, a skipped paragraph); the primary score and the silent wrong equations do not
+  change. It does not see a wrong reading, a dropped line next to a block, or display equations read
+  as inline maths (docs/eval-handwriting.md, docs/eval-image-pages.md, ADR 0007 point 8).
+
 ## Handwriting answer key and one measurement (2026-10-21, branch feat/handwriting-eval)
 
 - A handwriting evaluation set built from real human ink (Google's MathWriting, CC BY-NC-SA 4.0, so
