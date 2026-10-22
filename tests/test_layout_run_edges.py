@@ -101,3 +101,37 @@ def test_a_comma_between_two_formulas_ends_the_first():
         "y = 2",
         "z = 3",
     ]
+
+
+def _row(text: str):
+    from readablestem.pipeline.layout import _Char
+
+    return [_Char(c, k * 5.0, 0, k * 5.0 + 5, 10, 8, 10, "CMR10", 0) for k, c in enumerate(text)]
+
+
+def test_the_signature_of_a_map_is_one_formula():
+    from readablestem.pipeline.layout import _join_signatures
+
+    chars = _row("H : R \u2192 S")
+    runs = [(0, 1, ["a"]), (4, 7, ["b"])]
+    assert _join_signatures(chars, runs) == [(0, 7, ["a", "b"])]
+
+
+def test_a_colon_between_formulas_without_an_arrow_does_not_join():
+    from readablestem.pipeline.layout import _join_signatures
+
+    chars = _row("a : b = c")
+    runs = [(0, 1, ["a"]), (4, 9, ["b"])]
+    assert _join_signatures(chars, runs) == runs
+
+
+def test_a_colon_after_a_word_is_not_inside_a_formula():
+    assert found("Note: x = 5 is the value that we use in the experiment of the section.") == [
+        "x = 5"
+    ]
+
+
+def test_a_defining_colon_equals_stays_in_the_formula():
+    assert found("Given n, we define x := 5 + y for the length of the run in the experiment.") == [
+        "x := 5 + y"
+    ]

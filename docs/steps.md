@@ -294,6 +294,23 @@ pins each. On 2026-10-09 layout started reading the TeX style fonts (above), so 
 handout's `\mathbb{R}^n` is now a match, not a cosmetic note, and `\mathbb{R}` read as
 `R` there is meaning-level (`tests/test_letter_style_fonts.py`, on a Tectonic PDF).
 
+### Edges and faces the reading gets from the text layer (2026-10-21)
+
+Two corrections of the model's LaTeX, applied after `clean_latex`, deterministic, so a recorded answer
+replays to the same result (docs/eval-equation-rootcause.md):
+
+- **A bracket or mark that is the neighbour's** (`drop_neighbour_brackets`, `drop_neighbour_marks`; inline equations
+  only). The crop of an inline formula is padded by 2 pt and takes in half of the parenthesis or hyphen
+  beside it ("(x = 0.9)", "(k-1)-regular"), which the model then writes. The run's own text layer says what the
+  run holds: a pair of parentheses around the whole reading goes when the text layer has none (a tuple keeps its
+  pair), an unmatched `(` or `)` at an edge goes when the text layer has fewer than the reading, a
+  trailing `\text{-}`, `-` or `\cdot` and a leading `\text{-}` go when the text layer has fewer dashes or dots. Only
+  punctuation: a letter or digit that is not in the text layer is what `text_layer_symbols_differ` already asks about.
+- **Bold italic** (`restyle_bold_italic`). `\mathbf{x}` becomes `\boldsymbol{x}` when the PDF draws `x` in a bold
+  italic font (the text layer has the bold-italic code point and no upright bold one for that letter; layout:
+  `CMMIB`, newtx's `bmi`, Nimbus `MediItal`, any `BoldItalic`). A crop shows a bold vector as bold and the model
+  writes `\mathbf`; `\bm` and `\boldsymbol` are what the author typed (62 equations of the development set).
+
 ## Sign and relation check (equations)
 
 The symbol check compares letters, digits and Greek letters, so before pipeline 0.3.0 a

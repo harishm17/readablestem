@@ -64,7 +64,7 @@ def test_a_quantity_with_a_leading_hyphen_and_an_italic_unit_is_not_maths():
     ("pieces", "expected"),
     [
         ([("We set ", "helv"), ("x", "heit"), (" = 5 at the start.", "helv")], "x = 5"),
-        ([("At ", "helv"), ("t", "heit"), (" = 0 s the cart is at rest.", "helv")], "t = 0 s"),
+        ([("At ", "helv"), ("t", "heit"), (" = 0 s the cart is at rest.", "helv")], "t = 0"),
         ([("The speed is ", "helv"), ("v", "heit"), (" + 2 in the end.", "helv")], "v + 2"),
         ([("The change is ", "helv"), ("\u2212", "symb"), ("3 m to the left.", "helv")], None),
     ],

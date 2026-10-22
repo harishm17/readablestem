@@ -2801,6 +2801,7 @@ def _inline_runs(
                 between_digits
                 or (c == "," and (depth > 0 or _ellipsis_comma(chars, i)))
                 or (c in _ELLIPSIS_CHARS and _in_ellipsis(chars, i))
+                or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
             )
             accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
             if chars[i].blank and (
@@ -2816,7 +2817,28 @@ def _inline_runs(
             reasons = _inline_evidence(chars, info, start, end, kinds)
             if reasons:
                 runs.append((start, end, reasons))
-    return _with_chemistry(row, kinds, _with_nuclides(row, kinds, runs))
+    return _with_chemistry(row, kinds, _with_nuclides(row, kinds, _join_signatures(chars, runs)))
+
+
+_SIGNATURE_ARROWS = frozenset("\u2192\u21a6\u27f6\u27fc\u2208\u2282\u2286")
+
+
+def _join_signatures(
+    chars: list[_Char], runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """The maps "H : R^d -> R^p" and "f : A -> B" are one formula: two runs with only a colon
+    (and spaces) between them, the second holding an arrow or a membership sign, are joined.
+    A colon after a word ("Note: x = 1") is not between two runs."""
+    joined: list[tuple[int, int, list[str]]] = []
+    for run in runs:
+        if joined:
+            start, end, reasons = joined[-1]
+            between = [c.c for c in chars[end : run[0]] if not c.blank]
+            if between == [":"] and any(c.c in _SIGNATURE_ARROWS for c in chars[run[0] : run[1]]):
+                joined[-1] = (start, run[1], [*reasons, *(r for r in run[2] if r not in reasons)])
+                continue
+        joined.append(run)
+    return joined
 
 
 NUCLIDE_REASON = "nuclide with numbers before its symbol"
@@ -3029,6 +3051,8 @@ def _word_space_between_operands(chars: list[_Char], info: _CharInfo, i: int) ->
     if before is None or after is None or info.script[before] or info.script[after]:
         return False
     a, b = chars[before], chars[after]
+    if a.c.isdigit() and b.c.isalpha():
+        return False  # "8.5 m/s": a number and its unit are one quantity
     ends = a.c.isalnum() or a.c in _OPERAND_END
     starts = b.c.isalnum() or b.c in _OPERAND_START
     return ends and starts and b.x0 - a.x1 >= WORD_SPACE * max(a.size, b.size)
@@ -3351,6 +3375,8 @@ def _italic_variables(
                 return False
     before = next((k for k in range(start - 1, -1, -1) if not chars[k].blank), None)
     after = next((k for k in range(end, len(chars)) if not chars[k].blank), None)
+    if before is not None and chars[before].c.isdigit() and not info.script[before]:
+        return False  # "-49 m", a number, a space and an italic letter: a quantity with its unit
     if any(k is not None and chars[k].c.isalpha() and chars[k].italic for k in (before, after)):
         return False  # the edge of a longer italic stretch
     text = "".join(c.c for c in chars[start:end] if not c.blank)

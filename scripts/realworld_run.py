@@ -108,8 +108,28 @@ def papers(part: str) -> list[dict]:
     return manifest(part)["papers"]
 
 
+def code_identity() -> dict:
+    """The commit the run was made at and the hash of its `src` tree (a run of a pre-registered
+    arm names the code it ran: `git_head`, `src_tree`)."""
+    import subprocess
+
+    def git(*args: str) -> str:
+        try:
+            return subprocess.run(
+                ["git", *args], cwd=REPO, capture_output=True, text=True, check=True
+            ).stdout.strip()
+        except (OSError, subprocess.CalledProcessError):
+            return ""
+
+    return {"git_head": git("rev-parse", "HEAD"), "src_tree": git("rev-parse", "HEAD:src")}
+
+
 def log_spend(entry: dict) -> None:
-    entry = {"when": dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"), **entry}
+    entry = {
+        "when": dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        **code_identity(),
+        **entry,
+    }
     with SPEND_LOG.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, sort_keys=True) + "\n")
 

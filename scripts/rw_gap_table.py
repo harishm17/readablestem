@@ -151,6 +151,11 @@ def main() -> int:
     parser.add_argument("--part", choices=["dev", "heldout", "fresh", "fresh2"], default="dev")
     parser.add_argument("--rs", default="rs", help="ReadableSTEM's run folder under runs/PART")
     parser.add_argument("--out", type=Path)
+    parser.add_argument(
+        "--rescore-chat",
+        action="store_true",
+        help="score the chatbot arms again from their recorded answers with the current code",
+    )
     args = parser.parse_args()
     runs = ROOT / "runs" / args.part
     gold = {
@@ -170,8 +175,10 @@ def main() -> int:
         if not path.is_file():
             continue
         outcome[name] = {}
-        for line in path.read_text().splitlines():
-            item = json.loads(line)
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        if args.rescore_chat and name in ("Haiku", "Opus"):
+            rows = report.rescored_chat_items(args.part, f"Chatbot, {name}")
+        for item in rows:
             pairs = {p["gold_id"]: p for p in item["pairs"]}
             for gid in [*pairs, *item["missed_gold_ids"]]:
                 outcome[name][gid] = {"pair": pairs.get(gid)}
@@ -221,9 +228,48 @@ def main() -> int:
         for k in sorted(keys, key=lambda k: -(crossed[(k, False)] - crossed[(k, True)])):
             lost, won = crossed[(k, False)], crossed[(k, True)]
             print(f"| {k} | {lost} | {won} | {100 * (lost - won) / n_gold['ReadableSTEM']:+.2f} |")
+    print()
+    print(silent_errors(args, gold, buckets))
     if args.out:
         args.out.write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
     return 0
+
+
+def silent_errors(args: argparse.Namespace, gold: dict[str, dict], buckets) -> str:
+    """ReadableSTEM's wrong equations that nobody is asked about, by kind. A render-and-compare
+    check can only help where the symbols are right and the structure is not: the symbol bag
+    (letters, digits, operators and structure markers) is equal, the order or nesting differs."""
+    items = [
+        json.loads(line)
+        for line in (ROOT / "runs" / args.part / args.rs / "items.jsonl").read_text().splitlines()
+    ]
+    count: Counter[str] = Counter()
+    for item in items:
+        for pair in item["pairs"]:
+            if pair["exact_lenient"] or pair.get("review") == "required":
+                continue
+            record = gold[pair["gold_id"]]
+            cls = buckets.classify_pair(pair, record["mathml"])
+            if cls == "recognition":
+                a = Counter(sym.symbols_of_latex(pair["pred_latex"]))
+                b = Counter(sym.symbols_of(record["mathml"]))
+                cls = (
+                    "recognition, same symbols in another arrangement"
+                    if a == b
+                    else "recognition, other symbols"
+                )
+            count[cls] += 1
+    total = sum(count.values())
+    n_gold = sum(i["n_gold"] for i in items)
+    rows = [
+        f"Silent errors of ReadableSTEM ({args.rs}): {total} "
+        f"({100 * total / n_gold:.2f} per 100 gold)"
+    ]
+    rows += [
+        f"- {kind}: {n} ({100 * n / total:.0f}% of them, {100 * n / n_gold:.2f} per 100 gold)"
+        for kind, n in count.most_common()
+    ]
+    return "\n".join(rows)
 
 
 if __name__ == "__main__":

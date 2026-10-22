@@ -93,8 +93,9 @@ def test_fixtures_are_small_and_well_formed(name):
     for e in elements:
         if e.kind == Kind.EQUATION and e.display == "inline":
             parent = next(p for p in elements if p.id == e.parent_id)
-            assert parent.kind in (Kind.PARAGRAPH, Kind.LIST_ITEM)
-            assert (parent.text or "").count(inline_marker(e.id)) == 1
+            assert parent.kind in (Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.FIGURE)
+            holder = parent.caption_marked if parent.kind is Kind.FIGURE else parent.text
+            assert (holder or "").count(inline_marker(e.id)) == 1
         if e.kind == Kind.LIST_ITEM:
             assert e.list_marker and e.list_ordered is not None and e.list_level
             assert not (e.text or "").startswith(e.list_marker)

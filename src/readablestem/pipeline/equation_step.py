@@ -316,6 +316,38 @@ def drop_neighbour_brackets(latex: str, text_layer: str | None) -> str:
     return out
 
 
+_GAP = r"(?:\\[,;:! ]|\s|~)*"
+_DASHES = "-\u2212\u2013\u2010\u2011"
+_TEXT_DASH = r"\\text\{\s*[-\u2013\u2212]+\s*\}"
+_TRAILING_DASH = re.compile(rf"{_GAP}(?:{_TEXT_DASH}|-)\s*$")
+_LEADING_DASH = re.compile(rf"^\s*{_TEXT_DASH}{_GAP}")
+_TRAILING_CDOT = re.compile(rf"{_GAP}\\cdot\s*$")
+
+
+def drop_neighbour_marks(latex: str, text_layer: str | None) -> str:
+    r"""`latex` without a hyphen or a centred dot at an edge that the run's text layer lacks.
+
+    The padded crop of "(k-1)-regular" shows the start of the hyphen, and the reading is
+    `(k-1)\text{-}`. It has one dash more than the text layer of the run, `(k -1)`, so the one
+    at the edge is the sentence's. A bare sign at the start of a reading stays (it may be the
+    formula's own); a dash the text layer has stays."""
+    if not text_layer:
+        return latex
+    out = latex.strip()
+    for pattern, marks, count in (
+        (_TRAILING_DASH, _DASHES, lambda t: t.count("-")),
+        (_LEADING_DASH, _DASHES, lambda t: t.count("-")),
+        (_TRAILING_CDOT, "\u00b7\u22c5\u2219", lambda t: t.count("\\cdot")),
+    ):
+        in_text = sum(text_layer.count(c) for c in marks)
+        while count(out) > in_text and (match := pattern.search(out)):
+            trimmed = out[: match.start()] + out[match.end() :]
+            if not trimmed.strip():
+                break
+            out = trimmed.strip()
+    return out
+
+
 _MATHBF_LETTER = re.compile(r"\\mathbf\s*\{\s*([A-Za-z])\s*\}")
 
 
@@ -787,6 +819,7 @@ def _evaluate(
     if display == "inline":
         candidate.latex = strip_trailing_punctuation(candidate.latex)
         candidate.latex = drop_neighbour_brackets(candidate.latex, element.text)
+        candidate.latex = drop_neighbour_marks(candidate.latex, element.text)
     candidate.mathml, candidate.checks = _convert(candidate.latex, display)
     if candidate.mathml is None:
         return candidate
