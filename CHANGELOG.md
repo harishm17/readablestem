@@ -1,5 +1,27 @@
 # Changelog
 
+## Equations on real papers: root causes and fixes (2026-10-21, branch fix/equation-rootcause)
+
+- Root-cause analysis of the 12.4-point gap to the chatbot recipe on the 25 development papers
+  ([docs/eval-equation-rootcause.md](docs/eval-equation-rootcause.md); `scripts/rw_gap_table.py`): short
+  variables set in an italic text font (3.9 points), maths in table cells (2.9), in captions (1.7), the edge of an inline span
+  (3.6), `\bm` read as `\mathbf` (0.6). Reading the equations it found is not where it loses.
+- Fixes, from the text layer and the glyph boxes, no prompt change (`equation-68ebbbf9`, the eval gate and the `latest-*`
+  reports untouched): an italic letter in upright prose is a variable; a bold letter with an index is a vector; a figure's caption is cut
+  like a paragraph (`Element.caption_marked`, inline equations whose parent is the figure); the parentheses of the sentence, a unit after a number, a citation
+  and a trailing bracket are not part of an inline formula; a word space between operands ends it; an ellipsis list, `:=` and `H : A -> B` are one;
+  a parenthesis or hyphen the run's text layer lacks, which the padded crop showed and the model wrote, is dropped; `\mathbf` is `\boldsymbol`
+  where the PDF's font is bold italic. The TeX author's conventions apply to PDFs typeset by TeX only; 111 of the 126 PDFs of
+  `scripts/layout_identity.py` are identical.
+- Measurement: the converter changed under the gold (28 papers' gold no longer rebuilds), so a ReadableSTEM run of today and the chatbots' stored items were scored by two
+  converters; `realworld_report.py --rescore-chat` reads the chatbot answers again with today's code. Every ReadableSTEM item also keeps a second reading in which the maths
+  cells of a rebuilt table count as equations, as the chatbots' HTML is read (`pipeline_eval.with_table_maths`); the registered reading is unchanged. The scorer is not
+  changed: two notation artefacts (styled letters, upright words) are counted for every arm in `scripts/rw_scorer_sensitivity.py` (about 1.5 points, the same for ReadableSTEM and Haiku).
+- Results: development (tuned on it) 0.553 to 0.680, level with Haiku, the silent errors 12.0 to 8.8 per 100 gold. On 15 fresh papers, registered before any
+  system ran (`data/realworld/PREREGISTRATION-FRESH2.md`): the fixes are worth +0.068 [+0.031, +0.116] (0.558 to 0.626), the silent errors do not rise (9.76 to 8.42, limit +0.5), ReadableSTEM is level with Haiku (0.626 against 0.622)
+  and 5.6 points below Opus (0.682; 97.5% interval -0.109 to +0.007). The registered claim "clearly beats the chatbot recipe" is not met; it leaves 8.4 silent errors per 100 gold against 16.3 and 13.7. Spend $13.55 of $18.
+  Unresolved: table cells (the table branch's), formulas that wrap or are typed apart, `\text` against the authors' `\mathrm` (the scorer's artefact is 4 points for the chatbots, 1.5 for ReadableSTEM, on this set).
+
 ## Handwriting accuracy: root causes, display lines, omission recovery (2026-10-22, branch fix/handwriting-accuracy)
 
 - Root causes of the 43% wrong equations of the handwriting held-out set, from the recorded answers

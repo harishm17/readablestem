@@ -309,6 +309,11 @@ Review screen (ReadableSTEM only): of the aligned equations that are wrong in th
 
    Across them: **no proposal for display equations whose glyphs have no Unicode value** (2.6% of the held-out gold).
 
+**Update (2026-10-21, later the same day).** The root causes of the gap above, the fixes and a fresh registered test against both chatbot arms are in
+[eval-equation-rootcause.md](eval-equation-rootcause.md): on 15 new papers the fixes are worth +6.8 points (0.558 to 0.626), ReadableSTEM is level with Haiku and 5.6 points below Opus, and its silent errors are 8.4 per 100 gold against 16.3 and 13.7.
+Two corrections to how this page's numbers compare: the chatbot item files above were scored by the converter that made the gold and ReadableSTEM runs made after the chemistry work are scored by a newer one (the page's chatbot numbers are untouched; the other page re-scores them), and a table cell's maths was
+never an equation to the scorer for ReadableSTEM while it was for the chatbots.
+
 ## The page math pass on the real-world development set
 
 ADR 0006's page math pass (`FEATURE_PAGE_MATH`: one Haiku call per page places the equations, the reconciliation policy of
