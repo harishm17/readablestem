@@ -1398,9 +1398,11 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
 # ----------------------------------------------------------- proposals made here, not by the detector
 
 _ENUMERATION = re.compile(
-    r"^(?:\(?[A-Za-z]\)|\(?\d{1,3}(?:\.\d{1,3})*[.)]?|\(?[ivxlc]{1,5}[.)]|\[\d{1,3}\]|\d{1,3}:)$"
+    r"^(?:\(?[A-Za-z]\)|\(?\d{1,3}(?:\.\d{1,3})*[.)]?|\(?[ivxlc]{1,5}[.)]|\d{1,3}:"
+    r"|\[[A-Za-z0-9+,. -]{1,12}\]"  # [3], [JP14]: a reference
+    r"|[-\u2013\u2014*+>\u2022\u00b7\u25e6\u25aa])$"  # a bullet, a dash, a prompt
 )
-_EQUATION_TAG = re.compile(r"^\(\d{1,3}(?:[.-]\d{1,3})*[a-z]?\)$")
+_EQUATION_TAG = re.compile(r"^\([A-Za-z]{0,6}\d{0,3}(?:[.-]\d{1,3})*[a-z]?\)$")
 
 
 def own_proposals(view: _PageView) -> list[Proposal]:
