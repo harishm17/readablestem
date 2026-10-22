@@ -142,7 +142,7 @@ def test_an_unruled_table_of_numbers_is_found_by_its_caption_and_its_columns(lat
     # "Table 3" caption under them, are the proposal (docs/tables.md, "Recall on real
     # documents"). Without the caption a block of numbers is a matrix, not a table.
     [unruled] = [e for e in found(latex) if "Table 3" in (e.caption or "")]
-    assert rows(unruled)[0] == ["x", "f(x)", "f′(x)", "Difference"]
+    assert rows(unruled)[0] == ["x", "f(x)", "f^′(x)", "Difference"]
     assert rows(unruled)[-1][0] == "2"
 
 
