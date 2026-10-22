@@ -121,7 +121,9 @@ def test_a_scanned_page_becomes_elements_and_fixes_with_a_tier_each():
     assert by_reason[heading.id].review == "optional"
     paragraphs = [e for e in result.elements if e.kind is Kind.PARAGRAPH]
     sure, unsure = (by_reason[p.id] for p in paragraphs)
-    assert (sure.status, sure.review) == (Status.ACCEPTED, "optional")
+    # the sure paragraph holds a formula: required whatever the reader's confidence (ADR 0007, 12)
+    assert (sure.status, sure.review) == (Status.NEEDS_REVIEW, "required")
+    assert {c.code for c in sure.failed_checks} >= {"maths_checked"}
     assert (unsure.status, unsure.review) == (Status.NEEDS_REVIEW, "required")
     [table] = [e for e in result.elements if e.kind is Kind.TABLE]
     assert (by_reason[table.id].status, by_reason[table.id].review) == (
@@ -130,9 +132,9 @@ def test_a_scanned_page_becomes_elements_and_fixes_with_a_tier_each():
     )
     figure = [e for e in result.elements if e.kind is Kind.FIGURE][1]
     assert by_reason[figure.id].review == "optional"
-    # What a person must decide: the equation, the unsure paragraph and the table.
-    assert result.stats.required_decisions == 3
-    assert result.stats.by_review["required"] == 3
+    # What a person must decide: the equation, both paragraphs (one holds maths) and the table.
+    assert result.stats.required_decisions == 4
+    assert result.stats.by_review["required"] == 4
 
 
 def test_the_display_equation_is_read_again_from_its_crop_and_stays_a_decision():
@@ -196,7 +198,7 @@ def test_cost_is_per_page_and_in_the_totals():
         "paragraph": 2,
         "table": 1,
     }
-    assert (record.required, record.optional) == (3, 3)
+    assert (record.required, record.optional) == (4, 2)
     assert record.low_confidence == 1 and record.illegible == 1
     # In the document's numbers, once, and on the page's.
     fix_cost = sum(f.cost_usd for f in result.fixes)
@@ -319,9 +321,7 @@ def test_a_rejected_paragraph_is_written_as_the_picture_of_its_region():
 
     result = convert(scan_pdf())
     unsure = next(
-        e
-        for e in result.elements
-        if e.kind is Kind.PARAGRAPH and (result.fix_for(e.id) or object).review == "required"  # type: ignore[union-attr]
+        e for e in result.elements if e.kind is Kind.PARAGRAPH and "illegible" in (e.text or "")
     )
     fix = result.fix_for(unsure.id)
     assert fix is not None
@@ -364,7 +364,8 @@ def test_a_reader_that_stops_after_the_first_block_leaves_a_required_item_for_th
     assert element.page == 0 and element.bbox is not None
     assert result.image_pages is not None
     [record] = result.image_pages.per_page
-    assert record.omitted == 1 and record.required == 1 and record.optional == 1
+    # the omission item and the paragraph (it holds a formula: required, ADR 0007 point 12)
+    assert record.omitted == 1 and record.required == 2 and record.optional == 0
     assert "not converted" in result.html.lower()
 
 
@@ -450,8 +451,10 @@ def test_a_second_reading_that_agrees_lets_a_medium_line_be_an_optional_note_whe
         )
         return [f.review for f in result.fixes if f.kind is Kind.PARAGRAPH]
 
+    both = {"image_pages_second_reading": True, "image_pages_accept_agreed": True}
     assert required({}) == ["required"]  # off by default: nothing changes
     assert required({"image_pages_second_reading": True}) == ["required"]  # recorded only
-    assert required({"image_pages_second_reading": True, "image_pages_accept_agreed": True}) == [
-        "optional"
-    ]
+    # a block with maths is required whatever a second reading says (ADR 0007 point 12) ...
+    assert required(both) == ["required"]
+    # ... and acceptance only matters when that policy is off
+    assert required({**both, "image_pages_maths_always_required": False}) == ["optional"]

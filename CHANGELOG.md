@@ -1,5 +1,22 @@
 # Changelog
 
+## Maths always required on image pages (2026-10-22, branch fix/image-page-maths-required)
+
+- Decision (owner): on a page read from an image (scanned or handwritten, the opt-in pass), every block
+  that holds maths is a required review item whatever the page reader's confidence: a display equation
+  (always was), and a paragraph, list item or heading with any formula in it
+  (`IMAGE_PAGES_MATHS_ALWAYS_REQUIRED`, default on; `image_page._prose_fix`, `image_page.tier_headings`;
+  review sentence for `image_page.maths_always_checked` in `web/messages.py`; ADR 0007 point 12).
+  Prose-only blocks keep their tiers; typed pages and the typed equation step are untouched; an agreed
+  second reading cannot lift such a block out.
+- Measured by replay at $0: silent wrong equations 0 by construction, verified on handwriting development,
+  first held-out and fresh (2 to 0 on fresh), on the 36 typed development scans (15 to 0) and on the
+  scanned papers' held-out recording (46 to 0). Required decisions a page: handwriting fresh 5.79 to 5.96,
+  first held-out replay 5.92 to 6.08, development 5.90 to 5.90; typed scans 3.58 to 6.44; scanned papers
+  2.00 to 5.69. That is the price of "you check every item" on pages where the reader is confident.
+- docs/eval-handwriting.md also states the ceiling plainly: most "wrong" equations are ambiguous ink or the
+  label's notation, and reading each expression alone scores 0.61 to 0.64.
+
 ## Handwriting accuracy: root causes, display lines, omission recovery (2026-10-22, branch fix/handwriting-accuracy)
 
 - Root causes of the 43% wrong equations of the handwriting held-out set, from the recorded answers

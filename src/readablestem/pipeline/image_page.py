@@ -114,6 +114,7 @@ NO_CROP_REASON = types.IMAGE_PAGE_NO_CROP_REASON
 # and handwriting on a typed page are not scans or notebooks and stay as they were.
 READ_REASONS = frozenset({"scanned_page", "handwritten_page"})
 ILLEGIBLE = "[illegible]"
+INLINE_MARKER = re.compile(r"⟦[^⟧]*⟧")  # where an inline formula stands in a block's text
 
 # The page picture: 200 dpi, long side at most the size at which Claude stops scaling a picture
 # down (`pricing.IMAGE_MAX_EDGE_PX`), so small subscripts stay legible.
@@ -758,6 +759,16 @@ def _tier_checks(
 AGREED_CONFIDENCE = 0.85
 
 
+def _maths_check() -> Check:
+    """Why a block that would be an optional note is a decision: it holds maths."""
+    return Check(
+        name="image_page.maths_always_checked",
+        passed=False,
+        severity="warning",
+        code="maths_checked",
+    )
+
+
 def _prose_fix(
     element: Element,
     block: Block,
@@ -765,6 +776,8 @@ def _prose_fix(
     invalid_inline: int,
     verdict: second.Verdict | None = None,
     accept_agreed: bool = False,
+    has_maths: bool = False,
+    maths_required: bool = False,
 ) -> Fix:
     checks, required = _tier_checks(block.confidence, illegible, invalid_inline)
     confidence = CONFIDENCE_VALUE[block.confidence]
@@ -792,6 +805,11 @@ def _prose_fix(
             and not invalid_inline
         ):
             required, confidence = False, AGREED_CONFIDENCE
+    if maths_required and has_maths and not required:
+        # The policy (`Settings.image_pages_maths_always_required`): a block with maths is
+        # checked whatever the reader's confidence and whatever a second reading says.
+        checks.append(_maths_check())
+        required = True
     return Fix(
         element_id=element.id,
         kind=Kind.PARAGRAPH,
@@ -807,6 +825,7 @@ def _add_text_block(
     builder: _Builder,
     verdict: second.Verdict | None = None,
     accept_agreed: bool = False,
+    maths_required: bool = False,
 ) -> None:
     kind = {
         "heading": Kind.HEADING,
@@ -849,7 +868,14 @@ def _add_text_block(
         builder.add(eq)
     if kind is not Kind.HEADING:  # a heading's fix comes from the heading step
         builder.fixes[element_id] = _prose_fix(
-            element, block, illegible, invalid, verdict, accept_agreed
+            element,
+            block,
+            illegible,
+            invalid,
+            verdict,
+            accept_agreed,
+            has_maths=bool(inline) or invalid > 0,
+            maths_required=maths_required,
         )
 
 
@@ -1152,6 +1178,7 @@ def build(
     check_omission: bool = True,
     verdicts: Mapping[int, second.Verdict] | None = None,
     accept_agreed: bool = False,
+    maths_required: bool = False,
 ) -> Built | None:
     """The elements and decided fixes of one page, or None when nothing on it was usable.
 
@@ -1176,7 +1203,9 @@ def build(
             _add_equation(lone, builder, skip_marker=bool(block.marker.strip()))
             block = lone
         elif block.kind in {"heading", "paragraph", "list_item"}:
-            _add_text_block(block, builder, (verdicts or {}).get(index), accept_agreed)
+            _add_text_block(
+                block, builder, (verdicts or {}).get(index), accept_agreed, maths_required
+            )
         elif block.kind == "equation":
             _add_equation(block, builder)
         elif block.kind == "table":
@@ -1213,7 +1242,9 @@ def build(
 # ------------------------------------------------------------------------ the headings
 
 
-def tier_headings(fixes: Sequence[Fix], elements: Sequence[Element]) -> None:
+def tier_headings(
+    fixes: Sequence[Fix], elements: Sequence[Element], *, maths_required: bool = False
+) -> None:
     """Apply the image page tier to the heading fixes of elements read from an image (in
     place): never below an optional note; required when the page reader was not sure of the
     block or the text carries an `[illegible]` marker. A heading the heading step already
@@ -1226,6 +1257,9 @@ def tier_headings(fixes: Sequence[Fix], elements: Sequence[Element]) -> None:
         confidence: Confidence = element.image_confidence
         text = element.text or ""
         checks, required = _tier_checks(confidence, count_illegible(text))
+        if maths_required and not required and INLINE_MARKER.search(text):
+            checks.append(_maths_check())  # a heading with a formula in it: see `_prose_fix`
+            required = True
         fix.checks = [*fix.checks, *checks]
         if fix.status is Status.ACCEPTED and required:
             fix.status = Status.NEEDS_REVIEW
