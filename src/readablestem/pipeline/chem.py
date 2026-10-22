@@ -44,7 +44,7 @@ from typing import Literal
 from readablestem.pipeline.speech_nuclides import ELEMENTS
 
 ScriptKind = Literal["sup", "sub"]
-WordLabel = Literal["formula", "bare", "state", "arrow", "plus", "number", "other"]
+WordLabel = Literal["formula", "bare", "state", "arrow", "plus", "number", "label", "other"]
 
 STATE_SYMBOLS = frozenset({"aq", "s", "l", "g"})
 # Arrow glyphs a reaction is written with. The shaft of a long arrow ("−→", set as a minus
@@ -52,6 +52,9 @@ STATE_SYMBOLS = frozenset({"aq", "s", "l", "g"})
 ARROW_HEADS = frozenset("→⟶⇌⇄↔⟷←⟵⇋⇒⟹")
 _SHAFTS = frozenset("−-–—=═")
 _HYDRATE_DOTS = frozenset("·•∙⋅.")
+# What TeX sets over an arrow (`\\xrightarrow{\\Delta}`): the text layer has it as a word of its
+# own just before the arrow, so it is part of the reaction and not a species.
+ARROW_LABELS = frozenset({"\u2206", "\u0394", "heat", "light"})
 _TRIM_END = frozenset(",.;:!?\"'’”")
 _TRIM_START = frozenset("\"'‘“")
 _MINUS_SIGNS = "−–-"
@@ -251,6 +254,8 @@ def label_word(word: Word) -> Labelled:
         return Labelled(word, "arrow", 0, len(text))
     if plain and _NUMBER.fullmatch(text):
         return Labelled(word, "number", 0, len(text))
+    if plain and text in ARROW_LABELS:
+        return Labelled(word, "label", 0, len(text))
     lo, hi = _trim(text, kinds)
     if hi <= lo:
         return Labelled(word, "other", 0, 0)
@@ -291,7 +296,7 @@ def formulas(labelled: Sequence[Labelled]) -> list[tuple[int, int]]:
     return found
 
 
-_JOINED = {"formula", "bare", "state", "plus", "number"}
+_JOINED = {"formula", "bare", "state", "plus", "number", "label"}
 
 
 def reactions(labelled: Sequence[Labelled]) -> list[tuple[int, int]]:
@@ -314,7 +319,7 @@ def reactions(labelled: Sequence[Labelled]) -> list[tuple[int, int]]:
         # A reaction starts and ends on a species (or a state symbol after one).
         while (
             left < a
-            and labelled[left].label in {"plus", "state", "number"}
+            and labelled[left].label in {"plus", "state", "number", "label"}
             and not (
                 labelled[left].label == "number"
                 and left + 1 < n
@@ -322,7 +327,7 @@ def reactions(labelled: Sequence[Labelled]) -> list[tuple[int, int]]:
             )
         ):
             left += 1
-        while right > a and labelled[right].label in {"plus", "number", "arrow"}:
+        while right > a and labelled[right].label in {"plus", "number", "arrow", "label"}:
             right -= 1  # a trailing number belongs to the sentence ("... H2O 2.")
         species = {"formula", "bare"}
         before = [x for x in labelled[left:a] if x.label in species]
@@ -358,7 +363,7 @@ _ARROWS: list[tuple[str, str | None]] = [
 _COEFFICIENT = re.compile(r"(\d+(?:\.\d+)?)(?:/(\d+))?")
 _GREEK = re.compile(r"\\(alpha|beta|gamma|nu)(?![A-Za-z])")
 _STATE = re.compile(r"\((?:aq|s|l|g)\)")
-_LABEL_CHARS = re.compile(r"^[A-Za-z0-9 .,\\]+$")
+_LABEL_CHARS = re.compile(r"^[A-Za-z0-9 .,]+$")
 _SIGNS = "+−–-"
 _CARET_CHARGE = re.compile(r"\^([+−–-]?)(\d*)([+−–-]?)(?![A-Za-z0-9{])")
 
@@ -566,24 +571,61 @@ def _species_latex(s: str, i: int) -> tuple[str, int]:
     return prefix + "".join(body).strip(), i
 
 
-def _arrow_label(s: str, i: int) -> tuple[str | None, int]:
-    """The `[label]` after an arrow at `s[i]`, as LaTeX, and the index after it."""
+_LABEL_PIECE = re.compile(
+    r"\^\\circ(?![A-Za-z])|\^\{\\circ\}|\\text\{[A-Za-z0-9 .,()+-]+\}|[^\\^{}]+"
+)
+_LABEL_PLAIN = re.compile(r"[A-Za-z0-9 .,()+-]+")
+
+
+def _label_latex(raw: str) -> str:
+    r"""One arrow label as LaTeX: a word or words (`heat`), a lone command (`\Delta`), or a
+    mix of text, numbers, `\text{...}` and a degree sign (`600^\circ C`). Anything else is
+    outside the subset."""
+    raw = raw.strip().strip("$").strip()
+    if not raw:
+        raise CeError("unreadable arrow label")
+    command = re.fullmatch(r"\\([A-Za-z]+)", raw.replace(" ", ""))
+    if command:
+        return "\\" + command.group(1)
+    if not ("\\" in raw or "{" in raw or "^" in raw):
+        if not _LABEL_CHARS.match(raw):
+            raise CeError("unreadable arrow label")
+        return "\\text{" + raw + "}"
+    pieces = _LABEL_PIECE.findall(raw)
+    if "".join(pieces) != raw:
+        raise CeError("unreadable arrow label")
+    out: list[str] = []
+    for piece in pieces:
+        if piece.startswith("^") and out:
+            out[-1] += "^\\circ"  # the degree sign sits on what comes before it
+        elif piece.startswith(("\\text{", "^")):
+            out.append(piece.replace("^{\\circ}", "^\\circ"))
+        elif _LABEL_PLAIN.fullmatch(piece):
+            word = piece.strip()
+            if word:
+                out.append(word if re.fullmatch(r"[0-9 .,]+", word) else "\\text{" + word + "}")
+        else:
+            raise CeError("unreadable arrow label")
+    if not out:
+        raise CeError("unreadable arrow label")
+    return " ".join(out)
+
+
+def _arrow_label(s: str, i: int) -> tuple[tuple[str, str | None] | None, int]:
+    """The `[above]` or `[above][below]` after an arrow at `s[i]`, as LaTeX, and the index
+    after it: `((above, below), i)`, below None for one label."""
     if i >= len(s) or s[i] != "[":
         return None, i
-    close = s.find("]", i)
-    if close < 0:
-        raise CeError("unbalanced arrow label")
-    if close + 1 < len(s) and s[close + 1] == "[":
-        raise CeError("two-part arrow label")
-    raw = s[i + 1 : close].strip().strip("$").strip()
-    if not raw or not _LABEL_CHARS.match(raw):
-        raise CeError("unreadable arrow label")
-    if "\\" in raw:
-        command = re.fullmatch(r"\\([A-Za-z]+)", raw.replace(" ", ""))
-        if not command:
-            raise CeError("unreadable arrow label")
-        return "\\" + command.group(1), close + 1
-    return "\\text{" + raw + "}", close + 1
+    labels: list[str] = []
+    while i < len(s) and s[i] == "[":
+        close = s.find("]", i)
+        if close < 0:
+            raise CeError("unbalanced arrow label")
+        labels.append(_label_latex(s[i + 1 : close]))
+        i = close + 1
+    if len(labels) > 2:
+        raise CeError("three-part arrow label")
+    return (labels[0], labels[1] if len(labels) == 2 else None), i
 
 
 def _is_species_latex(piece: str) -> bool:
@@ -614,12 +656,16 @@ def ce_to_latex(source: str) -> str:
             label, i = _arrow_label(s, i)
             if label is None:
                 out.append(arrow[1])
-            elif arrow[1] == "\\longrightarrow":
-                out.append("\\xrightarrow{" + label + "}")
-            elif arrow[1] == "\\longleftarrow":
-                out.append("\\xleftarrow{" + label + "}")
             else:
-                out.append("\\overset{" + label + "}{" + arrow[1] + "}")
+                above, below = label
+                under = "[" + below + "]" if below else ""
+                if arrow[1] == "\\longrightarrow":
+                    out.append("\\xrightarrow" + under + "{" + above + "}")
+                elif arrow[1] == "\\longleftarrow":
+                    out.append("\\xleftarrow" + under + "{" + above + "}")
+                else:
+                    inner = "\\underset{" + below + "}{" + arrow[1] + "}" if below else arrow[1]
+                    out.append("\\overset{" + above + "}{" + inner + "}")
             continue
         if c in "+,":
             out.append(c)
@@ -643,6 +689,20 @@ def ce_to_latex(source: str) -> str:
     if not out:
         raise CeError("empty")
     return " ".join(out)
+
+
+_MIDDLE = re.compile(r"\\middle\s*(\\\||\\Vert(?![A-Za-z])|\\vert(?![A-Za-z])|\|)")
+_LEFT_RIGHT = re.compile(r"\\(?:left|right)(?![A-Za-z])")
+
+
+def tidy_cell_notation(latex: str) -> str:
+    r"""The phase boundaries of a cell (`Pt(s) | H2(g) || Cu2+(aq) | Cu(s)`, OpenStax 16.3) as
+    the model writes them: `\middle|` is only valid between `\left` and `\right`, and the
+    converter refuses the whole equation without them. With no `\left` or `\right` in the
+    text a `\middle` bar is a bar; with them it is left alone."""
+    if "\\middle" not in latex or _LEFT_RIGHT.search(latex):
+        return latex
+    return _MIDDLE.sub(lambda m: "\\Vert " if m.group(1) in {"\\|", "\\Vert"} else "| ", latex)
 
 
 def _find_ce(latex: str, start: int) -> int:
