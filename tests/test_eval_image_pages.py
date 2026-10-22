@@ -24,7 +24,7 @@ PAGE = {
 }
 
 
-def converted(equation: str = "v = \\frac{d}{t}"):
+def converted(equation: str = "v = \\frac{d}{t}", maths_required: bool = False):
     client = FakeVisionClient(
         responders={
             "image_page": lambda r: PAGE,
@@ -32,7 +32,10 @@ def converted(equation: str = "v = \\frac{d}{t}"):
         }
     )
     settings = Settings(  # type: ignore[call-arg]
-        _env_file=None, feature_image_pages=True, image_pages_recover_omissions=False
+        _env_file=None,
+        feature_image_pages=True,
+        image_pages_recover_omissions=False,
+        image_pages_maths_always_required=maths_required,
     )
     return run.convert_pdf(scan_pdf(), settings=settings, client=client).result
 
@@ -78,6 +81,21 @@ def test_an_item_has_the_pass_record_and_a_row_per_matched_equation():
     assert by[f"g-{names['inline_ok']}"]["asked"] is False  # paragraph 1: confident, optional
     assert by[f"g-{names['inline_asked']}"]["asked"] is True  # paragraph 3: low confidence
     assert by[f"g-{names['block']}"]["agreed"] is True  # the crop read what the page did
+
+
+def test_with_maths_always_required_no_inline_formula_goes_unasked():
+    # The tests above keep the policy off to count the old tiers; on (the default), every paragraph
+    # with a formula is a decision, so a confident paragraph's formula is asked about too.
+    result = converted(maths_required=True)
+    names = ids(result)
+    pairs = [
+        pair(names["inline_ok"], right=False, symbols=False, display="inline"),
+        pair(names["inline_asked"], right=False, symbols=False, display="inline"),
+    ]
+    item: Any = image_pages.item_for(result, pairs)
+    assert all(f["asked"] for f in item["flags"])
+    metrics: Any = image_pages.metrics([{"image_pages": item}], gold_equations=2)
+    assert metrics["equation_flags"]["all"]["wrong_not_asked"] == 0
 
 
 def test_a_disagreement_between_the_readings_is_recorded():

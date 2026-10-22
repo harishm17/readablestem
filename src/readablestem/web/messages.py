@@ -122,6 +122,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("image_page.second_reading", "second_reading_agrees"): "The line was read a second time "
     "from a picture of it alone and both readings agree; the page is still the only thing "
     "that can confirm them.",
+    ("image_page.maths_always_checked", "maths_checked"): "This was read from an image and holds "
+    "maths, and every such block is checked, however sure the reader was: compare each formula "
+    "with the original page symbol by symbol.",
     ("image_page.illegible", "illegible"): "Some of this could not be read and is marked "
     "[illegible]: look at the original page and write what it says.",
     ("image_page.inline_math", "inline_math_invalid"): "A formula in this text could not be "

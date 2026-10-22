@@ -346,6 +346,12 @@ class Settings(BaseSettings):
     # Compare each converted page's ink with the regions its blocks account for, and make
     # a stretch the reading left out a required decision (`pipeline.image_page_omission`).
     image_pages_omission_check: bool = True
+    # On a page read from an image, every block that holds maths (a display equation, or a
+    # paragraph, list item or heading with a formula in it) is a required decision whatever
+    # the page reader's confidence: its `high` is not trustworthy on handwriting
+    # (docs/eval-handwriting.md), and the option's promise is that every item is checked.
+    # Typed pages and prose-only blocks are not affected.
+    image_pages_maths_always_required: bool = True
     # ... and read the stretch from a picture of just that part, so that what the first reading
     # left out is converted (with its own decision) and not only flagged
     # (`image_page.recover_omissions`). Costs a request only for a page the check flags.
