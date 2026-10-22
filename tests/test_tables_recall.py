@@ -13,6 +13,7 @@ import pymupdf
 import pytest
 
 from readablestem.core.types import Kind
+from readablestem.pipeline import tables
 from readablestem.pipeline.layout import analyze
 from test_tables_detect import PENDULUM, PROSE, grid_table, no_model, pdf, write  # noqa: F401
 
@@ -278,3 +279,35 @@ def test_a_few_sideways_labels_do_not_turn_a_page():
 
     found = data_tables(pdf(fill))
     assert len(found) == 1 and found[0].table.turned == 0
+
+
+# ------------------------------------------------- a numbered reaction above a table
+
+
+def test_a_numbered_reaction_above_a_table_is_not_part_of_it():
+    # OpenStax sets "2NO + Cl2 -> 2NOCl   17.39" on the line above the data of a rate-law
+    # table, and the layout model boxes the two together; the reaction (an equation) is not
+    # a row.
+    def fill(page):
+        write(page, 150, 135, "2NO(g) + Cl2(g) = 2NOCl(g)")
+        write(page, 500, 135, "17.39")
+        grid_table(page, PENDULUM, y0=150)
+
+    [found] = data_tables(pdf(fill))
+    assert found.bbox[1] > 140, found.bbox
+    assert "2NOCl" not in {c.text for c in found.table.cells}
+
+
+def test_the_box_is_cut_below_a_numbered_equation_at_its_top_or_bottom():
+    from test_tables_detect import view_of
+
+    def fill(page):
+        write(page, 150, 135, "2NO(g) + Cl2(g) = 2NOCl(g)")
+        write(page, 500, 135, "17.39")
+        grid_table(page, PENDULUM, y0=150)
+        write(page, 150, 262, "x = 2y + 1")
+        write(page, 500, 262, "(4.2)")
+
+    view = view_of(pdf(fill))
+    _, y0, _, y1 = tables._without_captions(view, (90, 120, 520, 270))
+    assert 138 < y0 < 152 and 228 < y1 < 252

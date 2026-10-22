@@ -126,7 +126,9 @@ BLOCK_ROW_GAP = 1.3  # x font size: widest white gap between two lines of one te
 TITLE_ROW_WORDS = 6  # a title row of a group of rows has no more words than this
 HEADER_GAP = 3.5  # x font size: widest white gap under a header row of a block
 RUNNING_WIDTH = 0.6  # share of a framed box's width that a line of running text covers
-PAGE_CENTRE = 0.06  # a lone gutter this close to the page's middle (x its width) is a page's columns
+PAGE_CENTRE = (
+    0.06  # a lone gutter this close to the page's middle (x its width) is a page's columns
+)
 PAGE_SPAN = 0.7  # ... when the text spans this much of the page's width
 TEXT_TABLE_LINES = 4  # lines a box found from text alone needs, without a "Table N" caption
 BLOCK_MIN_LINES = 3  # lines with text in two or more cells that make a block of text columns
@@ -1585,7 +1587,10 @@ def _wordy(text: str, letters_needed: int = 2) -> bool:
     return letters >= letters_needed and letters >= 0.5 * sum(not c.isspace() for c in text)
 
 
-_RELATION = frozenset("=\u2264\u2265<>\u2192\u2208\u2209\u2260\u2248\u223c\u2211\u222b\u2282\u2286")
+_RELATION = frozenset(
+    "=\u2264\u2265<>\u2192\u2208\u2209\u2260\u2248\u223c\u2211\u222b\u2282\u2286"
+    "\u27f6\u27f5\u21cc\u21d2\u2194\u21d4\u27f9"  # long arrows, equilibrium, implies
+)
 
 
 def _pictured(view: _PageView, box: BBox, size: float) -> bool:
@@ -1651,9 +1656,7 @@ def _running_text(grid: _Grid, box: BBox) -> bool:
 
     return (
         sum(
-            1
-            for s in grid.segs
-            if per_line[s.line] == 1 and len(s.text.split()) >= 8 and across(s)
+            1 for s in grid.segs if per_line[s.line] == 1 and len(s.text.split()) >= 8 and across(s)
         )
         >= 2
     )
@@ -1786,6 +1789,27 @@ def _without_captions(view: _PageView, box: BBox) -> BBox:
         if TABLE_CAPTION.match(texts[i]):
             y1 = (bottoms[i - 1] + tops[i]) / 2
             break
+    # A numbered equation or reaction just above or below ("2NO + Cl2 -> 2NOCl    17.39"):
+    # the detector boxes it with the table it introduces.
+    by_line: dict[int, list[_Seg]] = {}
+    for seg in segs:
+        by_line.setdefault(seg.line, []).append(seg)
+
+    def numbered(i: int) -> bool:
+        cells = sorted(by_line.get(i, []), key=lambda m: m.x0)
+        return (
+            len(cells) >= 2
+            and bool(_BARE_TAG.match(cells[-1].text) or _EQUATION_TAG.match(cells[-1].text))
+            and any(ch in _RELATION for m in cells[:-1] for ch in m.text)
+        )
+
+    top, bottom = 0, len(lines) - 1
+    while top < bottom - 1 and numbered(top) and tops[top] >= y0 - 1:
+        top += 1
+        y0 = max(y0, (bottoms[top - 1] + tops[top]) / 2)
+    while bottom > top + 1 and numbered(bottom) and bottoms[bottom] <= y1 + 1:
+        bottom -= 1
+        y1 = min(y1, (bottoms[bottom] + tops[bottom + 1]) / 2)
     return (x0, y0, x1, y1)
 
 
