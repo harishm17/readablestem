@@ -829,6 +829,7 @@ class ImagePageRecord(BaseModel):
     low_confidence: int = 0  # blocks the model called medium or low
     kept_as_image: int = 0  # blocks whose LaTeX, grid or box could not be used
     omitted: int = 0  # regions of ink the blocks leave out: each a required decision
+    recovered: int = 0  # blocks read from a picture of a left-out region (not in `omitted`)
     required: int = 0  # required decisions the page's blocks start with
     optional: int = 0  # optional notes the page's blocks start with
 

@@ -346,6 +346,19 @@ class Settings(BaseSettings):
     # Compare each converted page's ink with the regions its blocks account for, and make
     # a stretch the reading left out a required decision (`pipeline.image_page_omission`).
     image_pages_omission_check: bool = True
+    # ... and read the stretch from a picture of just that part, so that what the first reading
+    # left out is converted (with its own decision) and not only flagged
+    # (`image_page.recover_omissions`). Costs a request only for a page the check flags.
+    image_pages_recover_omissions: bool = True
+    # Read each `medium` block that holds a formula a second time from a picture of that line
+    # alone (`pipeline.image_page_check`) and record whether the two readings agree. Costs one
+    # request for every few such lines. OFF until the measurement in docs/eval-handwriting.md
+    # decides.
+    image_pages_second_reading: bool = False
+    # With the second reading on: a block whose two readings agree, the second sure of every
+    # symbol, is an optional note and not a required decision. Fewer decisions, and a wrong
+    # reading both readings share is then not asked about.
+    image_pages_accept_agreed: bool = False
     # What a job that asked for its scanned and handwritten pages to be converted may spend, per
     # PDF page of the document, and at most per job. Measured with the main model: $0.106 a page
     # on the development pages, $0.136 on the real-world held-out papers (about $0.33 for the
