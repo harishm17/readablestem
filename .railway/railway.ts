@@ -51,6 +51,10 @@ const appVariables = [
   "TRUSTED_PROXY_HOPS",
 ];
 
+// Settings only the web service holds (the image-page switch and the per-page and per-job
+// spend caps added 2026-10-22; the worker thread runs inside web).
+const webOnlyVariables = ["FEATURE_IMAGE_PAGES", "MAX_USD_PER_JOB", "MAX_USD_PER_PAGE", "PORT"];
+
 export default defineRailway(() => {
   const Postgres = postgres("Postgres", { region: "iad" });
   Postgres.networking = { privateNetworkEndpoint: "postgres" };
@@ -77,7 +81,7 @@ export default defineRailway(() => {
     preDeploy: "readablestem db upgrade",
     replicas: { iad: 1 },
     domains: ["readablestem.com", "www.readablestem.com"],
-    env: preserved(...appVariables, "PORT"),
+    env: preserved(...appVariables, ...webOnlyVariables),
   });
 
   // Hourly at minute 7: aggregate finished jobs, then purge past retention. No pre-deploy
