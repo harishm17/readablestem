@@ -1072,7 +1072,10 @@ tuned on it, docs/tables.md "Recall on real documents"): after the fixes precisi
 and recall 0.920 (23 of 25). `data/real-tables-heldout/` is a fresh set of seven CC BY papers, 58
 pages, 39 labelled tables, registered (documents, labels, floors, selection rule) before any
 detection ran on it and run once: precision 0.914, full-extent recall 0.744, both under the floors
-(docs/tables.md has the table-by-table account). The committed `latest-tables-*` reports are made
+(docs/tables.md has the table-by-table account). A second fresh set, `data/real-tables-heldout2/`
+(ten CC BY documents, 100 pages, 58 tables, registered before the run), gave precision 1.000 (55 of
+55) and full-extent recall 0.948 (55 of 58), both floors met, the same on `main` and on the
+round-two branch; `data/real-tables-heldout` is a development set from that round on. The committed `latest-tables-*` reports are made
 without a real-document directory; check the floors on them with `eval gate --current <a run made
 with --real-dir>`. A private `private-inputs/tables/` of your own course PDFs is still the better
 test (lab-manual worksheets are not among the twelve papers).

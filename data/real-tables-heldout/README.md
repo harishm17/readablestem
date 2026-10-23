@@ -76,3 +76,9 @@ The seven works are (c) their authors and licensed CC BY 4.0
 (<https://creativecommons.org/licenses/by/4.0/>) according to the arXiv OAI-PMH record. The files
 here are extracts: pages selected from the arXiv PDFs, raster images downsampled to 72 dpi where
 larger. Originals: `https://arxiv.org/abs/<arXiv id>` for each id above.
+
+## Status after the second round
+
+This is a development set from the second table round on (docs/tables.md, "Second held-out
+measurement and the residuals"): the residual fixes were read off it. The held-out measurement is
+`data/real-tables-heldout2/`.
