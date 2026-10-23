@@ -1,0 +1,751 @@
+{
+ "seed": "realworld-fresh-2026-10-21",
+ "order_sha256": "4fbb0af63c2d8d985c59f2ba917d8964c21d30e8cd72da33a278430186f42f87",
+ "candidates": [
+  {
+   "id": "2406.12157",
+   "style": "tutorial",
+   "set": "physics:physics:flu-dyn",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    2,
+    7,
+    10,
+    11
+   ],
+   "pdf_pages": 14,
+   "pdf_sha256": "898cbe74a0ce3f03b93a7b93b248e03034363d5d00fb7e26113e2560083e91ac",
+   "source_sha256": "9f253f785c73ab4c7f6dbfb0bcd7f3dd549c9cb904f85b3547506cdc973f2e09",
+   "main_tex": "MAIN_Paper.tex",
+   "equations": 217,
+   "unconvertible": 0,
+   "usable_pages": 4,
+   "macro_failures": [],
+   "anchors": 1762
+  },
+  {
+   "id": "2504.19306",
+   "style": "research",
+   "set": "stat:stat:ME",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    2,
+    3,
+    7,
+    13
+   ],
+   "pdf_pages": 75,
+   "pdf_sha256": "99b3359a6c03932c6f01ef1431fe540d41d2bd8ed82abdd82594a77e62829f55",
+   "source_sha256": "de6b5dc2415292752efdfe060ba0730e064ccfc4b7eab5a9f5f9621fad5a99cc",
+   "main_tex": "main.tex",
+   "equations": 1413,
+   "unconvertible": 2,
+   "usable_pages": 6,
+   "macro_failures": [
+    "def with a delimited parameter: \\red"
+   ],
+   "anchors": 3666
+  },
+  {
+   "id": "2504.17546",
+   "style": "tutorial",
+   "set": "stat:stat:ME",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.45"
+  },
+  {
+   "id": "2410.04138",
+   "style": "research",
+   "set": "physics:cond-mat:stat-mech",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    2,
+    3,
+    7,
+    11
+   ],
+   "pdf_pages": 19,
+   "pdf_sha256": "18dbc029a4dd506b8029b43d3a27f49568ca5b2f83dd6d92f5be37c8645180e6",
+   "source_sha256": "13b1ed1689aec8afd0d3bc78709906a6289f164e5d11543a31c92c6c395ce19d",
+   "main_tex": "main_APS_v3.tex",
+   "equations": 611,
+   "unconvertible": 0,
+   "usable_pages": 4,
+   "macro_failures": [],
+   "anchors": 2405
+  },
+  {
+   "id": "2407.08602",
+   "style": "tutorial",
+   "set": "econ:econ:EM",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    6,
+    20,
+    26,
+    27
+   ],
+   "pdf_pages": 34,
+   "pdf_sha256": "35ed89b6d1133b728ef783df0729f43b85e833939447a3c0f3c9e83463f5362b",
+   "source_sha256": "702d8ad6bd4f24ca5e74264b6341c8121f503af0d26bf995715c510ec3c76732",
+   "main_tex": "main_manuscript.tex",
+   "equations": 606,
+   "unconvertible": 3,
+   "usable_pages": 11,
+   "macro_failures": [],
+   "anchors": 4708
+  },
+  {
+   "id": "2402.10836",
+   "style": "research",
+   "set": "econ:econ:EM",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    8,
+    16,
+    17,
+    19,
+    20,
+    27
+   ],
+   "pdf_pages": 45,
+   "pdf_sha256": "cae67a687c6f77860ff78eb59b25031ff5730c13b3997f6b477528d3dcb292e6",
+   "source_sha256": "370ce123c556b15d1d3a1e7f147310e6372b02eb2044c7321a84131c19e82463",
+   "main_tex": "main.tex",
+   "equations": 714,
+   "unconvertible": 0,
+   "usable_pages": 6,
+   "macro_failures": [],
+   "anchors": 3605
+  },
+  {
+   "id": "2411.07613",
+   "style": "tutorial",
+   "set": "math:math:PR",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    5,
+    6,
+    18,
+    19
+   ],
+   "pdf_pages": 28,
+   "pdf_sha256": "7336399d8cdf4c0157a8fb5b90bf88435ae331312de3080683db602961718d5b",
+   "source_sha256": "53416b90810bfca256689b30b52876ba6664a08d96dc12d8286ac9094d31a4fd",
+   "main_tex": "Manuscript.tex",
+   "equations": 993,
+   "unconvertible": 0,
+   "usable_pages": 4,
+   "macro_failures": [
+    "def with a delimited parameter: \\csname"
+   ],
+   "anchors": 5377
+  },
+  {
+   "id": "2404.11399",
+   "style": "research",
+   "set": "physics:physics:class-ph",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "id": "2503.14507",
+   "style": "tutorial",
+   "set": "math:math:HO",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "id": "2311.07158",
+   "style": "research",
+   "set": "physics:physics:ed-ph",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2412.11137",
+   "style": "tutorial",
+   "set": "q-bio:q-bio:QM",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2412.11084",
+   "style": "research",
+   "set": "q-bio:q-bio:QM",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "id": "2503.08473",
+   "style": "tutorial",
+   "set": "cs:cs:LG",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "6"
+  },
+  {
+   "id": "2502.11570",
+   "style": "research",
+   "set": "cs:cs:LG",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "2"
+  },
+  {
+   "id": "2409.08224",
+   "style": "tutorial",
+   "set": "physics:physics:ed-ph",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "2"
+  },
+  {
+   "id": "2506.01997",
+   "style": "research",
+   "set": "physics:physics:data-an",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    5,
+    6,
+    10,
+    16,
+    17,
+    26
+   ],
+   "pdf_pages": 41,
+   "pdf_sha256": "12a9ff61dc59a672bd444f30dd24bd7078c3f3f03c4c7506977c8ccd5de8e2b6",
+   "source_sha256": "09eef3538b4ee1128e432c05746b55ed2e4864a978b5bb2abe010369add1ed19",
+   "main_tex": "main.tex",
+   "equations": 103,
+   "unconvertible": 0,
+   "usable_pages": 6,
+   "macro_failures": [],
+   "anchors": 5579
+  },
+  {
+   "id": "2504.10177",
+   "style": "tutorial",
+   "set": "physics:physics:flu-dyn",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.16"
+  },
+  {
+   "id": "2408.01652",
+   "style": "research",
+   "set": "cs:cs:DS",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.17"
+  },
+  {
+   "id": "2401.00649",
+   "style": "tutorial",
+   "set": "stat:stat:ME",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "433"
+  },
+  {
+   "id": "2302.00479",
+   "style": "research",
+   "set": "math:math:HO",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "id": "2406.19702",
+   "style": "tutorial",
+   "set": "econ:econ:EM",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    3,
+    5,
+    16,
+    17
+   ],
+   "pdf_pages": 47,
+   "pdf_sha256": "b6671225dda3423b755f824dfba2bda05f5ff7acd17f279d027a30d4a0f352cf",
+   "source_sha256": "dd7414f6fac904e06fe9a5a8fdadd9864bf7f842dc848257ad20142184a7f485",
+   "main_tex": "main.tex",
+   "equations": 638,
+   "unconvertible": 0,
+   "usable_pages": 5,
+   "macro_failures": [],
+   "anchors": 5046
+  },
+  {
+   "id": "2212.05955",
+   "style": "research",
+   "set": "stat:stat:TH",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    4,
+    5,
+    20,
+    21,
+    28,
+    32
+   ],
+   "pdf_pages": 52,
+   "pdf_sha256": "c37b2e48090a7279a8cfb57c831ac92ef5f19c1cf15caa190d9b130b171a5073",
+   "source_sha256": "d83dda547e3bd6697b6fe04a2223c2d1edf1962c49f4612ce179d7c12864e1a4",
+   "main_tex": "lower_bounds.tex",
+   "equations": 794,
+   "unconvertible": 0,
+   "usable_pages": 6,
+   "macro_failures": [
+    "macro expansion did not settle (recursive definition?)"
+   ],
+   "anchors": 3319
+  },
+  {
+   "id": "2307.07619",
+   "style": "tutorial",
+   "set": "math:math:PR",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.24"
+  },
+  {
+   "id": "2403.02785",
+   "style": "research",
+   "set": "math:math:NA",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "2"
+  },
+  {
+   "id": "2302.09761",
+   "style": "tutorial",
+   "set": "math:math:HO",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "3"
+  },
+  {
+   "id": "2504.07276",
+   "style": "research",
+   "set": "physics:physics:flu-dyn",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.14"
+  },
+  {
+   "id": "2501.17729",
+   "style": "tutorial",
+   "set": "q-bio:q-bio:QM",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2503.01126",
+   "style": "research",
+   "set": "stat:stat:ML",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "2"
+  },
+  {
+   "id": "2410.19898",
+   "style": "tutorial",
+   "set": "cs:cs:LG",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "id": "2408.00946",
+   "style": "research",
+   "set": "math:math:PR",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "2"
+  },
+  {
+   "id": "2304.10014",
+   "style": "tutorial",
+   "set": "physics:physics:ed-ph",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "id": "2502.04553",
+   "style": "research",
+   "set": "stat:stat:ME",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    10,
+    11,
+    12,
+    14,
+    17
+   ],
+   "pdf_pages": 22,
+   "pdf_sha256": "2ce213ba4537d7c4efd382761ebf2f4e6836c9c05cf4614265effdbcc1091ed8",
+   "source_sha256": "8b48cbe4f3720bc1abd52ab925a65d2cc6cb5678e291cac5b0807277f6edcf57",
+   "main_tex": "main.tex",
+   "equations": 220,
+   "unconvertible": 1,
+   "usable_pages": 8,
+   "macro_failures": [],
+   "anchors": 2308
+  },
+  {
+   "id": "2502.08443",
+   "style": "tutorial",
+   "set": "stat:stat:ME",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    12,
+    13,
+    22,
+    26
+   ],
+   "pdf_pages": 31,
+   "pdf_sha256": "8f1c28843ac6a6ad8334c7e867cf0a58d38005636fdd130699882aa7e1578628",
+   "source_sha256": "8bc6e265c338b0af734f14a5d228f13dba3a0bd13a73977417dc894b476edda5",
+   "main_tex": "article_no_template.tex",
+   "equations": 440,
+   "unconvertible": 1,
+   "usable_pages": 15,
+   "macro_failures": [],
+   "anchors": 4478
+  },
+  {
+   "id": "2410.13739",
+   "style": "research",
+   "set": "physics:cond-mat:stat-mech",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "7"
+  },
+  {
+   "id": "2303.02529",
+   "style": "tutorial",
+   "set": "math:math:PR",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    35,
+    36,
+    44,
+    47
+   ],
+   "pdf_pages": 75,
+   "pdf_sha256": "a93a520bc7e7f1579802bfb87ac8888712aadd5906c0980ca15d2efd4fa7735d",
+   "source_sha256": "65e546d7156f5ac0d3f06b8d20d8f1bf028decbdbf16cc1b81e24b6df9f352e5",
+   "main_tex": "beta2_2025.tex",
+   "equations": 1462,
+   "unconvertible": 1,
+   "usable_pages": 4,
+   "macro_failures": [
+    "environment with arguments: romenumerate"
+   ],
+   "anchors": 7308
+  },
+  {
+   "id": "2210.13562",
+   "style": "research",
+   "set": "econ:econ:EM",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    2,
+    10,
+    12,
+    27,
+    34,
+    36
+   ],
+   "pdf_pages": 41,
+   "pdf_sha256": "5d86412676774b0deda9ed3657059a7a34f0a65944e0de81325a36472ed5a4d9",
+   "source_sha256": "9bc5561dc4cdf1c0e950b600e2dcecd06d0959de278718302616bb4e5370d8a2",
+   "main_tex": "gdp_intervals_arxiv_2024_complete.tex",
+   "equations": 537,
+   "unconvertible": 1,
+   "usable_pages": 11,
+   "macro_failures": [],
+   "anchors": 5257
+  },
+  {
+   "id": "2405.01397",
+   "style": "tutorial",
+   "set": "math:math:HO",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "id": "2411.19634",
+   "style": "research",
+   "set": "physics:physics:class-ph",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2407.10832",
+   "style": "tutorial",
+   "set": "q-bio:q-bio:QM",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    4,
+    6,
+    7,
+    8,
+    9,
+    11
+   ],
+   "pdf_pages": 20,
+   "pdf_sha256": "f681c63eac650e7b8747e9f2b57222eafbeda9da3df14376433fdf07e685374a",
+   "source_sha256": "c3dfe2784111618159e2e69c713ea322bf5a23be92d62bc3a1d47fa1f6c0b9a2",
+   "main_tex": "preprint_Volkening.tex",
+   "equations": 85,
+   "unconvertible": 0,
+   "usable_pages": 6,
+   "macro_failures": [],
+   "anchors": 4437
+  },
+  {
+   "id": "2412.19768",
+   "style": "research",
+   "set": "physics:physics:ed-ph",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2504.08861",
+   "style": "tutorial",
+   "set": "cs:cs:LG",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "id": "2309.01229",
+   "style": "research",
+   "set": "q-bio:q-bio:QM",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    5,
+    6,
+    12,
+    13
+   ],
+   "pdf_pages": 16,
+   "pdf_sha256": "ed2d2a4c9d98f8062f4e9d13f8534adf182fbb2ffb1c16334d9667dfdcc568ce",
+   "source_sha256": "be70d63359bb7acc9f7d85037467d6440194cbb0d6722060bb0b057a8ff3e9ff",
+   "main_tex": "LJ17864_Agliari_PRE_July2024.tex",
+   "equations": 614,
+   "unconvertible": 8,
+   "usable_pages": 4,
+   "macro_failures": [],
+   "anchors": 3721
+  },
+  {
+   "id": "2307.16839",
+   "style": "tutorial",
+   "set": "physics:physics:ed-ph",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    7,
+    10,
+    20,
+    21,
+    22,
+    26
+   ],
+   "pdf_pages": 29,
+   "pdf_sha256": "f9a7d53898f5b2259d216089606df9984c685e3efa63c64ea915a39f24e8529d",
+   "source_sha256": "e9b17f07c20c5f8ce423b2247b216c7e244739807ba0e4adba08f3aa97ab0d77",
+   "main_tex": "Revised_Submission.tex",
+   "equations": 403,
+   "unconvertible": 12,
+   "usable_pages": 11,
+   "macro_failures": [],
+   "anchors": 3386
+  },
+  {
+   "id": "2504.01452",
+   "style": "research",
+   "set": "cs:cs:LG",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "id": "2501.03568",
+   "style": "tutorial",
+   "set": "stat:stat:ME",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "id": "2412.16647",
+   "style": "research",
+   "set": "physics:physics:data-an",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "6"
+  },
+  {
+   "id": "2501.00140",
+   "style": "tutorial",
+   "set": "math:math:PR",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    9,
+    38,
+    39,
+    55,
+    58
+   ],
+   "pdf_pages": 70,
+   "pdf_sha256": "3526383d69700c4e16cc9253509dbdb2bcdbc70de9bedea3ce56fa9db62f4fef",
+   "source_sha256": "65424817da18286b796a8703f471fa50fd7f2d9288232f0cbc10d7ab1949514b",
+   "main_tex": "vandenBosch_notes.tex",
+   "equations": 2042,
+   "unconvertible": 1,
+   "usable_pages": 11,
+   "macro_failures": [
+    "environment with arguments: myproof",
+    "environment with arguments: myproof2"
+   ],
+   "anchors": 8167
+  },
+  {
+   "id": "2311.00882",
+   "style": "research",
+   "set": "cs:cs:DS",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "3"
+  },
+  {
+   "id": "2309.13577",
+   "style": "tutorial",
+   "set": "math:math:HO",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "id": "2112.07025",
+   "style": "research",
+   "set": "math:math:HO",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "id": "2502.07964",
+   "style": "tutorial",
+   "set": "q-bio:q-bio:QM",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "id": "2306.17329",
+   "style": "research",
+   "set": "stat:stat:TH",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.13"
+  },
+  {
+   "id": "2503.23616",
+   "style": "tutorial",
+   "set": "cs:cs:LG",
+   "licence": "CC BY 4.0",
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "3"
+  },
+  {
+   "id": "2411.04352",
+   "style": "research",
+   "set": "math:math:NA",
+   "licence": "CC BY 4.0",
+   "outcome": "accepted",
+   "pages": [
+    16,
+    25,
+    26,
+    38
+   ],
+   "pdf_pages": 44,
+   "pdf_sha256": "3820559416e7d6a6419a1df560a552e744e7cd5a3d39bc9f0308964ecb9fc8e5",
+   "source_sha256": "0faeb097a3a44eeb73f78c3ef7d5bef48b7eb4ed78b7722d2d49047a79e10afd",
+   "main_tex": "main.tex",
+   "equations": 1150,
+   "unconvertible": 2,
+   "usable_pages": 8,
+   "macro_failures": [],
+   "anchors": 5547
+  }
+ ]
+}

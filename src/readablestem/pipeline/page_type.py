@@ -1569,3 +1569,32 @@ def document_refusal(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -
             ink = ink_stats(page, drawings, budget)
         records.append(decide(stats, ink, coverage, hint).to_record(number))
     return refusal_code(records)
+
+
+def image_page_count(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -> int:
+    """How many pages of an open document are scanned or handwritten, the pages the image
+    page pass reads (ADR 0007: `kept_reason` "scanned_page" or "handwritten_page"). Typed
+    pages are told from their text alone, so only a page that is not clearly typed pays for the
+    drawings and the ink analysis, within `budget_s` (a page not analysed in time is not counted:
+    the conversion keeps such a page as an image, never reads it)."""
+    candidates: list[tuple[int, pymupdf.Page, TextStats, float]] = []
+    for number in range(doc.page_count):
+        page = doc[number]
+        raw = page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]
+        images, coverage = image_boxes(page)
+        stats = text_stats(page, raw, images, None)
+        if not clearly_convertible(stats, coverage):
+            candidates.append((number, page, stats, coverage))
+    if not candidates:
+        return 0
+    budget = InkBudget(budget_s)
+    hint = producer_hint(doc)
+    found = 0
+    for number, page, stats, coverage in candidates:
+        drawings = page.get_cdrawings() if budget.left() else None
+        if drawings is None:
+            continue
+        ink = ink_stats(page, drawings, budget)
+        record = decide(stats, ink, coverage, hint).to_record(number)
+        found += kept_reason(record) in {SCANNED_PAGE, HANDWRITTEN_PAGE}
+    return found

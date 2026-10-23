@@ -56,6 +56,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `EMAIL_LOGIN_ENABLED`, `EMAIL_SENDER`, `EMAIL_LINK_MINUTES` | Sign in by an emailed one-time link (T3-10). **Off, and no email provider is wired in.** `EMAIL_SENDER` names a registered sender (`web/email_senders.py`); the settings check refuses `EMAIL_LOGIN_ENABLED=true` without one in any environment, and in production refuses a sender that is for development only, which today means always. See "Sign-in, sessions and CSRF" and docs/launch.md "Sign-in fallback and Word input" |
 | `OFFICE_INPUT_ENABLED`, `SOFFICE_PATH`, `OFFICE_TIMEOUT_S` | Word and PowerPoint uploads (T3-30). On by default but taken only where LibreOffice is installed (`SOFFICE_PATH`, else `soffice` on `PATH`); `OFFICE_TIMEOUT_S` (90) is how long LibreOffice may take for one file. See "Uploads and limits" |
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default (docs/design/content-features.md "Flags") |
+| `FEATURE_PAGE_MATH`, `PAGE_MATH_MODEL`, `ANTHROPIC_EFFORT_PAGE_MATH`, `PAGE_MATH_UNCONFIRMED_FACTOR` | The page math pass (ADR 0006, docs/eval-page-math.md): one cheap-model call per page places the equations; off by default |
 | `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table; see "Usage events"). Both on by default; the questions are stored as events, so they need both |
 | `FEEDBACK_URL` | Where the footer's "Send feedback" link goes (http or https only). Unset: an email to `CONTACT_EMAIL`. A form service here is a new data processor: name it in the privacy notice first |
 | `BASE_URL` | Builds the OAuth redirect URIs, `${BASE_URL}/auth/callback` (Google) and `${BASE_URL}/auth/microsoft/callback` (Microsoft). Production: `https://readablestem.com`, so Google's redirect URI is `https://readablestem.com/auth/callback` |
@@ -71,6 +72,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `MAX_LARGE_UPLOAD_MB` (30), `MAX_SOURCE_PAGES` (300) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (Cloud Run takes at most 32 MiB). Equal to the limits above, they turn the feature off: such files are refused |
 | `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
+| `FEATURE_IMAGE_PAGES`, `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE` ($0.25), `IMAGE_PAGES_MAX_USD_PER_JOB` ($7.50), `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`, `IMAGE_PAGES_OMISSION_CHECK` (default on), `IMAGE_PAGES_RECOVER_OMISSIONS` (default on), `IMAGE_PAGES_SECOND_READING` (default off), `IMAGE_PAGES_ACCEPT_AGREED` (default off), `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED` (default on) | Scanned and handwritten pages read from an image of the page (ADR 0007, "Scanned and handwritten pages on request" below); the omission check makes writing the reading left out a required decision, and the recovery reads such a stretch from a picture of just that part so it is converted instead; the second reading reads each `medium` block with a formula again from a picture of its line and records whether the two agree, and acceptance lets a block whose two readings agree, the second sure of every symbol, be an optional note (off: docs/eval-handwriting.md, "Root causes and fixes"); the last makes every block of a page read from an image that holds maths (a display equation, or a paragraph, list item or heading with a formula) a required decision whatever the reader's confidence (ADR 0007, point 12; typed pages and prose-only blocks are not affected). The flag only offers the upload option; the model is the main one unless `IMAGE_PAGES_MODEL` says otherwise; a job that asked may spend `IMAGE_PAGES_USD_PER_PAGE` a page, at most `IMAGE_PAGES_MAX_USD_PER_JOB`, when that is more than `MAX_USD_PER_JOB` and `MAX_USD_PER_PAGE` allow |
 | `DECISIONS_FIGURE_VERIFY`, `DECISIONS_EQUATION_SHADOW`, `DECISIONS_CANARY` (and thresholds) | The second automated check (ADR 0005): an optional note on accepted figures, a shadow on equations, a daily drift canary in the cron (docs/steps.md, docs/operations.md). All on by default |
 | `MODEL_PROVIDER`, `OPENAI_API_KEY`, `MAIN_MODEL`, `CHEAP_MODEL` | Which provider answers (`openai`, the default) and its key and models |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (`claude-opus-5-5`, `claude-haiku-5-5`), the workspace id an organisation-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
@@ -414,6 +416,32 @@ With JavaScript, `app.js` checks the chosen file's size and type as soon as it i
 (the same field error, in a polite live region) and refuses to send a wrong one; while a
 good one is sent it says "Uploading notes.pdf. Keep this tab open." and a second click
 does nothing. The server checks everything again.
+
+### Scanned and handwritten pages on request (ADR 0007, `FEATURE_IMAGE_PAGES`)
+
+With the flag on, the upload form has a checkbox, "Convert scanned or handwritten pages (slower;
+every converted equation and table needs your check)", beside the exam box. It is the owner's
+choice for that upload (`Job.image_pages`, and `PendingUpload.image_pages` for a large file, applied
+to each of its parts that has such pages); the flag only offers it.
+
+- **The probe.** Only when the box is ticked is the probe told so (`pdf_probe MAX_PAGES
+  image_pages`): it then lets a PDF of scans or handwriting through and counts the pages
+  `page_type` calls scanned or handwritten (`page_type.image_page_count`, the same classifier layout
+  uses; typed pages are told from their text alone, so only a page that is not clearly typed pays
+  for the ink analysis). A file with none is not refused and not changed: the request does not
+  apply, and the job is made as if the box were not ticked. Without the box a PDF of only scans
+  or handwriting is refused as before, and the message (`upload_error_message`) says to upload it
+  again with the box ticked when the server offers it.
+- **Quota.** Pages count against the daily quota as for any document (`intake.store_job`),
+  open-tier accounts included.
+- **Spend.** A job that asked has the dollar cap `max(MAX_USD_PER_JOB limited by MAX_USD_PER_PAGE,
+  min(IMAGE_PAGES_MAX_USD_PER_JOB, pages x IMAGE_PAGES_USD_PER_PAGE))` (`worker.job_caps`, also
+  used for re-reads), since the main model reads a page for $0.10 to $0.13 against $0.02 for a typed
+  one. Every call still reserves its worst case against the daily cap and, for an open-tier account,
+  the open pool (`OPEN_TIER_DAILY_SPEND_CAP_USD`), so the pool bounds the cost whatever the job's cap;
+  `ops.limits.largest_reservation_usd` counts a page read when the feature is offered.
+- **The run.** `notation.conversion_options` gives the converter `image_pages` from the job, never
+  from the flag: a job that did not ask never has its scans read, whatever the server offers.
 
 ### Word and PowerPoint files (`web/office_convert.py`, T3-30)
 

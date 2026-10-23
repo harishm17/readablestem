@@ -47,7 +47,7 @@ tell the model that text between `<document_text>` tags is data, not instruction
 
 | Prompt | Output schema (strict pydantic, `extra=forbid`) | What it asks for |
 |---|---|---|
-| `equation.md` | `EquationOutput {is_equation: bool, latex: str, confidence: 0..1}` | Math-mode LaTeX only (no `$`, no `\displaystyle`); transcribe symbol by symbol, never simplify; `\mathbf` for bold vectors, `\vec` for arrows, `\text{}` for words and units, with `<`, `>` and `&` kept outside it; `\%` for a percent sign (a bare `%` is a comment); multi-line equations as `\begin{array}{rcl}` (relation in its own column, matching OpenStax), never `aligned`/`align`/`split`; standard commands only; calibrated confidence bands; a best partial reading with low confidence when unreadable. |
+| `equation.md` | `EquationOutput {is_equation: bool, latex: str, confidence: 0..1}` | Math-mode LaTeX only (no `$`, no `\displaystyle`); transcribe symbol by symbol, never simplify; `\mathbf` for bold vectors, `\vec` for arrows, `\text{}` for words and units, with `<`, `>` and `&` kept outside it; `\%` for a percent sign (a bare `%` is a comment); multi-line equations as `\begin{array}{rcl}` (relation in its own column, matching OpenStax), never `aligned`/`align`/`split`; standard commands only, except `\ce{...}` for chemical species ("Chemistry" in the prompt); calibrated confidence bands; a best partial reading with low confidence when unreadable. |
 | `equation_notation.md` | `EquationOutput`, as above | `equation.md` plus how to use the fenced course notation list; sent only when the run has course notation ("Course notation" below) |
 | `figure.md` | `FigureOutput {figure_type: FigureType, decorative: bool, alt: str, confidence: 0..1}` | Classify the figure; decorative only when it adds no information (charts, diagrams, tables and captioned figures never are); alt of at most 150 characters that gives a student the figure's information (charts: type, variables, main trend; diagrams: what it shows and the key relationship); no "Image of ..."; no file names, URLs, markup or LaTeX; do not repeat the caption; abstain (confidence below 0.3, empty alt) when unreadable. |
 | `figure_long.md` (long descriptions on) | `FigureLongOutput`: `FigureOutput` plus `long_description: str`, `long_description_unsure: bool`, `data_table: {header: [str], rows: [[str]]} \| null`, `values_printed: bool`, `colour_only: bool` | Everything in `figure.md` (the alt text must stand on its own), plus: for charts, diagrams and illustrations with several labelled parts, a long description of 100-1,200 characters in at most 8 short plain lines (what it shows; axes with quantity, unit and range, or the parts and how they connect; the trend; the key values), never inventing a value ("about" for one read off an axis); for charts whose values can be read, a data table with units in the headers, the horizontal axis first, at most 40 rows and 8 columns; `values_printed` only when every value is printed in the figure; `colour_only` when series or parts are told apart by colour alone. |
@@ -294,6 +294,23 @@ pins each. On 2026-10-09 layout started reading the TeX style fonts (above), so 
 handout's `\mathbb{R}^n` is now a match, not a cosmetic note, and `\mathbb{R}` read as
 `R` there is meaning-level (`tests/test_letter_style_fonts.py`, on a Tectonic PDF).
 
+### Edges and faces the reading gets from the text layer (2026-10-21)
+
+Two corrections of the model's LaTeX, applied after `clean_latex`, deterministic, so a recorded answer
+replays to the same result (docs/eval-equation-rootcause.md):
+
+- **A bracket or mark that is the neighbour's** (`drop_neighbour_brackets`, `drop_neighbour_marks`; inline equations
+  only). The crop of an inline formula is padded by 2 pt and takes in half of the parenthesis or hyphen
+  beside it ("(x = 0.9)", "(k-1)-regular"), which the model then writes. The run's own text layer says what the
+  run holds: a pair of parentheses around the whole reading goes when the text layer has none (a tuple keeps its
+  pair), an unmatched `(` or `)` at an edge goes when the text layer has fewer than the reading, a
+  trailing `\text{-}`, `-` or `\cdot` and a leading `\text{-}` go when the text layer has fewer dashes or dots. Only
+  punctuation: a letter or digit that is not in the text layer is what `text_layer_symbols_differ` already asks about.
+- **Bold italic** (`restyle_bold_italic`). `\mathbf{x}` becomes `\boldsymbol{x}` when the PDF draws `x` in a bold
+  italic font (the text layer has the bold-italic code point and no upright bold one for that letter; layout:
+  `CMMIB`, newtx's `bmi`, Nimbus `MediItal`, any `BoldItalic`). A crop shows a bold vector as bold and the model
+  writes `\mathbf`; `\bm` and `\boldsymbol` are what the author typed (62 equations of the development set).
+
 ## Sign and relation check (equations)
 
 The symbol check compares letters, digits and Greek letters, so before pipeline 0.3.0 a
@@ -447,6 +464,26 @@ with a vector product a × that became a · anywhere counts as the swap. Signs i
   subscript before the sign (`→𝐹12 · →𝑑`), `\overrightarrow{AB}`, and inline maths
   that layout cuts at the dot.
 
+## Page math pass and the second reading (equations; `FEATURE_PAGE_MATH`, off)
+
+With the flag on, one cheap-model call per page (`pipeline/page_math.py`, prompt `page_math`) says
+where the page's equations are, quoting the PDF's text layer; the verified spans are laid over
+layout's own decisions (`pipeline/page_math_reconcile.py`, [ADR 0006](decisions/0006-page-math-pass.md)),
+and `Element.page_latex` is the page's reading of each span. The equation step reads the crop as
+always and then compares the two readings as symbol streams (letter weight left out):
+
+- they agree and every check but a note passed: the confidence is lifted to 0.9, so a cheap answer
+  that two readings share is accepted without the main model's second read (`equation.page_reading`);
+- they disagree: the main model reads the crop once (as for an unsure answer); if it reads what the
+  cheap model read, the page pass was the odd one out (`equation.page_reading_overruled`); if it matches
+  neither reading, or the main model read first and the page contradicts it, the fix is a required
+  decision (`equation.page_reading` / `page_reading_mismatch`);
+- layout found the span and the page pass did not: unchanged by default
+  (`PAGE_MATH_UNCONFIRMED_FACTOR` 1.0).
+
+Agreement never overrides a text-layer check. The pass fails open: a page it cannot answer is
+layout's. Measurements: [eval-page-math.md](eval-page-math.md).
+
 ## Course notation (equations)
 
 With `FEATURE_NOTATION_MEMORY` on and a job converted for a course with notation entries
@@ -542,6 +579,12 @@ and a trailing `\\` (`equation_step.clean_latex`). It also escapes every bare `%
 `\%` (`validate.escape_percent_signs`): in one transcribed equation a `%` is a percent
 sign, never a comment. None of this changes the mathematics. Other callers of
 `check_latex` (for example a reviewer's LaTeX edit) get `comment` for a bare `%`.
+
+Chemistry: the prompt asks for mhchem, `\ce{...}`, for chemical species, and
+`equation_step.expand_ce` writes each `\ce` out as plain LaTeX (`pipeline/chem.py`, a tested
+subset) before `clean_latex` and the checks; one outside the subset is left as it is and
+`check_latex` refuses it (`unknown_command`). `clean_latex` does not convert, because the proof
+applies it to the chatbot arms' recorded LaTeX. See [chemistry.md](chemistry.md).
 
 ### `safe_latex_to_mathml(latex, display)`
 

@@ -134,6 +134,21 @@
         axes and labels, and leave out values, trends and results a student is asked to work
         out.</p>
     </div>
+    {# ADR 0007: scanned and handwritten pages are read from an image of the page when the
+       owner asks (Job.image_pages). Offered by FEATURE_IMAGE_PAGES; used only for a PDF the
+       server finds scanned or handwritten pages in. #}
+    {% if image_pages_offered|default(false) %}
+    <div class="field checkbox-field image-pages-choice">
+      <input type="checkbox" id="image_pages" name="image_pages" value="on" aria-describedby="image-pages-hint"{% if image_pages_default|default(false) %} checked{% endif %}>
+      <label for="image_pages">Convert scanned or handwritten pages (slower; every converted equation and table needs your check)</label>
+      <p class="hint" id="image-pages-hint">Without this, such pages are kept as pictures marked
+        “Not converted”, and a PDF that is only scans or handwriting is refused. With it, each
+        page is read from its picture, and the original page stays in the file for checking. A
+        tool can misread handwriting and small symbols: you decide each equation and table
+        before you share. It does nothing for a PDF that has no scanned or handwritten
+        pages.</p>
+    </div>
+    {% endif %}
     {# T1-8: two separate choices (UX review MF10 part 1). Neither ticked: deleted
        `retention_hours` after the last activity. One checkbox for the beta (docs/launch.md L2);
        the privacy page (privacy.html) says the same. #}

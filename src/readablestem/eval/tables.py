@@ -147,6 +147,7 @@ def norm(text: str | None) -> str:
 # Raised text the grid read from the PDF marks "^(...)" (a footnote mark "^([1])"): its
 # characters are compared, the mark is not, as gold's text drops the raise.
 _RAISED = re.compile(r"\^\(([^()]*)\)")
+_SCRIPT_MARKS = re.compile(r"[_^{}]")
 # Exponent markup a text cell may carry (10^{-18}, 10^-18): not compared.
 _EXPONENT_MARKS = str.maketrans("", "", "^{}")
 # A fraction written across: "1/3", and ⅓ (a fraction slash after NFKC), are gold
@@ -472,8 +473,12 @@ def header_text(text: str | None) -> str:
     """A header cell's text for the header numbers: `norm`, with a raised mark the grid
     read from the PDF writes "^([1])" compared as its characters ("[1]"), as gold's
     text drops the raise ("Relative Strength<sup>[1]</sup>"). Nothing else changes, so
-    table-bench's predictions (which carry no such mark) score as before."""
-    return _RAISED.sub(r"\1", norm(text))
+    table-bench's predictions (which carry no such mark) score as before. A formula header
+    the model reads as maths writes its text with the marks of the LaTeX it came from
+    (`d_i`, `v_w (m/s)`, `10^-18`), where the PDF's own text has the letters and digits
+    (`di`, `vw (m/s)`, `10-18`): the marks `_ ^ { }` are not compared (2026-10-21: the cause of
+    most of the tables the model lost column-header exactness on, docs/tables.md)."""
+    return _SCRIPT_MARKS.sub("", _RAISED.sub(r"\1", norm(text)))
 
 
 def header_texts(cells: Iterable[Cell], kind: HeaderKind | None = None) -> Counter[str]:
@@ -551,7 +556,7 @@ def _fidelity_key(cell: Cell) -> str:
     return "".join(sorted(alnum_chars(cell.text).elements()))
 
 
-def cell_fidelity(pred: Sequence[Cell], gold: Sequence[Cell]) -> dict:
+def cell_fidelity(pred: Sequence[Cell], gold: Sequence[Cell], kept_text: str = "") -> dict:
     """How many cells carry gold's text, and how many cell errors there are.
 
     A predicted non-empty cell is faithful when its text (`fidelity_text`) is a gold
@@ -560,13 +565,24 @@ def cell_fidelity(pred: Sequence[Cell], gold: Sequence[Cell]) -> dict:
     cells left over): a misread number is one error, a dropped or invented one is one,
     two cells merged into one are two. Fill-in blanks count as empty cells on both
     sides; gold's footnote cells count only when the prediction has them too (the PDF
-    prints them under the table, not in it).
+    prints them under the table, not in it). So does a gold *title*, a header cell spanning
+    the whole width on the first row ("Frequency Distribution for ..."), unless the
+    pipeline kept its words as the text just outside the table (`kept_text`: a heading
+    above the box): the words are in the output, only not in a cell.
     """
     printed = {fidelity_text(c.text) for c in pred} | {_fidelity_key(c) for c in pred}
+    kept = fidelity_text(kept_text)
+    width = max((c.col + c.col_span for c in gold), default=0)
+
+    def placed_outside(c: Cell) -> bool:
+        title = c.row == 0 and c.header and c.col == 0 and c.col_span == width and width > 1
+        return bool(title and fidelity_text(c.text) and fidelity_text(c.text) in kept)
+
     gold = [
         c
         for c in gold
-        if not c.footnote or fidelity_text(c.text) in printed or _fidelity_key(c) in printed
+        if (not c.footnote or fidelity_text(c.text) in printed or _fidelity_key(c) in printed)
+        and (not placed_outside(c) or fidelity_text(c.text) in printed)
     ]
     gold_left = Counter(fidelity_text(c.text) for c in gold if fidelity_text(c.text))
     pred_left: list[Cell] = []
@@ -658,6 +674,9 @@ class PredTable:
     review: str | None = None
     reasons: list[str] = field(default_factory=list)
     source: str | None = None
+    # The text of the headings and paragraphs layout made of the lines just above and below
+    # the box (a table title printed over it): words that are in the output, outside the cells.
+    kept_text: str = ""
 
     @property
     def detected_cells(self) -> list[Cell]:
@@ -750,7 +769,7 @@ def score_table(pred: PredTable | None, gold: GoldTable) -> dict:
             "gold": sum(g.values()),
             "hit": sum((p & g).values()),
         }
-    fidelity = cell_fidelity(pc, gc)
+    fidelity = cell_fidelity(pc, gc, pred.kept_text)
     row.update(
         page_pred=pred.page,
         element_id=pred.element_id,
@@ -1387,7 +1406,9 @@ def _table_fixes(cfg: TablesConfig, pdf: bytes, elements: list[Element]) -> dict
             return {element_id: future.result() for element_id, future in futures.items()}
 
 
-def _prediction(doc: TableDocument, element: Element, fix: Fix | None, mode: Mode) -> PredTable:
+def _prediction(
+    doc: TableDocument, element: Element, fix: Fix | None, mode: Mode, kept_text: str = ""
+) -> PredTable:
     """What the pipeline gives for one table element: the local grid in local mode, the
     fix's grid in model mode (nothing when the table was kept as an image)."""
     local = cells_from_grid(element.table) if element.table is not None else []
@@ -1413,7 +1434,26 @@ def _prediction(doc: TableDocument, element: Element, fix: Fix | None, mode: Mod
         review=fix.review if fix is not None else None,
         reasons=_tier_reasons(fix),
         source=grid.source if grid is not None else ("local" if local else None),
+        kept_text=kept_text,
     )
+
+
+EDGE_TEXT_REACH = 36.0  # pt: text this close to the box, above or below, is "just outside"
+
+
+def _kept_text(table: Element, elements: Sequence[Element]) -> str:
+    """The text of the headings, paragraphs and list items layout made of the lines just
+    above or below this table's box, overlapping it horizontally."""
+    x0, y0, x1, y1 = table.bbox
+    found = []
+    for e in elements:
+        if e.kind not in (Kind.HEADING, Kind.PARAGRAPH, Kind.LIST_ITEM) or e.page != table.page:
+            continue
+        ex0, ey0, ex1, ey1 = e.bbox
+        near = (0 <= y0 - ey1 <= EDGE_TEXT_REACH) or (0 <= ey0 - y1 <= EDGE_TEXT_REACH)
+        if near and ex1 > x0 and ex0 < x1 and e.text:
+            found.append(e.text)
+    return " ".join(found)
 
 
 def _tier_reasons(fix: Fix | None) -> list[str]:
@@ -1458,7 +1498,9 @@ def _document_item(cfg: TablesConfig, doc: TableDocument, pdf: bytes) -> dict:
     finally:
         layout.release(pdf)
     tables = [e for e in elements if e.kind is Kind.TABLE]
-    preds = [_prediction(doc, e, fixes.get(e.id), cfg.mode) for e in tables]
+    preds = [
+        _prediction(doc, e, fixes.get(e.id), cfg.mode, _kept_text(e, elements)) for e in tables
+    ]
     rows, false, extra = score_documents(golds, preds)
     table_fixes = [fixes[e.id] for e in tables if e.id in fixes]
     calls = [c for f in table_fixes for c in f.calls]

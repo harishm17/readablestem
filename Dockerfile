@@ -11,10 +11,10 @@
 # builder; the legacy builder rejects those flags. CI's docker job builds this file with
 # DOCKER_BUILDKIT=0 as well, and tests/test_ops_repo.py checks for the syntax.
 
-FROM ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.4@sha256:9f130421e930bfbdc563c00740466603f8723158e90297d07957c2294640262b AS uv
 
 # ---------------------------------------------------------------- build: locked venv
-FROM python:3.12-slim-trixie@sha256:05cda9777409a9c3ffddd94a4c476b79f0769a0b4857f0c7ed9226b6800b0d6f AS build
+FROM python:3.12-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS build
 
 COPY --from=uv /uv /bin/uv
 # UV_NO_CACHE: the download cache would only bloat this stage (Cloud Build runs with
@@ -41,7 +41,7 @@ RUN uv sync --locked --no-dev --no-editable --extra tracing
 RUN /app/.venv/bin/python -m readablestem.pipeline.table_model --dir /app/models
 
 # ---------------------------------------------------------------- runtime
-FROM python:3.12-slim-trixie@sha256:05cda9777409a9c3ffddd94a4c476b79f0769a0b4857f0c7ed9226b6800b0d6f AS runtime
+FROM python:3.12-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS runtime
 
 RUN groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --no-create-home --home-dir /app \

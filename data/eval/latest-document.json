@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "task": "document",
-  "date": "2026-10-14",
+  "date": "2026-10-21",
   "pipeline_version": "0.5.0",
   "prompt_versions": {
-    "equation": "equation-df0e12f1",
+    "equation": "equation-68ebbbf9",
     "figure": "figure-ac51f42d",
     "table": "table-b3769ce7"
   },
@@ -72,6 +72,15 @@
       "credited_split": 0,
       "credited_merged": 0
     },
+    "secondary_symbols": {
+      "label": "symbols (secondary; tables flattened; the primary scorer is exact_lenient)",
+      "matched_exact": 0.9666666666666667,
+      "matched_mean_similarity": 0.9990990990990991,
+      "end_to_end_exact": 0.9666666666666667,
+      "end_to_end_exact_with_credit": 0.9666666666666667,
+      "credited_split": 0,
+      "credited_merged": 0
+    },
     "static_violations": 0,
     "static_violation_codes": {},
     "axe_violations": 0,
@@ -83,13 +92,13 @@
     "review_load": {
       "required_decisions": 6,
       "required_fixes": 16,
-      "optional": 24,
-      "none": 154,
+      "optional": 25,
+      "none": 153,
       "required_by_kind": {
         "heading": 6
       },
       "optional_by_kind": {
-        "equation": 2,
+        "equation": 3,
         "figure": 2,
         "heading": 20
       },
@@ -99,14 +108,14 @@
       },
       "optional_by_reason": {
         "heading.weak_evidence": 20,
-        "single_reading": 2,
+        "single_reading": 3,
         "too_long": 2
       },
       "sections": 3,
       "pdf_pages": 43,
       "required_per_section": 2.0,
       "required_per_pdf_page": 0.1395,
-      "optional_per_pdf_page": 0.5581,
+      "optional_per_pdf_page": 0.5814,
       "equation_flags": {
         "units": 30,
         "required_units": 0,
@@ -178,7 +187,7 @@
           "review": "none",
           "reasons": [],
           "scorer_gap": false,
-          "pred_latex": "\\mathbf{v}_{\\mathbf{avg}} = \\frac{\\text{displacement}}{\\text{time}} = \\frac{\\Delta \\mathbf{d}}{\\Delta t} = \\frac{\\mathbf{d}_\\text{f} - \\mathbf{d}_0}{t_\\text{f} - t_0}"
+          "pred_latex": "\\mathbf{v}_\\mathbf{avg} = \\frac{\\text{displacement}}{\\text{time}} = \\frac{\\Delta \\mathbf{d}}{\\Delta t} = \\frac{\\mathbf{d}_\\text{f} - \\mathbf{d}_0}{t_\\text{f} - t_0}"
         },
         {
           "page": "physics/2-2-speed-and-velocity",
@@ -205,7 +214,7 @@
           "review": "none",
           "reasons": [],
           "scorer_gap": false,
-          "pred_latex": "\\begin{array}{rcl} \\mathbf{v} & = & \\frac{\\Delta \\mathbf{d}}{\\Delta t} \\\\ & = & \\frac{2000\\ \\text{m} - 525\\ \\text{m}}{6.4\\ \\text{s} - 0.50\\ \\text{s}}, \\\\ & = & 250\\ \\text{m/s} \\end{array}"
+          "pred_latex": "\\begin{array}{rcl} \\mathbf{v} & = & \\frac{\\Delta\\mathbf{d}}{\\Delta t} \\\\ & = & \\frac{2000\\ \\text{m} - 525\\ \\text{m}}{6.4\\ \\text{s} - 0.50\\ \\text{s}}, \\\\ & = & 250\\ \\text{m/s} \\end{array}"
         },
         {
           "page": "physics/2-3-position-vs-time-graphs",
@@ -552,29 +561,29 @@
       "outcomes": {
         "ok": 56
       },
-      "cost_usd": 0.0741926,
-      "per_pdf_page_usd": 0.00172541
+      "cost_usd": 0.0728698,
+      "per_pdf_page_usd": 0.00169465
     }
   },
   "cost": {
-    "total_usd": 0.23664132999999998,
-    "pipeline_usd": 0.23664132999999998,
-    "per_item_usd": 0.07888044333333333,
+    "total_usd": 0.23375076,
+    "pipeline_usd": 0.23375076,
+    "per_item_usd": 0.07791692,
     "per_item_unit": "section",
-    "model_calls": 61,
-    "verifier_usd": 0.0741926,
-    "verifier_per_item_usd": 0.024730866666666667,
-    "verifier_requests": 59,
+    "model_calls": 58,
+    "verifier_usd": 0.0728698,
+    "verifier_per_item_usd": 0.024289933333333333,
+    "verifier_requests": 57,
     "pdf_pages": 43,
-    "per_pdf_page_usd": 0.005503286744186046,
-    "verifier_per_pdf_page_usd": 0.0017254093023255813,
-    "budget_spent_usd": 0.23664132999999993,
-    "budget_calls": 61,
+    "per_pdf_page_usd": 0.0054360641860465115,
+    "verifier_per_pdf_page_usd": 0.0016946465116279069,
+    "budget_spent_usd": 0.06350676,
+    "budget_calls": 42,
     "dropped_usd": 0.0
   },
   "latency_ms": {
-    "p50": 20113.0,
-    "p95": 34828.9,
+    "p50": 9663.0,
+    "p95": 11145.3,
     "n": 3,
     "basis": "wall-clock conversion of each section's PDF (layout, crops, model calls and assembly; DocumentStats.latency_ms)"
   },
@@ -591,45 +600,45 @@
       },
       "equation/claude-haiku-5-5": {
         "calls": 23.0,
-        "input": 47674.0,
-        "cached": 45103.0,
+        "input": 67477.0,
+        "cached": 64906.0,
         "written": 0.0,
-        "output": 930.0,
-        "usd": 0.001173,
-        "steady_usd": 0.001173
+        "output": 920.0,
+        "usd": 0.001366,
+        "steady_usd": 0.001366
       },
       "equation/claude-opus-5-5": {
-        "calls": 22.0,
-        "input": 46002.0,
-        "cached": 43142.0,
+        "calls": 19.0,
+        "input": 56139.0,
+        "cached": 53618.0,
         "written": 0.0,
-        "output": 2006.0,
-        "usd": 0.060188,
-        "steady_usd": 0.060188
+        "output": 1881.0,
+        "usd": 0.058428,
+        "steady_usd": 0.058428
       }
     },
-    "steady_cost_usd": 0.162449,
-    "answers_file_hits": 0,
-    "answers_file_misses": 61,
-    "live_cost_usd": 0.162449,
-    "replayed_cost_usd": 0.0,
+    "steady_cost_usd": 0.160881,
+    "answers_file_hits": 16,
+    "answers_file_misses": 42,
+    "live_cost_usd": 0.059794,
+    "replayed_cost_usd": 0.101087,
     "second_check": {
       "by_step": {
         "check/claude-sonnet-5-5": {
-          "calls": 59.0,
-          "input": 88027.0,
-          "cached": 64373.0,
+          "calls": 57.0,
+          "input": 85619.0,
+          "cached": 62199.0,
           "written": 0.0,
-          "output": 1401.0,
-          "usd": 0.074193,
-          "steady_usd": 0.074193
+          "output": 1359.0,
+          "usd": 0.07287,
+          "steady_usd": 0.07287
         }
       },
-      "steady_cost_usd": 0.074193,
-      "answers_file_hits": 0,
-      "answers_file_misses": 59,
-      "live_cost_usd": 0.074193,
-      "replayed_cost_usd": 0.0
+      "steady_cost_usd": 0.07287,
+      "answers_file_hits": 52,
+      "answers_file_misses": 5,
+      "live_cost_usd": 0.003713,
+      "replayed_cost_usd": 0.069157
     }
   }
 }

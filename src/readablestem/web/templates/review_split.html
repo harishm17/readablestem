@@ -232,6 +232,22 @@
 {% endif %}
 {% endmacro %}
 
+{# Text read from an image of a scanned or handwritten page (ADR 0007): the words as read
+   beside the page, and the decision. The words are changed with the page tools. #}
+{% macro text_body(p) %}
+{% set item = p.item %}
+{% set eid = item.element_id %}
+{{ region(p) }}
+<dl class="facts">
+  <div><dt>Text as read from the image</dt><dd class="read-text">{{ item.read_text or "(no text)" }}</dd></div>
+</dl>
+{% if p.change_href %}<p class="notice-actions"><a class="button-secondary" href="{{ p.change_href }}" data-role="change-words">Change the words<span class="visually-hidden"> of {{ item.label|lower }}</span></a></p>{% endif %}
+<form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form{% if item.edited %} is-edited{% endif %}">
+  {{ hidden_fields() }}
+  {{ decide_row(item) }}
+</form>
+{% endmacro %}
+
 {% macro heading_body(p) %}
 {% set item = p.item %}
 {% set eid = item.element_id %}
@@ -485,6 +501,7 @@
     {% elif panel.item.kind == "equation" %}{{ equation_body(panel) }}
     {% elif panel.item.kind == "figure" %}{{ figure_body(panel) }}
     {% elif panel.item.kind == "table" %}{{ table_split_body(panel) }}
+    {% elif panel.item.kind == "paragraph" %}{{ text_body(panel) }}
     {% else %}{{ heading_body(panel) }}{% endif %}
 
     {% if panel.item and (panel.checks or panel.reason_code) %}

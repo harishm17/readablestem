@@ -1,0 +1,23 @@
+{
+ "part": "dev",
+ "arms": {
+  "ReadableSTEM (rs-pagemath-tok)": {
+   "aligned to gold: an added symbol": {
+    "point": 0.061038220193953226,
+    "low": 0.03508749632087336,
+    "high": 0.09701658269565874
+   },
+   "no gold partner (3+ symbols): no match in the PDF's text": {
+    "point": 0.08108108108108109,
+    "low": 0.024691358024691357,
+    "high": 0.16483516483516483
+   },
+   "counts": {
+    "a_n": 1753,
+    "a_bad": 107,
+    "u_n": 111,
+    "u_bad": 9
+   }
+  }
+ }
+}

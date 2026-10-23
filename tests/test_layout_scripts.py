@@ -1,7 +1,8 @@
-"""Raised and lowered text in running text (backlog T2-4, T2-5): the scripts of upright
-text (H2O, Na+, SO4 2-, cm3, 226Ra) come out as `Element.script_runs`, not flat and not as
-inline equations; those of a variable (an italic x) stay an inline equation; what cannot be
-carried is flagged `scripts_flattened`. Pages are built here glyph by glyph, so the sizes
+"""Raised and lowered text in running text (backlog T2-4, T2-5): the scripts of a unit
+(cm3) come out as `Element.script_runs`, not flat and not as inline equations; formulas and
+ions (H2O, Na+, SO4 2-) and nuclides (226Ra) are inline equations since 2026-10-21; those of
+a variable (an italic x) stay an inline equation; what cannot be carried is flagged
+`scripts_flattened`. Pages are built here glyph by glyph, so the sizes
 and offsets are the ones the test says."""
 
 from __future__ import annotations
@@ -76,34 +77,49 @@ def runs_of(element: Element) -> list[tuple[str, str]]:
     return [(text[r.start : r.end], r.kind) for r in element.script_runs]
 
 
-def test_a_formula_and_an_ion_keep_their_subscripts_and_charges():
+def test_a_formula_and_an_ion_are_inline_equations_not_raised_text():
+    """Since 2026-10-21 (docs/chemistry.md) formulas and ions with raised or lowered text are
+    inline equations: the equation step reads them, the speech says "H 2 O", "N a plus"."""
     pdf = build(
         [
             [("Water is H", None), ("2", "sub"), ("O and table salt is Na", None), ("+", "sup")],
             [("Cl", None), ("-", "sup"), (" is the chloride ion and Ca", None), ("2+", "sup")],
         ]
     )
-    (paragraph,) = paragraphs(pdf)
-    assert "H2O" in (paragraph.text or "") and "Na+" in (paragraph.text or "")
-    assert runs_of(paragraph) == [("2", "sub"), ("+", "sup"), ("-", "sup"), ("2+", "sup")]
-    assert not any(e.kind is Kind.EQUATION for e in layout.analyze(pdf).elements)
+    elements = layout.analyze(pdf).elements
+    (paragraph,) = [e for e in elements if e.kind is Kind.PARAGRAPH]
+    assert paragraph.script_runs == []
+    assert [e.text for e in elements if e.kind is Kind.EQUATION] == ["H2O", "Na+", "Cl-", "Ca2+"]
+    assert all(e.display == "inline" for e in elements if e.kind is Kind.EQUATION)
 
 
 def test_a_count_under_a_charge_is_read_count_first():
     pdf = build([[("The sulfate ion SO", None), ("4|2-", "stack"), (" is common.", None)]])
-    (paragraph,) = paragraphs(pdf)
-    assert (paragraph.text or "").startswith("The sulfate ion SO42-")
-    assert runs_of(paragraph) == [("4", "sub"), ("2-", "sup")]
+    elements = layout.analyze(pdf).elements
+    (paragraph,) = [e for e in elements if e.kind is Kind.PARAGRAPH]
+    assert paragraph.script_runs == []
+    assert [e.text for e in elements if e.kind is Kind.EQUATION] == ["SO42-"]
 
 
-def test_a_unit_exponent_and_a_mass_number_are_raised_text():
+def test_a_unit_exponent_is_raised_text():
     doc = pymupdf.open()
     line = Line(doc.new_page(), 100)
-    line.add("Gold is 19.3 g/cm").add("3", "sup").add(" and the isotope ").add("226", "sup")
-    line.add("Ra decays.")
+    line.add("Gold is 19.3 g/cm").add("3", "sup").add(" and the isotope is common.")
     (paragraph,) = paragraphs(doc.tobytes())
-    assert paragraph.text == "Gold is 19.3 g/cm3 and the isotope 226Ra decays."
-    assert runs_of(paragraph) == [("3", "sup"), ("226", "sup")]
+    assert paragraph.text == "Gold is 19.3 g/cm3 and the isotope is common."
+    assert runs_of(paragraph) == [("3", "sup")]
+
+
+def test_a_mass_number_before_an_element_symbol_is_a_nuclide_equation_not_raised_text():
+    """It was raised text (`226Ra`); since 2026-10-21 it is one inline equation, so the equation
+    step reads it and the speech says "radium 226" (layout `_nuclide_runs`)."""
+    doc = pymupdf.open()
+    line = Line(doc.new_page(), 100)
+    line.add("Gold is common and the isotope ").add("226", "sup").add("Ra decays.")
+    elements = layout.analyze(doc.tobytes()).elements
+    (paragraph,) = [e for e in elements if e.kind is Kind.PARAGRAPH]
+    assert paragraph.script_runs == []
+    assert [e.text for e in elements if e.kind is Kind.EQUATION] == ["226Ra"]
 
 
 def test_a_variable_with_an_exponent_stays_an_equation():
@@ -131,12 +147,18 @@ def test_a_script_with_nothing_before_it_is_flagged():
 
 
 def test_a_nuclides_numbers_stacked_before_its_symbol_read_mass_number_first():
+    """The numbers stacked before the symbol are one inline equation, the mass number first
+    (they were raised and lowered text; see `_nuclide_runs`)."""
     pdf = build(
         [[("The nuclide ", None), ("6|14", "stack-up-first"), ("C has six protons.", None)]]
     )
-    (paragraph,) = paragraphs(pdf)
-    assert paragraph.text == "The nuclide 146C has six protons."
-    assert runs_of(paragraph) == [("14", "sup"), ("6", "sub")]
+    elements = layout.analyze(pdf).elements
+    (paragraph,) = [e for e in elements if e.kind is Kind.PARAGRAPH]
+    assert paragraph.script_runs == []
+    assert (paragraph.text or "").startswith("The nuclide \u27e6")
+    assert [(e.text or "").replace(" ", "") for e in elements if e.kind is Kind.EQUATION] == [
+        "146C"
+    ]
 
 
 def test_display_nuclear_equations_of_a_latex_page_keep_each_nuclides_numbers_together():

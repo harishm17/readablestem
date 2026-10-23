@@ -56,8 +56,10 @@ import defusedxml.ElementTree as DET
 from latex2mathml.converter import convert as _latex2mathml_convert
 from latex2mathml.tokenizer import PATTERN as _LATEX2MATHML_TOKEN
 
+from readablestem.core.latex_groups import group_delimited_scripts
 from readablestem.core.mathchars import bake_bold_variants
 from readablestem.core.types import Check
+from readablestem.pipeline.chem import arrows_as_operators, group_element_symbols
 
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 
@@ -120,6 +122,7 @@ _RELATIONS = """
     leq le geq ge neq ne equiv approx approxeq cong sim simeq propto ll gg lt gt
     leqslant geqslant lesssim gtrsim prec succ preceq succeq subset supset subseteq
     supseteq in ni notin perp parallel mid nmid asymp doteq models vdash dashv
+    succsim gtrapprox trianglelefteq coloneqq triangleq intercal colon
 """
 _ARROWS = """
     to gets rightarrow leftarrow leftrightarrow Rightarrow Leftarrow Leftrightarrow
@@ -127,7 +130,7 @@ _ARROWS = """
     Longleftrightarrow mapsto longmapsto uparrow downarrow updownarrow Uparrow Downarrow
     Updownarrow nearrow searrow swarrow nwarrow implies iff impliedby rightleftharpoons
     leftrightharpoons rightharpoonup rightharpoondown leftharpoonup leftharpoondown
-    hookrightarrow hookleftarrow
+    hookrightarrow hookleftarrow rightsquigarrow leadsto
 """
 _SYMBOLS = """
     infty partial nabla hbar ell Re Im aleph emptyset varnothing forall exists nexists
@@ -143,7 +146,7 @@ _LARGE_OPERATORS = """
 """
 _FUNCTIONS = """
     sin cos tan cot sec csc arcsin arccos arctan sinh cosh tanh coth log ln lg exp deg
-    dim ker hom mod bmod pmod
+    dim ker hom mod bmod pmod arg
 """
 _SPACING = """
     quad qquad enspace thinspace negthinspace medspace negmedspace thickspace
@@ -162,7 +165,7 @@ ONE_ARG_COMMANDS = _words(
     underbrace sqrt boxed cancel xrightarrow xleftarrow
     mathbf mathrm mathit mathcal mathbb mathsf mathtt mathfrak mathscr mathnormal
     boldsymbol bm text textrm textbf textit textsf texttt textnormal textup mbox
-    operatorname
+    operatorname substack
     """
 )
 TWO_ARG_COMMANDS = _words("frac dfrac tfrac cfrac binom dbinom tbinom overset underset stackrel")
@@ -371,6 +374,15 @@ def _max_columns(body: str) -> int:
 _ALIGN_BEGIN = re.compile(r"\\begin\s*\{\s*(aligned|align\*?|split|gathered)\s*\}(\s*\[[tcb]\])?")
 
 
+# Standard operator names that latex2mathml does not know and would copy through as `\\name`.
+_OPERATOR_NAMES = re.compile(r"\\(arg)(?![A-Za-z])")
+
+
+def _rewrite_operator_names(latex: str) -> str:
+    r"""`\arg` -> `\operatorname{arg}` (the converter has no `\arg`)."""
+    return _OPERATOR_NAMES.sub(r"\\operatorname{\1}", latex)
+
+
 def rewrite_alignment_environments(latex: str) -> str:
     r"""`aligned`/`align`/`align*`/`split`/`gathered` -> `\begin{array}{rl...}`.
 
@@ -495,7 +507,9 @@ def safe_latex_to_mathml(latex: str, display: str = "block") -> str:
     if len(latex) > MAX_LATEX_CHARS:  # same limit as check_latex; bounds the work below
         raise LatexConversionError("input too long")
     try:
-        source = _escape_raw_text(rewrite_alignment_environments(latex))
+        source = _escape_raw_text(
+            group_delimited_scripts(rewrite_alignment_environments(_rewrite_operator_names(latex)))
+        )
         raw = _latex2mathml_convert(source, display=display)
     except Exception as exc:  # latex2mathml raises many exception types
         raise LatexConversionError(f"latex2mathml failed ({type(exc).__name__})") from None
@@ -510,6 +524,8 @@ def safe_latex_to_mathml(latex: str, display: str = "block") -> str:
     root.set("display", display)
     _unescape_text_specials(root)
     bake_bold_variants(root)
+    group_element_symbols(root)
+    arrows_as_operators(root)
     try:
         return serialize_mathml(root)
     except UnsafeMathMLError as exc:

@@ -100,9 +100,48 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.text_layer_style", "style_cosmetic"): "A letter's style differs from the PDF "
     "only where it does not change the meaning (a bold subscript or digit, or a style such "
     "as double-struck that the PDF's text cannot show), so this was accepted as it is.",
+    ("equation.page_reading", "page_reading_mismatch"): "Reading the crop and reading the "
+    "whole page gave different answers, and a second look at the crop agreed with neither, so "
+    "compare this equation with the page symbol by symbol.",
     ("equation.no_text_layer", "no_text_layer"): "This equation is a picture, so the PDF holds "
     "no text to check the transcription against: compare it with the picture symbol by "
     "symbol.",
+    # A page converted from an image (pipeline.image_page, ADR 0007)
+    ("image_page.no_text_layer", "image_page"): "This was read from an image of the page, so "
+    "nothing in the PDF can confirm it: compare it with the original page.",
+    ("image_page.read_confidence", "read_medium"): "The reader was not sure of every word or "
+    "symbol here and used the context to settle some, so compare it with the original page.",
+    ("image_page.read_confidence", "read_low"): "Part of this was hard to read, so compare "
+    "it with the original page and correct what is wrong.",
+    ("image_page.second_reading", "second_reading_differs"): "The line was read a second time "
+    "from a picture of it alone and the two readings differ, so compare this with the original "
+    "page symbol by symbol.",
+    ("image_page.second_reading", "second_reading_agrees_unsure"): "The line was read a second "
+    "time from a picture of it alone and the readings agree, but that reading was not sure of "
+    "every symbol either, so compare this with the original page.",
+    ("image_page.second_reading", "second_reading_agrees"): "The line was read a second time "
+    "from a picture of it alone and both readings agree; the page is still the only thing "
+    "that can confirm them.",
+    ("image_page.maths_always_checked", "maths_checked"): "This was read from an image and holds "
+    "maths, and every such block is checked, however sure the reader was: compare each formula "
+    "with the original page symbol by symbol.",
+    ("image_page.illegible", "illegible"): "Some of this could not be read and is marked "
+    "[illegible]: look at the original page and write what it says.",
+    ("image_page.inline_math", "inline_math_invalid"): "A formula in this text could not be "
+    "converted and is shown as its LaTeX in square brackets: look at the original page and "
+    "correct it.",
+    ("image_page.single_reading", "single_reading_no_box"): "The place of this equation on "
+    "the page could not be found, so it was read once, from the whole page, and not read "
+    "again from its own picture: compare it with the original page symbol by symbol.",
+    ("image_page.single_reading", "single_reading_crop_failed"): "The picture cut out for this "
+    "equation did not show an equation (its place on the page may be off), so this is the "
+    "reading from the whole page, not read again: compare it with the original page symbol by "
+    "symbol.",
+    ("image_page.omitted_region", "omitted_region"): "There is writing here that nothing in "
+    "the converted page accounts for, so the reading probably left it out: look at the picture "
+    "of this part of the page, then write what it says or keep it as an image.",
+    ("table.no_text_layer", "no_text_layer"): "This table was read from an image of the page, "
+    "so nothing in the PDF can confirm its cells: compare every value with the original.",
     ("equation.region", "half_fraction"): "The part of the page this equation was read "
     "from ends at a fraction bar and may hold only the top or the bottom of a fraction, so "
     "compare it with the page and write the whole fraction if part is missing.",
@@ -159,6 +198,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "once spacing is ignored, so this was accepted as it is.",
     ("table.cell_text", "no_pdf_text"): "The PDF stores no text for this table to compare "
     "the cells with, so check every value against the image.",
+    ("table.edge_text", "text_at_edge"): "There is text right under this table, in the same "
+    "size and lined up with one of its columns, that is not in a cell: probably the rest of a "
+    "wrapped cell, so check the last row against the image.",
     ("table.math", "invalid_latex"): "The maths in a cell could not be converted, so that "
     "cell shows plain text instead: check it against the image.",
     ("table.math", "flattened_maths"): "Some cells of the grid read from the PDF hold maths "
@@ -303,14 +345,16 @@ REASON_MESSAGES: dict[str, str] = {
     "budget_unknown": "A spending limit was reached before this item was converted.",
     # Pages and handwriting kept as images before any model work (pipeline.page_type).
     # Final wording for the beta (handwriting design, section 3.3).
-    "handwritten_page": "This page is handwritten and this tool does not convert handwriting, "
-    "so the page is kept as an image, marked “Not converted”.",
-    "scanned_page": "This page is a scanned image and this tool does not convert scans, so "
-    "the page is kept as an image, marked “Not converted”.",
+    "handwritten_page": "This page is handwritten and was not converted, so it is kept as an "
+    "image, marked “Not converted” (upload again with “Convert scanned or handwritten pages” "
+    "ticked).",
+    "scanned_page": "This page is a scanned image and was not converted, so it is kept as an "
+    "image, marked “Not converted” (upload again with “Convert scanned or handwritten pages” "
+    "ticked).",
     "unread_page": "Nothing on this page could be read as text, so the page is kept as an "
     "image, marked “Not converted”.",
     "handwriting_on_page": "This is handwriting on a typed page and this tool does not "
-    "convert handwriting, so it is kept as an image after the typed text.",
+    "convert handwriting on typed pages, so it is kept as an image after the typed text.",
 }
 
 # DocumentResult.notices: one sentence per notice code for the job page's list ("Not
@@ -354,6 +398,9 @@ NOTICE_MESSAGES: dict[str, str] = {
     "so English is assumed: check it is right.",
     "long_description_missing": "A complex figure, such as a chart or a diagram, has no "
     "long description yet.",
+    "image_page_converted": "A scanned or handwritten page was converted from an image of "
+    "it: nothing in the PDF can confirm the reading, so check it against the original, which "
+    "is kept with the page.",
     "page_omitted": "You left this page out of the student file and of the review, and the "
     "file says that it is not there.",
 }

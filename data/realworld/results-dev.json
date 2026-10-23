@@ -1,0 +1,661 @@
+{
+ "part": "dev",
+ "arms": {
+  "ReadableSTEM": {
+   "exact_lenient (primary)": {
+    "point": 0.5617021276595745,
+    "low": 0.49350868577566037,
+    "high": 0.6286465545904478
+   },
+   "symbols, credited (secondary)": {
+    "point": 0.5876595744680851,
+    "low": 0.5138249077089854,
+    "high": 0.6586406373156175
+   },
+   "detection recall": {
+    "point": 0.7365957446808511,
+    "low": 0.6577375264712133,
+    "high": 0.8081327096296651
+   },
+   "detection precision": {
+    "point": 0.860765788165092,
+    "low": 0.8314446016700298,
+    "high": 0.8919411271944442
+   },
+   "wrong, not asked, per 100 gold": {
+    "point": 11.191489361702128,
+    "low": 7.753918282855665,
+    "high": 14.904739339091153
+   },
+   "cost per PDF page (USD)": {
+    "point": 0.023455645438596497,
+    "low": 0.01833356489479259,
+    "high": 0.02894993145145038
+   },
+   "required decisions per PDF page, all kinds": {
+    "point": 4.543859649122807,
+    "low": 3.31032956972841,
+    "high": 5.89724341936037
+   },
+   "  of which on an aligned equation": {
+    "point": 2.1052631578947367,
+    "low": 1.4017094017094016,
+    "high": 2.9026762148734666
+   }
+  },
+  "Chatbot, Opus": {
+   "exact_lenient (primary)": {
+    "point": 0.793040293040293,
+    "low": 0.675603217158177,
+    "high": 0.857707509881423
+   },
+   "symbols, credited (secondary)": {
+    "point": 0.8095238095238095,
+    "low": 0.6997690531177829,
+    "high": 0.8721496177329904
+   },
+   "detection recall": {
+    "point": 0.8681318681318682,
+    "low": 0.7844155844155845,
+    "high": 0.9249448123620309
+   },
+   "detection precision": {
+    "point": 0.864963503649635,
+    "low": 0.7527593818984547,
+    "high": 0.9349112426035503
+   },
+   "wrong, not asked, per 100 gold": {
+    "point": 7.509157509157509,
+    "low": 4.761607142857145,
+    "high": 12.828947368421053
+   },
+   "cost per PDF page (USD)": {
+    "point": 0.08783466666666666,
+    "low": 0.07560476923076923,
+    "high": 0.09725261538461538
+   },
+   "required decisions per PDF page, all kinds": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   },
+   "  of which on an aligned equation": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   }
+  },
+  "Chatbot, Haiku": {
+   "exact_lenient (primary)": {
+    "point": 0.6868085106382978,
+    "low": 0.6153846153846154,
+    "high": 0.751146141449013
+   },
+   "symbols, credited (secondary)": {
+    "point": 0.7127659574468085,
+    "low": 0.6404955556665252,
+    "high": 0.7775894163523522
+   },
+   "detection recall": {
+    "point": 0.8378723404255319,
+    "low": 0.7847688792786912,
+    "high": 0.8826827554168503
+   },
+   "detection precision": {
+    "point": 0.8739458499778073,
+    "low": 0.8276428789397968,
+    "high": 0.9162715736951963
+   },
+   "wrong, not asked, per 100 gold": {
+    "point": 15.106382978723405,
+    "low": 10.589440423984806,
+    "high": 20.310040039181693
+   },
+   "cost per PDF page (USD)": {
+    "point": 0.0022339561403508777,
+    "low": 0.002075619897360704,
+    "high": 0.002397433597175771
+   },
+   "required decisions per PDF page, all kinds": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   },
+   "  of which on an aligned equation": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0
+   }
+  }
+ },
+ "common_papers": [
+  "arxiv/2305.06353",
+  "arxiv/2401.11209",
+  "arxiv/2404.14123",
+  "arxiv/2410.12036",
+  "arxiv/2501.06896",
+  "arxiv/2505.03099"
+ ],
+ "paired": [
+  {
+   "other": "Chatbot, Opus",
+   "metric": "exact_lenient (primary)",
+   "papers": 6,
+   "estimate": -0.1996336996336996,
+   "low": -0.3352272727272727,
+   "high": -0.12680115273775217,
+   "low_975": -0.35500000000000004,
+   "high_975": -0.12026143790849675,
+   "sign_flip_p": 0.03125
+  },
+  {
+   "other": "Chatbot, Opus",
+   "metric": "symbols, credited (secondary)",
+   "papers": 6,
+   "estimate": -0.19597069597069594,
+   "low": -0.3513068181818179,
+   "high": -0.10951008645533145,
+   "low_975": -0.36750000000000005,
+   "high_975": -0.10075566750629716,
+   "sign_flip_p": 0.03125
+  },
+  {
+   "other": "Chatbot, Opus",
+   "metric": "detection recall",
+   "papers": 6,
+   "estimate": -0.14835164835164838,
+   "low": -0.3542713567839195,
+   "high": -0.03308270676691727,
+   "low_975": -0.3772389632936507,
+   "high_975": -0.02110817941952503,
+   "sign_flip_p": 0.0625
+  },
+  {
+   "other": "Chatbot, Opus",
+   "metric": "wrong, not asked, per 100 gold",
+   "papers": 6,
+   "estimate": 1.831501831501832,
+   "low": -5.121951219512194,
+   "high": 5.780346820809249,
+   "low_975": -6.452363090772687,
+   "high_975": 6.122448979591837,
+   "sign_flip_p": 0.9375
+  },
+  {
+   "other": "Chatbot, Haiku",
+   "metric": "exact_lenient (primary)",
+   "papers": 25,
+   "estimate": -0.12510638297872334,
+   "low": -0.16604865779910247,
+   "high": -0.08348871077198754,
+   "low_975": -0.17159533239556896,
+   "high_975": -0.07701637990607568,
+   "sign_flip_p": 3.5e-05
+  },
+  {
+   "other": "Chatbot, Haiku",
+   "metric": "symbols, credited (secondary)",
+   "papers": 25,
+   "estimate": -0.12510638297872334,
+   "low": -0.16877093736879248,
+   "high": -0.07914299095344826,
+   "low_975": -0.1748047348216983,
+   "high_975": -0.07184723307075364,
+   "sign_flip_p": 0.000115
+  },
+  {
+   "other": "Chatbot, Haiku",
+   "metric": "detection recall",
+   "papers": 25,
+   "estimate": -0.10127659574468084,
+   "low": -0.15454935721232965,
+   "high": -0.05307975273410536,
+   "low_975": -0.16348912076887118,
+   "high_975": -0.04610134515583294,
+   "sign_flip_p": 0.003955
+  },
+  {
+   "other": "Chatbot, Haiku",
+   "metric": "wrong, not asked, per 100 gold",
+   "papers": 25,
+   "estimate": -3.914893617021276,
+   "low": -7.866764847899565,
+   "high": -0.4243147989759177,
+   "low_975": -8.4785737254973,
+   "high_975": 0.0,
+   "sign_flip_p": 0.08323
+  }
+ ],
+ "buckets": {
+  "ReadableSTEM": {
+   "bucket correct": 0.5617021276595745,
+   "bucket scorer": 0.01829787234042553,
+   "bucket span": 0.08638297872340425,
+   "bucket recognition": 0.0651063829787234,
+   "bucket no_proposal": 0.005106382978723404,
+   "bucket undetected": 0.26340425531914896,
+   "  of which credited split/merged": 0.002553191489361702
+  },
+  "Chatbot, Opus": {
+   "bucket correct": 0.793040293040293,
+   "bucket scorer": 0.016483516483516484,
+   "bucket span": 0.0347985347985348,
+   "bucket recognition": 0.023809523809523808,
+   "bucket no_proposal": 0.0,
+   "bucket undetected": 0.13186813186813187,
+   "  of which credited split/merged": 0.0
+  },
+  "Chatbot, Haiku": {
+   "bucket correct": 0.6868085106382978,
+   "bucket scorer": 0.02,
+   "bucket span": 0.03489361702127659,
+   "bucket recognition": 0.09063829787234043,
+   "bucket no_proposal": 0.005531914893617021,
+   "bucket undetected": 0.1621276595744681,
+   "  of which credited split/merged": 0.001702127659574468
+  }
+ },
+ "strata": {
+  "ReadableSTEM": {
+   "display": {
+    "inline": [
+     2153,
+     1221,
+     1555
+    ],
+    "block": [
+     197,
+     99,
+     176
+    ]
+   },
+   "length": {
+    "single symbol": [
+     608,
+     333,
+     369
+    ],
+    "longer": [
+     1742,
+     987,
+     1362
+    ]
+   },
+   "paper style": {
+    "tutorial": [
+     1374,
+     833,
+     1073
+    ],
+    "research": [
+     976,
+     487,
+     658
+    ]
+   },
+   "environment": {
+    "inline": [
+     2153,
+     1221,
+     1555
+    ],
+    "align-like": [
+     78,
+     30,
+     68
+    ],
+    "single-line display": [
+     119,
+     69,
+     108
+    ]
+   },
+   "typed in": {
+    "text": [
+     1908,
+     1258,
+     1654
+    ],
+    "algorithm": [
+     42,
+     24,
+     29
+    ],
+    "figure": [
+     172,
+     21,
+     28
+    ],
+    "table": [
+     223,
+     13,
+     15
+    ],
+    "figure>subfigure": [
+     5,
+     4,
+     5
+    ]
+   }
+  },
+  "Chatbot, Opus": {
+   "display": {
+    "inline": [
+     525,
+     425,
+     460
+    ],
+    "block": [
+     21,
+     8,
+     14
+    ]
+   },
+   "length": {
+    "single symbol": [
+     162,
+     134,
+     138
+    ],
+    "longer": [
+     384,
+     299,
+     336
+    ]
+   },
+   "paper style": {
+    "tutorial": [
+     406,
+     330,
+     352
+    ],
+    "research": [
+     140,
+     103,
+     122
+    ]
+   },
+   "environment": {
+    "inline": [
+     525,
+     425,
+     460
+    ],
+    "align-like": [
+     10,
+     3,
+     6
+    ],
+    "single-line display": [
+     11,
+     5,
+     8
+    ]
+   },
+   "typed in": {
+    "text": [
+     409,
+     339,
+     367
+    ],
+    "algorithm": [
+     18,
+     17,
+     18
+    ],
+    "figure": [
+     32,
+     17,
+     22
+    ],
+    "table": [
+     82,
+     55,
+     62
+    ],
+    "figure>subfigure": [
+     5,
+     5,
+     5
+    ]
+   }
+  },
+  "Chatbot, Haiku": {
+   "display": {
+    "inline": [
+     2153,
+     1514,
+     1795
+    ],
+    "block": [
+     197,
+     100,
+     174
+    ]
+   },
+   "length": {
+    "single symbol": [
+     608,
+     411,
+     440
+    ],
+    "longer": [
+     1742,
+     1203,
+     1529
+    ]
+   },
+   "paper style": {
+    "tutorial": [
+     1374,
+     982,
+     1174
+    ],
+    "research": [
+     976,
+     632,
+     795
+    ]
+   },
+   "environment": {
+    "inline": [
+     2153,
+     1514,
+     1795
+    ],
+    "align-like": [
+     78,
+     30,
+     69
+    ],
+    "single-line display": [
+     119,
+     70,
+     105
+    ]
+   },
+   "typed in": {
+    "text": [
+     1908,
+     1441,
+     1732
+    ],
+    "algorithm": [
+     42,
+     24,
+     27
+    ],
+    "figure": [
+     172,
+     64,
+     83
+    ],
+    "table": [
+     223,
+     81,
+     123
+    ],
+    "figure>subfigure": [
+     5,
+     4,
+     4
+    ]
+   }
+  }
+ },
+ "breakdown": {
+  "ReadableSTEM": {
+   "undetected": {
+    "single symbol in running text": 126,
+    "display equation": 21,
+    "longer inline expression": 34,
+    "2 or 3 symbols in running text": 86,
+    "typed in a figure": 144,
+    "typed in a table": 208
+   },
+   "span": {
+    "cut too short": 59,
+    "cut too long (extra symbols)": 138,
+    "both": 6
+   }
+  },
+  "Chatbot, Opus": {
+   "undetected": {
+    "longer inline expression": 6,
+    "display equation": 7,
+    "2 or 3 symbols in running text": 16,
+    "single symbol in running text": 13,
+    "typed in a figure": 10,
+    "typed in a table": 20
+   },
+   "span": {
+    "cut too long (extra symbols)": 18,
+    "cut too short": 1
+   }
+  },
+  "Chatbot, Haiku": {
+   "undetected": {
+    "display equation": 23,
+    "longer inline expression": 47,
+    "2 or 3 symbols in running text": 40,
+    "single symbol in running text": 81,
+    "typed in a figure": 90,
+    "typed in a table": 100
+   },
+   "span": {
+    "cut too long (extra symbols)": 64,
+    "cut too short": 18
+   }
+  }
+ },
+ "examples": [
+  {
+   "bucket": "recognition",
+   "id": "arxiv/2503.02792/eq-025",
+   "page": 4,
+   "display": "inline",
+   "gold_latex": "g_i(\\textbf{R})=0",
+   "pred_latex": "g_i(\\mathbf{R}) = 0",
+   "pdf_text": "gi(\ud835\udc11) = 0"
+  },
+  {
+   "bucket": "span",
+   "id": "arxiv/2505.11658/eq-006",
+   "page": 2,
+   "display": "inline",
+   "gold_latex": "6.371 \\times 10^{6}",
+   "pred_latex": "R = 6.371 \\times 10^{6}\\ \\text{m}",
+   "pdf_text": "R = 6.371 \u00d7 106 m"
+  },
+  {
+   "bucket": "undetected",
+   "id": "arxiv/2501.09629/eq-129",
+   "page": 50,
+   "display": "inline",
+   "gold_latex": "L",
+   "pred_latex": null,
+   "pdf_text": null
+  },
+  {
+   "bucket": "no_proposal",
+   "id": "arxiv/2412.08797/eq-102",
+   "page": 13,
+   "display": "block",
+   "gold_latex": "\\widetilde{\\mathcal{P}}^{**}\\equiv\\max_{\\substack{\\chi\\in(0,1)\\\\\\nu\\in(0,1) }}\\widetilde{\\mathcal{P}}\\left(\\nu,\\chi\\right)= \\max_{\\nu\\in(0,1)}\\widetilde{\\mathcal{P}}^*(\\nu).",
+   "pred_latex": null,
+   "pdf_text": "\ufffd\ud835\udcab\u2217\u2217\u2261max\u03bd\u2208(0,1)\u03c7\u2208(0,1) \ufffd\ud835\udcab (\u03bd, \u03c7) = max\u03bd\u2208(0,1) \ufffd\ud835\udcab\u2217(\u03bd)."
+  },
+  {
+   "bucket": "scorer",
+   "id": "arxiv/2504.04210/eq-050",
+   "page": 15,
+   "display": "inline",
+   "gold_latex": "f>\\langle u_\\theta \\rangle_{t,z}/d",
+   "pred_latex": "f > \\left\\langle u_{\\theta} \\right\\rangle_{t,z}/d",
+   "pdf_text": "\ud835\udc53> \u27e8\ud835\udc62\ud835\udf03\u27e9\ud835\udc61,\ud835\udc67/\ud835\udc51"
+  },
+  {
+   "bucket": "recognition",
+   "id": "arxiv/2404.15495/eq-080",
+   "page": 7,
+   "display": "inline",
+   "gold_latex": "k=1,...,T",
+   "pred_latex": "\\lambda_1\\ (k=1,\\ldots,T)",
+   "pdf_text": "\u03bb1 (k = 1,...,T)"
+  },
+  {
+   "bucket": "span",
+   "id": "arxiv/2408.09889/eq-000",
+   "page": 6,
+   "display": "inline",
+   "gold_latex": "\\mathcal{O}(n_\\text{live}^{-\\frac{1}{2}})",
+   "pred_latex": "\\mathcal{O}(n_{\\text{live}}^{-\\frac{1}{2}})\\ \\text{([26])}",
+   "pdf_text": "\ud835\udcaa(n\u22121live2) ([26])"
+  },
+  {
+   "bucket": "undetected",
+   "id": "arxiv/2505.11658/eq-022",
+   "page": 2,
+   "display": "inline",
+   "gold_latex": "t",
+   "pred_latex": null,
+   "pdf_text": null
+  },
+  {
+   "bucket": "no_proposal",
+   "id": "arxiv/2504.03499/eq-130",
+   "page": 21,
+   "display": "block",
+   "gold_latex": "\\begin{aligned} &\\bm z_{t+1}=\\arg\\max_{\\bm z \\in \\mathcal Z}\\Big\\{ r_{1:t}(\\bm z)+ \\langle {\\bm g_{1:t} + \\bm{\\tilde g}_{t+1}}, {\\bm z} \\rangle \\Big\\}, \\ \\text{with} \\\\ & r_t(\\bm z)=\\frac{\\sigma_t}{2}\\|\\bm z - \\bm z_t\\|_2^2, \\ \\ \\sigma_t=\\sigma(\\sqrt{\\epsilon_{1:t}}-\\sqrt{\\epsilon_{1:t-1}}). \\end{aligned}",
+   "pred_latex": null,
+   "pdf_text": "\ufffd rt(\ud835\udc33) = \u03c3t 2 \u2225\ud835\udc33 \u2212\ud835\udc33t\u222522, \u03c3t = \u03c3(\u221a\u03f51:t \u2212\u221a\u03f51:t\u22121)."
+  },
+  {
+   "bucket": "scorer",
+   "id": "arxiv/2505.08251/eq-016",
+   "page": 2,
+   "display": "inline",
+   "gold_latex": "p_{\\text{out}} = p_{ij}",
+   "pred_latex": "p_{out} = p_{ij}",
+   "pdf_text": "pout = pij"
+  },
+  {
+   "bucket": "recognition",
+   "id": "arxiv/2305.06353/eq-129",
+   "page": 10,
+   "display": "block",
+   "gold_latex": "\\bigg| \\mathbb{P}\\bigg\\{ n \\rho_n^{1/2} \\big( {\\Sigma}_U^{(n)}(k) \\big)^{-1/2} \\widetilde W^{\\top} \\big( ( \\widehat U W )_{i*} - U_{i*} \\big) \\in \\mathcal{A} \\bigg\\} - \\mathbb{P} \\{ G \\in \\mathcal{A}\\} \\bigg| \\leq \\frac{C \\log(n\\rho_n)}{(n\\rho_n)^{1/2}}",
+   "pred_latex": "\\left|\\mathbb{P}\\left\\{n\\rho_n^{1/2}\\big(\\Sigma_U^{(n)}(k)\\big)^{-1/2}\\widetilde{W}^\\top\\big((\\widehat{U}W)_{i*}-U_{i*}\\big)\\in\\mathcal{A}\\right\\}-\\mathbb{P}\\{G\\in\\mathcal{A}\\}\\right|\\leq\\frac{C\\log(n\\rho_n)}{(n\\rho_n)^{1/2}}",
+   "pdf_text": "\ufffd\ufffd\ufffd\ufffd\u2119 \ufffd n\u03c11/n2 \u03a3(n) \ufffd \ufffd\u22121/2\ufffd U (k) W \u22a4\ufffd (\ufffdUW)i\u2217\u2212Ui\u2217 \u2208\ud835\udc9c \u2212\u2119{G \u2208\ud835\udc9c} \ufffd \ufffd \ufffd\ufffd\ufffd\ufffd\u2264C log(n\u03c1n) (n\u03c1n)1/2"
+  },
+  {
+   "bucket": "span",
+   "id": "arxiv/2503.07628/eq-014",
+   "page": 6,
+   "display": "inline",
+   "gold_latex": "\\boldsymbol{g}: \\Gamma_N \\to \\mathbb{R}^2",
+   "pred_latex": "\\Gamma_N \\rightarrow \\mathbb{R}^2",
+   "pdf_text": "\u0393N \u2192\u211d2"
+  }
+ ]
+}

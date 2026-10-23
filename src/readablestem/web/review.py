@@ -106,6 +106,10 @@ ADD_DATA_TABLE = "add_data_table"
 # alt text after the same checks as any alt text (`describe_in_words`).
 DESCRIBE = "describe"
 MAX_LATEX_CHARS = 5000
+TEXT_EDIT_ELSEWHERE = (
+    "Change the words of this text with “Change the words” on the page, then Accept it; "
+    "or keep it as an image."
+)
 MAX_ALT_CHARS = 1000
 
 # Review screen groups, in priority order, and the slug each has in URLs and anchors.
@@ -116,6 +120,10 @@ GROUP_SLUGS = {
     Kind.FIGURE: "figures",
     Kind.TABLE: "tables",
     Kind.HEADING: "headings",
+    # Text read from an image of a scanned or handwritten page (ADR 0007): paragraphs and
+    # list items, the only prose that has a fix. Accept it, or keep it as the picture;
+    # its words are changed in the split view (`web.page_edits.edit_text`).
+    Kind.PARAGRAPH: "text",
 }
 GROUP_KINDS = tuple(GROUP_SLUGS)
 # Waiting for a decision: a proposal to check, or nothing usable (the reviewer can write
@@ -393,7 +401,10 @@ def group_anchor(group_key: str) -> str:
 
 
 def has_proposal(fix: Fix) -> bool:
-    return any(p is not None for p in (fix.equation, fix.figure, fix.heading, fix.table))
+    # A paragraph's proposal is its text, which lives on its element (ADR 0007).
+    return fix.kind is Kind.PARAGRAPH or any(
+        p is not None for p in (fix.equation, fix.figure, fix.heading, fix.table)
+    )
 
 
 def can_accept(fix: Fix) -> bool:
@@ -594,6 +605,8 @@ def _edit(
         return _edit_figure(fix, element, form)
     if fix.kind is Kind.HEADING:
         return _edit_heading(result, fix, element, form)
+    if fix.kind is Kind.PARAGRAPH:
+        raise ReviewInvalid([FieldError(field_id("actions", fix.element_id), TEXT_EDIT_ELSEWHERE)])
     raise ReviewInvalid([FieldError(field_id("actions", fix.element_id), "This cannot be edited.")])
 
 

@@ -1,0 +1,300 @@
+{
+ "a": "rs",
+ "b": "rs-pagemath",
+ "metrics": {
+  "exact_lenient (primary)": {
+   "a": 0.5617021276595745,
+   "b": 0.5808510638297872,
+   "diff": 0.019148936170212738,
+   "low": 0.009214387745387213,
+   "high": 0.030612244897959107,
+   "p": 0.00067138671875
+  },
+  "symbols, credited (secondary)": {
+   "a": 0.5876595744680851,
+   "b": 0.6089361702127659,
+   "diff": 0.02127659574468077,
+   "low": 0.011368015241476237,
+   "high": 0.03272747655931511,
+   "p": 0.00055
+  },
+  "detection recall": {
+   "a": 0.7365957446808511,
+   "b": 0.7489361702127659,
+   "diff": 0.012340425531914834,
+   "low": 0.00434426325284878,
+   "high": 0.021756682929976682,
+   "p": 0.06031
+  },
+  "detection precision": {
+   "a": 0.860765788165092,
+   "b": 0.8674223755544603,
+   "diff": 0.0066565873893683625,
+   "low": -0.006784930260130802,
+   "high": 0.018819449767899003,
+   "p": 0.708545
+  },
+  "wrong, not asked, per 100 gold": {
+   "a": 11.191489361702128,
+   "b": 11.74468085106383,
+   "diff": 0.5531914893617014,
+   "low": -0.17050662081125575,
+   "high": 1.3494851956559588,
+   "p": 0.4069
+  },
+  "cost per PDF page (USD)": {
+   "a": 0.023455645438596497,
+   "b": 0.02502565649122807,
+   "diff": 0.0015700110526315723,
+   "low": 0.0004041824099691864,
+   "high": 0.0028368695890926333,
+   "p": 0.01784
+  },
+  "required decisions per PDF page, all kinds": {
+   "a": 4.543859649122807,
+   "b": 3.9649122807017543,
+   "diff": -0.5789473684210531,
+   "low": -0.8482142857142856,
+   "high": -0.33628318584070804,
+   "p": 8.5e-05
+  },
+  "  of which on an aligned equation": {
+   "a": 2.1052631578947367,
+   "b": 1.719298245614035,
+   "diff": -0.3859649122807016,
+   "low": -0.5648248792270534,
+   "high": -0.21927797434763366,
+   "p": 0.000255
+  }
+ },
+ "buckets": {
+  "bucket correct": {
+   "a": 0.5617021276595745,
+   "b": 0.5808510638297872
+  },
+  "bucket scorer": {
+   "a": 0.01829787234042553,
+   "b": 0.020425531914893616
+  },
+  "bucket span": {
+   "a": 0.08638297872340425,
+   "b": 0.07872340425531915
+  },
+  "bucket recognition": {
+   "a": 0.0651063829787234,
+   "b": 0.06382978723404255
+  },
+  "bucket no_proposal": {
+   "a": 0.005106382978723404,
+   "b": 0.005106382978723404
+  },
+  "bucket undetected": {
+   "a": 0.26340425531914896,
+   "b": 0.251063829787234
+  },
+  "  of which credited split/merged": {
+   "a": 0.002553191489361702,
+   "b": 0.002553191489361702
+  }
+ },
+ "breakdown": {
+  "A": {
+   "undetected": {
+    "single symbol in running text": 126,
+    "display equation": 21,
+    "longer inline expression": 34,
+    "2 or 3 symbols in running text": 86,
+    "typed in a figure": 144,
+    "typed in a table": 208
+   },
+   "span": {
+    "cut too short": 59,
+    "cut too long (extra symbols)": 138,
+    "both": 6
+   }
+  },
+  "B": {
+   "undetected": {
+    "single symbol in running text": 116,
+    "display equation": 14,
+    "longer inline expression": 30,
+    "2 or 3 symbols in running text": 75,
+    "typed in a figure": 146,
+    "typed in a table": 209
+   },
+   "span": {
+    "cut too long (extra symbols)": 131,
+    "cut too short": 51,
+    "both": 3
+   }
+  }
+ },
+ "transitions": {
+  "helped": 63,
+  "hurt": 18,
+  "exact_a": 1320,
+  "exact_b": 1365
+ },
+ "flows": {
+  "helped: undetected -> correct": 31,
+  "helped: span -> correct": 24,
+  "helped: recognition -> correct": 8,
+  "hurt: correct -> undetected": 8,
+  "hurt: correct -> span": 8,
+  "hurt: correct -> recognition": 2
+ },
+ "helped": [
+  {
+   "id": "arxiv/2408.09889/eq-075",
+   "flow": "undetected -> correct",
+   "page": 8,
+   "typed_in": "figure",
+   "gold": "a",
+   "a": null,
+   "b": "a",
+   "b_text": "a"
+  },
+  {
+   "id": "arxiv/2503.02792/eq-076",
+   "flow": "span -> correct",
+   "page": 7,
+   "typed_in": "text",
+   "gold": "N_i > 0",
+   "a": "\\text{(i) } N_i > 0",
+   "b": "N_{i} > 0",
+   "b_text": "Ni > 0"
+  },
+  {
+   "id": "arxiv/2404.15495/eq-005",
+   "flow": "recognition -> correct",
+   "page": 2,
+   "typed_in": "text",
+   "gold": "K(t)",
+   "a": "K(t+\\Delta t)",
+   "b": "K(t)",
+   "b_text": "K(t)"
+  },
+  {
+   "id": "arxiv/2501.09629/eq-032",
+   "flow": "undetected -> correct",
+   "page": 28,
+   "typed_in": "text",
+   "gold": "m",
+   "a": null,
+   "b": "m",
+   "b_text": "m"
+  },
+  {
+   "id": "arxiv/2503.02792/eq-072",
+   "flow": "span -> correct",
+   "page": 7,
+   "typed_in": "text",
+   "gold": "S, M \\rightarrow \\infty",
+   "a": "M \\rightarrow \\infty",
+   "b": "S, M \\rightarrow \\infty",
+   "b_text": "S, M \u2192\u221e"
+  },
+  {
+   "id": "arxiv/2504.04210/eq-072",
+   "flow": "recognition -> correct",
+   "page": 16,
+   "typed_in": "text",
+   "gold": "P(f)/P_{\\phi=0\\%}(f)",
+   "a": "P(f)/P_{\\phi=0^\\circ}",
+   "b": "P(f)/P_{\\phi=0\\%}(f)",
+   "b_text": "\ud835\udc43( \ud835\udc53)/\ud835\udc43\ud835\udf19=0%( \ud835\udc53)"
+  },
+  {
+   "id": "arxiv/2503.00937/eq-006",
+   "flow": "undetected -> correct",
+   "page": 2,
+   "typed_in": "text",
+   "gold": "\\mathbf{A}",
+   "a": null,
+   "b": "\\mathbf{A}",
+   "b_text": "\ud835\udc00"
+  },
+  {
+   "id": "arxiv/2504.04210/eq-086",
+   "flow": "span -> correct",
+   "page": 18,
+   "typed_in": "text",
+   "gold": "0\\sim 20\\%",
+   "a": "0 \\sim 20",
+   "b": "0 \\sim 20\\%",
+   "b_text": "0 \u223c20%"
+  },
+  {
+   "id": "arxiv/2504.04210/eq-075",
+   "flow": "recognition -> correct",
+   "page": 16,
+   "typed_in": "text",
+   "gold": "P(f)/P_{\\phi=0\\%}(f)",
+   "a": "P(f)/P_{\\phi=0^\\circ}",
+   "b": "P(f)/P_{\\phi=0\\%}(f)",
+   "b_text": "\ud835\udc43( \ud835\udc53)/\ud835\udc43\ud835\udf19=0%( \ud835\udc53)"
+  },
+  {
+   "id": "arxiv/2404.15495/eq-015",
+   "flow": "undetected -> correct",
+   "page": 3,
+   "typed_in": "figure",
+   "gold": "K(t)",
+   "a": null,
+   "b": "K(t)",
+   "b_text": "K(t)"
+  }
+ ],
+ "hurt": [
+  {
+   "id": "arxiv/2410.12036/eq-072",
+   "flow": "correct -> span",
+   "page": 23,
+   "typed_in": "figure>subfigure",
+   "gold": "t=1, 2, 3",
+   "a": "t = 1, 2, 3",
+   "b": "t = 1, 2, 3, \\underline{w}_{t}",
+   "b_text": "t = 1, 2, 3, wt"
+  },
+  {
+   "id": "arxiv/2501.06896/eq-050",
+   "flow": "correct -> undetected",
+   "page": 23,
+   "typed_in": "text",
+   "gold": "\\phi",
+   "a": "\\phi",
+   "b": null,
+   "b_text": null
+  },
+  {
+   "id": "arxiv/2503.07628/eq-088",
+   "flow": "correct -> recognition",
+   "page": 8,
+   "typed_in": "text",
+   "gold": "a_h(\\boldsymbol{u}_h; \\boldsymbol{u}_h, \\, \\boldsymbol{\\varphi}_h) = \\sum_{\\tau_i \\in \\mathscr{T}_h}\\int_{\\tau_i} \\Psi\\left( \\|\\mathbb{E}^{1/2} [\\boldsymbol{\\epsilon}(\\boldsymbol{u}_h) ]\\| \\right) \\, \\mathbb{E}[\\boldsymbol{\\epsilon}(\\boldsymbol{u}_h)] \\colon \\boldsymbol{\\epsilon}( \\boldsymbol{\\varphi}_h) \\, d\\boldsymbol{x}",
+   "a": "a_h(\\boldsymbol{u}_h; \\boldsymbol{u}_h,\\, \\boldsymbol{\\varphi}_h) = \\sum_{\\tau_i \\in \\mathscr{T}_h} \\int_{\\tau_i} \\Psi \\left( \\| \\mathbb{E}^{1/2} [\\boldsymbol{\\epsilon}(\\boldsymbol{u}_h)] \\| \\right) \\, \\mathbb{E}[\\boldsymbol{\\epsilon}(\\boldsymbol{u}_h)] : \\boldsymbol{\\epsilon}(\\boldsymbol{\\varphi}_h) \\, d\\boldsymbol{x}",
+   "b": "a_h(\\mathbf{u}_h;\\mathbf{u}_h,\\,\\boldsymbol{\\varphi}_h)=\\sum_{\\tau_i\\in\\mathscr{T}_h}\\int_{\\tau_i}\\Psi\\left(\\|\\mathbb{E}^{1/2}[\\boldsymbol{\\epsilon}(\\mathbf{u}_h)]\\|\\right)\\,\\mathbb{E}[\\boldsymbol{\\epsilon}(\\mathbf{u}_h)]:\\boldsymbol{\\epsilon}(\\boldsymbol{\\varphi}_h)\\,d\\mathbf{x}",
+   "b_text": "ah(\ud835\udc2eh; \ud835\udc2eh, \ud835\uded7h) =\u03c4i\u2208\ud835\udcafh\u03c4i \u03a8 \u2225\ud835\udd3c1/2[\u03f5(\ud835\udc2eh)]\u2225 \ud835\udd3c[\u03f5(\ud835\udc2eh)]: \u03f5(\ud835\uded7h) d\ud835\udc31 \ufffd \ufffd \ufffd \ufffd"
+  },
+  {
+   "id": "arxiv/2410.12036/eq-002",
+   "flow": "correct -> span",
+   "page": 8,
+   "typed_in": "table",
+   "gold": "t=1, 2, 3",
+   "a": "t = 1, 2, 3",
+   "b": "t = 1, 2, 3, \\underline{w}_{t}",
+   "b_text": "t = 1, 2, 3, wt"
+  },
+  {
+   "id": "arxiv/2410.12036/eq-069",
+   "flow": "correct -> undetected",
+   "page": 23,
+   "typed_in": "figure>subfigure",
+   "gold": "\\log \\kappa",
+   "a": "\\log \\kappa",
+   "b": null,
+   "b_text": null
+  }
+ ]
+}

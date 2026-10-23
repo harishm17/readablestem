@@ -14,6 +14,14 @@ arrived at; read them by question, not front to back.
 | The proof cites a commit hash that is not in this repository. | [history-note.md](history-note.md): original hash to public hash, for every cited commit |
 | How are headings, lists, equations and figures found in a PDF? | [layout.md](layout.md): "How a page is read" and "Known failure modes" |
 | How do tables work, and why are they off by default? | [tables.md](tables.md); [eval.md](eval.md), "Tables" |
+| Which equation scores are secondary, and what do they say about the held-out run? | [eval-secondary-metrics.md](eval-secondary-metrics.md) |
+| What does the current system score on the held-out sections (a re-measurement, not blind)? | [remeasurement-2026-10-21.md](remeasurement-2026-10-21.md) |
+| Does the page math pass help, and what did it cost? | [eval-page-math.md](eval-page-math.md); [decisions/0006-page-math-pass.md](decisions/0006-page-math-pass.md) |
+| How are formulas, ions and reactions found, written (`\ce`) and read aloud? | [chemistry.md](chemistry.md) |
+| Can scanned and handwritten pages be converted, how well, and at what cost? | [eval-image-pages.md](eval-image-pages.md); [decisions/0007-image-pages.md](decisions/0007-image-pages.md) |
+| How well does it read real human handwriting (an answer key of ink with known LaTeX), and may the app advertise it? | [eval-handwriting.md](eval-handwriting.md) |
+| How does it do on real LaTeX PDFs from arXiv (not Chromium prints), against the chatbot recipe? | [eval-realworld.md](eval-realworld.md) |
+| Why did it lose equations to the chatbot recipe on real papers, what was fixed, and what did a fresh set of papers say? | [eval-equation-rootcause.md](eval-equation-rootcause.md) |
 
 ## If you want to know how it is built
 
@@ -33,7 +41,7 @@ arrived at; read them by question, not front to back.
 ## If you want to know why a choice was made
 
 The decision records are in [decisions/](decisions/): 0001 scope, 0002 models, 0003 PDF
-library and the AGPL, 0004 web stack, 0005 the second automated check. Each ends with its
+library and the AGPL, 0004 web stack, 0005 the second automated check, 0006 the page math pass (a proposal, off by default). Each ends with its
 consequences.
 
 ## If you want to run it as a service

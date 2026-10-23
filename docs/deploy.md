@@ -279,6 +279,7 @@ calls are in flight at once (`MODEL_CONCURRENCY`, "Concurrency" below).
 | `MAX_USD_PER_PAGE` | **$1.00** | $0.30 | A job's cap is at most this times its pages, and holds count: a one-page job holds as many calls at once as its cap allows (seven at $0.14; four with long descriptions: "Concurrency"). $1.00 is also the most a runaway one-page job can spend |
 | `MAX_USD_PER_JOB` | **$3.00** | $2.00 | A 30-page dense document is $0.45 spent plus about $1.1 held at once, so $1.6 at worst: it never reaches $3.00; a runaway stops at 7x a normal document |
 | `MAX_MODEL_CALLS_PER_JOB` / `_PER_PAGE` | 400 / 80 | 400 / 80 | Measured 2-2.7 calls a page, so 30 pages is about 80 calls: 5x room |
+| `IMAGE_PAGES_USD_PER_PAGE` / `IMAGE_PAGES_MAX_USD_PER_JOB` | **$0.25** / **$7.50** (only with `FEATURE_IMAGE_PAGES=true`) | any | A job that asked for its scanned and handwritten pages to be converted may spend this much per page of the document, at most this per job (the main model reads a page for $0.10 to $0.13; $0.33 for the densest held-out paper's pages). The daily cap and the open pool still bound it |
 | `DAILY_SPEND_CAP_USD` | **$10** (set by you) | any | 5 instructors converting their full quota is 5 x 90 pages x $0.015 = $6.75, plus the calls in flight (two instances x $1.1) = $9 |
 | `PER_USER_DAILY_PAGE_QUOTA` | **90** (set by you) | any | Three full-size (30-page) documents a day each; a course week of lecture notes |
 | `SIGNUP_MODE` | `allowlist` (default), **`open`** for a beta anyone can try | any | See "Open sign-up" below |
@@ -306,8 +307,13 @@ anything) when a number cannot work for the provider: a page or job cap below on
 reservation, or a daily cap below `MODEL_CONCURRENCY` calls held at once. `readablestem ops
 launch-check` lists the softer problems too: a job cap a normal document comes near or a runaway would run far past (over
 25x), a daily cap under one job's cap or one user's quota, a quota under one full-size
-document. Turning on `FEATURE_TABLES` makes the reservation $0.53 a call; the check then
-asks for `MAX_USD_PER_PAGE` of at least $2.20 and `MAX_USD_PER_JOB` of at least $2.60.
+document. Turning on `FEATURE_TABLES` makes the reservation $0.53 a call. The check (`ops/limits.py`) then
+refuses a `MAX_USD_PER_PAGE` under $0.53 and warns about a `MAX_USD_PER_JOB` under $4.66, a
+30-page document's $0.45 spent plus eight calls held at once ($4.21); checked 2026-10-21 by
+running `launch-check` with $4.65 (one blocker) and $4.66 (none). An earlier version of this
+page said $2.60: that was wrong. Production, tables on: `MAX_USD_PER_PAGE=2.20` (a one-page job
+then holds four calls at once; $0.53 would make its table and equation steps run one after
+another) and `MAX_USD_PER_JOB=4.70`; the daily cap of $10 and the quota of 90 pages stay.
 
 To measure again: `uv run --env-file .env readablestem convert FILE.pdf --out out.html
 --max-usd 1.5`. Without `--concurrency` the command runs as many steps at once as the cap
@@ -348,7 +354,7 @@ at the next deploy: put it in the file. Choices for the beta, and why:
 |---|---|---|
 | `FEATURE_LONG_DESCRIPTIONS` | on | Long descriptions and data tables for charts are what a blind student needs from a figure. Cost: figures about twice as dear ($0.13 to $0.21 for 30 pages) and one more review decision per such figure |
 | `FEATURE_NOTATION_MEMORY` | on | A course's second chapter reads its notation hints. It stores course names and notation; the privacy page says so (`launch-check` verifies) |
-| `FEATURE_TABLES` | off | Not through its held-out gate (docs/tables.md): off, a table stays an image with a required decision. On: real `<table>` for $0.007 each, but the worst-case reservation rises to $0.53 a call, so the dollar caps must be raised |
+| `FEATURE_TABLES` | **on** | The owner's decision of 2026-10-21 (docs/tables.md, "The decision"). Off, a table stays an image with a required decision and its formulas are lost. On: real `<table>` for $0.007 each, but the worst-case reservation rises to $0.53 a call, so with it set `MAX_USD_PER_PAGE=2.20` and `MAX_USD_PER_JOB=4.70` (the minimum `launch-check` accepts is $0.53 and $4.66). Known: tables of unruled lists and of long wrapped text are missed (real-document recall 0.56), which stay as they were with the flag off |
 | `FEATURE_COLOUR` | off | No eval has turned it on |
 | `DECISIONS_*` | off with Claude | The Decisions API is OpenAI's. With `MODEL_PROVIDER=anthropic` the script writes the three switches as `false`; the app ignores them for that provider either way |
 | `FEEDBACK_URL` | empty | The footer then links to an email to `CONTACT_EMAIL`. A form service is a new data processor; name it on the privacy page first |

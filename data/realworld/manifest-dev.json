@@ -1,0 +1,523 @@
+{
+ "part": "dev",
+ "seed": "realworld-2026-10-21",
+ "papers": [
+  {
+   "id": "2305.06353",
+   "title": "An Overview of Asymptotic Normality in Stochastic Blockmodels: Cluster Analysis and Inference",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:TH",
+   "style": "tutorial",
+   "pages_chosen": [
+    3,
+    6,
+    10,
+    39
+   ],
+   "equations": 200,
+   "display": 7,
+   "pdf_sha256": "36d42e01005df5ae9533ec03df9cbac1ea56c1705aec1113b5994cadd3502ee8",
+   "source_sha256": "05319366701454f57e80670e2b1eabae4a14f7fc4f7ed8cdcea264071fbf87ed",
+   "extract_pdf_sha256": "440827ba73fd748ef6b0675388d26d33cdd3ef0775668b9d53e7fe5b78a18e11",
+   "gold_sha256": "f34015d1bb04edc8ca006f03228f16f61edc0aa80ccad0c49894e2bbe111e732"
+  },
+  {
+   "id": "2401.11209",
+   "title": "A review on the Vortex and Coherent Structures in Dusty Plasma Medium",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:flu-dyn",
+   "style": "tutorial",
+   "pages_chosen": [
+    8,
+    9,
+    11,
+    13
+   ],
+   "equations": 29,
+   "display": 0,
+   "pdf_sha256": "0ccd43bf350ed1a6ffa8a63393400be37abd68a9a9e69c39edd91b56abbe3e62",
+   "source_sha256": "331ad09abe36214890de7c5649949bed54f45a1864c51768daf101d99f4d6b30",
+   "extract_pdf_sha256": "ec040d80cc3d0e24ad28cf1742a890cf1359b8ed5bad57c06e32cdfe9c6217a9",
+   "gold_sha256": "6e5bd880b7d4d1507d27a77d129dd5dc900e4dda73426d15c0984b3f9615aa16"
+  },
+  {
+   "id": "2404.05746",
+   "title": "Causality for Earth Science -- A Review on Time-series and Spatiotemporal Causality Methods",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:data-an",
+   "style": "tutorial",
+   "pages_chosen": [
+    9,
+    14,
+    28,
+    34,
+    36
+   ],
+   "equations": 59,
+   "display": 4,
+   "pdf_sha256": "c8614631d23060284d545f373ffb3e8895ae2f51023dd7359888485a4366d944",
+   "source_sha256": "caca599b09fb18e752bd8e0a29fb9af30bb105abf92e0696187e2657213f1200",
+   "extract_pdf_sha256": "05317476aa6717abc770ea5fe00515b2aa92e55cd05dd2de6f7bb4d38d023fda",
+   "gold_sha256": "de6d95b1e561171954cf9a644b818a789d5e19d019e0222627611d4532951187"
+  },
+  {
+   "id": "2404.14123",
+   "title": "Cooperativity, information gain, and energy cost during early LTP in dendritic spines",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "q-bio:q-bio:QM",
+   "style": "research",
+   "pages_chosen": [
+    9,
+    12,
+    31,
+    45
+   ],
+   "equations": 65,
+   "display": 3,
+   "pdf_sha256": "4f5066107bc27ca222c13728b87e6cbe44656a2e15267a808b96dc4dee3bef47",
+   "source_sha256": "5755bb8cc236c1ca91e701670280a9e4425be418dc28ce7707e71c92c3180c1f",
+   "extract_pdf_sha256": "43dace7203a83be67144f95e18ce47d0212f91c950b17143dc71426f550536a5",
+   "gold_sha256": "9c46f45442040ed9e1b0f2c69ef390bff29e02cdf38b8cf053e25eaeb57b88f2"
+  },
+  {
+   "id": "2404.15495",
+   "title": "Correlations versus noise in the NFT market",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "econ:econ:EM",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    3,
+    7,
+    8
+   ],
+   "equations": 119,
+   "display": 2,
+   "pdf_sha256": "c64fcf005085e4786778197e376156a28cc055d8ff29716b3198f1fe349d8590",
+   "source_sha256": "21de74e3a0848fcbda6814205eaaef6cb57942d3bb3f5fe4bff5845fe0f8a4e2",
+   "extract_pdf_sha256": "be52c0cfcd5fb695c2612c1423eeb106005cf066c14cd0c05c3912c6798eee10",
+   "gold_sha256": "6ef293225d08110879f3691021dbb0a1ed8144a52023c61db5a7cba1f2649728"
+  },
+  {
+   "id": "2405.09610",
+   "title": "Learning 3-Manifold Triangulations",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ML",
+   "style": "research",
+   "pages_chosen": [
+    14,
+    15,
+    16,
+    23
+   ],
+   "equations": 37,
+   "display": 0,
+   "pdf_sha256": "4f910482b42850914f8f216acecd65b71566b920e77e2fe27aa3578885401355",
+   "source_sha256": "9a5d37a6191eafbb39db9dca439255e03ca0c56307596b152b9ebfb463471ae3",
+   "extract_pdf_sha256": "623c0d129c743fc2bbc43a34a5181d6a32c785da453aeb6e6ca57e9310c0772a",
+   "gold_sha256": "297e1f63f1acca343147f21622fb75e65a8494894460fb61a1278d057c5d4e22"
+  },
+  {
+   "id": "2407.09859",
+   "title": "Chemically active droplets",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:ed-ph",
+   "style": "tutorial",
+   "pages_chosen": [
+    4,
+    5,
+    26,
+    27
+   ],
+   "equations": 69,
+   "display": 9,
+   "pdf_sha256": "753970da42fc02074527da2b1cebbb2a3a4bf1f469085078256fd8d9f89b05cb",
+   "source_sha256": "b4a66ee4da6b44d1f50fe0a8f458c1e6c931b6ba8afcdec10a1af879210db30b",
+   "extract_pdf_sha256": "e8242babb2a158b619ade9881b15ae576921fd7862b4b5ba0ebe20fcfb6ddee5",
+   "gold_sha256": "485fee4ef41152ef0d862d325483a655f3facd10018b9e9c9e6f6b7b40516a5e"
+  },
+  {
+   "id": "2407.20815",
+   "title": "Jena lectures on generalized global symmetries: principles and applications",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:cond-mat:stat-mech",
+   "style": "tutorial",
+   "pages_chosen": [
+    5,
+    8,
+    17,
+    29,
+    33,
+    65
+   ],
+   "equations": 62,
+   "display": 15,
+   "pdf_sha256": "13c232248f1e2df5c99b7a82eb36f44938d641a56cbc091a43d98eee95b4a098",
+   "source_sha256": "0b7c02b922b925345000ec90d9c4c3998bb0fcd6174f6ae03631863ddc21edf2",
+   "extract_pdf_sha256": "c8e4b6308845e8f347737f3a5aef0c50ddd39be2e76153c1f17046d567cabe91",
+   "gold_sha256": "69e505d4ff2953813ac242a816f64696b52fe24f651b59b181b9b088b556dc6c"
+  },
+  {
+   "id": "2408.09889",
+   "title": "Towards a Field Based Bayesian Evidence Inference from Nested Sampling Data",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:data-an",
+   "style": "research",
+   "pages_chosen": [
+    6,
+    7,
+    8,
+    10
+   ],
+   "equations": 124,
+   "display": 9,
+   "pdf_sha256": "5c438ed7224af51ddbcac5eb76eb9ff1ec5b4aa65bd593fa23f7460bc9a92c70",
+   "source_sha256": "e13df407149164088b8cbd539c59754fd1764c7be6c4b3035af638a4f8711e44",
+   "extract_pdf_sha256": "93d307a8c11c42e0b595bc10ced2790419c1057185369a2470acb723d83caa84",
+   "gold_sha256": "975d8916e584d6bf98bbbbddf442ec79a81c7e8108ce87e95a16f891c72f8fe2"
+  },
+  {
+   "id": "2410.12036",
+   "title": "Deep Optimal Sensor Placement for Black Box Stochastic Simulations",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ML",
+   "style": "research",
+   "pages_chosen": [
+    8,
+    18,
+    19,
+    20,
+    23
+   ],
+   "equations": 75,
+   "display": 3,
+   "pdf_sha256": "8435cb510f533f87b9c0e808f113e04571b6cd4543a08a3765b8dd5933594ba4",
+   "source_sha256": "0f3278d023d0828e254e31a28aa3381e7e6627b98b10607e190ccbbeb5d390f2",
+   "extract_pdf_sha256": "da46405ef7989fb3b5e1dcb9040bfca0ccad74a33341001e0e48723cac13c65c",
+   "gold_sha256": "b5463caeb9da75b8ea4e3aba6dd3fadc6c46599a99b550dd439725ece68f4efd"
+  },
+  {
+   "id": "2412.08797",
+   "title": "Maximum power Stirling-like heat engine with a harmonically confined Brownian particle",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:cond-mat:stat-mech",
+   "style": "research",
+   "pages_chosen": [
+    5,
+    12,
+    13,
+    14,
+    19
+   ],
+   "equations": 138,
+   "display": 18,
+   "pdf_sha256": "a1dfeef10f94b1d8a64ad0de9306d3a12846f19aaf673aa2414bc6117af06e3e",
+   "source_sha256": "9d608ec9307d0e4558f132dfed4fabe1c9b659f0c4db5f867c81e7083b83e02b",
+   "extract_pdf_sha256": "39b971e8ddb9cdb0cad48c93078cf856b68948e0077a54d940bef80e3a8a5c0e",
+   "gold_sha256": "2b9acde0eb84656134bb186ae7ee4542354c90e3adc7d53efc1875244ba9589d"
+  },
+  {
+   "id": "2412.12319",
+   "title": "The Critical Beta-splitting Random Tree IV: Mellin analysis of Leaf Height",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:PR",
+   "style": "tutorial",
+   "pages_chosen": [
+    12,
+    13,
+    14,
+    29
+   ],
+   "equations": 102,
+   "display": 27,
+   "pdf_sha256": "727f1d84b92da9b950f1d11c97759ff755cc311fa807765e9ac0faaacd2298b9",
+   "source_sha256": "08a5dddcc7d79523cb7f2017f2890f71da7ccae0bc346109747e69f70c0edf53",
+   "extract_pdf_sha256": "bc1c15df0d89aea8c5b4faf7c9df94782d6d461bbeba356084e60f5d147f9cf3",
+   "gold_sha256": "9a4afa9836dd763bebc5c8ef0166a702a3a056b6c698ba95636a88d6f6b01021"
+  },
+  {
+   "id": "2501.06896",
+   "title": "Introduction to the Usage of Open Data from the Large Hadron Collider for Computer Scientists in the Context of Machine Learning",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:data-an",
+   "style": "tutorial",
+   "pages_chosen": [
+    3,
+    4,
+    22,
+    23,
+    30
+   ],
+   "equations": 77,
+   "display": 0,
+   "pdf_sha256": "c5bc89b5183d277552f504271e2d1261919e1c735da4361ccdc73036772aa042",
+   "source_sha256": "bb5505ff01345506c616f0c6f1ca2e4c91979a184e3b9a9f8db4de403f8c1a5b",
+   "extract_pdf_sha256": "28e09667b2093780a611f496c0b96d42eae443ed8491e4881ba80a6c35efb3da",
+   "gold_sha256": "20b5be5533816609d4d82c4dbb243ce03de39d4bf304b627822a5e2a1834ce23"
+  },
+  {
+   "id": "2501.09629",
+   "title": "Optimal paths and dynamical symmetry breaking in the current fluctuations of driven diffusive media",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:flu-dyn",
+   "style": "tutorial",
+   "pages_chosen": [
+    16,
+    28,
+    29,
+    50
+   ],
+   "equations": 176,
+   "display": 11,
+   "pdf_sha256": "27fbaf46e0a9432376229886fce8f9d1cd518c4518bfa09fe64ac3f141110d33",
+   "source_sha256": "c5519a74abfba2662b8428402cc02ee403e40adb7a5f16141a9bb6e2fe51b3d4",
+   "extract_pdf_sha256": "ad54489c8db559c8d139cfebef68d28183ca086e6f66198086c8e471a88c5bd2",
+   "gold_sha256": "4b52ab2b1e505c5664e5d943c5222a2b66894a0b123416597b9bfc4e33384b5d"
+  },
+  {
+   "id": "2501.17892",
+   "title": "Object Detection with Deep Learning for Rare Event Search in the GADGET II TPC",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:data-an",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    4,
+    5,
+    13
+   ],
+   "equations": 51,
+   "display": 0,
+   "pdf_sha256": "d5b4c6a26320ca29121e9e922903785de82b9143e19d42f8ca83ac8ef9a9f053",
+   "source_sha256": "5abc46327a6f89f2013d7e87163bafc0a9be303b65ca54f2238cc2844ce469e7",
+   "extract_pdf_sha256": "21c268108e07dea79605149937c14f2d60a38e3dfd462d807a0e893b3dacda02",
+   "gold_sha256": "ffd8d0770129671069874878eb307616c9ea41805c11bf6edcc09903e24ecfe0"
+  },
+  {
+   "id": "2503.00937",
+   "title": "Learning-Augmented Frequent Directions",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "cs:cs:DS",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    3,
+    8,
+    10,
+    20
+   ],
+   "equations": 57,
+   "display": 1,
+   "pdf_sha256": "36bbad4063c0b489b15e7edd34a03286d1ac9210725634b9b30c76de9be1664a",
+   "source_sha256": "b10b1d81fb39400412452a99153be27e1f0dfb21e95dd68abc84e08486d508bb",
+   "extract_pdf_sha256": "d2462a7d6bb6d0adc24b482e996b20bdb63a1a8b67f05cdf42addb288d01b3ac",
+   "gold_sha256": "2297b33a56daebe6643536fd2e424de99d8e37e449cc9b035970bd891d835623"
+  },
+  {
+   "id": "2503.02792",
+   "title": "Les Houches lectures on Theoretical Ecology: High-dimensional models and extreme events",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:cond-mat:stat-mech",
+   "style": "tutorial",
+   "pages_chosen": [
+    4,
+    5,
+    6,
+    7,
+    11,
+    18
+   ],
+   "equations": 125,
+   "display": 14,
+   "pdf_sha256": "fad30467406ab49faa19b87632a0588224cccbdffe6a628ce8cff32ee2d00399",
+   "source_sha256": "89022c7c6ceb0a2ef0a84f01e33f2ac26450eafc9b42e0f114abe9f4a4803f7e",
+   "extract_pdf_sha256": "3c71619f8201c68964bbc33c89667f0e44386a77cd48a0d7ef9de8ee3ce87f68",
+   "gold_sha256": "f973b1f183e837f0a0b1af8d273ef08c81a050c5845fb951a94d73f60cfd8aee"
+  },
+  {
+   "id": "2503.07628",
+   "title": "A finite element model to analyze crack-tip fields in a transversely isotropic strain-limiting elastic solid",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:NA",
+   "style": "research",
+   "pages_chosen": [
+    6,
+    7,
+    8,
+    9
+   ],
+   "equations": 119,
+   "display": 17,
+   "pdf_sha256": "a60333bfb701ac6d6a74360ce6ad92a7c74c06625604339ceeb62e6f3f67b583",
+   "source_sha256": "52f679cd082ebbbf30ddb70feecbf26539403cb040e6eae4ed0e4fbf35df10c9",
+   "extract_pdf_sha256": "3c35206ee88178b4b3471512eb2464c582e614c8c0896306f56baa51353dc12a",
+   "gold_sha256": "9b7500f16628fb98241c4171db4a9c5a66a8d0a685164b0111711bd8b25e066f"
+  },
+  {
+   "id": "2504.03499",
+   "title": "Optimistic Learning for Communication Networks",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "cs:cs:LG",
+   "style": "tutorial",
+   "pages_chosen": [
+    2,
+    3,
+    10,
+    11,
+    21
+   ],
+   "equations": 136,
+   "display": 13,
+   "pdf_sha256": "fa3a957539039554cd8b5a1dd25dd62e6efd6a4819d03baa12b32e52acbdf397",
+   "source_sha256": "72c1c041c062b6475e6127db1b8a9f2f03e09d31b35be48332e708906f34dc9e",
+   "extract_pdf_sha256": "3efe9acbbf4bdb956f8f6f8ab7b03755d8624f12946a6ab7f66fc99cf747153a",
+   "gold_sha256": "6c2da33a907aa7a4ac6c05327d7a44122c7650f4e950b50a14c588752c33c92b"
+  },
+  {
+   "id": "2504.04210",
+   "title": "Experimental study of velocity statistics in wall-bounded turbulent emulsions",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:flu-dyn",
+   "style": "research",
+   "pages_chosen": [
+    6,
+    11,
+    15,
+    16,
+    18
+   ],
+   "equations": 97,
+   "display": 1,
+   "pdf_sha256": "1605eba166b74ec2253cd4f17630d5d395796bc74531f714e3042f22dee76f82",
+   "source_sha256": "0df923fb6d19c864062d9e4fd6844d65d581147a0eb7778cc01fa753ae7e36fc",
+   "extract_pdf_sha256": "c838522e2d311f072071fee425d0ba100ae8f5a680a9fceeb3fd7a47840a4316",
+   "gold_sha256": "cc614b8394fdd3df53bb365c39d4ecfb523c7b7eed96703697ae3e17d722340f"
+  },
+  {
+   "id": "2505.03099",
+   "title": "Pedagogical Implications for the Falling Astronaut Problem",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:class-ph",
+   "style": "tutorial",
+   "pages_chosen": [
+    2,
+    17,
+    19,
+    20,
+    22
+   ],
+   "equations": 100,
+   "display": 8,
+   "pdf_sha256": "4616932d44c556b560737b0e963e40a548c6877c91e78027d9744e9a55fcf836",
+   "source_sha256": "e1bdfd651c9fcddfc4da07386a288ce981a373aa961e79113c3f185c3052e4e8",
+   "extract_pdf_sha256": "633f6864e0cdab02c13ac081a5fd20c740fb3a160d656b1ab436b84f6d467aa6",
+   "gold_sha256": "58bbe6a036adb9fcaf9676ca7f0d78d219fa14b208db918bd5fcfbf3fb2c12b6"
+  },
+  {
+   "id": "2505.08251",
+   "title": "Community Recovery on Noisy Stochastic Block Models",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:PR",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    3,
+    4,
+    8
+   ],
+   "equations": 94,
+   "display": 9,
+   "pdf_sha256": "7a4d837d20be6900301929b5e784093a578e2656d0e1281d1b5bbb00744e33e2",
+   "source_sha256": "00e2ccf1fcbbfb565dc61b3acb55995014fa026bcc95843fa34a96099973fd7f",
+   "extract_pdf_sha256": "683beb9ba094c236be1d810bbedde2887e130cdb4fd2a5f4b5bc558850839627",
+   "gold_sha256": "9e879cc584cd8807293f484dd8401d85b1acf05baad3629ca3d6c7385b90d36b"
+  },
+  {
+   "id": "2505.11658",
+   "title": "The Hyperbolic Tangent as an Educational Tool for Teaching Variable Acceleration",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:class-ph",
+   "style": "tutorial",
+   "pages_chosen": [
+    2,
+    8,
+    9,
+    10
+   ],
+   "equations": 88,
+   "display": 7,
+   "pdf_sha256": "f8b11a858a69cf61b9a8bd500b1be51142ae33c2ec087e0d4bf666451d8e0a6b",
+   "source_sha256": "2e5566f2b3258510afa7cf74cea12c54b33bc954fef91c55b95bd33b95a43e72",
+   "extract_pdf_sha256": "b8ac6799d51d67dabfdb140311036f8a128a8685b2fad9f22840eb3dc8174db5",
+   "gold_sha256": "ea9a00b0c6deeeecdbe01bce9e69577db5fdadcd9c8a3ea88183f120b4acbb9c"
+  },
+  {
+   "id": "2506.13076",
+   "title": "Hopfield Networks as Models of Emergent Function in Biology",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:cond-mat:stat-mech",
+   "style": "tutorial",
+   "pages_chosen": [
+    12,
+    13,
+    14,
+    15
+   ],
+   "equations": 61,
+   "display": 6,
+   "pdf_sha256": "5fcc383b108db49cf06246c8ba0501656b2f6668597333157b0565d0e2950e2f",
+   "source_sha256": "93a8e0f6e30abde9a26b14ac575211e2f2c6f617289cfb4231c9cd7d06ee6dd8",
+   "extract_pdf_sha256": "3ac7e018e3047edda569d27f320712dd75563e816aa718bb5ca87923a265a01b",
+   "gold_sha256": "5ee07db087030e837db2320a2b8d0ad88137d643564bf87969657faf56eb699a"
+  },
+  {
+   "id": "2506.16486",
+   "title": "An introduction to Causal Modelling",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:TH",
+   "style": "tutorial",
+   "pages_chosen": [
+    7,
+    12,
+    13,
+    23,
+    24,
+    28
+   ],
+   "equations": 90,
+   "display": 13,
+   "pdf_sha256": "97d9120b7f54152eb6945ce4258adb099f107b1e0c7779bba99060d5336b0c76",
+   "source_sha256": "2744236178294ae0b0a32b0136b69c4ac0f84cc0bfc2879ff3897c15771ff274",
+   "extract_pdf_sha256": "a5e854110d2eb95e4cb402ab8144c9a56b6cb2a3be1cb447fe9b6edb1d211f5f",
+   "gold_sha256": "e7d9be9ef385c0cda4af20d91ad43a5e661f8e5d9f6e0166fd142fb475088295"
+  }
+ ],
+ "n_papers": 25,
+ "n_equations": 2350,
+ "n_pages": 114
+}

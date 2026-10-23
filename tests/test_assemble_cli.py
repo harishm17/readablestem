@@ -476,7 +476,7 @@ def test_tables_notices_and_the_language_are_in_the_summary(tmp_path, capsys):
     fixture = Path(__file__).parent / "fixtures" / "layout" / "latex" / "tables.pdf"
     assert run(fixture, "--out", tmp_path / "t.html", "--fake") == 0
     out = capsys.readouterr().out
-    assert re.search(r"Elements:    \d+ \(.*, 0 figures, [45] tables\)", out)
+    assert re.search(r"Elements:    \d+ \(.*, 0 figures, [56] tables\)", out)
     assert re.search(r"^  table +", out, re.MULTILINE)
-    assert re.search(r"^Notices:     .*table_not_rebuilt [45]", out, re.MULTILINE)
+    assert re.search(r"^Notices:     .*table_not_rebuilt [56]", out, re.MULTILINE)
     assert re.search(r"^Language:    en \((detected|default|pdf)\)$", out, re.MULTILINE)

@@ -96,6 +96,9 @@ MIN_ALIGNMENT = 0.75  # share of a column's cells that line up (left, right or c
 ALIGN_TOL = 2.0  # cells line up when their edges (or centres) are this close
 CURVE_SHARE = 0.05  # one curve covering this share of the box makes it a drawing
 IMAGE_SHARE = 0.2  # raster images covering this share of the box make it a picture
+EDGE_GAP = 0.5  # x the table's text size: how close under the box a cut line sits
+EDGE_SIZE_TOLERANCE = 0.6  # pt: the line's glyphs are the table's size, within this
+EDGE_COLUMN_TOLERANCE = 3.0  # pt: it starts where a column of the grid starts, within this
 CAPTION_MAX_GAP = 36.0  # furthest a "Table N" caption may sit from its table (as figures)
 LAYOUT_CELL_CHARS = 60  # mean text length of a prose column in a layout grid
 WORD_GRID_WORDS = 3  # a grid of terms: no cell longer than this (words) ...
@@ -110,9 +113,43 @@ THIN_IMAGE = 1.6  # an image this thin is a rule (as RULE_THICKNESS in layout)
 DOUBLE_RULE = 4.0  # two rules this close are one double rule
 COLUMN_RULE_LINES = 2.2  # x font size: a column rule is at least about two lines long
 GUTTER_PT = 3.0  # narrowest white gap between two columns of text
+WORD_GUTTER_PT = (
+    2.5  # narrowest strip between two columns that no word crosses (see `_word_gutters`)
+)
+WORD_GUTTER_LINES = 10  # a box needs this many lines of text before such a strip counts
+WORD_GUTTER_FLUSH = 0.6  # share of the lines whose text ends and begins at the strip's edges
+WORD_GUTTER_CROSSING = 0.1  # share of the lines a word may cross it on (a spanning title)
 SCRIPT_SIZE = 0.85  # x the line's largest glyph: smaller glyphs may be scripts (as layout)
 RAISED = 0.2  # x the full-size glyph: a smaller one with its baseline this far up is raised
 STACK_GAP = 3.0  # x font size: furthest apart two rules of one booktabs table may be
+BLOCK_ROW_GAP = 1.3  # x font size: widest white gap between two lines of one text block
+TITLE_ROW_WORDS = 6  # a title row of a group of rows has no more words than this
+HEADER_GAP = 3.5  # x font size: widest white gap under a header row of a block
+RUNNING_WIDTH = 0.6  # share of a framed box's width that a line of running text covers
+PAGE_CENTRE = (
+    0.06  # a lone gutter this close to the page's middle (x its width) is a page's columns
+)
+PAGE_SPAN = 0.7  # ... when the text spans this much of the page's width
+TEXT_TABLE_LINES = 4  # lines a box found from text alone needs, without a "Table N" caption
+BLOCK_MIN_LINES = 3  # lines with text in two or more cells that make a block of text columns
+PROSE_WORDS = 6  # a cell of this many words is a line of running text, not a label or a term
+FRAME_MIN_WIDTH = 100.0  # pt: a rule shorter than this does not frame a table
+FRAME_MAX_RULES = 12  # rules of one extent on a page that are looked at together
+FRAME_GRID_SHARE = 0.3  # share of a framed box's lines with text in two columns (callouts have few)
+FRAME_WHOLE_RULES = 3  # a stack of this many rules (top, header, bottom) is one table as a whole
+FRAME_MAX_HEIGHT = 0.8  # share of the page a framed table may take
+PROSE_WIDTH = 0.25  # share of the page width a column's cells average to be running text
+SCRIPT_CELL = 0.8  # x the text size: smaller cells are scripts or labels of a symbol
+SMALL_TEXT = 0.7  # x the page's text size: lettering this small in a box made here is a diagram
+PICTURE_REACH = 30.0  # pt around a box made here in which curves make it part of a plot
+PICTURE_NEAR = 3  # curves reaching that far
+PICTURE_MARKS = 4  # small curves in a box made here (a legend's markers, scatter dots)
+PICTURE_FILLS = 12  # filled shapes in a box that make it a chart (bars), not a table
+PICTURE_SHARE = 0.05  # raster images covering this share of a box made here make it a picture
+MATH_SHARE = 0.6  # share of the lines with a relation or operator that makes a block maths
+TURN_MIN_CHARS = 60  # a page needs this much text to be turned
+TURN_SHARE = 0.6  # share of its characters set sideways, one way, to turn the page
+EXTENT_TOL = 3.0  # pt: rules with ends this close have one extent
 
 # The page test before detection (`may_hold_table`): a gap counts from this wide (x font
 # size; the arbitration's own cut is SEGMENT_GAP, 0.8), and aligned text needs this many
@@ -160,21 +197,43 @@ REASON_SLANET = "SLANet-plus grid"
 REASON_PYMUPDF = "PyMuPDF grid"
 REASON_DRAWN_CELLS = "drawn cell grid"
 REASON_EXTENDED = "box extended along rules"
+REASON_TEXT_CELLS = "text cell grid"
 REASON_CONTINUED = "continued from previous page"
 REASON_TERMS = "grid of terms"  # claimed, not data: written as a list (`is_term_grid`)
 # A row split by a page break (`join_split_row`): the table's last row goes on at the top
 # of the next page's table, and that table's first row is the end of it.
 REASON_ROW_SPLIT = "last row continues on the next page"
 REASON_ROW_CONTINUED = "first row ends the last row of the page before"
+# A line of the table's own size, outside its box, right under it and starting where a column
+# starts: probably the rest of a cell the box ended a line too early (`_edge_text`). The grid
+# and a model that reads the crop both miss it, so the table step asks a person.
+REASON_EDGE_TEXT = "text at the table's edge outside its box"
 
 # Verdicts of `judge` (codes, safe to log and count).
+SOURCE_FRAME = "rule frame"  # `_rule_frames`: the span of a stack of rules of one extent
+SOURCE_TEXT = "text block"  # `_text_blocks`: lines of text in aligned columns
 TABLE = "table"
-DROPPED = ("toc", "list", "labels", "figure", "no_grid", "overlap", "layout_grid", "no_structure")
+DROPPED = (
+    "toc",
+    "list",
+    "labels",
+    "figure",
+    "no_grid",
+    "overlap",
+    "layout_grid",
+    "no_structure",
+    "page_text",
+    "numbered",
+    "no_words",
+    "split",
+    "container",
+)
 
 # "Table 2.3 Speeds", "TABLE 4: ...", "Tab. 1 ...", but not "Table 2 shows that ..." (as
 # layout's "Figure N" CAPTION).
 TABLE_CAPTION = re.compile(
-    r"^(?:Table|TABLE|Tab\.|TAB\.)\s*\d+[A-Za-z]?(?:[.\-\u2013]\d+[A-Za-z]?)*"
+    r"^(?:Table|TABLE|Tab\.|TAB\.)\s*"
+    r"(?:\d+[A-Za-z]?(?:[.\-\u2013]\d+[A-Za-z]?)*|[IVXLC]{1,6}\b)"  # 4, 2.3, 4a, or IV (APS, IEEE)
     r"(?:\s*[.:|\u2013\u2014-]\s*|\s+(?=[A-Z(\"'\u201c])|\s*$)"
 )
 # Dot leaders of a table of contents: five dots (spaced or not), ellipses, middle dots.
@@ -261,6 +320,7 @@ class Proposal:
     bbox: BBox
     slots: list[Slot]
     header_rows: int = 0
+    source: str = "detector"  # "detector", or what found it here: SOURCE_FRAME, SOURCE_TEXT
 
 
 @dataclass
@@ -290,6 +350,7 @@ class PageTable:
     reasons: list[str]
     at_top: bool = False  # nothing but the running header above it on its page
     column_edges: list[float] = field(default_factory=list)  # for continued tables
+    layout_grid: bool = False  # text set out in boxes (`is_layout_grid`): data only if captioned
 
 
 # ============================================================================ the detector
@@ -524,6 +585,8 @@ def may_hold_table(
     the repository: tests/test_tables_prefilter.py) and many with none (columns of text, a
     callout box with a list in it), which the arbitration then drops as before.
     """
+    if _page_turn(lines):
+        return True  # the lines of a turned page are read in its turned frame (`_find_turned`)
     view = _PageView.of(page, lines, paths)
     rows, columns = _positions(y for _, _, y in view.hsegs), _positions(x for _, _, x in view.vsegs)
     cells = rows >= 3 and columns >= 3
@@ -654,6 +717,7 @@ class _Seg:
     size: float
     line: int  # index of its visual line in the box
     columns: tuple[int, ...] = ()
+    bold: bool = False
 
 
 @dataclass
@@ -755,6 +819,8 @@ class _PageView:
     images: list[BBox]
     width: float
     height: float
+    fills: list[BBox] = field(default_factory=list)  # filled areas that are not curved (bars)
+    body_size: float = 10.0  # the page's median glyph size
 
     @classmethod
     def of(
@@ -798,7 +864,12 @@ class _PageView:
                 vsegs.append((y0, y1, (x0 + x1) / 2))
             else:
                 pictures.append((x0, y0, x1, y1))
-        return cls(lines, hsegs, vsegs, curves, pictures, width, height)
+        view = cls(lines, hsegs, vsegs, curves, pictures, width, height)
+        view.fills = [p.bbox for p in paths if p.kind == "shape" and p.filled and not p.curved]
+        sizes = [c.size for line in lines for c in line.chars if not c.blank and not line.vertical]
+        if sizes:
+            view.body_size = statistics.median(sizes)
+        return view
 
     def glyphs_in(self, box: BBox, pad: float = CLAIM_PAD) -> list[list[GlyphLike]]:
         """The glyphs of each line whose centre lies in `box` (grown by `pad`)."""
@@ -881,10 +952,11 @@ def _attach_mark(lines: list[list[GlyphLike]], mark: GlyphLike) -> None:
 
 
 def _segments(
-    lines: list[list[GlyphLike]], cuts: Sequence[float]
+    lines: list[list[GlyphLike]], cuts: Sequence[float], soft_cuts: Sequence[float] = ()
 ) -> tuple[list[_Seg], list[_Word], int]:
-    """Cells-on-a-line (split at wide gaps and at vertical rules), words, and how many
-    times a vertical rule runs through a word (a grid drawn behind text, not a table)."""
+    """Cells-on-a-line (split at wide gaps, at vertical rules and at `soft_cuts`, the
+    white strips between columns of text, `_word_gutters`), words, and how many times a
+    vertical rule runs through a word (a grid drawn behind text, not a table)."""
     segs: list[_Seg] = []
     words: list[_Word] = []
     crossings = 0
@@ -905,7 +977,8 @@ def _segments(
                 cut = any(last.x1 - 0.5 <= x <= ch.x0 + 0.5 for x in cuts)
                 if cut and gap <= WORD_GAP * size:
                     crossings += 1
-                if gap > SEGMENT_GAP * size or cut:
+                soft = any(last.x1 - 0.5 <= x <= ch.x0 + 0.5 for x in soft_cuts)
+                if gap > SEGMENT_GAP * size or cut or soft:
                     word_groups.append([])
                     seg_groups.append([])
                 elif gap > WORD_GAP * size:
@@ -927,7 +1000,8 @@ def _segments(
             ink = [c for c in group if not c.blank]
             if ink:
                 size = statistics.median(c.size for c in ink)
-                segs.append(_Seg(*_ink_box(ink), _spaced(group), size, index))
+                bold = all(getattr(c, "bold", False) for c in ink)
+                segs.append(_Seg(*_ink_box(ink), _spaced(group), size, index, bold=bold))
     return segs, words, crossings
 
 
@@ -1058,6 +1132,33 @@ def _gutters(segs: list[_Seg], extent: float) -> list[tuple[float, float]]:
     return gaps
 
 
+def _word_gutters(words: Sequence[_Word], lines: int, x0: float, x1: float) -> list[float]:
+    """x positions in the middle of the white strips between columns of text whose gap
+    is narrower than a cell gap: a table's justified cells (TeX's `p{}` columns) leave a
+    column padding of 4 pt, below `SEGMENT_GAP`, so every line reads as one cell. A strip
+    counts when it is at least `WORD_GUTTER_PT` wide, no word crosses it on more than
+    `WORD_GUTTER_CROSSING` of the lines (a title across the columns), and the text on both
+    sides of it is flush against it on `WORD_GUTTER_FLUSH` of the lines (justified text ends
+    and begins at the same x; a gap inside a cell, or the free space left by a column of
+    short words, has no text at its edges). Prose has none: the spaces of a justified
+    paragraph do not line up through six lines."""
+    if lines < WORD_GUTTER_LINES:
+        return []
+    allowed = int(WORD_GUTTER_CROSSING * lines)
+    events = sorted([(w.x0, 1) for w in words] + [(w.x1, -1) for w in words])
+    found = []
+    depth = 0
+    for (x, step), (following, _) in pairwise(events):
+        depth += step
+        if depth > allowed or following - x < WORD_GUTTER_PT or not x0 < x < following < x1:
+            continue
+        left = len({w.line for w in words if x - 2.0 <= w.x1 <= x + 0.5})
+        right = len({w.line for w in words if following - 0.5 <= w.x0 <= following + 2.0})
+        if min(left, right) >= WORD_GUTTER_FLUSH * lines:
+            found.append((x + following) / 2)
+    return found
+
+
 def _assign_columns(segs: list[_Seg], cuts: list[float]) -> int:
     """Give each cell the columns it covers; return the number of columns."""
     edges = sorted(cuts)
@@ -1068,12 +1169,14 @@ def _assign_columns(segs: list[_Seg], cuts: list[float]) -> int:
     return len(edges) + 1
 
 
-def _alignment(segs: list[_Seg]) -> float:
+def _alignment(segs: list[_Seg], size: float = 0.0) -> float:
     """Share of cells that line up with the others in their column (left, right or
-    centre, whichever fits most), over columns with two or more cells."""
+    centre, whichever fits most), over columns with two or more cells. Cells set in
+    lettering smaller than `SCRIPT_CELL` of `size` (the text of a limit or an arrow, set
+    over it) belong to the cell beside them, not to a column of their own."""
     by_column: dict[int, list[_Seg]] = {}
     for seg in segs:
-        if len(seg.columns) == 1:
+        if len(seg.columns) == 1 and seg.size >= SCRIPT_CELL * size:
             by_column.setdefault(seg.columns[0], []).append(seg)
     total = aligned = 0
     for members in by_column.values():
@@ -1105,6 +1208,7 @@ class _Grid:
     size: float
     crossings: int  # words a vertical rule runs through
     texts: list[str]  # each visual line's text (for leaders), never logged
+    cuts: list[float] = field(default_factory=list)  # x positions between the columns
 
     @property
     def strong(self) -> bool:
@@ -1148,6 +1252,16 @@ def _text_grid(view: _PageView, box: BBox, column_rules: list[float]) -> _Grid:
     cuts += drawn
     cuts.sort()
     cuts = [x for i, x in enumerate(cuts) if i == 0 or x - cuts[i - 1] > 2.0]
+    # Justified cells: some strips between columns are narrower than a cell gap.
+    wrapped = any(len(seg.text.split()) >= PROSE_WORDS + 2 for seg in segs)
+    soft = [
+        x
+        for x in (_word_gutters(words, len(lines), text_x0, text_x1) if wrapped or not cuts else [])
+        if x not in drawn and all(abs(x - c) > 2.0 for c in cuts)
+    ]
+    if soft:
+        segs, words, crossings = _segments(lines, column_rules, [*cuts, *soft])
+        cuts = sorted([*cuts, *soft])
     columns = _assign_columns(segs, cuts)
     by_line: dict[int, set[int]] = {}
     for seg in segs:
@@ -1156,16 +1270,25 @@ def _text_grid(view: _PageView, box: BBox, column_rules: list[float]) -> _Grid:
     grid_lines = sum(1 for cols in by_line.values() if len(cols) >= 2)
     texts = [" ".join(s.text for s in segs if s.line == i) for i in range(len(lines))]
     return _Grid(
-        segs, words, len(lines), columns, grid_lines, _alignment(segs), size, crossings, texts
+        segs,
+        words,
+        len(lines),
+        columns,
+        grid_lines,
+        _alignment(segs, size),
+        size,
+        crossings,
+        texts,
+        cuts,
     )
 
 
-def _toc(grid: _Grid) -> bool:
+def _toc(grid: _Grid, min_lines: int = 4) -> bool:
     """A table of contents: dot leaders, or titles each ending in a page number."""
     leaders = sum(1 for t in grid.texts if _LEADERS.search(t))
     if leaders >= 2 and leaders >= 0.3 * grid.lines:
         return True
-    if grid.columns < 2 or grid.lines < 4:
+    if grid.columns < 2 or grid.lines < min_lines:
         return False
     last = grid.columns - 1
     numbers = [s for s in grid.segs if s.columns == (last,) and _PAGE_REF.match(s.text)]
@@ -1173,7 +1296,11 @@ def _toc(grid: _Grid) -> bool:
     if len(numbers) < 0.7 * grid.lines or not titles:
         return False
     letters = sum(c.isalpha() for s in titles for c in s.text)
-    mean_len = statistics.mean(len(s.text) for s in titles)
+    # A title is the longest cell before the number ("E.1" and "Linear cost per reset").
+    longest: dict[int, int] = {}
+    for s in titles:
+        longest[s.line] = max(longest.get(s.line, 0), len(s.text))
+    mean_len = statistics.mean(longest.values())
     values = [int(s.text) for s in sorted(numbers, key=lambda s: s.y0) if s.text.isdigit()]
     ascending = len(values) >= 3 and all(a <= b for a, b in pairwise(values))
     return ascending and mean_len >= 15 and letters >= 0.6 * sum(len(s.text) for s in titles)
@@ -1224,7 +1351,9 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
     only when they do not run through the words."""
     size = _median_size(view, proposal.bbox)
     snapped = _snap(view, _without_captions(view, proposal.bbox), size)
-    box = _extend(view, snapped, size)
+    # A span between two rules is what it is: grown along the column rules that end at its
+    # edges it would take in the tables above and below it.
+    box = snapped if proposal.source == SOURCE_FRAME else _extend(view, snapped, size)
     if box != snapped:
         box = _snap(view, box, size)
     # Grown by a row or a column, not just to a border a few points away.
@@ -1251,15 +1380,26 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
     # in a second column to be a table).
     ruled_cells = ruled and len(row_rules) >= 3 and len(column_rules) >= 3
     drawing = _drawing(view, box, grid.size)
-    if _toc(grid):
+    own = proposal.source != "detector"
+    # Rules round the box and a "Table N" line just above or below it: the document calls it
+    # a table, whatever the glyphs say about its columns (wrapped text, bullets in cells). A
+    # box made here from rules alone (the span between two callouts) needs columns too.
+    captioned = ruled and (not own or grid.weak) and _has_caption(view, box)
+    # A chart is a chart whoever proposed it: bars, scatter dots and a plot's lines in the
+    # box (the detector's layout model also takes a bar chart's axes for a ruled grid).
+    if _pictured(view, box, grid.size, strict=own) or (
+        own and grid.size < SMALL_TEXT * view.body_size
+    ):
+        verdict.verdict = "figure"  # a chart's frame and labels: no ML box vouches for a table
+    elif _toc(grid, 3 if own else 4):
         verdict.verdict = "toc"
-    elif _bullet_list(grid):
+    elif _bullet_list(grid) and not captioned:
         verdict.verdict = "list"
     elif grid.labels_only:
         verdict.verdict = "labels"
     elif drawing and not (grid.strong and grid.grid_lines >= 0.5 * grid.lines):
         verdict.verdict = "figure"
-    elif grid.strong or (ruled and grid.weak) or ruled_cells:
+    elif grid.strong or (ruled and grid.weak and not own) or ruled_cells or captioned:
         verdict.verdict = TABLE
         if ruled:
             verdict.reasons.append(REASON_RULED)
@@ -1267,7 +1407,377 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
             verdict.reasons.append(REASON_TEXT_GRID)
         if extended:
             verdict.reasons.append(REASON_EXTENDED)
+        if proposal.source == SOURCE_TEXT:
+            verdict.verdict = (
+                _text_block_dropped(grid, view.width, _has_caption(view, box)) or TABLE
+            )
+        elif proposal.source == SOURCE_FRAME:
+            # Read without the drawn column rules, which a grid of cells in the box would
+            # otherwise carry through its paragraphs, cutting their lines into cells.
+            if (
+                _running_text(_text_grid(view, box, []), box)
+                or grid.lines < BLOCK_MIN_LINES
+                or grid.grid_lines < FRAME_GRID_SHARE * grid.lines
+            ):
+                verdict.verdict = "no_grid"  # rules around paragraphs, or around one line
+            else:
+                # Not the page-column test: a table of paragraphs has columns of prose.
+                dropped = _text_block_dropped(
+                    grid, view.width, _has_caption(view, box), columns_of_prose=True
+                )
+                if dropped:
+                    verdict.verdict = dropped
+        if verdict.verdict != TABLE:
+            verdict.reasons.clear()
     return verdict
+
+
+# ------------------------------------------------------ proposals made here, not by the detector
+
+_ENUMERATION = re.compile(
+    r"^(?:\(?[A-Za-z]\)|\(?\d{1,3}(?:\.\d{1,3})*[.)]?|\(?[ivxlc]{1,5}[.)]|\d{1,3}:"
+    r"|\[[^\]]{1,12}\]"  # [3], [JP14], [ABC+20]: a reference
+    r"|[-\u2013\u2014*+>\u2022\u00b7\u25e6\u25aa])$"  # a bullet, a dash, a prompt
+)
+_BARE_TAG = re.compile(r"^\d{1,3}\.\d{1,3}$")
+_EQUATION_TAG = re.compile(r"^\([A-Za-z]{0,6}\d{0,3}(?:[.-]\d{1,3})*[a-z]?\)$")
+
+
+def own_proposals(view: _PageView) -> list[Proposal]:
+    """Boxes the detector does not give: the layout model looks for ruled, shaded or
+    header-marked grids, so it never proposes a list of symbols and their meanings set in
+    two aligned columns (a `tabular` with no rules), proposes only fragments of a table
+    ruled at its top and bottom whose cells are paragraphs of justified text, and is not run
+    at all on a page with too many drawn items. Each box goes through `judge` as the
+    detector's do. `_rule_frames` and `_text_blocks`."""
+    return [*_rule_frames(view), *_text_blocks(view)]
+
+
+def _rule_frames(view: _PageView) -> list[Proposal]:
+    """The span of rules of one extent: a booktabs table's top, header and bottom rules, or
+    the double rules that frame a table of text, each stack read as one rule. Every two
+    neighbouring rules are a box, and so is the whole of a stack of three (a table's top,
+    header and bottom rules) when no "Table N" caption sits between them."""
+    rules = [r for r in _chains(view.hsegs, (-1e9, 1e9)) if r[2] - r[1] >= FRAME_MIN_WIDTH]
+    groups: list[list[tuple[float, float, float]]] = []
+    for rule in sorted(rules):
+        for group in groups:
+            if (
+                abs(group[0][1] - rule[1]) <= EXTENT_TOL
+                and abs(group[0][2] - rule[2]) <= EXTENT_TOL
+            ):
+                group.append(rule)
+                break
+        else:
+            groups.append([rule])
+    out: list[Proposal] = []
+    for group in groups:
+        group.sort()
+        distinct: list[tuple[float, float, float]] = []
+        for rule in group:  # a double rule is one
+            if not distinct or rule[0] - distinct[-1][0] > DOUBLE_RULE:
+                distinct.append(rule)
+        if not 2 <= len(distinct) <= FRAME_MAX_RULES:
+            continue
+        spans = list(pairwise(distinct))
+        if len(distinct) == FRAME_WHOLE_RULES:  # top, header and bottom: one booktabs table
+            spans.append((distinct[0], distinct[-1]))
+        for top, bottom in spans:
+            if bottom[0] - top[0] > FRAME_MAX_HEIGHT * view.height:
+                continue
+            box = (min(top[1], bottom[1]), top[0], max(top[2], bottom[2]), bottom[0])
+            if (
+                len(distinct) == FRAME_WHOLE_RULES
+                and (top, bottom) == spans[-1]
+                and _captions_between(view, box)
+            ):
+                continue
+            out.append(Proposal(box, [], 0, SOURCE_FRAME))
+    return out
+
+
+def _captions_between(view: _PageView, box: BBox) -> bool:
+    """Is there a "Table N" line strictly inside `box`, past its first two lines?"""
+    lines = _visual_lines(view.glyphs_in(box, pad=0.0))
+    return any(TABLE_CAPTION.match("".join(c.c for c in line).strip()) for line in lines[2:-1])
+
+
+def _text_blocks(view: _PageView) -> list[Proposal]:
+    """Runs of lines whose text sets out in cells: at least `BLOCK_MIN_LINES` lines with
+    two or more cells (white gaps wider than `SEGMENT_GAP`) with at most `BLOCK_ROW_GAP`
+    lines of white between neighbours, and the single cell of a wrapped line that starts
+    where a later column starts. The box is the text's; `judge` decides whether the
+    columns line up (and `_text_block_dropped` whether it is a table at all)."""
+    lines = _visual_lines(view.glyphs_in((-1e9, -1e9, 1e9, 1e9), pad=0.0))
+    if len(lines) < BLOCK_MIN_LINES:
+        return []
+    segs, _, _ = _segments(lines, [])
+    by_line: dict[int, list[_Seg]] = {}
+    for seg in segs:
+        by_line.setdefault(seg.line, []).append(seg)
+    ordered = sorted(by_line.values(), key=lambda members: min(m.y0 for m in members))
+    out: list[Proposal] = []
+    block: list[list[_Seg]] = []
+
+    def close() -> None:
+        if sum(len(members) >= 2 for members in block) >= BLOCK_MIN_LINES:
+            members = [m for line in block for m in line]
+            box = (
+                min(m.x0 for m in members),
+                min(m.y0 for m in members),
+                max(m.x1 for m in members),
+                max(m.y1 for m in members),
+            )
+            out.append(Proposal(box, [], 0, SOURCE_TEXT))
+        block.clear()
+
+    held: list[list[_Seg]] = []  # title rows waiting for a row of cells to follow them
+    for members in ordered:
+        members.sort(key=lambda m: m.x0)
+        size = statistics.median(m.size for m in members)
+        last = (held or block)[-1] if (held or block) else None
+        above = max(m.y1 for m in last) if last else None
+        gap = min(m.y0 for m in members) - above if above is not None else 0.0
+        # A header row has more white under it than the rows have between them.
+        header = len(block) == 1 and not held and len(block[0]) >= 2 and gap <= HEADER_GAP * size
+        if above is not None and gap > BLOCK_ROW_GAP * size and not header:
+            held.clear()
+            close()
+        if len(members) >= 2 or (block and _starts_a_column(members[0], block)):
+            block.extend(held)
+            held.clear()
+            block.append(members)
+        elif block and _is_title_row(members[0], block):
+            held.append(members)  # "Gases at 0 C" over a group of rows: the table goes on
+        else:
+            held.clear()
+            close()
+    close()
+    return out
+
+
+def _is_title_row(seg: _Seg, block: list[list[_Seg]]) -> bool:
+    """A short cell on a line of its own that starts where the first column does: the title
+    of a group of rows (a table of media: "Gases", "Liquids", "Solids"). It joins the block
+    when a row of cells follows it."""
+    left = min(m.x0 for line in block for m in line)
+    return abs(seg.x0 - left) <= ALIGN_TOL and len(seg.text.split()) <= TITLE_ROW_WORDS
+
+
+def _starts_a_column(seg: _Seg, block: list[list[_Seg]]) -> bool:
+    """Does the lone cell of a line start where a column after the first starts (the
+    wrapped end of the cell above)?"""
+    return any(
+        abs(seg.x0 - other.x0) <= ALIGN_TOL
+        for line in block
+        if len(line) >= 2
+        for other in line[1:]
+    )
+
+
+def _has_caption(view: _PageView, box: BBox) -> bool:
+    """A "Table N" line just above or below the box (within `CAPTION_MAX_GAP`), over it."""
+    for line in view.lines:
+        if line.vertical:
+            continue
+        lx0, ly0, lx1, ly1 = line.bbox
+        if min(lx1, box[2]) - max(lx0, box[0]) <= 0:
+            continue
+        gap = max(ly0 - box[3], box[1] - ly1)
+        if 0 <= gap <= CAPTION_MAX_GAP and TABLE_CAPTION.match(_line_text(line).strip()):
+            return True
+    return False
+
+
+def _wordy(text: str, letters_needed: int = 2) -> bool:
+    """A word or words: letters make up at least half of it and it has at least
+    `letters_needed`."""
+    letters = sum(c.isalpha() for c in text)
+    return letters >= letters_needed and letters >= 0.5 * sum(not c.isspace() for c in text)
+
+
+_RELATION = frozenset(
+    "=\u2264\u2265<>\u2192\u2208\u2209\u2260\u2248\u223c\u2211\u222b\u2282\u2286"
+    "\u27f6\u27f5\u21cc\u21d2\u2194\u21d4\u27f9"  # long arrows, equilibrium, implies
+)
+
+
+def _pictured(view: _PageView, box: BBox, size: float, *, strict: bool = True) -> bool:
+    """A chart or drawing in a box nothing but the geometry proposed: any curve (a plotted
+    line, an arrow), a few small ones (scatter dots, a legend's markers) or curves running
+    past it (a legend inside a plot), a raster image covering `PICTURE_SHARE` of it, or
+    `PICTURE_FILLS` filled shapes (the bars of a histogram, a heat map). The detector's boxes
+    (`strict` False) get the weaker `_drawing` test and only the last two of these: its model
+    has seen the page, but it takes a bar chart's axes for a ruled grid."""
+    x0, y0, x1, y1 = box
+    area = max((x1 - x0) * (y1 - y0), 1.0)
+    if strict:
+        near = sum(
+            1
+            for c in view.curves
+            if c[2] >= x0 - PICTURE_REACH
+            and c[0] <= x1 + PICTURE_REACH
+            and c[3] >= y0 - PICTURE_REACH
+            and c[1] <= y1 + PICTURE_REACH
+        )
+        if near >= PICTURE_NEAR:
+            return True  # a legend inside a plot: the plotted lines run past it
+    marks = 0
+    for c in view.curves:
+        if x0 - 1 <= (c[0] + c[2]) / 2 <= x1 + 1 and y0 - 1 <= (c[1] + c[3]) / 2 <= y1 + 1:
+            if strict and max(c[2] - c[0], c[3] - c[1]) > 0.8 * size:
+                return True
+            marks += 1  # the dots of a scatter plot are small
+    if marks >= (PICTURE_MARKS if strict else PICTURE_FILLS):
+        return True
+    if (
+        strict
+        and sum(_area(_intersection(img, box)) for img in view.images) >= PICTURE_SHARE * area
+    ):
+        return True
+    inside = [
+        f
+        for f in view.fills
+        if x0 <= (f[0] + f[2]) / 2 <= x1 and y0 <= (f[1] + f[3]) / 2 <= y1 and _area(f) < 0.5 * area
+    ]
+    if len(inside) < PICTURE_FILLS:
+        return False
+    # Shading is drawn behind text (in pieces, a word or a space each); a bar of a chart has none.
+    centres = [
+        ((c.x0 + c.x1) / 2, (c.y0 + c.y1) / 2)
+        for chars in view.glyphs_in(box, pad=0.0)
+        for c in chars
+        if not c.blank
+    ]
+    empty = [
+        f
+        for f in inside
+        if not any(f[0] - 4 <= cx <= f[2] + 4 and f[1] <= cy <= f[3] for cx, cy in centres)
+    ]
+    return len(empty) >= PICTURE_FILLS
+
+
+def _running_text(grid: _Grid, box: BBox) -> bool:
+    """Two lines of running text in the box: a single cell of eight words or more that runs
+    across two column gutters or more (or most of the box's width, when it has fewer): a
+    paragraph in a box, not one column's cell."""
+    width = max(box[2] - box[0], 1.0)
+    per_line = Counter(s.line for s in grid.segs)
+
+    def across(seg: _Seg) -> bool:
+        crossed = sum(seg.x0 < c < seg.x1 for c in grid.cuts)
+        return crossed >= 2 or seg.x1 - seg.x0 >= RUNNING_WIDTH * width
+
+    return (
+        sum(
+            1 for s in grid.segs if per_line[s.line] == 1 and len(s.text.split()) >= 8 and across(s)
+        )
+        >= 2
+    )
+
+
+def _bold_terms(grid: _Grid) -> bool:
+    """Is the first column set in bold, term after term? LaTeX's `description` list sets
+    its labels so, and a textbook's glossary; a `tabular` of notation is plain. An unruled
+    list of bold terms with their prose descriptions is a list, as a ruled box of them is
+    (`is_layout_grid`); the same list in plain type is what a table of notation looks like."""
+    first = [m for m in grid.segs if m.columns == (0,)]
+    return len(first) >= 2 and sum(m.bold for m in first) >= 0.7 * len(first)
+
+
+def _numbered(grid: _Grid) -> bool:
+    """A first column of numbers or letters in sequence ("1:", "(a)", "[3]") before text of
+    several words: the lines of an algorithm, a numbered list, a bibliography. Or a
+    caption that says so: "Algorithm 2".
+    """
+    first = min((m.line for m in grid.segs), default=0)
+    if any(re.match(r"^(?:Algorithm|Listing)\s+\d", m.text) for m in grid.segs if m.line == first):
+        return True
+    labels = [m.text for m in grid.segs if m.columns == (0,)]
+    others = [m for m in grid.segs if m.columns and m.columns[0] != 0]
+    return (
+        len(labels) >= 2
+        and sum(bool(_ENUMERATION.match(t)) for t in labels) >= 0.7 * len(labels)
+        and bool(others)
+        and sum(_wordy(m.text) for m in others) >= 0.5 * len(others)
+    ) or (
+        len([m for m in grid.segs if m.line == first and re.match(r"^\([a-z]\)", m.text)]) >= 2
+    )  # (a) ... (b) ... side by side: subfigure captions
+
+
+def _text_block_dropped(
+    grid: _Grid, page_width: float, captioned: bool = False, *, columns_of_prose: bool = False
+) -> str | None:
+    """Why lines of text in aligned columns are not a table, as a `DROPPED` code, or None.
+    Aligned columns are everywhere in a document: the two text columns of a page, numbered
+    equations, a bibliography, the line numbers of an algorithm, a matrix. What separates
+    a table is a column of words (labels, terms) next to the other cells."""
+    columns: dict[int, list[_Seg]] = {}
+    for seg in grid.segs:
+        if len(seg.columns) == 1:
+            columns.setdefault(seg.columns[0], []).append(seg)
+    prose = [
+        c
+        for c, members in columns.items()
+        if len(members) >= 2
+        and (
+            sum(len(m.text.split()) >= PROSE_WORDS for m in members) >= 2
+            or statistics.mean(m.x1 - m.x0 for m in members) >= PROSE_WIDTH * page_width
+        )
+    ]
+    if len(prose) >= 2 and not columns_of_prose:
+        return "page_text"
+    if len(grid.cuts) == 1 and not columns_of_prose and grid.segs:
+        # One gutter in the middle of the page, across the width of its text: the two text
+        # columns of a page, one of them short here.
+        left = min(m.x0 for m in grid.segs)
+        right = max(m.x1 for m in grid.segs)
+        if (
+            abs(grid.cuts[0] - page_width / 2) <= PAGE_CENTRE * page_width
+            and right - left >= PAGE_SPAN * page_width
+        ):
+            return "page_text"
+    if captioned:
+        return None  # "Table 3: ..." under it: the document says it is one
+    if grid.lines < TEXT_TABLE_LINES:
+        return "no_grid"  # three lines of cells are as likely a fraction, a limit, a formula
+    if any("@" in m.text for m in grid.segs):
+        return "no_words"  # a block of authors and their addresses
+    cells_per_line = Counter(m.line for m in grid.segs)
+    rows = [line for line, n in cells_per_line.items() if n >= 2]
+    maths = {m.line for m in grid.segs if any(ch in _RELATION for ch in m.text)}
+    if len(maths & set(rows)) >= MATH_SHARE * max(len(rows), 1):
+        return "no_words"
+    last = max(columns, default=0)
+    tags = [m.text for m in columns.get(last, [])]
+    if any(_EQUATION_TAG.match(t) for t in tags) and not any(len(t.split()) > 2 for t in tags):
+        return "numbered"
+    # OpenStax numbers its equations "17.41", with no brackets: the last cell of two lines or
+    # more, beside lines of maths.
+    bare = [t for t in tags if _BARE_TAG.match(t)]
+    if len(bare) >= 2 and len(bare) == len(tags) and maths:
+        return "numbered"
+    if _numbered(grid):
+        return "numbered"
+    if any(
+        len(members) >= 2
+        and len({m.text for m in members}) >= 2  # a column of "kg" is a unit, not words
+        and sum(_wordy(m.text, 3) for m in members) >= 0.6 * len(members)
+        for members in columns.values()
+    ):
+        return None
+    # No column of words: a header row of words over rows of values is still a table.
+    first = min((m.line for m in grid.segs), default=0)
+    head = [m for m in grid.segs if m.line == first]
+    rest = [m for m in grid.segs if m.line != first]
+    if (
+        len(head) >= 2
+        and all(_wordy(m.text) for m in head)
+        and rest
+        and sum(bool(_QUANTITY.match(m.text)) for m in rest) >= 0.7 * len(rest)
+    ):
+        return None
+    return "no_words"
 
 
 def _without_captions(view: _PageView, box: BBox) -> BBox:
@@ -1293,6 +1803,27 @@ def _without_captions(view: _PageView, box: BBox) -> BBox:
         if TABLE_CAPTION.match(texts[i]):
             y1 = (bottoms[i - 1] + tops[i]) / 2
             break
+    # A numbered equation or reaction just above or below ("2NO + Cl2 -> 2NOCl    17.39"):
+    # the detector boxes it with the table it introduces.
+    by_line: dict[int, list[_Seg]] = {}
+    for seg in segs:
+        by_line.setdefault(seg.line, []).append(seg)
+
+    def numbered(i: int) -> bool:
+        cells = sorted(by_line.get(i, []), key=lambda m: m.x0)
+        return (
+            len(cells) >= 2
+            and bool(_BARE_TAG.match(cells[-1].text) or _EQUATION_TAG.match(cells[-1].text))
+            and any(ch in _RELATION for m in cells[:-1] for ch in m.text)
+        )
+
+    top, bottom = 0, len(lines) - 1
+    while top < bottom - 1 and numbered(top) and tops[top] >= y0 - 1:
+        top += 1
+        y0 = max(y0, (bottoms[top - 1] + tops[top]) / 2)
+    while bottom > top + 1 and numbered(bottom) and bottoms[bottom] <= y1 + 1:
+        bottom -= 1
+        y1 = min(y1, (bottoms[bottom] + tops[bottom + 1]) / 2)
     return (x0, y0, x1, y1)
 
 
@@ -1898,13 +2429,37 @@ def find_with_judgements(
     budget: DetectorBudget | None = None,
 ) -> tuple[list[PageTable], list[tuple[Proposal, Judgement]]]:
     """`find`, plus every proposal with its judgement (for the evaluation)."""
-    proposals = propose(page, budget)
+    turn = _page_turn(lines)
+    if turn:
+        return _find_turned(page, lines, paths, turn, clean=clean, budget=budget)
+    return _find_in(page, lines, paths, clean=clean, budget=budget)
+
+
+def _find_in(
+    page: pymupdf.Page,
+    lines: Sequence[LineLike],
+    paths: Sequence[PathLike],
+    *,
+    clean: Callable[[str], str],
+    budget: DetectorBudget | None,
+) -> tuple[list[PageTable], list[tuple[Proposal, Judgement]]]:
+    view = _PageView.of(page, lines, paths)
+    proposals = [*propose(page, budget), *own_proposals(view)]
     if not proposals:
         return [], []
-    view = _PageView.of(page, lines, paths)
     judged = [(p, judge(p, view)) for p in proposals]
+    judged += _joined_frames(judged, view)
+    _split_stacked(judged)
+    _mark_containers(judged)
     kept: list[tuple[Proposal, Judgement]] = []
-    for proposal, judgement in sorted(judged, key=lambda pj: -_area(pj[1].bbox)):
+
+    def standing(pj: tuple[Proposal, Judgement]) -> tuple[int, float]:
+        # The detector's boxes first, the larger of two overlapping ones staying; a box found
+        # here only where no detector box is (it has no grid of its own, and no model vouched
+        # for it).
+        return (pj[0].source != "detector", -_area(pj[1].bbox))
+
+    for proposal, judgement in sorted(judged, key=standing):
         if judgement.verdict != TABLE:
             continue
         if any(_overlaps(judgement.bbox, other.bbox) for _, other in kept):
@@ -1924,7 +2479,7 @@ def find_with_judgements(
             # data: layout writes its terms as a list.
             table.grid = table.grid.model_copy(update={"is_data": False})
             table.reasons.append(REASON_TERMS)
-        elif table.caption is None and is_word_grid(table.grid):
+        elif table.caption is None and (table.layout_grid or is_word_grid(table.grid)):
             judgement.verdict = "layout_grid"  # its words stay in the text, as before
             continue
         tables.append(table)
@@ -1932,7 +2487,301 @@ def find_with_judgements(
         table.lines |= _claimed_lines(view, table.bbox)
         table.paths = _claimed_paths(paths, table.bbox)
         table.at_top = _at_top(view, table)
+    inside = set().union(*(table.lines for table in tables)) if tables else set()
+    for table in tables:
+        if _edge_text(view, table, inside):
+            table.reasons.append(REASON_EDGE_TEXT)
     return tables, judged
+
+
+def _mark_containers(judged: list[tuple[Proposal, Judgement]]) -> None:
+    """A box found here that holds another table, narrower than itself and under 60% of its
+    area, is the outline of a callout or a worked example with the table inside it (OpenStax
+    prints its examples so): the inner box is the table."""
+    boxes = [j for _, j in judged if j.verdict == TABLE]
+    for proposal, judgement in judged:
+        if proposal.source == "detector" or judgement.verdict != TABLE:
+            continue
+        outer = judgement.bbox
+        for inner in boxes:
+            box = inner.bbox
+            if (
+                inner is not judgement
+                and _area(box) < 0.6 * _area(outer)
+                and _area(_intersection(box, outer)) >= 0.9 * _area(box)
+                and (box[0] > outer[0] + EXTENT_TOL or box[2] < outer[2] - EXTENT_TOL)
+            ):
+                judgement.verdict = "container"
+                break
+
+
+def _joined_frames(
+    judged: list[tuple[Proposal, Judgement]], view: _PageView
+) -> list[tuple[Proposal, Judgement]]:
+    """A table whose rules run between its rows (or between groups of rows) is a stack of
+    spans between rules, each its own box. Spans of one extent that follow each other with
+    no space between, at least two of them tables and the rest slivers (a header row on its
+    own) or short of the evidence of a table of their own (a last row or two), are one table:
+    the box of the stack, judged like the others. A span of text between two tables is none
+    of these, and breaks the chain."""
+    frames = sorted(
+        ((p, j) for p, j in judged if p.source == SOURCE_FRAME),
+        key=lambda pj: (round(pj[0].bbox[0]), pj[0].bbox[1]),
+    )
+    out: list[tuple[Proposal, Judgement]] = []
+    chain: list[tuple[Proposal, Judgement]] = []
+
+    def close() -> None:
+        tables_ = [pj for pj in chain if pj[1].verdict == TABLE]
+        if len(tables_) >= 2:
+            box = (
+                min(pj[0].bbox[0] for pj in chain),
+                min(pj[0].bbox[1] for pj in chain),
+                max(pj[0].bbox[2] for pj in chain),
+                max(pj[0].bbox[3] for pj in chain),
+            )
+            whole = Proposal(box, [], 0, SOURCE_FRAME)
+            out.append((whole, judge(whole, view)))
+        chain.clear()
+
+    for proposal, judgement in frames:
+        sliver = judgement.verdict == "no_grid" and judgement.grid_lines <= 1
+        cells = (
+            judgement.verdict == "no_grid" and judgement.columns >= 2 and judgement.grid_lines >= 2
+        )
+        if judgement.verdict != TABLE and not sliver and not cells:
+            close()
+            continue
+        if chain:
+            last = chain[-1][0].bbox
+            same = abs(last[0] - proposal.bbox[0]) <= EXTENT_TOL
+            same = same and abs(last[2] - proposal.bbox[2]) <= EXTENT_TOL
+            if not (same and 0 <= proposal.bbox[1] - last[3] <= EXTENT_TOL):
+                close()
+        chain.append((proposal, judgement))
+    close()
+    return out
+
+
+def _split_stacked(judged: list[tuple[Proposal, Judgement]]) -> None:
+    """The detector boxes two unruled lists set one under the other as one table, its
+    columns the union of both lists'. When two or more tables found here from the text lie
+    inside such a box and hold most of it, they are the tables and the box is not."""
+    own = [j for p, j in judged if p.source == SOURCE_TEXT and j.verdict == TABLE]
+    for proposal, judgement in judged:
+        if proposal.source != "detector" or judgement.verdict != TABLE:
+            continue
+        if REASON_RULED in judgement.reasons:
+            continue
+        box = judgement.bbox
+        parts = [
+            j
+            for j in own
+            if _area(_intersection(j.bbox, box)) >= 0.9 * _area(j.bbox)
+            and _area(j.bbox) < _area(box)
+        ]
+        if len(parts) >= 2 and sum(_area(j.bbox) for j in parts) >= 0.6 * _area(box):
+            judgement.verdict = "split"
+
+
+# ------------------------------------------------------------- a page whose text is set sideways
+
+
+@dataclass(frozen=True, slots=True)
+class _TurnedChar:
+    c: str
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    size: float
+    blank: bool
+    bold: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _TurnedLine:
+    chars: Sequence[_TurnedChar]
+    bbox: BBox
+    vertical: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _TurnedPath:
+    bbox: BBox
+    kind: str
+    curved: bool
+    filled: bool
+
+
+def _page_turn(lines: Sequence[LineLike]) -> int:
+    """90 or 270 when the text of the page reads upwards or downwards (a landscape table
+    on a portrait page that has no /Rotate: `sidewaystable`, a page printed landscape and
+    saved as it is), else 0. How far to turn the page clockwise to read it. Needs a page
+    whose text is mostly set that way, so the sideways label of a figure does not turn it."""
+    up = down = total = 0
+    for line in lines:
+        ink = [c for c in line.chars if not c.blank]
+        total += len(ink)
+        if len(ink) < 2 or not line.vertical:
+            continue
+        first, last = ink[0], ink[-1]
+        dx = (last.x0 + last.x1 - first.x0 - first.x1) / 2
+        dy = (last.y0 + last.y1 - first.y0 - first.y1) / 2
+        if abs(dy) <= abs(dx):
+            continue  # upside down, or not a line of text
+        if dy < 0:
+            up += len(ink)
+        else:
+            down += len(ink)
+    if total < TURN_MIN_CHARS:
+        return 0
+    if up >= TURN_SHARE * total:
+        return 90
+    if down >= TURN_SHARE * total:
+        return 270
+    return 0
+
+
+def _turner(turn: int, width: float, height: float) -> tuple[Callable, Callable]:
+    """(forward, back) maps of a point of the page as displayed to the page turned
+    clockwise by `turn` degrees (`width`, `height`: the page as displayed)."""
+    if turn == 90:
+        return (lambda x, y: (height - y, x)), (lambda x, y: (y, height - x))
+    return (lambda x, y: (y, width - x)), (lambda x, y: (width - y, x))
+
+
+def _map_box(box: BBox, move: Callable) -> BBox:
+    (a, b), (c, d) = move(box[0], box[1]), move(box[2], box[3])
+    return min(a, c), min(b, d), max(a, c), max(b, d)
+
+
+def _find_turned(
+    page: pymupdf.Page,
+    lines: Sequence[LineLike],
+    paths: Sequence[PathLike],
+    turn: int,
+    *,
+    clean: Callable[[str], str],
+    budget: DetectorBudget | None,
+) -> tuple[list[PageTable], list[tuple[Proposal, Judgement]]]:
+    """`_find_in` on the page turned upright: the lines and paths are turned to match (the
+    indices stay, so the lines a table claims are the same ones), the detector and the
+    structure model are run on a copy of the page given the extra /Rotate, and what comes
+    back is turned again into the page's own frame. The grid says how far the picture of
+    the table has to be turned to read it (`TableGrid.turned`)."""
+    rect = page.rect
+    forward, back = _turner(turn, rect.width, rect.height)
+    turned_lines = [
+        _TurnedLine(
+            [
+                _TurnedChar(
+                    c.c,
+                    *_map_box((c.x0, c.y0, c.x1, c.y1), forward),
+                    c.size,
+                    c.blank,
+                    getattr(c, "bold", False),
+                )
+                for c in line.chars
+            ],
+            _map_box(line.bbox, forward),
+            not _reads_along(line, turn),
+        )
+        for line in lines
+    ]
+    swap = {"hrule": "vrule", "vrule": "hrule"}
+    turned_paths = [
+        _TurnedPath(_map_box(p.bbox, forward), swap.get(p.kind, p.kind), p.curved, p.filled)
+        for p in paths
+    ]
+    with _pdf_lock():
+        copy = pymupdf.open()
+        try:
+            copy.insert_pdf(page.parent, from_page=page.number, to_page=page.number)
+            sideways = copy[0]
+            sideways.set_rotation((page.rotation + turn) % 360)
+        except Exception:
+            copy.close()
+            raise
+    try:
+        found, judged = _find_in(sideways, turned_lines, turned_paths, clean=clean, budget=budget)
+    finally:
+        with _pdf_lock():
+            copy.close()
+    for table in found:
+        table.bbox = _rounded(_map_box(table.bbox, back))
+        table.grid = table.grid.model_copy(
+            update={
+                "turned": turn,
+                "cells": [
+                    c.model_copy(update={"bbox": _rounded(_map_box(c.bbox, back))})
+                    if c.bbox is not None
+                    else c
+                    for c in table.grid.cells
+                ],
+            }
+        )
+    for _, judgement in judged:
+        judgement.bbox = _map_box(judgement.bbox, back)
+    return found, judged
+
+
+def _reads_along(line: LineLike, turn: int) -> bool:
+    """Does this line read in the direction the page's text does (so it is horizontal once
+    the page is turned)?"""
+    ink = [c for c in line.chars if not c.blank]
+    if len(ink) < 2 or not line.vertical:
+        return False
+    dy = (ink[-1].y0 + ink[-1].y1 - ink[0].y0 - ink[0].y1) / 2
+    dx = (ink[-1].x0 + ink[-1].x1 - ink[0].x0 - ink[0].x1) / 2
+    return abs(dy) > abs(dx) and (dy < 0) == (turn == 90)
+
+
+def _edge_text(view: _PageView, table: PageTable, claimed: set[int]) -> bool:
+    """Is there a line no table or caption claimed, of the table's own text size, just under
+    its box and starting where one of its columns starts? The box of an unruled table can end a
+    line early and leave the last line of a wrapped cell outside it; the grid then lacks the
+    words and so does the crop the model reads, so nothing downstream sees the loss. Text
+    above is not looked at (a title or a heading is not a cell), nor is a line of another size
+    (a heading), one that starts off the columns (a note), one that runs on across the columns
+    (a paragraph that follows the table closely) or one a line's gap further down."""
+    size = _median_size(view, table.bbox)
+    glyphs = [ch for chars in view.glyphs_in(table.bbox) for ch in chars if not ch.blank]
+    edges: dict[float, float] = {}  # where the text of a column starts -> where its cells end
+    for cell in table.grid.cells:
+        if cell.bbox is None:
+            continue
+        cx0, cy0, cx1, cy1 = cell.bbox
+        inside = [
+            ch.x0
+            for ch in glyphs
+            if cx0 <= (ch.x0 + ch.x1) / 2 <= cx1 and cy0 <= (ch.y0 + ch.y1) / 2 <= cy1
+        ]
+        if inside:
+            start = min(inside)
+            edges[start] = max(edges.get(start, cx1), cx1)
+    if not edges:
+        return False
+    x0, _, x1, bottom = table.bbox
+    for i, line in enumerate(view.lines):
+        if i in claimed or line.vertical:
+            continue
+        lx0, ly0, lx1, _ = line.bbox
+        ink = [ch for ch in line.chars if not ch.blank]
+        if not ink or not 0.0 <= ly0 - bottom <= EDGE_GAP * size:
+            continue
+        if lx1 < x0 or lx0 > x1:
+            continue
+        if any(abs(ch.size - size) > EDGE_SIZE_TOLERANCE for ch in ink):
+            continue
+        first = min(ink, key=lambda ch: ch.x0).x0
+        # It stays in its column: a line that runs on across the columns is a paragraph.
+        if any(
+            abs(first - start) <= EDGE_COLUMN_TOLERANCE and lx1 <= end + EDGE_COLUMN_TOLERANCE
+            for start, end in edges.items()
+        ):
+            return True
+    return False
 
 
 def _overlaps(a: BBox, b: BBox) -> bool:
@@ -1967,16 +2816,28 @@ def _build(
         candidates.append((REASON_SLANET, slots, header_rows or _header_rows_at(slots, proposal)))
     if not extended:  # PyMuPDF's grid stops where the detector's box did
         candidates.append((REASON_PYMUPDF, proposal.slots, proposal.header_rows))
+    cells = _text_slots(view, box, text)
+    if cells is not None and not proposal.slots:
+        # A box found from the lines of text (no grid of its own): their rows and columns
+        # are the evidence it was found by, so on a tie they beat a model's reading, which
+        # joins neighbouring rows of a list; the drawn cells, when there are any, still win.
+        candidates.insert(1 if ruled is not None else 0, (REASON_TEXT_CELLS, *cells))
     best: tuple[int, int, TableGrid, str] | None = None
-    for rank, (reason, slots, header_rows) in enumerate(candidates):
-        score = misfit(slots, text)
-        if score is None or (best is not None and (score, rank) >= best[:2]):
-            continue
-        grid = fill(slots, text.words, header_rows=header_rows, clean=clean)
-        if grid is not None:
-            best = (score, rank, grid, reason)
-    if best is None or is_layout_grid(best[2]):
-        judgement.verdict = "no_structure" if best is None else "layout_grid"
+    for attempt in range(2):
+        for rank, (reason, slots, header_rows) in enumerate(candidates):
+            score = misfit(slots, text)
+            if score is None or (best is not None and (score, rank) >= best[:2]):
+                continue
+            grid = fill(slots, text.words, header_rows=header_rows, clean=clean)
+            if grid is not None:
+                best = (score, rank, grid, reason)
+        if best is not None or cells is None or attempt:
+            break
+        # Nothing else gave a grid (no model, and a box grown past the detector's): the
+        # text's own cells keep the table.
+        candidates = [(REASON_TEXT_CELLS, *cells)]
+    if best is None:
+        judgement.verdict = "no_structure"
         return None
     return PageTable(
         bbox=_rounded(box),
@@ -1986,6 +2847,8 @@ def _build(
         paths=set(),
         reasons=[*judgement.reasons, best[3]],
         column_edges=_column_edges(best[2]),
+        layout_grid=is_layout_grid(best[2])
+        and (proposal.source != SOURCE_TEXT or _bold_terms(text)),
     )
 
 
@@ -2089,6 +2952,94 @@ def _ruled(pieces: Sequence[tuple[float, float, float]], at: float, lo: float, h
             covered += stop - max(start, end)
             end = stop
     return covered >= 0.6 * (hi - lo)
+
+
+def _text_slots(view: _PageView, box: BBox, text: _Grid) -> tuple[list[Slot], int] | None:
+    """The cells as the text sets them out, with no model and no drawn cells: columns
+    between the gutters (`_Grid.cuts`), a row for each line with text in the first column
+    (a line without is the wrapped end of the cell above, when it follows at the text's own
+    leading), and the header rows above the first rule between rows. The structure of last
+    resort: it only wins where no other fits the glyphs better (`misfit`), but it keeps a
+    table found and extended along its rules from being dropped for want of a model."""
+    if text.columns < 2 or not text.segs:
+        return None
+    by_line: dict[int, list[_Seg]] = {}
+    for seg in text.segs:
+        by_line.setdefault(seg.line, []).append(seg)
+    order = sorted(by_line, key=lambda i: min(s.y0 for s in by_line[i]))
+    tops = {i: min(s.y0 for s in by_line[i]) for i in order}
+    bottoms = {i: max(s.y1 for s in by_line[i]) for i in order}
+    pitches = [tops[b] - tops[a] for a, b in pairwise(order)]
+    leading = min((p for p in pitches if p > 0.3 * text.size), default=text.size)
+    rows: list[list[int]] = []
+    for k, line in enumerate(order):
+        starts = any(0 in s.columns for s in by_line[line])
+        tight = k > 0 and tops[line] - tops[order[k - 1]] <= 1.15 * leading
+        if starts or not rows or not tight:
+            rows.append([line])
+        else:
+            rows[-1].append(line)
+    if len(rows) < 2 or len(rows) > MAX_TABLE_ROWS or text.columns > MAX_TABLE_COLS:
+        return None
+    xs = [box[0], *text.cuts, box[2]]
+    if len(xs) != text.columns + 1:
+        return None
+    edges = [box[1]]
+    for above, below in pairwise(rows):
+        edges.append((bottoms[above[-1]] + tops[below[0]]) / 2)
+    edges.append(box[3])
+    slots: list[Slot] = []
+    for r, members in enumerate(rows):
+        taken: set[int] = set()
+        for seg in (s for line in members for s in by_line[line]):
+            lo, hi = seg.columns[0], seg.columns[-1]
+            if (
+                hi > lo
+                and not taken & set(range(lo, hi + 1))
+                and not any(
+                    lo <= c <= hi
+                    for other in members
+                    for o in by_line[other]
+                    if o is not seg
+                    for c in o.columns
+                )
+            ):
+                taken |= set(range(lo, hi + 1))
+                slots.append(
+                    Slot(r, lo, 1, hi - lo + 1, (xs[lo], edges[r], xs[hi + 1], edges[r + 1]))
+                )
+        for c in range(text.columns):
+            if c not in taken:
+                slots.append(Slot(r, c, 1, 1, (xs[c], edges[r], xs[c + 1], edges[r + 1])))
+    return slots, _text_header_rows(view, box, text, rows, tops, bottoms, by_line)
+
+
+def _text_header_rows(
+    view: _PageView,
+    box: BBox,
+    text: _Grid,
+    rows: list[list[int]],
+    tops: dict[int, float],
+    bottoms: dict[int, float],
+    by_line: dict[int, list[_Seg]],
+) -> int:
+    """Header rows of a text-set table: the rows above the first rule that runs between two
+    rows (booktabs' midrule), at most three; without one, the first row when it holds no
+    value and a row below does."""
+    rules = [
+        pos
+        for pos, covered in _merged_rules(view.hsegs, box[0], box[2], (box[1], box[3]))
+        if covered >= ROW_RULE_SPAN * (box[2] - box[0])
+    ]
+    for k in range(1, min(4, len(rows))):
+        gap = (bottoms[rows[k - 1][-1]], tops[rows[k][0]])
+        if any(gap[0] - 1.0 <= y <= gap[1] + 1.0 for y in rules):
+            return k
+
+    def values(row: list[int]) -> bool:
+        return any(_QUANTITY.match(s.text) for line in row for s in by_line[line])
+
+    return int(not values(rows[0]) and any(values(row) for row in rows[1:]))
 
 
 def _header_rows_at(slots: list[Slot], proposal: Proposal) -> int:

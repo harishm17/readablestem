@@ -179,6 +179,7 @@ What Canvas still removes, and why that is accepted:
 | Contents page (T2-17) | a list (`<ul>`, nested by indent) of the entries' titles, each a link to the heading it names when there is one; no dot leaders, no page numbers | (no fix) |
 | Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
 | Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text.", "Handwriting on page 3, not converted to text."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items") |
+| Page read from an image (`FEATURE_IMAGE_PAGES`, ADR 0007) | at the start of the page, `<div class="image-page-note" role="note">` with the notice and `<details><summary>Show the original page 2</summary><img alt="Original of page 2, shown for checking the converted text."></details>`, then the page's blocks as ordinary elements (see "Pages converted from an image") | a prose block the instructor keeps as the picture: `<div class="flagged" data-reason="image_page_text">`; an equation or table whose reading could not be used: the usual flagged equation or table |
 | Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
 | Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables"); a grid that is not a table of data is its text in reading order: a grid of terms as a `<ul>` (layout), one the model calls not data as a `<dl>`, `<ul>` or paragraphs in a `<div id>` | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
 
@@ -408,6 +409,38 @@ and label are unchanged. In a document in another language the alt text is marke
   where they are handled. So are fixes accepted with an optional note
   (`Fix.review == "optional"`, docs/design/beta-architecture.md "Review tiers").
 
+## Pages converted from an image (ADR 0007, `FEATURE_IMAGE_PAGES`)
+
+A page `page_type` calls scanned or handwritten, with the flag on, is read by one vision call
+and written as ordinary elements (`pipeline/image_page.py`); with the flag off, or when the
+read fails, it is a page kept as an image as before ("Flagged items"). What the output holds
+for such a page:
+
+- **The notice and the original.** The page starts with a bordered note, labelled in words and
+  not by colour alone: "**Converted from an image of the page.** Check it against the
+  original.", and under it a `<details>` whose summary reads "Show the original page N". Opened,
+  it shows the page's own picture (a JPEG at the student file's size, `figure_images`) with the
+  alt text "Original of page N, shown for checking the converted text." No script: the control
+  is the browser's own disclosure, so it works with the keyboard (Enter, Space) and a screen
+  reader announces it as one. The element is the figure for the whole page
+  (`IMAGE_PAGE_ORIGINAL_REASON`); it has no fix, because nothing is decided about it, and the
+  steps leave it alone.
+- **The blocks.** Headings, paragraphs and list items as written elsewhere; a display equation
+  as `<math>` with its printed number; an inline formula as `<math>` inside its paragraph; a
+  figure as `<figure><img alt>` with the model's short description as its alt text; a table as
+  a `<table>` with `scope`d headers. A word the reader could not read is the visible marker
+  `[illegible]`; an inline formula that did not validate is its LaTeX in square brackets.
+- **What readers are told.** The about section says which pages were converted from images.
+  The wording assists; it never says the conversion is right (architecture rule 7).
+- **When the instructor keeps text as the picture.** A prose block rejected on the review
+  screen is written as the picture of its region (a figure with
+  `data-reason="image_page_text"`, alt "Text on page 3, not converted to text.", the label
+  "Not converted."), like any kept image.
+
+How the pipeline tiers each block, and why every one is a review item, is in
+[ADR 0007](decisions/0007-image-pages.md); how it was measured, in
+[eval-image-pages.md](eval-image-pages.md).
+
 ## Equations kept as pictures (T3-15)
 
 An equation that was not converted is shown as the crop of the PDF
@@ -517,12 +550,14 @@ section) is English whatever the document's language.
 
 ## Raised and lowered text
 
-Raised and lowered text of upright text (`Element.script_runs`: H2O, Na+, g/cm3, 226Ra) is
+Raised and lowered text of upright text (`Element.script_runs`: g/cm3, a footnote mark, a letter
+subscript; formulas and ions such as H2O and Na+, and a nuclide's numbers before its symbol, are
+inline equations since 2026-10-21, see "Chemistry" below and docs/layout.md) is
 written as `<sup>` and `<sub>` inside the paragraph, list item or heading, inside any link or
 colour:
 
 ```html
-<p id="p1-e2">Water is H<sub>2</sub>O, table salt is Na<sup>+</sup> and gold is 19.3 g/cm<sup>3</sup>.</p>
+<p id="p1-e2">Gold is 19.3 g/cm<sup>3</sup>, and the measurement is in Nature<sup>1</sup>.</p>
 ```
 
 A lowered and a raised run side by side (the count and the charge of SO4 2-, the two
@@ -539,6 +574,33 @@ The text itself is unchanged (`H2O`), so search and copy read as before. A run i
 when it would start inside an inline equation's marker or overlap another. What cannot be
 carried (a figure caption, a table cell's lowered text, a script with nothing before it) is
 written flat, and the notice `scripts_flattened` ("Worth checking") says where.
+
+## Chemistry
+
+Formulas, ions, state symbols, reactions and concentrations are inline or display equations
+(docs/chemistry.md). The MathML the converter makes for them is shaped for a screen reader:
+
+```html
+<!-- the ion Fe3+, from \ce{Fe^3+} -->
+<msup><mi mathvariant="normal">Fe</mi><mrow><mn>3</mn><mo>+</mo></mrow></msup>
+```
+
+- A charge or a count hangs on the whole element symbol: the converter wrote `\mathrm{Na^+}` as
+  `N`, `msup(a, +)` and a reader said "N a to the power plus"; it is now `msup(mrow(N, a), +)`
+  ("N a plus"). The letters stay one `mi` each, as published MathML has them. Only real element
+  symbols are grouped (`Hz_2` and `km^2` stay as the model wrote them).
+- A subscript or superscript after a closing bracket belongs to the whole group, `[A]_0` is
+  `msub(mrow([A]), 0)` and `Al_2(SO_4)_3` has `msub(mrow((SO4)), 3)`; the converter used to hang
+  it on the bracket alone (`msub(], 0)`), which was read "close bracket sub 0". This is done for
+  every `(...)` and `[...]` that carries a script, in chemistry and in maths.
+- A reaction arrow is an `mo` (`\longrightarrow` came out as an `mi`).
+- The review screen's reading says "H 2 O", "S O 4 2 minus", "aqueous", "reacts to form", "is in
+  equilibrium with", "the concentration of H 3 O plus" (`pipeline/speech_chem.py`); the reading is
+  written into the file only with `MATHML_ALTTEXT` on, as for any equation.
+
+A formula's own MathML is checked like any other (`mathml.*` checks) and against the PDF's text
+layer. A reading the model wrote as mhchem (`\ce{...}`) that the converter does not read is
+refused by the LaTeX check, so the equation stays a picture with a required decision.
 
 ## Coloured text (FEATURE_COLOUR)
 
@@ -667,6 +729,9 @@ review words ("needs review", "rejected"): those are for the instructor, on the 
   "Needs a description": ask your instructor for a version you can read.", and when whole
   pages are kept as images, which ones: "Pages 2 and 5 are pictures of handwritten or
   scanned pages and were not converted." (`assemble.kept_pages_note`);
+- when pages were read from an image of the page: "Page 2 was converted from an image of the
+  page: it starts with a note and the original page to check it against."
+  (`assemble.image_pages_note`);
 - "If something is hard to read or looks wrong, tell your instructor.";
 - an optional plain-text `source_note`, such as an OpenStax attribution.
 

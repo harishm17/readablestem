@@ -220,7 +220,9 @@ def result_outcome(result: DocumentResult) -> tuple[JobStatus, str | None]:
     Nothing to convert is a failure: the upload probe's own code when every analysed page
     is certainly handwritten or scanned (`page_type.refusal_code` on the stored page
     types; for a result without them, "scanned" when every page was only a picture of a
-    page), "no_content" when the result has no elements at all. Otherwise the job is
+    page; not when the image page pass ran, `result.image_pages`: such a PDF was let in to
+    be read, and the pages it could not read are kept as images), "no_content" when the
+    result has no elements at all. Otherwise the job is
     done, with a code when it is incomplete: the spend cap that stopped model work
     ("budget_<scope>"), else "pages_not_converted" when pages or handwriting were kept as
     images. A page the probe could not be sure of (a full-page picture with a short
@@ -231,7 +233,9 @@ def result_outcome(result: DocumentResult) -> tuple[JobStatus, str | None]:
     analysed = {page.page for page in result.stats.per_page}
     image_only = set(result.image_only_pages)
     typed = {t.page for t in result.page_types}
-    if result.page_types and analysed <= typed:
+    if result.image_pages is not None:
+        pass  # scans were let in and read (ADR 0007): whatever stayed an image is a decision
+    elif result.page_types and analysed <= typed:
         refused = refusal_code([t for t in result.page_types if t.page in analysed])
         if refused is not None and refused != "no_content":
             return JobStatus.FAILED, refused
@@ -254,17 +258,27 @@ def job_time_limit_s(page_count: int, settings: Settings) -> float:
     return JOB_BASE_S + JOB_PER_PAGE_S * min(pages, settings.max_pages_per_job)
 
 
-def job_caps(settings: Settings, page_count: int) -> tuple[float, int]:
+def job_caps(settings: Settings, page_count: int, image_pages: bool = False) -> tuple[float, int]:
     """(max USD, max model calls) for a whole job of `page_count` pages, all attempts.
 
     `MAX_USD_PER_JOB` and `MAX_MODEL_CALLS_PER_JOB`, lowered for short documents to the
     per-page allowances times the pages. Without that, one dense page (layout puts no
     limit on figures per page) could use a long document's whole allowance, and a user's
     daily page quota would not bound what they can spend in a day.
+
+    A job that asked for its scanned and handwritten pages to be converted (`Job.image_pages`,
+    ADR 0007) reads them with the main model, which costs several times a typed page: its dollar
+    cap is `IMAGE_PAGES_USD_PER_PAGE` a page of the document, at most `IMAGE_PAGES_MAX_USD_PER_JOB`,
+    when that is more than the ordinary cap. The daily cap and the open-tier pool still bound the
+    spend as they do any job's (`_guard_for`).
     """
     pages = page_count if page_count > 0 else settings.max_pages_per_job
+    usd = min(settings.max_usd_per_job, pages * settings.max_usd_per_page)
+    if image_pages and settings.feature_image_pages:
+        wider = min(settings.image_pages_max_usd_per_job, pages * settings.image_pages_usd_per_page)
+        usd = max(usd, wider)
     return (
-        min(settings.max_usd_per_job, pages * settings.max_usd_per_page),
+        usd,
         min(settings.max_model_calls_per_job, pages * settings.max_model_calls_per_page),
     )
 
@@ -679,8 +693,9 @@ class Worker:
         prior_calls: int,
         page_count: int,
         pool: str | None = None,
+        image_pages: bool = False,
     ) -> _Attempt:
-        max_usd, max_calls = job_caps(self.settings, page_count)
+        max_usd, max_calls = job_caps(self.settings, page_count, image_pages)
         attempt = _Attempt(
             claim=claim,
             prior_usd=prior_usd,
@@ -899,9 +914,13 @@ class Worker:
         started = time.monotonic()
         with session_scope(self.factory) as session:
             job = session.execute(
-                select(Job.page_count, Job.cost_usd, Job.model_calls, Job.user_id).where(
-                    Job.id == claim.job_id
-                )
+                select(
+                    Job.page_count,
+                    Job.cost_usd,
+                    Job.model_calls,
+                    Job.user_id,
+                    Job.image_pages,
+                ).where(Job.id == claim.job_id)
             ).one_or_none()
             pool = access.spend_pool(access.tier_of(session, job.user_id)) if job else None
             pdf = session.scalar(
@@ -912,7 +931,12 @@ class Worker:
             return DISCARDED
         page_count = int(job.page_count or 0)
         attempt = self._start_attempt(
-            claim, float(job.cost_usd or 0.0), int(job.model_calls or 0), page_count, pool
+            claim,
+            float(job.cost_usd or 0.0),
+            int(job.model_calls or 0),
+            page_count,
+            pool,
+            bool(job.image_pages),
         )
         if pdf is None:
             return self._finish_failed(attempt, "upload_missing")

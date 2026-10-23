@@ -80,7 +80,8 @@ from readablestem.core.types import Check, Element, EquationFix, Fix, Kind, Mode
 from readablestem.models import router
 from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.models.prompts import load_prompt
-from readablestem.pipeline import equation_images, layout, notation_memory
+from readablestem.pipeline import equation_images, layout, notation_memory, page_math
+from readablestem.pipeline.chem import CeError, convert_ce_commands, tidy_cell_notation
 from readablestem.pipeline.signs import compare_signs
 from readablestem.pipeline.speech import SpeechError, mathml_to_speech
 from readablestem.pipeline.text_layer_compare import compare_case, numbers_differ
@@ -111,6 +112,18 @@ SKIP_ESCALATION_FROM = 0.80
 # MathML, and a decision costs a person more than the call it replaces. Set False to keep the
 # status rules as they were (the answer then needs a decision).
 ACCEPT_SINGLE_READING = True
+# The page math pass's second reading (ADR 0006; `Element.page_latex`). Agreement of the crop's
+# reading with it lifts a usable answer whose checks all pass to this confidence, so a cheap
+# answer that two independent readings share is not asked of the main model again; a
+# disagreement is asked of the main model once (as an unsure answer is) and, when the main
+# model's reading matches neither the crop's first reading nor the page's, is a required
+# decision. A main-model reading that the page pass contradicts has no one left to ask: it is
+# a required decision too when `FLAG_MAIN_DISAGREES` (the dev-set measurement decides).
+PAGE_AGREE_CONFIDENCE = 0.9
+PAGE_READING = "equation.page_reading"
+PAGE_READING_OVERRULED = "equation.page_reading_overruled"
+PAGE_READING_CODE = "page_reading_mismatch"
+FLAG_MAIN_DISAGREES = True
 SHORT_INLINE_CHARS = 25  # inline candidates up to this many text-layer chars start cheap
 MAX_OUTPUT_TOKENS = 2048  # LaTeX up to 2000 chars plus reasoning tokens
 # A model that thinks within its own allowance (claude: `pricing.Price.thinking_tokens`)
@@ -199,6 +212,23 @@ _DISPLAYSTYLE = re.compile(r"\\(?:displaystyle|textstyle)(?![A-Za-z])")
 _BARE_SCRIPT = re.compile(r"(?:^|(?<=[+\-=(\[,<>]))(\s*)(?=[\^_])")
 
 
+def expand_ce(latex: str) -> str:
+    r"""`latex` with each `\ce{...}` (mhchem, which the prompt asks the model to use for
+    chemical species) written out as plain LaTeX (`pipeline.chem`). A `\ce` outside the
+    converted subset is left as it is, so the LaTeX check refuses it (`unknown_command`) and
+    the equation goes to the main model or to a person: nothing is guessed. Not part of
+    `clean_latex`, which the proof also applies to the chatbot arms' LaTeX as recorded. The
+    bare `\middle|` the model writes for the phase boundary of a cell is made a bar here too
+    (`chem.tidy_cell_notation`), for the same reason."""
+    latex = tidy_cell_notation(latex)
+    if "\\ce" not in latex:
+        return latex
+    try:
+        return convert_ce_commands(latex)
+    except CeError:
+        return latex
+
+
 def clean_latex(latex: str) -> str:
     r"""Remove wrappers the prompt forbids but models still add ($...$, \[...\],
     equation environments, \displaystyle), escape bare `%` signs, and give a script that
@@ -218,8 +248,142 @@ def clean_latex(latex: str) -> str:
     return escape_percent_signs(text)
 
 
+_OPEN_PAREN = r"(?:\\left\s*\(|\()"
+_CLOSE_PAREN = r"(?:\\right\s*\)|\))"
+_WRAPPED = re.compile(rf"^{_OPEN_PAREN}(.*?){_CLOSE_PAREN}$", re.S)
+_SPACING = r"(?:\\[,;:! ]|\s|~)*"
+_LEADING_OPEN = re.compile(rf"^{_OPEN_PAREN}{_SPACING}")
+_TRAILING_OPEN = re.compile(rf"{_SPACING}{_OPEN_PAREN}{_SPACING}$")
+_LEADING_CLOSE = re.compile(rf"^{_CLOSE_PAREN}{_SPACING}")
+_TRAILING_CLOSE = re.compile(rf"{_SPACING}{_CLOSE_PAREN}$")
+
+
+def _top_level_comma(text: str) -> bool:
+    depth = 0
+    for c in text:
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif c == "," and depth == 0:
+            return True
+    return False
+
+
+def _encloses(inner: str) -> bool:
+    """Do the brackets of `inner` pair up without going below zero (one pair encloses it)?"""
+    depth = 0
+    for c in inner:
+        depth += c in "([{"
+        depth -= c in ")]}"
+        if depth < 0:
+            return False
+    return depth == 0
+
+
+def drop_neighbour_brackets(latex: str, text_layer: str | None) -> str:
+    r"""`latex` without a parenthesis the run's text layer does not have.
+
+    An inline run's crop is padded by 2 pt, which takes in half of the parenthesis next to the
+    formula ("(x = 0.9)" in a sentence), and the reading then writes `(x = 0.9)`, `x = 0.9\ (`
+    or `x_1)`. The text layer of the run says what the run holds, so a parenthesis at an edge of
+    the reading that has no counterpart there is the sentence's. A pair that encloses the whole
+    reading goes when the text layer has neither; one with a comma at its top level is a tuple
+    and stays; an unmatched one at an edge goes when the text layer has fewer than the reading."""
+    if not text_layer:
+        return latex
+    out = latex.strip()
+    opens_in_text, closes_in_text = text_layer.count("("), text_layer.count(")")
+    if not opens_in_text and not closes_in_text:
+        wrapped = _WRAPPED.match(out)
+        if wrapped and not _top_level_comma(wrapped.group(1)):
+            inner = wrapped.group(1).strip()
+            if inner and _encloses(inner.replace("\\left", "").replace("\\right", "")):
+                return inner
+    for _ in range(2):
+        opens = len(re.findall(_OPEN_PAREN, out))
+        closes = len(re.findall(_CLOSE_PAREN, out))
+        if opens > closes and opens > opens_in_text:
+            trimmed = _TRAILING_OPEN.sub("", out, count=1)
+            if trimmed == out:
+                trimmed = _LEADING_OPEN.sub("", out, count=1)
+        elif closes > opens and closes > closes_in_text:
+            trimmed = _TRAILING_CLOSE.sub("", out, count=1)
+            if trimmed == out:
+                trimmed = _LEADING_CLOSE.sub("", out, count=1)
+        else:
+            break
+        if trimmed == out or not trimmed.strip():
+            break
+        out = trimmed
+    return out
+
+
+_GAP = r"(?:\\[,;:! ]|\s|~)*"
+_DASHES = "-\u2212\u2013\u2010\u2011"
+_TEXT_DASH = r"\\text\{\s*[-\u2013\u2212]+\s*\}"
+_TRAILING_DASH = re.compile(rf"{_GAP}(?:{_TEXT_DASH}|-)\s*$")
+_LEADING_DASH = re.compile(rf"^\s*{_TEXT_DASH}{_GAP}")
+_TRAILING_CDOT = re.compile(rf"{_GAP}\\cdot\s*$")
+
+
+def drop_neighbour_marks(latex: str, text_layer: str | None) -> str:
+    r"""`latex` without a hyphen or a centred dot at an edge that the run's text layer lacks.
+
+    The padded crop of "(k-1)-regular" shows the start of the hyphen, and the reading is
+    `(k-1)\text{-}`. It has one dash more than the text layer of the run, `(k -1)`, so the one
+    at the edge is the sentence's. A bare sign at the start of a reading stays (it may be the
+    formula's own); a dash the text layer has stays."""
+    if not text_layer:
+        return latex
+    out = latex.strip()
+    for pattern, marks, count in (
+        (_TRAILING_DASH, _DASHES, lambda t: t.count("-")),
+        (_LEADING_DASH, _DASHES, lambda t: t.count("-")),
+        (_TRAILING_CDOT, "\u00b7\u22c5\u2219", lambda t: t.count("\\cdot")),
+    ):
+        in_text = sum(text_layer.count(c) for c in marks)
+        while count(out) > in_text and (match := pattern.search(out)):
+            trimmed = out[: match.start()] + out[match.end() :]
+            if not trimmed.strip():
+                break
+            out = trimmed.strip()
+    return out
+
+
+_MATHBF_LETTER = re.compile(r"\\mathbf\s*\{\s*([A-Za-z])\s*\}")
+
+
+def restyle_bold_italic(latex: str, text_layer: str | None) -> str:
+    r"""`\mathbf{x}` written `\boldsymbol{x}` for a letter the PDF draws in a bold italic font.
+
+    A crop shows a bold vector as bold; whether it is upright (`\mathbf`, CMBX) or italic
+    (`\boldsymbol`, `\bm`, CMMIB) is small, and every reading says `\mathbf`. The layout
+    step writes the text layer's bold-italic letters as bold-italic code points, so the
+    letter's face is known. A letter drawn in both faces is left as the model wrote it."""
+    if not text_layer or "\\mathbf" not in latex:
+        return latex
+    faces: dict[str, set[str]] = {}
+    for ch in text_layer:
+        variant = char_variant(ch)
+        if variant in ("bold", "bold-italic"):
+            faces.setdefault(base_char(ch), set()).add(variant)
+
+    def swap(match: re.Match[str]) -> str:
+        letter = match.group(1)
+        return (
+            f"\\boldsymbol{{{letter}}}" if faces.get(letter) == {"bold-italic"} else match.group(0)
+        )
+
+    return _MATHBF_LETTER.sub(swap, latex)
+
+
 # Spacing a model may leave before a sentence mark: blanks, ~, \, \; \: \! \  and quads.
 _TRAILING_SPACING = re.compile(r"(?:\s|~|\\[,;:! ]|\\q?quad(?![A-Za-z]))+$")
+
+
+# `\left` or `\right` (not `\leftarrow`, `\rightarrow`...) right before a ".".
+_NULL_DELIMITER = re.compile(r"\\(?:left|right)(?![A-Za-z])\s*$")
 
 
 def strip_trailing_punctuation(latex: str) -> str:
@@ -229,14 +393,17 @@ def strip_trailing_punctuation(latex: str) -> str:
     the model also transcribes it (the crop showed part of it) the output reads
     "d0, ,". Spacing left in front of the mark goes with it. A mark after a backslash is
     a command (\, \; \: are spaces) and stays; so does LaTeX that would be left empty.
-    "!" stays: after maths it is a factorial. Display equations keep their punctuation:
-    it is part of the line the reader sees.
+    "!" stays: after maths it is a factorial. The "." of `\right.` and `\left.` is the
+    invisible delimiter that closes (or opens) a brace and is not punctuation either.
+    Display equations keep their punctuation: it is part of the line the reader sees.
     """
     text = latex.rstrip()
     while text and text[-1] in ",.;:?":
         backslashes = len(text[:-1]) - len(text[:-1].rstrip("\\"))
         if backslashes % 2:
             break  # "\," is a thin space, not a comma
+        if text[-1] == "." and _NULL_DELIMITER.search(text[:-1]):
+            break  # "\right." is a delimiter, not a full stop
         stripped = _TRAILING_SPACING.sub("", text[:-1])
         if not stripped.strip():
             break
@@ -524,6 +691,16 @@ def text_layer_similarity(text_layer: str | None, mathml: str) -> float | None:
     return 2 * sum((expected & got).values()) / total if total else None
 
 
+def symbol_dice(text: str, mathml: str) -> float:
+    """Dice similarity of the symbol bags of a text and a MathML, with no minimum of symbols
+    (`text_layer_similarity` declines to judge a text of fewer than three): 1.0 when neither
+    has a letter, digit or Greek letter. For comparing two readings of the same stretch."""
+    expected = _symbol_bag(text)
+    got = _mathml_symbols(mathml)
+    total = sum(expected.values()) + sum(got.values())
+    return 2 * sum((expected & got).values()) / total if total else 1.0
+
+
 def text_layer_symbols_differ(text_layer: str | None, mathml: str) -> bool | None:
     """Do the letters, digits and Greek letters of the PDF text layer and the MathML
     differ at all (as multisets: one wrong digit, one misread Greek letter, a dropped
@@ -641,9 +818,11 @@ def _evaluate(
     candidate = _Candidate(output, calls, confidence=output.confidence)
     if not output.is_equation:
         return candidate
-    candidate.latex = clean_latex(output.latex)
+    candidate.latex = restyle_bold_italic(clean_latex(expand_ce(output.latex)), element.text)
     if display == "inline":
         candidate.latex = strip_trailing_punctuation(candidate.latex)
+        candidate.latex = drop_neighbour_brackets(candidate.latex, element.text)
+        candidate.latex = drop_neighbour_marks(candidate.latex, element.text)
     candidate.mathml, candidate.checks = _convert(candidate.latex, display)
     if candidate.mathml is None:
         return candidate
@@ -794,6 +973,76 @@ def _escalation_outcome(
     return "same" if _same_reading(first, escalated) else "changed"
 
 
+def _page_stream(element: Element) -> list[str] | None:
+    """The symbol stream of the page pass's reading of this span; None without one (the
+    flag is off, layout found the span alone, or the LaTeX does not convert)."""
+    if element.page_status != "span" or not element.page_latex:
+        return None
+    return page_math.latex_stream(element.page_latex)
+
+
+def _agrees(candidate: _Candidate, page: list[str] | None) -> bool | None:
+    """Does the candidate's reading say what the page pass's does? None when either side
+    has no reading to compare."""
+    if page is None or not candidate.usable or candidate.mathml is None:
+        return None
+    if candidate.output is None or not candidate.output.is_equation:
+        return None
+    stream = page_math.mathml_stream(candidate.mathml)
+    return None if stream is None else stream == page
+
+
+def _lift(candidate: _Candidate) -> None:
+    """Two readings agree: raise the confidence to `PAGE_AGREE_CONFIDENCE`, unless a check
+    other than a note failed (agreement never overrides the text-layer checks)."""
+    failed = [c for c in candidate.checks if not c.passed and c.code not in NOTE_CODES]
+    if (
+        candidate.confidence is not None
+        and candidate.usable
+        and not failed
+        and candidate.confidence < PAGE_AGREE_CONFIDENCE
+    ):
+        candidate.confidence = PAGE_AGREE_CONFIDENCE
+
+
+def _compare_readings(
+    candidate: _Candidate,
+    first: _Candidate,
+    reread: _Candidate | None,
+    page: list[str],
+    *,
+    asked_main_first: bool,
+    lift: bool = True,
+) -> None:
+    """Record how the final reading stands against the page pass's, and flag it when the
+    crop's readings and the page's do not meet (module constants). `lift`: agreement raises
+    the confidence (`Settings.page_math_agreement_lift`)."""
+    agrees = _agrees(candidate, page)
+    if agrees is None:
+        return
+    if agrees:
+        if lift:
+            _lift(candidate)
+        candidate.checks.append(Check(name=PAGE_READING, passed=True))
+        return
+    if reread is not None:
+        same = (
+            first.mathml is not None
+            and reread.mathml is not None
+            and page_math.mathml_stream(first.mathml) == page_math.mathml_stream(reread.mathml)
+        )
+        if same or _agrees(first, page):
+            # The main model read the crop as the cheap model did (the page pass was the odd
+            # one out), or the cheap reading is the page's: the answer stands as it would have.
+            candidate.checks.append(Check(name=PAGE_READING_OVERRULED, passed=True))
+            return
+    elif not asked_main_first or not FLAG_MAIN_DISAGREES:
+        return
+    candidate.checks.append(
+        Check(name=PAGE_READING, passed=False, severity="warning", code=PAGE_READING_CODE)
+    )
+
+
 def _prefer(main: _Candidate, cheap: _Candidate) -> _Candidate:
     """The main model's answer wins unless only the cheap one is usable (or the main
     call produced nothing, for example during an outage)."""
@@ -912,7 +1161,11 @@ def transcribe(
     calls = list(candidate.calls)
     cheap_start = first_model != settings.main_model
     reread: _Candidate | None = None
-    if cheap_start and _needs_escalation(candidate, settings):
+    page = _page_stream(element)  # the page pass's reading of this span, when it has one
+    first_agrees = _agrees(first, page)
+    if first_agrees and settings.page_math_agreement_lift:
+        _lift(first)
+    if cheap_start and (_needs_escalation(candidate, settings) or first_agrees is False):
         reread = attempt(settings.main_model, escalation=True)
         calls += reread.calls
         candidate = _prefer(reread, candidate)
@@ -943,6 +1196,19 @@ def transcribe(
                 code=NO_TEXT_LAYER_CODE,
             )
         )
+    if page is not None:
+        _compare_readings(
+            candidate,
+            first,
+            reread,
+            page,
+            asked_main_first=not cheap_start,
+            lift=settings.page_math_agreement_lift,
+        )
+    elif element.page_status == "layout" and candidate.confidence is not None:
+        # Layout found this span by its geometry rules and the page pass, which read the
+        # page, did not: a little less sure (`Settings.page_math_unconfirmed_factor`).
+        candidate.confidence *= settings.page_math_unconfirmed_factor
     if layout.REASON_HALF_FRACTION in element.reasons:
         candidate.checks.append(
             Check(

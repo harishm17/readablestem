@@ -43,8 +43,32 @@ image says.
    `\rightarrow`), functions (`\sin`, `\log`, `\ln`), `\sum`, `\int`, `\lim`, accents
    (`\hat`, `\bar`, `\dot`), `\left( ... \right)`, and the `array`, `pmatrix`,
    `bmatrix` and `cases` environments. Never use `\def`, `\newcommand`, `\href`,
-   `\url`, `\color`, `\label`, `\tag` or package-specific commands.
+   `\url`, `\color`, `\label`, `\tag` or package-specific commands (`\ce` for chemical
+   species is the one exception, see Chemistry below).
 9. Keep punctuation that is part of the image, such as a final period or comma.
+
+## Chemistry
+
+Write each chemical species and reaction with `\ce{...}`, and everything else (numbers,
+units, words, fractions, and quantities such as `K_\text{sp}`) as ordinary LaTeX around it.
+
+- Formulas: `\ce{H2O}`, `\ce{Al2(SO4)3}`, `\ce{CH3CO2-}`, `\ce{[Cu(NH3)4]^2+}`.
+- Ions: `\ce{Na+}`, `\ce{OH-}`, `\ce{H3O+}`; a charge of two or more goes after a `^`:
+  `\ce{SO4^2-}`, `\ce{Fe^3+}`, `\ce{Hg2^2+}`. The electron is `\ce{e-}`.
+- State symbols stay with their species: `\ce{NaCl(aq)}`, `\ce{H2O(l)}`, `\ce{CO2(g)}`,
+  `\ce{AgCl(s)}`.
+- A reaction is one `\ce` for the whole line, coefficients in front of their species:
+  `\ce{2 H2 + O2 -> 2 H2O}`. Arrows are `->`, `<-`, `<->`, and `<=>` for an equilibrium; a
+  condition on an arrow goes in brackets: `\ce{CaCO3(s) ->[\Delta] CaO(s) + CO2(g)}`.
+- Nuclides: `\ce{^{14}_{6}C}`, `\ce{^{0}_{-1}e}`.
+- A concentration keeps its brackets outside the `\ce`: `[\ce{H3O+}]`, and a script after
+  the bracket goes outside too: `[\ce{NH3}]^2`. A generic letter that is not an element
+  (A, B, X) is not chemistry: `[A]_0`.
+- Whatever `\ce` cannot hold goes in ordinary LaTeX, with `\ce` only for the species inside
+  it: `K = \frac{[\ce{NH3}]^2}{[\ce{N2}][\ce{H2}]^3}`, `\text{rate} = k[\ce{NO}]^2`, and a
+  state symbol with a concentration, `\mathrm{Zn^{2+}(aq,\ 0.10\ M)}`. Never put `\text`,
+  `$` or other LaTeX commands inside `\ce`.
+- Write only what is drawn: do not balance, complete or correct a reaction.
 
 ## Confidence
 

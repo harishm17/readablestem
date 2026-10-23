@@ -157,6 +157,7 @@ _STRUCTURAL = {
     "nonumber", "notag", "displaystyle", "textstyle", "pmod", "mod",
     "big", "Big", "bigg", "Bigg", "bigl", "bigr", "Bigl", "Bigr", "biggl", "biggr",
     "Biggl", "Biggr",
+    "arg",  # rewritten to \operatorname{arg} before conversion (`safe_latex_to_mathml`)
 }  # fmt: skip
 
 
@@ -173,6 +174,38 @@ def test_every_allowed_command_converts_without_leftovers():
         if "\\" in convert(f"\\{cmd}{{x}}{{y}}"):
             leftovers.append(cmd)
     assert leftovers == []
+
+
+# Found on real LaTeX PDFs (arXiv papers, docs/eval-realworld.md): proposals the allowlist refused.
+_REAL_WORLD_COMMANDS = {
+    "arg": r"\arg\min_{x} f(x)",
+    "substack": r"\sum_{\substack{i<j \\ k>0}} x_{ij}",
+    "succsim": r"a \succsim b",
+    "colon": r"f \colon A \to B",
+    "coloneqq": r"a \coloneqq b",
+    "triangleq": r"a \triangleq b",
+    "trianglelefteq": r"S \trianglelefteq T",
+    "gtrapprox": r"N \gtrapprox 30",
+    "intercal": r"a \intercal b",
+    "rightsquigarrow": r"u \rightsquigarrow v",
+    "leadsto": r"u \leadsto v",
+}
+
+
+@pytest.mark.parametrize("command", sorted(_REAL_WORLD_COMMANDS))
+def test_commands_seen_on_real_pdfs_pass_the_checks_and_convert_cleanly(command):
+    latex = _REAL_WORLD_COMMANDS[command]
+    assert command in validate.ALLOWED_COMMANDS
+    assert not has_errors(validate.check_latex(latex))
+    mathml = validate.safe_latex_to_mathml(latex, "inline")
+    assert "\\" not in mathml
+
+
+def test_arg_becomes_an_operator_name():
+    plain = validate.safe_latex_to_mathml(r"\arg x", "inline")
+    assert plain == validate.safe_latex_to_mathml(r"\operatorname{arg} x", "inline")
+    assert "<mo>arg</mo>" in plain
+    assert has_errors(validate.check_latex(r"\argx"))  # not a prefix match
 
 
 def test_forbidden_and_allowed_lists_do_not_overlap():

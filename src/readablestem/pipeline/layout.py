@@ -68,7 +68,7 @@ from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property, lru_cache
 from itertools import combinations, count, pairwise
-from typing import Any
+from typing import Any, Literal
 
 import pymupdf
 
@@ -76,7 +76,7 @@ from readablestem.core.childenv import child_env
 from readablestem.core.mathchars import base_char, char_variant, styled_char
 from readablestem.core.notation import canonical_from_parts
 from readablestem.core.types import BBox, Element, Kind, Link, Notice, TableGrid, inline_marker
-from readablestem.pipeline import equation_images, hyphens, page_type, script_marks, tables
+from readablestem.pipeline import chem, equation_images, hyphens, page_type, script_marks, tables
 from readablestem.pipeline import options as run_options
 from readablestem.pipeline.notation_memory import (
     BOLD_LETTER_REASON,
@@ -200,6 +200,8 @@ REASON_LARGER_FONT = "larger font"
 REASON_BOLD_BODY = "bold body-size line"
 # The PDF's own tags call this line a heading, "tagged heading h2" (`pipeline.tagged`).
 REASON_TAGGED = "tagged heading h"
+# A heading read from an image of a page (ADR 0007): the level the page reader gave it.
+REASON_IMAGE_HEADING = "image heading h"
 REASON_NUMBERED = "numbered section"
 REASON_NUMBERED_LINE = "standalone numbered line"
 REASON_LIST_NUMBER = "list-style number"
@@ -320,6 +322,9 @@ _BOLD_FONT = re.compile(
     re.IGNORECASE,
 )
 _ITALIC_FONT = re.compile(r"italic|oblique|cmti|cmsl|sfti|-it$|,it|ital", re.IGNORECASE)
+# Bold italic: `\boldsymbol` and `\bm` (CMMIB, newtx's bmi, Nimbus MediItal, ...), against `\mathbf`
+# (CMBX, upright). The text layer gives both as a bold letter; the equation step restores it.
+_BOLD_ITALIC_FONT = re.compile(r"cmmib|bmi\d*$|bold-?ital|bold-?obl|medi-?ital|bdit", re.IGNORECASE)
 # Regular-weight text and maths fonts known to have a bold face that PDFs name as bold
 # (CMBX, Times-Bold, DejaVuSerif-Bold, ...), or OpenType maths fonts that write bold as
 # Unicode maths bold. A letter drawn in one of them, not bold, is known to be plain, so
@@ -351,9 +356,17 @@ _SUPERSCRIPT_FLAG = 1
 _MONO_FLAG = 8
 
 _LOCK = threading.RLock()  # PyMuPDF is not thread-safe: one PyMuPDF call at a time
+# The document being analysed was typeset by TeX (`page_type.producer_hint`): the conventions
+# below that come from what a TeX author types (an italic letter is `$x$`, the maths stops
+# before a unit or a parenthesis of the sentence) apply only then. Set by `_analyze_document`
+# under `_LOCK`; a Chromium print of MathML or a Word file is read as before.
+_TEX_MADE = False
 # Run the table detector only on pages that could hold a table (`tables.may_hold_table`).
 # The result is the same either way; switched off, only to check that.
 TABLE_PREFILTER = True
+
+
+PageStatus = Literal["span", "layout"]  # `Element.page_status`
 
 
 class LayoutError(ValueError):
@@ -391,7 +404,11 @@ class Layout:
 
 
 def analyze(
-    pdf_bytes: bytes, *, pages: list[int] | None = None, max_pages: int | None = None
+    pdf_bytes: bytes,
+    *,
+    pages: list[int] | None = None,
+    max_pages: int | None = None,
+    page_math: Any = None,
 ) -> Layout:
     """Elements of the given 0-based pages (all by default), ids "p{page+1}-e{index}".
 
@@ -402,6 +419,11 @@ def analyze(
     The selected pages are first rendered once in a child process (see `_probe_pages`);
     the document is opened for this call only and closed again, so analysis leaves no
     user content in this module (only `crop` caches documents).
+
+    `page_math` (ADR 0006): an object with `on_page(number, rows, ordered, rules)` and
+    `after_regions(number, rows)` (`pipeline.page_math_reconcile.PageMathHook`). It is shown
+    each page's text rows before the display equations are grouped, and may return them
+    cut and marked by a verified plan. None (the default) is layout's own rules alone.
     """
     with _LOCK:
         _quiet_mupdf()
@@ -410,13 +432,21 @@ def analyze(
             try:
                 selected = _select_pages(doc.page_count, pages, max_pages)
                 _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
-                return _analyze_document(doc, selected)
+                return _analyze_document(doc, selected, page_math)
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
             finally:
+                global _TEX_MADE
+                _TEX_MADE = False
                 doc.close()
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store quotes PDF content
+
+
+def _zoom(zoom: float, turn: int) -> pymupdf.Matrix:
+    """The scale of a crop, and the turn clockwise (0, 90 or 270 degrees) that reads it."""
+    matrix = pymupdf.Matrix(zoom, zoom)
+    return matrix.prerotate(turn) if turn else matrix
 
 
 def crop(
@@ -456,12 +486,35 @@ def crop(
                 raise ValueError("element region is empty or outside the page")
             # MuPDF rounds the clip outwards to whole pixels, so leave one pixel of headroom.
             zoom = min(dpi / 72.0, (max_side_px - 1) / max(clip.width, clip.height))
-            pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
+            # A table set sideways on an upright page is cut turned, so it reads upright.
+            turn = element.table.turned if element.table is not None else 0
+            pixmap = page.get_pixmap(matrix=_zoom(zoom, turn), clip=clip, alpha=False)
             if max(pixmap.width, pixmap.height) > max_side_px:  # defensive; rounding only
                 zoom *= (max_side_px - 1) / max(pixmap.width, pixmap.height)
-                pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
+                pixmap = page.get_pixmap(matrix=_zoom(zoom, turn), clip=clip, alpha=False)
             if tag_dpi:
                 pixmap.set_dpi(round(zoom * 72), round(zoom * 72))
+            return pixmap.tobytes("png")
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()
+
+
+def render_page(pdf_bytes: bytes, page: int, *, dpi: int = 150, max_side_px: int = 2048) -> bytes:
+    """PNG of the whole page at `dpi` on white (long side capped at `max_side_px`), the picture
+    the page math pass reads. Same document cache and lock as `crop`."""
+    if dpi <= 0 or max_side_px < 16:
+        raise ValueError("render_page needs dpi > 0 and max_side_px >= 16")
+    with _LOCK:
+        _quiet_mupdf()
+        try:
+            key, doc = _CACHE.document(pdf_bytes)
+            if not 0 <= page < doc.page_count:
+                raise ValueError(f"page {page} is not in the PDF")
+            _ensure_probed(pdf_bytes, key, [page])
+            sheet = doc[page]
+            rect = sheet.rect
+            zoom = min(dpi / 72.0, (max_side_px - 1) / max(rect.width, rect.height))
+            pixmap = sheet.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False)
             return pixmap.tobytes("png")
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()
@@ -480,10 +533,12 @@ def release(pdf_bytes: bytes | None = None) -> None:
 
 
 def tagged_level(element: Element) -> int | None:
-    """The heading level the PDF's tags gave this element, or None."""
+    """The heading level the PDF's tags gave this element, or the level the page reader gave
+    a heading read from an image of a page (`REASON_IMAGE_HEADING`), or None."""
     for reason in element.reasons:
-        if reason.startswith(REASON_TAGGED) and reason[len(REASON_TAGGED) :].isdigit():
-            return int(reason[len(REASON_TAGGED) :])
+        for prefix in (REASON_TAGGED, REASON_IMAGE_HEADING):
+            if reason.startswith(prefix) and reason[len(prefix) :].isdigit():
+                return int(reason[len(prefix) :])
     return None
 
 
@@ -898,6 +953,8 @@ class _Char:
         style = _letter_style(self.font) if self.c.isascii() and self.c.isalpha() else None
         if style is not None and (self.c.isupper() or not style[1]):
             return styled_char(self.c, style[0])
+        if self.c.isascii() and self.c.isalpha() and _bold_italic(self.font):
+            return styled_char(self.c, "bold-italic")
         return styled_char(self.c, "bold") if self.bold else self.c
 
     @property
@@ -907,6 +964,11 @@ class _Char:
         if not self.c.isalpha() or self.bold or char_variant(self.c) not in (None, "italic"):
             return False
         return bool(_REGULAR_FACE.match(self.font.split("+", 1)[-1].replace(" ", "")))
+
+
+@lru_cache(maxsize=1024)
+def _bold_italic(font: str) -> bool:
+    return bool(_BOLD_ITALIC_FONT.search(font.split("+", 1)[-1]))
 
 
 @lru_cache(maxsize=1024)
@@ -982,6 +1044,11 @@ def _rounded(box: BBox) -> BBox:
     return (round(box[0], 2), round(box[1], 2), round(box[2], 2), round(box[3], 2))
 
 
+def clean_text(text: str) -> str:
+    """`_clean` for other modules (the image page pass cleans a model's text the same way)."""
+    return _clean(text)
+
+
 def _clean(text: str) -> str:
     """Whitespace collapsed, soft hyphens/zero-width/control characters removed, marker
     brackets neutralised (`_TEXT_MAP`), TeX's negation slash joined to its relation."""
@@ -1041,6 +1108,13 @@ class _Row:
     # A row of a function defined by cases (`_mark_case_rows`): its columns may stand
     # twice as far apart as those of an aligned row.
     case_row: bool = False
+    # The page math pass (ADR 0006, `pipeline.page_math_reconcile`), only with a plan for
+    # the page: `page_checked` says it ran; `page_inline` are the inline spans it placed in
+    # this row (character indexes into `chars`, and its LaTeX); `page_nonmath` the stretches
+    # it called look-alikes of maths.
+    page_checked: bool = False
+    page_inline: list[tuple[int, int, str]] = field(default_factory=list)
+    page_nonmath: list[tuple[int, int]] = field(default_factory=list)
 
     @cached_property
     def ink(self) -> list[_Char]:
@@ -1599,7 +1673,9 @@ def _merge_baselines(
                     continue
                 frag = rest
                 gap = frag.x0 - current.x1
-            if -0.5 * current.size <= gap <= 4 * max(current.size, frag.size) and not crosses:
+            if (-0.5 * current.size <= gap <= 4 * max(current.size, frag.size) and not crosses) or (
+                gap < 0 and not crosses and _label_over_arrow(current, frag)
+            ):
                 current = _join_rows(current, frag)
             else:
                 rows.append(current)
@@ -1609,6 +1685,28 @@ def _merge_baselines(
     for row in rows:
         row.column = _column_of(row.bbox, gutter)
     return _attach_big_operators(_attach_scripts(rows))
+
+
+def _label_over_arrow(current: _Row, frag: _Row) -> bool:
+    """Does `frag` start with a reaction arrow that has a label over it, the label being the
+    small glyphs `current` ends with? TeX sets `\\xrightarrow{\\Delta}` with the label raised
+    over the arrow: the text layer has one line end at the label and the next start at the
+    arrow, and the two overlap by the width of the label. Without this the reaction is cut in
+    three (docs/chemistry.md, "Accuracy"). Only a label no larger than a script, ending the
+    row, with the arrow starting under it."""
+    ink = frag.ink
+    head = next((i for i, c in enumerate(ink) if c.c in chem.ARROW_HEADS), None)
+    if head is None or head > 1 or any(c.c not in _CHEM_DASHES for c in ink[:head]):
+        return False
+    label: list[_Char] = []
+    for c in reversed(current.ink):
+        if c.size > SCRIPT_RATIO * current.size:
+            break
+        label.append(c)
+    if not label:
+        return False
+    x0, x1 = min(c.x0 for c in label), max(c.x1 for c in label)
+    return x0 - 0.5 * current.size <= frag.x0 <= x1 + 0.2 * current.size
 
 
 def _attach_scripts(rows: list[_Row]) -> list[_Row]:
@@ -2256,18 +2354,30 @@ def _word_lengths(
     lengths = [0] * len(chars)
     maths_word = [False] * len(chars)
     upright = any(k == "L" and not c.italic for k, c in zip(classes, chars, strict=True))
+    longest = _longest_italic_run(chars, classes, script)
     if not upright and any(c.c in _ROW_RELATIONS for c in chars):
-        upright = _longest_italic_run(chars, classes, script) <= 3
+        upright = longest <= 3
+    # An italic sentence with a function name in it ("... for all 1 <= k <= K", log(n) upright)
+    # has italic words, not variables: a short English word beside a longer italic one is text.
+    italic_text = longest > 3
     i = 0
     while i < len(chars):
         if classes[i] != "L":
             i += 1
             continue
         j = i
-        while j < len(chars) and classes[j] == "L" and script[j] == script[i]:
+        while (
+            j < len(chars)
+            and classes[j] == "L"
+            and script[j] == script[i]
+            # TeX sets "ln" upright and the variable after it in italic: two words, not one
+            and (not _TEX_MADE or chars[j].italic == chars[i].italic)
+        ):
             j += 1
         italic_variables = upright and j - i <= 3 and all(c.italic for c in chars[i:j])
         word = "".join(c.c for c in chars[i:j]).lower()
+        if italic_variables and italic_text and j - i > 1 and word in hyphens.words():
+            italic_variables = False
         for k in range(i, j):
             lengths[k] = 1 if italic_variables else j - i
             maths_word[k] = word in _MATH_WORDS
@@ -2395,6 +2505,24 @@ def _script_glyphs(
     return raw, kinds
 
 
+def _power_of_ten(chars: list[_Char], last: int, script: int) -> bool:
+    """Is the raised glyph at `script` the exponent of "10", whose last digit is at `last`
+    ($10^{-6}$, $6 \\times 10^3$)? In a TeX paper that is maths, not the unit exponent of "cm3"."""
+    if not _TEX_MADE or chars[last].c != "0" or last < 1 or chars[last - 1].c != "1":
+        return False
+    before = chars[last - 2].c if last >= 2 else " "
+    if before.isalnum() or before in ".,":
+        return False  # "210", "0.10": not the number ten
+    return chars[script].baseline < chars[last].baseline - 0.2 * chars[last].size
+
+
+def _bold_variable(chars: list[_Char], at: int) -> bool:
+    """Is the glyph at `at` a lone bold Latin letter, a vector in a text font (`\\mathbf{v}_2` set
+    in Times Bold)? Its script is an index, not the count of "H2O"."""
+    base = chars[at]
+    return _TEX_MADE and base.bold and base.c.isalpha() and (at == 0 or chars[at - 1].blank)
+
+
 def _script_base(chars: list[_Char], info: _CharInfo, start: int, end: int, size: float) -> bool:
     """Does the group of script glyphs `chars[start:end]` belong to upright text?"""
     reach = SCRIPT_BASE_GAP * size
@@ -2403,7 +2531,11 @@ def _script_base(chars: list[_Char], info: _CharInfo, start: int, end: int, size
         before -= 1  # an earlier script of the same word
     if before >= 0 and not chars[before].blank and chars[start].x0 - chars[before].x1 <= reach:
         base = chars[before]
-        if _text_char(base):
+        if (
+            _text_char(base)
+            and not _bold_variable(chars, before)
+            and not _power_of_ten(chars, before, start)
+        ):
             return True
         if base.c in ")]":
             return _bracket_base(chars, info, before)
@@ -2661,6 +2793,10 @@ def _classify_row(row: _Row) -> None:
         row.kind = "frag"  # a lone "," or "." belongs to the maths it ends, if any
     elif _is_equation_number(text):
         row.kind = "frag"  # "(2.4)", "Eq. 2.4", "2.4": maths only beside an equation
+    elif _reaction_row(row, info):
+        row.kind = "math"  # a chemical reaction on its own line
+        row.reasons = [*row.reasons, REACTION_REASON]
+        row.score = max(row.score, EQUATION_THRESHOLD)
     elif prose == 0 and row.score >= EQUATION_THRESHOLD and ratio >= 0.5:
         row.kind = "math"
     elif prose == 0 and ratio >= 0.6 and len(ink) <= 40:
@@ -2679,6 +2815,10 @@ class _Inline:
     reasons: list[str]
     font_size: float
     regular: str | None = None  # `Element.regular_letters`
+    # The page math pass (ADR 0006): its LaTeX reading of this run, and whether it placed
+    # the run ("span") or only layout found it ("layout"); None without a pass.
+    page_latex: str | None = None
+    page_status: PageStatus | None = None
 
 
 def _inline_runs(
@@ -2717,9 +2857,16 @@ def _inline_runs(
                 and chars[i - 1].c.isdigit()
                 and chars[i + 1].c.isdigit()
             )
-            inside = between_digits or (c == "," and depth > 0)
+            inside = (
+                between_digits
+                or (c == "," and (depth > 0 or _ellipsis_comma(chars, i)))
+                or (c in _ELLIPSIS_CHARS and _in_ellipsis(chars, i))
+                or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
+            )
             accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
-            if chars[i].blank and _between_formulas(chars, i):
+            if chars[i].blank and (
+                _between_formulas(chars, i) or _word_space_between_operands(chars, info, i)
+            ):
                 break
             if info.mathy(i) or chars[i].blank or inside or accent:
                 i += 1
@@ -2730,7 +2877,296 @@ def _inline_runs(
             reasons = _inline_evidence(chars, info, start, end, kinds)
             if reasons:
                 runs.append((start, end, reasons))
+    return _with_chemistry(row, kinds, _with_nuclides(row, kinds, _join_signatures(chars, runs)))
+
+
+_SIGNATURE_ARROWS = frozenset("\u2192\u21a6\u27f6\u27fc\u2208\u2282\u2286")
+
+
+def _join_signatures(
+    chars: list[_Char], runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """The maps "H : R^d -> R^p" and "f : A -> B" are one formula: two runs with only a colon
+    (and spaces) between them, the second holding an arrow or a membership sign, are joined.
+    A colon after a word ("Note: x = 1") is not between two runs."""
+    joined: list[tuple[int, int, list[str]]] = []
+    for run in runs:
+        if joined:
+            start, end, reasons = joined[-1]
+            between = [c.c for c in chars[end : run[0]] if not c.blank]
+            if between == [":"] and any(c.c in _SIGNATURE_ARROWS for c in chars[run[0] : run[1]]):
+                joined[-1] = (start, run[1], [*reasons, *(r for r in run[2] if r not in reasons)])
+                continue
+        joined.append(run)
+    return joined
+
+
+NUCLIDE_REASON = "nuclide with numbers before its symbol"
+NUCLIDE_GAP = 0.35  # x font size: widest gap between the stacked numbers and the symbol
+MAX_NUCLIDE_DIGITS = 6  # a mass number and an atomic number of three digits each
+
+
+def _nuclide_runs(row: _Row, kinds: list[ScriptKind | None]) -> list[tuple[int, int, list[str]]]:
+    """(start, end, reasons) of nuclide notation in a prose row: the mass number raised and
+    usually the atomic number lowered before an element's symbol ("14C", "235U", "4 2 He" with
+    the 4 above the 2), one run from the first number to the last letter of the symbol.
+
+    The numbers are raised or lowered text of upright type that stands against the symbol
+    (`_script_glyphs` gives them a kind: a group of digits and a capital letter at once after
+    it). The run is kept only when the group is all digits, starts at the beginning of a word,
+    and the letters after it are the symbol of an element (`speech_nuclides.ELEMENTS`) that
+    does not go on into a longer word: "226Ra" is a nuclide, "10 m2S" is not."""
+    from readablestem.pipeline.speech_nuclides import ELEMENTS
+
+    chars = row.chars
+    n = len(chars)
+    runs: list[tuple[int, int, list[str]]] = []
+    i = 0
+    while i < n:
+        if kinds[i] is None:
+            i += 1
+            continue
+        j = i
+        while j < n and kinds[j] is not None:
+            j += 1
+        group = chars[i:j]
+        glued = i > 0 and chars[i - 1].c.isalnum()
+        k = j  # a blank the PDF puts between the stacked numbers and the symbol is not a gap
+        while k < n and chars[k].blank:
+            k += 1
+        if (
+            not glued
+            and group
+            and all(c.c.isdigit() for c in group)
+            and len(group) <= MAX_NUCLIDE_DIGITS
+            and k < n
+            and chars[k].c.isupper()
+            and chars[k].x0 - max(c.x1 for c in group) <= NUCLIDE_GAP * row.size
+        ):
+            end = k + 1
+            if end < n and chars[end].c.islower() and kinds[end] is None:
+                end += 1
+            symbol = "".join(c.c for c in chars[k:end])
+            after = chars[end].c if end < n else " "
+            if symbol in ELEMENTS and not after.isalpha():
+                runs.append((i, end, [NUCLIDE_REASON]))
+                i = end
+                continue
+        i = j
     return runs
+
+
+def _with_nuclides(
+    row: _Row, kinds: list[ScriptKind | None], runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """`runs` with the row's nuclide notation as runs of their own, a run that overlaps one
+    taken into it."""
+    found = _nuclide_runs(row, kinds)
+    if not found:
+        return runs
+    merged = list(runs)
+    for start, end, reasons in found:
+        touching = [r for r in merged if r[0] < end and start < r[1]]
+        merged = [r for r in merged if r not in touching]
+        lo = min([start, *(r[0] for r in touching)])
+        hi = max([end, *(r[1] for r in touching)])
+        merged.append(
+            (lo, hi, [*reasons, *(x for r in touching for x in r[2] if x not in reasons)])
+        )
+    return sorted(merged)
+
+
+FORMULA_REASON = "chemical formula"
+REACTION_REASON = "chemical reaction"
+CHEM_WORD_GAP = 0.25  # x glyph size: a wider gap between two glyphs of a row ends a word
+_CHEM_DASHES = frozenset("\u2212-\u2013")
+
+
+def _chem_words(row: _Row, kinds: Sequence[ScriptKind | None]) -> list[chem.Word]:
+    """The row's words as `pipeline.chem` reads them: cut at a blank, at a gap (TeX sets no
+    space after a script: "Cl-and"), and around an arrow glyph, which is a word of its own
+    with the dash that is its shaft ("\u2212\u2192")."""
+    chars = row.chars
+    words: list[chem.Word] = []
+    current: list[int] = []
+    right = 0.0
+
+    def flush() -> None:
+        if current:
+            first, last = current[0], current[-1] + 1
+            words.append(
+                chem.Word(
+                    first,
+                    last,
+                    "".join(chars[k].c for k in range(first, last)),
+                    tuple(kinds[first:last]),
+                )
+            )
+            current.clear()
+
+    for i, c in enumerate(chars):
+        if c.blank:
+            flush()
+            continue
+        if c.c in chem.ARROW_HEADS:
+            shaft = i
+            while (
+                shaft - 1 in current
+                and chars[shaft - 1].c in _CHEM_DASHES
+                and kinds[shaft - 1] is None
+                and c.x0 - chars[shaft - 1].x1 <= CHEM_WORD_GAP * c.size
+            ):
+                shaft -= 1
+                current.remove(shaft)
+            flush()
+            words.append(
+                chem.Word(
+                    shaft,
+                    i + 1,
+                    "".join(x.c for x in chars[shaft : i + 1]),
+                    (None,) * (i + 1 - shaft),
+                )
+            )
+            right = c.x1
+            continue
+        if current and c.x0 - right >= CHEM_WORD_GAP * c.size:
+            flush()
+        if not current:
+            right = c.x1
+        current.append(i)
+        right = max(right, c.x1)
+    flush()
+    return words
+
+
+def _has_chemistry(row: _Row, kinds: Sequence[ScriptKind | None]) -> bool:
+    """A cheap test before the words are cut: a raised or lowered glyph of upright text, or
+    an arrow."""
+    return any(k is not None for k in kinds) or any(c.c in chem.ARROW_HEADS for c in row.chars)
+
+
+def _chem_runs(row: _Row, kinds: Sequence[ScriptKind | None]) -> list[tuple[int, int, list[str]]]:
+    """(start, end, reasons) of the chemical formulas, ions and reactions in a prose row
+    (`pipeline.chem`, docs/chemistry.md): formulas with lowered counts or raised charges,
+    with their state symbols; reactions, an arrow with species on both sides."""
+    if not _has_chemistry(row, kinds):
+        return []
+    labelled = chem.label_words(_chem_words(row, kinds))
+    found = [(a, b, [FORMULA_REASON]) for a, b in chem.formulas(labelled)]
+    found += [(a, b, [REACTION_REASON]) for a, b in chem.reactions(labelled)]
+    return sorted(found)
+
+
+def _with_chemistry(
+    row: _Row, kinds: Sequence[ScriptKind | None], runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """`runs` with the row's chemistry as runs of their own; a run that overlaps one is taken
+    into it (the arrow of a reaction was a run by itself, a formula may sit inside a run
+    that is maths for another reason)."""
+    found = _chem_runs(row, kinds)
+    if not found:
+        return runs
+    merged = list(runs)
+    for start, end, reasons in found:
+        touching = [r for r in merged if r[0] < end and start < r[1]]
+        merged = [r for r in merged if r not in touching]
+        lo = min([start, *(r[0] for r in touching)])
+        hi = max([end, *(r[1] for r in touching)])
+        # Formulas already inside this stretch (a reaction found them too) are one run.
+        merged = [r for r in merged if not (lo <= r[0] and r[1] <= hi)]
+        merged.append(
+            (lo, hi, [*reasons, *(x for r in touching for x in r[2] if x not in reasons)])
+        )
+    return sorted(merged)
+
+
+def _reaction_row(row: _Row, info: _CharInfo) -> bool:
+    """Is the whole row one chemical reaction (`Ag+(aq) + Cl-(aq) -> AgCl(s)`)? Then it is a
+    display equation line, not a sentence with an arrow in it: the ink outside the reaction
+    is at most the punctuation that ends it."""
+    if not any(c.c in chem.ARROW_HEADS for c in row.chars):
+        return False
+    kinds = _script_kinds(row, info)
+    labelled = chem.label_words(_chem_words(row, kinds))
+    spans = chem.reactions(labelled)
+    if len(spans) != 1:
+        return False
+    start, end = spans[0]
+    outside = [c.c for i, c in enumerate(row.chars) if not c.blank and not start <= i < end]
+    return all(ch in ",.;:" for ch in outside)
+
+
+# TeX sets nothing between two operands of a formula ("f(x) (y)" has no space), so a visible
+# gap there is a word space of the sentence, and the formula ends before it: "eps(k) (i = 1)" is
+# two formulas, as the author typed them. A thin space ("dx \\, dy", 0.17 em) is narrower.
+WORD_SPACE = 0.25  # x font size: the narrowest gap that is a word space
+_OPERAND_END = frozenset(")]}'\u2032!\u221e")
+_OPERAND_START = frozenset("([{\u2202\u2207\u221a\u222b\u2211\u220f\u221e")
+
+
+def _word_space_between_operands(chars: list[_Char], info: _CharInfo, i: int) -> bool:
+    """Is the blank at `i` a word space between the end of one operand and the start of another?"""
+    if not _TEX_MADE:
+        return False
+    before = next((k for k in range(i - 1, -1, -1) if not chars[k].blank), None)
+    after = next((k for k in range(i + 1, len(chars)) if not chars[k].blank), None)
+    if before is None or after is None or info.script[before] or info.script[after]:
+        return False
+    a, b = chars[before], chars[after]
+    if a.c.isdigit() and b.c.isalpha():
+        return False  # "8.5 m/s": a number and its unit are one quantity
+    ends = a.c.isalnum() or a.c in _OPERAND_END
+    starts = b.c.isalnum() or b.c in _OPERAND_START
+    return ends and starts and b.x0 - a.x1 >= WORD_SPACE * max(a.size, b.size)
+
+
+_ELLIPSES = frozenset("\u2026\u22ef\u22ee\u22f1")
+_ELLIPSIS_CHARS = _ELLIPSES | frozenset(".\u00b7")
+
+
+def _in_ellipsis(chars: list[_Char], i: int) -> bool:
+    """Is the glyph at `i` one of an ellipsis: a single ellipsis character, or a dot (or a
+    centred dot) in a group of three, set side by side, with a comma on one side of the group?"""
+    if chars[i].c in _ELLIPSES:
+        return True
+    lo = hi = i
+    while (lo > 0 and chars[lo - 1].c in ".\u00b7") or (
+        lo > 1 and chars[lo - 1].blank and chars[lo - 2].c in ".\u00b7"
+    ):
+        lo -= 1
+    while (hi + 1 < len(chars) and chars[hi + 1].c in ".\u00b7") or (
+        hi + 2 < len(chars) and chars[hi + 1].blank and chars[hi + 2].c in ".\u00b7"
+    ):
+        hi += 1
+    group = [c for c in chars[lo : hi + 1] if not c.blank]
+    if len(group) != 3:
+        return False
+    before = next((chars[k].c for k in range(lo - 1, -1, -1) if not chars[k].blank), "")
+    after = next((chars[k].c for k in range(hi + 1, len(chars)) if not chars[k].blank), "")
+    return before == "," or after == ","
+
+
+def _ellipsis_comma(chars: list[_Char], i: int) -> bool:
+    """Is the comma at `i` next to an ellipsis ("i = 1, ..., S", "1, 2, ..., n")? Authors type
+    such a list as one formula; a bare comma between two formulas ends the first."""
+
+    def dots(indexes: Iterable[int]) -> bool:
+        seen = 0
+        for k in indexes:
+            if chars[k].blank:
+                if seen:
+                    break
+                continue
+            if chars[k].c in _ELLIPSES:
+                return True
+            if chars[k].c not in ".\u00b7":
+                break
+            seen += 1
+        return seen >= 3 or (seen > 0 and any(chars[k].c in "\u00b7" for k in indexes))
+
+    ahead = dots(range(i + 1, min(len(chars), i + 8)))
+    behind = dots(range(i - 1, max(-1, i - 8), -1))
+    return ahead or behind
 
 
 def _between_formulas(chars: list[_Char], i: int) -> bool:
@@ -2790,7 +3226,56 @@ def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tupl
             else:
                 end -= 1
             changed = True
+        elif _TEX_MADE and end - start > 1 and text[-1] in "([{":
+            end -= 1  # "K (see below)": the run never ends with a bracket it opens
+            changed = True
+        elif _TEX_MADE and end - start > 2 and _sentence_parentheses(text):
+            start, end = start + 1, end - 1  # "(x = 0.9)": the pair is the sentence's
+            changed = True
+        elif _TEX_MADE and (cut := _tail_outside_maths(chars, info, start, end)) is not None:
+            end = cut  # "t = 915 s", "x = 5 [8]": a unit and a citation are text
+            changed = True
     return start, end
+
+
+def _sentence_parentheses(text: str) -> bool:
+    """Does one pair of parentheses enclose the whole run, with no comma at its top level?
+    A tuple, "(a, b)", is maths; "(x = 0.9)" is a formula in a parenthesis of the sentence."""
+    if text[0] != "(" or text[-1] != ")":
+        return False
+    depth = 0
+    for k, c in enumerate(text):
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+            if depth == 0 and k < len(text) - 1:
+                return False  # "(a + b)(c + d)", "(x + 1)^2": the first pair closes early
+        elif c == "," and depth == 1:
+            return False
+    return depth == 0
+
+
+_CITATION_TAIL = re.compile(r"\[\d(?:[\d,\u2013\-\s]*\d)?\]$")
+
+
+def _tail_outside_maths(chars: list[_Char], info: _CharInfo, start: int, end: int) -> int | None:
+    """Where the run should end, when it ends in what the author writes outside the dollar
+    signs: the upright unit of a number ("915 s", "9.8 m"), or a numbered citation ("[8]")
+    after a space. None when it ends in neither."""
+    text = "".join(c.c for c in chars[start:end])
+    cite = _CITATION_TAIL.search(text)
+    if cite is not None and cite.start() > 0 and text[cite.start() - 1].isspace():
+        return start + cite.start()
+    last = end - 1
+    if not (chars[last].c.isalpha() and info.classes[last] == "L" and not chars[last].italic):
+        return None
+    if info.script[last] or chars[last].math or last - 1 < start or not chars[last - 1].blank:
+        return None
+    back = next((k for k in range(last - 1, start - 1, -1) if not chars[k].blank), None)
+    if back is None or not chars[back].c.isdigit():
+        return None
+    return back + 1
 
 
 def _article(chars: list[_Char], info: _CharInfo, start: int, end: int, blank: int) -> bool:
@@ -2897,6 +3382,17 @@ def _inline_evidence(
         if own[i] is None and own[i + 1] is None
     ):
         return ["signed number"]
+    if _italic_variables(chars, info, start, end, own):
+        return ["italic variable in prose"]
+    if any(
+        chars[k].c == "0"
+        and info.script[k + 1]
+        and own[k + 1] is None
+        and _power_of_ten(chars, k, k + 1)
+        for k in range(start, end - 1)
+        if own[k] is None
+    ):
+        return ["power of ten"]
     text = "".join(chars[i].c for i in range(start, end))
     if _MARKUP.search(text):
         return []  # "<a><b/></a>" in a paragraph about XML is not a comparison
@@ -2906,6 +3402,71 @@ def _inline_evidence(
             if any(c.isalnum() for c in left) and any(c.isalnum() for c in right):
                 return ["relation between operands"]
     return []
+
+
+# A run of italic letters in upright prose is a variable (`S`, `N_i`, `K(t)`): LaTeX sets the Latin
+# letters of a formula in the text family's italic when the maths font only has the Greek and the
+# symbols (mathptmx, mathpazo, Charter, newtx), so no glyph is in a maths font. Emphasis is words:
+# a group of more than three letters, a short English word ("not"), a whole italic phrase, or a
+# label ("(a)") is text.
+_ITALIC_GROUP_LETTERS = 3
+_LABEL_RUN = re.compile(r"^\(?[A-Za-z]\)$|^[A-Za-z]\)$")  # "(a)", "a)"
+_FIGURE_PART = re.compile(r"^\d+\([A-Za-z](?:[,\u2013-][A-Za-z])*\)$")  # "6(a)", "5(d,e)"
+
+
+def _italic_variables(
+    chars: list[_Char],
+    info: _CharInfo,
+    start: int,
+    end: int,
+    own: Sequence[ScriptKind | None],
+) -> bool:
+    """Is the run `chars[start:end]` made of italic variables standing in upright prose?"""
+    if not _TEX_MADE:
+        return False
+    # The letters of a maths word ("ln" in "ln X") are upright and say nothing against the
+    # italic of the variables beside them; a run of nothing but them is not evidence.
+    letters = [
+        i
+        for i in range(start, end)
+        if own[i] is None and info.classes[i] == "L" and not info.maths_words[i]
+    ]
+    if not letters or not all(chars[i].italic for i in letters):
+        return False
+    row_letters = [c for c in chars if c.c.isalpha()]
+    if not row_letters or sum(c.italic for c in row_letters) * 2 > len(row_letters):
+        return False  # an italic phrase: its single letters are words ("a", "I")
+    group: list[int] = []
+    for i in [*letters, -1]:
+        if group and (i < 0 or i != group[-1] + 1 or info.script[i] != info.script[group[0]]):
+            word = "".join(chars[k].c for k in group).lower()
+            if len(group) > _ITALIC_GROUP_LETTERS or (
+                len(group) > 1 and not info.script[group[0]] and word in hyphens.words()
+            ):
+                return False
+            group = []
+        if i >= 0:
+            group.append(i)
+    for i in letters:  # "-49 m": a number, a space and an italic letter is a quantity
+        if i > start and chars[i - 1].blank and not chars[i].c.isdigit():
+            back = next((k for k in range(i - 1, start - 1, -1) if not chars[k].blank), None)
+            if back is not None and chars[back].c.isdigit() and not info.script[back]:
+                return False
+    before = next((k for k in range(start - 1, -1, -1) if not chars[k].blank), None)
+    after = next((k for k in range(end, len(chars)) if not chars[k].blank), None)
+    if before is not None and chars[before].c.isdigit() and not info.script[before]:
+        return False  # "-49 m", a number, a space and an italic letter: a quantity with its unit
+    if any(k is not None and chars[k].c.isalpha() and chars[k].italic for k in (before, after)):
+        return False  # the edge of a longer italic stretch
+    text = "".join(c.c for c in chars[start:end] if not c.blank)
+    if (
+        before is not None
+        and after is not None
+        and chars[before].c == "("
+        and chars[after].c == ")"
+    ):
+        return False  # the run was trimmed out of "(a)": a label
+    return not (_LABEL_RUN.match(text) or _FIGURE_PART.match(text))  # "(a) Use", "Fig. 6(a)"
 
 
 # ============================================================================ bold letters
@@ -4196,10 +4757,23 @@ def _resolve_fragments(rows: list[_Row], rules: list[_Path]) -> list[_Path]:
     return used
 
 
+# How far to the right of a stray opening brace the first equation of its system may start.
+STRAY_BRACE_REACH = 2.0
+
+
 def _math_neighbours(row: _Row, other: _Row) -> bool:
     """Does fragment `row` belong with maths row `other`? Vertically adjacent and
-    overlapping in x, or an equation number beside it (`_number_beside`)."""
+    overlapping in x, or an equation number beside it (`_number_beside`), or an opening brace
+    level with `other` and a little to its left (the brace of a system, `_stray_brace_cut`)."""
     size = max(row.size, other.size)
+    if (
+        row.ink
+        and all(c.c in _OPENING_BRACES for c in row.ink)
+        and row.column == other.column
+        and 0 <= other.x0 - row.x1 <= STRAY_BRACE_REACH * size
+        and other.y0 - size <= (row.y0 + row.y1) / 2 <= other.y1 + size
+    ):
+        return True
     gap_y = max(row.y0 - other.y1, other.y0 - row.y1)
     gap_x = max(row.x0 - other.x1, other.x0 - row.x1)
     if gap_y <= 0.6 * size and gap_x <= 1.0 * size and gap_y > -0.5 * min(row.height, other.height):
@@ -4371,11 +4945,61 @@ def _split_braced_systems(rows: list[_Row]) -> list[_Row]:
     for row in rows:
         cut = _brace_cut(row, index)
         if cut is None:
+            cut = _stray_brace_cut(row, index)
+        if cut is None:
             out.append(row)
             continue
         out.append(_Row(row.chars[:cut], column=row.column, marker=row.marker))
         out.append(_Row(row.chars[cut:], column=row.column))
     return out
+
+
+def _stray_brace_cut(row: _Row, index: _RowIndex) -> int | None:
+    """Index of the opening brace that ends a row of text, when it is the brace of the system
+    set to its right, or None.
+
+    OpenStax also prints "Solve the system by substitution. {" with the brace the last glyph of
+    the sentence's row and the two equations in rows of their own to its right, level with the
+    brace, not with the sentence (the maths rows' baselines are above and below the brace's).
+    The row is then text with a brace at its end, and the system's crop starts at its first
+    equation, without the brace. The brace is cut off as a row of its own when a maths row starts
+    within `STRAY_BRACE_REACH` font sizes to its right, with another maths row under that one,
+    and the brace's middle is level with the two; `_math_neighbours` then takes it into the system.
+    """
+    chars = row.chars
+    ink = [i for i, c in enumerate(chars) if not c.blank]
+    if row.vertical or len(ink) < 3 or chars[ink[-1]].c != "{":
+        return None
+    start = ink[-1]
+    if not any(not c.blank for c in chars[:start]):
+        return None
+    brace = chars[start]
+    size = row.size
+    for right in index.near(brace.y0, brace.y1):
+        if right is row or right.column != row.column or right.vertical:
+            continue
+        if not 0 <= right.x0 - brace.x1 <= STRAY_BRACE_REACH * size:
+            continue
+        probe = _Row(right.chars, column=right.column)
+        _classify_row(probe)
+        if probe.kind != "math":
+            continue
+        for below in index.near(right.y1 - 0.3 * size, right.y1 + 1.0 * size):
+            if below is row or below is right or below.y0 < right.y1 - 0.3 * size:
+                continue
+            shared = min(below.x1, right.x1) - max(below.x0, right.x0)
+            if below.column == row.column and shared >= 0.5 * min(
+                below.x1 - below.x0, right.x1 - right.x0
+            ):
+                trial = _Row(below.chars, column=below.column)
+                _classify_row(trial)
+                middle = (brace.y0 + brace.y1) / 2
+                if (
+                    trial.kind == "math"
+                    and right.y0 - 0.5 * size <= middle <= below.y1 + 0.5 * size
+                ):
+                    return start  # level with the middle of the system's rows
+    return None
 
 
 def _brace_cut(row: _Row, index: _RowIndex) -> int | None:
@@ -4479,6 +5103,12 @@ class _Region:
     rules: list[_Path] = field(default_factory=list)
     labels: list[_Row] = field(default_factory=list)
     box: BBox = (0.0, 0.0, 0.0, 0.0)  # rows and rules, while lines are being stacked
+    # Placed by the page math pass instead of by the rules above: `forced`; its LaTeX
+    # reading; and, on a page that had a pass, whether the pass confirmed the region
+    # ("span") or only layout found it ("layout").
+    forced: bool = False
+    page_pass: PageStatus | None = None
+    latex: str | None = None
 
 
 @dataclass(eq=False)
@@ -4609,7 +5239,11 @@ def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
        aligned (the rows of an aligned derivation). Two whole equations stacked close
        together but centred on their own ("time = d / v" over "d = v t") stay apart.
     """
-    maths = [r for r in rows if r.kind == "math" and not r.absorbed and not r.vertical]
+    maths = [
+        r
+        for r in rows
+        if r.kind == "math" and not r.absorbed and not r.vertical and r.region is None
+    ]
     if not maths:
         return []
     parent = list(range(len(maths)))
@@ -4781,6 +5415,9 @@ class _Figure:
     paths: int = 0  # vector paths in it
     labels: list[_Row] = field(default_factory=list)
     caption: str | None = None
+    # The caption cut into text and inline maths (`_paragraph_pieces`), when it has any maths.
+    caption_pieces: list[str | _Inline] | None = None
+    caption_size: float | None = None
     xref: int = 0  # the image of a figure that is one raster image (0: inline, or several)
     flat_scripts: bool = False  # its caption has raised or lowered text, written flat
     equation: bool = False  # a picture of an equation (`_equation_pictures`)
@@ -5877,6 +6514,7 @@ class _Block:
     score: float | None = None
     reasons: list[str] = field(default_factory=list)
     caption: str | None = None
+    caption_pieces: list[str | _Inline] | None = None  # figures: the caption's text and maths
     marker: _Marker | None = None  # list items: the marker of the first row
     origin: float = 0.0  # list items: left edge of their column's text (`_column_origins`)
     label: str | None = None  # display equations: the equation number beside them
@@ -5889,6 +6527,9 @@ class _Block:
     # written flat, and a notice says so (`scripts_flattened`).
     flat_scripts: bool = False
     marked: str | None = None  # headings: `text` with its raised and lowered runs marked
+    # Display equations placed by the page math pass: its LaTeX, and "span" or "layout".
+    page_latex: str | None = None
+    page_status: PageStatus | None = None
 
 
 def _dominant_size(rows: Sequence[_Row]) -> float:
@@ -6174,7 +6815,7 @@ def _wrapped_maths(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
     left margin at the usual line pitch. A numbered or multi-line equation is never one.
     """
     region = row.region
-    if region is None or region.labels or len(region.rows) != 1:
+    if region is None or region.forced or region.labels or len(region.rows) != 1:
         return False
     return abs(row.x0 - run.box[0]) <= 0.5 and _continues(prev, row, run, ctx)
 
@@ -6239,7 +6880,14 @@ def _equation_block(
 
     `plain`: the text layer keeps no letter styles. For a line set bold as a whole (a
     heading's weight), where bold says nothing about vectors."""
-    text = _clean(" ".join((r.text if plain else r.styled_text) for r in rows))
+    # A system's opening brace (a row of its own, standing left of all the others) is read first;
+    # the brace of "f(x) = {" stays where it is.
+    braces = [r for r in rows if r.ink and all(c.c in _OPENING_BRACES for c in r.ink)]
+    others = [r for r in rows if r not in braces]
+    left = min((r.x0 for r in others), default=0.0)
+    first = [r for r in braces if r.x1 <= left + 0.5]
+    ordered = [*first, *(r for r in rows if r not in first)]
+    text = _clean(" ".join((r.text if plain else r.styled_text) for r in ordered))
     script = any(c.flags & _SUPERSCRIPT_FLAG or c.size < SCRIPT_RATIO * size for c in ink)
     score, reasons = equation_score(text, sorted({c.font for c in ink}), script)
     if len(rows) > 1:
@@ -6248,6 +6896,8 @@ def _equation_block(
     labels = sorted(region.labels, key=lambda r: (r.y0, r.x0)) if region else []
     if labels:
         reasons.append("equation number")
+    if region is not None and region.page_pass is not None:
+        reasons.append(PAGE_SPAN_REASON if region.page_pass == "span" else PAGE_LAYOUT_ONLY_REASON)
     return _Block(
         Kind.EQUATION,
         box,
@@ -6258,6 +6908,8 @@ def _equation_block(
         reasons=reasons,
         label=" ".join(r.clean for r in labels) or None,
         regular=_regular_letters(ink),
+        page_latex=region.latex if region is not None else None,
+        page_status=region.page_pass if region is not None else None,
     )
 
 
@@ -6481,6 +7133,65 @@ def _marked(chars: list[_Char], kinds: list[ScriptKind | None], start: int, end:
     return script_marks.wrap(text, marks)
 
 
+# `Element.reasons` the page math pass leaves on what it placed and on what it did not confirm.
+PAGE_SPAN_REASON = "page pass span"
+PAGE_LAYOUT_ONLY_REASON = "page pass did not confirm"
+
+
+def _carry_page_math(old: _Row, new: _Row, offset: int) -> None:
+    """The page math marks of `old` on `new`, a row made of `old.chars[offset:]`."""
+    new.page_checked = old.page_checked
+    new.page_inline = [(a - offset, b - offset, t) for a, b, t in old.page_inline if a >= offset]
+    new.page_nonmath = [(a - offset, b - offset) for a, b in old.page_nonmath if a >= offset]
+
+
+def _with_page_spans(
+    row: _Row, runs: list[tuple[int, int, list[str]]]
+) -> tuple[list[tuple[int, int, list[str]]], dict[tuple[int, int], str]]:
+    """Layout's inline runs of a row with the page pass's spans laid over them.
+
+    A run that touches a span the pass placed is replaced by that span (the pass settles
+    where the maths starts and ends); a run inside a stretch the pass called a look-alike of
+    maths is dropped; the other runs stay, marked as not confirmed. The pass's own spans
+    come with their LaTeX."""
+    spans = sorted(row.page_inline)
+    out: list[tuple[int, int, list[str]]] = []
+    for start, end, reasons in runs:
+        if any(start < b and a < end for a, b, _ in spans):
+            continue
+        if any(start < b and a < end for a, b in row.page_nonmath):
+            continue
+        out.append((start, end, [*reasons, PAGE_LAYOUT_ONLY_REASON]))
+    latex = {(a, b): t for a, b, t in spans}
+    out += [(a, b, [PAGE_SPAN_REASON]) for a, b, _ in spans]
+    return sorted(out, key=lambda r: (r[0], r[1])), latex
+
+
+_NO_SPACE_BEFORE = frozenset(",.;:!?)]}\u2019\u201d")
+_NO_SPACE_AFTER = frozenset("([{\u2018\u201c")
+
+
+def _gap_before(chars: list[_Char], start: int) -> bool:
+    """Is there a visible gap between the glyph before an inline equation and its first
+    glyph, with no blank in the text layer for it ("ions" and "SO42-" in TeX output, which
+    sets no space after a script)? Then the text before it gets one."""
+    if start == 0 or chars[start - 1].blank or chars[start].blank:
+        return False
+    before, first = chars[start - 1], chars[start]
+    return (
+        before.c not in _NO_SPACE_AFTER and first.x0 - before.x1 >= SPACE_AFTER_SCRIPT * first.size
+    )
+
+
+def _gap_after(chars: list[_Char], start: int, end: int) -> bool:
+    """The same after an inline equation: a visible gap to the next glyph, no blank."""
+    if end >= len(chars) or chars[end].blank or chars[end - 1].blank:
+        return False
+    nxt = chars[end]
+    right = max((c.x1 for c in chars[start:end] if not c.blank), default=chars[end - 1].x1)
+    return nxt.c not in _NO_SPACE_BEFORE and nxt.x0 - right >= SPACE_AFTER_SCRIPT * nxt.size
+
+
 def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
     """Paragraph (or list item) text with inline equations cut out, hyphenation repaired
     between rows. A list item's text starts after its marker."""
@@ -6491,13 +7202,18 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
     if block.marker is not None and block.marker.end:
         first = rows[0]
         rows[0] = _Row(first.chars[block.marker.end :], column=first.column)
+        _carry_page_math(first, rows[0], block.marker.end)
     letters = _BoldLetters.start()
     for row in rows:
         row_pieces: list[str | _Inline] = []
         cursor = 0
         info = _CharInfo.of(row)
         raw, kinds = _script_glyphs(row, info)
-        found = _bold_letter_runs(row, _inline_runs(row, info, kinds), letters)
+        runs = _inline_runs(row, info, kinds)
+        page_latex: dict[tuple[int, int], str] = {}
+        if row.page_checked:
+            runs, page_latex = _with_page_spans(row, runs)
+        found = _bold_letter_runs(row, runs, letters)
         found = sorted(
             [
                 *(
@@ -6516,6 +7232,8 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
             block.flat_scripts = True  # raised or lowered text that is written flat
         for start, end, reasons in found:
             row_pieces.append(_marked(row.chars, kinds, cursor, start))
+            if _gap_before(row.chars, start):
+                row_pieces.append(" ")
             chars = row.chars[start:end]
             text = (
                 ""
@@ -6526,10 +7244,24 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
             fonts = sorted({c.font for c in ink})
             score, _ = equation_score(text, fonts, any(c.flags & _SUPERSCRIPT_FLAG for c in ink))
             box = _clear_of_punctuation(_union((c.x0, c.y0, c.x1, c.y1) for c in ink), row, end)
+            status = (
+                ("span" if (start, end) in page_latex else "layout") if row.page_checked else None
+            )
             row_pieces.append(
-                _Inline(box, text, score, reasons, _dominant_size([row]), _regular_letters(ink))
+                _Inline(
+                    box,
+                    text,
+                    score,
+                    reasons,
+                    _dominant_size([row]),
+                    _regular_letters(ink),
+                    page_latex.get((start, end)),
+                    status,
+                )
             )
             cursor = end
+            if _gap_after(row.chars, start, end):
+                row_pieces.append(" ")
         row_pieces.append(_marked(row.chars, kinds, cursor, len(row.chars)))
         _append_row(pieces, row_pieces)
     return _strip_teacher_tags(_tidy(pieces))
@@ -6640,6 +7372,10 @@ def _attach_captions(blocks: list[_Block], figures: list[_Figure]) -> None:
         figures[f_index].flat_scripts = any(
             kind for row in blocks[c_index].rows for kind in _script_kinds(row)
         )
+        pieces = _paragraph_pieces(blocks[c_index])
+        if any(isinstance(piece, _Inline) for piece in pieces):
+            figures[f_index].caption_pieces = pieces
+            figures[f_index].caption_size = blocks[c_index].font_size
         used_captions.add(c_index)
     for index, block in enumerate(blocks):
         if block.kind == "caption":
@@ -6845,6 +7581,7 @@ def _page_blocks(
     mixed_ink: bool = False,
     label_keys: Collection[tuple] = frozenset(),
     covers: Sequence[tuple[float, float]] = (),
+    page_math: Any = None,
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_exercise_numbers(_split_braced_systems(_split_labels(rows)))
@@ -6883,8 +7620,16 @@ def _page_blocks(
     _take_labels(restored, figures, rows)
     figures, rows = _equation_pictures(page, figures, rows, ctx, small_pictures)
     text_rows = [r for r in rows if not r.absorbed]
-    _equation_regions(text_rows, used_rules)
     placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
+    if page_math is not None:
+        # The page math pass (ADR 0006): the rows as they stand, in reading order, are what
+        # the model is shown, and its verified spans are laid over them before the rules
+        # below group them into equations.
+        first = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
+        text_rows = page_math.on_page(number, text_rows, [text_rows[i] for i in first], used_rules)
+    _equation_regions(text_rows, used_rules)
+    if page_math is not None:
+        page_math.after_regions(number, text_rows)
     order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
     ordered = _contiguous_regions([text_rows[i] for i in order])
     runs = _runs(ordered, ctx)
@@ -6915,6 +7660,8 @@ def _page_blocks(
                 figure.bbox,
                 text=labels or None,
                 caption=figure.caption,
+                caption_pieces=figure.caption_pieces,
+                font_size=figure.caption_size,
                 reasons=figure.reasons,
                 flat_scripts=figure.flat_scripts,
             )
@@ -7542,12 +8289,14 @@ def _read_page(
     return rows, _page_paths(page, drawings, seen), kind
 
 
-def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
+def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any = None) -> Layout:
     frags: dict[int, list[_Row]] = {}
     paths: dict[int, list[_Path]] = {}
     types: dict[int, page_type.PageTypeResult] = {}
     budget = page_type.InkBudget()
     producer = page_type.producer_hint(doc)
+    global _TEX_MADE
+    _TEX_MADE = producer == "tex"
     for number in selected:
         frags[number], paths[number], types[number] = _read_page(doc[number], budget, producer)
         if _kept_whole(types[number]):
@@ -7619,6 +8368,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             mixed_ink=types[n].kind == "mixed_ink",
             label_keys=label_keys,
             covers=_covered_points(doc[n], types[n]),
+            page_math=page_math,
         )
         for n in selected
     ]
@@ -8034,26 +8784,25 @@ def _to_elements(
                 )
                 for child_id, inline in children:
                     elements.append(
-                        Element(
-                            id=child_id,
-                            kind=Kind.EQUATION,
-                            page=page.number,
-                            bbox=_rounded(inline.bbox),
-                            order=len(elements),
-                            text=inline.text or None,  # None: a picture, no text layer
-                            font_size=inline.font_size,
-                            score=inline.score,
-                            reasons=inline.reasons,
-                            display="inline",
-                            parent_id=element_id,
-                            regular_letters=inline.regular,
-                        )
+                        _inline_element(child_id, inline, page.number, element_id, elements)
                     )
                 continue
             kind = Kind(block.kind)
             heading_text, heading_runs = (
                 script_marks.split(block.marked) if block.marked else (None, [])
             )
+            caption_children: list[tuple[str, _Inline]] = []
+            caption_marked = None
+            if kind is Kind.FIGURE and block.caption_pieces:
+                parts = []
+                for piece in block.caption_pieces:
+                    if isinstance(piece, _Inline):
+                        child_id = next(ids)
+                        caption_children.append((child_id, piece))
+                        parts.append(inline_marker(child_id))
+                    else:
+                        parts.append(piece)
+                caption_marked = " ".join(script_marks.strip_marks("".join(parts)).split())
             elements.append(
                 Element(
                     id=element_id,
@@ -8070,11 +8819,40 @@ def _to_elements(
                     display="block" if kind == Kind.EQUATION else None,
                     equation_label=block.label if kind == Kind.EQUATION else None,
                     caption=block.caption,
+                    caption_marked=caption_marked,
                     regular_letters=block.regular if kind == Kind.EQUATION else None,
+                    page_latex=block.page_latex if kind == Kind.EQUATION else None,
+                    page_status=block.page_status if kind == Kind.EQUATION else None,
                     table=block.table if kind == Kind.TABLE else None,
                 )
             )
+            for child_id, inline in caption_children:
+                elements.append(
+                    _inline_element(child_id, inline, page.number, element_id, elements)
+                )
     return elements
+
+
+def _inline_element(
+    child_id: str, inline: _Inline, page: int, parent_id: str, elements: list[Element]
+) -> Element:
+    """The equation element of an inline formula of `parent_id` (a paragraph or a caption)."""
+    return Element(
+        id=child_id,
+        kind=Kind.EQUATION,
+        page=page,
+        bbox=_rounded(inline.bbox),
+        order=len(elements),
+        text=inline.text or None,  # None: a picture, no text layer
+        font_size=inline.font_size,
+        score=inline.score,
+        reasons=inline.reasons,
+        display="inline",
+        parent_id=parent_id,
+        regular_letters=inline.regular,
+        page_latex=inline.page_latex,
+        page_status=inline.page_status,
+    )
 
 
 # ============================================================================ glyphs

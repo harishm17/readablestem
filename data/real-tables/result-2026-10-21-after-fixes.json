@@ -1,0 +1,312 @@
+{
+ "date": "2026-10-21",
+ "mode": "local (no model)",
+ "command": "readablestem eval pipeline --task tables --mode local --real-dir data/real-tables",
+ "floors": {
+  "precision": 0.95,
+  "full_extent_recall": 0.85
+ },
+ "note": "the development set after the fixes of fix/table-recall (tuned on); the first measurement is result-2026-10-21.json",
+ "real_documents": {
+  "documents": 5,
+  "pdf_pages": 64,
+  "labelled_tables": 25,
+  "predicted_tables": 23,
+  "true_tables": 23,
+  "precision": 1.0,
+  "precision_ci95": [
+   0.8568833796149266,
+   1.0
+  ],
+  "full_extent_recall": 0.92,
+  "full_extent_recall_ci95": [
+   0.7503389087653979,
+   0.9777795989158738
+  ],
+  "any_extent_recall": 0.92,
+  "errors": {},
+  "labels_sha256": "b548f2c6250a8bca526e03e97183061dbdce959cd7dc739154383c94070cf944"
+ },
+ "tables": [
+  {
+   "file": "2401.00649.pdf",
+   "tables": [
+    {
+     "page": 1,
+     "bbox": [
+      130.5,
+      208.6,
+      480.5,
+      453.7
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 3,
+     "bbox": [
+      166.0,
+      207.8,
+      445.1,
+      372.5
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 5,
+     "bbox": [
+      115.7,
+      209.3,
+      509.9,
+      409.3
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 8,
+     "bbox": [
+      168.2,
+      328.5,
+      442.8,
+      409.1
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 10,
+     "bbox": [
+      163.8,
+      244.0,
+      471.8,
+      329.7
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 13,
+     "bbox": [
+      228.7,
+      226.8,
+      382.4,
+      289.3
+     ],
+     "outcome": "found"
+    }
+   ],
+   "false": []
+  },
+  {
+   "file": "2412.19752.pdf",
+   "tables": [
+    {
+     "page": 1,
+     "bbox": [
+      77.6,
+      163.3,
+      392.6,
+      351.2
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 1,
+     "bbox": [
+      76.7,
+      369.6,
+      299.3,
+      436.0
+     ],
+     "outcome": "missed"
+    },
+    {
+     "page": 1,
+     "bbox": [
+      76.7,
+      453.1,
+      361.0,
+      515.7
+     ],
+     "outcome": "missed"
+    },
+    {
+     "page": 1,
+     "bbox": [
+      76.1,
+      542.6,
+      519.4,
+      662.5
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 2,
+     "bbox": [
+      76.7,
+      99.6,
+      556.5,
+      254.1
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 2,
+     "bbox": [
+      77.1,
+      277.6,
+      458.4,
+      361.3
+     ],
+     "outcome": "found"
+    }
+   ],
+   "false": []
+  },
+  {
+   "file": "2505.03022.pdf",
+   "tables": [
+    {
+     "page": 3,
+     "bbox": [
+      136.1,
+      99.7,
+      459.2,
+      208.1
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 17,
+     "bbox": [
+      74.9,
+      99.7,
+      520.3,
+      282.2
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 22,
+     "bbox": [
+      87.5,
+      99.7,
+      507.8,
+      473.9
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 24,
+     "bbox": [
+      208.3,
+      126.6,
+      376.4,
+      676.6
+     ],
+     "outcome": "found"
+    }
+   ],
+   "false": []
+  },
+  {
+   "file": "2409.08224.pdf",
+   "tables": [
+    {
+     "page": 1,
+     "bbox": [
+      56.0,
+      160.7,
+      295.0,
+      205.5
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 2,
+     "bbox": [
+      54.0,
+      107.1,
+      558.0,
+      311.4
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 3,
+     "bbox": [
+      54.0,
+      107.1,
+      558.0,
+      299.9
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 4,
+     "bbox": [
+      54.0,
+      121.6,
+      558.0,
+      567.7
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 6,
+     "bbox": [
+      54.0,
+      107.1,
+      561.9,
+      460.3
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 9,
+     "bbox": [
+      54.0,
+      187.1,
+      558.0,
+      540.8
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 10,
+     "bbox": [
+      54.0,
+      210.0,
+      558.0,
+      643.9
+     ],
+     "outcome": "found"
+    }
+   ],
+   "false": []
+  },
+  {
+   "file": "2407.13734.pdf",
+   "tables": [
+    {
+     "page": 1,
+     "bbox": [
+      84.2,
+      169.1,
+      535.3,
+      369.2
+     ],
+     "outcome": "found"
+    },
+    {
+     "page": 4,
+     "bbox": [
+      93.8,
+      133.6,
+      518.1,
+      328.4
+     ],
+     "outcome": "found"
+    }
+   ],
+   "false": []
+  }
+ ]
+}

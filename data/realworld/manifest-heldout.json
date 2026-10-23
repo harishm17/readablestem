@@ -1,0 +1,320 @@
+{
+ "part": "heldout",
+ "seed": "realworld-2026-10-21",
+ "papers": [
+  {
+   "id": "2301.06637",
+   "title": "How many acres of potatoes does a society need?",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:ed-ph",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    3,
+    4,
+    9,
+    16
+   ],
+   "equations": 54,
+   "display": 5,
+   "pdf_sha256": "04e29ddac103e3982e7ad02725e9685c023245342e1268159cd1e2f28e565e1c",
+   "source_sha256": "615281312902374d55dc4c940a61f1d8d96382130d9a206a2e09afc55058fb66",
+   "extract_pdf_sha256": "ca5a170b0abb2175aa0d0770b06de97866b254e5aa2a4b79234ca5d082c1cc69",
+   "gold_sha256": "6b43fad876c1bbf52d745814d3727913a5b6fb052b7422b596ee4400acd00cfb"
+  },
+  {
+   "id": "2301.08958",
+   "title": "A Practical Introduction to Regression Discontinuity Designs: Extensions",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "econ:econ:EM",
+   "style": "tutorial",
+   "pages_chosen": [
+    5,
+    6,
+    20,
+    33
+   ],
+   "equations": 60,
+   "display": 3,
+   "pdf_sha256": "7405c2dbd6ba6d8ee92ea4bd8287a652d1972dee92ceab26b3e5eb4418a1693c",
+   "source_sha256": "1cb89e32377886fc40c03907b9d9d92311072c97fef5f7c2c16c9ee290ed6109",
+   "extract_pdf_sha256": "e4dfce6441f205ce8a47109acfd431e8f0cba2f5fbca02d96def50245e172bbb",
+   "gold_sha256": "8bfa5e7feedff59050a449b2723f098862d979829d483243f0b6f015b03f16a1"
+  },
+  {
+   "id": "2310.04390",
+   "title": "Experimental Designs for Heteroskedastic Variance",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:TH",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    3,
+    4,
+    5,
+    14
+   ],
+   "equations": 189,
+   "display": 3,
+   "pdf_sha256": "5782e86498c06a52a9605ce5bd01e5ff8baec9cc3fb04ab65fc477ed48348d7f",
+   "source_sha256": "369ac66aee7046330aebf2e05dc26c1c7227ef4fa3f8c5bace7f287069892cad",
+   "extract_pdf_sha256": "dfdb4c93698a1b53c8c3d2553248f87b186f7c8e5d1d8c9e0c2cfc37ecdaf13d",
+   "gold_sha256": "6d15e6a3ca2e3e424be34156580efded0196082d3bbcb0dab71493565e93e0fc"
+  },
+  {
+   "id": "2311.10204",
+   "title": "The NFA Acceptance Hypothesis: Non-Combinatorial and Dynamic Lower Bounds",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "cs:cs:DS",
+   "style": "tutorial",
+   "pages_chosen": [
+    3,
+    6,
+    11,
+    31
+   ],
+   "equations": 109,
+   "display": 0,
+   "pdf_sha256": "5acee84c6b544098b23dc6afc6abcad088722895f7eafd47f1ec20095eb7f4ad",
+   "source_sha256": "19e69998222725eed222789fe07227f5bac4da377344cb8ef86dd9eb52996d54",
+   "extract_pdf_sha256": "b3ccadab1789c40f33941409a62ef62fe736adaf1e7516abbfbd549a15b4612f",
+   "gold_sha256": "1a1016175d69145b1fa357a4e6fcc481b7bfe5c5c50bb001a8f8e0b240f6b438"
+  },
+  {
+   "id": "2403.05373",
+   "title": "Regularized Principal Spline Functions to Mitigate Spatial Confounding",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ME",
+   "style": "research",
+   "pages_chosen": [
+    16,
+    17,
+    18,
+    28,
+    34,
+    35
+   ],
+   "equations": 49,
+   "display": 0,
+   "pdf_sha256": "f8e245757f31d4e4259a70772c4f0b8d09b9a251ac18b24d113df010924b6f0b",
+   "source_sha256": "71c976bfc3e6667b6a0c37916f47be6723ace4157f510f3f74921bec38664a57",
+   "extract_pdf_sha256": "ac9ecb7bcdcb6e346fed4d1e63b887f6de3b8a94476bbe12887f385e1ffd373d",
+   "gold_sha256": "ed5cbe21ca2c10139d81baf35e8eec9b29014e7f8bc7ce17b08156af5ee3505c"
+  },
+  {
+   "id": "2404.01071",
+   "title": "Machine Learning in High Energy Physics: A review of heavy-flavor jet tagging at the LHC",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:data-an",
+   "style": "tutorial",
+   "pages_chosen": [
+    10,
+    17,
+    19,
+    20
+   ],
+   "equations": 56,
+   "display": 3,
+   "pdf_sha256": "8abdbd8386588016bdd70fe5cc783d2c1942d8f2a6515d61c9bbf563926e5c64",
+   "source_sha256": "b5d75fa2546973d4f07c94567b93ca9938d85c9f346a8847b290820bd7c9d8e8",
+   "extract_pdf_sha256": "4c1fcc9370485fa0c93ca981d0310126d56256841267b124fe3d3a45198a0629",
+   "gold_sha256": "9b990bbdd00b7545558eee53a941bb2aa0d58a37293aad42a9796d2f9db8e9b8"
+  },
+  {
+   "id": "2405.01155",
+   "title": "SynFlowNet: Design of Diverse and Novel Molecules with Synthesis Constraints",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "cs:cs:LG",
+   "style": "research",
+   "pages_chosen": [
+    3,
+    8,
+    9,
+    21
+   ],
+   "equations": 176,
+   "display": 1,
+   "pdf_sha256": "5d05054590be2ba91fe5c5d6c55c8b35850fa9f4816f06114bb2c445057e3655",
+   "source_sha256": "78f3450b4ec4ddbb579f5abecb44f419f67fac9aec6f47fc2e39febb839aa6a9",
+   "extract_pdf_sha256": "41d64f2c9f3587f6e2ad1dbb22081a453e32b96ae0d39d7cdb1c02542741b225",
+   "gold_sha256": "c7ae11be3f09b2b33d15686f764dd26d6829a848f88dfa306e140f01377d8193"
+  },
+  {
+   "id": "2405.03801",
+   "title": "Finding Most Shattering Minimum Vertex Cuts of Polylogarithmic Size in Near-Linear Time",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "cs:cs:DS",
+   "style": "research",
+   "pages_chosen": [
+    40,
+    48,
+    49,
+    50,
+    51
+   ],
+   "equations": 246,
+   "display": 5,
+   "pdf_sha256": "d30c0a92e489db628bf8f199dc005d9a6ec2d910b1691c2d50c4795157a2924e",
+   "source_sha256": "e209a57dd3a456b39c44e96a1d250da2d6c49197fdfa73d697c1f1173fe1d956",
+   "extract_pdf_sha256": "bd7070e8332cff28ca0aa565a17a751dffceeedb590054ad7762e558b9794fc2",
+   "gold_sha256": "22dfbd0117cb841a25473925d8a4d8380982f658f24daa229388ac2ea8bc45aa"
+  },
+  {
+   "id": "2407.03929",
+   "title": "Magic spreading in random quantum circuits",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:cond-mat:stat-mech",
+   "style": "research",
+   "pages_chosen": [
+    8,
+    14,
+    17,
+    18,
+    19
+   ],
+   "equations": 208,
+   "display": 18,
+   "pdf_sha256": "54e9a7f4ab4d48849940a1f3753b9de0564d4bbda45ac9e4197b9bfc0872c0b6",
+   "source_sha256": "500a61d6c8fe6e6e4330161b3f336a9d45d286171928cc25c6aae29df0f1dd68",
+   "extract_pdf_sha256": "08bab7b1a0632a0d37e39cc1bbaa6c1603a972038b976adc5bbcc7718c7bf5b4",
+   "gold_sha256": "5350161ae6fb4e62dfb723225a5de891a4f86c7e0bd3abf45edede1916ba7a71"
+  },
+  {
+   "id": "2407.04881",
+   "title": "Coupled Stochastic-Statistical Equations for Filtering Multiscale Turbulent Systems",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:TH",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    4,
+    7,
+    8,
+    13,
+    24
+   ],
+   "equations": 226,
+   "display": 30,
+   "pdf_sha256": "2791632df0caa5233989f81742d091d287ea11df0b5cd8d114cc3c7439930062",
+   "source_sha256": "1979b0c9d4e220a903840bda6cc1543171d25118de281404900f870f2ac65081",
+   "extract_pdf_sha256": "c8202524646d9788eff00d1fad45d6ed645f99bba8bcb73a651d411d3c20cc07",
+   "gold_sha256": "0b031cc4dc55847bed53c0f5b4bb9ebe102d53bd5a1297387b3794225d927445"
+  },
+  {
+   "id": "2410.10911",
+   "title": "Quantum-Enhanced Detection of Viral cDNA via Luminescence Resonance Energy Transfer Using Upconversion and Gold Nanoparticles",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "q-bio:q-bio:QM",
+   "style": "tutorial",
+   "pages_chosen": [
+    3,
+    4,
+    6,
+    7,
+    9
+   ],
+   "equations": 87,
+   "display": 5,
+   "pdf_sha256": "ea024f447bbab968da8a5ef05edb264200e640937a1c5e21839e850fb0cfeb15",
+   "source_sha256": "49005834dce661e487a104eaa23f00c9389eec77681b44faaaf3773111616767",
+   "extract_pdf_sha256": "ca7b2a6ff7ff154dab106e1fcac5c4f969cc31722793a2cb6bc496b5af22eddc",
+   "gold_sha256": "1995644a4f3bd16e27412848ecab98fa0f5d4592c63ec20d1fc22122e3b163ea"
+  },
+  {
+   "id": "2411.03234",
+   "title": "Exploring the properties of quantum scars in a toy model",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:cond-mat:stat-mech",
+   "style": "tutorial",
+   "pages_chosen": [
+    7,
+    9,
+    10,
+    11
+   ],
+   "equations": 99,
+   "display": 2,
+   "pdf_sha256": "e58086fb528cc010ce541b4baf16f59f00073813a60c064d6763631aaf89f16e",
+   "source_sha256": "21627e1e5c76f2e23155206932c89b0b195fbfc33c008e810ae72f566fd68fae",
+   "extract_pdf_sha256": "cdebe22509b28c1c27ca7ab7eb205b034dd122c3686f5993ebc170b25f3f7fb7",
+   "gold_sha256": "d9f9b39e1dbfde618eb0ba8b93aa99b1737f34ee822a3dbc8e70ad87ec367aeb"
+  },
+  {
+   "id": "2503.17379",
+   "title": "Challenges and Advancements in Modeling Shock Fronts with Physics-Informed Neural Networks: A Review and Benchmarking Study",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:flu-dyn",
+   "style": "tutorial",
+   "pages_chosen": [
+    6,
+    7,
+    14,
+    18,
+    20,
+    22
+   ],
+   "equations": 112,
+   "display": 7,
+   "pdf_sha256": "73ffb95b4af41e239befa4668f21159204d44d235efa8608828ccfd4c015708c",
+   "source_sha256": "65741c639377a809d2aa98e0b6f31b58ca895339ff3ea1d049ababaabefa73da",
+   "extract_pdf_sha256": "a588a6d3fb077d9447b574728b8580e27d2afaddcc376907a7403f568e911b74",
+   "gold_sha256": "490b0c029f81dec33657c0028a28566ac3a9280020c2641aa7f440a34d8fedc2"
+  },
+  {
+   "id": "2504.05959",
+   "title": "Old and New Results on Alphabetic Codes",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "cs:cs:DS",
+   "style": "tutorial",
+   "pages_chosen": [
+    7,
+    11,
+    16,
+    22
+   ],
+   "equations": 113,
+   "display": 5,
+   "pdf_sha256": "cbab8381d90ed928b20f0249766d37664fe14f2b7acf566d5909500ddcdca4ec",
+   "source_sha256": "643054e68a0211e360fa1d87afbb6e262f8dad80f284ddea1e82d19258a6c65e",
+   "extract_pdf_sha256": "1bb0d0b26508a4a4e523db4af2d8c950b517e75d9eebfac33c2a2562546a4443",
+   "gold_sha256": "083b3f9e07de87fc5f7807b63f38778d82b3d540b50627be6f5aa3c0b241f669"
+  },
+  {
+   "id": "2504.14081",
+   "title": "An Introduction to Topological Data Analysis Ball Mapper in R",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ME",
+   "style": "tutorial",
+   "pages_chosen": [
+    12,
+    13,
+    16,
+    17
+   ],
+   "equations": 42,
+   "display": 0,
+   "pdf_sha256": "9f4b7ef45afe6f38f71c030258a46c98d086b697924cbb418808f832affdafc4",
+   "source_sha256": "5a2049182c9dfa3028419c8a5c44618a42a7619871aa4f7dde15d5029a2b4e01",
+   "extract_pdf_sha256": "af789aaa973d3566e3cae27c0912c78782eae1f5d8a5cf57756cbf4d233f1a44",
+   "gold_sha256": "cf3eaea9eba390a0687c6eb2d294c71f8ed37c1c3251af31e94d742eb617b7ba"
+  }
+ ],
+ "n_papers": 15,
+ "n_equations": 1826,
+ "n_pages": 71
+}

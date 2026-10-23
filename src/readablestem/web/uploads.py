@@ -228,10 +228,10 @@ def safe_filename(raw: str | None, *, limit: int = 200) -> str:
     return name or "document.pdf"
 
 
-def inspect_pdf(data: bytes, *, max_pages: int) -> int:
+def inspect_pdf(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> int:
     """Return the page count, or raise UploadRejected. In-process: prefer the isolated one."""
     try:
-        return probe(data, max_pages=max_pages)
+        return probe(data, max_pages=max_pages, allow_image_pages=allow_image_pages)
     except ProbeRejected as exc:
         raise UploadRejected(exc.code, exc.pages) from None
 
@@ -240,20 +240,45 @@ def inspect_pdf(data: bytes, *, max_pages: int) -> int:
 
 
 def inspect_pdf_isolated(
-    data: bytes, *, max_pages: int, timeout_s: float = INSPECT_TIMEOUT_S
+    data: bytes,
+    *,
+    max_pages: int,
+    timeout_s: float = INSPECT_TIMEOUT_S,
+    allow_image_pages: bool = False,
 ) -> int:
     """`inspect_pdf` in a child process (`web.pdf_probe`); a crash or hang is "unreadable".
 
     Cheap checks (empty, magic bytes) run here first so obvious junk never starts a child.
     Costs about 0.1 s per upload. Call it from a worker thread, not the event loop.
     """
+    return inspect_pdf_detail(
+        data, max_pages=max_pages, timeout_s=timeout_s, allow_image_pages=allow_image_pages
+    )[0]
+
+
+def inspect_pdf_detail(
+    data: bytes,
+    *,
+    max_pages: int,
+    timeout_s: float = INSPECT_TIMEOUT_S,
+    allow_image_pages: bool = False,
+) -> tuple[int, int]:
+    """`(pages, image_pages)`: `inspect_pdf_isolated` and, when `allow_image_pages` (the person
+    asked for scanned and handwritten pages to be converted), how many pages the probe found
+    scanned or handwritten (0 without the request)."""
     if not data:
         raise UploadRejected("empty")
     if not looks_like_pdf(data):
         raise UploadRejected("not_pdf")
     try:
         completed = subprocess.run(
-            [sys.executable, "-m", "readablestem.web.pdf_probe", str(max_pages)],
+            [
+                sys.executable,
+                "-m",
+                "readablestem.web.pdf_probe",
+                str(max_pages),
+                *(["image_pages"] if allow_image_pages else []),
+            ],
             input=data,
             capture_output=True,  # MuPDF's own messages are discarded, never logged
             timeout=timeout_s,
@@ -266,7 +291,8 @@ def inspect_pdf_isolated(
     if not isinstance(answer, dict):
         raise UploadRejected("unreadable")
     if answer.get("ok") is True and isinstance(answer.get("pages"), int):
-        return answer["pages"]
+        found = answer.get("image_pages")
+        return answer["pages"], found if isinstance(found, int) and found >= 0 else 0
     code = answer.get("code")
     pages = answer.get("pages")
     raise UploadRejected(

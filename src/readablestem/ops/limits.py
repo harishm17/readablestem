@@ -73,6 +73,22 @@ def largest_reservation_usd(settings: Settings, *, optional_steps: bool = True) 
                 largest = max(largest, cost)
         except UnknownModelError:  # refused at the first call anyway
             continue
+    # The image page pass (ADR 0007), offered: one page picture and a page of output on the
+    # model that reads pages (the main model unless IMAGE_PAGES_MODEL says otherwise).
+    if settings.feature_image_pages:
+        from readablestem.pipeline import image_page
+
+        page_model = settings.image_pages_model or settings.main_model
+        with contextlib.suppress(UnknownModelError):  # refused at the first call anyway
+            largest = max(
+                largest,
+                estimate_max_cost_usd(
+                    page_model,
+                    n_images=1,
+                    text_chars=0,
+                    max_output_tokens=image_page.MAX_OUTPUT_TOKENS,
+                ),
+            )
     # The Claude second check (T2-20) holds its own reservation, after the step's and never
     # beside it, on a model of its own: it counts when it is the dearest.
     if settings.model_provider == "anthropic" and settings.claude_second_check != "off":

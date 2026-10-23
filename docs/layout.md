@@ -543,12 +543,109 @@ Modern Sans):
   letters, or has a relation sign and no longer italic run: "at" in `v = v₀ + at` is
   not the English word. Beamer captions have no number ("Figure: ...") and still attach.
 
+### Inline formulas in LaTeX papers (2026-10-21)
+
+Found by the error analysis of the real-world set ([eval-equation-rootcause.md](eval-equation-rootcause.md)):
+a paper page is mostly `$x$` in running text, in a font the OpenStax prints never use. What the
+layout learned from it, all from the text layer and the glyph boxes, no model call. The rules that
+come from what a TeX author types (italic variables, bold letters with an index, the edges: parentheses, units,
+citations, word spaces) apply to PDFs typeset by TeX only (`_TEX_MADE`, from `page_type.producer_hint`): an
+OpenStax print from Chromium, where emphasis is italic and the unit is inside the maths, is read as before
+(`scripts/layout_identity.py` on 126 PDFs: 111 identical, the rest explained in
+[eval-equation-rootcause.md](eval-equation-rootcause.md) section 7). Captions, ellipsis lists and `:=` apply to every producer.
+
+- **Italic variables** (`_italic_variables`, evidence `italic variable in prose`). mathptmx, mathpazo,
+  Charter and newtx set the Latin letters of a formula in the text family's italic, so a lone `S`,
+  `N_i` or `K(t)` has no glyph in a maths font. A run of italic letters (at most three letters in a
+  group, a group that is not a short English word, so "not" and "for all" stay words) standing in
+  upright prose, whose neighbours are not italic letters, is a variable. Not variables: an italic
+  phrase (a theorem set in italics, where `a` and `I` are words and a short word beside a longer
+  italic one is text, `_word_lengths`), a label (`(a)`, `a)`), a reference to a part of a figure
+  (`6(a)`, `5(d,e)`), a number and a space and an italic letter (`-49 m`, a quantity with its unit).
+- **A bold letter with an index** is a vector set in a text font (`v` in Times Bold with a lowered `2`);
+  its script is an index, not the count of `H2O` (`_bold_variable`).
+- **Where a formula starts and ends** (`_trim_run`, `_inline_runs`). The author's maths stops at the dollar
+  sign, so the parentheses of the sentence around a whole formula (`(x = 0.9)`; a tuple, which has a
+  comma at its top level, keeps them), the upright unit after a number (`915 s`), a numbered
+  citation after a space (`[8]`) and an opening bracket that the formula does not close are not part
+  of it. A visible gap of at least `WORD_SPACE` (0.25 em) between two operands ends the formula (TeX
+  sets nothing between operands, so the gap is a word space of the sentence: "eps(k) (i = 1)" is two
+  formulas). A list with an ellipsis (`i = 1, ..., S`) is one formula, a map `H : R -> S` is one (a colon
+  between two runs, the second with an arrow or a membership sign: `_join_signatures`).
+  On the 25 development papers 27 of 31 formulas cut inside a pair of parentheses had the pair
+  outside the author's maths, and of the formulas that ended in an upright unit 37 were span failures
+  against 2 that were exact.
+- **Figure captions** are cut like paragraphs (`_attach_captions`): `Element.caption` stays plain text,
+  `Element.caption_marked` has an inline marker where each formula was, and each formula is an
+  equation element whose `parent_id` is the figure (id right after the figure's). `assemble` writes the
+  maths into the `<figcaption>`; the equation step reads them as any inline equation. Table captions
+  are not cut this way (the table step owns them).
+- **Bold italic.** `CMMIB`, newtx's `bmi`, Nimbus `MediItal` and `BoldItalic` fonts give bold-italic code
+  points in the equation's text layer (`_Char.styled`), so the equation step can tell `\boldsymbol{x}` from
+  `\mathbf{x}` (docs/steps.md "Letter-style check").
+
+### A stray opening brace (2026-10-21)
+
+OpenStax also prints "Solve the system by substitution. {" with the brace the last glyph of the
+sentence's row and the two equations in rows of their own to its right, level with the brace and
+not with the sentence. `_stray_brace_cut` cuts the brace off the sentence's row when a maths row
+starts within two font sizes to its right, another maths row sits under that one, and the brace's
+middle is level with the two; `_math_neighbours` then takes the brace row into the system, so the
+crop shows the brace and the text reads it first (`_equation_block`). Measured on dev-v2 with the
+layout alone: Elementary Algebra 5.2 has 80 instead of 53 of its 101 gold equations cut as the
+answer key has them (text layer within 0.99), no other section moves by more than two; nothing else in
+the 121 PDFs of `scripts/layout_identity.py` changes except nuclide paragraphs and the brace text
+order (headings, figures, tables, lists, kept pages are identical; the "scripts flattened" notice
+goes where a nuclide was raised text).
+
+### Chemistry in running text and on display lines (2026-10-21)
+
+Formulas, ions and reactions are mathematics, so in a paragraph or a list item they are inline
+equations, and a line that is one reaction is a display equation (`pipeline/chem.py`; the full
+description, the decisions, the measurements and the limits are in [chemistry.md](chemistry.md)).
+Raised and lowered text that is not chemistry (units, footnote marks, a letter subscript) stays
+raised text (next section).
+
+- **Words** (`_chem_words`). The row is cut into words at a blank, at a gap of 0.25 of the glyph
+  size (TeX sets no space after a script: `Cl-and`) and around an arrow glyph, which is a word of
+  its own together with the dash that is its shaft (`−→`). Each word carries the script kind of its
+  characters (`_script_glyphs`, so only the scripts of upright text count).
+- **A formula** (`chem.label_word`): the letters read as element symbols, and there is evidence
+  only chemistry has: a lowered number on an element or a bracket (`H2O`, `Al2(SO4)3`), a raised
+  charge (`Na+`, `SO4 2-`, a number then a sign), or a state symbol (`NaCl(aq)`). Sentence marks and
+  a pair of parentheses around the whole formula are cut off (`(NaHCO3).` is `NaHCO3`); a bracket
+  around it is kept (`[H3O+]`, a concentration). Not a formula: `cm3`, `m2`, `Kw` (a letter
+  subscript), `K-1` (a raised sign then a number is an exponent), a footnote mark (`Nature1`), a
+  word. Plain letters and digits that a PDF set at one size (`H2O` with no lowered 2) are never
+  marked: the text layer cannot tell them from a word.
+- **A reaction** (`chem.reactions`): an arrow (`→ ⟶ ⇌ ⇄ ↔ ←`, `−→`) with species on each side, the
+  species, the `+` and the coefficients taken as far as they go, and at least one formula in all;
+  words that read as elements but carry no evidence (`HCl`, `NaOH`) count only inside a reaction.
+  A trailing number belongs to the sentence. Several arrows in a row are one reaction.
+- **Where it applies**. `_inline_runs` adds the formulas and reactions of a row to its maths runs
+  (`_with_chemistry`; a run that overlaps one, such as the arrow that used to stand alone, is taken
+  into it). `_classify_row` makes a row a display equation line when the whole row is one reaction
+  (`_reaction_row`: the ink outside it is at most the punctuation that ends it), so the net ionic
+  equations of a LaTeX page are display equations and not a paragraph with an arrow cut out of it.
+- **Spaces**. An inline equation that stands against its neighbours with a visible gap and no blank
+  glyph between them (the text after `SO42-` in TeX output) gets a space on that side
+  (`_gap_before`, `_gap_after`); `releases ⟦e1⟧ions` read as one word before.
+- Measured on the 121 PDFs of `scripts/layout_identity.py`: 96 are identical, and the 25 that differ
+  are the chemistry material (21 files: the section prints, the authored chemistry document, a fixture), the Word lecture (its
+  formulas and ions), one slide whose reaction line was a heading and is now an equation, and
+  a space after "Simplify:" in the two prints of an algebra section. Nothing in physics, algebra,
+  statistics or the other slides and Word material gains a formula that is not one.
+
 ### Raised and lowered text in prose (backlog T2-4, T2-5)
 
 Text sets formulas, ions, units and nuclides with scripts that the text layer flattens:
-H2O, Na+, SO4 2-, g/cm3, 226Ra. A paragraph or list item or heading now keeps them as
+H2O, Na+, SO4 2-, g/cm3, 226Ra. A paragraph or list item or heading keeps them as
 `Element.script_runs` (`ScriptRun(start, end, kind="sup"|"sub")`, offsets into `text`), which
 the assembler writes as `<sup>` and `<sub>` (docs/output.md "Raised and lowered text").
+**Since 2026-10-21 formulas, ions and nuclides in a paragraph or list item are inline equations
+instead** (the section above and "Nuclides" below); units, footnote marks, letter subscripts and
+anything in a heading or a table cell stay raised or lowered text, which is what the rest of
+this section describes.
 
 - **Which glyphs** (`_script_glyphs`): smaller than the row's text (`SCRIPT_RATIO`) and off
   its baseline by 4 % of the row size (`SCRIPT_OFFSET`: Word and LibreOffice lower a subscript
@@ -558,14 +655,28 @@ the assembler writes as `<sup>` and `<sub>` (docs/output.md "Raised and lowered 
   letter, digit or closing bracket just before it (a gap of at most 35 % of the row size), a
   closing bracket only when the group it closes holds upright text (`(SO4)3`, `[Zn]2+`), or,
   for digits only, the capital letter right after it (`226Ra`, a mass number; before a word,
-  never after one). A script of an italic letter or a letter in a maths font (`E` with a
+  never after one; since 2026-10-21 that case is no longer raised text, see "Nuclides" below).
+  A script of an italic letter or a letter in a maths font (`E` with a
   subscript `k`, `x2`) is not given to this: it stays an inline equation, as before, and the
   model reads it.
+- **Nuclides** (`_nuclide_runs`, 2026-10-21): the mass number raised and the atomic number
+  lowered before an element's symbol (`14C`, `235U`, `4 2 He` with the 4 above the 2), in running
+  text, are one inline run from the first number to the last letter of the symbol, so the equation
+  step reads it and the speech says "carbon 14, atomic number 6" (it was `<sup>14</sup>
+  <sub>6</sub>C`). The group must be all digits (at most six), at the start of a word, with the
+  symbol of an element right after it (a blank the PDF puts between is not a gap, `NUCLIDE_GAP`)
+  that does not go on into a longer word; `10 m2 S`, `3 Xx` and `235Uranium` are not nuclides.
+  Measured on dev-v2 with the layout alone (`--fake`): the authored chemistry document finds 70 of
+  its 108 gold equations instead of 64 and Chemistry 2.3 finds 12 of 38 instead of 7; the
+  isotope tables of 2.3 are tables, not prose, and are untouched. The new inline equations in a
+  Word lecture are real nuclides its gold does not list as equations.
 - **Evidence** (`_inline_evidence`): a script of upright text is no evidence that a run is
   maths. `H2` was an inline equation, `SO4` was not, and half a formula reached the model
   ("2O3", "34-"); now a run that only such scripts made is dropped. Inside a run that is
   maths for another reason (an arrow, a relation, an italic variable with an operator: `2H2 + O2
-  -> 2H2O`, `E = mc2`) the scripts stay part of it.
+  -> 2H2O`, `E = mc2`) the scripts stay part of it. A formula or an ion is maths for its own
+  reason, found by `pipeline/chem.py` (the section "Chemistry in running text" above), so `H2` and
+  `SO4` are no longer dropped, they are inline equations.
 - **Stacked scripts** (`_merge_baselines`, `_insert_script`, `_stack_position`): a lowered and
   a raised script one over the other (the 4 and the 2- of SO4 2-, the 6 and the 14 of a
   nuclide) arrive as two fragments, and the lowered one used to start a paragraph of its own
@@ -963,8 +1074,15 @@ over visible text. Read as content, a real 4-page set of iPad lecture notes beca
 headings and 72 paragraphs of garbage, titled with a 35 pt scrawl, with no maths, no
 model call and 0 decisions: "Finished. The accessible HTML is ready." OCR'd scans fell
 into the same hole, and the app's own advice for scans ("run OCR and upload again")
-produced exactly those files. There is **no handwriting or scan conversion** (decided
-2026-10-09): such pages are kept as page images, marked "Not converted", with a decision.
+produced exactly those files. There is **no handwriting or scan conversion by default**
+(decided 2026-10-09): such pages are kept as page images, marked "Not converted", with a
+decision. On request, per upload (the box "Convert scanned or handwritten pages", offered by
+`FEATURE_IMAGE_PAGES`, default off; [ADR 0007](decisions/0007-image-pages.md), measured in
+[eval-image-pages.md](eval-image-pages.md)) a page the types below call
+`scan_no_text`, `scan_ocr`, `handwritten` or `handwritten_ocr` (kept reasons `scanned_page` and
+`handwritten_page`, nothing else) is read from an image of the page instead, every block of it
+is a review item, and the page keeps its original: see "Pages read from an image" below. A page
+the pass cannot read stays a kept image exactly as described here.
 
 **What is never content** (`_page_rows`, the same extraction as before, no second one):
 
@@ -1156,6 +1274,43 @@ layer (perhaps a slide), a page kept by the safety net (a short note under a typ
 that may be a row of machine-drawn curves, see below) and a page whose ink was not
 analysed never refuse: the conversion keeps them as images with a decision. The worker
 fails a result with the same rule (`worker.result_outcome`).
+
+### Pages read from an image (on request, ADR 0007)
+
+For a conversion that has the option on (a job whose owner ticked the box; `ConversionOptions.image_pages`,
+or the whole run for the CLI and the eval with `FEATURE_IMAGE_PAGES`), the kept pages with the reasons `scanned_page` and `handwritten_page` (not
+`unread_page`, not handwriting on a typed page) are read by `pipeline/image_page.py`: one vision
+call per page, the page at 200 dpi, long side at most 2,576 px (`IMAGE_PAGES_DPI`), the main model
+unless `IMAGE_PAGES_MODEL` says otherwise, effort `ANTHROPIC_EFFORT_IMAGE_PAGES` (default low), up
+to `IMAGE_PAGES_TIMEOUT_S` (180) per send. The answer is a list of blocks in reading order
+(heading with a level, paragraph or list item as text and inline-maths runs, display equation,
+figure with a short description, table as a grid), each with a box on a 0 to 1000 scale and a
+confidence, an unreadable word being the marker `[illegible]`. `image_page.build` makes elements
+of them (ids `p{page}-e{n}`, `Element.reasons` has "image page", `Element.image_confidence` the
+model's word), validates every LaTeX and table grid, trims each box to the ink in it, and
+decides each fix:
+
+| Block | What it becomes | Tier |
+|---|---|---|
+| display equation | an equation element with the picture-of-an-equation reason and the page reader's LaTeX in `page_latex`; the equation step reads the crop of its box and compares (ADR 0006's two readings) | always **required** (`equation.no_text_layer`) |
+| table | a TABLE element, `TableFix` from the model's grid through the table step's constructor and checks | always **required** |
+| paragraph, list item | an element and a `PARAGRAPH` fix | optional at `high`; **required** at `medium` or `low`, with an `[illegible]`, or with an inline formula that failed |
+| inline formula | an inline equation element validated like any LaTeX, accepted without a decision of its own (it rides with its paragraph) | none |
+| heading | a heading element with the page reader's level (`REASON_IMAGE_HEADING`); the heading step repairs the outline, then `tier_headings` | optional; required as for prose, or when the heading step asks |
+| figure | a figure element, the description as its alt text | optional at `high`; required otherwise |
+
+A display equation whose crop cannot be read (box off the page, "not an equation") keeps the page
+reader's reading as the proposal, required (`image_page.rescued`, check
+`image_page.single_reading`). The page's own picture is one more figure element, first in the page,
+with no fix (`IMAGE_PAGE_ORIGINAL_REASON`). A page the model cannot read (refused, cut off,
+invalid, no usable block, a spend cap) stays in `kept_pages` and is kept as its image. Each page
+has a record in `DocumentResult.image_pages` (outcome, model, calls, tokens, dollars, blocks by
+kind, markers, decisions and notes), its cost is in `DocumentStats` and its notice
+`image_page_converted` (optional) on the job page. When the box is ticked the upload probe lets a
+PDF of scans through and counts its scanned and handwritten pages (`pdf_probe MAX_PAGES
+image_pages`, `page_type.image_page_count`), and `worker.result_outcome` does not fail the result for
+being only scans; the job's spend allowance is wider ([web.md](web.md), "Scanned and handwritten
+pages on request").
 
 **What is not detected** (the text reaches the HTML, or the content is lost as before):
 
@@ -1485,6 +1640,25 @@ paragraphs of coloured text on the same page gets the optional notice
 `text_pass.link_count(doc, pages)` counts the link annotations of any kind on the given
 pages of an open PyMuPDF document (hold layout's lock): `SourceFacts.links`. The pass
 also returns the same count for the analysed pages as `TextPassResult.annotations`.
+
+## The page math hook (`pipeline/page_math_reconcile.py`, `FEATURE_PAGE_MATH`, off)
+
+`analyze(pdf, page_math=hook)` calls `hook.on_page(number, rows, ordered, rules)` once per page
+after the fragments are resolved and before `_equation_regions`, and `hook.after_regions` after it.
+With a collecting hook (no plan) layout is unchanged and the hook records each page's rows as
+the page pass is shown them: `L0, L1, ...` in reading order, rotated rows left out, each row's
+text with control characters dropped and blanks collapsed, one character of that text for one
+character of the row (`page_math.PageRow`). With a verified plan the hook cuts rows at the
+anchors, makes the block spans `_Region`s (`forced`, with their rules and labels), marks inline
+spans on their rows (`_Row.page_inline`, which `_paragraph_pieces` turns into inline
+equations) and what the pass called a look-alike (`_Row.page_nonmath`, which drops layout's runs
+inside it), and the rest of the page goes through the rules above unchanged. `Element.page_latex`
+and `Element.page_status` ("span": the pass placed it; "layout": only layout found it) carry the
+result to the equation step. A block span that would split a layout region or leave a piece layout
+reads as maths in a shared row is refused (`HookStats.refused`); a span whose LaTeX and quoted text
+disagree is dropped (`inconsistent`); an exception in the hook leaves the page as layout has it.
+The design and its measurements: [ADR 0006](decisions/0006-page-math-pass.md),
+[eval-page-math.md](eval-page-math.md).
 
 ## Errors
 

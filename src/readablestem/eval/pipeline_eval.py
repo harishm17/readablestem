@@ -63,10 +63,22 @@ from typing import Any, Protocol
 from readablestem.config import Settings
 from readablestem.core import triage
 from readablestem.core.budget import BudgetExceeded, JobBudget
-from readablestem.core.types import Check, ConversionOptions, Element, Fix, Kind, ModelCall, Status
+from readablestem.core.types import (
+    Check,
+    ConversionOptions,
+    Element,
+    EquationFix,
+    Fix,
+    Kind,
+    ModelCall,
+    Status,
+)
+from readablestem.eval import equations_chem as chem_score
+from readablestem.eval import equations_symbols as sym
 from readablestem.eval import equations_v2 as v2
+from readablestem.eval import image_pages as image_pages_eval
 from readablestem.eval import judge as judge_mod
-from readablestem.eval import prose_classes
+from readablestem.eval import prose_classes, prose_wer, table_maths
 from readablestem.eval import verifier_metrics as vm
 from readablestem.eval.equations import (
     EquationScore,
@@ -240,6 +252,11 @@ def load_gold(gold_dir: Path) -> list[dict]:
     return list(iter_gold_records(gold_dir))
 
 
+def _in_sections(record: dict, sections: Sequence[str]) -> bool:
+    name = f"{record.get('book_slug', '')}/{record.get('page_slug', '')}"
+    return any(part in name for part in sections)
+
+
 def group_pages(records: Iterable[dict]) -> list[list[dict]]:
     """Records grouped by (book, page), pages in first-seen order."""
     pages: dict[tuple[str, str], list[dict]] = {}
@@ -270,13 +287,21 @@ def manifest_sha256(gold_dir: Path) -> str:
 
 
 def select_units(
-    task: str, records: list[dict], limit: int | None, every: int | None = None
+    task: str,
+    records: list[dict],
+    limit: int | None,
+    every: int | None = None,
+    sections: Sequence[str] = (),
 ) -> list[Any]:
     """What one task iterates over: equation or figure records, or pages of records.
 
     `limit` counts those units: equations, figures, or pages (headings, document). `every`
-    keeps every Nth unit from the first, before `limit` is applied.
+    keeps every Nth unit from the first, before `limit` is applied. `sections` keeps the
+    equations, figures or pages whose "book/page" id contains any of the strings (a slice of
+    a set, for a run that must stay small); it is applied first.
     """
+    if sections:
+        records = [r for r in records if _in_sections(r, sections)]
     units: list[Any]
     if task == "equations":
         units = [r for r in records if r.get("kind") == "equation"]
@@ -413,6 +438,7 @@ class EvalConfig:
     gold_dir: Path
     limit: int | None = None
     every: int | None = None  # every Nth unit (`select_units`)
+    sections: tuple[str, ...] = ()  # only these "book/page" ids (substrings; `select_units`)
     client_label: str = "openai"  # "fake" for FakeVisionClient runs
     gold_label: str | None = None  # how to show gold_dir in the report (no home paths)
     concurrency: int = 4  # document task: convert_pdf's thread pool
@@ -470,6 +496,26 @@ def budget_reason(fix: Fix) -> str | None:
 
 def _failed_codes(checks: Sequence[Check]) -> list[str]:
     return [c.code or c.name for c in checks if not c.passed and c.severity == "error"]
+
+
+def _equation_cost_split(fixes: Sequence[Fix], main_model: str) -> dict[str, float]:
+    """What the equation steps of a document cost, by who read the crop: `cheap` (the cheap
+    model's reads), `main_first` (the main model asked first: display equations),
+    `escalation` (the main model asked again after a cheap read), and `other` (anything else,
+    a fallback)."""
+    split = {"cheap": 0.0, "main_first": 0.0, "escalation": 0.0, "other": 0.0}
+    for fix in fixes:
+        if fix.kind is not Kind.EQUATION:
+            continue
+        first_main = bool(fix.calls) and fix.calls[0].model == main_model
+        for call in fix.calls:
+            if call.model != main_model:
+                split["cheap"] += call.cost_usd
+            elif first_main:
+                split["main_first"] += call.cost_usd
+            else:
+                split["escalation"] += call.cost_usd
+    return split
 
 
 def _calls_summary(calls: Sequence[ModelCall]) -> dict:
@@ -602,6 +648,11 @@ def equation_item(record: dict, fix: Fix, settings: Settings) -> dict:
         if proposal is not None
         else v2.missing_stream(record["mathml"])
     )
+    symbols = (
+        sym.score_symbols(proposal.mathml, record["mathml"])
+        if proposal is not None
+        else sym.missing_symbols(record["mathml"])
+    )
     return {
         "id": record["id"],
         "display": record.get("display"),
@@ -618,6 +669,9 @@ def equation_item(record: dict, fix: Fix, settings: Settings) -> dict:
         # The labelled secondary scorer (eval.equations_v2); `wrong` below stays primary.
         "exact_stream_v2": stream.exact,
         "stream_similarity": stream.similarity,
+        # The second labelled secondary scorer (eval.equations_symbols): tables flattened.
+        "exact_symbols": symbols.exact,
+        "symbols_similarity": symbols.similarity,
         "score_error": score.error if proposal is not None else None,
         "failed_checks": _failed_codes(fix.checks),
         "pred_latex": proposal.latex if proposal is not None else None,
@@ -698,6 +752,13 @@ def equation_metrics(items: Sequence[dict]) -> dict:
             "exact": rate(i["exact_stream_v2"] for i in items if "exact_stream_v2" in i),
             "mean_similarity": mean(
                 i["stream_similarity"] for i in items if "stream_similarity" in i
+            ),
+        },
+        "secondary_symbols": {
+            "label": sym.LABEL,
+            "exact": rate(i["exact_symbols"] for i in items if "exact_symbols" in i),
+            "mean_similarity": mean(
+                i["symbols_similarity"] for i in items if "symbols_similarity" in i
             ),
         },
         "by_status": _group_rates(items, "status", STATUS_ORDER),
@@ -1330,6 +1391,16 @@ def document_page_item(
             if proposal is not None
             else v2.missing_stream(gold[gi]["mathml"])
         )
+        symbols = (
+            sym.score_symbols(proposal.mathml, gold[gi]["mathml"])
+            if proposal is not None
+            else sym.missing_symbols(gold[gi]["mathml"])
+        )
+        chem = (
+            chem_score.score_chem(proposal.mathml, gold[gi]["mathml"])
+            if proposal is not None
+            else chem_score.missing_chem(gold[gi]["mathml"])
+        )
         matched.append(
             {
                 "gold_id": gold[gi]["id"],
@@ -1342,9 +1413,20 @@ def document_page_item(
                 "teds": result.teds,
                 "exact_stream_v2": stream.exact,
                 "stream_similarity": stream.similarity,
+                "exact_symbols": symbols.exact,
+                "symbols_similarity": symbols.similarity,
+                # The chemistry scorer (eval.equations_chem): meaningful for chemistry gold only.
+                "exact_chem": chem.exact,
+                "chem_similarity": chem.similarity,
+                **_page_pass_fields(element, fix),
+                # How far the predicted span's own text layer is from the gold equation (span
+                # fidelity, whatever the model then read), and that text, for examples.
+                "text_similarity": round(similarity(gold_sigs[gi], pred_sigs[pi][1]), 4),
+                "pred_text": (element.text or "")[:300],
                 "review": fix.review if fix is not None else None,
                 "tier_reasons": triage.tier_reasons(fix) if fix is not None else [],
                 "pred_latex": proposal.latex if proposal is not None else None,
+                "pred_mathml": proposal.mathml if proposal is not None else None,
                 **_shadow_pair(fix),
             }
         )
@@ -1363,10 +1445,25 @@ def document_page_item(
                 "reason": reason,
                 "piece_of": gold[pieces[pi]]["id"] if pi in pieces else None,
                 "text_layer_supported": _text_layer_supported(element, fix, reason),
+                "pred_text": (element.text or "")[:300],
+                "pred_latex": fix.equation.latex if fix is not None and fix.equation else None,
+                "review": fix.review if fix is not None else None,
+                "tier_reasons": triage.tier_reasons(fix) if fix is not None else [],
+                **_page_pass_fields(element, fix),
             }
         )
     split = _split_gold(gold, pairs, pieces)
     credited = _stream_credits(gold, predicted, fixes, pairs, pieces, matched)
+    symbols_credited = _stream_credits(
+        gold,
+        predicted,
+        fixes,
+        pairs,
+        pieces,
+        matched,
+        stream_of=sym.symbols_of,
+        exact_key="exact_symbols",
+    )
     return {
         "id": page_id,
         "n_gold": len(gold),
@@ -1381,19 +1478,23 @@ def document_page_item(
         },
         "split_gold_ids": split,
         "stream_credited": credited,
+        "symbols_credited": symbols_credited,
         "static_violations": _failed_codes(static),
         "axe_violations": _failed_codes(axe) if axe_status(axe) == "ran" else [],
         "axe_status": axe_status(axe),
     }
 
 
-def _stream(fix: Fix | None) -> list[str] | None:
-    """The stream (`eval.equations_v2`) of a fix's proposed MathML; None without one."""
+def _stream(
+    fix: Fix | None, stream_of: Callable[[str], list[str]] = v2.stream_of
+) -> list[str] | None:
+    """The stream (`eval.equations_v2`, or the symbols of `eval.equations_symbols`) of a
+    fix's proposed MathML; None without one."""
     proposal = fix.equation if fix is not None else None
     if proposal is None:
         return None
     try:
-        return v2.stream_of(proposal.mathml)
+        return stream_of(proposal.mathml)
     except MathMLError:
         return None
 
@@ -1405,29 +1506,32 @@ def _stream_credits(
     pairs: Sequence[tuple[int, int, float]],
     pieces: dict[int, int],
     matched: Sequence[dict],
+    *,
+    stream_of: Callable[[str], list[str]] = v2.stream_of,
+    exact_key: str = "exact_stream_v2",
 ) -> dict[str, list[str]]:
     """Gold equations the stream scorer credits although no single aligned prediction is
     exact for them: `split` (the matched prediction and its pieces, in reading order,
     make the gold equation) and `merged` (one prediction is several consecutive gold
     equations, the later ones not matched to anything). A split or a merge is still a
     layout error; this only says the transcription was right."""
-    exact = {m["gold_id"] for m in matched if m["exact_stream_v2"]}
+    exact = {m["gold_id"] for m in matched if m[exact_key]}
     by_gold = {gi: pi for gi, pi, _ in pairs}
-    gold_streams = [v2.stream_of(g["mathml"]) for g in gold]
+    gold_streams = [stream_of(g["mathml"]) for g in gold]
     split: list[str] = []
     for gi in sorted({*pieces.values()}):
         indices = sorted(
             [pi for pi, host in pieces.items() if host == gi]
             + ([by_gold[gi]] if gi in by_gold else [])
         )
-        streams = [_stream(fixes.get(predicted[pi].id)) for pi in indices]
+        streams = [_stream(fixes.get(predicted[pi].id), stream_of) for pi in indices]
         if all(st is not None for st in streams) and v2.credit_split(
             [st for st in streams if st is not None], gold_streams[gi]
         ):
             split.append(gold[gi]["id"])
     merged: list[str] = []
     for gi, pi, _ in pairs:
-        stream = _stream(fixes.get(predicted[pi].id))
+        stream = _stream(fixes.get(predicted[pi].id), stream_of)
         if stream is None or gold[gi]["id"] in exact:
             continue
         # The alignment may have paired the prediction with any of the gold equations it
@@ -1439,6 +1543,24 @@ def _stream_credits(
                 merged += [gold[gj]["id"] for gj in covered]
                 break
     return {"split": split, "merged": merged}
+
+
+def _page_pass_fields(element: Element, fix: Fix | None) -> dict[str, Any]:
+    """What the page math pass (ADR 0006) said about a predicted equation: whether it placed
+    the span or only layout found it, its LaTeX, and how the two readings met
+    ("agree", "overruled" or "mismatch"; None when they were not compared)."""
+    reading = None
+    for check in fix.checks if fix is not None else []:
+        if check.name == equation_step.PAGE_READING:
+            reading = "agree" if check.passed else "mismatch"
+        elif check.name == equation_step.PAGE_READING_OVERRULED:
+            reading = "overruled"
+    return {
+        "page_status": element.page_status,
+        "page_latex": element.page_latex,
+        "page_reading": reading,
+        "escalation": fix.escalation if fix is not None else None,
+    }
 
 
 def _shadow_pair(fix: Fix | None) -> dict[str, Any]:
@@ -1615,8 +1737,10 @@ def document_metrics(items: Sequence[dict]) -> dict:
         for reason in UNMATCHED_REASONS
     }
     classes = prose_classes.summarize([i["prose_classes"] for i in items if "prose_classes" in i])
+    cells = [i["table_maths"] for i in items if "table_maths" in i]
     return {
         **({"prose_classes": classes} if classes else {}),
+        **({"table_cell_maths": table_maths.summarize(cells)} if cells else {}),
         "gold_equations": gold,
         "predicted_equations": pred,
         "matched": matched,
@@ -1640,6 +1764,15 @@ def document_metrics(items: Sequence[dict]) -> dict:
         **_supported_extras(items, matched, pred),
         "split_gold_equations": sum(len(i.get("split_gold_ids", [])) for i in items),
         "secondary_stream_v2": stream_document_metrics(items, pairs, gold),
+        "secondary_symbols": stream_document_metrics(
+            items,
+            pairs,
+            gold,
+            label=sym.LABEL,
+            exact_key="exact_symbols",
+            similarity_key="symbols_similarity",
+            credit_key="symbols_credited",
+        ),
         "static_violations": sum(static_codes.values()),
         "static_violation_codes": dict(sorted(static_codes.items())),
         "axe_violations": sum(axe_codes.values()),
@@ -1650,7 +1783,31 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "page_errors": _page_errors(items),
         "review_load": document_review_load(items),
         "second_check": vm.document_metrics(items),
+        **_scan_metrics(items, gold),
     }
+
+
+def _scan_metrics(items: Sequence[dict], gold_equations: int) -> dict:
+    """The image page pass's numbers and the prose word error rate, when the run has them
+    (`eval.image_pages`, `eval.prose_wer`); nothing for a run on typed pages."""
+    out: dict = {}
+    prose = [i["prose"] for i in items if "prose" in i]
+    if prose:
+        out["prose_wer"] = prose_wer.pooled(prose)
+        out["prose_only_wer"] = prose_wer.pooled(
+            [i["prose_only"] for i in items if "prose_only" in i]
+        )
+        out["prose_bag"] = prose_wer.bag_pooled([i["prose_bag"] for i in items if "prose_bag" in i])
+    scored = [i["headings_scored"] for i in items if "headings_scored" in i]
+    if scored:
+        scored_headings = heading_metrics(scored)
+        out["headings"] = {
+            k: scored_headings[k]
+            for k in ("gold_headings", "predicted_headings", "matched", "precision", "recall", "f1")
+        } | {"level_accuracy": scored_headings["level_accuracy"]}
+    if pages := image_pages_eval.metrics(items, gold_equations):
+        out["image_pages"] = pages
+    return out
 
 
 def _supported_extras(items: Sequence[dict], matched: int, pred: int) -> dict:
@@ -1669,21 +1826,29 @@ def _supported_extras(items: Sequence[dict], matched: int, pred: int) -> dict:
     }
 
 
-def stream_document_metrics(items: Sequence[dict], pairs: Sequence[dict], gold: int) -> dict:
-    """The labelled secondary scorer on the document task (`eval.equations_v2`): exactness
-    of aligned pairs under the stream comparison, and the same with split and merged gold
-    credited. The primary numbers (`matched_exact_lenient`, `end_to_end_exact_lenient`)
-    are unchanged."""
-    exact_ids = {p["gold_id"] for p in pairs if p.get("exact_stream_v2")}
-    split = {g for i in items for g in i.get("stream_credited", {}).get("split", [])}
-    merged = {g for i in items for g in i.get("stream_credited", {}).get("merged", [])}
+def stream_document_metrics(
+    items: Sequence[dict],
+    pairs: Sequence[dict],
+    gold: int,
+    *,
+    label: str = v2.LABEL,
+    exact_key: str = "exact_stream_v2",
+    similarity_key: str = "stream_similarity",
+    credit_key: str = "stream_credited",
+) -> dict:
+    """A labelled secondary scorer on the document task (stream v2 by default,
+    `eval.equations_v2`; the symbols scorer, `eval.equations_symbols`, with the keys of its
+    own): exactness of aligned pairs under the comparison, and the same with split and
+    merged gold credited. The primary numbers (`matched_exact_lenient`,
+    `end_to_end_exact_lenient`) are unchanged."""
+    exact_ids = {p["gold_id"] for p in pairs if p.get(exact_key)}
+    split = {g for i in items for g in i.get(credit_key, {}).get("split", [])}
+    merged = {g for i in items for g in i.get(credit_key, {}).get("merged", [])}
     credited = exact_ids | split | merged
     return {
-        "label": v2.LABEL,
-        "matched_exact": rate(p["exact_stream_v2"] for p in pairs if "exact_stream_v2" in p),
-        "matched_mean_similarity": mean(
-            p["stream_similarity"] for p in pairs if "stream_similarity" in p
-        ),
+        "label": label,
+        "matched_exact": rate(p[exact_key] for p in pairs if exact_key in p),
+        "matched_mean_similarity": mean(p[similarity_key] for p in pairs if similarity_key in p),
         "end_to_end_exact": _safe_div(len(exact_ids), gold),
         "end_to_end_exact_with_credit": _safe_div(len(credited), gold),
         "credited_split": len(split - exact_ids),
@@ -1803,6 +1968,67 @@ def _collect_sections(
     return items, None
 
 
+def with_table_maths(
+    elements: Sequence[Element], fixes: dict[str, Fix]
+) -> tuple[list[Element], dict[str, Fix]]:
+    """The elements and fixes with the maths cells of every rebuilt table as inline equations
+    of their own, placed right after their table.
+
+    The document task's equation scorer sees equations that are elements of their own. A table
+    the table step rebuilt is one TABLE element whose cells hold MathML, so the formulas in its
+    cells are not equations to the scorer, while a reader of the output HTML (and the chatbots'
+    HTML is read that way) finds them. This is that reading for ReadableSTEM: each cell with
+    validated MathML is one inline equation, asked about when its table is."""
+    ordered = sorted(elements, key=lambda e: e.order)
+    out: list[Element] = []
+    extra: dict[str, Fix] = {}
+    shift = 0
+    for element in ordered:
+        out.append(element.model_copy(update={"order": element.order + shift}))
+        fix = fixes.get(element.id)
+        if element.kind is not Kind.TABLE or fix is None or fix.table is None:
+            continue
+        for k, cell in enumerate(c for c in fix.table.grid.cells if c.latex and c.mathml):
+            shift += 1
+            new_id = f"{element.id}-m{k}"
+            out.append(
+                Element(
+                    id=new_id,
+                    kind=Kind.EQUATION,
+                    page=element.page,
+                    bbox=cell.bbox or element.bbox,
+                    order=element.order + shift,
+                    text=cell.text or None,
+                    display="inline",
+                    parent_id=element.id,
+                )
+            )
+            extra[new_id] = Fix(
+                element_id=new_id,
+                kind=Kind.EQUATION,
+                status=fix.status,
+                confidence=fix.confidence,
+                equation=EquationFix(
+                    latex=cell.latex or "", mathml=cell.mathml or "", speech="", display="inline"
+                ),
+                review=fix.review,
+            )
+    return out, {**fixes, **extra}
+
+
+_TABLE_READING_KEYS = (
+    "n_pred",
+    "pairs",
+    "missed_gold_ids",
+    "matched",
+    "unmatched",
+    "unmatched_by_reason",
+    "split_gold_ids",
+    "symbols_credited",
+    "stream_credited",
+)
+
+
 def _document_section(
     cfg: EvalConfig, page: list[dict], pdf: bytes
 ) -> tuple[dict | None, str | None]:
@@ -1821,6 +2047,8 @@ def _document_section(
         return item, None
     result = output.result
     stopped = next((r for f in result.fixes if (r := budget_reason(f))), None)
+    if stopped is None and result.image_pages is not None and result.image_pages.stopped_by:
+        stopped = f"budget_{result.image_pages.stopped_by}"  # scans left unread by a cap
     if stopped:  # a half-converted page would score as misses; drop it and stop
         return None, stopped
     fixes = {f.element_id: f for f in result.fixes}
@@ -1834,13 +2062,52 @@ def _document_section(
     )
     for pair in item["pairs"]:
         pair["scorer_gap"] = pair["gold_id"] in cfg.scorer_gaps
+    if any(
+        f.table is not None and any(c.mathml for c in f.table.grid.cells) for f in fixes.values()
+    ):
+        # The same page read as an HTML reader does: the maths cells of its tables count as
+        # equations (`with_table_maths`). Kept beside the registered reading, not instead of it.
+        elements_c, fixes_c = with_table_maths(result.elements, fixes)
+        reading = document_page_item(
+            _page_id(page), _of_kind(page, "equation"), elements_c, fixes_c, [], []
+        )
+        for pair in reading["pairs"]:
+            pair["scorer_gap"] = pair["gold_id"] in cfg.scorer_gaps
+        item["table_maths_reading"] = {k: reading[k] for k in _TABLE_READING_KEYS if k in reading}
     item["review"] = load_counts(result.fixes)
     item["figures"] = document_figures(result)
     headings = predicted_headings(result.fixes)
     heading_item = heading_page_item(_page_id(page), _of_kind(page, "heading"), headings)
     item["heading_flags"] = heading_flags(heading_item, headings)
+    if result.image_pages is not None or getattr(cfg.media, "gold_words", None) is not None:
+        item["headings_scored"] = heading_item  # scanned inputs: the headings task's scorer
     calls = [c for f in result.fixes for c in f.calls]
     item.update(_calls_summary(calls))
+    item["cost_split"] = _equation_cost_split(result.fixes, cfg.settings.main_model)
+    if result.page_math is not None:
+        # The page math pass (ADR 0006) is a model call of the pipeline's: its cost is in the
+        # item's cost, and apart as `page_math_cost_usd`.
+        pass_ = result.page_math
+        item["page_math"] = pass_.model_dump()
+        item["page_math_cost_usd"] = pass_.cost_usd
+        item["cost_usd"] += pass_.cost_usd
+        item["model_calls"] += pass_.calls
+    if result.image_pages is not None:
+        # The image page pass (ADR 0007) is a model call of the pipeline's: its cost is in the
+        # item's cost, and apart as `image_pages_cost_usd`.
+        item["image_pages"] = image_pages_eval.item_for(result, item["pairs"])
+        item["image_pages_cost_usd"] = result.image_pages.cost_usd
+        item["cost_usd"] += result.image_pages.cost_usd
+        item["model_calls"] += result.image_pages.calls
+    gold_words = getattr(cfg.media, "gold_words", None)
+    if gold_words is not None and (answer_key := gold_words(page)) is not None:
+        # scanned inputs: the prose answer key is the page's own text, mathematics out
+        item["prose"] = prose_wer.score(answer_key, prose_wer.predicted_words(result)).as_dict()
+        # ... and the words of the prose alone (formulas out of both sides; three letters up)
+        prose_key = gold_words(page, include_math=False) or []
+        prose_pred = prose_wer.prose_only(prose_wer.predicted_words(result, include_math=False))
+        item["prose_only"] = prose_wer.score(prose_wer.prose_only(prose_key), prose_pred).as_dict()
+        item["prose_bag"] = prose_wer.bag_score(prose_wer.prose_only(prose_key), prose_pred)
     item["verifier"] = vm.page_summary(result.fixes)
     item["verifier_cost_usd"] = sum(f.verifier_cost_usd for f in result.fixes)
     item["verifier_requests"] = sum(vm.requests_sent(f) for f in result.fixes)
@@ -1853,6 +2120,9 @@ def _document_section(
     # glossary, hyphenated words): scored on the output HTML; absent without such gold.
     if classes := prose_classes.score_page(result.html, page):
         item["prose_classes"] = classes
+    # Formulas in the gold's table cells, and how many the page has in cells of its own.
+    if cells := table_maths.score_page(result.html, page):
+        item["table_maths"] = cells
     return item, None
 
 
@@ -1952,6 +2222,12 @@ def _cost(task: str, items: Sequence[dict], budget: JobBudget | None) -> dict:
         out["pdf_pages"] = pdf_pages
         out["per_pdf_page_usd"] = step_cost / pdf_pages if pdf_pages else None
         out["verifier_per_pdf_page_usd"] = verifier_cost / pdf_pages if pdf_pages else None
+        if any("image_pages" in i for i in items):  # the image page pass ran (ADR 0007)
+            out["image_pages_usd"] = sum(i.get("image_pages_cost_usd", 0.0) for i in items)
+        page_math_cost = sum(i.get("page_math_cost_usd", 0.0) for i in items)
+        if any("page_math" in i for i in items):  # the page math pass ran (ADR 0006)
+            out["page_math_usd"] = page_math_cost
+            out["page_math_per_pdf_page_usd"] = page_math_cost / pdf_pages if pdf_pages else None
     if budget is not None:
         out["budget_spent_usd"] = budget.spent_usd
         out["budget_calls"] = budget.calls
@@ -1982,6 +2258,7 @@ def build_report(
             "manifest_sha256": manifest_sha256(cfg.gold_dir),
             "limit": cfg.limit,
             **({"every": cfg.every} if cfg.every else {}),
+            **({"sections": list(cfg.sections)} if cfg.sections else {}),
             "unit": {"equations": "equation", "figures": "figure"}.get(task, "page"),
             "selection_sha256": hashlib.sha256("\n".join(planned_ids).encode()).hexdigest(),
         },
@@ -2007,7 +2284,7 @@ def run_pipeline_eval(cfg: EvalConfig) -> EvalRun:
     """
     if cfg.task not in RUNNERS:
         raise ValueError(f"unknown task {cfg.task!r}; expected one of {', '.join(TASKS)}")
-    units = select_units(cfg.task, load_gold(cfg.gold_dir), cfg.limit, cfg.every)
+    units = select_units(cfg.task, load_gold(cfg.gold_dir), cfg.limit, cfg.every, cfg.sections)
     planned = unit_ids(cfg.task, units)
     # All inputs before the first model call (see the module docstring): a RenderError
     # raises here, with nothing spent. Then the browser goes, before any step runs.
@@ -2228,11 +2505,24 @@ def format_markdown(report: dict) -> str:
     if metrics.get("prose_classes"):
         lines += ["", "### Prose classes (dev-v2: scripts, code, glossary, hyphenated words)", ""]
         lines += _table(["class", "n", "right", "rate", "other results"], _class_rows(metrics))
+    if metrics.get("table_cell_maths"):
+        lines += ["", "### Formulas in table cells (the gold's data tables with MathML cells)", ""]
+        lines += _table(["metric", "value"], metrics["table_cell_maths"].items())
     if report["task"] in {"equations", "document"} and metrics.get("secondary_stream_v2"):
         lines += ["", "### Secondary scorer: stream v2 (the rows above are primary)", ""]
         lines += _table(
             ["metric", "value"],
             ((k, v) for k, v in metrics["secondary_stream_v2"].items() if k != "label"),
+        )
+    if report["task"] in {"equations", "document"} and metrics.get("secondary_symbols"):
+        lines += [
+            "",
+            "### Secondary scorer: symbols, tables flattened (the rows above are primary)",
+            "",
+        ]
+        lines += _table(
+            ["metric", "value"],
+            ((k, v) for k, v in metrics["secondary_symbols"].items() if k != "label"),
         )
     if report["task"] == "document":
         lines += ["", "### Unmatched predicted equations", ""]

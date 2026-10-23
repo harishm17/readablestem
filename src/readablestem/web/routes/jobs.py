@@ -84,6 +84,7 @@ from readablestem.web.uploads import (
     UploadedFile,
     UploadRejected,
     convert_office_isolated,
+    inspect_pdf_detail,
     inspect_pdf_isolated,
     is_office_upload,
     max_upload_bytes,
@@ -108,6 +109,14 @@ AUTO_RELOAD_S = 15
 FRESH_COPY = (
     "If it opens on your computer, save a fresh copy (File > Save As, or Print to PDF) "
     "and upload that."
+)
+# The refusals of a PDF that is only scans or handwriting, and what is offered instead when
+# the deployment offers the conversion of such pages (ADR 0007).
+IMAGE_PAGE_REFUSALS = frozenset({"scanned", "scanned_ocr", "handwritten", "handwritten_no_text"})
+IMAGE_PAGES_ADVICE = (
+    "Or upload it again with “Convert scanned or handwritten pages” ticked: the pages are "
+    "read from their images, which is slower, and every converted equation and table needs "
+    "your check."
 )
 # A refused upload costs nothing: the probe runs before the daily page count.
 NOTHING_TAKEN = "Nothing was converted, and no pages were taken from your daily allowance."
@@ -139,7 +148,7 @@ def upload_error_message(
     accepted = office_convert.input_kinds(s)  # Word and PowerPoint files taken (T3-30)
     word = bool(accepted)
     kinds, endings = office_convert.accepted_phrases(accepted)
-    return {
+    message = {
         "missing_file": f"Choose {kinds} to upload." if word else "Choose a PDF file to upload.",
         "bad_form": "The upload did not arrive complete. Please try again.",
         "empty": f"{name} is empty. Choose a file that has content."
@@ -227,6 +236,9 @@ def upload_error_message(
         f"allowed. Delete one you no longer need, then upload {name} again. Nothing was "
         "uploaded.",
     }.get(code, f"{name} cannot be converted.")
+    if code in IMAGE_PAGE_REFUSALS and s.feature_image_pages:
+        message += " " + IMAGE_PAGES_ADVICE
+    return message
 
 
 def upload_error_summary(message: str) -> str:
@@ -396,6 +408,8 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         ),
         # Word (.docx) and PowerPoint (.pptx) files are taken (T3-30): the kinds installed.
         "office_kinds": kinds,
+        # "Convert scanned or handwritten pages" is offered (ADR 0007, FEATURE_IMAGE_PAGES).
+        "image_pages_offered": ctx.settings.feature_image_pages,
         "office_what": phrases[0],
         "office_choose": phrases[1],
     }
@@ -434,6 +448,7 @@ def revision_context(ctx: AppContext, user: CurrentUser, job_id: str) -> dict[st
             "revises": {"id": job.id, "title": title, "filename": job.filename},
             "chosen_course": job.course_id or "",
             "exam_default": bool(job.exam_mode),
+            "image_pages_default": bool(job.image_pages),
         }
 
 
@@ -633,8 +648,11 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     )
     # "Exam or quiz": figures are described without giving answers (T1-14).
     exam = form.fields.get("exam") == "on"
+    # "Convert scanned or handwritten pages" (ADR 0007): offered by FEATURE_IMAGE_PAGES, used
+    # only for a file whose probe finds such pages.
+    image_pages = form.fields.get("image_pages") == "on" and s.feature_image_pages
     placed = await run_in_threadpool(
-        _place_files, ctx, user, form.files, mode, course_id, exam, revises
+        _place_files, ctx, user, form.files, mode, course_id, exam, revises, image_pages
     )
     if len(placed) == 1:
         return await _answer_one(request, user, placed[0], chosen, revises or "")
@@ -649,6 +667,7 @@ def _place_files(
     course_id: str | None,
     exam: bool,
     revises: str | None,
+    image_pages: bool = False,
 ) -> list[Placed]:
     """Check each file and queue it, or keep it for choosing its pages, or say why not.
     A refusal of one file does not stop the others: each is its own document."""
@@ -677,11 +696,16 @@ def _place_files(
             remaining = deadline - time.monotonic()
             if remaining < 1.0:
                 raise UploadRejected("unreadable")
-            pages = inspect_pdf_isolated(
-                data,
-                max_pages=s.source_page_limit,
-                timeout_s=min(INSPECT_TIMEOUT_S, remaining),
-            )
+            limit_s = min(INSPECT_TIMEOUT_S, remaining)
+            if image_pages:  # also counts the scanned and handwritten pages
+                pages, found = inspect_pdf_detail(
+                    data, max_pages=s.source_page_limit, timeout_s=limit_s, allow_image_pages=True
+                )
+            else:
+                pages = inspect_pdf_isolated(data, max_pages=s.source_page_limit, timeout_s=limit_s)
+                found = 0
+            # The request applies to a file with scanned or handwritten pages and to no other.
+            convert_images = image_pages and found > 0
             if len(data) > s.upload_limit_bytes:  # the PDF made from a Word file can be big
                 raise UploadRejected("too_large")
         except UploadRejected as exc:
@@ -708,6 +732,7 @@ def _place_files(
                     course_id,
                     exam,
                     revises,
+                    convert_images,
                 )
             )
             placed[-1].office = office
@@ -723,6 +748,7 @@ def _place_files(
                 mode,
                 course_id=course_id,
                 exam=exam,
+                image_pages=convert_images,
                 revises=revises,
                 now=utcnow(),
             )
@@ -769,6 +795,7 @@ def _keep_for_parts(
     course_id: str | None,
     exam: bool,
     revises: str | None,
+    image_pages: bool = False,
 ) -> Placed:
     """A file over the page or size limit is kept for the person to choose its pages
     (T3-3, `web.pending`); nothing is converted or counted until they do."""
@@ -786,6 +813,7 @@ def _keep_for_parts(
                 mode=mode,
                 course_id=course_id,
                 exam=exam,
+                image_pages=image_pages,
             )
             pending_id = row.id
     except pending.TooManyPending:

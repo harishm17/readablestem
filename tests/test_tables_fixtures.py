@@ -75,6 +75,7 @@ def test_latex_tables_are_found_with_their_captions(latex):
     assert [(e.page, e.caption) for e in tables_] == [
         (0, "Table 1: Drop times for five heights."),
         (0, "Table 2: Frequency of quiz scores."),
+        (1, "Table 3: Values of f and its derivative."),
         (1, "Table 4: Specific heat by phase."),
         (2, "Table 5: Mechanical quantities."),
         (2, "Table 6: Pendulum trials."),
@@ -106,21 +107,21 @@ def test_a_ruled_grid_is_read_from_its_drawn_cells(latex):
 
 
 def test_a_two_row_header_with_spanning_cells(latex):
-    heat = found(latex)[2]
+    heat = found(latex)[3]
     assert heat.table is not None and heat.table.header_rows == 2
     texts = {cell.text for cell in heat.table.cells}
     assert {"Solid", "Liquid", "Aluminium", "Ethanol", "4186"} <= texts
 
 
 def test_maths_in_cells_keeps_its_symbols_with_their_letters(latex):
-    quantities = found(latex)[3]
+    quantities = found(latex)[4]
     texts = {cell.text for cell in quantities.table.cells} if quantities.table else set()
     assert "p⃗" in texts  # the arrow of \vec{p} right after its p
     assert {"Momentum", "Kinetic energy", "Power"} <= texts
 
 
 def test_a_blank_worksheet_table_keeps_all_its_rows(latex):
-    blank = found(latex)[4]
+    blank = found(latex)[5]
     assert (
         rows(blank)
         == [["Trial", "Length (m)", "Ten swings (s)", "Period (s)"]] + [["", "", "", ""]] * 4
@@ -136,13 +137,13 @@ def test_latex_things_that_are_not_tables_stay_as_they_were(latex):
     assert toc and Kind.TABLE not in {e.kind for e in toc}  # the table of contents
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="pymupdf-layout does not propose this all-number table set without rules; it "
-    "stays a display equation (docs/tables.md, 'Known misses')",
-)
-def test_an_unruled_table_of_numbers(latex):
-    assert any(e.page == 1 and "Table 3" in (e.caption or "") for e in found(latex))
+def test_an_unruled_table_of_numbers_is_found_by_its_caption_and_its_columns(latex):
+    # No rules, so the layout model proposes nothing; the lines set out in columns, with a
+    # "Table 3" caption under them, are the proposal (docs/tables.md, "Recall on real
+    # documents"). Without the caption a block of numbers is a matrix, not a table.
+    [unruled] = [e for e in found(latex) if "Table 3" in (e.caption or "")]
+    assert rows(unruled)[0] == ["x", "f(x)", "f^′(x)", "Difference"]
+    assert rows(unruled)[-1][0] == "2"
 
 
 # ---------------------------------------------------------------- Word-style
@@ -257,7 +258,7 @@ def test_with_the_model_spans_and_maths_cells_come_out_whole(monkeypatch):
     tables.reset_models()
     release()
     layout = analyze(LATEX.read_bytes())
-    heat, quantities = found(layout)[2:4]
+    heat, quantities = found(layout)[3:5]
     assert heat.table is not None and quantities.table is not None
     spanning = [c for c in heat.table.cells if c.text == "Specific heat (J/kg K)"]
     assert spanning and spanning[0].col_span == 2

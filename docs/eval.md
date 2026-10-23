@@ -538,6 +538,23 @@ in the offline `FakeVisionClient` with no recorded answers: every call is refuse
 real cost, so a fake run checks the plumbing and nothing else (all scores are 0).
 `--fake --max-usd X` caps the fake's simulated cost, which exercises the budget stop.
 
+`--sections BOOK/PAGE ...` keeps only the equations, figures or pages whose "book/page" id
+contains one of the strings (`--sections latex-matrices 5-2-solve`): a slice of a set for a run
+that has to stay small, applied before `--every` and `--limit`; the report's `dataset` records
+it. `FEATURE_PAGE_MATH=true` runs the document task with the page math pass (ADR 0006); its
+cost is `cost.page_math_usd` and the pass's counts are in each item's `page_math`.
+The real-world set (arXiv papers compiled by their authors, gold from the authors' own LaTeX, a registered
+held-out split; `scripts/realworld_*.py`): [eval-realworld.md](eval-realworld.md).
+Results on the development sets and the scripts that compare runs (`scripts/dev_buckets.py`,
+`scripts/dev_spans.py`): [eval-page-math.md](eval-page-math.md). The second secondary equation
+score (`secondary_symbols`) and what the secondary scores say about the held-out run:
+[eval-secondary-metrics.md](eval-secondary-metrics.md).
+
+`--scanned` (document task, development sets) turns every printed page into the image-only PDF
+of a degraded scan before it is converted, adds a prose word error rate and, with
+`FEATURE_IMAGE_PAGES=true`, the image page numbers; `--scan-seed N` picks the degradation. See
+[eval-image-pages.md](eval-image-pages.md).
+
 `--section-workers N` (document task, default 1) converts N sections at once. It shortens a
 live run, which waits on a hosted model, and gives the same items in the same order (a
 budget stop still ends the run at the first section it stopped, in section order, although
@@ -927,6 +944,12 @@ are in "Content features after integration" below. The scorer was checked agains
 research benchmark first (below). Code: `eval/tables.py`; the design is in the author's
 private research notes, which are not in this repository.
 
+2026-10-21: the model mode was run again with claude-haiku-5-5 and claude-opus-5-5 (183 tables,
+$2.26) and the document task with the flag on and off; the numbers, the gate result and the
+decision are in [tables.md](tables.md), "Tables on, on the development sets". The document task's
+report has a `table_cell_maths` block (formulas of the gold's table cells found in the output's
+cells; `eval/table_maths.py`), and the chemistry measurements are in [chemistry.md](chemistry.md).
+
 ### Gold
 
 | Set | Where | Licence | Documents | Data tables | Layout tables |
@@ -1040,9 +1063,19 @@ codes and the labels file's SHA-256. No file name, page or text leaves the priva
 The research's four public manuals are copyrighted: use them for local work only, never
 commit them or their labels.
 
-TODO(Harish): add 3-5 of your own course PDFs (or colleagues' with permission) to
-`private-inputs/tables/` and label their tables; the real-document gate has no data
-until then.
+`data/real-tables/` is a committed set of the same shape: five openly licensed (CC BY 4.0)
+lecture notes, textbook and tutorial extracts, 64 pages, 25 labelled tables, with the floors and
+the licences in its README. Run it with `--real-dir data/real-tables`, free and without a model
+(about four minutes). First measured 2026-10-21: precision 1.000 (14 of 14), full-extent recall
+0.560 (14 of 25): the recall floor was missed. It is a development set now (the detector was
+tuned on it, docs/tables.md "Recall on real documents"): after the fixes precision 1.000 (23 of 23)
+and recall 0.920 (23 of 25). `data/real-tables-heldout/` is a fresh set of seven CC BY papers, 58
+pages, 39 labelled tables, registered (documents, labels, floors, selection rule) before any
+detection ran on it and run once: precision 0.914, full-extent recall 0.744, both under the floors
+(docs/tables.md has the table-by-table account). The committed `latest-tables-*` reports are made
+without a real-document directory; check the floors on them with `eval gate --current <a run made
+with --real-dir>`. A private `private-inputs/tables/` of your own course PDFs is still the better
+test (lab-manual worksheets are not among the twelve papers).
 
 ### Gate
 
