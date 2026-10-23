@@ -1,0 +1,9 @@
+{
+  "name": "readablestem-railway-iac",
+  "private": true,
+  "description": "Railway infrastructure config (railway.ts). Only the Railway CLI's TypeScript SDK; the app is Python.",
+  "type": "module",
+  "devDependencies": {
+    "railway": "^3.16.0"
+  }
+}
