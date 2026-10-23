@@ -25,7 +25,10 @@ What the first deploy found, and how production is actually configured:
 - **Railway ignores `railway.json` for new services.** `railway config migrate status` reported
   "No services in production read Config as Code", so the first deploy ran no migration and
   crash-looped on an empty database. The settings were applied through Railway's API instead
-  (`railway api 'mutation { serviceInstanceUpdate(...) }'`), and are what production uses now:
+  (`railway api 'mutation { serviceInstanceUpdate(...) }'`). Since 2026-10-21 they are described in
+  `.railway/railway.ts` (imported from the live project with `railway config pull`; the old
+  `railway.json` and `deploy/railway.cron.json` were deleted because nothing read them). What
+  production uses:
 
   | Service | Settings |
   |---|---|
@@ -35,6 +38,9 @@ What the first deploy found, and how production is actually configured:
 
   A redeploy reuses the old deployment's settings; after changing a setting, deploy afresh with
   `railway up --service <name>`.
+  The live builder setting reads `RAILPACK` (what `railway.ts` records, so the plan is empty), but
+  the deployments of `web` and `cron` are built from the repository `Dockerfile`, which Railway
+  picks up on its own. Keep the Dockerfile at the repository root.
 - **Backups.** Railway's own scheduled backups need a Pro workspace, so the `backup` service
   above does the daily copy inside the same project. The privacy page's "kept for about 6 days"
   matches it. To restore: `railway ssh --service backup`, then
@@ -53,15 +59,46 @@ What the first deploy found, and how production is actually configured:
 
 | File | Used for |
 |---|---|
-| `railway.json` | The web service: Dockerfile build, pre-deploy migration, `/healthz` deploy check, restart policy. Railway reads this file at the repository root for every service that does not name another file. |
-| `deploy/railway.cron.json` | The cron service only: start command `readablestem ops cron`, hourly schedule. Point that service at this file (below). |
-| `tests/test_railway_config.py` | Fails if either file stops parsing, the health-check path stops being a route, or the pre-deploy and start commands stop being real commands. |
+| `.railway/railway.ts` | The whole Railway project as code: services `web`, `cron`, `backup`, the Postgres service, both volumes, domains, schedules, start and pre-deploy commands, health check. Every variable is listed by name with `preserve()`; values stay in Railway. |
+| `.railway/package.json`, `.railway/package-lock.json` | Only the `railway` npm package (the TypeScript SDK that `railway.ts` imports). The app is Python; nothing else uses Node. |
+| `tests/test_railway_config.py` | Fails if `railway.ts` stops naming the services, the health-check path stops being a route, the pre-deploy and start commands stop being real commands, a literal secret appears in it, or a `railway.json` comes back. |
 
-Railway marks config as code as deprecated: "Existing files keep working for legacy services
-until 2026-12-01" and then are not guaranteed, with Infrastructure as Code
-(`.railway/railway.ts`, `railway config apply`) as the replacement. **Confirm** whether a service
-created now counts as legacy. Nothing breaks if the file stops being read, because every value in it
-is also a dashboard setting; the table in step 5 lists them so you can copy them over.
+`railway.json` and `deploy/railway.cron.json` (Config as Code) are gone. Railway stops reading
+them on 2026-12-01 and names Infrastructure as Code as the replacement;
+`railway config migrate status` reports that no service in production reads them, so deleting
+them changes nothing live.
+
+### Changing the infrastructure
+
+Run these from a checkout linked to the project (`railway link -p readablestem -e production`),
+using the global `railway` CLI directly (not through `npx` or `timeout`: the CLI's version check
+reads `$_` and breaks).
+
+```sh
+(cd .railway && npm install)   # once per checkout: installs the SDK
+# edit .railway/railway.ts
+railway config plan            # what would change in production; read it
+railway config apply           # makes the change, after the same review
+```
+
+Rules that keep the plan honest:
+
+- **An empty plan is the resting state.** "Your Railway configuration is already up to date"
+  means the file and production agree. Run the plan after any change made in the dashboard; if it
+  shows a difference, either put the change in the file or undo it in the dashboard.
+- **Variables are managed.** A variable that exists in Railway but is missing from `railway.ts`
+  appears in the plan as a deletion. After `railway variable set NEW=...`, add the name to
+  `appVariables` (or `preserve()` it on the service) so the plan stays empty. A non-secret value may
+  be written as a literal only if it equals what production has; secrets and anything changed from
+  the dashboard stay `preserve()`.
+- **Do not set `build.watchPatterns`.** With them `railway up` skips builds whose files did not
+  match. Do not add a `builder` either: the file records the live value, and the plan compares
+  against it.
+- **Applying never deploys code.** It changes service settings and creates or removes the
+  resources the file names or drops. A settings change reaches a running service at its next
+  deployment. Deploy code with `railway up`, below.
+- To bring dashboard changes into the file instead, `railway config pull --variables managed --force`
+  rewrites it from production (it drops the comments and the `preserved` helper; review the diff).
 
 ## Decisions for Harish
 
@@ -103,7 +140,7 @@ the `DECISIONS_*` variables. For open sign-up, set the five variables in the nex
 settings are not set yet; the app starts without them, in `allowlist` mode).
 
 `PORT` must stay `8080`: the Dockerfile's start command is fixed to that port, and Railway
-sends its health check to `$PORT`. `railway.json` leaves the start command to the image.
+sends its health check to `$PORT`. `.railway/railway.ts` leaves the start command to the image.
 
 Still to decide or set (none is required for the service to start; the app refuses to start in
 production if a required one is missing, and logs the reason):
@@ -146,14 +183,15 @@ client address to `X-Forwarded-For`).
    `postgresql+psycopg://${{Postgres.PGUSER}}:${{Postgres.PGPASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}`).
    Production refuses SQLite, a non-https `BASE_URL`, and any missing key.
 3. **Web service settings.** Source: the repository; builder Dockerfile; no start command; no cron
-   schedule; replicas 1. `railway.json` sets the rest. Do not scale beyond one replica: rate limits
+   schedule; replicas 1. `.railway/railway.ts` sets the rest. Do not scale beyond one replica: rate limits
    and the upload gate are per process, and a second worker would only take pages.
 4. **Migrations run before each deploy** through `preDeployCommand`:
    `readablestem db upgrade` (`alembic upgrade head`) in a separate container on the private
    network with the service's variables. The app does not migrate itself: in production it refuses to
    start against a schema that is missing or behind its code (`require_migrated`), and it accepts one
    that is ahead, so a failed pre-deploy command stops the deploy and the old version keeps serving. Write migrations additively (deploy.md, "Roll back").
-5. **If the config file is not read,** set these in the web service's settings instead:
+5. **Settings of the web service** (declared in `.railway/railway.ts`; set by hand only if the
+   service is ever rebuilt from scratch):
 
    | Setting | Value |
    |---|---|
@@ -197,14 +235,11 @@ never breaks the 24-hour deletion promise; it only stops the counts and logs
 The CLI command exists: `readablestem ops cron` (exit 1 if aggregation failed, after the purge ran).
 It needs only the database, so no token travels over the network.
 
-1. In the project, **New > GitHub repo**, the same repository and branch. Name it `cron`.
-2. Settings > **Config-as-code** (named "Railway Config File" in the dashboard; **confirm**): set the
-   path to `/deploy/railway.cron.json`. This is essential: without it the service reads the root
-   `railway.json`, would run the migration too, and two services migrating at once can race.
-   If that setting does not exist, do not create the cron service from this repository until you have
-   found another way to keep it off `railway.json`; the HTTP route (option B) needs no second service.
-   With the file read, nothing else needs setting: start command `readablestem ops cron`, cron schedule
-   `7 * * * *`, no pre-deploy command, no healthcheck, restart policy Never.
+1. The `cron` service is declared in `.railway/railway.ts` (same repository and Dockerfile as the
+   web service); `railway config apply` creates it from the file.
+2. The file gives it start command `readablestem ops cron`, cron schedule `7 * * * *`, no
+   pre-deploy command, no healthcheck, restart policy Never. Keep it that way: a pre-deploy
+   command here would run the migration too, and two services migrating at once can race.
 3. Variables on the cron service (minimum):
 
    | Variable | Value |
@@ -306,16 +341,20 @@ change because `gcloud builds submit --tag` cannot pass build arguments.)
 
 ## Ship a new version
 
-Two ways; choose one per service so they do not both deploy the same commit.
+Production is deployed from a checkout; none of its services is connected to GitHub (`source` is empty
+in `railway.ts`, so `railway config apply` does not change that).
 
-- **GitHub-connected deploys (recommended).** The web and cron services watch a branch; a push to it
-  builds, runs the pre-deploy migration, checks `/healthz`, then switches traffic. Turn on "Wait for CI"
-  in the service settings if you want the GitHub checks to pass first (**confirm**).
-- **From a checkout:** `railway up --service web` from this branch's checkout uploads the working tree
-  (`.dockerignore` applies) and deploys it. It deploys uncommitted files too, so run it from a clean tree.
-  Deploy the cron service the same way (`--service cron`) after changes that touch `ops`.
+- **From a clean `main` checkout:** `railway up --service web` uploads the working tree
+  (`.dockerignore` applies), builds the Dockerfile, runs the pre-deploy migration, checks `/healthz`,
+  then switches traffic. It deploys uncommitted files too, so run it from a clean tree. Deploy the
+  cron service the same way (`railway up --service cron`) after changes that touch `ops`.
+- **GitHub-connected deploys** (not used today) would be a `source: github(...)` on the service in
+  `railway.ts`, applied with the plan and apply steps above. Do not give it `build.watchPatterns`
+  unless every deploy comes from GitHub: with them `railway up` skips builds.
 
-Nothing in this repository runs `railway up` for you, and none of the checks in this guide need it.
+Infrastructure changes and code deploys are separate: `railway config apply` changes settings,
+`railway up` ships code. Nothing in this repository runs either for you, and none of the checks in
+this guide need them.
 
 **Roll back.** In the web service's **Deployments** list, open the menu of the last good deployment
 and choose **Rollback** (Railway keeps images for 72 hours after removal; **confirm** the menu name).

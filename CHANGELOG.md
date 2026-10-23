@@ -16,6 +16,14 @@
   research articles, not lecture notes. Three misses are left (a small-capital caption split by
   `layout`, a check-mark table, rotated labels). No model call, no setting.
 
+## Railway infrastructure as code (2026-10-21)
+
+- The Railway project is now described in `.railway/railway.ts` (imported from production, so
+  `railway config plan` reports no changes) instead of `railway.json` and
+  `deploy/railway.cron.json`, which Railway stops reading on 2026-12-01 and which no service read.
+  Both files are deleted. The file also preserves `FEATURE_IMAGE_PAGES`, `MAX_USD_PER_PAGE` and
+  `MAX_USD_PER_JOB` on web, set after the import; without them a plan would have deleted them. How to change the infrastructure: [docs/deploy-railway.md](docs/deploy-railway.md).
+
 ## Table recall on real documents (2026-10-21, branch fix/table-recall)
 
 - On the five real documents of `data/real-tables` the detector found 14 of 25 tables (recall 0.560

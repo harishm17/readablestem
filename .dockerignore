@@ -23,6 +23,8 @@ private-inputs/
 tests/
 proof/
 deploy/
+.railway/
+node_modules/
 Dockerfile
 .dockerignore
 **/__pycache__/
