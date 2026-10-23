@@ -148,9 +148,18 @@ def mechanism(arm: dict | None, record: dict, kind: str, caption: bool, buckets)
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--part", choices=["dev", "heldout", "fresh", "fresh2"], default="dev")
+    parser.add_argument(
+        "--part", choices=["dev", "dev2", "heldout", "fresh", "fresh2", "fresh3"], default="dev"
+    )
     parser.add_argument("--rs", default="rs", help="ReadableSTEM's run folder under runs/PART")
     parser.add_argument("--out", type=Path)
+    parser.add_argument(
+        "--vs",
+        choices=["Haiku", "Opus"],
+        default="Haiku",
+        help="the chatbot the cross-tabulation (who is right where the other is wrong) is against; "
+        "Opus is scored on the papers it was run on only",
+    )
     parser.add_argument("--reading", choices=["registered", "cells"], default="registered")
     parser.add_argument(
         "--rescore-chat",
@@ -208,10 +217,12 @@ def main() -> int:
         f"{sum(result[n].values())} ({sum(result[n].values()) / n_gold[n]:.3f})" for n in names
     ]
     print("| all failures | " + " | ".join(totals) + " |")
-    if "Haiku" in outcome:
+    versus = args.vs
+    if versus in outcome:
         crossed: Counter[tuple[str, bool]] = Counter()
+        scored = [g for g in outcome["ReadableSTEM"] if g in outcome[versus]]
         for gid, arm in outcome["ReadableSTEM"].items():
-            other = outcome["Haiku"].get(gid)
+            other = outcome[versus].get(gid)
             if other is None:
                 continue
             mine = mechanism(arm, gold[gid], kinds.get(gid, "text"), gid in captions, buckets)
@@ -222,14 +233,15 @@ def main() -> int:
                 crossed[(theirs, True)] += 1
         print()
         print(
-            "| mechanism | ReadableSTEM wrong, Haiku right | Haiku wrong, ReadableSTEM right "
-            "| net points |"
+            f"| mechanism | ReadableSTEM wrong, {versus} right | {versus} wrong, ReadableSTEM "
+            f"right "
+            f"| net points (of {len(scored)} gold) |"
         )
         print("|---|---|---|---|")
         keys = sorted({k for k, _ in crossed})
         for k in sorted(keys, key=lambda k: -(crossed[(k, False)] - crossed[(k, True)])):
             lost, won = crossed[(k, False)], crossed[(k, True)]
-            print(f"| {k} | {lost} | {won} | {100 * (lost - won) / n_gold['ReadableSTEM']:+.2f} |")
+            print(f"| {k} | {lost} | {won} | {100 * (lost - won) / len(scored):+.2f} |")
     print()
     print(silent_errors(args, gold, buckets))
     if args.out:

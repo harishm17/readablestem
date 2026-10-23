@@ -2264,6 +2264,10 @@ class _ColumnExtent:
     def __init__(self, boxes: list[BBox], body: float) -> None:
         self.bands = _bands(boxes, 2.0 * body)
         self.band_tops = [y0 for y0, _ in self.bands]
+        # The column's text width: a line as wide as that is a line of a paragraph.
+        self.width = max((b[2] for b in boxes), default=0.0) - min(
+            (b[0] for b in boxes), default=0.0
+        )
         self.tops = sorted(b[1] for b in boxes)
         self.bottoms = sorted(b[3] for b in boxes)
 
@@ -2280,6 +2284,9 @@ class _ColumnExtent:
         return self.bottoms[k - 1] if k else None
 
 
+FULL_LINE = 0.9  # share of its column's width at which a single item is a full line of text
+
+
 def _section_break(box: BBox, own: _ColumnExtent, other: _ColumnExtent, body: float) -> bool:
     """Is this narrow item really full-width: a heading at a break across both columns?
 
@@ -2291,6 +2298,8 @@ def _section_break(box: BBox, own: _ColumnExtent, other: _ColumnExtent, body: fl
     """
     if other.overlaps(box[1], box[3]):
         return False
+    if box[2] - box[0] >= FULL_LINE * own.width:
+        return False  # a line of a paragraph, as wide as its column; a heading is shorter
     other_below = other.first_top_from(box[3])
     if other_below is None:
         return False
@@ -7640,6 +7649,7 @@ def _page_blocks(
         if block.kind == Kind.EQUATION and region is not None:
             _add_rules(block, region.rules)
     _attach_captions(blocks, figures)
+    captions = [b.bbox for b in blocks if b.kind == "attached"]
     blocks = [b for b in blocks if b.kind != "attached"]
     for figure in figures:
         if figure.equation:  # a picture of an equation: the equation step reads it
@@ -7696,7 +7706,9 @@ def _page_blocks(
     if len(loose) >= LOOSE_INK_STROKES or marks:
         ink = [*ink, *page_type.stroke_regions([*loose, *marks])]
     blocks.extend(_ink_blocks(ink, page_rect))
-    order = _reading_order([b.bbox for b in blocks], gutter, ctx.body)
+    # A caption held by its figure still fills its column: without it the column looks empty
+    # beside the next line of the other column, which then reads as a heading across both.
+    order = _reading_order([b.bbox for b in blocks], gutter, ctx.body, captions)
     final = _merge_column_continuations([blocks[i] for i in order])
     for block in final:
         if block.kind in _TEXT_BLOCKS:
