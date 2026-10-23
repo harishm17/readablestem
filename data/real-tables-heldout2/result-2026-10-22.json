@@ -1,0 +1,1338 @@
+{
+ "date": "2026-10-22",
+ "mode": "local (no model)",
+ "command": "readablestem eval pipeline --task tables --mode local --real-dir data/real-tables-heldout2",
+ "floors": {
+  "precision": 0.95,
+  "full_extent_recall": 0.85
+ },
+ "run": "once, each arm, after the registration commit 5b1ea27; nothing tuned on these documents before it",
+ "main_8555f6c": {
+  "real_documents": {
+   "documents": 10,
+   "pdf_pages": 100,
+   "labelled_tables": 58,
+   "predicted_tables": 55,
+   "true_tables": 55,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9347150979202339,
+    1.0
+   ],
+   "full_extent_recall": 0.9482758620689655,
+   "full_extent_recall_ci95": [
+    0.8586059871294194,
+    0.9822538654787383
+   ],
+   "any_extent_recall": 0.9482758620689655,
+   "errors": {},
+   "labels_sha256": "2970472f582a4e4c0f38a1609254ac64f9a939694070cf2bc2707b0025c1e4e9"
+  },
+  "tables": [
+   {
+    "file": "2202.07104.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       240.2,
+       205.6,
+       506.9,
+       258.4
+      ],
+      "outcome": "missed"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       173.2,
+       118.2,
+       553.6,
+       237.2
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 5,
+      "bbox": [
+       174.0,
+       280.4,
+       573.1,
+       361.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       173.0,
+       337.2,
+       574.1,
+       451.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 9,
+      "bbox": [
+       178.9,
+       230.8,
+       568.2,
+       672.4
+      ],
+      "outcome": "missed"
+     },
+     {
+      "page": 11,
+      "bbox": [
+       171.1,
+       100.8,
+       402.0,
+       519.9
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2212.00756.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       91.2,
+       256.0,
+       501.0,
+       534.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       92.9,
+       99.9,
+       514.9,
+       326.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 6,
+      "bbox": [
+       81.6,
+       317.5,
+       526.2,
+       665.4
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2304.04752.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       98.5,
+       54.9,
+       450.3,
+       129.3
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       71.0,
+       54.9,
+       477.8,
+       250.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 7,
+      "bbox": [
+       79.4,
+       54.9,
+       231.3,
+       104.4
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 7,
+      "bbox": [
+       317.5,
+       54.9,
+       469.4,
+       104.4
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 7,
+      "bbox": [
+       82.5,
+       142.9,
+       228.2,
+       172.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 7,
+      "bbox": [
+       320.6,
+       203.8,
+       466.3,
+       233.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       63.3,
+       54.9,
+       244.0,
+       104.4
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       73.9,
+       142.7,
+       233.4,
+       172.4
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       284.0,
+       177.2,
+       502.2,
+       303.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       284.0,
+       416.8,
+       502.2,
+       484.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 11,
+      "bbox": [
+       45.9,
+       54.9,
+       522.3,
+       452.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 14,
+      "bbox": [
+       60.9,
+       54.9,
+       484.5,
+       151.7
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2407.05381.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       130.3,
+       72.4,
+       481.7,
+       155.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 2,
+      "bbox": [
+       131.0,
+       230.2,
+       480.9,
+       326.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 5,
+      "bbox": [
+       156.1,
+       72.4,
+       455.9,
+       137.9
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2106.10091.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       108.6,
+       237.6,
+       503.5,
+       530.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 2,
+      "bbox": [
+       120.2,
+       285.5,
+       491.9,
+       459.4
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 3,
+      "bbox": [
+       73.5,
+       72.4,
+       538.4,
+       645.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       123.0,
+       201.9,
+       489.1,
+       476.2
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2504.14964.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       137.7,
+       358.5,
+       477.6,
+       501.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       134.8,
+       376.7,
+       481.9,
+       541.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 7,
+      "bbox": [
+       207.4,
+       326.0,
+       408.0,
+       564.5
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2503.10293.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       60.0,
+       67.4,
+       446.5,
+       184.4
+      ],
+      "outcome": "missed"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       92.3,
+       67.4,
+       430.5,
+       259.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 7,
+      "bbox": [
+       94.2,
+       284.4,
+       421.4,
+       356.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       60.0,
+       368.9,
+       422.4,
+       513.4
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2401.05900.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       51.5,
+       106.4,
+       560.5,
+       271.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 2,
+      "bbox": [
+       128.4,
+       70.5,
+       485.9,
+       451.1
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 5,
+      "bbox": [
+       64.1,
+       70.5,
+       550.2,
+       167.2
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 6,
+      "bbox": [
+       61.8,
+       70.5,
+       550.2,
+       156.0
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       61.8,
+       70.6,
+       550.2,
+       200.0
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 9,
+      "bbox": [
+       61.8,
+       70.5,
+       550.2,
+       174.7
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 10,
+      "bbox": [
+       61.8,
+       70.6,
+       550.2,
+       179.0
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 12,
+      "bbox": [
+       61.8,
+       70.6,
+       550.2,
+       229.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 13,
+      "bbox": [
+       61.8,
+       70.5,
+       550.2,
+       186.3
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 15,
+      "bbox": [
+       61.8,
+       70.6,
+       550.2,
+       206.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 16,
+      "bbox": [
+       61.8,
+       70.6,
+       550.2,
+       220.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 17,
+      "bbox": [
+       61.8,
+       70.6,
+       550.2,
+       204.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 20,
+      "bbox": [
+       64.1,
+       70.5,
+       547.9,
+       238.5
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2411.14542.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       54.0,
+       119.7,
+       278.6,
+       293.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 1,
+      "bbox": [
+       54.0,
+       346.5,
+       588.8,
+       509.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 1,
+      "bbox": [
+       54.0,
+       562.6,
+       268.3,
+       664.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 2,
+      "bbox": [
+       54.0,
+       78.6,
+       475.9,
+       195.0
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2002.00539.pdf",
+    "tables": [
+     {
+      "page": 3,
+      "bbox": [
+       383.7,
+       276.0,
+       491.3,
+       322.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       123.1,
+       155.9,
+       225.9,
+       221.4
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       357.1,
+       321.5,
+       517.9,
+       424.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       123.1,
+       639.4,
+       225.9,
+       704.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 5,
+      "bbox": [
+       73.7,
+       114.1,
+       275.3,
+       268.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 5,
+      "bbox": [
+       59.5,
+       438.8,
+       289.5,
+       520.7
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   }
+  ]
+ },
+ "branch_433b729": {
+  "real_documents": {
+   "documents": 10,
+   "pdf_pages": 100,
+   "labelled_tables": 58,
+   "predicted_tables": 55,
+   "true_tables": 55,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9347150979202339,
+    1.0
+   ],
+   "full_extent_recall": 0.9482758620689655,
+   "full_extent_recall_ci95": [
+    0.8586059871294194,
+    0.9822538654787383
+   ],
+   "any_extent_recall": 0.9482758620689655,
+   "errors": {},
+   "labels_sha256": "2970472f582a4e4c0f38a1609254ac64f9a939694070cf2bc2707b0025c1e4e9"
+  },
+  "tables": [
+   {
+    "file": "2202.07104.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       240.2,
+       205.6,
+       506.9,
+       258.4
+      ],
+      "outcome": "missed"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       173.2,
+       118.2,
+       553.6,
+       237.2
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 5,
+      "bbox": [
+       174.0,
+       280.4,
+       573.1,
+       361.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       173.0,
+       337.2,
+       574.1,
+       451.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 9,
+      "bbox": [
+       178.9,
+       230.8,
+       568.2,
+       672.4
+      ],
+      "outcome": "missed"
+     },
+     {
+      "page": 11,
+      "bbox": [
+       171.1,
+       100.8,
+       402.0,
+       519.9
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2212.00756.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       91.2,
+       256.0,
+       501.0,
+       534.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       92.9,
+       99.9,
+       514.9,
+       326.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 6,
+      "bbox": [
+       81.6,
+       317.5,
+       526.2,
+       665.4
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2304.04752.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       98.5,
+       54.9,
+       450.3,
+       129.3
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       71.0,
+       54.9,
+       477.8,
+       250.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 7,
+      "bbox": [
+       79.4,
+       54.9,
+       231.3,
+       104.4
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 7,
+      "bbox": [
+       317.5,
+       54.9,
+       469.4,
+       104.4
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 7,
+      "bbox": [
+       82.5,
+       142.9,
+       228.2,
+       172.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 7,
+      "bbox": [
+       320.6,
+       203.8,
+       466.3,
+       233.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       63.3,
+       54.9,
+       244.0,
+       104.4
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       73.9,
+       142.7,
+       233.4,
+       172.4
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       284.0,
+       177.2,
+       502.2,
+       303.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       284.0,
+       416.8,
+       502.2,
+       484.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 11,
+      "bbox": [
+       45.9,
+       54.9,
+       522.3,
+       452.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 14,
+      "bbox": [
+       60.9,
+       54.9,
+       484.5,
+       151.7
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2407.05381.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       130.3,
+       72.4,
+       481.7,
+       155.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 2,
+      "bbox": [
+       131.0,
+       230.2,
+       480.9,
+       326.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 5,
+      "bbox": [
+       156.1,
+       72.4,
+       455.9,
+       137.9
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2106.10091.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       108.6,
+       237.6,
+       503.5,
+       530.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 2,
+      "bbox": [
+       120.2,
+       285.5,
+       491.9,
+       459.4
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 3,
+      "bbox": [
+       73.5,
+       72.4,
+       538.4,
+       645.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       123.0,
+       201.9,
+       489.1,
+       476.2
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2504.14964.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       137.7,
+       358.5,
+       477.6,
+       501.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       134.8,
+       376.7,
+       481.9,
+       541.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 7,
+      "bbox": [
+       207.4,
+       326.0,
+       408.0,
+       564.5
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2503.10293.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       60.0,
+       67.4,
+       446.5,
+       184.4
+      ],
+      "outcome": "missed"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       92.3,
+       67.4,
+       430.5,
+       259.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 7,
+      "bbox": [
+       94.2,
+       284.4,
+       421.4,
+       356.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       60.0,
+       368.9,
+       422.4,
+       513.4
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2401.05900.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       51.5,
+       106.4,
+       560.5,
+       271.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 2,
+      "bbox": [
+       128.4,
+       70.5,
+       485.9,
+       451.1
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 5,
+      "bbox": [
+       64.1,
+       70.5,
+       550.2,
+       167.2
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 6,
+      "bbox": [
+       61.8,
+       70.5,
+       550.2,
+       156.0
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 8,
+      "bbox": [
+       61.8,
+       70.6,
+       550.2,
+       200.0
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 9,
+      "bbox": [
+       61.8,
+       70.5,
+       550.2,
+       174.7
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 10,
+      "bbox": [
+       61.8,
+       70.6,
+       550.2,
+       179.0
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 12,
+      "bbox": [
+       61.8,
+       70.6,
+       550.2,
+       229.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 13,
+      "bbox": [
+       61.8,
+       70.5,
+       550.2,
+       186.3
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 15,
+      "bbox": [
+       61.8,
+       70.6,
+       550.2,
+       206.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 16,
+      "bbox": [
+       61.8,
+       70.6,
+       550.2,
+       220.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 17,
+      "bbox": [
+       61.8,
+       70.6,
+       550.2,
+       204.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 20,
+      "bbox": [
+       64.1,
+       70.5,
+       547.9,
+       238.5
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2411.14542.pdf",
+    "tables": [
+     {
+      "page": 1,
+      "bbox": [
+       54.0,
+       119.7,
+       278.6,
+       293.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 1,
+      "bbox": [
+       54.0,
+       346.5,
+       588.8,
+       509.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 1,
+      "bbox": [
+       54.0,
+       562.6,
+       268.3,
+       664.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 2,
+      "bbox": [
+       54.0,
+       78.6,
+       475.9,
+       195.0
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   },
+   {
+    "file": "2002.00539.pdf",
+    "tables": [
+     {
+      "page": 3,
+      "bbox": [
+       383.7,
+       276.0,
+       491.3,
+       322.8
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       123.1,
+       155.9,
+       225.9,
+       221.4
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       357.1,
+       321.5,
+       517.9,
+       424.5
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 4,
+      "bbox": [
+       123.1,
+       639.4,
+       225.9,
+       704.9
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 5,
+      "bbox": [
+       73.7,
+       114.1,
+       275.3,
+       268.6
+      ],
+      "outcome": "found"
+     },
+     {
+      "page": 5,
+      "bbox": [
+       59.5,
+       438.8,
+       289.5,
+       520.7
+      ],
+      "outcome": "found"
+     }
+    ],
+    "false": []
+   }
+  ]
+ }
+}
