@@ -17,7 +17,9 @@ Rules, all on the LaTeX of the cell (no model, no text layer):
 - what lies between two runs is maths when it holds a letter, a symbol or a script; a bare
   number, a sign, a comma or a bracket between words is text again (`2 \\text{ of}` is "2 of");
 - the brackets that wrap a whole formula and the sentence punctuation after it belong to the text:
-  `\\text{Momenta } (p_{T}) \\text{ of}` is "Momenta (", p_T, ") of".
+  `\\text{Momenta } (p_{T}) \\text{ of}` is "Momenta (", p_T, ") of";
+- a cut that would leave a formula with unbalanced brackets (`g\\ (\\text{m/s}^2)` gives `g\\ (`
+  and `^2)`) is not made: the cell is left whole.
 """
 
 from __future__ import annotations
@@ -109,6 +111,24 @@ def _balanced(inner: str) -> bool:
     return depth == 0
 
 
+def _brackets_balanced(value: str) -> bool:
+    """Every (, [ and { in the LaTeX closes in it, in order (escaped braces aside)."""
+    pairs = {")": "(", "]": "[", "}": "{"}
+    stack: list[str] = []
+    i = 0
+    while i < len(value):
+        ch = value[i]
+        if ch == "\\":
+            i += 2
+            continue
+        if ch in "([{":
+            stack.append(ch)
+        elif ch in pairs and (not stack or stack.pop() != pairs[ch]):
+            return False
+        i += 1
+    return not stack
+
+
 def _unwrap(value: str) -> tuple[str, str, str]:
     """("(", "p_{T}", ")") for "(p_{T})"; ("", value, "") when the brackets are not a pair round
     the whole formula. A closing "." or "," after it is the sentence's: (before, maths, after)."""
@@ -135,6 +155,8 @@ def cell_pieces(latex: str | None) -> list[Piece] | None:
         return None
     pieces = _split(latex)
     if pieces is None or not any(p.kind == "text" and p.value.strip() for p in pieces):
+        return None
+    if any(p.kind == "math" and not _brackets_balanced(p.value) for p in pieces):
         return None
     out: list[Piece] = []
 

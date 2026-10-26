@@ -85,3 +85,12 @@ def test_a_cell_of_only_maths_is_written_whole_as_before():
     html = render_table(_grid(_cell(r"1.5 \times 10^{-3}", "1.5 x 10^-3")), id_prefix="t")
     td = html.split("<td")[1]
     assert td.count("<math") == 1 and td.count("</math>") == 1
+
+
+def test_a_unit_with_a_script_on_its_text_is_left_whole():
+    # `\\text{m/s}^2` is part of the formula; cutting at it leaves "g\\ (" and "^2)".
+    assert cell_pieces(r"g\ (\text{m/s}^2)") is None
+
+
+def test_a_cut_that_leaves_unbalanced_brackets_is_not_made():
+    assert cell_pieces(r"\left( a \text{ and } b \right)") is None

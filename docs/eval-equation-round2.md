@@ -21,7 +21,10 @@ symbols-wrong equations are a required decision; the chatbots flag none). Spend 
 - **Column order** (`pipeline/layout.py`): a column's full-width line is no longer a section break, and a caption held
   with its column fills the column. Text that was read in the wrong order across columns is read in the right one.
 - **Table cells of words with maths** (`pipeline/table_cells.py`, `pipeline/table_html.py`): a cell of words with a
-  formula in it is read as words and maths, not as one formula.
+  formula in it is read as words and maths, not as one formula. After the fresh3 run a test showed one case it
+  cut wrongly: a cell whose formula has words inside its brackets (`g\ (\text{m/s}^2)`) was cut into `g\ (`, the
+  words and `^2)`. A cut that leaves a formula with unbalanced brackets is no longer made. The fresh3 numbers
+  below are from the code before that correction (frozen at 64ec616 as registered) and were not re-run.
 - **Evaluation**: `scripts/rw_notation_neutral.py`, a notation-neutral secondary score that does not count
   `\mathrm`, `\textrm`, `\mbox`, `\textnormal`, `\operatorname` and `{\rm }` as different from `\text`, applied to the
   prediction and the gold alike and to every arm; reading B (`pipeline_eval.with_table_maths`), which counts each
