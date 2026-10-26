@@ -1988,32 +1988,58 @@ def with_table_maths(
         fix = fixes.get(element.id)
         if element.kind is not Kind.TABLE or fix is None or fix.table is None:
             continue
-        for k, cell in enumerate(c for c in fix.table.grid.cells if c.latex and c.mathml):
-            shift += 1
-            new_id = f"{element.id}-m{k}"
-            out.append(
-                Element(
-                    id=new_id,
-                    kind=Kind.EQUATION,
-                    page=element.page,
-                    bbox=cell.bbox or element.bbox,
-                    order=element.order + shift,
-                    text=cell.text or None,
-                    display="inline",
-                    parent_id=element.id,
+        k = 0
+        for cell in (c for c in fix.table.grid.cells if c.latex and c.mathml):
+            for latex, mathml, text in _cell_formulas(cell):
+                shift += 1
+                new_id = f"{element.id}-m{k}"
+                k += 1
+                out.append(
+                    Element(
+                        id=new_id,
+                        kind=Kind.EQUATION,
+                        page=element.page,
+                        bbox=cell.bbox or element.bbox,
+                        order=element.order + shift,
+                        text=text,
+                        display="inline",
+                        parent_id=element.id,
+                    )
                 )
-            )
-            extra[new_id] = Fix(
-                element_id=new_id,
-                kind=Kind.EQUATION,
-                status=fix.status,
-                confidence=fix.confidence,
-                equation=EquationFix(
-                    latex=cell.latex or "", mathml=cell.mathml or "", speech="", display="inline"
-                ),
-                review=fix.review,
-            )
+                extra[new_id] = Fix(
+                    element_id=new_id,
+                    kind=Kind.EQUATION,
+                    status=fix.status,
+                    confidence=fix.confidence,
+                    equation=EquationFix(latex=latex, mathml=mathml, speech="", display="inline"),
+                    review=fix.review,
+                )
     return out, {**fixes, **extra}
+
+
+def _cell_formulas(cell: Any) -> list[tuple[str, str, str | None]]:
+    """(LaTeX, MathML, text) of each formula the output HTML has in a maths cell: the cell's
+    one formula, or, for a cell of words with formulas in it, each formula in it
+    (`pipeline.table_cells`). A source that predates that module writes the cell whole, and so
+    is read: the reading follows what the arm's own HTML has."""
+    whole = [(cell.latex or "", cell.mathml or "", cell.text or None)]
+    try:
+        from readablestem.pipeline import table_cells, validate
+    except ImportError:
+        return whole
+    pieces = table_cells.cell_pieces(cell.latex)
+    if pieces is None:
+        return whole
+    found: list[tuple[str, str, str | None]] = []
+    for piece in pieces:
+        if piece.kind != "math":
+            continue
+        try:
+            mathml = validate.safe_latex_to_mathml(equation_step.clean_latex(piece.value), "inline")
+        except validate.LatexConversionError:
+            return whole
+        found.append((piece.value, mathml, None))
+    return found
 
 
 _TABLE_READING_KEYS = (

@@ -41,7 +41,10 @@ import re
 from dataclasses import dataclass, field
 
 from readablestem.core.types import TableCell, TableGrid
+from readablestem.pipeline.equation_step import clean_latex
 from readablestem.pipeline.safe_html import Display, escape_text, sanitize_mathml
+from readablestem.pipeline.table_cells import cell_pieces
+from readablestem.pipeline.validate import LatexConversionError, safe_latex_to_mathml
 
 # The class of the tool's own words (`assemble.AUTHORED_CLASS`: `lang="en"` in a document
 # in another language).
@@ -250,7 +253,7 @@ class _Writer:
                 attrs += f' headers="{" ".join(headers)}"'
         tag = "th" if header else "td"
         content = self.content(placed.cell)
-        if header and content.startswith("<math"):
+        if header and "<math" in content:
             content = self.named_maths(placed.cell, content)
         return f"<{tag}{attrs}>{content}</{tag}>"
 
@@ -282,10 +285,37 @@ class _Writer:
 
     def content(self, cell: TableCell) -> str:
         if cell.mathml:
+            mixed = self.words_and_maths(cell)
+            if mixed is not None:
+                return mixed
             mathml = sanitize_mathml(cell.mathml, display=self.math_display)
             if mathml is not None:
                 return mathml
         return escape_text(cell.text)
+
+    def words_and_maths(self, cell: TableCell) -> str | None:
+        """A cell of words with formulas in it as its words and a `<math>` for each formula
+        (`table_cells.cell_pieces`), or None: a cell that is only maths, or only words, or one
+        of whose formulas does not convert, is written whole."""
+        pieces = cell_pieces(cell.latex)
+        if pieces is None:
+            return None
+        parts: list[str] = []
+        for piece in pieces:
+            if piece.kind == "text":
+                parts.append(escape_text(piece.value))
+                continue
+            try:
+                mathml = sanitize_mathml(
+                    safe_latex_to_mathml(clean_latex(piece.value), "inline"),
+                    display=self.math_display,
+                )
+            except LatexConversionError:
+                return None
+            if mathml is None:
+                return None
+            parts.append(mathml)
+        return "".join(parts)
 
     def header_id(self, placed: _Placed) -> str:
         return f"{self.id_prefix}-r{placed.row}c{placed.col}"

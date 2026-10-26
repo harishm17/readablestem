@@ -1,0 +1,322 @@
+{
+ "part": "fresh3",
+ "seed": "realworld-fresh-2026-10-21",
+ "papers": [
+  {
+   "id": "2201.10048",
+   "title": "A First Look at First-Passage Processes",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:PR",
+   "style": "tutorial",
+   "pages_chosen": [
+    12,
+    14,
+    18,
+    19,
+    24
+   ],
+   "equations": 123,
+   "display": 16,
+   "pdf_sha256": "223e852772768f1af3c86147bb5b588f179c3c332772da6b9f1664137afd267b",
+   "source_sha256": "91063166d758bae23ce30eafaf5ca2370e1dc2a771baba7b14d598342e8f837d",
+   "extract_pdf_sha256": "8d774149f601ae314042b35c286ea1e17c25486fb05d38c605b2144108f8bc12",
+   "gold_sha256": "0c287204844ebfd108353e59a43f29eee8c7f185d5a3d42202de4c5eed97267a"
+  },
+  {
+   "id": "2303.08046",
+   "title": "Ultra-High-Resolution Detector Simulation with Intra-Event Aware GAN and Self-Supervised Relational Reasoning",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:data-an",
+   "style": "research",
+   "pages_chosen": [
+    9,
+    10,
+    12,
+    24
+   ],
+   "equations": 39,
+   "display": 4,
+   "pdf_sha256": "0f3b449c2519110c475b95fccefe69183fa0d87365c31478faa6537abbaf4082",
+   "source_sha256": "af1a74314eb8374eb53c44548e613907c5403bc5d8f5e3be5de196e2caf9896c",
+   "extract_pdf_sha256": "6406c1eac9a90b004138c7f9663e6fedf984821c4689a5ff2a98269577491ad6",
+   "gold_sha256": "5f2ff79c8be675da4ea29aa64618049cbe8cead8c61b0d5b7b7a05745a563941"
+  },
+  {
+   "id": "2305.00609",
+   "title": "Group Dynamics in Inquiry-based Labs: Gender Inequities and the Efficacy of Partner Agreements",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:ed-ph",
+   "style": "tutorial",
+   "pages_chosen": [
+    10,
+    12,
+    18,
+    19
+   ],
+   "equations": 278,
+   "display": 0,
+   "pdf_sha256": "924a63b5dff055e8f8c24970bce436e097652f55385178c0db9a6ea22592a6f8",
+   "source_sha256": "2c3e530d7e8daebf210316d8cfccd3e3b233ae660a329216c8233e981391e8b1",
+   "extract_pdf_sha256": "fda77d91d79d610b630d647e9144cba008aea2c816abd0837e75ef8cad447fa2",
+   "gold_sha256": "98fbbf9a32854d9f7cf4555ce4e6409a6d01c4a9622d73ad05425e370e919e0b"
+  },
+  {
+   "id": "2405.13060",
+   "title": "Remark on Pascal's Triangle",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:HO",
+   "style": "research",
+   "pages_chosen": [
+    7,
+    8,
+    9,
+    10
+   ],
+   "equations": 108,
+   "display": 1,
+   "pdf_sha256": "87a594fd1df6fee3419ecd3d4916c5d61750c0f5a766a0192c1af69b116acaa7",
+   "source_sha256": "37be0ac71983f203b5fb4be57e327336a61a9f41b81c2eeee755aedc5e647325",
+   "extract_pdf_sha256": "1681f89da9bbfc6fae8fd568c6890ee01f164994e855db46af146e524f9c35b3",
+   "gold_sha256": "b1b6d8edfc8db587193c5d980ae02bf0a1180b1ee524c96e1be26118779bf1b8"
+  },
+  {
+   "id": "2406.01324",
+   "title": "Isoperimetric inequalities in high-dimensional convex sets",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:PR",
+   "style": "tutorial",
+   "pages_chosen": [
+    2,
+    5,
+    31,
+    32,
+    50
+   ],
+   "equations": 142,
+   "display": 24,
+   "pdf_sha256": "9b1bfc4c78a3c8e25aed51845bd1c4928831a4b6f324dfcf86241f09b0b81112",
+   "source_sha256": "40bedecf479d8dd1c0b831e9f0a6521e295ed8bde21270d139ffabbe017504a4",
+   "extract_pdf_sha256": "5504ae9b7c9ce70fa7c15d13f568619c36fa1351c82aff230b916f0051759eab",
+   "gold_sha256": "8963c6de08bdd7ea59490b7098e4c87353c37f8960973931127c6cce6bf3629d"
+  },
+  {
+   "id": "2406.03321",
+   "title": "Decision synthesis in monetary policy",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ME",
+   "style": "research",
+   "pages_chosen": [
+    4,
+    9,
+    10,
+    14,
+    18
+   ],
+   "equations": 137,
+   "display": 6,
+   "pdf_sha256": "bcd5cd06647d3e06e9411812b13f2dd55dc44cc809d7dabe0e02da83b74c087d",
+   "source_sha256": "f7a7660394706904e8d38b4a7fba10d39da5279f141557decfe06892bc78b8fc",
+   "extract_pdf_sha256": "0b98a66f349ddfb18ff696017eb496459440918c4fc4d658b70413c7c6e3ac1e",
+   "gold_sha256": "35122f29a55c77dd1d52bd96200b8a28ab445a8cbffd58657237c8b625b71d36"
+  },
+  {
+   "id": "2408.05847",
+   "title": "Correcting invalid regression discontinuity designs with multiple time period data",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "econ:econ:EM",
+   "style": "research",
+   "pages_chosen": [
+    12,
+    13,
+    14,
+    16,
+    17
+   ],
+   "equations": 109,
+   "display": 3,
+   "pdf_sha256": "d97c5c443245b923cf1dca26ad24bfb993da84c1097bd077552fafc5f5d0c064",
+   "source_sha256": "cd81cc7d65cbf7935097929485fc4b65f1c318b72f4c2b6e34d84b0f94099587",
+   "extract_pdf_sha256": "164eba05455dc23f02c444b65d05c3d1fb0dec9561e1e41a47ff5463724bf208",
+   "gold_sha256": "6ddd285ccb6ee0042cda07be5ae041c291c176ffb7cf67d9b0857c52cfc02239"
+  },
+  {
+   "id": "2501.19367",
+   "title": "Turbulence: A Nonequilibrium Field Theory",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:flu-dyn",
+   "style": "research",
+   "pages_chosen": [
+    3,
+    4,
+    21,
+    26,
+    43
+   ],
+   "equations": 136,
+   "display": 14,
+   "pdf_sha256": "be396f03f2b992e4ef49e2f1e82af2f4d9cff6e9e9bb190d5a325dac469b8fa6",
+   "source_sha256": "8fd4319dbfce83a027876567c4fa554bbee1d03d226bcfdd7539dee2e49f4d4c",
+   "extract_pdf_sha256": "8750141ebe2219327afbec6564cec0ecb65ed2b06a93a357650e0ffef190d697",
+   "gold_sha256": "737c40722b42ee830c49f5b57950bba0f76f27fdc914892cdcd60ef5bd9a4d7f"
+  },
+  {
+   "id": "2503.00504",
+   "title": "On the Saturation Effects of Spectral Algorithms in Large Dimensions",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ML",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    3,
+    14,
+    15,
+    16
+   ],
+   "equations": 145,
+   "display": 9,
+   "pdf_sha256": "b6071ea53cc917dca64c63b0c761a77ef2b417231a4a9d3e9a966a252934d03f",
+   "source_sha256": "ad14a89c5c6385397ea2b9cd1b2c8459d733b44e3bc96bdc494dde894104007a",
+   "extract_pdf_sha256": "f0755e433fd21847dff6210f63717c33cfbb55abf73819a0240f9365b6311f65",
+   "gold_sha256": "ebc3ea90f11bc85184455a7abcfd4d981b87450026d27124b14c5b8663166e54"
+  },
+  {
+   "id": "2503.22999",
+   "title": "Coarse-grained entropy balance of the Szilard engine",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:class-ph",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    3,
+    4,
+    15,
+    18,
+    19
+   ],
+   "equations": 90,
+   "display": 7,
+   "pdf_sha256": "a73b03d70be546b7caa61dfce16185820df190c8142d12648bef9d26f3d26507",
+   "source_sha256": "6cce98a15e957d4e021cacc18d661b03167b3b788d5dcd3e6b7c00518a2315b1",
+   "extract_pdf_sha256": "90a3bc0149aeb7fe1fa9d82cf90ec5d3171a1f6c356c12537739ccb0c90c45be",
+   "gold_sha256": "bea44f84cca951ccbdaca682a0a9d3851f4c74d9ba1a8484a9b54f2b266b33bf"
+  },
+  {
+   "id": "2504.06207",
+   "title": "An experimental survey and Perspective View on Meta-Learning for Automated Algorithms Selection and Parametrization",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "cs:cs:LG",
+   "style": "research",
+   "pages_chosen": [
+    3,
+    5,
+    10,
+    13,
+    16
+   ],
+   "equations": 78,
+   "display": 0,
+   "pdf_sha256": "27964437f0dbf8ad22e191ae39939bbc790d6a3bc17123ac2fd7a3f6038ea067",
+   "source_sha256": "f62f84c5b7a7ef1d40dbb9e93eb2818db2ad31e9a6c1f90ee6cc64fa6c8306d7",
+   "extract_pdf_sha256": "06ae4a5e5dfcdbf71dce82045bceab282a4a3ab235ef949362cefdbc97d2b0cb",
+   "gold_sha256": "06b38882ec50f6c6ff837d50b2f63cde6d897bbf1f58fa773ab8f8c7d8a7e094"
+  },
+  {
+   "id": "2505.13042",
+   "title": "An introduction to Neural Networks for Physicists",
+   "licence": "CC0 1.0",
+   "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/",
+   "set": "physics:physics:ed-ph",
+   "style": "tutorial",
+   "pages_chosen": [
+    3,
+    6,
+    7,
+    8,
+    15,
+    16
+   ],
+   "equations": 108,
+   "display": 22,
+   "pdf_sha256": "b9ea50a720ca480e054a10f76657daebbb745bcd240ed04e6a767a2072f72b6a",
+   "source_sha256": "0da10a6d55925b54f61ef99ee30ec53d4be3cec704d09fe6b4ec04397c3d4bfb",
+   "extract_pdf_sha256": "dc81b7734876760d62300819206121986ee28563b132f981fddf3279fa970524",
+   "gold_sha256": "844e3e7a3b2257d9e14991480de5d5b6c31e4ca193dc41a4041e3e5446699412"
+  },
+  {
+   "id": "2506.15579",
+   "title": "Advanced Langevin thermostats: Properties, extensions to rheology, and a lean momentum-conserving approach",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:cond-mat:stat-mech",
+   "style": "research",
+   "pages_chosen": [
+    9,
+    10,
+    11,
+    14
+   ],
+   "equations": 88,
+   "display": 9,
+   "pdf_sha256": "1268bba5a4888349db6b59cd9094ca905818d7bad8a1c5d3a887825bc2c532f4",
+   "source_sha256": "3ca9141f294fe58af5bc26492f54252e3061ad054e650f2b186acd7b2c52534c",
+   "extract_pdf_sha256": "6f2a18b37deec86a58a98df88f7242253a49643d2d94edc4b4be1ca5de824007",
+   "gold_sha256": "30c5a03e7aac3d8ac89895403dc62bac4191cc6dc4e033b740a87b55a1043056"
+  },
+  {
+   "id": "2506.15876",
+   "title": "Tree-based adaptive finite element methods for deformable image registration",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:NA",
+   "style": "research",
+   "pages_chosen": [
+    5,
+    6,
+    7,
+    8,
+    11,
+    13
+   ],
+   "equations": 169,
+   "display": 27,
+   "pdf_sha256": "40bee2416b20a4d251535aab5a7aea419c2a4460330497df28b3d0d92a95232b",
+   "source_sha256": "4957c734fe3018d38fd7aeb944d6ae84eb884a53a426afe4095d81883fccea20",
+   "extract_pdf_sha256": "355441d5166adde9be21e8f229b009a4224ab3492b088c147a054fd6a8ae271b",
+   "gold_sha256": "d36aa2b568e1a20dccd0963d360bf987828d818ef98792974bfafb697022de62"
+  },
+  {
+   "id": "2506.20341",
+   "title": "A Neural-Operator Surrogate for Platelet Deformation Across Capillary Numbers",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:flu-dyn",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    6,
+    7,
+    8
+   ],
+   "equations": 29,
+   "display": 0,
+   "pdf_sha256": "8dba4df304616b329856464471cda660feb287a942e2d90ef421a353ff27ffd8",
+   "source_sha256": "82dc97ca522ac83f77c0f6b6518abf22f2bc59f04293dc49583c20d951dbdc28",
+   "extract_pdf_sha256": "160cd3325fd27db17ab5de7e1aa6a491005bdb1f992def9c049c6d1c312bc856",
+   "gold_sha256": "3d269359d9a4d96bd482ff5ffd27a580bc62ce835f4a24c428fa0975ad0926bb"
+  }
+ ],
+ "n_papers": 15,
+ "n_equations": 1779,
+ "n_pages": 73
+}

@@ -138,7 +138,9 @@ def test_a_session_cookie_cannot_be_forged_or_altered(tmp_path):
         env.allow(ALICE)
         login(client, ALICE)
         good = next(iter(client.cookies.jar))
-        for tampered in (good.value[:-2] + "xx", "x" + good.value, "", "e30=.AAAA.BBBB"):
+        # The last two characters always change (the cookie may already end in "xx").
+        tail = "yy" if good.value.endswith("xx") else "xx"
+        for tampered in (good.value[:-2] + tail, "x" + good.value, "", "e30=.AAAA.BBBB"):
             other = env.client()
             other.cookies.set(good.name, tampered)
             assert other.get("/app").status_code == 303, tampered

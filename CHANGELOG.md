@@ -1,5 +1,18 @@
 # Changelog
 
+## Equations on real papers, round 2 (2026-10-23, branch fix/equations-round2)
+
+- Two deterministic fixes: a column's full-width line is no longer a section break and a held caption fills its
+  column (`pipeline/layout.py`); a table cell of words with maths is read as words and maths
+  (`pipeline/table_cells.py`).
+- A third registered set (15 papers, 1,779 equations, `data/realworld/PREREGISTRATION-FRESH3.md`), one run per arm.
+  Registered `exact_lenient`: ReadableSTEM 0.620, Haiku 0.648, Opus 0.678, ReadableSTEM before the fixes 0.614. The
+  claim of beating both chatbots is not met; counting the maths in table cells it is 0.654 against 0.648 and 0.678.
+  The silent-error limit is met (+0.056 per 100 gold against +0.5). Spend $9.73 of $16.
+  [docs/eval-equation-round2.md](docs/eval-equation-round2.md).
+- `scripts/rw_notation_neutral.py` (a notation-neutral secondary score), reading B in `eval/pipeline_eval.py`,
+  `scripts/realworld_refresh_gold.py`.
+
 ## Tables, second round: residuals and a second held-out set (2026-10-22, branch fix/tables-round2)
 
 - Fixed on development data only (tests in `tests/test_tables_round2.py`): bar charts of few bars
