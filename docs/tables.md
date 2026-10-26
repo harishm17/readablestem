@@ -1009,3 +1009,104 @@ uv run readablestem eval gate --current dev.json --baseline data/eval/baseline-t
 
 `scripts/tables_label.py` and `scripts/tables_heldout.py` (with `gold/tabulars.py`) place a paper's
 LaTeX tables on its PDF pages and build a labelled set like the held-out one.
+
+
+## Second held-out measurement and the residuals (2026-10-22, branch `fix/tables-round2`)
+
+Two parts: the residuals of the first round, fixed on development data only, and a second fresh
+set, registered and run once. No model is called: spend $0, no setting changes.
+
+### The residuals, fixed on development data
+
+Development data here is `data/real-tables`, `data/real-tables-heldout` (a development set since the
+first round), the 25 real-world dev papers and the 156 other papers of the real-world cache (181
+papers, 4,177 pages, run whole through `layout.analyze` and compared with the papers' `tabular`
+sources), and the OpenStax and dev-v2 table tasks. Each fix has a test (`tests/test_tables_round2.py`
+and `tests/test_tables_recall.py`) that fails on `main` at the branch point, except the bold-list
+pin, which passes on both.
+
+| Residual | Cause | Fix | Dev effect |
+|---|---|---|---|
+| bar charts with fewer than 12 bars taken for tables | the bars of one series are one drawing of many `re` items, so they counted as one fill, and the count needed 12 | `layout._Path.rects` keeps the rectangles of a filled drawing; `tables._bars`: at least four filled rectangles on one line, side by side, of three or more different lengths, mostly with no text on them, is a chart (rules drawn as thin filled boxes are not bars) | the two bar charts of `data/real-tables-heldout` (false tables) gone: precision 0.951 to 1.000 |
+| lists of relations (`X ~ f(n)   if ...`) left as text | lines of symbols in aligned columns look like displayed equations | `tables._conditions`: three or more lines whose last cell opens with "if", "when", "where"..., not built from bracket glyph pieces (`cases` is maths), are a list of definitions | the two lists of `data/real-tables`: recall 0.920 to 1.000 (25 of 25) |
+| a ruled table split by far-apart rules (groups of rows) found as its first part | `_stack` only follows rules within three lines; the detector stops there | `_joined_frames`: the whole stack is the table when the detector's box in it is the stack's width and covers two spans, no paragraph runs across it, no caption is inside, and no other detector table is in it | partial find of 2302.07336 Table I found whole |
+| two rules and ragged number columns under a "Table N" line | the span between two rules is not "ruled" for the arbitration | the detector's box with a top and a bottom rule, three lines in aligned columns and a caption is a table | 1 table found (2503.16294) |
+| grids of single digits (codes, truth tables) called diagram labels | `labels_only` | not when a "Table N" line is over a grid that lines up | 6 tables found (2505.15032) |
+| bold "term, description" lists (LaTeX `description`) stay lists | the bold is the only difference from a notation `tabular` | no change: the guard (`_bold_terms`) fires on none of the 181 papers' pages; one test pins it (a bold list is a list, with a caption a table, in plain type a table) | none: not a residual the data shows |
+
+Measured on the development data, before (`main` at `8555f6c`) and after:
+
+| | before | after |
+|---|---|---|
+| `data/real-tables`: precision / full-extent recall | 1.000 (23/23) / 0.920 (23/25) | **1.000 (25/25) / 1.000 (25/25)** |
+| `data/real-tables-heldout`: precision / recall | 0.951 (39/41) / 0.923 (36/39) | **1.000 (39/39) / 0.949 (37/39)** |
+| 181 papers, whole pipeline, tables found | 313 | 324 (11 more, by eye all tables, none false) |
+| OpenStax tables task: recall / precision | 0.980 / 0.985 | **0.985 / 0.985** (3 false tables, the same) |
+| same: TEDS / column headers exact | 0.936 / 0.899 | 0.941 / 0.899 |
+| dev-v2 tables task: recall / precision | 0.925 / 0.907 | 0.925 / 0.907 |
+| gate (`eval gate`, with `--real-dir data/real-tables`) | PASS | PASS (every floor and regression check) |
+| `layout.analyze`, s per page, one CPU: `data/real-tables` / `data/real-tables-heldout` | 0.38 / 0.85 | 0.38 / 0.85 (within 1% over two runs each) |
+| the 181 papers, s per page (10 processes in parallel) | 0.87 | 0.83 |
+
+These are development numbers: the first two rows are what the fixes were read off.
+
+### Held out, second set: registered, run once
+
+`data/real-tables-heldout2/` (README: the question, floors, rule, labels and comparison; hashes in
+`REGISTRATION.sha256`; committed at `5b1ea27`, before any detection ran on it): ten CC BY 4.0
+arXiv documents, 100 pages, 58 labelled tables, from computer science (4), engineering (3),
+statistics (2) and economics (1), chosen by a seeded rule over the real-world pool and 20 further
+sets (21,615 records) minus the 330 papers earlier work used. The rule's "teaching" tier matched
+words in abstracts too, so the set is mostly surveys and research articles; two documents are a
+tutorial and a practitioner's guide, **none is lecture notes**. Biology and mathematics gave no
+document (their candidates had fewer than three tables in the PDF's words, or a PDF source).
+Labels: proposals from the LaTeX source, every page looked at, boxes corrected by hand
+(`label-corrections.json`). Run once for each arm, free:
+
+| | `main` (`8555f6c`) | `fix/tables-round2` (`433b729`) | floor |
+|---|---|---|---|
+| precision | **1.000** (55/55; Wilson 0.93 to 1.00) | **1.000** (55/55) | 0.95 |
+| full-extent recall | **0.948** (55/58; 0.86 to 0.98) | **0.948** (55/58) | 0.85 |
+| any-extent recall | 0.948 | 0.948 | |
+
+**Both floors are met, by both arms, and the two arms agree table for table.** The round's fixes
+changed nothing on this set: what held up here was the first round's code (`main`). The set shows
+no effect of the round-two fixes, up or down, and the intervals are wide (10 documents, 58 tables;
+the recall interval starts at 0.86, barely above the floor). The three misses, the same in both
+arms (`result-2026-10-22.json` has every table):
+
+- **Table 1 of 2202.07104** (a two-row table with rotated labels in the first column): judged a
+  figure; the rotated words are drawn as paths.
+- **Table 6 of 2202.07104** (a 28-row table of check marks, ticks and stars): judged a figure, for
+  the same reason: the marks are vector drawings in the box.
+- **Table 1 of 2503.10293** (a ruled four-column table of words with no digit): the detector and
+  the arbitration keep it, then `is_term_grid` turns it into a list ("grid of terms"), because its
+  caption "Table 1. Correspondences ..." is not attached: the journal's small capitals make `layout`
+  split the caption into one row per word, so `TABLE_CAPTION` never matches.
+
+No false table on any of the ten documents. The misses were read off the held-out result, so fixing
+them would be development work; they are left, and listed below.
+
+### What is not fixed (second round)
+
+- The three misses above: a caption set in small capitals that `layout` splits into one row per
+  word (a grid of terms is then written as a list), check-mark tables, rotated first-column labels.
+- Lists of relations without "if", "when" or "where" in the last cell stay text; a bold description
+  list has no instance in the data and is pinned by a test only.
+- The second set is not lecture notes, has no biology or mathematics, and its labels were checked
+  by one person.
+- A bar chart with values printed on most bars is not called a chart by `_bars` (the rule needs
+  most bars empty): if the layout model boxes it, it stays a table.
+- `tests/test_proof_interim.py::test_the_report_is_what_the_committed_data_produce` fails here on
+  `main` at the branch point too (a 0.1738 against 0.1760 in one interval of the committed report);
+  not caused by this work.
+
+Unchanged from the first round: a sideways table on a page with upright paragraphs is not turned;
+a table whose first column is empty on most lines is read as wrapped cells.
+
+How to repeat (free):
+
+```
+uv run readablestem eval pipeline --task tables --mode local --real-dir data/real-tables-heldout2 --out held2.json
+uv run python scripts/tables_heldout2.py pool|select|build --cache DIR   # how the set was made
+```

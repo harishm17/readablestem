@@ -13,6 +13,22 @@
 - `scripts/rw_notation_neutral.py` (a notation-neutral secondary score), reading B in `eval/pipeline_eval.py`,
   `scripts/realworld_refresh_gold.py`.
 
+## Tables, second round: residuals and a second held-out set (2026-10-22, branch fix/tables-round2)
+
+- Fixed on development data only (tests in `tests/test_tables_round2.py`): bar charts of few bars
+  are charts (`tables._bars`, `layout._Path.rects`); lists of definitions by condition ("... if ...")
+  are tables; a ruled stack split by far-apart rules is one table; two rules with a caption over
+  ragged numbers, and grids of single digits under a caption, are tables. Development effect:
+  `data/real-tables` 1.000 / 1.000 (was 1.000 / 0.920), `data/real-tables-heldout` 1.000 / 0.949
+  (was 0.951 / 0.923); OpenStax tables task recall 0.980 to 0.985, precision 0.985 (unchanged),
+  dev-v2 unchanged; the gate passes; `layout.analyze` time per page unchanged (0.38 and 0.85 s).
+- A second fresh set, `data/real-tables-heldout2/` (ten CC BY documents, 58 tables, registered with
+  its rule, floors and comparison before detection, `scripts/tables_heldout2.py`): run once,
+  `main` and this branch both give precision 1.000 (55/55) and full-extent recall 0.948 (55/58), so
+  both floors are met and the round's fixes show no effect on it. The set is mostly surveys and
+  research articles, not lecture notes. Three misses are left (a small-capital caption split by
+  `layout`, a check-mark table, rotated labels). No model call, no setting.
+
 ## Railway infrastructure as code (2026-10-21)
 
 - The Railway project is now described in `.railway/railway.ts` (imported from production, so

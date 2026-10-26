@@ -1,0 +1,285 @@
+{
+ "seed": "tables-heldout2-2026-10-22",
+ "candidates": {
+  "other/biology": 4132,
+  "other/computer science": 7524,
+  "other/economics": 2018,
+  "other/engineering": 5983,
+  "other/mathematics": 2831,
+  "other/statistics": 2893,
+  "teaching/biology": 50,
+  "teaching/computer science": 100,
+  "teaching/economics": 19,
+  "teaching/engineering": 35,
+  "teaching/mathematics": 26,
+  "teaching/statistics": 48
+ },
+ "accepted": [
+  {
+   "id": "2202.07104",
+   "title": "The Hitchhiker's Guide to Fused Twins: A Review of Access to Digital Twins in situ in Smart Cities",
+   "licence": "CC BY 4.0",
+   "categories": "cs.CY cs.GL cs.HC",
+   "tier": "teaching",
+   "stratum": "computer science",
+   "pdf_pages": 59,
+   "tables": 5,
+   "pdf_sha256": "d82370792785ddf9d54f737e065e3eacf7d304a983daa2b71574d9fa0cbd78ee"
+  },
+  {
+   "id": "2212.00756",
+   "title": "Mechanism Design Theory in Control Engineering: A Tutorial and Overview of Applications in Communication, Power Grid, Transportation, and Security Systems",
+   "licence": "CC BY 4.0",
+   "categories": "eess.SY cs.SY",
+   "tier": "teaching",
+   "stratum": "engineering",
+   "pdf_pages": 55,
+   "tables": 3,
+   "pdf_sha256": "5b46d29c0e48b4225ae5c609b333f49b955979f002a7ea30f96970587704f8a0"
+  },
+  {
+   "id": "2304.04752",
+   "title": "A Practitioner's Guide to Bayesian Inference in Pharmacometrics using Pumas",
+   "licence": "CC BY 4.0",
+   "categories": "stat.AP cs.LG cs.MS stat.CO",
+   "tier": "teaching",
+   "stratum": "statistics",
+   "pdf_pages": 60,
+   "tables": 12,
+   "pdf_sha256": "0be2ed450e6d76e08f816704478453ea035d7a530ff6267dbe4e40f3e777c8a0"
+  },
+  {
+   "id": "2407.05381",
+   "title": "Online Matching: A Brief Survey",
+   "licence": "CC BY 4.0",
+   "categories": "cs.DS",
+   "tier": "teaching",
+   "stratum": "computer science",
+   "pdf_pages": 24,
+   "tables": 3,
+   "pdf_sha256": "d0e36ed91e97627c89f4e6dfb2787da0c09ba2fcb463b03f3f20cdcb7e3f6aad"
+  },
+  {
+   "id": "2106.10091",
+   "title": "Introductory Economics: Gender, Majors, and Future Performance",
+   "licence": "CC BY 4.0",
+   "categories": "econ.GN q-fin.EC",
+   "tier": "teaching",
+   "stratum": "economics",
+   "pdf_pages": 18,
+   "tables": 4,
+   "pdf_sha256": "56af063104d29c669d0d5dba5728d8dee2871fd37913e015935bab3c8c4bf949"
+  },
+  {
+   "id": "2504.14964",
+   "title": "Evaluating Code Generation of LLMs in Advanced Computer Science Problems",
+   "licence": "CC BY 4.0",
+   "categories": "cs.AI cs.CY",
+   "tier": "teaching",
+   "stratum": "computer science",
+   "pdf_pages": 15,
+   "tables": 3,
+   "pdf_sha256": "53176057b4595389d4521826d2242d30fd11eed478e33769e81c9171c6bda824"
+  },
+  {
+   "id": "2503.10293",
+   "title": "The Cahn-Hilliard-Navier-Stokes Framework for Multiphase Fluid Flows: Laminar, Turbulent, and Active",
+   "licence": "CC BY 4.0",
+   "categories": "physics.flu-dyn cond-mat.soft nlin.CD physics.comp-ph",
+   "tier": "teaching",
+   "stratum": "engineering",
+   "pdf_pages": 68,
+   "tables": 4,
+   "pdf_sha256": "908a24fb8e8078ab5ab6f1ec91b03bca633a6e10a97ac0e4be315838433b0c67"
+  },
+  {
+   "id": "2401.05900",
+   "title": "Near-Field Communications: A Comprehensive Survey",
+   "licence": "CC BY 4.0",
+   "categories": "eess.SP",
+   "tier": "teaching",
+   "stratum": "engineering",
+   "pdf_pages": 41,
+   "tables": 13,
+   "pdf_sha256": "c6208ad8dcd773057024e261ff65e851cf78a1595c6c505a47540e923311b5bc"
+  },
+  {
+   "id": "2411.14542",
+   "title": "Combining missing data imputation and internal validation in clinical risk prediction models",
+   "licence": "CC BY 4.0",
+   "categories": "stat.ME stat.AP",
+   "tier": "teaching",
+   "stratum": "statistics",
+   "pdf_pages": 31,
+   "tables": 3,
+   "pdf_sha256": "bbdc30de426397a3876912ffa675c12039c21ed957dd68ad2c87f49528dda9b8"
+  },
+  {
+   "id": "2002.00539",
+   "title": "Evolving Neural Networks through a Reverse Encoding Tree",
+   "licence": "CC BY 4.0",
+   "categories": "cs.NE cs.AI cs.LG cs.SY eess.SY q-bio.PE",
+   "tier": "teaching",
+   "stratum": "computer science",
+   "pdf_pages": 10,
+   "tables": 7,
+   "pdf_sha256": "1f34e5684ba618cb4287550b149a132eb86f3bcfd67e558a80b0030fcdeced05"
+  }
+ ],
+ "skipped": [
+  {
+   "id": "2407.13814",
+   "tier": "teaching",
+   "stratum": "statistics",
+   "reason": "fewer_than_3_tables",
+   "detail": "2 of 2"
+  },
+  {
+   "id": "2105.08988",
+   "tier": "teaching",
+   "stratum": "economics",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2010.10614",
+   "tier": "teaching",
+   "stratum": "biology",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2410.11523",
+   "tier": "teaching",
+   "stratum": "mathematics",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2408.02650",
+   "tier": "teaching",
+   "stratum": "biology",
+   "reason": "fewer_than_3_tables",
+   "detail": "1 of 2"
+  },
+  {
+   "id": "2407.07932",
+   "tier": "teaching",
+   "stratum": "engineering",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2406.15398",
+   "tier": "teaching",
+   "stratum": "mathematics",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2210.03991",
+   "tier": "teaching",
+   "stratum": "statistics",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2205.02167",
+   "tier": "teaching",
+   "stratum": "economics",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2302.06507",
+   "tier": "teaching",
+   "stratum": "biology",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2412.20721",
+   "tier": "teaching",
+   "stratum": "mathematics",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2101.07097",
+   "tier": "teaching",
+   "stratum": "statistics",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2402.06729",
+   "tier": "teaching",
+   "stratum": "computer science",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2308.08808",
+   "tier": "teaching",
+   "stratum": "economics",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2111.13344",
+   "tier": "teaching",
+   "stratum": "biology",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2304.06127",
+   "tier": "teaching",
+   "stratum": "mathematics",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  },
+  {
+   "id": "2506.15955",
+   "tier": "teaching",
+   "stratum": "computer science",
+   "reason": "fewer_than_3_tables",
+   "detail": "2 of 2"
+  },
+  {
+   "id": "2306.09678",
+   "tier": "teaching",
+   "stratum": "economics",
+   "reason": "source_is_pdf",
+   "detail": ""
+  },
+  {
+   "id": "2307.02169",
+   "tier": "teaching",
+   "stratum": "biology",
+   "reason": "fewer_than_3_tables",
+   "detail": "1 of 1"
+  },
+  {
+   "id": "2409.16948",
+   "tier": "teaching",
+   "stratum": "engineering",
+   "reason": "fewer_than_3_tables",
+   "detail": "2 of 2"
+  },
+  {
+   "id": "2009.12666",
+   "tier": "teaching",
+   "stratum": "mathematics",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 1"
+  },
+  {
+   "id": "2012.14390",
+   "tier": "teaching",
+   "stratum": "statistics",
+   "reason": "fewer_than_3_tables",
+   "detail": "0 of 0"
+  }
+ ]
+}

@@ -153,6 +153,8 @@ PEN_FILL_SHARE = 0.5  # a filled mark is a stroke's ribbon when it covers at mos
 LABEL_MAX_CHARS = 40
 LABEL_REACH = 8.0
 RULE_THICKNESS = 1.6  # a fraction bar or table rule is at most this thick
+MIN_BARS = 2  # a filled drawing of this many rectangles keeps them (`_Path.rects`) ...
+MAX_BAR_ITEMS = 1000  # ... unless it has more items than this
 CAPTION_MAX_GAP = 36.0  # furthest a "Figure N" caption may sit from its figure
 SCRIPT_RATIO = 0.85  # characters smaller than this x the row size are sub/superscripts
 # Raised and lowered text in a paragraph (`_script_kinds`): a glyph smaller than the row's
@@ -4183,6 +4185,10 @@ class _Path:
     turns: bool = False
     colour: tuple[float, float, float] = (0.0, 0.0, 0.0)
     fill_share: float = 0.0
+    # The rectangles of a filled shape drawn as several (the bars of one series of a chart
+    # are one drawing, `re` after `re`): what the table detector counts as bars. Empty for
+    # any other path.
+    rects: tuple[BBox, ...] = ()
 
 
 def _page_paths(
@@ -4256,10 +4262,27 @@ def _page_paths(
             path.colour = _rgb(drawing.get("color") if stroked else drawing.get("fill"))
             if fill:  # a ribbon tick has tens of points; a longer fill is no such mark
                 path.fill_share = _fill_share(items, display, box) if len(items) <= 200 else 1.0
+        if fill and kind == "shape" and not curved and MIN_BARS <= len(items) <= MAX_BAR_ITEMS:
+            path.rects = _rects_of(items, display)
         paths.append(path)
         lines.append(_straight_lines(path, segments))
     _mark_axes(paths, lines)
     return paths
+
+
+def _rects_of(items: Sequence[Any], display: _Display) -> tuple[BBox, ...]:
+    """The `re` and four-point `qu` items of a filled drawing as display boxes, or nothing
+    unless it is rectangles throughout and there are at least `MIN_BARS` of them."""
+    out: list[BBox] = []
+    for item in items:
+        if item[0] == "re":
+            out.append(display.box(item[1]))
+        elif item[0] == "qu":
+            xs, ys = zip(*(display.point(*q) for q in item[1]), strict=True)
+            out.append((min(xs), min(ys), max(xs), max(ys)))
+        else:
+            return ()
+    return tuple(out) if len(out) >= MIN_BARS else ()
 
 
 def _fill_share(items: Sequence[Any], display: _Display, box: BBox) -> float:
