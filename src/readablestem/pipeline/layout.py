@@ -501,6 +501,65 @@ def crop(
             pymupdf.TOOLS.reset_mupdf_warnings()
 
 
+LINE_BAND = 0.8  # x the span's height: how far above and below the span the line crop reaches
+LINE_SIDE = 150.0  # pt either side of the span when it has no paragraph to take the width from
+LINE_MARK = (0xD0, 0x10, 0x10)  # the box drawn round the span, in sRGB
+
+
+def crop_line(
+    pdf_bytes: bytes,
+    element: Element,
+    across: tuple[float, float] | None = None,
+    *,
+    dpi: int = 150,
+    max_side_px: int = 2048,
+) -> bytes:
+    """PNG of the line an inline equation sits in, with the span boxed: the region from
+    `across` (the paragraph's x-range; LINE_SIDE either side of the span without one) and
+    from LINE_BAND span heights above it to as many below, so a radical, an integral sign or
+    a stacked fraction that the text layer puts on a line of its own is in it. The box is two
+    pixels wide in LINE_MARK. The model reads the formula the box is part of
+    (`equation_step`, `Settings.equation_line_context`): the text layer's span ends where its
+    characters do, the formula where the author's maths does."""
+    with _LOCK:
+        _quiet_mupdf()
+        try:
+            key, doc = _CACHE.document(pdf_bytes)
+            if not 0 <= element.page < doc.page_count:
+                raise ValueError(f"element page {element.page} is not in the PDF")
+            _ensure_probed(pdf_bytes, key, [element.page])
+            page = doc[element.page]
+            x0, y0, x1, y1 = element.bbox
+            band = LINE_BAND * max(y1 - y0, 4.0)
+            left, right = across if across is not None else (x0 - LINE_SIDE, x1 + LINE_SIDE)
+            clip = pymupdf.Rect(min(left, x0) - 2, y0 - band, max(right, x1) + 2, y1 + band)
+            clip &= page.rect
+            if clip.is_empty or clip.width < 0.5 or clip.height < 0.5:
+                raise ValueError("line region is empty or outside the page")
+            zoom = min(dpi / 72.0, (max_side_px - 1) / max(clip.width, clip.height))
+            pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
+            ox, oy = pixmap.x, pixmap.y  # the clip's origin in pixels at this zoom
+            bx0 = round((x0 - 1) * zoom) - ox
+            by0 = round((y0 - 1) * zoom) - oy
+            bx1 = round((x1 + 1) * zoom) - ox
+            by1 = round((y1 + 1) * zoom) - oy
+            w, h = pixmap.width, pixmap.height
+            for rect in (
+                (bx0, by0, bx1, by0 + 2),
+                (bx0, by1 - 2, bx1, by1),
+                (bx0, by0, bx0 + 2, by1),
+                (bx1 - 2, by0, bx1, by1),
+            ):
+                left, top = max(0, rect[0]), max(0, rect[1])
+                right, bottom = min(w, rect[2]), min(h, rect[3])
+                if right > left and bottom > top:  # set_rect takes the pixmap's own coordinates
+                    box = pymupdf.IRect(left + ox, top + oy, right + ox, bottom + oy)
+                    pixmap.set_rect(box, LINE_MARK)
+            return pixmap.tobytes("png")
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()
+
+
 def render_page(pdf_bytes: bytes, page: int, *, dpi: int = 150, max_side_px: int = 2048) -> bytes:
     """PNG of the whole page at `dpi` on white (long side capped at `max_side_px`), the picture
     the page math pass reads. Same document cache and lock as `crop`."""

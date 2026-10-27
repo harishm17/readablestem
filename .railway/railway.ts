@@ -53,7 +53,13 @@ const appVariables = [
 
 // Settings only the web service holds (the image-page switch and the per-page and per-job
 // spend caps added 2026-10-22; the worker thread runs inside web).
-const webOnlyVariables = ["FEATURE_IMAGE_PAGES", "MAX_USD_PER_JOB", "MAX_USD_PER_PAGE", "PORT"];
+const webOnlyVariables = [
+  "EQUATION_LINE_CONTEXT",
+  "FEATURE_IMAGE_PAGES",
+  "MAX_USD_PER_JOB",
+  "MAX_USD_PER_PAGE",
+  "PORT",
+];
 
 export default defineRailway(() => {
   const Postgres = postgres("Postgres", { region: "iad" });

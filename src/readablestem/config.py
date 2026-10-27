@@ -97,6 +97,12 @@ class Settings(BaseSettings):
     # Equation context (the text around the equation) is sent only when the main model
     # re-reads a cheap model's answer, not with the cheap model's first reading (T3-23).
     equation_context_on_escalation: bool = False
+    # An inline equation is also sent as its whole line with the span boxed, and the model writes
+    # the formula the box is part of (`layout.crop_line`, prompt `equation_line`): the text
+    # layer's span is cut where its characters are (a radical, an integral sign or the left side
+    # of a relation on a line object of its own), the author's formula is not. Off until a
+    # registered real-world test says otherwise (docs/eval-equation-round3.md).
+    equation_line_context: bool = False
     # A figure crop is scaled down to this many pixels on its long side before it goes to the
     # model (T3-24); review and the HTML keep the full crop. None: sent as it is.
     figure_model_max_edge_px: int | None = Field(default=None, ge=256)

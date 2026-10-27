@@ -1,0 +1,320 @@
+{
+ "part": "fresh4",
+ "seed": "realworld-fresh-2026-10-21",
+ "papers": [
+  {
+   "id": "2201.12936",
+   "title": "Pigeonhole Design: Balancing Sequential Experiments from an Online Matching Perspective",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "econ:econ:EM",
+   "style": "research",
+   "pages_chosen": [
+    20,
+    21,
+    39,
+    40
+   ],
+   "equations": 97,
+   "display": 2,
+   "pdf_sha256": "14ac232ec751818d9529cdaccb8d255b4003e9ccdbdeec925dcdbba4f7ca0cbb",
+   "source_sha256": "0af81a588644e20c5e1b4c0f3baa2b12262f53c68b3574da8c01da8e1b7c540d",
+   "extract_pdf_sha256": "70d828e1e0c4ff4bbf2aef95f238114c7b84bb18346aa34f7bed8d338ff7bb8e",
+   "gold_sha256": "7ad59cd44e14baad65e3fd6b1b46b4e6f387e481f0e551ba9673c5a1f9c8d9bc"
+  },
+  {
+   "id": "2309.04589",
+   "title": "Motif-aware Attribute Masking for Molecular Graph Pre-training",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "q-bio:q-bio:QM",
+   "style": "research",
+   "pages_chosen": [
+    5,
+    8,
+    9,
+    13,
+    14
+   ],
+   "equations": 231,
+   "display": 5,
+   "pdf_sha256": "ebe315f9867000a3d6642482b5d815b2d644f9b1ad6239dca6e395ced4d0a3e7",
+   "source_sha256": "015dad80efdbe8b74120d9bdccc4c0513428e79ba7a070f337939acc1ddaa748",
+   "extract_pdf_sha256": "440a0c37b3456625eefedb9d659de658e385e82d85bdf38e191c708c65b3febb",
+   "gold_sha256": "e65c7db68906ff16efc00f8a493afb453e0a7af7e01ad9dc2ff77450fefadf47"
+  },
+  {
+   "id": "2309.13554",
+   "title": "A Novel Stochastic Interacting Particle-Field Algorithm for 3D Parabolic-Parabolic Keller-Segel Chemotaxis System",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:NA",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    4,
+    5,
+    21,
+    24,
+    28
+   ],
+   "equations": 96,
+   "display": 8,
+   "pdf_sha256": "fb3909f7f3d1a846af451ded8386b848051925c5e19208b7c3668474f18a16c0",
+   "source_sha256": "e093ea70730cf6dec8fa0785916d37717eb85a76b7fa4fca585b3e39eb8dd259",
+   "extract_pdf_sha256": "5bbe0417be3ea6d4b73d5f66f03e4263b01f0791f5c76413c4ba986169398084",
+   "gold_sha256": "ab1a11fd8e5c1128bc8c563ce9ff117cf52e833983c804ec0d6b182192a5094f"
+  },
+  {
+   "id": "2312.01530",
+   "title": "Evaluation of Active Feature Acquisition Methods for Time-varying Feature Settings",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ML",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    31,
+    55,
+    56
+   ],
+   "equations": 91,
+   "display": 5,
+   "pdf_sha256": "aeb3ea80686af57ffce693b5fd5458a173c7a115f0f15a49a2b4593e994f2fa9",
+   "source_sha256": "d782e2af6f20d3817a80f59a6b32dd9e7d70db180d745d867aa69fc878329e16",
+   "extract_pdf_sha256": "ad65cca1ca04461c599f9753f35d92caa30b94011d0393e4a507093f703cf8bf",
+   "gold_sha256": "949b4c2513898fd8f74222ba3a97a005d3fd32714a49c0967b6140000d1ab994"
+  },
+  {
+   "id": "2402.06415",
+   "title": "Many-body computing on Field Programmable Gate Arrays",
+   "licence": "CC0 1.0",
+   "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/",
+   "set": "physics:cond-mat:stat-mech",
+   "style": "research",
+   "pages_chosen": [
+    5,
+    8,
+    14,
+    15,
+    16,
+    17
+   ],
+   "equations": 82,
+   "display": 0,
+   "pdf_sha256": "6d7fc6675320e374c45ae4646f3c3d66f09c70c70ea34c76a69191adbb602c38",
+   "source_sha256": "99caa89a46eaf17988eb6ada4347a8c171ca0631cf095bc09abeb4b2f91a9362",
+   "extract_pdf_sha256": "bdf3671ac1e38551ad9af34046c5ad16da1077e331ebf145e3a6afc7b4a9318b",
+   "gold_sha256": "ee712013674df1a699333836a414d968afb11c347400be1cf2e90b4cfe9ef9d9"
+  },
+  {
+   "id": "2406.17446",
+   "title": "Data-Driven Turbulence Modeling Approach for Cold-Wall Hypersonic Boundary Layers",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:flu-dyn",
+   "style": "research",
+   "pages_chosen": [
+    6,
+    13,
+    14,
+    18,
+    26
+   ],
+   "equations": 86,
+   "display": 6,
+   "pdf_sha256": "b65b8711361cca68a30ce4518c1acd1c17f283cd6056e3fa8d8d865d643beab3",
+   "source_sha256": "e4a931317dd42a72199ce14bf6f26fcc5c350e21de9fffd9054196be3b92e93d",
+   "extract_pdf_sha256": "1ec7c65489884e06bdd4066cc4a74a84cf4b07c6b732ecaacb7e897b8662a392",
+   "gold_sha256": "d01abddf92c04849b1d2284ed02c651831d713c54c6bd3a861ef00fc549ec4f8"
+  },
+  {
+   "id": "2407.06788",
+   "title": "A unified machine learning approach for reconstructing hadronically decaying tau leptons",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:data-an",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    3,
+    4,
+    14
+   ],
+   "equations": 84,
+   "display": 0,
+   "pdf_sha256": "18372d3d7165a15f31d01cbcdab14c2677c8eb4a186bd94f96068f1b9fdc333b",
+   "source_sha256": "0623bf88d53cc684b1daf9f67eabaf079b22a6d49bc3536fc415c4c61b9559db",
+   "extract_pdf_sha256": "f9c2cc80819c9e21838491ccc90412f332d3065c2ade201bf2c2169156b78203",
+   "gold_sha256": "84085ab69ba69867e0f352a890e1951ab07d33f671ee202e28ed344abd470d27"
+  },
+  {
+   "id": "2409.05598",
+   "title": "When resampling/reweighting improves feature learning in imbalanced classification?: A toy-model study",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ML",
+   "style": "research",
+   "pages_chosen": [
+    4,
+    5,
+    9,
+    10
+   ],
+   "equations": 176,
+   "display": 20,
+   "pdf_sha256": "c41838a25d3a290eecd1a79533c05c1e6082be18f01860a8830d72e2f77c8e62",
+   "source_sha256": "44b154b590df076c50096d5baacb39bb1cbca9e71abae2ee39da867c177faac0",
+   "extract_pdf_sha256": "b459b2868928a0d06da9cdbaaa0f0eba87546fe7b86d8425509d481a7263e38b",
+   "gold_sha256": "e36182ebfa30b5d669b889066b12d1ebe616c7e64c822fb5be9bbb06021b0f26"
+  },
+  {
+   "id": "2409.12662",
+   "title": "Testing for equal predictive accuracy with strong dependence",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "econ:econ:EM",
+   "style": "research",
+   "pages_chosen": [
+    15,
+    19,
+    20,
+    21,
+    22
+   ],
+   "equations": 158,
+   "display": 0,
+   "pdf_sha256": "9d000b2a4a9217a209f2a8174434b6312beab6a0609c5d0d9018bc00ab359fd4",
+   "source_sha256": "2fb01912b7f285d77300231552da593225915dab5fa4e81eb136002b9b106807",
+   "extract_pdf_sha256": "5592a0541552121fc06f745599e12e22ce55d455fb159aac3781347c9866fe81",
+   "gold_sha256": "7192ba851fcb933f2195eccb69d9898393a88e5f7068091380d99089f6a83d48"
+  },
+  {
+   "id": "2410.22388",
+   "title": "ET-Flow: Equivariant Flow-Matching for Molecular Conformer Generation",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "q-bio:q-bio:QM",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    5,
+    6,
+    7,
+    8,
+    18
+   ],
+   "equations": 119,
+   "display": 5,
+   "pdf_sha256": "8dbc7fd5f9f2157add1aecbfda5ec7840a4b8d86a585e98ad97862f74609fac9",
+   "source_sha256": "1afe32b08b3ffc52733ad256b9fca39470e31a2fd4ec8223be4c7d20456795bd",
+   "extract_pdf_sha256": "16f0ac641a6a4292e38ebafa78c8174b68832ffa4e7d5aece73de1a3045e6e62",
+   "gold_sha256": "c4370358201586caa96eda203362759343e1b4966e5fac2144dfc41afa3b4c45"
+  },
+  {
+   "id": "2501.15793",
+   "title": "Advancing Portfolio Optimization: Adaptive Minimum-Variance Portfolios and Minimum Risk Rate Frameworks",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ME",
+   "style": "research",
+   "pages_chosen": [
+    10,
+    12,
+    17,
+    20,
+    21
+   ],
+   "equations": 67,
+   "display": 16,
+   "pdf_sha256": "330ea88b40769c668ff7399231a34592ea13c301dafdec939f98083a9ded299b",
+   "source_sha256": "da48ce16f06ccbb7d051d44d6f86380bfb2349b097ffa002c540a49bab385375",
+   "extract_pdf_sha256": "26d076e91aba68973b28b23cb449b3e5a7dd33bcc5e48867f10da9b8ea649726",
+   "gold_sha256": "e00263686eea4e3af596e04dfcd591ceddb523b70cc595e3a0416e89c413a6a5"
+  },
+  {
+   "id": "2502.21009",
+   "title": "Position: Solve Layerwise Linear Models First to Understand Neural Dynamical Phenomena (Neural Collapse, Emergence, Lazy/Rich Regime, and Grokking)",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:data-an",
+   "style": "research",
+   "pages_chosen": [
+    4,
+    5,
+    6,
+    25
+   ],
+   "equations": 113,
+   "display": 8,
+   "pdf_sha256": "2f6504965ebd1602ad5cf17e5fda48b9428ead4ee0b64a5bc7ee09a8f3ac75ad",
+   "source_sha256": "5ebec12d41bbf04400686947f22143af6768354ab8ecfcdb26a11aee93c6e02b",
+   "extract_pdf_sha256": "8e55e6f72f285505e9ac275aacc0e6a764982acf79d3670e6e2ad9c488aff071",
+   "gold_sha256": "0869ebf599c9eda94f180783d0bdbd8373eedc851ad6c56e93ff88d9d2df4cb2"
+  },
+  {
+   "id": "2503.18982",
+   "title": "Generative Data Imputation for Sparse Learner Performance Data Using Generative Adversarial Imputation Networks",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "cs:cs:LG",
+   "style": "research",
+   "pages_chosen": [
+    4,
+    5,
+    7,
+    10
+   ],
+   "equations": 75,
+   "display": 2,
+   "pdf_sha256": "9cf4590815c66ca3c531480906690c93a5ce93ecad96f780e5e584dd33450ab1",
+   "source_sha256": "05fa47e1db42d8e570823718151079baf361115db871b5c4adf352ef3221c6f3",
+   "extract_pdf_sha256": "bcc4be56de5f1b5d6e939313881d6d90d782f50a6801a3ec64db13d9f6bd72d7",
+   "gold_sha256": "2dcee18d275f5f880b94c6124a2f368c4d455561ff12224a1711a580ebdffab3"
+  },
+  {
+   "id": "2504.10283",
+   "title": "$α$-Flow: A Unified Framework for Continuous-State Discrete Flow Matching Models",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ML",
+   "style": "research",
+   "pages_chosen": [
+    9,
+    15,
+    23,
+    24
+   ],
+   "equations": 66,
+   "display": 8,
+   "pdf_sha256": "c605b7bbd03d632cd6c3ee7a523589a0b2bc8d7b594636ff4ec984a667001abe",
+   "source_sha256": "7b0b9621d0614958c4c1177214d3ce08fb4f4ce08db0cb7fac338418400d9474",
+   "extract_pdf_sha256": "98547bf1b60a64d8c12f73b57934e3b7e701ef2a144771d1af1b260a39410a69",
+   "gold_sha256": "68576bdae7edf2e972ecba27ca839c91d4affc2ac0ad2f76c0573f4e861d85fc"
+  },
+  {
+   "id": "2505.23940",
+   "title": "Diff-FlowFSI: A GPU-Optimized Differentiable CFD Platform for High-Fidelity Turbulence and FSI Simulations",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:flu-dyn",
+   "style": "research",
+   "pages_chosen": [
+    20,
+    24,
+    25,
+    29,
+    37
+   ],
+   "equations": 59,
+   "display": 2,
+   "pdf_sha256": "b8e65ce66ee41c462745d2566e4e9a65505adf3b4b5ef7bf3daf7c1e20c382bc",
+   "source_sha256": "9b92e164ab30607ef8793b3c89ca4ed93b9eaafe6eb66327ba0be619a9f25d5f",
+   "extract_pdf_sha256": "2e7cfcc7392b60e8df536c724c64ac5089082fbce8b1ece112b402e13e930d6c",
+   "gold_sha256": "6e1eb447c78d1a2ce3d405df4c1503bb56e7c99b77b436474483f8a8dbb46f43"
+  }
+ ],
+ "n_papers": 15,
+ "n_equations": 1600,
+ "n_pages": 71
+}
