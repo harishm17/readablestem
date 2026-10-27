@@ -95,3 +95,22 @@ test, with the table-cell detection gap.
 Commands: `scripts/realworld_report.py --part fresh4 --tag after --extra-arm before=before --reading cells [--neutral]`;
 `scripts/rw_gap_table.py --part fresh4 --rs after --reading cells --vs Opus`; results in
 `data/realworld/results-fresh4*.json`.
+
+## 6. Checks for over-fitting (2026-10-26, after the switch-on)
+
+- **The gain is broad.** On fresh4, line context raised 14 of the 15 papers and lowered none (+0.0 to +4.8 points per
+  paper). It was +2.0 on the development papers and +2.6 on fresh4: no shrinkage from tuned to untuned papers.
+- **Course material.** On the 14 OpenStax algebra and trigonometry sections of dev-v2 (1,114 gold, production flags) it
+  changed 46 transcriptions and the score not at all: 3 equations right that were wrong, 3 wrong that were right
+  (0.5395 either way). Textbook maths is mostly display equations, which line context does not touch. The chemistry
+  sections were not compared: the API account ran out of credit during the run, and the calls after that failed.
+- **What a student hears.** `scripts/rw_spoken.py` (`--spoken` on `realworld_report.py` and `rw_gap_table.py`;
+  exploratory, not registered) also counts an equation right when ReadableSTEM's speech reads prediction and gold
+  alike. `\mathbf{x}`, `\boldsymbol{x}` and `\bm{x}` are all "bold x", so the bold-italic loss of section 5 is not a loss
+  a screen-reader user hears, and it is dropped as a next change: fixing it would tune to the scorer. Read this way,
+  fresh3 is a tie with Opus (0.707 against 0.706) and fresh4 is 0.632 against 0.669.
+- **One paper carries most of the rest.** Of the 58 table-cell equations ReadableSTEM missed on fresh4 and Opus read
+  right (spoken), 42 are in one paper, arXiv 2409.12662, whose two 28-row tables on pages 14 and 15 are not found as
+  tables and whose floor brackets have no character in the text layer. Leaving that paper out (a sensitivity check
+  chosen after seeing the data, not a result): spoken 0.671 against Opus 0.684 (-1.2, p 0.45); primary -2.8. No rule
+  for that paper is added.
