@@ -101,6 +101,9 @@ PROMPT_VERSION = load_prompt(PROMPT_NAME).version
 # conversion has course notation, so runs without it keep PROMPT_VERSION.
 NOTATION_PROMPT_NAME = "equation_notation"
 NOTATION_PROMPT_VERSION = load_prompt(NOTATION_PROMPT_NAME).version
+# Appended to either prompt when an inline equation comes with its line, span boxed
+# (`Settings.equation_line_context`, `layout.crop_line`); the version names both parts.
+LINE_PROMPT_NAME = "equation_line"
 
 # A cheap answer with passing checks and a confidence from here to the accept bar is not
 # asked again (`_needs_escalation`).
@@ -1113,8 +1116,10 @@ def transcribe(
     client: VisionClient,
     settings: Settings,
     context_text: str | None = None,
+    line_png: bytes | None = None,
 ) -> Fix:
-    """Transcribe one equation crop. Never raises for model or validation problems (they
+    """Transcribe one equation crop (with `line_png`, an inline equation's line with the
+    span boxed, read under `LINE_PROMPT_NAME`). Never raises for model or validation problems (they
     become FAILED/ABSTAINED fixes); raises BudgetExceeded when spend is refused.
 
     A bold letter layout found in running text gets its fix without a model call
@@ -1131,15 +1136,22 @@ def transcribe(
         context_text = notation_memory.notation_context(entries, context_text)
     else:
         prompt = load_prompt(PROMPT_NAME)
+    images = [png]
+    instructions, version = prompt.text, prompt.version
+    if line_png is not None:
+        line = load_prompt(LINE_PROMPT_NAME)
+        images.append(line_png)
+        instructions = prompt.text.rstrip("\n") + "\n" + line.text
+        version = f"{prompt.version}+{line.version}"
     display: Display = element.display or "block"
 
     def attempt(model: str, *, escalation: bool = False) -> _Candidate:
         request = VisionRequest(
             step="equation",
             model=model,
-            prompt_version=prompt.version,
-            instructions=prompt.text,
-            images=[png],
+            prompt_version=version,
+            instructions=instructions,
+            images=images,
             context_text=first_context if not escalation else context_text,
             max_output_tokens=output_limit(model),
             image_detail="high",

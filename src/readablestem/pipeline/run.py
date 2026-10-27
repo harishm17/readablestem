@@ -523,6 +523,8 @@ class _Task:
     element: Element
     png: bytes
     context_text: str | None
+    # An inline equation's line with its span boxed (`Settings.equation_line_context`).
+    line_png: bytes | None = None
 
 
 @dataclass(frozen=True)
@@ -582,12 +584,14 @@ def _run_step(
         page=element.page,
     ) as span:
         try:
+            extra = {"line_png": task.line_png} if task.line_png is not None else {}
             fix = step(
                 element,
                 task.png,
                 client=recorder,
                 settings=settings,
                 context_text=task.context_text,
+                **extra,
             )
         except BudgetExceeded as exc:
             stop.trip(exc.scope)
@@ -777,11 +781,14 @@ class _Run:
     observer: Callable[[ModelCall], None] | None = None
     # The scale an equation's picture is shown at in the student file (T3-15).
     eq_scale: Callable[[Element], float] = field(default_factory=lambda: _unit_scale)
+    # The paragraph (or list item, figure) each inline equation sits in, by id.
+    parents: dict[str, Element] = field(default_factory=dict)
 
     def start_stages(self, elements: list[Element]) -> None:
         """Each model stage's total, counting what was decided before any model work (a
         scanned page) as done."""
         self.eq_scale = equation_scale.scaler(elements)
+        self.parents = {e.id: e for e in elements if e.kind is not Kind.EQUATION}
         for kind, stage in _STAGE_OF.items():
             # (a converted page's own picture is cropped, not sent anywhere)
             members = [e.id for e in elements if e.kind is kind and not image_page.is_original(e)]
@@ -832,6 +839,22 @@ class _Run:
             log.warning("sharp crop failed: %s", type(exc).__name__)
             return None
 
+    def line_crop(self, element: Element) -> bytes | None:
+        """The line of an inline equation with its span boxed, when the setting is on."""
+        if not (
+            self.settings.equation_line_context
+            and element.kind is Kind.EQUATION
+            and element.display == "inline"
+        ):
+            return None
+        parent = self.parents.get(element.parent_id or "")
+        across = (parent.bbox[0], parent.bbox[2]) if parent is not None else None
+        try:
+            return layout.crop_line(self.pdf_bytes, element, across)
+        except Exception as exc:
+            log.warning("line crop failed: %s", type(exc).__name__)
+            return None
+
     def crop_and_submit(self, element: Element) -> None:
         self.raise_if_fatal()
         try:
@@ -854,8 +877,15 @@ class _Run:
             self.step_done(element)
             return
         self.raise_if_fatal()  # a step may have failed while this element was being cut
+        line_png = self.line_crop(element)
         if self.cache is not None:
-            key = step_key(element, png, self.contexts.get(element.id), self.options, self.settings)
+            key = step_key(
+                element,
+                png + (line_png or b""),
+                self.contexts.get(element.id),
+                self.options,
+                self.settings,
+            )
             if (kept := self.cache.lookup(element, key)) is not None:
                 self.fixes[element.id] = kept  # finished in an earlier run: no model call
                 self.step_done(element)
@@ -863,7 +893,7 @@ class _Run:
             self.keys[element.id] = key
         work = partial(
             _run_step,
-            _Task(element, png, self.contexts.get(element.id)),
+            _Task(element, png, self.contexts.get(element.id), line_png),
             client=self.client,
             settings=self.settings,
             stop=self.stop,
