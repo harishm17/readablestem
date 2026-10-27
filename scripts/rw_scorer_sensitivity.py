@@ -99,7 +99,9 @@ def flips(items: list[dict], gold: dict[str, dict]) -> tuple[int, int, int, int]
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument(
-        "--part", choices=["dev", "dev2", "heldout", "fresh", "fresh2", "fresh3", "fresh4"], default="dev"
+        "--part",
+        choices=["dev", "dev2", "heldout", "fresh", "fresh2", "fresh3", "fresh4"],
+        default="dev",
     )
     parser.add_argument("--rs", default="rs")
     parser.add_argument("--out", type=Path)
