@@ -18,6 +18,16 @@ import sys
 from pathlib import Path
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "realworld"
+FRESH4_FILES = (
+    "PREREGISTRATION-FRESH4.md",
+    "manifest-fresh4.json",
+    "candidates-fresh4.json",
+    "order-realworld-fresh4-2026-10-26.json",
+    "order-realworld-fresh3-2026-10-22.json",
+    "pool.json",
+    "../../scripts/rw_notation_neutral.py",
+    "../../src/readablestem/models/prompts/equation_line.md",  # the arm under test
+)
 FRESH3_FILES = (
     "PREREGISTRATION-FRESH3.md",
     "manifest-fresh3.json",
@@ -63,7 +73,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--check", action="store_true")
     parser.add_argument(
-        "--set", choices=["heldout", "fresh", "fresh2", "fresh3"], default="heldout"
+        "--set", choices=["heldout", "fresh", "fresh2", "fresh3", "fresh4"], default="heldout"
     )
     args = parser.parse_args()
     targets = {
@@ -71,6 +81,7 @@ def main() -> int:
         "fresh": ("REGISTRATION-fresh.sha256", FRESH_FILES),
         "fresh2": ("REGISTRATION-fresh2.sha256", FRESH2_FILES),
         "fresh3": ("REGISTRATION-fresh3.sha256", FRESH3_FILES),
+        "fresh4": ("REGISTRATION-fresh4.sha256", FRESH4_FILES),
     }
     name, files = targets[args.set]
     target = DATA / name

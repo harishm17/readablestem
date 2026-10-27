@@ -81,6 +81,7 @@ REGISTRATIONS = {
     "fresh": "REGISTRATION-fresh.sha256",
     "fresh2": "REGISTRATION-fresh2.sha256",
     "fresh3": "REGISTRATION-fresh3.sha256",
+    "fresh4": "REGISTRATION-fresh4.sha256",
 }
 
 
@@ -102,7 +103,7 @@ def require_registration(part: str, arm: str, offline: bool) -> None:
 def registered_arm(args: argparse.Namespace) -> str:
     """The name a registered run is recorded under: `rs` on the held-out part, the tag on the
     fresh part (two arms of one registration)."""
-    return args.tag if args.part in ("fresh", "fresh2", "fresh3") else "rs"
+    return args.tag if args.part in ("fresh", "fresh2", "fresh3", "fresh4") else "rs"
 
 
 def papers(part: str) -> list[dict]:
@@ -337,7 +338,7 @@ def cmd_tally(args: argparse.Namespace) -> int:
     run's answers (`--seed-answers-from`) holds copies of them: each answer is counted once,
     under the first run that holds it (`rs` first, then by tag)."""
     rows = []
-    for part in ("dev", "dev2", "heldout", "fresh", "fresh2", "fresh3"):
+    for part in ("dev", "dev2", "heldout", "fresh", "fresh2", "fresh3", "fresh4"):
         counted: set[str] = set()
         for tag_dir in sorted(
             runs_dir(part).glob("*/answers.jsonl"),
@@ -382,7 +383,7 @@ def main() -> int:
         if name != "tally":
             p.add_argument(
                 "--part",
-                choices=["dev", "dev2", "heldout", "fresh", "fresh2", "fresh3"],
+                choices=["dev", "dev2", "heldout", "fresh", "fresh2", "fresh3", "fresh4"],
                 required=True,
             )
         if name == "rs":
