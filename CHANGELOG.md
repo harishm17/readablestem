@@ -1,5 +1,17 @@
 # Changelog
 
+## Equations on real papers, round 3: inline equations read with their line (2026-10-26, branch explore/span-edges)
+
+- Why ReadableSTEM trailed the chatbot recipe: reading A counted the chatbots' table formulas and not
+  ReadableSTEM's (3.9 of 5.8 points on fresh3); read the same way, the largest remaining loss was the
+  text layer cutting inline formulas at the wrong place. Reading B is primary from now on.
+- `EQUATION_LINE_CONTEXT`: an inline equation is also sent as its whole line with the span boxed
+  (`layout.crop_line`, prompt `equation_line.md`) and the model writes the formula the box is part of.
+- Fourth registered set (15 papers, 1,600 equations, `data/realworld/PREREGISTRATION-FRESH4.md`): +2.6
+  points [+1.7, +3.6] (0.586 to 0.613), silent errors 7.9 to 7.3 per 100 gold; the rule for turning it on is
+  met. Haiku 0.563, Opus 0.641: ahead of Haiku by point estimate, still 2.8 points behind Opus, fewest silent
+  errors of the three. Spend $12.00. [docs/eval-equation-round3.md](docs/eval-equation-round3.md).
+
 ## Equations on real papers, round 2 (2026-10-23, branch fix/equations-round2)
 
 - Two deterministic fixes: a column's full-width line is no longer a section break and a held caption fills its
