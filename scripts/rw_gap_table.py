@@ -164,6 +164,11 @@ def main() -> int:
     )
     parser.add_argument("--reading", choices=["registered", "cells"], default="registered")
     parser.add_argument(
+        "--spoken",
+        action="store_true",
+        help="the spoken reading (scripts/rw_spoken.py) for every arm",
+    )
+    parser.add_argument(
         "--rescore-chat",
         action="store_true",
         help="score the chatbot arms again from their recorded answers with the current code",
@@ -192,6 +197,8 @@ def main() -> int:
             rows = report.rescored_chat_items(args.part, f"Chatbot, {name}")
         for item in rows:
             item = report.apply_reading(item, args.reading) if name == "ReadableSTEM" else item
+            if args.spoken:
+                item = _load("rw_spoken").refold(item, gold)
             pairs = {p["gold_id"]: p for p in item["pairs"]}
             for gid in [*pairs, *item["missed_gold_ids"]]:
                 outcome[name][gid] = {"pair": pairs.get(gid)}

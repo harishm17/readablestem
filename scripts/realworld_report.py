@@ -346,6 +346,12 @@ def main() -> int:
         "upright-word commands folded on both sides for every arm",
     )
     parser.add_argument(
+        "--spoken",
+        action="store_true",
+        help="the spoken reading (scripts/rw_spoken.py, exploratory): an aligned equation is "
+        "also right when ReadableSTEM's speech says prediction and gold alike",
+    )
+    parser.add_argument(
         "--rescore-chat",
         action="store_true",
         help="score the chatbot arms again from their recorded answers with the current code",
@@ -356,6 +362,7 @@ def main() -> int:
     gold = {r["id"]: r for r in pe.load_gold(gold_dir) if r.get("kind") == "equation"}
     buckets = load_buckets_module()
     neutral = load_script("rw_notation_neutral") if args.neutral else None
+    spoken = load_script("rw_spoken") if args.spoken else None
     items: dict[str, list[dict]] = {}
     for label, rel in ARMS.items():
         path = runs / (rel.replace("rs/", f"{args.tag}/") if rel.startswith("rs/") else rel)
@@ -366,6 +373,8 @@ def main() -> int:
             rows_in = [apply_reading(r, args.reading) for r in rows_in]
             if args.neutral:
                 rows_in = [neutral.refold(r, gold) for r in rows_in]
+            if args.spoken:
+                rows_in = [spoken.refold(r, gold) for r in rows_in]
             items[label] = [r for r in rows_in if not any(e in r["id"] for e in args.exclude)]
     for spec in args.extra_arm:
         label, _, tag = spec.partition("=")
@@ -375,6 +384,8 @@ def main() -> int:
         ]
         if args.neutral:
             rows_in = [neutral.refold(r, gold) for r in rows_in]
+        if args.spoken:
+            rows_in = [spoken.refold(r, gold) for r in rows_in]
         items[label] = [r for r in rows_in if not any(e in r["id"] for e in args.exclude)]
     result: dict = {"part": args.part, "arms": {}}
     print(f"## {args.part}: " + ", ".join(f"{k}: {len(v)} papers" for k, v in items.items()))
