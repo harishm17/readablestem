@@ -59,8 +59,7 @@ These are design statements that the tests exercise; they are not guarantees.
   child and not the server (`docs/web.md`, "Uploads and limits"). Document text reaches a
   model only through a fenced context field. Model output is validated before use: LaTeX
   against an allowlist, MathML parsed with `defusedxml` and re-serialised from an
-  allowlisted tree, alt text checked, and all HTML escaped (`docs/design/beta-architecture.md`,
-  rule 2).
+  allowlisted tree, alt text checked, and all HTML escaped.
 - **The converted document is served in a sandbox.** It gets its own Content Security
   Policy (`sandbox; default-src 'none'`), so it cannot run scripts, submit forms or read
   the app's cookies. App pages carry no inline scripts or styles (`docs/web.md`,

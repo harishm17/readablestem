@@ -5,7 +5,7 @@ send one plain-text message to one address. This module is the seam for it: a `L
 is any object with `send(message)`, registered under a name, and EMAIL_SENDER picks the
 name. **No email provider is wired in.** Sending mail is a new data processor (it sees
 the address and the time of every sign-in), so which provider, on what terms, and what the
-privacy page says about it are Harish's decisions (docs/launch.md, "Sign-in fallback").
+privacy page says about it are Harish's decisions.
 Until a sender that is marked `production_ok` is registered, production refuses to start
 with EMAIL_LOGIN_ENABLED=true (`Settings.check_production`).
 

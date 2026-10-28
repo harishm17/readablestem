@@ -22,7 +22,7 @@ figures it was smaller than Pillow's `optimize=True`, so an image that keeps its
 keeps its PNG bytes. A scaled image's PNG size is estimated from the original's
 (bytes x area ratio) to choose the format, so a JPEG-bound scan is never encoded twice.
 The result depends only on the crop and the figure type, so rendering a stored result
-gives the same file every time (docs/design/content-features.md rule 3). That also makes it
+gives the same file every time. That also makes it
 cacheable: the web app makes the file again after review writes, and decoding, scaling and
 encoding every figure each time was most of a re-render's work, so the finished image is
 kept per (crop, figure type) in a small memory cache (`CACHE_BYTES`; a crop is looked up by

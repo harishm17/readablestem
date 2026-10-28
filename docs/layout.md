@@ -226,7 +226,7 @@ the first three penalties (so its confidence is >= 0.85, the default
 `heading.length` / `heading.very_short`, `heading.list_like`. An empty heading text gives
 ABSTAINED with reason `heading.empty_text` (review "required").
 
-**Review tiers** (docs/design/beta-architecture.md "Review tiers"). Every heading is
+**Review tiers**. Every heading is
 written as a heading; the tier only says whether a person must decide:
 
 | Heading | Status | `Fix.review` |
@@ -1729,8 +1729,7 @@ by its SHA-256, so cropping every element of a PDF parses it once. The cache hol
 content, so an entry unused for `DOCUMENT_CACHE_TTL_S` (120 s) is closed by a daemon timer
 even if nobody calls `release`: an idle worker does not keep the last jobs' PDFs past the
 retention purge. `pipeline.run.convert_pdf` also calls `layout.release(pdf_bytes)` in a
-`finally` when the job ends (`release` is in the contract table of
-`docs/design/beta-architecture.md`).
+`finally` when the job ends.
 
 Crops render at `dpi` on a white background; when the long side would exceed `max_side_px`,
 the zoom drops so it fits (one pixel of headroom absorbs MuPDF's rounding).

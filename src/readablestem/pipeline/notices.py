@@ -3,8 +3,7 @@
 A notice (`core.types.Notice`) is something the job page lists beyond the review
 decisions: "Not handled in this file" (review "required" or "none") and "Worth checking"
 (review "optional"). It never adds a decision: when one is needed, the decision is the
-fix with the same `element_id`, and only fixes count (docs/design/content-features.md,
-"Notices").
+fix with the same `element_id`, and only fixes count.
 
 Some notices are facts about a fix, so they are derived here from the fixes rather than
 written by the steps (the figure and table work only set their fix fields):

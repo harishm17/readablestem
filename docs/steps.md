@@ -10,7 +10,7 @@ The steps assist a reviewer. They never treat model output as correct on its own
 proposal passes through validators, carries a confidence and the checks it passed, and
 anything that could change what a student reads goes to the review screen as a decision
 (`Fix.review == "required"`). Differences that do not change the meaning are accepted with
-an optional note (`"optional"`; docs/design/beta-architecture.md "Review tiers").
+an optional note (`"optional"`).
 
 ## At a glance
 
@@ -539,7 +539,7 @@ v and a are vectors", real models (docs/eval.md "Course notation"):
   it flags every one of them again, plus the same 6.
   So the case is worth its required decision only where a course writes a letter one
   way; the course page asks instructors to add both forms when they use both.
-  Kept required for the beta (content-features.md's tier; docs/launch.md L6).
+  Kept required for the beta.
 
 ## Validators and codes
 

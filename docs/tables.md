@@ -11,8 +11,7 @@ How a data table in a PDF becomes an accessible HTML table (pipeline 0.4.0). Two
   inside `pipeline/assemble_tables.py`.
 
 The review card is in [web.md](web.md) ("The table card") and the evaluation in
-[eval.md](eval.md) ("Tables"). Contracts, flags and review tiers:
-[design/content-features.md](design/content-features.md). The plan behind it is in the
+[eval.md](eval.md) ("Tables"). Flags and review tiers are in [web.md](web.md). The plan behind it is in the
 author's private research notes, which are not in this repository.
 
 ## Detection (`pipeline/tables.py`)
@@ -497,7 +496,7 @@ layer, so maths read into an empty cell was invented.
 
 ### Status and review tier
 
-First matching rule wins (content-features.md "Review tiers"):
+First matching rule wins:
 
 | # | Condition | Status | `reason` | Tier |
 |---|---|---|---|---|

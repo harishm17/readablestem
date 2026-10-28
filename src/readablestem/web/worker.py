@@ -744,7 +744,7 @@ class Worker:
     def _converter_kwargs(self, attempt: _Attempt) -> dict[str, Any]:
         """The converter's optional arguments, each passed only when set (`Converter`).
 
-        Content features add theirs here (docs/design/content-features.md), each in its
+        Content features add theirs here, each in its
         own block: `options` (the job's course notation; with none, `convert_pdf` uses
         the settings' feature flags) and `stage_progress` (live progress by stage).
         """

@@ -1,7 +1,7 @@
 """How `assemble` writes running text: inline equations, links, colour and language.
 
 Two seams, so the text features land here and not in `assemble.py`
-(docs/design/content-features.md; what the output looks like: docs/output.md "Links and
+(what the output looks like: docs/output.md "Links and
 cross-references", "Language", "Coloured text"):
 
 - `render_inline_text`: the one place inline text becomes HTML (paragraphs, list items,

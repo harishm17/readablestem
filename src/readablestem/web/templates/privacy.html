@@ -62,11 +62,10 @@
 <h2>Who else sees your documents</h2>
 <ul>
   {% if provider == "anthropic" %}
-  {# What is known (docs/design/beta-architecture.md, "Data path and retention with
-     Anthropic"): the commercial API terms say inputs and outputs are not used to train
+  {# What is known: the commercial API terms say inputs and outputs are not used to train
      models by default; Anthropic's standard API retention is 30 days; content its safety
-     systems flag can be kept longer. No zero-retention agreement is in place for the beta
-     (docs/launch.md B1). Re-read Anthropic's policy page when you launch. #}
+     systems flag can be kept longer. No zero-retention agreement is in place for the beta.
+     Re-read Anthropic's policy page when you launch. #}
   <li><strong>Anthropic.</strong> To propose LaTeX for equations and alt text for figures{% if tables_on %},
     and to rebuild tables{% endif %}, images of those parts of the page, and a little of the
     nearby text, are sent to Anthropic's API (the Claude models).{% if notation_on %} For a document you upload
@@ -90,7 +89,7 @@
   <li><strong>Railway</strong> hosts the app and its database (Railway Postgres), in its
     United States region.</li>
   {% if tracing %}
-  {# Tracing is off for the beta (TRACING_ENABLED=false, docs/launch.md L4). Before turning
+  {# Tracing is off for the beta (TRACING_ENABLED=false). Before turning
      it on, set the Langfuse project retention (docs/operations.md, "Tracing") and state it
      in this item. #}
   <li><strong>Langfuse</strong> receives performance records of each conversion: timings,
@@ -148,7 +147,7 @@
 
 <h2>What is logged</h2>
 {# Platform logs: Railway keeps its own request logs; how long depends on the plan, so the
-   sentence does not give a number (docs/launch.md P5). #}
+   sentence does not give a number. #}
 <p>The app's logs record what happened, not what was in your document: event names, random
   ids, page and fix counts, timings, model costs and error categories (for example
   <code>unknown_command</code>). They never contain document text, images, LaTeX, alt

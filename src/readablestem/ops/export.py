@@ -16,7 +16,7 @@ The export is a copy of document content outside the database, so it keeps the s
 deadline: `prune_exports(DIR)` (`readablestem ops export-opted-in --prune DIR`) deletes
 every job directory whose `EXPIRES` has passed. Do not use this before the privacy page
 says opted-in results may be copied to the maintainer's machine for analysis and are
-deleted by the same date (docs/launch.md L3). Reviewer decisions do not outlive the job
+deleted by the same date. Reviewer decisions do not outlive the job
 as labels; that would need its own retention and wording, and is not built.
 """
 

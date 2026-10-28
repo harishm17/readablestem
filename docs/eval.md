@@ -333,8 +333,7 @@ numbers until then.
 
 ### Review load (equations, headings, document)
 
-How much the pipeline asks of a person, and whether it asks about the right things
-(docs/design/beta-architecture.md "Review tiers").
+How much the pipeline asks of a person, and whether it asks about the right things.
 
 | Metric | Definition |
 |---|---|
@@ -449,7 +448,7 @@ with or without a baseline (see "Tables": "Gate").
 | Field | Content |
 |---|---|
 | `schema_version`, `task`, `date` | `date` comes from `--date` (default: today, taken in the CLI) |
-| `pipeline_version`, `prompt_versions` | `run.PIPELINE_VERSION`; prompt versions as seen on the model calls, module constants when no call ran. 0.3.0 (2026-10-08) changed the review rules (a sign or relation that differs from the text layer is a required decision): reports before 0.3.0 used the old review policy, so compare review-load numbers (required decisions, flags) only between reports of the same pipeline version. 0.4.0 (2026-10-09) added the content features (docs/design/content-features.md) without changing equations, figures or headings while the flags are off, so 0.4.0 and 0.3.0 reports compare. Layout detects tables whatever the flags say, and each data table kept as an image is a required decision of its own; on the document gold it claims no data table (its two ruled key-term grids are claimed as grids of terms and written as lists, `tables.is_term_grid`, with no decision). Chart data tables read from the image are optional extras, never a decision (since 2026-10-09; "Content features after integration"). Which version made each committed `data/eval/latest-*.json`: "Results" |
+| `pipeline_version`, `prompt_versions` | `run.PIPELINE_VERSION`; prompt versions as seen on the model calls, module constants when no call ran. 0.3.0 (2026-10-08) changed the review rules (a sign or relation that differs from the text layer is a required decision): reports before 0.3.0 used the old review policy, so compare review-load numbers (required decisions, flags) only between reports of the same pipeline version. 0.4.0 (2026-10-09) added the content features without changing equations, figures or headings while the flags are off, so 0.4.0 and 0.3.0 reports compare. Layout detects tables whatever the flags say, and each data table kept as an image is a required decision of its own; on the document gold it claims no data table (its two ruled key-term grids are claimed as grids of terms and written as lists, `tables.is_term_grid`, with no decision). Chart data tables read from the image are optional extras, never a decision (since 2026-10-09; "Content features after integration"). Which version made each committed `data/eval/latest-*.json`: "Results" |
 | `models`, `models_used`, `client` | configured main/cheap (and judge) ids, ids actually called, and the provider that answered: `openai`, `anthropic` or `fake` |
 | `dataset` | `gold_dir`, `manifest_sha256`, `limit`, `unit`, `selection_sha256` (hash of the planned item ids) |
 | `n_planned`, `n`, `complete`, `stopped_reason` | `stopped_reason` is a budget category (e.g. `budget_job_usd`) when spend ran out |
@@ -1232,8 +1231,8 @@ uv run python -m readablestem.eval.notation_flags .local/eval/notation/items-equ
 The first runs of the integrated branch (`feat/content-integration`: all eleven content
 builders merged). Reports and per-item rows are kept local (`.local/integration/smoke/`),
 not promoted: the committed `latest-*.json` stay the baselines until Harish decides.
-Real spend for everything below and the conversions in docs/design/content-features.md
-("Status after integration"): $1.00 of a $1.50 cap.
+Real spend for everything below and the conversions
+("Content features after integration"): $1.00 of a $1.50 cap.
 
 ### Review load with every flag on (document task)
 
@@ -1309,7 +1308,7 @@ again equation 2.5's dropped bold v.
 
 ## Review load after the meaning-level changes (2026-10-09, evening)
 
-What changed (docs/design/content-features.md "Review tiers"; Harish's policy: additive
+What changed (Harish's policy: additive
 extras never add a required decision):
 
 - A chart data table whose values are not all in the PDF text is not written into the

@@ -47,8 +47,8 @@ proposed scope; the questions further down are still open.
 - Out of the beta: university SSO
 
 **Since this record was written.** Tables, long figure descriptions, links and language,
-colour and course-notation memory were built behind flags that are off by default
-(`docs/design/content-features.md`); tables have their own amendment in ADR 0003. They are
+colour and course-notation memory were built behind flags that are off by default;
+tables have their own amendment in ADR 0003. They are
 not part of the beta scope above until their flags are turned on.
 
 **Questions that were open on 2026-10-06**

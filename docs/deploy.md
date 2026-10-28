@@ -188,8 +188,7 @@ assembled with the originals kept, and the fixes that could not run are flagged.
 `MODEL_PROVIDER=anthropic` answers every model request with the Claude API instead
 (`models/anthropic_client.py`); OpenAI is then not called at all. Anthropic becomes a data
 processor for the app, so the privacy page changes with the setting and
-`readablestem ops launch-check` flags a deployment whose page does not name Anthropic
-(`docs/design/beta-architecture.md`, "Data path and retention with Anthropic").
+`readablestem ops launch-check` flags a deployment whose page does not name Anthropic.
 
 1. In the Anthropic Console, create a workspace for the app (for example "ReadableSTEM prod")
    and an API key inside it. **Use a workspace-scoped key.** A key that is not scoped to a
@@ -437,8 +436,7 @@ The production image does **not** include it: it adds a few hundred megabytes, a
    It installs the Writer and Impress components without the graphical interface, and three
    metric-compatible fonts (Carlito for Calibri, Caladea for Cambria, Liberation).
 2. Set `MEMORY=2Gi` in `deploy/.env.deploy`.
-3. Read the privacy page's new line (it appears when the form takes these files), and
-   docs/launch.md "Sign-in fallback and Word input".
+3. Read the privacy page's new line (it appears when the form takes these files).
 
 With no LibreOffice in the image nothing else changes: the form takes PDFs only and a Word
 file is refused with a message that says to save it as a PDF. `OFFICE_INPUT_ENABLED=false`

@@ -1,7 +1,7 @@
 """Long descriptions, chart data tables and the colour-only flag (FEATURE_LONG_DESCRIPTIONS)
 in the figure step, with FakeVisionClient: the option off sends exactly what it did
 before; on, the long prompt, the figure's labels as fenced context, and the review tiers
-of docs/design/content-features.md (unsure description: a note; values read from the
+of the content features (unsure description: a note; values read from the
 image: a required decision; colour only: no change)."""
 
 from __future__ import annotations

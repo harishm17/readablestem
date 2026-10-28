@@ -3,7 +3,7 @@
 `review_pdf()` makes a two-page PDF with PyMuPDF; `review_output()` is the result the
 pipeline would make of it, with every element's box measured on that PDF, so page images,
 marks and crops line up as they do for a real upload. What needs a person, as the review
-policy would have it (docs/design/beta-architecture.md, "Review tiers"):
+policy would have it:
 
 - decision 1, equation p1-e2: a bold omega (a vector) in the PDF, read as a plain omega
   (`style_mismatch`, required);
