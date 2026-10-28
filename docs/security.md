@@ -3,7 +3,7 @@
 The threat model, the controls that answer it, what the pre-launch audit found, and how to
 report a problem. The controls are exercised by tests, named below; where a statement here and
 a test disagree, the test is right and this page is the bug. The policy for reporters is in
-[SECURITY.md](../SECURITY.md); the launch checklist is in [launch.md](launch.md).
+[SECURITY.md](../SECURITY.md).
 
 ## What is protected, and from whom
 
@@ -192,8 +192,7 @@ The rate limit is on by default and production refuses to start with `RATE_LIMIT
 restart forgets it. It is a seatbelt for a few people, not a flood defence. The address is the
 entry `TRUSTED_PROXY_HOPS` places from the right of `X-Forwarded-For` (1 on Cloud Run, 2 behind
 an external load balancer); entries further left are written by the client and never
-believed. **If this is set wrong the limits are shared by everyone or by no one**; see
-[launch.md](launch.md).
+believed. **If this is set wrong the limits are shared by everyone or by no one**.
 
 A Word or PowerPoint file (T3-30) is handled the same way, with more care because
 LibreOffice is far larger than MuPDF and, unlike it, reads files and not pipes. In a child
@@ -283,7 +282,7 @@ short fenced piece of nearby text, and "Read this cell with the model" sends the
 Nothing else leaves the server, they are the same "what is sent" as the table above, and they
 are under the same spend caps (docs/web.md, "What the model costs here").
 
-The privacy page's wording for the model provider is the beta wording (docs/launch.md B1).
+The privacy page's wording for the model provider is the beta wording.
 What is known as of the audit is above; re-read the provider's policy page on the day of
 launch. No zero-data-retention agreement is requested for the beta. A document deleted here
 can remain at the provider for up to 30 days.
@@ -291,7 +290,7 @@ can remain at the provider for up to 30 days.
 ## Pre-launch audit: findings
 
 Audit date 2026-10-14, branch `feat/launch-audit`, from `feat/public-proof`. Findings 1 to 6
-have regression tests; 7 to 9 are wording and are tracked in [launch.md](launch.md).
+have regression tests; 7 to 9 are wording.
 
 | # | Severity | Finding | Fix |
 |---|---|---|---|
@@ -302,8 +301,8 @@ have regression tests; 7 to 9 are wording and are tracked in [launch.md](launch.
 | 5 | Low | The session cookie had no `__Host-` prefix in production | Prefix in production; `test_audit_headers.py` |
 | 6 | Low | No `Cross-Origin-Resource-Policy` | Added; `test_audit_headers.py` |
 | 7 | Low | The privacy page did not say that a document deleted here can remain with Anthropic for up to 30 days | Stated; the wording is final for the beta |
-| 8 | Info | The privacy page had no "how it is protected", "where it is processed" or "changes" section, and the terms had no accounts, institution or changes section | Sections added; the launch.md defaults are now the wording |
-| 9 | Info | SECURITY.md names a different email address (outlook) from the project metadata (gmail) | Left for Harish to confirm ([launch.md](launch.md)) |
+| 8 | Info | The privacy page had no "how it is protected", "where it is processed" or "changes" section, and the terms had no accounts, institution or changes section | Sections added; the defaults are now the wording |
+| 9 | Info | SECURITY.md names a different email address (outlook) from the project metadata (gmail) | Left for Harish to confirm |
 
 Checked and found sound (tests added as regression guards, no code change): headers on
 every response kind; CSRF on every state-changing route; owner checks and IDOR on all 29

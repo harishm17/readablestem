@@ -23,13 +23,12 @@ share them:
 - `data_table_shown` / `data_table_offered`: a table whose values all come from the
   PDF's text is written; one read from the image is an optional extra, kept on the fix
   and offered on the review screen, and written only once a reviewer adds it
-  (`FigureFix.data_table_added`). Additive extras never add a required decision
-  (docs/design/content-features.md "Review tiers");
+  (`FigureFix.data_table_added`). Additive extras never add a required decision;
 - `render_details`: the `<details>` written after a figure in the output (the long
   description, then the data table, when shown, through `table_html.render_table`).
 
 Everything here is pure and bounded, and never reads `ConversionOptions`: rendering
-depends on the stored fix only (docs/design/content-features.md rule 3).
+depends on the stored fix only.
 """
 
 from __future__ import annotations

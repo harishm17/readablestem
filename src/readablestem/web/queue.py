@@ -1,6 +1,6 @@
 """The review screen's queue: the decisions the pipeline asked for, numbered, in order.
 
-A reviewer makes decisions, not fixes (docs/design/beta-architecture.md, "Review tiers"):
+A reviewer makes decisions, not fixes:
 a fix that needs a decision is one, and a group of repeated headings that share a
 `Fix.group_key` is one for all of its headings, and so are the pages (or the pieces of
 handwriting) kept as images for one reason ("pg-" keys, `web.review.is_kept_image`). The

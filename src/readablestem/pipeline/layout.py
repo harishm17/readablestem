@@ -8717,7 +8717,7 @@ def _layout_notices(
     marks_out: dict[str, _FootnoteMark] | None = None,
 ) -> list[Notice]:
     """The code blocks and footnotes the job page lists under "Not handled in this file"
-    (review "none": no decision; docs/design/content-features.md "Notices"). `marks_out`
+    (review "none": no decision). `marks_out`
     gets each footnote's element id with the place of its mark (`_FootnoteMark`)."""
     notices: list[Notice] = []
     for page in pages:

@@ -22,8 +22,7 @@ context, and the proposal may also carry (`pipeline.figure_details`):
   `figure.data_values` fails with `values_from_image`, a note (review "optional"): the
   table is kept on the fix as an optional extra the review screen offers ("Add the data
   table"), not written into the student file until a reviewer adds it
-  (`figure_details.data_table_shown`). An additive extra never adds a required decision
-  (docs/design/content-features.md "Review tiers");
+  (`figure_details.data_table_shown`). An additive extra never adds a required decision;
 - `colour_only`: the figure tells things apart by colour alone. It changes no status or
   tier (the job page lists it as the notice `colour_only`).
 The alt text, the status rules and the escalation below are the same either way.
@@ -143,8 +142,7 @@ COMPLEX_FIGURE_TYPES = frozenset({"chart", "diagram"})
 # in this version (its thresholds are not calibrated on human labels yet). A long
 # description the model was unsure of is one, and so is a data table with values read
 # from the image (`values_from_image`): it is not in the student file until a reviewer
-# adds it, so it changes nothing a student reads (docs/design/content-features.md
-# "Review tiers").
+# adds it, so it changes nothing a student reads.
 NOTE_CODES = frozenset(
     {
         "too_long",

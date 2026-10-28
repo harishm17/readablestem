@@ -2,8 +2,7 @@
 
 `table_pdf()` draws a two-page PDF with PyMuPDF (ruled tables, a caption above each);
 `table_output()` is the result the pipeline would make of it, every table's box measured
-on that PDF, with a fix in each review tier (docs/design/content-features.md, "Review
-tiers for the new items"):
+on that PDF, with a fix in each review tier:
 
 - decision 1, table p1-e1 ("Table 1 Motion of two objects"): a model proposal that
   needs a decision (a check doubts it), its first row not marked as a header, a maths

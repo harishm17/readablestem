@@ -1,7 +1,7 @@
 """How `assemble` writes a TABLE element (owned by the tables-step builder).
 
 `render_table_element` is the one place a table element becomes HTML, so table work
-lands here and not in `assemble.py` (docs/design/content-features.md). It writes:
+lands here and not in `assemble.py`. It writes:
 
 - a rebuilt table, when the fix has a usable one (`Fix.table`, its status not in
   `KEPT_ORIGINAL_STATUSES`, a data table): `table_html.render_table` inside a wrapper

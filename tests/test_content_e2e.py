@@ -11,7 +11,7 @@ colour and notation memory on and a course notation list, against a fake model c
   (`Element.table`), registered for the exact crop the run sends.
 
 Then the student HTML passes the static checks, re-renders byte for byte from the stored
-result (content-features rule 3), carries the new features (rebuilt tables, links and
+result (rule 3 of the content features), carries the new features (rebuilt tables, links and
 cross-references that resolve, the passage language, colour classes, long descriptions,
 bold letters made maths), lists only known notices, and (browser suite) passes axe.
 """

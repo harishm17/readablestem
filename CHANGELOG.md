@@ -337,10 +337,10 @@
   reports no unfinished copy. Railway is named as host, daily backups are kept about 6 days (a
   deleted document can remain in a backup for up to about a week), governing law is Texas, and
   Word and PowerPoint are described only when the server can convert them. Details in
-  [docs/launch.md](docs/launch.md).
+  docs/security.md.
 - The source link (`SOURCE_URL` default), the README and the site point at
   https://github.com/harishm17/readablestem. The repository has to be public before the first
-  sign-in (AGPL, launch.md B12).
+  sign-in (AGPL).
 
 ## Railway deploy and layout limits (2026-10-14)
 

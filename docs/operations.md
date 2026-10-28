@@ -118,7 +118,7 @@ read from the `before` snapshot of its earliest review. Categories:
 | same | `call:fallback` | calls made on the other model after a failure |
 | same | `call:escalated` | fixes re-asked on a different model without a failure (e.g. a low-confidence `gpt-6-luna` answer sent to `gpt-6.1-sol`) |
 | same | `review:<action>` | reviewer decisions (`accept`, `edit`, `reject`), counted when the job is deleted, because reviews can happen until then |
-| same | `tier:<tier>` | fixes by review tier as the pipeline left them (`required`, `optional`, `none`; `Fix.review`, see docs/design/beta-architecture.md "Review tiers") |
+| same | `tier:<tier>` | fixes by review tier as the pipeline left them (`required`, `optional`, `none`; `Fix.review`) |
 | same | `tier:<tier>:<reason>` | why each required or optional fix has its tier: each failed check code, its `Fix.reason`, `heading.repeated_label` for a member of a group of repeated headings, or `below_accept` when only the confidence held it back (`core.triage.tier_reasons`) |
 | same | `decisions:required` | decisions the pipeline asked a person for: one per required fix, but one per group of repeated headings and one per group of pages kept as images for one reason (`sum(decisions:required) / sum(pages)` is the review load per page) |
 | same | `aggregate:checks_edited` | fixes whose checks could not be counted: a reviewer's edit replaced them before aggregation ran (a heading edit keeps them; checks in the earliest `before` snapshot are counted when it has them) |
@@ -464,7 +464,7 @@ control, with the file deleted after a day for the same reason as the Cloud SQL 
 ## Open sign-up (`SIGNUP_MODE=open`)
 
 What to look at, and what to do. Setting and design: docs/web.md, "Sign-up modes and access
-tiers"; decisions: docs/launch.md, "Open sign-up".
+tiers".
 
 - **The Admin page** shows "New accounts today (UTC)" against `MAX_NEW_ACCOUNTS_PER_DAY`,
   accounts by tier and blocked, the open pool's spend, and every account with its tier. A day

@@ -83,7 +83,7 @@ Checks (content-free codes; docs/tables.md):
   Greek letters; signs and relations; a meaning-level letter style, or a cosmetic one
   as a note). Only when the grids agree, so the PDF cell is known.
 
-Status rules, in order (docs/design/content-features.md "Review tiers"):
+Status rules, in order:
 1. rebuilding off -> FAILED "table_not_rebuilt" (required; the image is kept). Layout
    only makes a table element of a grid its local check calls data (`tables.find`: a
    grid of terms becomes a list, prose grids stay paragraphs), so this is a data table;

@@ -1,6 +1,6 @@
 """content features: courses, notation, events, sign-in identities, job progress
 
-The schema for the content features (docs/design/content-features.md):
+The schema for the content features:
 
 - `courses` and `notation_entries`: an instructor's courses and each course's notation
   memory (one entry per canonical symbol). User content, deleted with the user.

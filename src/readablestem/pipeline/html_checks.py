@@ -25,7 +25,7 @@ A link in the text (`<a href>`) loads nothing, so it is not an external resource
 link rules check it instead. The last four rules are the text work's
 (docs/output.md "Links and cross-references", "Language", "Coloured text").
 
-The wording rule (docs/design/beta-architecture.md rule 7) only reads text inside
+The wording rule only reads text inside
 elements carrying `assemble.AUTHORED_CLASS` (the notes and the about section). Course
 text is the instructor's, not a claim by this tool: mechanics uses "compliance" for the
 flexibility of a beam.

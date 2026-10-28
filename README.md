@@ -311,8 +311,8 @@ A FastAPI app wraps the pipeline with sign-in (open to anyone with a Google acco
 allowlist), spend caps, daily limits and short retention
 (uploads are deleted 24 hours after the last activity, or after 7 days or 30 days if the user chooses). Every model request
 reserves its worst-case cost before it is sent. Logs carry counts and category codes, never
-document content. The architecture, its module contracts and the rules every part follows
-are in [docs/design/beta-architecture.md](docs/design/beta-architecture.md); the reasons for
+document content. The module contracts and the rules every part follows are described in the per-stage
+documents listed in [docs/README.md](docs/README.md); the reasons for
 the main choices are in [docs/decisions/](docs/decisions/).
 
 ## Quick start
@@ -409,14 +409,13 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
 
 [docs/README.md](docs/README.md) says which document answers which question. The most useful
 starting points are [docs/eval.md](docs/eval.md) (how quality is measured and what the numbers
-leave out), [docs/design/beta-architecture.md](docs/design/beta-architecture.md) and the
+leave out) and the
 [decision records](docs/decisions/).
 
 The history of this repository was rewritten once before it was made public, so the commit
 hashes cited in `PROOF.md` and in the registration addenda are not the hashes you see here.
-[docs/history-note.md](docs/history-note.md) maps each original hash to its public one, so the
-order of events (for example, that the held-out run's code was committed before any held-out call)
-can be checked.
+[docs/history-commit-map.txt](docs/history-commit-map.txt) lists each original hash and its public one (original first), so the
+order of events can be checked.
 
 ## Licence
 

@@ -19,7 +19,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 # The two models Harish chose on 2026-10-07 (ADR 0002). Each is the other's fallback.
 MAIN_MODEL = "gpt-6.1-sol"
 CHEAP_MODEL = "gpt-6-luna"
-# The Claude models used when MODEL_PROVIDER=anthropic (docs/design/beta-architecture.md):
+# The Claude models used when MODEL_PROVIDER=anthropic:
 # the cheap model reads first, the main model re-reads what the cheap one is unsure about,
 # and each is the other's fallback, as with the OpenAI pair.
 ANTHROPIC_MAIN_MODEL = "claude-opus-5-5"
@@ -266,8 +266,8 @@ class Settings(BaseSettings):
     ms_client_secret: SecretStr | None = None
     ms_allowed_tenants: Annotated[list[str], NoDecode] = Field(default_factory=list)
     # Sign in by an emailed one-time link (T3-10). OFF, and no email provider is wired in:
-    # sending mail is a new data processor, which is Harish's decision (docs/launch.md,
-    # "Sign-in fallback"). Turning it on needs EMAIL_SENDER to name a registered sender
+    # sending mail is a new data processor, which is Harish's decision.
+    # Turning it on needs EMAIL_SENDER to name a registered sender
     # (`web.email_senders`); production refuses to start without one that is meant for it.
     email_login_enabled: bool = False
     email_sender: str | None = None
@@ -304,7 +304,7 @@ class Settings(BaseSettings):
     # Content-free usage events (`events` table: a name, a code, a number; never text).
     events_enabled: bool = True
 
-    # --- content features (docs/design/content-features.md). Each is off until its eval
+    # --- content features. Each is off until its eval
     # says it helps; ConversionOptions.from_settings reads them for every conversion.
     # Rebuild data tables as <table> (off: a detected table is kept as an image of the
     # table with a required decision, "table not rebuilt").

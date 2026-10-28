@@ -12,7 +12,7 @@ can be logged and aggregated after the document itself is deleted.
 
 Every field added after the first release has a default, so results stored before it
 existed still load. The content features of pipeline 0.4.0 (tables, long descriptions,
-links, language, colour, notation memory) are described in docs/design/content-features.md.
+links, language, colour, notation memory) are described in docs/web.md and docs/tables.md.
 """
 
 from __future__ import annotations
@@ -647,7 +647,7 @@ class DocumentStats(BaseModel):
     per_page: list[PageStats] = Field(default_factory=list)
 
 
-# Notice codes known to this release (docs/design/content-features.md "Notices"; each has
+# Notice codes known to this release (each has
 # a sentence in web/messages.py NOTICE_MESSAGES). `Notice.code` stays a plain string, so a
 # result written by a newer release with a code this one does not know still loads.
 NOTICE_CODES = frozenset(

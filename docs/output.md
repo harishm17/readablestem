@@ -1,7 +1,7 @@
 # The output HTML
 
 What `pipeline/assemble.py` writes for one PDF, why it looks that way, and which checks run
-on it. The pipeline that feeds it is in `docs/design/beta-architecture.md`.
+on it. The pipeline that feeds it is in docs/steps.md.
 
 ## One self-contained file
 
@@ -407,7 +407,7 @@ and label are unchanged. In a document in another language the alt text is marke
   Hidden text from such a page is never in the file: layout never reads it.
 - NEEDS_REVIEW fixes are shown as converted and not flagged here: the review screen is
   where they are handled. So are fixes accepted with an optional note
-  (`Fix.review == "optional"`, docs/design/beta-architecture.md "Review tiers").
+  (`Fix.review == "optional"`).
 
 ## Pages converted from an image (ADR 0007, `FEATURE_IMAGE_PAGES`)
 
@@ -735,7 +735,7 @@ review words ("needs review", "rejected"): those are for the instructor, on the 
 - "If something is hard to read or looks wrong, tell your instructor.";
 - an optional plain-text `source_note`, such as an OpenStax attribution.
 
-The wording is final for the beta (docs/launch.md B7): the note does not name screen
+The wording is final for the beta: the note does not name screen
 readers, and "checked" appears only once an instructor has made a decision (the feature
 review's challenge, 10.3 row 4, would say "decided by your instructor" instead, since the
 tool only knows that decisions were made). Model cost is not in the HTML: the file is meant for

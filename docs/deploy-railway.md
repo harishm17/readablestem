@@ -102,7 +102,7 @@ Rules that keep the plan honest:
 
 ## Decisions for Harish
 
-1. **Backup window and the privacy page (blocking-beta, B2 in [launch.md](launch.md)). Decided:
+1. **Backup window and the privacy page (blocking-beta, B2). Decided:
    daily only, kept 6 days; the privacy page says a deleted document can remain in a backup for up
    to about a week.** The earlier sentence ("one daily backup", "up to about one more day") was
    the Cloud SQL setting. Railway's backups are different: daily backups are kept 6 days, weekly
@@ -124,10 +124,10 @@ Rules that keep the plan honest:
    (about $0.04 a run); `ops cron` does not. Decide whether you want the canary (step 4, option B).
 4. **LibreOffice in the image (Word and PowerPoint uploads).** Off by default. To turn it on:
    variable `INSTALL_LIBREOFFICE=true` on the web service and a memory allowance of 2 GB (below).
-   Read launch.md W1 to W3 first.
+   Check `readablestem ops launch-check` first.
 5. **Google sign-in client.** It is in Testing with harishmanoharan17@gmail.com as the only test user.
    Publishing it (so other instructors can sign in without being added as test users) needs the final
-   privacy and terms wording and the launch.md items B1 to B6; `readablestem ops launch-check` lists
+   privacy and terms wording and the unfinished items; `readablestem ops launch-check` lists
    what is still unfinished.
 
 ## Variables
@@ -147,12 +147,12 @@ production if a required one is missing, and logs the reason):
 
 | Variable | Why | Suggested |
 |---|---|---|
-| `SIGNUP_MODE` | `allowlist` (the default) or `open`: whether anyone with a verified Google (or allowed Microsoft) account gets an account at the first sign-in (docs/web.md, "Sign-up modes and access tiers"; launch.md "Open sign-up"). | **`open`** for the free beta anyone can try. Set it last, after the checks below. |
+| `SIGNUP_MODE` | `allowlist` (the default) or `open`: whether anyone with a verified Google (or allowed Microsoft) account gets an account at the first sign-in (docs/web.md, "Sign-up modes and access tiers"). | **`open`** for the free beta anyone can try. Set it last, after the checks below. |
 | `OPEN_TIER_DAILY_PAGE_QUOTA` | Pages a day for an account that signed itself up. Invited people keep `PER_USER_DAILY_PAGE_QUOTA` (90). | **`20`** (a couple of short handouts a day; the default). |
 | `OPEN_TIER_DAILY_REREADS` | Model reads from the review screen (a marked equation, a table cell) a day for such an account. Each costs model spend that no page count bounds. | **`30`** (the default). |
 | `MAX_NEW_ACCOUNTS_PER_DAY` | Accounts open sign-up may make per UTC day, for the whole service. When it is used up, new sign-ins get "Sign-ups are full for today"; people with accounts are not affected. `0` pauses sign-up. | **`100`** (the default). |
 | `OPEN_TIER_DAILY_SPEND_CAP_USD` | The part of `DAILY_SPEND_CAP_USD` that documents of such accounts may use together; invited people are not held back when it is spent. It is inside the daily cap, not added to it. | **`4`** (the default; $4 of the $10 day, so strangers can never take the instructors' whole budget). |
-| `SOURCE_URL` | The footer's link to the source (AGPL, launch.md B12). The default is the public repository, `https://github.com/harishm17/readablestem`, which has to exist before the first sign-in. | Leave unset, or set it to the deployed commit's URL (launch.md B12). |
+| `SOURCE_URL` | The footer's link to the source (AGPL). The default is the public repository, `https://github.com/harishm17/readablestem`, which has to exist before the first sign-in. | Leave unset, or set it to the deployed commit's URL. |
 | `MAX_USD_PER_JOB`, `MAX_USD_PER_PAGE` | Per-conversion dollar caps. | Leave unset: the defaults for Claude are $3.00 and $1.00, and the start-up check refuses numbers that cannot work. |
 | `FEEDBACK_URL` | The footer's Feedback link. | Leave unset: it becomes an email to `CONTACT_EMAIL`. A form service is a new data processor to name on the privacy page. |
 | `ALERT_EMAIL` | Read only by `deploy/deploy.sh` (Google Cloud alert policies). The app ignores it, so setting it on Railway does nothing. | Skip. Use Railway's project notifications and the weekly GitHub uptime check (below). |
@@ -160,7 +160,7 @@ production if a required one is missing, and logs the reason):
 | `CLAUDE_CANARY` | Daily drift check, only run by the HTTP cron route. | `false` if you use the cron service and do not want option B. |
 | `INSTALL_LIBREOFFICE` | Build argument, see decision 4. | Unset. |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | How long Railway waits between SIGTERM and killing the old container on a deploy. The worker stops claiming at once on SIGTERM and gives its running job back; uvicorn waits 5 s for open connections. **Confirm** the name and default on Railway's deployment page. | `10` |
-| `TRACING_ENABLED` and the Langfuse keys | Off. | Leave off (launch.md L4). |
+| `TRACING_ENABLED` and the Langfuse keys | Off. | Leave off. |
 
 The Google client needs `https://readablestem.com/auth/callback` as an authorized redirect URI
 (exact match; the app sends `BASE_URL + /auth/callback`). Sessions are per host: sign in again at
@@ -395,7 +395,7 @@ changed on Railway, and the command prints item names only, never a setting's va
 echoes the environment. Alternatively `railway ssh -s web -- readablestem ops launch-check` runs it in the
 container (the image has the templates, but not `tests/`, `proof/` or the eval baseline, so it can list
 repository items that exist in the checkout). Exit code 1 means items remain; `launch_blockers=0` is the goal.
-Before the Google client is published, launch.md items B1 to B6 and P1 to P7 are what clear it.
+Before the Google client is published, the launch-check items are what clear it.
 
 ## What it costs
 

@@ -2,8 +2,8 @@
 
 FILE may also be a Word (.docx) or PowerPoint (.pptx) file, made into a tagged PDF first.
 
-Runs the whole pipeline on one PDF and writes one HTML file. Model spend is capped twice
-(docs/design/beta-architecture.md rule 3): `--max-usd` sets an in-memory spend guard
+Runs the whole pipeline on one PDF and writes one HTML file. Model spend is capped twice:
+`--max-usd` sets an in-memory spend guard
 for this run, and `MAX_USD_PER_JOB` / `MAX_MODEL_CALLS_PER_JOB` cap the job. `--fake`
 uses the offline fake model client instead (no API key, nothing billed); its answers are
 placeholders, so the HTML then opens with a note saying it is an offline test run.

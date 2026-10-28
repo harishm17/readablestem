@@ -59,7 +59,7 @@ Design notes:
   the whole run (`pipeline.options.using`), so every step reads them with
   `options.current()`, pool threads included (each task runs in a copy of the context).
   They decide what the steps produce; the stored result alone decides the HTML.
-- Content features (docs/design/content-features.md) hook in here: TABLE elements go to
+- Content features hook in here: TABLE elements go to
   `table_step.rebuild` like equations and figures go to their steps; `stage_progress`
   receives `ProgressEvent`s; notices and source facts go on the result. The text pass
   (links, cross-references, the document and passage languages, colour runs) runs once
@@ -154,7 +154,7 @@ log = logging.getLogger(__name__)
 # 0.3.0 (2026-10-08): review rules changed, a sign or relation that differs from the text
 # layer is a required decision (`signs.compare_signs`). Results and eval reports from
 # 0.2.0 were made under the old review policy.
-# 0.4.0 (2026-10-09): the content-feature data model (docs/design/content-features.md):
+# 0.4.0 (2026-10-09): the content-feature data model:
 # TABLE elements and fixes, figure long descriptions and data tables, links, colour
 # runs, passage languages, notices and source facts on the result, conversion options.
 # Results from 0.3.0 load unchanged (every new field has a default); a table detected by
@@ -1552,7 +1552,7 @@ def _convert(
         stats.cost_usd,
         stats.latency_ms,
     )
-    # Content-free additions of the content features (docs/design/content-features.md):
+    # Content-free additions of the content features:
     # each feature adds its notices here (the text pass's first); those that follow from
     # the fixes are derived once, then everything is merged (one notice per code and
     # element, or code and page) and ordered by page and reading order.

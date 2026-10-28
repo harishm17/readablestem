@@ -18,14 +18,14 @@ What the output looks like and why is in docs/output.md. In short:
   anything hard to read. No counts: those are for the instructor, on the job page. An
   optional `notice` at the top (e.g. "offline test run": placeholders, not conversions).
 
-Security (rule 2 of docs/design/beta-architecture.md): all document and model text is
+Security: all document and model text is
 escaped with `html.escape`. MathML is never pasted as a string: `sanitize_mathml` parses
 it with defusedxml and re-serialises an allowlisted tree of presentation elements and
 attributes (both live in `safe_html`, shared with `table_html`). Text this module writes
 itself carries the `AUTHORED_CLASS` class so the wording check in `html_checks` can tell
 it apart from the instructor's text.
 
-Extension points (docs/design/content-features.md): TABLE elements are written by
+Extension points: TABLE elements are written by
 `assemble_tables.render_table_element`, and inline text (with its markers, and later its
 links, colours and language) by `inline_text.render_inline_text`, so features that change
 those land in their own modules. CSS a feature needs is added only to documents that use
@@ -103,7 +103,7 @@ EQUATION_ALT_MAX_CHARS = 200  # a longer text layer is not alt text: the fixed w
 FIGURE_NOT_DESCRIBED_ALT = "Figure without a description"
 # The student note (`_about_section`). It speaks to students: what this file is and who
 # to tell about problems. Final for the beta: it does not name screen readers, and
-# "checked" appears only once an instructor has made a decision (docs/launch.md B7). The
+# "checked" appears only once an instructor has made a decision. The
 # feature review's challenge (10.3, row 4) warns that "checked" can read as a
 # certificate; its alternative, "N parts were decided by your instructor", was not taken.
 ABOUT_TITLE = "About this version"

@@ -53,9 +53,9 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `SESSION_SECRET` | Signs the session cookie. Required in production, at least 32 characters (e.g. `python -c 'import secrets; print(secrets.token_urlsafe(48))'`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in. Without them the "Sign in with Google" button is hidden |
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft (Entra ID) sign-in, on only with all three set; tenants are directory ids, comma-separated. Half of them set refuses to start (`check_production`, any environment). See "Sign-in, sessions and CSRF" |
-| `EMAIL_LOGIN_ENABLED`, `EMAIL_SENDER`, `EMAIL_LINK_MINUTES` | Sign in by an emailed one-time link (T3-10). **Off, and no email provider is wired in.** `EMAIL_SENDER` names a registered sender (`web/email_senders.py`); the settings check refuses `EMAIL_LOGIN_ENABLED=true` without one in any environment, and in production refuses a sender that is for development only, which today means always. See "Sign-in, sessions and CSRF" and docs/launch.md "Sign-in fallback and Word input" |
+| `EMAIL_LOGIN_ENABLED`, `EMAIL_SENDER`, `EMAIL_LINK_MINUTES` | Sign in by an emailed one-time link (T3-10). **Off, and no email provider is wired in.** `EMAIL_SENDER` names a registered sender (`web/email_senders.py`); the settings check refuses `EMAIL_LOGIN_ENABLED=true` without one in any environment, and in production refuses a sender that is for development only, which today means always. See "Sign-in, sessions and CSRF" |
 | `OFFICE_INPUT_ENABLED`, `SOFFICE_PATH`, `OFFICE_TIMEOUT_S` | Word and PowerPoint uploads (T3-30). On by default but taken only where LibreOffice is installed (`SOFFICE_PATH`, else `soffice` on `PATH`); `OFFICE_TIMEOUT_S` (90) is how long LibreOffice may take for one file. See "Uploads and limits" |
-| `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default (docs/design/content-features.md "Flags") |
+| `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default |
 | `FEATURE_PAGE_MATH`, `PAGE_MATH_MODEL`, `ANTHROPIC_EFFORT_PAGE_MATH`, `PAGE_MATH_UNCONFIRMED_FACTOR` | The page math pass (ADR 0006, docs/eval-page-math.md): one cheap-model call per page places the equations; off by default |
 | `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table; see "Usage events"). Both on by default; the questions are stored as events, so they need both |
 | `FEEDBACK_URL` | Where the footer's "Send feedback" link goes (http or https only). Unset: an email to `CONTACT_EMAIL`. A form service here is a new data processor: name it in the privacy notice first |
@@ -225,7 +225,7 @@ yours to see". It is a 404 either way. The
   allowed directory set) is linked to the same user too, the way the re-registration
   case needs; Google sign-in gives access by verified address alone in the same way.
   Refusing it (`login_refused reason=identity_conflict`, with an admin command to unlink
-  an identity after a re-registration) is not done for the beta (docs/launch.md P8).
+  an identity after a re-registration) is not done for the beta.
 - **Other Google accounts for one instructor** (T3-10, `web/linked_emails.py`, table
   `linked_emails`). An instructor invited under a university address who can sign in with
   Google only as a personal one is linked by an admin (`/admin`, "Let an instructor sign in
@@ -241,8 +241,7 @@ yours to see". It is a 404 either way. The
 - **Email sign-in link** (T3-10, `web/email_login.py`, `web/email_senders.py`, table
   `login_links`), behind `EMAIL_LOGIN_ENABLED` (off). Built so that turning it on needs one
   decision and one small module, not more code: Harish picks a provider and writes a class
-  with `send(message)`, registered under a name and chosen with `EMAIL_SENDER`
-  (docs/launch.md). Nothing is wired in; the start-up check refuses the setting without a
+  with `send(message)`, registered under a name and chosen with `EMAIL_SENDER`. Nothing is wired in; the start-up check refuses the setting without a
   sender, and in production without one marked `production_ok`. How it works: the same
   page is the answer for every address, so the form does not say who is on the list; a link
   is made only for an allowed person's own or linked address; the token is 32 random bytes
@@ -1310,7 +1309,7 @@ words, a heading made, a picture or an equation added, the model's read under it
 no JavaScript; `browser` marker).
 
 Real documents need only one to three decisions under the review policy
-(docs/design/beta-architecture.md "Review tiers": OpenStax 2.1 three heading groups, the
+(OpenStax 2.1 three heading groups, the
 LaTeX handout one equation), so the screen asks them one at a time beside the page they
 are on. It is the Split View design Harish chose on 2026-10-08, with ideas taken from the
 queue and outline prototypes.
@@ -1883,8 +1882,7 @@ Every fix of the document, grouped by kind, as the review screen was before the 
 view, without bulk accept. Its forms send `view=list`, so a decision there comes back to
 the list's next card.
 
-**Order.** Only meaning-level problems ask for a decision (docs/design/beta-architecture.md
-"Review tiers"), so the page has three sections:
+**Order.** Only meaning-level problems ask for a decision, so the page has three sections:
 
 1. **Needs your decision (N)**: equations, then figures, then tables, then headings (a
    mistake there costs a student most), each with the fixes still waiting (needs review, failed and not
@@ -2021,7 +2019,7 @@ The landing item has `tabindex="-1"`, so the next Tab reaches that link.
 **No bulk accept** (removed 2026-10-09). The list view used to offer "Accept every
 equation proposal at or above X%" and "Accept all N remaining headings". Both took
 proposals that need a decision without anyone opening them, and under the review tiers
-("meaning-level only", docs/design/beta-architecture.md) every decision asked for could
+("meaning-level only") every decision asked for could
 change what a student reads: each is now opened and decided on its own (repeated
 headings are already one decision). Optional notes are accepted already and need no
 bulk action. A POST with a kind (`equations`, `figures`, `tables`, `headings`) in place
@@ -2199,7 +2197,7 @@ URL comes from `DATABASE_URL` (or the settings, which read `.env`).
 
 Besides jobs and their children, the schema holds a user's courses and their notation
 entries (user content), content-free usage events, sign-in identities and the daily
-counters (docs/design/content-features.md "Database"). `readablestem users delete` and the
+counters. `readablestem users delete` and the
 account's own "Delete my account" erase a person through `ops.retention.erase_user`: every job
 (counted first), then every row of every table that holds their user id, then the account; a
 test fails when a table with a user id is added without it.
