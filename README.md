@@ -430,8 +430,8 @@ endorsed by OpenStax.
 
 ## How it was built
 
-Built with AI coding agents working from my specifications. I own the design, the
-evaluation protocol, the review and every decision.
+I designed and built ReadableSTEM. The design, the evaluation protocol, the review of every
+change and every decision are mine.
 
 ## Contributing and security
 
