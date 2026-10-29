@@ -353,9 +353,8 @@ and says so on `/status`.
 
 **Shutdown.** On a deploy Railway sends SIGTERM to the old deployment once the new one is
 live, then SIGKILL after `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` (docs.railway.com, "Deployment
-Teardown"). That variable is not set in production (it is not in `.railway/railway.ts`), so
-Railway's default of 0 seconds applies and the old process can be killed at once; Cloud Run gave
-10 seconds. The app does what it can in the time it is given: it stops the worker at once (no new
+Teardown"). Production sets it to 10 seconds (`deploy.drainingSeconds` on `web` in `.railway/railway.ts`;
+Railway's default is 0), the same window Cloud Run gave. The app does what it can in the time it is given: it stops the worker at once (no new
 job is claimed, the running conversion is cancelled so no more model calls are sent, and its
 lease ends now so another run requeues it immediately instead of after two minutes). Then uvicorn
 drains open connections for at most 5 seconds (`GRACEFUL_SHUTDOWN_S`) and the app's shutdown

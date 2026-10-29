@@ -88,6 +88,9 @@ export default defineRailway(() => {
     build: { buildEnvironment: "V3", builder: "RAILPACK" },
     healthcheck: "/healthz",
     healthcheckTimeout: 300,
+    // SIGTERM to SIGKILL on a deploy. The shutdown needs about 8 s: uvicorn drains for up to
+    // 5 s (GRACEFUL_SHUTDOWN_S), then the worker stop waits up to 3 s (WORKER_STOP_S).
+    deploy: { drainingSeconds: 10 },
     preDeploy: "readablestem db upgrade",
     replicas: { iad: 1 },
     domains: ["readablestem.com", "www.readablestem.com"],

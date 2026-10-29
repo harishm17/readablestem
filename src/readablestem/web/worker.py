@@ -1365,9 +1365,9 @@ class Worker:
 
     def begin_shutdown(self, timeout: float = 6.0) -> None:
         """Start `stop` on another thread and return at once. Called from the SIGTERM
-        handler: the host kills the process a short time after the signal (none at all on
-        Railway unless `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` is set; 10 seconds on Cloud
-        Run), so the claim loop must stop and the running job's lease must end now, not
+        handler: the host kills the process a short time after the signal (10 seconds on
+        Railway, `drainingSeconds` in .railway/railway.ts; Railway's default is none), so
+        the claim loop must stop and the running job's lease must end now, not
         after uvicorn has finished draining connections. Safe to call twice; `stop` is
         idempotent."""
         if self._shutdown_thread is not None:
