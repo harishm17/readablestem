@@ -114,6 +114,8 @@ def strict_violations(page, axe_source: str) -> list[dict]:
 PAGES = {
     "/app": ALICE,
     "/help/posting": None,
+    "/guides/ada-title-ii-stem-course-materials": None,
+    "/guides/readablestem-mathpix-latexml": None,
     "/jobs/{decide}/feedback": ALICE,
     "/jobs/{ready}": ALICE,
     "/jobs/{decide}/delete?from=app": ALICE,
@@ -176,7 +178,16 @@ def test_on_a_phone_each_document_is_a_block_and_no_badge_is_cut(site, browser, 
     context.close()
 
 
-@pytest.mark.parametrize("path", ["/app", "/jobs/{decide}/feedback", "/help/posting"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/app",
+        "/jobs/{decide}/feedback",
+        "/help/posting",
+        "/guides/ada-title-ii-stem-course-materials",
+        "/guides/readablestem-mathpix-latexml",
+    ],
+)
 def test_pages_without_javascript_have_no_serious_axe_violations(
     site, browser, documents, axe_source, path
 ):

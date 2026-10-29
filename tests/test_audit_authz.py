@@ -35,6 +35,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/terms"): PUBLIC,
     ("GET", "/limits"): PUBLIC,
     ("GET", "/help/posting"): PUBLIC,
+    ("GET", "/guides/ada-title-ii-stem-course-materials"): PUBLIC,
+    ("GET", "/guides/readablestem-mathpix-latexml"): PUBLIC,
     ("GET", "/status"): PUBLIC,
     ("GET", "/healthz"): PUBLIC,
     ("GET", "/readyz"): PUBLIC,  # is the database reachable; no document data

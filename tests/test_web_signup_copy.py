@@ -24,7 +24,17 @@ STALE_WHEN_OPEN = (
     "invitation was sent",
     "invite-only",
 )
-PUBLIC_PAGES = ("/", "/login", "/privacy", "/terms", "/limits", "/help/posting", "/status")
+PUBLIC_PAGES = (
+    "/",
+    "/login",
+    "/privacy",
+    "/terms",
+    "/limits",
+    "/help/posting",
+    "/guides/ada-title-ii-stem-course-materials",
+    "/guides/readablestem-mathpix-latexml",
+    "/status",
+)
 GOOGLE = {
     "dev_login_enabled": False,
     "google_client_id": "client-id",
