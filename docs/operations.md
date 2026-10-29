@@ -1,31 +1,35 @@
 # Operations
 
 How the deployed app looks after itself, what it records, and what to do when something
-goes wrong. First deploy, rollback and secret rotation: [deploy.md](deploy.md).
+goes wrong. It describes production, which runs on Railway. First deploy, rollback and
+variables: [deploy-railway.md](deploy-railway.md). The Google Cloud Run alternative
+([deploy.md](deploy.md)) has its own scheduler, alerts and backups, which this page does not
+cover.
 
 ## What runs on a schedule
 
 | What | When | Where |
 |---|---|---|
-| Aggregate, then purge | Hourly, Cloud Scheduler job `readablestem-cron` | `POST /internal/cron/aggregate-and-purge` (needs the `X-Cron-Token` header); logs `cron_done` |
-| Decisions canary | At most once per UTC day, inside the hourly cron, after the purge | `ops.canary.maybe_run_daily`: 20 fixed requests to the Decisions API, compared with committed answers; `decisions_canary_drift` (ERROR) on any move over 0.02. See "Decisions canary" below |
-| Claude canary | At most once per UTC day, inside the hourly cron, after the Decisions canary | `ops.claude_canary.maybe_run_daily`: the Claude second check asked about 12 synthetic cases with known answers; `claude_canary_drift` (ERROR) when more than `CLAUDE_CANARY_MAX_MISSES` are wrong. See docs/steps.md "Second check on Claude" |
-| Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the scheduler is late |
-| Uptime check of `/readyz` | Every 5 minutes, Cloud Monitoring | Emails `ALERT_EMAIL` when the database, the worker thread or the model provider setting is not ok for 10 minutes |
-| Cron alerts | Cloud Monitoring (log-based metrics) | Emails `ALERT_EMAIL` when there is no `cron_done` for 2 hours, or on any `cron_refused`, `aggregate_failed`, `purge_backstop_deleted`, `purge_backstop_failed` or failed Cloud Scheduler attempt |
-| Outside-in check of `/readyz` and `/demo` | Weekly, GitHub Actions `uptime.yml` | Skips unless the repo variable `LIVE_URL` is set |
+| Aggregate, then purge | Hourly at minute 7, the Railway `cron` service | `readablestem ops cron`: needs only the database, prints `aggregated_jobs=... jobs_deleted=...`, exits 1 if aggregation failed (after the purge ran). The HTTP route `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, logs `cron_done`) does the same work, but nothing in production calls it |
+| Decisions canary | Not run in production | Only the HTTP cron route runs it (`ops.canary.maybe_run_daily`), and it is OpenAI's Decisions API, which is off under `MODEL_PROVIDER=anthropic`. By hand only. See "Decisions canary" below |
+| Claude canary | Not run in production | Only the HTTP cron route runs it (`ops.claude_canary.maybe_run_daily`); `ops cron` does not. By hand: `readablestem ops claude-canary --max-usd 0.25`. See docs/steps.md "Second check on Claude" |
+| Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the cron is late |
+| Database backup | Daily at 08:17 UTC, the Railway `backup` service | `pg_dump` to the `/backups` volume, a restore into a scratch database to prove it, then dumps older than 5 days are deleted (the last 6 are kept); logs `backup_ok file=... tables=... alembic=...`. See "Backups and restore" |
+| Failed cron or backup run | Railway | Shows in the service's deployments list; Railway's project notifications can mail it (deploy-railway.md, "Logs and monitoring"). There is no log-based alert |
+| Deploy health check of `/healthz` | On every deploy, Railway | A new deployment takes traffic only once `/healthz` answers (timeout 300 s) |
+| Outside-in check of `/readyz` and `/demo` | Weekly, GitHub Actions `uptime.yml` | Skips unless the repo variable `LIVE_URL` is set. This is the only check of `/readyz` |
 | Dependency updates | Weekly, Dependabot | One grouped PR per ecosystem (uv, actions, Docker) |
 
 The same tasks run by hand:
 
 ```sh
-gcloud scheduler jobs run readablestem-cron --location="$REGION" --project="$PROJECT_ID"
-
+# On Railway: redeploy the `cron` service from its latest deployment (deploy-railway.md, "Cron"),
 # or from a machine that can reach the database (prints counts only):
 DATABASE_URL=postgresql+psycopg://... uv run readablestem ops cron
 uv run readablestem ops aggregate
 uv run readablestem ops purge
-uv run --env-file .env readablestem ops decisions-canary --max-usd 0.02   # no database needed
+uv run --env-file .env readablestem ops decisions-canary --max-usd 0.02   # OpenAI key; no database needed
+uv run --env-file .env readablestem ops claude-canary --max-usd 0.25       # Anthropic key; no database needed
 uv run readablestem ops launch-check      # unfinished copy, demo, baseline, settings and spend limits
 uv run readablestem ops backup-check      # DATABASE_URL could run the app? ("Backups and restore")
 uv run readablestem ops restore-drill     # pg_dump, restore into a scratch database, check, drop
@@ -57,10 +61,10 @@ What survives deletion: accounts (the allowlist, and with open sign-up the peopl
 themselves up, until they delete them or an admin does), the daily spend and quota counters, the
 content-free aggregates below, the usage events (next section), and database backups. A
 backup holds every document that existed when it ran, so a deleted document stays in the
-backups taken before its deletion until they are dropped. The deploy keeps one daily
-backup and no point-in-time-recovery logs, so that is up to about a day after the purge
-([deploy.md](deploy.md), "Backups and deleted documents"); the privacy page has to say so
-(or backups have to be off).
+backups taken before its deletion until they are dropped. The `backup` service takes one
+dump a day and keeps the last 6, and there are no point-in-time-recovery logs, so that is up
+to about a week after the purge (deploy-railway.md, "As deployed"); the privacy page says so
+("about 6 days", "up to about a week") and has to keep saying so if the schedule changes.
 
 ### Large files waiting for their pages
 
@@ -146,8 +150,8 @@ Aggregation is idempotent: a job's counts and its `aggregated` flag are written 
 transaction, and on Postgres the job rows are locked with `FOR UPDATE SKIP LOCKED`, so two
 overlapping cron runs never count a job twice.
 
-Reading them (Cloud SQL Studio in the console, or `psql` through the Cloud SQL Auth
-Proxy):
+Reading them (the Postgres service's Data tab in the Railway dashboard, or `psql` through
+Railway's public TCP proxy, which you remove afterwards):
 
 ```sql
 -- Most frequent failed checks in the last 7 days
@@ -194,7 +198,8 @@ FROM error_aggregates WHERE step = 'job' AND day >= current_date - 30;
 ```
 
 `readablestem ops report --days 7` prints the weekly error-analysis tables from these rows
-(through the Cloud SQL Auth Proxy, like the other `ops` commands), including the review
+(with `DATABASE_URL` pointing at a database you can reach, like the other `ops` commands),
+including the review
 load (required decisions and optional notes per page, by step) and, per step (equation,
 figure, table, heading: every reviewable kind), the tier mix and the most frequent
 reasons for each tier. The opted-in export's labels carry the table proposal and the
@@ -202,8 +207,9 @@ reviewed table too.
 
 ## Logs
 
-Every line on stdout is one JSON object. Cloud Logging reads `severity`, `message` and
-`time` (UTC) from it; everything else lands in `jsonPayload`.
+Every line on stdout is one JSON object. Railway's log viewer and CLI treat each key as an
+attribute you can filter on (`@key:value`); `severity`, `message` and `time` (UTC) are always
+there, and Cloud Logging reads the same three on the Cloud Run path.
 
 ```json
 {"method": "POST", "route": "/jobs/{job_id}/review", "status": 303, "latency_ms": 41,
@@ -211,20 +217,20 @@ Every line on stdout is one JSON object. Cloud Logging reads `severity`, `messag
  "severity": "INFO", "message": "request"}
 ```
 
-Useful Logs Explorer queries (add `resource.type="cloud_run_revision" AND
-resource.labels.service_name="readablestem"`):
+Useful filters for the service's **Logs** panel or `railway logs --service web --filter '...'`
+(syntax: docs.railway.com/observability/logs; `severity` is an ordinary attribute here):
 
-| Question | Query |
+| Question | Filter |
 |---|---|
-| Anything wrong? | `severity>=WARNING` |
-| Server errors | `jsonPayload.message="request" AND jsonPayload.status>=500` |
-| Slow pages | `jsonPayload.message="request" AND jsonPayload.latency_ms>5000` |
-| Hourly cleanup | `jsonPayload.message=("aggregate_done" OR "purge_done" OR "aggregate_failed" OR "aggregate_on_delete_failed")` |
-| Tracing problems | `jsonPayload.message=("tracing_disabled" OR "trace_failed")` |
-| Handwritten and scanned PDFs refused at upload (they never become jobs, so the `page_type` aggregates cannot count them) | `jsonPayload.message="upload_rejected" AND jsonPayload.code=("handwritten" OR "handwritten_no_text" OR "scanned" OR "scanned_ocr")` |
-| Decisions API | `jsonPayload.message=("decision_call" OR "verifier_unavailable")` (failures are WARNING; `outcome`, `status`, `code`, `request_id`) |
-| Claude canary | `jsonPayload.message=("claude_canary_ok" OR "claude_canary_drift" OR "claude_canary_incomplete" OR "claude_canary_failed")`, and `jsonPayload.claude_canary` on `cron_done` |
-| Decisions canary | `jsonPayload.message=("decisions_canary_ok" OR "decisions_canary_drift" OR "decisions_canary_incomplete" OR "decisions_canary_failed")`, and `jsonPayload.decisions_canary` on `cron_done` |
+| Anything wrong? | `@severity:WARNING OR @severity:ERROR` |
+| Server errors | `@message:request AND @status:>=500` |
+| Slow pages | `@message:request AND @latency_ms:>5000` |
+| Hourly cleanup (cron service) | `@message:aggregate_done OR @message:purge_done OR @message:aggregate_failed OR @message:aggregate_on_delete_failed` |
+| Tracing problems | `@message:tracing_disabled OR @message:trace_failed` |
+| Handwritten and scanned PDFs refused at upload (they never become jobs, so the `page_type` aggregates cannot count them) | `@message:upload_rejected AND (@code:handwritten OR @code:handwritten_no_text OR @code:scanned OR @code:scanned_ocr)` |
+| Decisions API (OpenAI provider only) | `@message:decision_call OR @message:verifier_unavailable` (failures are WARNING; `outcome`, `status`, `code`, `request_id`) |
+| Claude canary | `@message:claude_canary_ok OR @message:claude_canary_drift OR @message:claude_canary_incomplete OR @message:claude_canary_failed` |
+| Decisions canary | `@message:decisions_canary_ok OR @message:decisions_canary_drift OR @message:decisions_canary_incomplete OR @message:decisions_canary_failed` |
 
 ### What can never be in a log line
 
@@ -281,14 +287,14 @@ Code on a standard-library logger (the web app and worker use `web.logsafe.log_e
 and `log_exception`; the OpenAI and Anthropic clients log `model_call`, `model_call_retry` and
 `model_call_retry_skipped`) goes through `observability.logging.log_fields`: the message
 is the event name alone and the fields become top-level keys, so
-`jsonPayload.message="job_failed" AND jsonPayload.error_code="internal_error"` or
-`jsonPayload.message="model_call" AND jsonPayload.code="project_spend_limit_exceeded"`
-work as written. `log_exception` adds `error_type` and `stack`, as the chain does for
+`@message:job_failed AND @error_code:internal_error` or
+`@message:model_call AND @code:project_spend_limit_exceeded` work as written. `log_exception` adds `error_type` and `stack`, as the chain does for
 `exc_info`.
 
 ## Decisions canary
 
-The second automated check (ADR 0005, docs/steps.md) compares the Decisions API's
+This applies to the OpenAI provider only (the Decisions API is OpenAI's); production runs
+Anthropic, so nothing here runs there. The second automated check (ADR 0005, docs/steps.md) compares the Decisions API's
 probabilities with fixed thresholds. Those thresholds mean nothing once the answers
 under them move, and the API is in beta: one model, no version pinning. Its answers are
 deterministic, so a fixed set of requests answered differently on one day is a change
@@ -308,8 +314,9 @@ of the model or the service, seen the day it happens.
   away) logs one ERROR line `decisions_canary_drift` with the counts, the largest move
   and the case ids, and the command exits 1. A case that got no answer is
   `decisions_canary_incomplete` (WARNING), not drift.
-- **In the hourly cron** (`POST /internal/cron/aggregate-and-purge`), after the purge:
-  at most once per UTC day. The first cron run of the day claims it by inserting the
+- **In the HTTP cron route** (`POST /internal/cron/aggregate-and-purge`), after the purge:
+  at most once per UTC day. The Railway cron service runs `ops cron` instead, which does
+  not run it, so no canary runs in production unless something calls the route. The first cron run of the day claims it by inserting the
   aggregate row (day, `canary`, `decisions:run`) if it is missing, so two instances or
   two runs cannot both send it; a claimed day is not retried, even if the run failed.
   Fail-open: nothing about the canary changes the cron's response or its status code.
@@ -317,7 +324,7 @@ of the model or the service, seen the day it happens.
   key. It reserves through a `JobBudget` of $0.02 on the daily spend cap (dollars only:
   Decisions requests are not model calls, and the budget allows none); a run costs
   about $0.00075 and takes about 3 s; cases still unsent after 60 s count as failed
-  (`deadline`), so a hanging API cannot hold the cron request. `ops cron` (the by-hand cron) does not run it; use the command below.
+  (`deadline`), so a hanging API cannot hold the cron request. `ops cron` does not run it; use the command below.
 - **By hand:** `uv run --env-file .env readablestem ops decisions-canary --max-usd 0.02`
   (exit 0 no drift, 1 drift, 2 could not compare). After a deliberate change (new
   question wording, new canary cases) or a drift you have looked at and accept:
@@ -325,17 +332,16 @@ of the model or the service, seen the day it happens.
   `canary_expected.json`, commit it with the change, and re-check the thresholds on
   labelled data (docs/eval.md).
 
-TODO(Harish): the drift line is an ERROR in Cloud Logging, but no alert policy emails it
-yet. To be told by email, add `decisions_canary_drift` to the
-`$SERVICE-cron-problems` log metric in `deploy/deploy.sh` (it then reports as a "cron or
-purge problem"), or give it a policy of its own.
+No alert is wired to the drift line (the log-based alert policies in `deploy/deploy.sh` are
+the Cloud Run path only). To get one on Railway, run the canary somewhere that can mail
+failures, for example the weekly GitHub workflow.
 
 ## Health, readiness and shutdown
 
 | Endpoint | Answers | Used by |
 |---|---|---|
-| `GET /healthz` | `{"status":"ok"}` when the process answers and a `SELECT 1` works, else 503 | Cloud Run's startup probe; the Dockerfile's HEALTHCHECK |
-| `GET /readyz` | 200 `{"status":"ready","checks":{...}}`, or 503 `not_ready` when any check is not ok | The Cloud Monitoring uptime check; the weekly GitHub `uptime.yml`; you, with `curl` |
+| `GET /healthz` | `{"status":"ok"}` when the process answers and a `SELECT 1` works, else 503 | Railway's deploy health check (`.railway/railway.ts`); the Dockerfile's HEALTHCHECK for local Docker |
+| `GET /readyz` | 200 `{"status":"ready","checks":{...}}`, or 503 `not_ready` when any check is not ok | The weekly GitHub `uptime.yml`; you, with `curl` (Cloud Monitoring's uptime check is the Cloud Run path) |
 
 `/readyz` has three checks, each one word and never a setting's value (so no key, URL or
 model name can leak): `database` (`ok`, `unreachable`), `worker` (`ok`; `disabled` when
@@ -345,16 +351,20 @@ neither the loop nor a running conversion has shown life for six minutes; `not_s
 `fake` with `FAKE_MODELS`). A spent daily cap is not "not ready": the service is working
 and says so on `/status`.
 
-**Shutdown.** Cloud Run sends SIGTERM and kills the process 10 seconds later (a new
-revision, a scale-down, a deploy). The app stops the worker at once: no new job is
-claimed, the running conversion is cancelled (no more model calls are sent), and its lease
-ends now so another instance requeues it immediately instead of after two minutes. Then
-uvicorn drains open connections for at most 5 seconds (`GRACEFUL_SHUTDOWN_S`) and the
-app's shutdown makes sure the worker is stopped (3 seconds). The requeued job restarts
+**Shutdown.** On a deploy Railway sends SIGTERM to the old deployment once the new one is
+live, then SIGKILL after `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` (docs.railway.com, "Deployment
+Teardown"). That variable is not set in production (it is not in `.railway/railway.ts`), so
+Railway's default of 0 seconds applies and the old process can be killed at once; Cloud Run gave
+10 seconds. The app does what it can in the time it is given: it stops the worker at once (no new
+job is claimed, the running conversion is cancelled so no more model calls are sent, and its
+lease ends now so another run requeues it immediately instead of after two minutes). Then uvicorn
+drains open connections for at most 5 seconds (`GRACEFUL_SHUTDOWN_S`) and the app's shutdown
+makes sure the worker is stopped (3 seconds). If the process is killed before the lease is
+ended, the lease runs out and the job is requeued by the next worker. The requeued job restarts
 from the beginning on another attempt (three attempts end in `lease_expired`). Look for
 `sigterm_received`, `job_cancelled reason=shutdown` and `worker_stopped` in the logs.
-`tests/test_web_health.py` starts a real server, sends SIGTERM, and checks it exits
-well inside 10 seconds.
+`tests/test_web_health.py` starts a real server, sends SIGTERM, and checks it exits well inside
+10 seconds.
 
 **Error pages.** Every page that fails answers in the app's plain style with a way home:
 404 "Page not found", 500 "Something went wrong" (the same page whether the error was
@@ -379,58 +389,29 @@ An account deleted by its owner is gone from the database at once and stays in t
 taken before, until they are dropped (the privacy notice says so for documents; the same holds
 for the account row).
 
-**What the deploy sets up.** Cloud SQL's automated backup, daily at 08:00 UTC, of which
-`SQL_RETAINED_BACKUPS` (1) is kept, and no point-in-time recovery. That is deliberate:
-every backup holds the documents present when it ran, so keeping seven would stretch
-"deleted after 24 hours" to a week, and the transaction logs of point-in-time recovery
-would do the same (deploy.md, "Backups and deleted documents"). The cost is a restore
-point up to a day old and no recovery to a chosen minute. If you need that, enable it on
-purpose and change the privacy page: `gcloud sql instances patch readablestem-db
---enable-point-in-time-recovery --retained-transaction-log-days=3`.
+**What production runs.** The `backup` service (`.railway/railway.ts`): daily at 08:17 UTC it
+runs `pg_dump` of the Postgres service into `/backups/readablestem-<date>.sql.gz` on its own
+volume, restores that file into a scratch database `restore_check`, counts its tables, reads
+`alembic_version`, drops the scratch database and logs
+`backup_ok file=... tables=... alembic=...`. A dump that does not restore fails the run. It then
+deletes dumps older than 5 days (`find -mtime +5`), so the last 6 are kept. There is no
+point-in-time recovery and Railway's own scheduled volume backups are not used (they need a Pro
+workspace). That is deliberate: every dump holds the documents present when it ran, so keeping
+more would stretch "deleted after 24 hours" past the "about a week" the privacy page promises
+(deploy-railway.md, "As deployed"). The cost is a restore point up to a day old. If you want more,
+change the privacy page first.
 
-**Check it weekly** (a calendar reminder is enough; exits 1 when something needs you):
+**Check it weekly** (a calendar reminder is enough): open the `backup` service's latest
+deployment in Railway and look for a `backup_ok` line from today, with `tables=` and `alembic=`
+as expected (`ls -l /backups` at the end of the log lists the dumps kept). A run that failed shows
+in the deployments list.
 
-```sh
-set -a; . deploy/.env.deploy; set +a
-./deploy/backups.sh status
-```
-
-It reports: automated backups on; the newest successful automated backup is under 36 hours
-old; and no manual backup older than 7 days (a manual backup is kept until deleted, so it
-outlives the retention promise). `./deploy/backups.sh list` shows every backup.
-
-**Before a risky change** (a migration that drops or renames something, a restore):
-
-```sh
-./deploy/backups.sh now                      # one on-demand backup
-# ... make the change, check it ...
-gcloud sql backups delete BACKUP_ID --instance=readablestem-db --project="$PROJECT_ID"
-```
-
-**Prove a restore works (the drill; do it once before real use and after any big schema
-change; it costs a few cents).** This restores the newest backup into a throwaway
-instance, so the live database is never touched:
-
-```sh
-./deploy/backups.sh list                     # note the newest BACKUP_ID (status SUCCESSFUL)
-gcloud sql instances create readablestem-db-drill --database-version=POSTGRES_16 \
-  --edition=enterprise --tier=db-f1-micro --region="$REGION" --storage-size=10 \
-  --project="$PROJECT_ID"
-gcloud sql backups restore BACKUP_ID --restore-instance=readablestem-db-drill \
-  --backup-instance=readablestem-db --project="$PROJECT_ID"
-gcloud sql users set-password postgres --instance=readablestem-db-drill \
-  --prompt-for-password --project="$PROJECT_ID"
-# in a second terminal: the Cloud SQL Auth Proxy to the drill instance
-cloud-sql-proxy "$PROJECT_ID:$REGION:readablestem-db-drill" --port 5433
-```
-
-then, from the checkout:
-
-```sh
-read -rs PGPW; export DATABASE_URL="postgresql+psycopg://postgres:${PGPW}@127.0.0.1:5433/a11y"; unset PGPW
-uv run readablestem ops backup-check
-gcloud sql instances delete readablestem-db-drill --project="$PROJECT_ID"   # when done
-```
+**Restoring for real.** Restore into an empty database, never over the live one without a
+decision (deploy-railway.md, "As deployed", has the commands: `railway ssh --service backup`, then
+`gunzip -c /backups/readablestem-<date>.sql.gz | psql "$PGURL"`). Then run the cron right after
+(redeploy the `cron` service): the restore brings back documents that retention had already
+deleted, and the purge removes them again. Then `uv run readablestem ops backup-check` against
+the restored database and a sign-in.
 
 `backup-check` reads the copy and prints table names and row counts only. It exits 1 unless
 the schema is at this release's migration head (`schema=head`; `ahead` means a newer
@@ -438,28 +419,16 @@ release migrated it, fine for a rollback), every table exists, and at least one 
 sign in. It also prints the age of the newest job and the newest spend day, which should
 match the day the backup was taken.
 
-**Restoring for real.** To go back to a backup in place (this overwrites the instance):
-
-```sh
-gcloud sql backups restore BACKUP_ID --restore-instance=readablestem-db --project="$PROJECT_ID"
-gcloud scheduler jobs run readablestem-cron --location="$REGION" --project="$PROJECT_ID"
-```
-
-Run the cron right after: the restore brings back documents that retention had already
-deleted, and the purge removes them again. Then `uv run readablestem ops backup-check`
-against the instance (through the proxy) and a sign-in.
-
 **Any Postgres: the pg_dump drill.** `readablestem ops restore-drill` takes the database in
 `DATABASE_URL`, runs `pg_dump` (custom format) into a private temporary directory, runs
 `pg_restore` into a scratch database on the same server, runs the same checks as
 `backup-check` on the scratch copy, compares the row counts with the source and drops the
 scratch database and the dump file whatever happens. It needs the PostgreSQL client tools
 on the machine (`--pg-bin DIR` if they are not on PATH) and a user allowed to create
-databases (on Cloud SQL, `postgres` through the proxy, not the app's `a11y` user). The
-output is counts only. It is also the way to test a `pg_dump` schedule for `DB_MODE=external`:
-a cron job running `pg_dump --format=custom --file=a11y-$(date +%F).dump` to storage you
-control, with the file deleted after a day for the same reason as the Cloud SQL setting.
-`tests/test_ops_backup.py` runs both commands against a real Postgres.
+databases (the Postgres service's own user on Railway, reached through its public TCP proxy,
+which you remove afterwards). The output is counts only. The `backup` service does the same
+by shell commands every day. `tests/test_ops_backup.py` runs both commands against a real
+Postgres.
 
 ## Open sign-up (`SIGNUP_MODE=open`)
 
@@ -498,8 +467,7 @@ tiers".
 
 ## Tracing (Langfuse)
 
-Off unless `TRACING_ENABLED=true` and both Langfuse keys are set (`deploy.sh` stores the
-secret key in Secret Manager when tracing is enabled). If the `tracing` extra is missing
+Off unless `TRACING_ENABLED=true` and both Langfuse keys are set (the Langfuse keys are Railway variables). If the `tracing` extra is missing
 or the client cannot start, the app logs `tracing_disabled` with a `reason` and carries
 on without traces. Keep it off for any run on `private-inputs/`.
 
@@ -542,20 +510,19 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 
 | Symptom | Look at | Usual fix |
 |---|---|---|
-| Uptime alert email | `severity>=WARNING` logs; `gcloud run revisions list` | Roll back traffic to the last good revision (deploy.md, "Roll back") |
-| `/healthz` answers 503, or `/readyz` shows `database: unreachable` | The database: Cloud SQL instance state, connections. Users meanwhile see a calm "Not available right now" page (503 with `Retry-After`) | See "Too many connections" below |
-| `/readyz` shows `worker: stalled` or `stopped`, or documents wait for ever | `worker_loop_error`, `lease_refresh_failed` and `conversion_abandoned` in the logs | The worker thread is stuck or dead; documents are queued but nothing converts. Deploy a new revision (`./deploy/deploy.sh service`) or `gcloud run services update ReadableSTEM --region="$REGION" --project="$PROJECT_ID" --update-env-vars=RESTARTED_AT=$(date +%s)` to replace the instance; the running job's lease expires and it is requeued |
-| `/readyz` shows `model_provider: no_key` or `unpriced_model` | The `anthropic-api-key` secret has a version and the service reads `:latest`; `ANTHROPIC_MAIN_MODEL` names a model in `models/pricing.py` | Add the secret version and redeploy, or fix the model name |
+| The weekly GitHub uptime run failed, or a Railway deploy or crash notification | `@severity:WARNING` logs; the web service's deployments list | Roll back to the last good deployment (deploy-railway.md, "Ship a new version") |
+| `/healthz` answers 503, or `/readyz` shows `database: unreachable` | The database: the Postgres service's state and connections. Users meanwhile see a calm "Not available right now" page (503 with `Retry-After`) | See "Too many connections" below |
+| `/readyz` shows `worker: stalled` or `stopped`, or documents wait for ever | `worker_loop_error`, `lease_refresh_failed` and `conversion_abandoned` in the logs | The worker thread is stuck or dead; documents are queued but nothing converts. Redeploy the web service (`railway up --service web`, or Redeploy on its latest deployment) to replace the process; the running job's lease expires and it is requeued |
+| `/readyz` shows `model_provider: no_key` or `unpriced_model` | `ANTHROPIC_API_KEY` is set on the web service; `ANTHROPIC_MAIN_MODEL` names a model in `models/pricing.py` | Set the variable and redeploy, or fix the model name |
 | Conversions fail with `reason:budget_daily`, jobs end `error:budget_daily`, or `claims_paused` in the logs | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed: users see "Stopped early" or "Waiting", and queued jobs start after 00:00 UTC. Raise the cap only on purpose |
 | Conversions fail with provider errors | `call:<model>:outcome:api_error` counts; OpenAI or Anthropic dashboard | The OpenAI project limit may be reached (HTTP 429 `project_spend_limit_exceeded`); with Claude, the workspace limit or rate limit (HTTP 429 `rate_limit_error`), or a key not scoped to a workspace (HTTP 400, set `ANTHROPIC_WORKSPACE_ID`) |
-| "cron not running" or "cron or purge problem" alert | `jsonPayload.message=("cron_done" OR "cron_refused" OR "aggregate_failed" OR "purge_backstop_deleted")`; Cloud Scheduler > job history | See the next rows. The worker's backstop keeps purging meanwhile, so documents are still deleted on time; fix the scheduler anyway |
-| Cron returns 403 | `cron_refused` in logs | The scheduler's token differs from the secret, usually after a rotation: `./deploy/deploy.sh cron` |
-| Cron returns 500 | `aggregate_failed` with `error_type` and `stack` | Purge still ran. Fix the bug; jobs stay unaggregated until then. A job that expires first is aggregated as it is deleted, or, if that fails too (`aggregate_on_delete_failed`), counted in `unaggregated_deleted` |
+| The `cron` service's run failed, or `purge_backstop_deleted` in the web logs | The `cron` service's deployments list and logs; `@message:purge_backstop_deleted OR @message:aggregate_failed` | The worker's backstop keeps purging meanwhile, so documents are still deleted on time; fix the cron anyway. `aggregate_failed` (with `error_type` and `stack`): the purge still ran, so fix the bug; jobs stay unaggregated until then. A job that expires first is aggregated as it is deleted, or, if that fails too (`aggregate_on_delete_failed`), counted in `unaggregated_deleted` |
+| The `backup` service's run failed, or no `backup_ok` line today | The `backup` service's latest deployment log | Read the error (a full `/backups` volume, a database that cannot be reached, a dump that did not restore). Fix it before the dumps age out |
 | `unaggregated_deleted` above 0 | The cron history | Some statistics are lost for those jobs; nothing else to do |
 | Purge itself failing | `purge_done` missing for over an hour (from both `source=cron` and `source=worker`), or `purge_backstop_failed` | Treat as a privacy incident: run `readablestem ops purge` by hand, then fix the cause. Job pages already answer 404 once `retain_until` has passed, purged or not |
-| Too many connections | Cloud SQL connection count (25 on db-f1-micro) | Each instance pools up to 10 connections; keep `--max-instances=2` or move to `db-g1-small` (50) |
-| Weekly GitHub uptime run failed | The run's log | Same as the uptime alert; also check the custom domain and certificate |
-| `decisions_canary_drift` | The line's `drifted_cases` and `max_delta`; `readablestem ops decisions-canary --max-usd 0.02` to see each moved answer | The Decisions API's answers changed under the thresholds. Conversions are unaffected (the check is a note or a shadow and fails open); to stop the figure notes meanwhile set `DECISIONS_FIGURE_VERIFY=false`. Re-measure the thresholds (docs/eval.md), then re-record the canary |
+| Too many connections | The Postgres service's connection count (`max_connections`, `SHOW max_connections`) | The web process pools up to 5 connections (3 plus 2 overflow) and the cron service opens its own for a few seconds an hour; keep one web replica |
+| Weekly GitHub uptime run failed | The run's log | Check `/readyz` first; also the custom domain and certificate |
+| `decisions_canary_drift` (OpenAI provider, run by hand) | The line's `drifted_cases` and `max_delta`; `readablestem ops decisions-canary --max-usd 0.02` to see each moved answer | The Decisions API's answers changed under the thresholds. Conversions are unaffected (the check is a note or a shadow and fails open); to stop the figure notes meanwhile set `DECISIONS_FIGURE_VERIFY=false`. Re-measure the thresholds (docs/eval.md), then re-record the canary |
 | Many `decision_call` WARNINGs or `verify:*:outcome:timeout` counts | `outcome`, `status`, `code` on the lines | Decisions API trouble. Nothing to do for conversions (fail-open); the check's answers are missing for those fixes |
 
 ## CI and dependency updates
@@ -567,7 +534,7 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 | `lint-test` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, `pytest` (offline; Postgres tests use the embedded server on 3.12) |
 | `postgres` | `pytest -m postgres` against a Postgres 16 service container |
 | `browser` | `pytest -m browser` with Playwright Chromium (axe-core checks) |
-| `docker` | Builds the image (no push) with BuildKit and again with the legacy builder (`DOCKER_BUILDKIT=0`, as Cloud Build's `--tag` build may use), and checks the entry point and non-root user |
+| `docker` | Builds the image (no push) with BuildKit and again with the legacy builder (`DOCKER_BUILDKIT=0`, as the Cloud Run path's Cloud Build `--tag` build may use), and checks the entry point and non-root user |
 | `eval-gate` | `readablestem eval gate --require-current` for every committed `data/eval/baseline-<task>.json` against its `latest-<task>.json` (skips while none is committed). Fails on a regression, a changed judge, or a latest report the current prompts did not produce |
 | `secret-scan` | gitleaks over the full history |
 

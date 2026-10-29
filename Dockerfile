@@ -1,4 +1,5 @@
-# ReadableSTEM web app (FastAPI + worker thread) for Cloud Run.
+# ReadableSTEM web app (FastAPI + worker thread). Production builds this file on Railway
+# (docs/deploy-railway.md); the Cloud Run path (deploy/deploy.sh) builds it too.
 #   docker build -t readablestem .
 #   docker run --rm -p 8080:8080 -e DATABASE_URL=sqlite:////tmp/a11y.db readablestem
 #
@@ -78,7 +79,8 @@ ENV PATH="/app/.venv/bin:${PATH}" \
 USER 10001:10001
 EXPOSE 8080
 
-# Cloud Run ignores HEALTHCHECK (its uptime check calls /healthz); local Docker uses it.
+# Railway's deploy check is its own setting (/healthz, in .railway/railway.ts); local Docker
+# uses this one.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=4)"]
 

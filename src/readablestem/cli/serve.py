@@ -102,7 +102,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         reload=args.reload,
         proxy_headers=True,
         server_header=False,
-        # Cloud Run stops the process 10 s after SIGTERM. uvicorn waits this long for open
+        # The host stops the process soon after SIGTERM (Cloud Run: 10 s; Railway: whatever
+        # RAILWAY_DEPLOYMENT_DRAINING_SECONDS says, 0 by default). uvicorn waits this long for open
         # connections (an htmx poll or a slow upload), then runs the app's shutdown, which
         # stops the worker and ends the running job's lease (web.app.WORKER_STOP_S).
         timeout_graceful_shutdown=GRACEFUL_SHUTDOWN_S,

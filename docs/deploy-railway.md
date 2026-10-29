@@ -5,8 +5,9 @@ works and still explains the settings, spend limits and sizing in detail; this p
 what is different on Railway. Day-to-day running is in [operations.md](operations.md).
 
 Railway documentation was read on 2026-10-14 (docs.railway.com: config as code, healthchecks,
-pre-deploy command, cron jobs, Dockerfiles, backups, networking limits, pricing). Anything that
-could not be confirmed from it is marked **confirm**.
+pre-deploy command, cron jobs, Dockerfiles, backups, networking limits, pricing) and again on
+2026-10-29 for the restart policy, deployment teardown (SIGTERM and draining) and log filters.
+Anything that could not be confirmed from it is marked **confirm**.
 
 ```
 Instructors ── https://readablestem.com ──> Railway edge ──> web service "web"
@@ -15,6 +16,7 @@ Instructors ── https://readablestem.com ──> Railway edge ──> web ser
                                                                  ▼
                                                               Postgres service
 Cron service "cron" (same repo and Dockerfile, hourly) ── `readablestem ops cron` ──> Postgres
+Backup service "backup" (postgres:18 image, daily) ── pg_dump ──> Postgres, dumps on its volume
 GitHub uptime.yml (weekly) ── GET /readyz and /demo ──> readablestem.com
 ```
 
@@ -32,9 +34,9 @@ What the first deploy found, and how production is actually configured:
 
   | Service | Settings |
   |---|---|
-  | `web` | Dockerfile; pre-deploy `readablestem db upgrade`; health check `/healthz` (300 s); restart on failure, 10 retries; domains readablestem.com and www.readablestem.com |
-  | `cron` | Same image; start `readablestem ops cron`; schedule `7 * * * *`; restart never; every variable a reference to `web` (`${{web.NAME}}`) |
-  | `backup` | Image `postgres:18`; daily at 08:17 UTC `pg_dump` of the database (`PGURL=${{Postgres.DATABASE_URL}}`), gzipped onto the private volume `/backups`, then restored into a scratch database to prove it works; copies older than 6 days are deleted |
+  | `web` | Dockerfile; pre-deploy `readablestem db upgrade`; health check `/healthz` (300 s); restart policy not set in `railway.ts`, so Railway's default applies (on failure, 10 retries); one replica; domains readablestem.com and www.readablestem.com |
+  | `cron` | Same image; start `readablestem ops cron`; schedule `7 * * * *`; restart policy `NEVER`; every variable a reference to `web` (`${{web.NAME}}`) |
+  | `backup` | Image `postgres:18`; daily at 08:17 UTC `pg_dump` of the database (`PGURL=${{Postgres.DATABASE_URL}}`), gzipped onto the private volume `/backups`, then restored into a scratch database to prove it works; dumps older than 5 days are deleted (`find -mtime +5`), so the last 6 are kept; restart policy `NEVER` |
 
   A redeploy reuses the old deployment's settings; after changing a setting, deploy afresh with
   `railway up --service <name>`.
@@ -100,35 +102,29 @@ Rules that keep the plan honest:
 - To bring dashboard changes into the file instead, `railway config pull --variables managed --force`
   rewrites it from production (it drops the comments and the `preserved` helper; review the diff).
 
-## Decisions for Harish
+## Standing decisions
 
-1. **Backup window and the privacy page (blocking-beta, B2). Decided:
-   daily only, kept 6 days; the privacy page says a deleted document can remain in a backup for up
-   to about a week.** The earlier sentence ("one daily backup", "up to about one more day") was
-   the Cloud SQL setting. Railway's backups are different: daily backups are kept 6 days, weekly
-   27 days, monthly 89 days, and you choose which schedules to switch on. A deleted document stays in
-   any backup taken before it was deleted. Pick one and make the privacy sentence match:
-   - recommended: **daily only, kept 6 days**; change the sentence to "up to about a week";
-   - or no Railway backups for the beta and the current retention wording stays true, at the cost of
-     having no restore if the volume is lost (the data is small and mostly rebuildable, see
-     deploy.md "Backups and deleted documents").
-   Weekly and monthly schedules stretch the promise to 27 and 89 days: do not switch them on.
-2. **Off-site nightly dump to Cloudflare R2 (optional, needs your Cloudflare account).** See
-   "Backups". Railway's own backups live in the same Railway account as the database; an R2 copy
-   survives losing the account or the project. It also adds a second place deleted documents live, so
-   it needs a short lifetime (R2 object lifecycle rule: delete after 3 days) and a sentence on the
-   privacy page. Recommended for the beta: skip it, use Railway's daily backup, and revisit if the
-   service gets real use.
-3. **Cron: Railway cron service or an HTTP call.** Recommended: the cron service below. The
-   HTTP route (`POST /internal/cron/aggregate-and-purge`) also runs the daily Claude canary
-   (about $0.04 a run); `ops cron` does not. Decide whether you want the canary (step 4, option B).
+1. **Backups and the privacy page. Decided: daily only, kept 6 days; the privacy page says a
+   deleted document can remain in a backup for up to about a week.** The earlier sentence ("one
+   daily backup", "up to about one more day") was the Cloud SQL setting. A deleted document stays
+   in any dump taken before it was deleted. The `backup` service keeps the last 6 daily dumps and
+   there are no weekly or monthly ones: more would stretch the promise, and the privacy page
+   (`privacy.html`) would have to change first. Railway's own volume backups (daily kept 6 days,
+   weekly 27, monthly 89) are not used; they need a Pro workspace.
+2. **Off-site nightly dump to Cloudflare R2: not built.** See "Backups". The dumps live in the
+   same Railway project as the database, so losing the project loses both. An R2 copy would add a
+   second place deleted documents live, so it would need a short lifetime (an R2 lifecycle rule
+   of 3 days) and a sentence on the privacy page.
+3. **Cron: the Railway cron service (option A).** The HTTP route (`POST
+   /internal/cron/aggregate-and-purge`) also runs the daily canaries (the Claude canary, about
+   $0.04 a run; the OpenAI Decisions canary, which is off under Anthropic); `ops cron` does not,
+   so **no canary runs in production**. To get the Claude canary, run `readablestem ops
+   claude-canary --max-usd 0.25` on a schedule you control (option B below, or a GitHub workflow
+   with a repository secret).
 4. **LibreOffice in the image (Word and PowerPoint uploads).** Off by default. To turn it on:
    variable `INSTALL_LIBREOFFICE=true` on the web service and a memory allowance of 2 GB (below).
    Check `readablestem ops launch-check` first.
-5. **Google sign-in client.** It is in Testing with harishmanoharan17@gmail.com as the only test user.
-   Publishing it (so other instructors can sign in without being added as test users) needs the final
-   privacy and terms wording and the unfinished items; `readablestem ops launch-check` lists
-   what is still unfinished.
+5. **Google sign-in client.** Published (In production), see "As deployed".
 
 ## Variables
 
@@ -136,8 +132,11 @@ Already set by hand on the web service: `ENV=prod`, `PORT=8080`, `BASE_URL=https
 `DATABASE_URL`, `MODEL_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, `SESSION_SECRET`, `CRON_TOKEN`,
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `CONTACT_EMAIL`, `ADMIN_EMAILS`,
 `DAILY_SPEND_CAP_USD=10`, `PER_USER_DAILY_PAGE_QUOTA=90`, `TRUSTED_PROXY_HOPS=1`, the `FEATURE_*` and
-the `DECISIONS_*` variables. For open sign-up, set the five variables in the next table (the new
-settings are not set yet; the app starts without them, in `allowlist` mode).
+the `DECISIONS_*` variables. The `DECISIONS_*` ones (`DECISIONS_CANARY`, `DECISIONS_EQUATION_SHADOW`,
+`DECISIONS_FIGURE_VERIFY`) have no effect under `MODEL_PROVIDER=anthropic`: they only control OpenAI's
+Decisions API check, which is skipped with Claude (`models.verifier.any_check_enabled`). They stay in
+`.railway/railway.ts` so the plan stays empty. `SIGNUP_MODE` and the open-tier variables in the next
+table are also set on web; the app starts without them, in `allowlist` mode.
 
 `PORT` must stay `8080`: the Dockerfile's start command is fixed to that port, and Railway
 sends its health check to `$PORT`. `.railway/railway.ts` leaves the start command to the image.
@@ -157,9 +156,9 @@ production if a required one is missing, and logs the reason):
 | `FEEDBACK_URL` | The footer's Feedback link. | Leave unset: it becomes an email to `CONTACT_EMAIL`. A form service is a new data processor to name on the privacy page. |
 | `ALERT_EMAIL` | Read only by `deploy/deploy.sh` (Google Cloud alert policies). The app ignores it, so setting it on Railway does nothing. | Skip. Use Railway's project notifications and the weekly GitHub uptime check (below). |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | Defaults 24 hours and 30 days. | Leave unset. If you set them, the cron service needs the same values (reference the web service's). |
-| `CLAUDE_CANARY` | Daily drift check, only run by the HTTP cron route. | `false` if you use the cron service and do not want option B. |
+| `CLAUDE_CANARY` | Daily drift check of the Claude second check. Only the HTTP cron route runs it, so with the cron service it never runs and this variable does nothing. | Leave unset. |
 | `INSTALL_LIBREOFFICE` | Build argument, see decision 4. | Unset. |
-| `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | How long Railway waits between SIGTERM and killing the old container on a deploy. The worker stops claiming at once on SIGTERM and gives its running job back; uvicorn waits 5 s for open connections. **Confirm** the name and default on Railway's deployment page. | `10` |
+| `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | How long Railway waits between SIGTERM and SIGKILL for the old deployment (its documented default is 0). **Not set in production**, so the old process can be killed at once on a deploy. The worker stops claiming at once on SIGTERM and gives its running job back; if it is killed first, the job's lease runs out and the job restarts. uvicorn would wait 5 s for open connections. | `10` would let the shutdown finish; not applied yet |
 | `TRACING_ENABLED` and the Langfuse keys | Off. | Leave off. |
 
 The Google client needs `https://readablestem.com/auth/callback` as an authorized redirect URI
@@ -175,9 +174,9 @@ client address to `X-Forwarded-For`).
 
 ## First deploy: checklist
 
-1. **Project.** One Railway project with the web service (from this GitHub repository, branch
-   `feat/launch-integration` until it is merged to the branch you deploy from), the Postgres
-   service, and the custom domain `readablestem.com` on the web service. (Done.)
+1. **Project.** One Railway project with the web service (deployed from a checkout of `main`
+   with `railway up`, see "Ship a new version"), the Postgres service, and the custom domain
+   `readablestem.com` on the web service. (Done.)
 2. **Variables** as above. `DATABASE_URL` must use the `postgresql+psycopg://` scheme and Railway's
    private hostname, as a reference to the Postgres service (for example
    `postgresql+psycopg://${{Postgres.PGUSER}}:${{Postgres.PGPASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}`).
@@ -198,7 +197,7 @@ client address to `X-Forwarded-For`).
    | Builder | Dockerfile (`Dockerfile`) |
    | Pre-deploy command | `readablestem db upgrade` |
    | Healthcheck path | `/healthz` (timeout 300 s) |
-   | Restart policy | On failure, 10 retries |
+   | Restart policy | Not set in `railway.ts`: Railway's default, on failure with 10 retries |
    | Start command | empty |
 
    Why `/healthz` and not `/readyz`: Railway uses the health check only to decide whether a new
@@ -279,14 +278,20 @@ without repository activity, which is why option A is the recommendation.
 
 ## Backups
 
-The Postgres service stores its data on a Railway volume. Railway's volume backups cover it
-(docs.railway.com/volumes/backups): open the **Postgres service > Backups**, switch on
-**Daily** (every 24 hours, kept 6 days) and nothing else (decision 1). Plans: the page does not
-say whether Hobby includes backups; **confirm** the tab is there, and do not rely on backups
-until you have restored one. Restore: Backups tab > the backup > **Restore**; Railway mounts a
-new volume named for the backup's date and stages the change; review it under Details at the top
-of the canvas, then **Deploy**. The old volume stays unmounted in the project. A restore also brings
-back documents that retention had already deleted: run the cron right after.
+The Postgres service stores its data on a Railway volume. The `backup` service in
+`.railway/railway.ts` is the backup: daily at 08:17 UTC it dumps the database with `pg_dump`
+to `/backups/readablestem-<date>.sql.gz` on its own volume (`backup-volume`), restores the dump
+into a scratch database, and logs `backup_ok file=... tables=... alembic=...`. It keeps the
+last 6 dumps. The privacy page's "about 6 days" matches that (decision 1). Railway's own
+volume backups (docs.railway.com/volumes/backups) are not switched on.
+
+Restore into an empty database with `railway ssh --service backup`, then
+`gunzip -c /backups/readablestem-<date>.sql.gz | psql "$PGURL"`. A restore also brings back
+documents that retention had already deleted: run the cron right after (redeploy the `cron`
+service). Check the restored copy with `readablestem ops backup-check`.
+
+Check that it runs: the `backup` service's latest deployment log should show today's
+`backup_ok` line. A run that fails shows in the deployments list.
 
 Prove a restore before real users. With a scratch database: `readablestem ops restore-drill`
 (pg_dump into a scratch database and back, counts only) and `readablestem ops backup-check` on a

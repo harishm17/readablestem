@@ -25,7 +25,7 @@ How it works, and why:
   looks the same and no message is sent.
 - Nothing about the address or the token is logged.
 
-Known limits, stated in docs/security.md: the link is in the URL, so Cloud Run's request
+Known limits, stated in docs/security.md: the link is in the URL, so the host's request
 logs and the recipient's mail provider hold it until it expires or is used; anyone who can
 read the mailbox can sign in (as with any email sign-in).
 """

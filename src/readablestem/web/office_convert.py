@@ -27,7 +27,7 @@ the way the PDF probe is (`web.pdf_probe`, `web.uploads`):
   unreachable proxy set for every protocol, so that a fetch a check missed has nowhere to go.
 - The file is written to a private temporary directory (mode 0700) for the seconds the
   conversion takes, because LibreOffice reads files and not pipes; the directory is
-  removed in a `finally`. On Cloud Run that file system is memory.
+  removed in a `finally`. The container's file system is not kept across restarts.
 - A file that fails any check, or that LibreOffice cannot open, makes no PDF. Nothing is
   logged by the child; the parent logs a category code only.
 

@@ -20,7 +20,8 @@ once the answers under them move.
 - Alert: any probability that moved by more than `TOLERANCE` (0.02), or an answer that
   became or stopped being a refusal, is drift: one ERROR line `decisions_canary_drift`
   (counts, the largest move and the case ids, all content-free) and a non-zero exit.
-- In the hourly cron (`maybe_run_daily`): at most once per UTC day, claimed with an
+- In the HTTP cron route (`maybe_run_daily`; not in `ops cron`, so not in production): at
+  most once per UTC day, claimed with an
   insert-if-missing of the aggregate row (day, "canary", "decisions:run"), so two
   instances or two cron runs cannot both run it. Fail-open: nothing about the canary can
   fail the cron. The result is counted as "decisions:<status>" for the day.
@@ -351,7 +352,7 @@ def maybe_run_daily(
     *,
     decider_factory: Callable[[Settings, JobBudget], Decider] | None = None,
 ) -> str:
-    """Run today's canary from the hourly cron if it is on and has not run today (UTC).
+    """Run today's canary from the HTTP cron route if it is on and has not run today (UTC).
 
     Returns a status code ("ok", "drift", "failed", "stale", "not_due" when another run
     already claimed today, or why it is off). Never raises: a canary problem must not

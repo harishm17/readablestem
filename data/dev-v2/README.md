@@ -1,6 +1,6 @@
 # Extended development set (dev-v2)
 
-Backlog item T2-0 (`a11y-research/IMPROVEMENTS.md`). The original development set
+Backlog item T2-0 (the Tier 2 backlog, an internal note that is not in this repository). The original development set
 (`data/gold`) is 30 physics equations at the scorer's ceiling: it cannot show the failures
 the held-out run found. This set holds the classes it cannot see, so that Tier 2 accuracy
 work can be built and measured without touching held-out data. Full description, counts

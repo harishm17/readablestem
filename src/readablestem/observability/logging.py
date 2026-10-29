@@ -1,9 +1,9 @@
 """Structured JSON logs that cannot carry document content.
 
-Cloud Run reads one JSON object per stdout line; the `severity`, `message` and `time` keys
-are the ones Cloud Logging understands. Every record, from our own code or a third-party
-library, goes through the same processor chain, and two processors in it exist only to
-keep course material out of the logs:
+One JSON object per stdout line, which Railway's log viewer and Cloud Logging both read;
+`severity`, `message` and `time` are the keys Cloud Logging understands. Every record, from
+our own code or a third-party library, goes through the same processor chain, and two
+processors in it exist only to keep course material out of the logs:
 
 - `privacy_filter` drops any key that names content (`text`, `latex`, `alt`, `email`,
   `title`, ..., also in the plural, inside compound names like `alt_text`, `user_email`,

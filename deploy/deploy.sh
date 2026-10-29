@@ -66,7 +66,7 @@ load_config() {
   SQL_USER=${SQL_USER:-a11y}
   # Daily backups kept. Each one holds every document present when it was taken, so a
   # purged document survives in backups until they roll over (docs/operations.md,
-  # "Retention"). One keeps that to about a day and still allows a restore.
+  # "Retention"; docs/deploy.md, "Backups and deleted documents"). One keeps that to about a day and still allows a restore.
   SQL_RETAINED_BACKUPS=${SQL_RETAINED_BACKUPS:-1}
   # About 1.5x the fixed monthly cost of this setup (docs/deploy.md, "What it costs"),
   # so the alert means something; a Cloud Billing budget does not include OpenAI.
@@ -509,8 +509,8 @@ step_monitoring() {
 }
 
 # The hourly cron carries the privacy promise (aggregate, then purge), and /healthz stays
-# 200 when it breaks, so it gets alerts of its own (docs/operations.md, "When something
-# goes wrong"):
+# 200 when it breaks, so it gets alerts of its own (docs/deploy.md, "Cloud SQL backups,
+# alerts and fixes"):
 # - no `cron_done` for 2 hours: the scheduler is not reaching the app (paused or deleted
 #   job, 403 after a cron-token rotation, 500s). The worker's hourly purge backstop
 #   keeps deleting meanwhile, and logs as `purge_done source=worker`, which is why this

@@ -22,7 +22,8 @@ up the day the model or the prompt changes.
   non-zero exit by hand. One miss is tolerated because a model is not a deterministic
   service: a one-off miss is logged at WARNING, a repeat across days is what to read in the
   daily counts (`ops report`).
-- In the hourly cron (`maybe_run_daily`): at most once per UTC day, claimed with an
+- In the HTTP cron route (`maybe_run_daily`; not in `ops cron`, so not in production): at
+  most once per UTC day, claimed with an
   insert-if-missing of the aggregate row (day, "canary", "claude:run"); fail-open; the result
   is counted as "claude:<status>" for the day.
 - Spend: every request reserves first through a `JobBudget` (`CANARY_MAX_USD`) on the
@@ -244,7 +245,7 @@ def maybe_run_daily(
     *,
     verifier_factory: Callable[[Settings, JobBudget], Verifier] | None = None,
 ) -> str:
-    """Run today's canary from the hourly cron if it is on and has not run today (UTC).
+    """Run today's canary from the HTTP cron route if it is on and has not run today (UTC).
 
     Returns a status code ("ok", "drift", "failed", "not_due" when another run already
     claimed today, or why it is off). Never raises: a canary problem must not fail the

@@ -191,8 +191,8 @@ blank tables as figures) without rebuilding anything; meaning would be lost othe
   size the thread pools from the host's cores: on a 1-CPU container that ran 5-9 times
   slower. Before the add-on is imported (lazily, on first use), the session class is
   replaced by one that sets `intra_op_num_threads` to the CPUs this process may use
-  (`cpu_allowance`: the CPU affinity, capped by a cgroup v2 or v1 quota, so Cloud Run's
-  `--cpu` and Docker's `--cpus` count), `inter_op_num_threads` to 1 and turns spinning
+  (`cpu_allowance`: the CPU affinity, capped by a cgroup v2 or v1 quota, so a container's CPU limit,
+  Docker's `--cpus` for one, counts), `inter_op_num_threads` to 1 and turns spinning
   off. Only sessions made from PyMuPDF's own model files are changed. `LAYOUT_SESSIONS`
   records what each session got; a test checks it.
 - **Messages.** `find_tables` reports problems with `pymupdf.message` and the add-on uses
@@ -204,7 +204,7 @@ blank tables as figures) without rebuilding anything; meaning would be lost othe
   (median; mean 0.38, 95th percentile 0.68, slowest 1.3 s) on the real manuals and
   0.30 s (median; 0.51 s on pages that hold a table) on the benchmark. `layout.analyze`
   of 30 manual pages went from about 1 s to about 10 s. Loading the add-on takes about
-  0.6 s once per process. Expect Cloud Run to be slower: measure a staging revision
+  0.6 s once per process. Expect a small hosted container to be slower: measure on the host
   before promising times.
 
 ### The model file

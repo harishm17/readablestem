@@ -14,9 +14,10 @@ Uploads are untrusted bytes from the internet, so:
 - At most `MAX_CONCURRENT_UPLOADS` uploads are taken in at once, and one per user
   (`UploadGate`). An upload is held in memory while it is read, copied once, and read
   again by the probe child, so each costs about three times its size: with the defaults
-  (20 MB, 3 at once) that stays near 200 MB, well inside the instance's 1 GiB, however
-  many requests Cloud Run sends (concurrency 20). Over the limit the user gets a short
-  "try again in a moment" page before any of the body is read.
+  (20 MB, 3 at once) that stays near 200 MB, well inside the 1 GiB the service was sized for,
+  however many requests arrive at once (the limit was set when Cloud Run sent up to 20 at a
+  time). Over the limit the user gets a short "try again in a moment" page before any of the
+  body is read.
 
 Every rejection is an `UploadRejected` with a category `code`, safe to log.
 """

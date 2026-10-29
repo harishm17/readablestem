@@ -21,6 +21,10 @@ import { defineRailway, image, postgres, preserve, project, service, volume } fr
 const preserved = (...names: string[]) => Object.fromEntries(names.map((name) => [name, preserve()]));
 
 // Settings shared by the web and cron services (cron has no PORT).
+// DECISIONS_CANARY, DECISIONS_EQUATION_SHADOW and DECISIONS_FIGURE_VERIFY do nothing while
+// MODEL_PROVIDER=anthropic: they only control OpenAI's Decisions API check, which is skipped
+// with Claude (`models.verifier.any_check_enabled`). They are kept so the plan stays empty;
+// removing them is an infrastructure change for a separate PR.
 const appVariables = [
   "ADMIN_EMAILS",
   "ANTHROPIC_API_KEY",

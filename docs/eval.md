@@ -1619,7 +1619,7 @@ cut apart, systems and determinants cut into rows, exercise numbers glued onto e
 equations pasted as pictures, chemistry and nuclide notation, flattened sub- and
 superscripts, large slide formulas, repeated and sentence-like headings. Fixes found by
 looking at held-out errors must be checked on a new held-out set, so the development set
-has to contain those classes first (IMPROVEMENTS.md, T2-0). `data/dev-v2/` is that set.
+has to contain those classes first (backlog item T2-0). `data/dev-v2/` is that set.
 It is a development set: numbers on it say nothing about documents in general, and a rule
 tuned against it is not validated until it passes a set nobody tuned against.
 

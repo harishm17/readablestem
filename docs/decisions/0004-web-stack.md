@@ -23,6 +23,13 @@ One Python service on Cloud Run (min-instances=1, CPU always allocated):
 Rejected: Next.js front end + separate FastAPI workers + Cloud Tasks (two deploys, more
 surface for a 3-5 instructor beta).
 
+**Update (2026-10-29).** Since 2026-10-14 the service runs on Railway, not Cloud Run. It is
+still one FastAPI service with the worker thread in the same process and one replica, and
+Postgres is Railway Postgres. The hourly cron is a separate Railway `cron` service running
+`readablestem ops cron`; nothing calls `/internal/cron/aggregate-and-purge`, so the daily
+canaries that only that route runs are off in production. A `backup` service takes the daily
+database dump. See [deploy-railway.md](../deploy-railway.md). The rest of the decision stands.
+
 ## Consequences
 
 Drafted from what the repository shows; the author confirms or edits.

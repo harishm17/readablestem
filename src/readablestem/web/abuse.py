@@ -3,7 +3,7 @@
 What this is for: a script guessing at the sign-in or cron endpoints, or hammering the upload
 route (each upload that is not a PDF still costs a probe process), or making accounts
 (`signup`, counted only when a sign-in would create one). It is a seatbelt for a free beta,
-not a defence against a distributed flood (that is Cloud Run's and Cloud Armor's job):
+not a defence against a distributed flood (that is the host's and its edge's job):
 accounts made from many addresses are bounded by the daily cap on new accounts
 (`MAX_NEW_ACCOUNTS_PER_DAY`, kept in the database) and by the open-tier limits, not here.
 Limits are kept in memory per instance, so with two instances the real allowance is twice
@@ -11,9 +11,9 @@ the numbers below; a restart forgets them. Both are acceptable here and stated i
 docs/security.md.
 
 `client_ip` reads the address from `X-Forwarded-For`, counting `trusted_proxy_hops` entries
-from the right (Cloud Run's front end appends the address it saw, so one hop; an external
-load balancer in front adds a second). Entries further left are written by the client and
-are never believed. With no such header the peer address is used.
+from the right (the platform's front end appends the address it saw, so one hop, as on
+Railway; another proxy in front, such as Cloudflare's, adds a second). Entries further left
+are written by the client and are never believed. With no such header the peer address is used.
 
 Nothing here is logged with an address: a limited request logs the rule name only
 (`deps.enforce`, which turns a refusal into the 429 page).

@@ -25,6 +25,12 @@
 - Data handling: OpenAI API inputs are not used for training by default. Private test
   runs on `private-inputs/` keep tracing off.
 
+**Update (2026-10-29).** The default in code is still `MODEL_PROVIDER=openai` with the pair
+above, but production runs `MODEL_PROVIDER=anthropic`: `claude-opus-5-5` (main) and
+`claude-haiku-5-5` (cheap), each the other's fallback, with their own spend-limit defaults
+(`PROVIDER_LIMIT_DEFAULTS` in `config.py`). The decision above is kept as written; the OpenAI
+path still works as an alternative.
+
 ## Smoke test (2026-10-07)
 
 One rendered equation (`v = d / t = 12 m / 4 s`), both models, structured output:

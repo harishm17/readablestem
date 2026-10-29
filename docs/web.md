@@ -69,11 +69,11 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `DAILY_SPEND_CAP_USD` | Global model spend per UTC day (`spend_days`) |
 | `PER_USER_DAILY_PAGE_QUOTA` | Pages per invited user per UTC day (`quota_days`); open-tier accounts have `OPEN_TIER_DAILY_PAGE_QUOTA` instead |
 | `MAX_UPLOAD_MB`, `MAX_PAGES_PER_JOB`, `MAX_CONCURRENT_UPLOADS` | Upload limits (the last: uploads taken in at once per instance, one per user) |
-| `MAX_LARGE_UPLOAD_MB` (30), `MAX_SOURCE_PAGES` (300) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (Cloud Run takes at most 32 MiB). Equal to the limits above, they turn the feature off: such files are refused |
+| `MAX_LARGE_UPLOAD_MB` (30), `MAX_SOURCE_PAGES` (300) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (30 was sized for Cloud Run's 32 MiB request limit; Railway documents none). Equal to the limits above, they turn the feature off: such files are refused |
 | `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
 | `FEATURE_IMAGE_PAGES`, `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE` ($0.25), `IMAGE_PAGES_MAX_USD_PER_JOB` ($7.50), `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`, `IMAGE_PAGES_OMISSION_CHECK` (default on), `IMAGE_PAGES_RECOVER_OMISSIONS` (default on), `IMAGE_PAGES_SECOND_READING` (default off), `IMAGE_PAGES_ACCEPT_AGREED` (default off), `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED` (default on) | Scanned and handwritten pages read from an image of the page (ADR 0007, "Scanned and handwritten pages on request" below); the omission check makes writing the reading left out a required decision, and the recovery reads such a stretch from a picture of just that part so it is converted instead; the second reading reads each `medium` block with a formula again from a picture of its line and records whether the two agree, and acceptance lets a block whose two readings agree, the second sure of every symbol, be an optional note (off: docs/eval-handwriting.md, "Root causes and fixes"); the last makes every block of a page read from an image that holds maths (a display equation, or a paragraph, list item or heading with a formula) a required decision whatever the reader's confidence (ADR 0007, point 12; typed pages and prose-only blocks are not affected). The flag only offers the upload option; the model is the main one unless `IMAGE_PAGES_MODEL` says otherwise; a job that asked may spend `IMAGE_PAGES_USD_PER_PAGE` a page, at most `IMAGE_PAGES_MAX_USD_PER_JOB`, when that is more than `MAX_USD_PER_JOB` and `MAX_USD_PER_PAGE` allow |
-| `DECISIONS_FIGURE_VERIFY`, `DECISIONS_EQUATION_SHADOW`, `DECISIONS_CANARY` (and thresholds) | The second automated check (ADR 0005): an optional note on accepted figures, a shadow on equations, a daily drift canary in the cron (docs/steps.md, docs/operations.md). All on by default |
+| `DECISIONS_FIGURE_VERIFY`, `DECISIONS_EQUATION_SHADOW`, `DECISIONS_CANARY` (and thresholds) | The second automated check (ADR 0005): an optional note on accepted figures, a shadow on equations, a daily drift canary that only the HTTP cron route runs (docs/steps.md, docs/operations.md). All on by default in code; the Decisions ones do nothing with `MODEL_PROVIDER=anthropic` |
 | `MODEL_PROVIDER`, `OPENAI_API_KEY`, `MAIN_MODEL`, `CHEAP_MODEL` | Which provider answers (`openai`, the default) and its key and models |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (`claude-opus-5-5`, `claude-haiku-5-5`), the workspace id an organisation-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
@@ -149,7 +149,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone (adding makes them `invited`; removing blocks them) |
 | POST `/admin/users/block`, `/admin/users/unblock` | admins | Block an account (signed out everywhere, jobs stopped, sign-ins refused in either mode, no new row) or lift the block (the tier is kept). Not oneself |
 | POST `/admin/linked-emails`, `/admin/linked-emails/remove` | admins | Let an allowed instructor also sign in with another Google address, or take that away (T3-10; "Sign-in, sessions and CSRF") |
-| POST `/internal/cron/aggregate-and-purge` | Cloud Scheduler | `X-Cron-Token` header; aggregates, then purges |
+| POST `/internal/cron/aggregate-and-purge` | a scheduler (Cloud Scheduler on the Cloud Run path; production runs the `cron` service instead and does not call it) | `X-Cron-Token` header; aggregates, then purges, then runs the daily canaries |
 | GET `/healthz` | anyone | `{"status": "ok"}` after a database ping, else 503 |
 | GET `/readyz` | anyone | `{"status": "ready", "checks": {"database", "worker", "model_provider"}}`, one word per check, 503 `not_ready` if any is not ok (docs/operations.md, "Health, readiness and shutdown") |
 
@@ -250,7 +250,7 @@ yours to see". It is a 404 either way. The
   session's CSRF token) signs in, so a mail scanner fetching the link does not use it up;
   redeeming is one conditional UPDATE, so two clicks sign in once; at most three messages
   per target address in 15 minutes whoever asks, besides the per-address sign-in limits; a
-  failing sender is logged by type and never shown. The link is in the URL, so Cloud Run's
+  failing sender is logged by type and never shown. The link is in the URL, so the host's
   request logs and the mailbox hold it until it expires or is used.
 - **Allowlist.** `users.is_allowed`, managed with `readablestem users allow|deny|unblock|list`
   or on `/admin`. It is checked on every request, so removing or blocking someone ends their
@@ -364,7 +364,8 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
 2. uploads in progress: at most `MAX_CONCURRENT_UPLOADS` (3) per instance and one per
    user (`uploads.UploadGate`). Each upload costs about three times its size in memory
    while it is read, copied and probed, so this keeps uploads near 200 MB however many
-   requests Cloud Run sends at once (`--concurrency=20`, 1 GiB). Over the limit: a 503
+   requests arrive at once (the limit was set for Cloud Run's `--concurrency=20` and a 1 GiB
+   instance). Over the limit: a 503
    (busy) or 429 (your own upload is still in progress) page with `Retry-After`, before
    the body is read;
 3. size: a declared `Content-Length` over the limit is refused before reading, and the
@@ -463,8 +464,8 @@ in any XML part; and any relationship that points outside the file except an ord
 hyperlink. The last one matters: **LibreOffice fetches the address of a linked picture
 when it converts** (tested: it connects), so linked pictures, linked objects, templates and
 sub-documents are refused. LibreOffice then runs headless in its own session with a
-private profile in a private temporary directory (removed in a `finally`; on Cloud Run
-that file system is memory), macros off, links never updated, an unreachable proxy set for
+private profile in a private temporary directory (removed in a `finally`; the container's
+file system is not kept across restarts), macros off, links never updated, an unreachable proxy set for
 every protocol (a second line behind the check, also tested), `RLIMIT_AS` 2 GiB, a CPU
 limit, an output size limit and 256 open files, and its whole process group is killed at
 `OFFICE_TIMEOUT_S`. It makes a **tagged** PDF (`UseTaggedPDF`), so the headings and alt
@@ -1046,7 +1047,7 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   | `handwritten`, `handwritten_no_text`, `scanned`, `scanned_ocr` | Every analysed page was handwritten or scanned (`page_type.refusal_code` on the stored page types; the upload probe normally refuses these first). A result stored before page types: `scanned` when every page was only a picture of a page |
   | `too_complex` | A page needs more time or memory to read than a conversion has: the layout step's child process (open and render the pages, `layout._probe_pages`) passed its time limit (`PROBE_TIMEOUT_S` + `PROBE_PER_PAGE_S` per page after the first) or its 768 MB address-space cap (`PROBE_MEMORY_BYTES`) |
   | `no_content` | The result had no elements at all |
-  | `model_not_configured` | The model client is misconfigured (no OpenAI key): every job would fail the same way |
+  | `model_not_configured` | The model client is misconfigured (no key for the selected provider): every job would fail the same way |
   | `access_removed` | The owner was removed from the allowlist |
   | `timeout` | The conversion ran past its time limit |
   | `store_failed` | The result could not be written to the database |

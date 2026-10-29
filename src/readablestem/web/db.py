@@ -518,7 +518,8 @@ def make_engine(database_url: str) -> Engine:
             cur.close()
 
         return engine
-    # 2 instances x (3 + 2) = 10 connections, well under db-f1-micro's 25.
+    # 3 pooled + 2 overflow = at most 5 connections per process; production runs one web
+    # replica and the cron service opens its own for a few seconds an hour.
     return create_engine(database_url, pool_pre_ping=True, pool_size=3, max_overflow=2)
 
 
