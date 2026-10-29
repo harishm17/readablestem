@@ -1,10 +1,11 @@
-"""Public pages: landing, demo, privacy, terms, known limits, posting help, status, and
-the health check."""
+"""Public pages: landing, demo, privacy, terms, known limits, posting help, the guides,
+status, and the health check."""
 
 from __future__ import annotations
 
 import html
 import re
+from datetime import date
 from pathlib import Path
 
 from fastapi import APIRouter, Request
@@ -152,6 +153,38 @@ def posting_help(request: Request) -> Response:
     """How to put the file in front of students (UX review MF11): upload it and link it,
     never paste it into an LMS page. Public, so an accessibility office can read it."""
     return render(request, "help_posting.html", {"active": "posting"})
+
+
+def _guide_context(path: str, active: str) -> dict[str, object]:
+    """The dates a guide shows. They come from seo.PUBLIC_PAGES, which also feeds the
+    sitemap and the Article in the page's structured data, so the three cannot differ."""
+    page = next(page for page in seo.PUBLIC_PAGES if page.path == path)
+    return {
+        "active": active,
+        "updated": page.updated,
+        "updated_text": _long_date(page.updated),
+        "published": page.published or page.updated,
+    }
+
+
+def _long_date(iso: str) -> str:
+    day = date.fromisoformat(iso)
+    return f"{day.day} {day.strftime('%B %Y')}"
+
+
+@router.get(seo.ADA_GUIDE)
+def guide_ada_title_ii(request: Request) -> Response:
+    """What the Justice Department's web rule asks of STEM course materials, with sources
+    and the dates as checked on the day it was written. Public, like /help/posting."""
+    path = seo.ADA_GUIDE
+    return render(request, "guide_ada_title_ii.html", _guide_context(path, "guide-ada"))
+
+
+@router.get(seo.COMPARE_GUIDE)
+def guide_compare(request: Request) -> Response:
+    """ReadableSTEM beside Mathpix and LaTeXML, from each project's own documentation."""
+    path = seo.COMPARE_GUIDE
+    return render(request, "guide_compare.html", _guide_context(path, "guide-compare"))
 
 
 @router.get("/status")

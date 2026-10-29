@@ -14,7 +14,7 @@
   <link rel="canonical" href="{{ site_url }}{{ request.url.path }}">
   <meta property="og:url" content="{{ site_url }}{{ request.url.path }}">
   {% endif %}
-  <meta property="og:type" content="website">
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
   <meta property="og:site_name" content="ReadableSTEM">
   <meta property="og:title" content="{{ self.title() }} | ReadableSTEM">
   <meta property="og:description" content="{{ self.description() }}">
@@ -94,6 +94,8 @@
           <li><a href="/terms"{% if active == "terms" %} aria-current="page"{% endif %}>Terms</a></li>
           <li><a href="/limits"{% if active == "limits" %} aria-current="page"{% endif %}>Known limits</a></li>
           <li><a href="/help/posting"{% if active == "posting" %} aria-current="page"{% endif %}>Posting in your course</a></li>
+          <li><a href="/guides/ada-title-ii-stem-course-materials"{% if active == "guide-ada" %} aria-current="page"{% endif %}>ADA Title II guide</a></li>
+          <li><a href="/guides/readablestem-mathpix-latexml"{% if active == "guide-compare" %} aria-current="page"{% endif %}>Compared with Mathpix and LaTeXML</a></li>
           <li><a href="/status"{% if active == "status" %} aria-current="page"{% endif %}>Service status</a></li>
           {% if feedback_url %}
           <li><a href="{{ feedback_url }}">Send feedback</a></li>

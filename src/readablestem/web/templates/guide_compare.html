@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}ReadableSTEM, Mathpix and LaTeXML compared{% endblock %}
+{% block description %}What ReadableSTEM, Mathpix and LaTeXML take in and give back, and what each automates and costs, from their own documentation. The right one depends on your file.{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block head %}
+<meta property="article:published_time" content="{{ published }}">
+<meta property="article:modified_time" content="{{ updated }}">
+<meta property="article:author" content="https://harishmanoharan.com">
+{% endblock %}
+{% block content %}
+{# R2 of the content-pages plan. One page for both tools, because the choice depends first
+   on the file you hold (a PDF or the LaTeX source), not on which product you searched for;
+   two pages would repeat the same decision list. Facts about Mathpix and LaTeXML come from
+   their own documentation, read on 2026-10-28 and listed under Sources. Mathpix changes its
+   prices and formats: re-read the sources and update the date in web/seo.py PUBLIC_PAGES
+   when this page changes. No accuracy comparison: neither tool was run on the held-out
+   test (PROOF.md). No "better" claims beyond which input each tool starts from. #}
+<h1>ReadableSTEM, Mathpix and LaTeXML compared</h1>
+<p class="hint">Last updated <time datetime="{{ updated }}">{{ updated_text }}</time>. By
+  <a href="https://harishmanoharan.com">Harish Manoharan</a>, who made ReadableSTEM. The
+  facts about the other two tools come from their own documentation, read on 28 October
+  2026 and linked under Sources.</p>
+<p class="lede">The right tool depends first on the file you have. This page sets out what each
+  tool takes in and gives back, what it automates, and what it costs, so you can choose.
+  Where another tool fits your file better, it says so.</p>
+
+<h2>Start with the file you have</h2>
+<ul>
+  <li><strong>You have the LaTeX source.</strong> LaTeXML is the better fit. It converts the
+    source itself, so nothing has to be recognized from a PDF. ReadableSTEM starts from the
+    PDF and does not work from LaTeX sources.</li>
+  <li><strong>You have only a PDF and want a web page.</strong> Mathpix and ReadableSTEM both
+    do this. Mathpix is a paid service with a free tier. ReadableSTEM is a free beta with a
+    review screen for the instructor.</li>
+  <li><strong>The file has to stay a PDF.</strong> Mathpix documents an accessible PDF output
+    (a tagged PDF that keeps the original pages). ReadableSTEM returns a web page, not a
+    PDF. Mathpix is the better fit.</li>
+  <li><strong>You have other formats, images, handwriting or a large batch.</strong> Mathpix
+    takes more kinds of input, has an API for batches, and exports to more formats.
+    ReadableSTEM takes a PDF and returns one HTML file, with a zip for Canvas and a Common
+    Cartridge.</li>
+  <li><strong>You want to check each uncertain change before students see it.</strong>
+    ReadableSTEM is built around that step. The Mathpix and LaTeXML pages we read describe no
+    such step.</li>
+</ul>
+
+<h2>Side by side</h2>
+<div class="table-scroll" role="group" aria-label="ReadableSTEM, Mathpix and LaTeXML side by side" tabindex="0">
+  <table class="compare-table">
+    <caption>Facts from each project's own pages, read on October 28, 2026</caption>
+    <thead>
+      <tr><th scope="col">Topic</th><th scope="col">ReadableSTEM</th><th scope="col">Mathpix</th><th scope="col">LaTeXML</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Takes in</th>
+        <td>A STEM course PDF.</td>
+        <td>PDF, EPUB, Word (DOCX, DOC), PowerPoint (PPTX), OpenDocument Text (ODT), DjVu, WordPerfect (WPD), Mobipocket (MOBI) and Amazon Kindle (AZW3); also images and handwriting strokes.</td>
+        <td>TeX and LaTeX sources (and BibTeX).</td>
+      </tr>
+      <tr>
+        <th scope="row">Gives back</th>
+        <td>One self-contained HTML file. Also a zip for a Canvas page and a Common Cartridge.</td>
+        <td>Mathpix Markdown, DOCX, XLSX, LaTeX, HTML, PDF and PPTX. Also a tagged accessible PDF (PDF/UA) of the PDF you sent.</td>
+        <td>XML, HTML5 (also XHTML and HTML4) and ePub; the project page also names JATS.</td>
+      </tr>
+      <tr>
+        <th scope="row">Math in the HTML</th>
+        <td>MathML.</td>
+        <td>SVG by default. MathML or LaTeX (for MathJax or KaTeX) by option. An accessibility option adds assistive MathML.</td>
+        <td>Presentation MathML by default for HTML5 and XHTML. Content MathML, OpenMath and math images by option.</td>
+      </tr>
+      <tr>
+        <th scope="row">What is automated</th>
+        <td>Finding and rebuilding equations, restoring headings and lists, and writing short alt text for figures, with AI models.</td>
+        <td>Recognition and export, through the Snip web editor, an API, a command-line tool and a Files API for batches.</td>
+        <td>The whole conversion, from the command line (<code>latexmlc</code>).</td>
+      </tr>
+      <tr>
+        <th scope="row">Review by a person</th>
+        <td>A review screen where the instructor accepts, edits or rejects each change it is unsure about.</td>
+        <td>The pages we read describe none. Figure alt text &ldquo;remains yours to write&rdquo;.</td>
+        <td>None built in. The manual lists the errors it reports.</td>
+      </tr>
+      <tr>
+        <th scope="row">Cost and licence</th>
+        <td>Free beta, with daily limits. The code is MIT. The hosted service's terms are on the <a href="/terms">terms page</a>.</td>
+        <td>Free plan: 10 PDF pages a month (double with an .edu email). Pro: $4.99 a month with 1,000 PDF pages. API: $0.005 a page, after a one-time $19.99 setup fee.</td>
+        <td>Free. Public domain, from its source repository's licence file.</td>
+      </tr>
+      <tr>
+        <th scope="row">Version or date</th>
+        <td>Beta; the live service.</td>
+        <td>Prices and documentation as read on October 28, 2026.</td>
+        <td>Version 0.8.8, released February 26, 2024, the latest release on GitHub.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h2 id="readablestem">ReadableSTEM</h2>
+<p>ReadableSTEM assists instructors who need to turn a STEM course PDF into an accessible web
+  page. It reads the PDF, rebuilds equations as MathML a screen reader can speak, restores
+  headings and lists, writes short alt text for figures, and returns one self-contained HTML
+  file. Every change it is unsure about goes to a review screen where the instructor accepts,
+  edits or rejects it.</p>
+<p><strong>It assists; it does not certify.</strong> Nothing here establishes conformance with
+  WCAG, the ADA or any other standard, and the output still needs a person to look at it. That
+  is what the review screen is for.</p>
+<p>It makes mistakes, so look over the equations your students rely on. We have not run
+  Mathpix or LaTeXML on our held-out test, so this page makes no accuracy comparison.
+  <a href="{{ source_url }}/blob/main/PROOF.md">The full results</a> compare ReadableSTEM with a
+  general chatbot and three open parsers, including where it loses. It starts from a PDF, and
+  its <a href="/limits">known limits</a> list what it does not do yet.</p>
+
+<h2 id="mathpix">Mathpix</h2>
+<p>Mathpix recognizes printed and handwritten STEM content, including math, text, tables and
+  chemistry diagrams, from images, stroke data or PDF files. Its documentation describes
+  Mathpix Markdown as the main output, with conversion to DOCX, XLSX, LaTeX, HTML, PDF and
+  PPTX. For HTML, equations are SVG by default, and the options include MathML.</p>
+<p>It fits when you have more than a PDF to convert: other file types, images, handwriting, a
+  batch of documents or an API. It is also the one to look at if the file has to stay a PDF:
+  its accessible PDF output adds a text layer and PDF/UA tags to the PDF you sent, so that
+  headings, tables and lists are announced as such and formulas are spoken. Mathpix says
+  figures there get a short alternative built from the caption, not a description of the
+  picture.</p>
+<p>Mathpix's own page on its HTML output says that headings are headings, tables are tables
+  and equations carry their source, and that alt text for figures is not something
+  recognition can invent, so that remains yours to write.</p>
+
+<h2 id="latexml">LaTeXML</h2>
+<p>LaTeXML converts TeX and LaTeX sources to XML, HTML, MathML and ePub. It was written for
+  the Digital Library of Mathematical Functions at the U.S. National Institute of Standards and
+  Technology (NIST), and the project says plainly that emulating TeX is hard and that there
+  are gaps in fidelity and coverage.</p>
+<p>If you have the LaTeX source of your notes or problem sets, it is the better fit: the
+  conversion is automatic, the math comes out as MathML, and it is free. If you only have the
+  PDF, LaTeXML cannot use it. This guide has not tested how accessible LaTeXML's output is; it
+  is a converter, and the result still needs checking like any other.</p>
+
+<h2>Check with your accessibility office</h2>
+<p>This page is guidance, not legal advice. Your campus accessibility office can say what your
+  courses need, and may already license one of these tools. What the rule asks of course
+  materials is in <a href="/guides/ada-title-ii-stem-course-materials">ADA Title II and STEM
+  course materials</a>.</p>
+
+<h2>Sources</h2>
+<p class="hint">All accessed on October 28, 2026.</p>
+<ul>
+  <li><a href="https://docs.mathpix.com/">Mathpix OCR API introduction</a> (Mathpix docs: inputs, outputs and conversion formats)</li>
+  <li><a href="https://docs.mathpix.com/reference/shared-types">Mathpix shared types</a> (the HTML options <code>math_output_format</code> and <code>accessibility</code>)</li>
+  <li><a href="https://docs.mathpix.com/guides/accessible-pdf">Mathpix accessible PDF</a> (the <code>mmd.overlay.pdf</code> format)</li>
+  <li><a href="https://mathpix.com/pdf-to-html">Mathpix PDF to HTML</a> (accepted files, equations, and what stays yours to write)</li>
+  <li><a href="https://mathpix.com/pricing/snip">Mathpix Snip pricing</a> and <a href="https://mathpix.com/pricing/api">OCR API pricing</a></li>
+  <li><a href="https://dlmf.nist.gov/LaTeXML/">LaTeXML home page</a> and <a href="https://math.nist.gov/~BMiller/LaTeXML/">project description</a> (NIST)</li>
+  <li><a href="https://dlmf.nist.gov/LaTeXML/manual/usage/">LaTeXML manual: using LaTeXML</a> and <a href="https://dlmf.nist.gov/LaTeXML/manual/commands/latexmlpost.html">latexmlpost options</a> (version 0.8.8, February 26, 2024)</li>
+  <li><a href="https://github.com/brucemiller/LaTeXML/blob/master/LICENSE">LaTeXML licence file</a> and <a href="https://github.com/brucemiller/LaTeXML/releases/tag/v0.8.8">release v0.8.8</a> (GitHub)</li>
+  <li><a href="{{ source_url }}/blob/main/README.md">ReadableSTEM README</a>, <a href="/limits">known limits</a>, <a href="/help/posting">posting in your course</a> and <a href="{{ source_url }}/blob/main/PROOF.md">PROOF.md</a></li>
+</ul>
+{% endblock %}

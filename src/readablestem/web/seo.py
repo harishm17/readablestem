@@ -57,8 +57,14 @@ class PublicPage:
     path: str
     # The date the page's text last changed; update it with the template.
     updated: str
+    # Set for the guides (/guides/...): the date the article first went up. A page with a
+    # publication date is described as an Article in its structured data, and the page
+    # shows both dates (routes/pages.py).
+    published: str | None = None
 
 
+ADA_GUIDE = "/guides/ada-title-ii-stem-course-materials"
+COMPARE_GUIDE = "/guides/readablestem-mathpix-latexml"
 PUBLIC_PAGES = (
     PublicPage("/", "2026-10-28"),
     PublicPage("/demo", "2026-10-14"),
@@ -66,6 +72,8 @@ PUBLIC_PAGES = (
     PublicPage("/help/posting", "2026-10-27"),
     PublicPage("/privacy", "2026-10-27"),
     PublicPage("/terms", "2026-10-20"),
+    PublicPage(ADA_GUIDE, "2026-10-28", "2026-10-28"),
+    PublicPage(COMPARE_GUIDE, "2026-10-28", "2026-10-28"),
 )
 PUBLIC_PATHS = frozenset(page.path for page in PUBLIC_PAGES)
 
@@ -171,6 +179,14 @@ def llms_txt(site: str, showcase: bool) -> str:
         f"- [Privacy]({site}/privacy): what happens to uploaded documents",
         f"- [Terms]({site}/terms)",
         "",
+        "## Guides",
+        "",
+        f"- [ADA Title II and STEM course materials]({site}{ADA_GUIDE}): "
+        "the Justice Department's web rule, its technical standard and dates, with sources, "
+        "and what ReadableSTEM does and does not do",
+        f"- [ReadableSTEM, Mathpix and LaTeXML]({site}{COMPARE_GUIDE}): "
+        "what each takes in and gives back, from each project's own documentation",
+        "",
         "## Evidence",
         "",
     ]
@@ -202,9 +218,15 @@ def llms_txt(site: str, showcase: bool) -> str:
 
 
 def structured_data(
-    site: str, path: str, title: str, description: str, updated: str | None
+    site: str,
+    path: str,
+    title: str,
+    description: str,
+    updated: str | None,
+    published: str | None = None,
 ) -> dict[str, Any]:
-    """One @graph for a public page: the site, the app, its author, and the page itself."""
+    """One @graph for a public page: the site, the app, its author, and the page itself.
+    A page with a publication date (a guide) also gets an Article."""
     person = {
         "@type": "Person",
         "@id": AUTHOR_ID,
@@ -264,17 +286,39 @@ def structured_data(
     }
     if updated:
         page["dateModified"] = updated
-    return {
-        "@context": "https://schema.org",
-        "@graph": [website, organization, application, person, page],
-    }
+    nodes = [website, organization, application, person, page]
+    if published:
+        nodes.append(
+            {
+                "@type": "Article",
+                "@id": f"{site}{path}#article",
+                "headline": title,
+                "description": description,
+                "url": f"{site}{path}",
+                "mainEntityOfPage": {"@id": f"{site}{path}#webpage"},
+                "inLanguage": "en",
+                "datePublished": published,
+                "dateModified": updated or published,
+                "author": {
+                    "@type": "Person",
+                    "@id": AUTHOR_ID,
+                    "name": AUTHOR,
+                    "url": AUTHOR_URL,
+                },
+                "publisher": {"@id": f"{site}/#organization"},
+                "isPartOf": {"@id": f"{site}/#website"},
+            }
+        )
+    return {"@context": "https://schema.org", "@graph": nodes}
 
 
 def page_json_ld(site: str, path: str, title: str, description: str) -> Markup:
     """The JSON-LD data block for an app page (base.html, public pages only)."""
-    updated = next((page.updated for page in PUBLIC_PAGES if page.path == path), None)
+    entry = next((page for page in PUBLIC_PAGES if page.path == path), None)
+    updated = entry.updated if entry else None
+    published = entry.published if entry else None
     title, description = html.unescape(str(title)), html.unescape(str(description))
-    return json_ld_tag(structured_data(site, path, title, description, updated))
+    return json_ld_tag(structured_data(site, path, title, description, updated, published))
 
 
 def json_ld_tag(data: dict[str, Any]) -> Markup:
