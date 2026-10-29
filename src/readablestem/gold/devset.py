@@ -1,6 +1,6 @@
 """The extended development set (dev-v2): classes the first development set cannot see.
 
-Tier 2 accuracy work (IMPROVEMENTS.md, T2-0) needs a development set that contains the
+Tier 2 accuracy work (backlog item T2-0) needs a development set that contains the
 failures the held-out run found: inline stacked fractions, systems and determinants cut
 into rows, equations pasted as pictures, chemistry and nuclide notation, flattened
 sub- and superscripts, large slide formulas, repeated headings and so on. The original

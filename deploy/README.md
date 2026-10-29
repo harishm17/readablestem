@@ -13,4 +13,5 @@ Google Cloud Run alternative.
 
 Step-by-step guide (it opens with Harish's first-deploy checklist), including the parts that are not scripted (model provider's spend limit, Google
 sign-in client, custom domain, rollback): [`docs/deploy.md`](../docs/deploy.md).
-Day-to-day running: [`docs/operations.md`](../docs/operations.md).
+Backups, alerts and fixes on this path are in the same guide; what the app records and
+what its commands do is in [`docs/operations.md`](../docs/operations.md).

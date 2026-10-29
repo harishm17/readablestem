@@ -1,14 +1,16 @@
-"""Readiness (`/readyz`) and the SIGTERM hook for Cloud Run.
+"""Readiness (`/readyz`) and the SIGTERM hook.
 
 `/healthz` says the process answers and the database does. `/readyz` says the service can
 do its job: the database answers, the worker thread is alive and not stuck, and the model
 provider is set up. Each check is one word; nothing in the answer comes from a setting's
 value, so a key or a connection string can never end up in it.
 
-Cloud Run sends SIGTERM and stops the process 10 seconds later. uvicorn reacts by closing
-its listeners and waiting for connections, and only then runs the lifespan shutdown that
-stops the worker, so a job could be claimed (and model calls paid for) after the signal.
-`stop_worker_on_sigterm` puts a handler in front of uvicorn's that stops the worker at once.
+The host sends SIGTERM and later kills the process. On Railway the gap is
+`RAILWAY_DEPLOYMENT_DRAINING_SECONDS` (0 unless set; Cloud Run gave 10 seconds). uvicorn
+reacts by closing its listeners and waiting for connections, and only then runs the lifespan
+shutdown that stops the worker, so a job could be claimed (and model calls paid for) after
+the signal. `stop_worker_on_sigterm` puts a handler in front of
+uvicorn's that stops the worker at once.
 """
 
 from __future__ import annotations

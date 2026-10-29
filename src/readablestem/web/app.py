@@ -379,7 +379,7 @@ def create_app(
         finally:
             restore_sigterm()
             if ctx.worker is not None:
-                # Cloud Run kills the process 10 s after SIGTERM; uvicorn waits at most
+                # The host kills the process soon after SIGTERM; uvicorn waits at most
                 # `GRACEFUL_SHUTDOWN_S` for connections first (cli.serve), so keep this short.
                 await run_in_threadpool(ctx.worker.stop, WORKER_STOP_S)
             if ctx.tracer is not None:

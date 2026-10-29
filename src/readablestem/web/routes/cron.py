@@ -1,4 +1,6 @@
-"""/internal/cron/aggregate-and-purge, called by Cloud Scheduler with X-Cron-Token.
+"""/internal/cron/aggregate-and-purge, called with X-Cron-Token by a scheduler (Cloud Scheduler
+on the Cloud Run path). Production's Railway cron service runs `readablestem ops cron` instead
+and does not call it.
 
 Aggregation runs first so the content-free counts survive deletion, but deletion always
 runs, even when aggregation fails (privacy beats statistics). A failed aggregation still

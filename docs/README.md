@@ -39,7 +39,7 @@ arrived at; read them by question, not front to back.
 ## If you want to know why a choice was made
 
 The decision records are in [decisions/](decisions/): 0001 scope, 0002 models, 0003 PDF
-library and the AGPL, 0004 web stack, 0005 the second automated check, 0006 the page math pass (a proposal, off by default). Each ends with its
+library and the AGPL, 0004 web stack, 0005 the second automated check, 0006 the page math pass (a proposal, off by default), 0007 converting scanned and handwritten pages. Each ends with its
 consequences.
 
 ## If you want to run it as a service
@@ -51,7 +51,8 @@ says how to report a vulnerability.
 
 ## Reading notes
 
-- **Labels such as "MF10", "BW9", "FEATURE-REVIEW 10.3" or "handwriting design 3.3"** point
+- **Labels such as "MF10", "BW9", "FEATURE-REVIEW 10.3", "handwriting design 3.3" or a
+  backlog id like "T2-0" or "T3-30"** point
   into internal working notes (UX and feature reviews) that are not part of this
   repository. The text around each label states the decision, so nothing depends on
   finding the note.

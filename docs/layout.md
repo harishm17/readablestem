@@ -1178,7 +1178,7 @@ The decisions in the rules, with the measured values next to each threshold in t
   pinned to one core: the upload probe on a 19.6 MB file of 17 pages of dense synthetic
   ink (no text layer) took 13.8 s alone and 17.4 s with another busy process on the same
   core, under the probe's 30 s limit; the file was accepted, because pages not analysed
-  in time never refuse an upload. Not measured on Cloud Run's 1 vCPU. A page not analysed
+  in time never refuse an upload. Not measured on the host's CPU allowance. A page not analysed
   with less than a line of typed text is kept as its image beside that text; with a line
   or more it is read as before (its drawings are figures for the figure model), unless a
   drawing fills the page, which keeps the page image (the safety net below). So writing

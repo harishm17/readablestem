@@ -1,14 +1,17 @@
 """CLI commands: readablestem ops aggregate|purge|cron|launch-check|backup-check|restore-drill|
 report|export-opted-in|decisions-canary|claude-canary.
 
-The same tasks the web app runs on Cloud Scheduler's hourly call, for running by hand or
-from a Cloud Run job. Output is counts only, as `key=value` pairs on one line; database
-errors are reported by type, because their messages can include connection details.
+The same tasks the web app runs on its hourly cron call, for running by hand or as the
+Railway `cron` service (`readablestem ops cron`). Output is counts only, as `key=value` pairs on
+one line; database errors are reported by type, because their messages can include
+connection details.
 `backup-check` and `restore-drill` (ops/backup.py) say whether a database copy can run the
 app and whether dump-and-restore works; they print table names and counts only.
-`decisions-canary` is the Decisions API drift canary the hourly cron runs once a day
-(ops/canary.py); by hand it needs no database, only a key and `--max-usd`.
-`claude-canary` is the same for the Claude second check (ops/claude_canary.py).
+`decisions-canary` is the Decisions API drift canary that the HTTP cron route runs once a
+day (ops/canary.py; `ops cron` does not); by hand it needs no database, only a key and
+`--max-usd`.
+`claude-canary` is the same for the Claude second check (ops/claude_canary.py). Nothing in
+production calls either, because production runs `ops cron`: run them by hand.
 """
 
 from __future__ import annotations

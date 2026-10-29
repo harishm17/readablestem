@@ -42,7 +42,7 @@ Account page when you are done.
 - Secrets in the repository, its history, the CI workflows or the deploy scripts.
 
 Out of scope: findings that need an already compromised account or machine, volumetric
-denial of service, social engineering, and problems in OpenAI, Anthropic, Google Cloud or Microsoft
+denial of service, social engineering, and problems in OpenAI, Anthropic, Railway, Google Cloud or Microsoft
 services (report those to the provider). A wrong equation or a poor alt text is a
 quality bug, not a vulnerability, unless it also leaks data. Please open an ordinary issue
 for those.

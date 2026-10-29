@@ -1,6 +1,6 @@
 """Background worker: claims queued jobs from the database and converts them.
 
-One worker thread runs inside the web process (Cloud Run, min-instances=1), but the
+One worker thread runs inside the web process (one replica in production), but the
 queue is safe with several workers or instances:
 
 - Claiming is atomic. Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` (two workers never
@@ -48,8 +48,8 @@ queue is safe with several workers or instances:
   `jobs.model_calls` and is never refused by the call cap (`core.budget`).
 - Retention backstop: once an hour the worker loop runs the purge itself
   (`ops.retention.purge_expired`, logged as `purge_done source=worker`). The hourly
-  Cloud Scheduler call stays the primary path; this keeps the 24-hour deletion promise
-  if the scheduler stops (a rotated token, a paused job). A backstop run that deletes
+  cron (the Railway `cron` service) stays the primary path; this keeps the 24-hour deletion
+  promise if it stops (a failed run, a paused service). A backstop run that deletes
   anything logs `purge_backstop_deleted`, which means the scheduler is late.
 - Results are stored only if this worker still owns the job (same attempt, still
   running), so a job deleted or requeued meanwhile is never resurrected. If storing
@@ -1365,9 +1365,11 @@ class Worker:
 
     def begin_shutdown(self, timeout: float = 6.0) -> None:
         """Start `stop` on another thread and return at once. Called from the SIGTERM
-        handler: Cloud Run kills the process 10 seconds after the signal, so the claim
-        loop must stop and the running job's lease must end now, not after uvicorn has
-        finished draining connections. Safe to call twice; `stop` is idempotent."""
+        handler: the host kills the process a short time after the signal (none at all on
+        Railway unless `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` is set; 10 seconds on Cloud
+        Run), so the claim loop must stop and the running job's lease must end now, not
+        after uvicorn has finished draining connections. Safe to call twice; `stop` is
+        idempotent."""
         if self._shutdown_thread is not None:
             return
         self._stop.set()

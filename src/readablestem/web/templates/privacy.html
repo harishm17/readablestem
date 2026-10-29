@@ -46,9 +46,9 @@
     Nothing is sent to an AI service until you choose the pages. The sample document is
     a recorded conversion of a published textbook section, not your file: it is deleted on the
     same schedule as your own documents.</li>
-  {# Railway's Daily backup schedule keeps each backup for about 6 days
-     (docs/deploy-railway.md, "Backups"). Keep this sentence true: if the schedule or the
-     kept time changes, change the sentence; weekly or monthly schedules would stretch it. #}
+  {# The Railway `backup` service (.railway/railway.ts) dumps the database daily and keeps the
+     last 6 dumps (docs/deploy-railway.md, "Backups"). Keep this sentence true: if the
+     schedule or the kept time changes, change the sentence. #}
   <li>The database is backed up once a day by our host, Railway, and each daily backup is
     kept for about 6 days, so a deleted document can remain in a backup for up to about a
     week after you delete it. Backups are only used to recover the service after a

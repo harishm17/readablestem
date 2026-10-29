@@ -51,6 +51,13 @@ colour and course-notation memory were built behind flags that are off by defaul
 tables have their own amendment in ADR 0003. They are
 not part of the beta scope above until their flags are turned on.
 
+**Update (2026-10-29).** Hosting moved from Cloud Run to Railway (one web service, Railway
+Postgres, a cron service and a backup service, described in `.railway/railway.ts` and
+[deploy-railway.md](../deploy-railway.md)). The uptime check with an email alert is now the
+weekly GitHub `uptime.yml` plus Railway's project notifications, and the Google Cloud billing
+row above does not apply to production. Production uses the Anthropic provider (see the update
+in ADR 0002). The Cloud Run guide ([deploy.md](../deploy.md)) stays as an alternative.
+
 **Questions that were open on 2026-10-06**
 
 | Question | Outcome |
@@ -58,7 +65,7 @@ not part of the beta scope above until their flags are turned on.
 | Tables in the beta? | Out for 2026 and listed on the known-limits page. The code exists behind `FEATURE_TABLES` (off) |
 | Model routing (cheap cases to a cheap model)? | Yes: ADR 0002 |
 | Fallback model per step? | Yes, each model is the other's fallback: ADR 0002 |
-| Hosting | Cloud Run, one service: ADR 0004 |
+| Hosting | Cloud Run, one service: ADR 0004 (moved to Railway, see its update) |
 | Code licence | **MIT**, decided 2026-10-06. The shortest widely recognised permissive licence; Apache-2.0's patent grant was judged unnecessary for a small project. Data under `data/gold/` stays CC BY 4.0 |
 
 ## New facts from building the skeleton (2026-10-06, checked against live OpenStax APIs)

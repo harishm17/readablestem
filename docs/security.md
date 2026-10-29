@@ -21,10 +21,10 @@ cookie; the model provider's API key and the daily spend it can create; the data
 | A crafted PDF | Crash or stall the parser, balloon memory, smuggle text that becomes HTML or a prompt | Isolated probe process with time and memory limits, page and size limits, escaping and allowlists on everything that reaches HTML |
 | The model's output | Contain markup, script, unsafe URLs, wrong content | Validation before use; HTML built by escaping and by rebuilding MathML from an allowlisted tree |
 | A person with read access to logs, traces or the aggregate tables | Read document content if it were there | Content-free logging by construction; no document text in events, aggregates or traces |
-| A compromised dependency or a leaked key | Run code, spend money | Locked and audited dependencies, pinned CI actions, spend caps, secrets only in Secret Manager |
+| A compromised dependency or a leaked key | Run code, spend money | Locked and audited dependencies, pinned CI actions, spend caps, secrets only in Railway's service variables (never in the repository; `.railway/railway.ts` lists names only) |
 
 **Not defended:** a compromised instructor account or machine; a malicious operator; volumetric
-denial of service (Cloud Run and Cloud Armor are the answer, not this app); the model
+denial of service (the host and its edge are the answer, not this app); the model
 provider's own handling of what is sent to it (see "Where document data goes").
 
 ## Controls
@@ -190,8 +190,8 @@ script injected into an app page is refused by the policy.
 
 The rate limit is on by default and production refuses to start with `RATE_LIMITS_ENABLED=false`. It is in memory, per instance: with two instances the allowance is doubled, and a
 restart forgets it. It is a seatbelt for a few people, not a flood defence. The address is the
-entry `TRUSTED_PROXY_HOPS` places from the right of `X-Forwarded-For` (1 on Cloud Run, 2 behind
-an external load balancer); entries further left are written by the client and never
+entry `TRUSTED_PROXY_HOPS` places from the right of `X-Forwarded-For` (1 with Railway's edge alone, which is production; 2 if another proxy such as Cloudflare's sits in
+front as well); entries further left are written by the client and never
 believed. **If this is set wrong the limits are shared by everyone or by no one**.
 
 A Word or PowerPoint file (T3-30) is handled the same way, with more care because
@@ -207,7 +207,7 @@ every protocol (a second line of defence: with the check skipped, the socket sti
 connection), a private profile in a private directory that is removed afterwards, resource
 limits, and its process group killed at the timeout. The upload exists on disk, in a
 directory only the child can read, for the seconds the conversion takes (LibreOffice cannot
-read from a pipe); on Cloud Run that file system is memory. Hostile files end in a category,
+read from a pipe); the container's file system is not kept across restarts. Hostile files end in a category,
 never an exception or a hang; byte-mutated files never escape as another exception. The PDF
 that comes out is probed like any upload, and only it is stored.
 
@@ -258,21 +258,30 @@ a wrong alt text or equation, which the instructor reviews.
   the job, its blobs and review edits. `test_audit_privacy.py` moves a clock through the
   upload route, the job page and the cron endpoint to check 23 h 59 min, 24 h 1 min, 29 days
   and 30 days 1 min. "Delete now" removes the same rows at once.
+- The same clock covers what is made from a document: a large file kept while its pages are
+  chosen (`pending_uploads`, `RETENTION_HOURS` after it was made), the answer page of a
+  multi-file upload (`upload_results`, an hour after it was made) and the sample document. Usage
+  events are deleted after 400 days or with the person. The keyed hash kept for the rest of
+  the day after an account is deleted (so the day's limits are not reset) is deleted the next
+  day. Accounts, the daily spend and quota counters and the content-free aggregates are kept
+  until a person deletes the account (counters and aggregates hold no content or link to
+  them). Details: docs/operations.md, "Retention".
 - Erasure of a person (`readablestem users delete EMAIL --yes`, or the person's own "Delete my
   account", `ops.retention.erase_user`)
   removes their jobs, blobs, review edits, courses and notation, events, sign-in identities,
   quota rows and the user. Only content-free aggregates and global daily spend remain. A test
   fails when a table with a user id is added without being listed there.
-- **What deletion does not reach:** Postgres keeps dead rows until vacuum; Cloud SQL backups
-  hold every document that existed when they ran (the deploy keeps one daily backup, no
-  point-in-time recovery); Cloud Run's own request logs hold URLs (job ids, and for one
-  moment an OAuth `code`) and client addresses; and the model provider's copy (below).
+- **What deletion does not reach:** Postgres keeps dead rows until vacuum; the daily database
+  backups hold every document that existed when they ran (the `backup` service on Railway keeps
+  the last 6 dumps, no point-in-time recovery, so up to about a week after a deletion); Railway's
+  own request logs hold URLs (job ids, and for one moment an OAuth `code`) and client
+  addresses, for a time that depends on the plan; and the model provider's copy (below).
 
 ### Where document data goes
 
 | Recipient | What | How long |
 |---|---|---|
-| Google Cloud (Cloud Run, Cloud SQL) | The PDF, results and HTML while retained; sessions; logs without content | Until the retention time; backups roughly one more day |
+| Railway (the web service, Railway Postgres and the `backup` volume) | The PDF, results and HTML while retained; sessions; logs without content | Until the retention time; backups up to about a week more |
 | The model provider (`MODEL_PROVIDER`) | Images cut from the page (equations, figures, and tables when enabled) with a short fenced piece of nearby text; a course's notation when that feature is on. No file name, no email, never the whole PDF | OpenAI: requests are sent with `store=False`. Anthropic: per its published policy, deleted from its systems within 30 days (longer for material its safety systems flag); zero retention only by agreement |
 | Langfuse (only if tracing is on) | Timings, model names, token counts, costs, error categories, random ids; payloads are masked | Set in the Langfuse project |
 
@@ -344,7 +353,7 @@ Triage of what the scanners reported:
   it: a bug in LibreOffice's own parsers is contained by the child's environment, limits and
   timeout, not prevented. Turning `OFFICE_INPUT_ENABLED` off, or not installing LibreOffice
   (the production image does not unless built with it), removes the exposure.
-- The emailed sign-in link (when it is switched on) is in a URL: Cloud Run's request logs and
+- The emailed sign-in link (when it is switched on) is in a URL: Railway's request logs and
   the recipient's mail provider hold it until it expires or is used, and anyone who reads the
   mailbox can sign in.
 - Rate limits and the upload gate are per instance and in memory.

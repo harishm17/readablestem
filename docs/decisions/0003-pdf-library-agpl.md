@@ -55,7 +55,8 @@ read as display equations and blank ruled tables as figures. PyMuPDF's own
 2026-10-08 benchmark. The evaluation (the author's private research notes, which are not
 in this repository, so these numbers cannot be reproduced from here; their method is in
 `docs/tables.md`) compared six detectors and four structure
-recognisers that fit Cloud Run (1 vCPU, 1 GiB).
+recognisers that fit Cloud Run (1 vCPU, 1 GiB; the service has since moved to Railway, see
+ADR 0004).
 
 ### Decision
 

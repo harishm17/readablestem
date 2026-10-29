@@ -1,7 +1,7 @@
 """Database-backed daily spend cap: `core.budget.SpendGuard` over the `spend_days` table.
 
 Every model call reserves its worst-case cost first. With several workers (threads or
-Cloud Run instances) the check and the hold must be one atomic step, so `reserve` is a
+service instances) the check and the hold must be one atomic step, so `reserve` is a
 single conditional UPDATE:
 
     UPDATE spend_days SET held_usd = held_usd + :a

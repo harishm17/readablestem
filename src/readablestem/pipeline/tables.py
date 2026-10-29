@@ -380,7 +380,8 @@ LAYOUT_SESSIONS: list[SessionInfo] = []  # filled when pymupdf.layout loads its 
 
 def cpu_allowance() -> int:
     """CPUs this process may use: its CPU affinity, capped by a cgroup CPU quota
-    (Cloud Run's `--cpu`, Docker's `--cpus`), rounded up, at least 1."""
+    (a container CPU limit such as Docker's `--cpus` or Cloud Run's `--cpu`), rounded up, at
+    least 1."""
     try:
         count = len(os.sched_getaffinity(0))
     except (AttributeError, OSError):

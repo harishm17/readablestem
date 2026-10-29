@@ -78,6 +78,12 @@ Where it lives: `models/decisions_client.py`, `models/verifier.py`, `models/pric
 `ops/aggregate.py`, `ops/report.py`, `ops/canary.py`, `eval/verifier_metrics.py`. Details:
 docs/steps.md "Second automated check", docs/eval.md, docs/operations.md.
 
+**Update (2026-10-29).** The Decisions API is OpenAI's, so this check runs only with
+`MODEL_PROVIDER=openai`. Production runs `anthropic`, where the `DECISIONS_*` settings (still
+listed in `.railway/railway.ts`) do nothing and the Claude second check
+([steps.md](../steps.md), "Second check on Claude") takes its place. The daily canary only runs
+in the HTTP cron route, which production does not call (its cron service runs `ops cron`).
+
 ## Measured on this branch (2026-10-08)
 
 | Run | Result | Added cost |

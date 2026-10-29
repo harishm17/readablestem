@@ -115,7 +115,7 @@ Allowlist. They must also be test users in item 4 while the consent screen is in
 and anyone with a Google account can sign in; people who sign themselves up are in the open
 tier, and allowing one makes them an instructor.
 
-**9. HARISH: backups, once** (details in operations.md, "Backups and restore"):
+**9. HARISH: backups, once** (details in "Cloud SQL backups, alerts and fixes" below):
 
 ```sh
 ./deploy/backups.sh status        # automated backups on, newest under 36 hours old
@@ -408,12 +408,13 @@ What follows from it:
   while a 30-page conversion ran on the single CPU.
 - **Concurrency** `20` requests per instance is far above need; nothing is CPU bound in a
   request. `--max-instances=2` keeps database connections under db-f1-micro's 25 (each
-  instance pools up to 5), and a second instance would only take pages, not a job.
+  instance pools up to 5: 3 plus 2 overflow), and a second instance would only take pages, not a job.
 - **Request timeout** `300` seconds: it covers the upload request (a 20 MB file on a slow
   link) and every page; the conversion runs on the worker thread, which a request timeout
   does not stop. It was 900.
-- **Worker**: one job at a time per instance; the model steps inside it run 4 at once
-  (`convert_pdf`; more would put more reservations in flight and the CPU is not the limit).
+- **Worker**: one job at a time per instance; the model steps inside it run 8 at once
+  (`MODEL_CONCURRENCY`, "Concurrency" above; fewer when the job's caps could not hold that many
+  reservations; the CPU is not the limit).
   `WORKER_POLL_S=2`. The job time limit is 180 s plus 30 s a page (18 minutes for 30
   pages: 20x the measurement); it was 300 s plus 90 s a page. A job claimed again after a
   restart counts an attempt; three attempts end in `lease_expired`. On SIGTERM the worker
@@ -595,7 +596,7 @@ Why these Cloud Run settings: the worker thread that converts PDFs lives in the 
 process, so one instance is always up and its CPU stays allocated between requests;
 `--max-instances=2` bounds both cost and database connections. On db-f1-micro Postgres
 allows 25 connections, which two instances at the default pool size come close to; see
-operations.md before raising the instance count.
+"Cloud SQL backups, alerts and fixes" below before raising the instance count.
 
 ### Backups and deleted documents
 
@@ -622,7 +623,7 @@ recovery) and say so on the privacy page. What would be lost in a disaster is sm
 mostly rebuildable: the allowlist, courses and notation, and the content-free counts;
 documents are gone after a day by design, and an instructor can upload again. How to
 check the backup, take an extra one and prove a restore works is in
-[operations.md](operations.md), "Backups and restore".
+"Cloud SQL backups, alerts and fixes" below.
 
 With `DB_MODE=external`, the same applies to your provider's backups.
 
@@ -821,6 +822,104 @@ item 6), add it as a version, deploy, check a Microsoft sign-in, then delete the
 secret in the Entra app. For `database-url`, change the user's password first
 (`gcloud sql users set-password a11y --instance=readablestem-db --prompt-for-password`),
 then add the new URL as a version.
+
+## Cloud SQL backups, alerts and fixes (Cloud Run path)
+
+Production runs on Railway, where [operations.md](operations.md) ("Backups and restore") and
+[deploy-railway.md](deploy-railway.md) apply. This section is what `deploy/deploy.sh` sets up
+on Google Cloud and how to use it.
+
+**Alerts the script creates.** Cloud Monitoring checks `/readyz` every 5 minutes and emails
+`ALERT_EMAIL` when the database, the worker thread or the model provider setting is not ok for
+10 minutes. Log-based alerts email it when there is no `cron_done` for 2 hours, or on any
+`cron_refused`, `aggregate_failed`, `purge_backstop_deleted`, `purge_backstop_failed` or failed
+Cloud Scheduler attempt. The scheduler calls `POST /internal/cron/aggregate-and-purge` hourly;
+that route also runs the daily canaries (operations.md, "Decisions canary"). Run it by hand with
+`gcloud scheduler jobs run readablestem-cron --location="$REGION" --project="$PROJECT_ID"`.
+Log queries: Logs Explorer with `resource.type="cloud_run_revision"` and
+`jsonPayload.message="..."` for the event names in operations.md.
+
+| Symptom | Look at | Usual fix |
+|---|---|---|
+| Uptime alert email | `severity>=WARNING` logs; `gcloud run revisions list` | Roll back traffic to the last good revision ("Roll back") |
+| `/readyz` shows `worker: stalled` or `stopped` | `worker_loop_error`, `lease_refresh_failed` in the logs | Deploy a new revision (`./deploy/deploy.sh service`) or `gcloud run services update ReadableSTEM --region="$REGION" --project="$PROJECT_ID" --update-env-vars=RESTARTED_AT=$(date +%s)`; the running job's lease expires and it is requeued |
+| `/readyz` shows `model_provider: no_key` | The `anthropic-api-key` secret has a version and the service reads `:latest` | Add the secret version and redeploy |
+| "cron not running" or "cron or purge problem" alert | `jsonPayload.message=("cron_done" OR "cron_refused" OR "aggregate_failed" OR "purge_backstop_deleted")`; Cloud Scheduler > job history | The worker's backstop keeps purging meanwhile; fix the scheduler anyway |
+| Cron returns 403 | `cron_refused` in logs | The scheduler's token differs from the secret, usually after a rotation: `./deploy/deploy.sh cron` |
+| Too many connections | Cloud SQL connection count (25 on db-f1-micro) | Each instance pools up to 5 connections (3 plus 2 overflow); keep `--max-instances=2` or move to `db-g1-small` (50) |
+
+The `decisions_canary_drift` ERROR line has no alert policy. To be emailed, add it to the
+`$SERVICE-cron-problems` log metric in `deploy/deploy.sh`, or give it a policy of its own.
+
+**What the deploy sets up.** Cloud SQL's automated backup, daily at 08:00 UTC, of which
+`SQL_RETAINED_BACKUPS` (1) is kept, and no point-in-time recovery. That is deliberate:
+every backup holds the documents present when it ran, so keeping seven would stretch
+"deleted after 24 hours" to a week, and the transaction logs of point-in-time recovery
+would do the same ("Backups and deleted documents" above). The cost is a restore
+point up to a day old and no recovery to a chosen minute. If you need that, enable it on
+purpose and change the privacy page: `gcloud sql instances patch readablestem-db
+--enable-point-in-time-recovery --retained-transaction-log-days=3`.
+
+**Check it weekly** (a calendar reminder is enough; exits 1 when something needs you):
+
+```sh
+set -a; . deploy/.env.deploy; set +a
+./deploy/backups.sh status
+```
+
+It reports: automated backups on; the newest successful automated backup is under 36 hours
+old; and no manual backup older than 7 days (a manual backup is kept until deleted, so it
+outlives the retention promise). `./deploy/backups.sh list` shows every backup.
+
+**Before a risky change** (a migration that drops or renames something, a restore):
+
+```sh
+./deploy/backups.sh now                      # one on-demand backup
+# ... make the change, check it ...
+gcloud sql backups delete BACKUP_ID --instance=readablestem-db --project="$PROJECT_ID"
+```
+
+**Prove a restore works (the drill; do it once before real use and after any big schema
+change; it costs a few cents).** This restores the newest backup into a throwaway
+instance, so the live database is never touched:
+
+```sh
+./deploy/backups.sh list                     # note the newest BACKUP_ID (status SUCCESSFUL)
+gcloud sql instances create readablestem-db-drill --database-version=POSTGRES_16 \
+  --edition=enterprise --tier=db-f1-micro --region="$REGION" --storage-size=10 \
+  --project="$PROJECT_ID"
+gcloud sql backups restore BACKUP_ID --restore-instance=readablestem-db-drill \
+  --backup-instance=readablestem-db --project="$PROJECT_ID"
+gcloud sql users set-password postgres --instance=readablestem-db-drill \
+  --prompt-for-password --project="$PROJECT_ID"
+# in a second terminal: the Cloud SQL Auth Proxy to the drill instance
+cloud-sql-proxy "$PROJECT_ID:$REGION:readablestem-db-drill" --port 5433
+```
+
+then, from the checkout:
+
+```sh
+read -rs PGPW; export DATABASE_URL="postgresql+psycopg://postgres:${PGPW}@127.0.0.1:5433/a11y"; unset PGPW
+uv run readablestem ops backup-check
+gcloud sql instances delete readablestem-db-drill --project="$PROJECT_ID"   # when done
+```
+
+`backup-check` reads the copy and prints table names and row counts only. It exits 1 unless
+the schema is at this release's migration head (`schema=head`; `ahead` means a newer
+release migrated it, fine for a rollback), every table exists, and at least one admin can
+sign in. It also prints the age of the newest job and the newest spend day, which should
+match the day the backup was taken.
+
+**Restoring for real.** To go back to a backup in place (this overwrites the instance):
+
+```sh
+gcloud sql backups restore BACKUP_ID --restore-instance=readablestem-db --project="$PROJECT_ID"
+gcloud scheduler jobs run readablestem-cron --location="$REGION" --project="$PROJECT_ID"
+```
+
+Run the cron right after: the restore brings back documents that retention had already
+deleted, and the purge removes them again. Then `uv run readablestem ops backup-check`
+against the instance (through the proxy) and a sign-in.
 
 ## Tear down
 

@@ -16,7 +16,9 @@ from typing import Annotated, Literal
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-# The two models Harish chose on 2026-10-07 (ADR 0002). Each is the other's fallback.
+# The OpenAI pair Harish chose on 2026-10-07 (ADR 0002), used when MODEL_PROVIDER=openai,
+# which is the default in code. Production runs MODEL_PROVIDER=anthropic (the pair below).
+# Each model is the other's fallback.
 MAIN_MODEL = "gpt-6.1-sol"
 CHEAP_MODEL = "gpt-6-luna"
 # The Claude models used when MODEL_PROVIDER=anthropic:
@@ -136,6 +138,8 @@ class Settings(BaseSettings):
     fake_models: bool = False
 
     # --- second automated check: the OpenAI Decisions API (ADR 0005, docs/steps.md)
+    # All the DECISIONS_* settings take effect only with MODEL_PROVIDER=openai
+    # (`models.verifier.any_check_enabled`); under anthropic they do nothing.
     # Only gpt-6-luna serves /v1/decisions. Answers come back in ~0.15 s, so a short
     # timeout: a slow check is skipped (fail-open), it never holds up a conversion.
     decisions_model: str = CHEAP_MODEL
@@ -156,8 +160,9 @@ class Settings(BaseSettings):
     # Shadow only: P(meaning_changing) at or above this counts as "would flag" in the
     # aggregates and the eval (research value, tuned in-sample; not a gate).
     decisions_equation_flag_at: float = Field(default=0.2, ge=0, le=1)
-    # A daily drift canary in the hourly cron (ops/canary.py): ~20 fixed requests, at
-    # most once per UTC day; an answer that moves by more than 0.02 logs an ERROR.
+    # A daily drift canary (ops/canary.py): ~20 fixed requests, at most once per UTC day; an
+    # answer that moves by more than 0.02 logs an ERROR. Only the HTTP cron route runs it,
+    # not `ops cron`, and not with MODEL_PROVIDER=anthropic.
     decisions_canary: bool = True
 
     # --- second automated check on Claude (T2-20; docs/steps.md "Second check on Claude")
@@ -184,7 +189,8 @@ class Settings(BaseSettings):
     # A slow check is skipped (fail-open), it never holds up a conversion; no retries.
     claude_check_timeout_s: float = Field(default=45.0, gt=0)
     # Daily canary of the Claude check on fixed synthetic cases with known answers
-    # (ops/claude_canary.py); about 12 requests, at most once per UTC day.
+    # (ops/claude_canary.py); about 12 requests, at most once per UTC day. Only the HTTP
+    # cron route runs it, not `ops cron` (what production runs).
     claude_canary: bool = True
     # More cases than this answered against their known truth is drift (an ERROR line).
     claude_canary_max_misses: int = Field(default=1, ge=0)
@@ -224,7 +230,8 @@ class Settings(BaseSettings):
     # Larger than a conversion takes (MAX_PAGES_PER_JOB pages, MAX_UPLOAD_MB): a file up to
     # this many MB and pages is kept so the person can choose which pages to convert, in
     # parts that each fit (web/pending.py). Also the most one upload request may carry, files
-    # together: Cloud Run takes at most 32 MiB in a request. Equal to the limits above, it
+    # together. 30 was chosen under Cloud Run's 32 MiB request limit; Railway documents no
+    # request-size limit (docs/deploy-railway.md). Equal to the limits above, it
     # turns the feature off (the file is refused, as before).
     max_large_upload_mb: int = Field(default=30, gt=0)
     max_source_pages: int = Field(default=300, gt=0)
@@ -273,9 +280,10 @@ class Settings(BaseSettings):
     email_sender: str | None = None
     # How long an emailed link works, in minutes. It works once.
     email_link_minutes: int = Field(default=15, ge=5, le=60)
-    # Shared secret that Cloud Scheduler sends to /internal/cron/* (header X-Cron-Token).
+    # Shared secret that a scheduler sends to /internal/cron/* (header X-Cron-Token). Production
+    # does not call that route: its cron service runs `readablestem ops cron` instead.
     cron_token: SecretStr | None = None
-    # Run the background worker thread inside the web process (one Cloud Run service).
+    # Run the background worker thread inside the web process (one web service).
     run_worker: bool = True
     worker_poll_s: float = Field(default=2.0, gt=0)
     # Load the table detector and the structure model when the worker starts (production
@@ -283,8 +291,9 @@ class Settings(BaseSettings):
     # first conversion after every start.
     preload_table_models: bool = True
     # How many proxies in front of the app write the caller's address into the right-hand end
-    # of X-Forwarded-For (web/abuse.py): 1 on Cloud Run, 2 behind an external load balancer
-    # as well, 0 with none (the peer address is used and the header is ignored).
+    # of X-Forwarded-For (web/abuse.py): 1 with the platform's front end alone (Railway,
+    # Cloud Run), 2 with another proxy such as Cloudflare's as well, 0 with none (the peer
+    # address is used and the header is ignored).
     trusted_proxy_hops: int = Field(default=1, ge=0, le=5)
     # The per-address and per-person rate limits (web/abuse.py). On by default and required in
     # production; only a local load test or a browser test server has a reason to turn it off.

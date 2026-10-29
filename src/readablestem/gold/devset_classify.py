@@ -27,7 +27,7 @@ class DevClass:
     label: str
     unit: str  # what one item is: equation, script run, heading, table, ...
     target: int  # items wanted in the whole set (maths classes: 20 to 40)
-    backlog: str  # the IMPROVEMENTS.md rows this class feeds
+    backlog: str  # the backlog items (T2-n) this class feeds
 
 
 CLASSES: tuple[DevClass, ...] = (
