@@ -188,7 +188,8 @@ def llms_txt(site: str, showcase: bool) -> str:
         "",
         "## Source and author",
         "",
-        f"- [Source code]({SOURCE_URL}): MIT licence",
+        f"- [Source code]({SOURCE_URL}): the code is MIT; the hosted service is offered "
+        "under AGPL-3.0 terms",
         f"- [README]({SOURCE_URL}/blob/main/README.md)",
         f"- [{AUTHOR}]({AUTHOR_URL}): the developer",
         f"- [Case study]({CASE_STUDY_URL})",
