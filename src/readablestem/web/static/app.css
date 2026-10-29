@@ -183,6 +183,11 @@ table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1rem; }
 th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
 thead th { border-bottom: 2px solid var(--border); }
 tbody th { font-weight: 600; }
+/* The comparison guide's table (templates/guide_compare.html): four columns do not fit a
+   phone, so it keeps a readable width and scrolls inside its focusable box. Row headings
+   keep whole words (the rule for headings breaks them anywhere). */
+.compare-table { min-width: 46rem; }
+.compare-table tbody th { overflow-wrap: normal; width: 8rem; }
 .num { text-align: right; }
 
 /* Status badges: the text says the status; the colour only repeats it. A small radius,
