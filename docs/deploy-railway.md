@@ -158,7 +158,7 @@ production if a required one is missing, and logs the reason):
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | Defaults 24 hours and 30 days. | Leave unset. If you set them, the cron service needs the same values (reference the web service's). |
 | `CLAUDE_CANARY` | Daily drift check of the Claude second check. Only the HTTP cron route runs it, so with the cron service it never runs and this variable does nothing. | Leave unset. |
 | `INSTALL_LIBREOFFICE` | Build argument, see decision 4. | Unset. |
-| `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | How long Railway waits between SIGTERM and SIGKILL for the old deployment (its documented default is 0). **Not set in production**, so the old process can be killed at once on a deploy. The worker stops claiming at once on SIGTERM and gives its running job back; if it is killed first, the job's lease runs out and the job restarts. uvicorn would wait 5 s for open connections. | `10` would let the shutdown finish; not applied yet |
+| `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | How long Railway waits between SIGTERM and SIGKILL for the old deployment (its documented default is 0). The worker stops claiming at once on SIGTERM and gives its running job back; uvicorn waits up to 5 s for open connections, then the worker stop up to 3 s. | `10`, set as `deploy.drainingSeconds` on `web` in `.railway/railway.ts` |
 | `TRACING_ENABLED` and the Langfuse keys | Off. | Leave off. |
 
 The Google client needs `https://readablestem.com/auth/callback` as an authorized redirect URI

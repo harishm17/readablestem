@@ -6,7 +6,7 @@ provider is set up. Each check is one word; nothing in the answer comes from a s
 value, so a key or a connection string can never end up in it.
 
 The host sends SIGTERM and later kills the process. On Railway the gap is
-`RAILWAY_DEPLOYMENT_DRAINING_SECONDS` (0 unless set; Cloud Run gave 10 seconds). uvicorn
+`RAILWAY_DEPLOYMENT_DRAINING_SECONDS`, 10 seconds for `web` (.railway/railway.ts). uvicorn
 reacts by closing its listeners and waiting for connections, and only then runs the lifespan
 shutdown that stops the worker, so a job could be claimed (and model calls paid for) after
 the signal. `stop_worker_on_sigterm` puts a handler in front of
