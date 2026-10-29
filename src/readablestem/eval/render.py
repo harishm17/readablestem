@@ -990,7 +990,8 @@ def demo_note_html(
     """Short accessible note placed above the converted page in the public demo.
 
     It links back to the app and, when `source_url` is given, to the source code (the
-    AGPL notice every page of the service carries). A `placeholder` demo (built with the
+    licence notice every page of the service carries: code MIT, service offered under
+    AGPL-3.0 terms). A `placeholder` demo (built with the
     offline client) says so in a marked paragraph.
     """
     esc = html.escape
@@ -1003,9 +1004,9 @@ def demo_note_html(
         else ""
     )
     source = (
-        f' ReadableSTEM is free, open-source software; its complete <a href="'
-        f'{esc(source_url, quote=True)}">source code is on GitHub</a> (it uses PyMuPDF under the '
-        "GNU Affero General Public License v3)."
+        " The code is MIT. The hosted service links PyMuPDF, which is AGPL-3.0, so the service "
+        "is offered under AGPL-3.0 terms and its complete "
+        f'<a href="{esc(source_url, quote=True)}">source code is on GitHub</a>.'
         if source_url
         else ""
     )

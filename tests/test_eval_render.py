@@ -297,7 +297,10 @@ def test_demo_links_back_to_the_app_and_to_the_source_and_marks_placeholders():
         "<main></main>", page, date="2026-10-07", source_url="https://example.org/src"
     )
     assert '<a href="/">Back to ReadableSTEM</a>' in wrapped
-    assert '<a href="https://example.org/src">' in wrapped and "Affero" in wrapped
+    assert (
+        '<a href="https://example.org/src">' in wrapped
+        and "offered under AGPL-3.0 terms" in wrapped
+    )
     assert "data-readablestem-demo" not in wrapped
     fake = wrap_demo_html("<main></main>", page, date="2026-10-07", placeholder=True)
     assert 'data-readablestem-demo="placeholder"' in fake and "Placeholder output." in fake

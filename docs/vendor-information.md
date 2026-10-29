@@ -51,7 +51,7 @@ checks ran, and what was not checked.
   application against a written checklist and ran automated accessibility tests on its
   pages (`docs/security.md`, `docs/web.md`).
 - **One developer.** The beta is run by an individual developer (an independent project), not a company or a university, with
-  no support contract. The source code is published under the AGPL.
+  no support contract. The code is MIT. The hosted service links PyMuPDF, which is AGPL-3.0, so the service is offered under AGPL-3.0 terms and links its complete source.
 
 ## Where to read more
 
