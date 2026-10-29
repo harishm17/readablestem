@@ -213,6 +213,21 @@ def test_the_sites_own_pages_have_no_scripts_and_no_inline_event_handlers(built)
         assert not re.search(r"\son[a-z]+\s*=", text), rel
 
 
+def test_the_sites_own_pages_fit_the_apps_style_policy(built):
+    """The app serves these pages at /showcase/ under its own CSP (style-src 'self'): no
+    inline style attribute or <style> element, and each page has its own description."""
+    out, _ = built
+    descriptions = {}
+    for rel in OWN_PAGES | {str(p.relative_to(out)) for p in out.glob("examples/*/index.html")}:
+        text = (out / rel).read_text(encoding="utf-8")
+        assert not re.search(r"\sstyle\s*=", text) and "<style" not in text, rel
+        match = re.search(r'<meta name="description" content="([^"]+)"', text)
+        assert match, rel
+        descriptions[rel] = match.group(1)
+    pages = {rel: d for rel, d in descriptions.items() if rel != "404.html"}
+    assert len(set(pages.values())) == len(pages), pages
+
+
 def test_css_loads_nothing_from_outside(built):
     out, _ = built
     for css in out.glob("assets/*.css"):

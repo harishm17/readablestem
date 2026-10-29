@@ -43,6 +43,8 @@ DEFAULT_OUT = SITE_DIR / "_build"
 REPO_URL = "https://github.com/harishm17/readablestem"
 STEMCHECK_URL = "https://github.com/harishm17/stemcheck"
 AUTHOR = "Harish Manoharan"
+AUTHOR_URL = "https://harishmanoharan.com"
+APP_URL = "https://readablestem.com/"
 CC_BY = "https://creativecommons.org/licenses/by/4.0/"
 
 # Rendering. A page is shown about 600 px wide; 1.5x keeps it sharp on a high-density screen.
@@ -985,6 +987,30 @@ def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+# The meta description of each page (search results and link previews).
+DESCRIPTIONS = {
+    "index.html": "A static demo of ReadableSTEM, which helps instructors turn STEM course PDFs "
+    "into accessible web pages. Real OpenStax pages, no sign-in.",
+    "examples/index.html": "Worked examples of ReadableSTEM on real OpenStax pages: the PDF "
+    "pages beside the HTML they became, what the checks found and the decisions a person "
+    "would see.",
+    "before-after/index.html": "Equations before and after ReadableSTEM: the PDF's text layer "
+    "and how a screen reader reads it, beside the HTML's MathML and its reading.",
+    "stemcheck/index.html": "stemcheck, a separate open-source checker that compares an HTML "
+    "file with the PDF it came from, and one report it wrote.",
+    "method/index.html": "How the ReadableSTEM numbers and examples were made, and the limits "
+    "of what was measured: held-out OpenStax sections, answer keys and scoring.",
+    "attribution/index.html": "Title, authors, licence and link for every OpenStax page in the "
+    "ReadableSTEM demo, and the credits for the other material.",
+}
+
+
+def example_description(example: Example) -> str:
+    """One example page's meta description: its title and the blurb in meta.json."""
+    blurb = str(example.meta.get("blurb", "")).strip()
+    return f"{example.title}, converted by ReadableSTEM. {blurb}".strip()
+
+
 def build_site(out_dir: Path, *, proof_path: Path | None = None) -> list[str]:
     """Build every page into `out_dir`. Returns the paths written, relative to it."""
     out = Out()
@@ -1001,10 +1027,13 @@ def build_site(out_dir: Path, *, proof_path: Path | None = None) -> list[str]:
         "repo_url": REPO_URL,
         "stemcheck_url": STEMCHECK_URL,
         "author": AUTHOR,
+        "author_url": AUTHOR_URL,
+        "app_url": APP_URL,
         "cc_by": CC_BY,
     }
 
     def page(path: str, template: str, current: str, title: str, **context: Any) -> None:
+        context.setdefault("description", DESCRIPTIONS.get(path, DESCRIPTIONS["index.html"]))
         text = env.get_template(template).render(
             **common, root=root_of(path), current=current, title=title, **context
         )
@@ -1022,7 +1051,8 @@ def build_site(out_dir: Path, *, proof_path: Path | None = None) -> list[str]:
     for example in examples:
         page(
             f"{example.base}/index.html", "example.html", "examples", example.title,
-            example=example, summary=summarise(example), provider=provider_words(example),
+            description=example_description(example), example=example,
+            summary=summarise(example), provider=provider_words(example),
             findings=check_findings(example), page_checks=page_checks(example),
             notices=notices_of(example), speech_rows=example.speech[:3],
         )  # fmt: skip

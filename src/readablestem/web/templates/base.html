@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{% endblock %} | ReadableSTEM</title>
   {# Link previews (Open Graph, Twitter/X cards); og:image and og:url must be absolute. #}
-  <meta name="description" content="{% block description %}Turns STEM course PDFs into accessible web pages: equations as MathML a screen reader can read, real headings, and described figures, with a short review by the instructor. Free and open source.{% endblock %}">
+  <meta name="description" content="{% block description %}Turns STEM course PDFs into accessible web pages: equations as MathML a screen reader can read, real headings and described figures. Free and open source.{% endblock %}">
+  {# Only the public pages (web.seo.PUBLIC_PAGES) are offered to search engines. #}
+  {% if not indexable %}
+  <meta name="robots" content="noindex">
+  {% endif %}
   {% if not (hide_page_url is defined and hide_page_url) %}
   <link rel="canonical" href="{{ site_url }}{{ request.url.path }}">
   <meta property="og:url" content="{{ site_url }}{{ request.url.path }}">
@@ -24,10 +28,16 @@
   <meta name="twitter:image" content="{{ site_url }}{{ static_url('social-card.png') }}">
   <meta name="twitter:image:alt" content="ReadableSTEM: accessible HTML from STEM course PDFs. An equation from a PDF beside the note that the web page has it as real maths (MathML) a screen reader can read.">
   <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "allowScriptTags": false, "historyCacheSize": 0, "refreshOnHistoryMiss": true, "selfRequestsOnly": true}'>
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="icon" href="{{ static_url('icon-192.png') }}" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="{{ static_url('apple-touch-icon.png') }}">
   <link rel="stylesheet" href="{{ static_url('app.css') }}">
   <script src="/static/vendor/htmx-2.0.11.min.js" integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg" defer></script>
   <script src="{{ static_url('app.js') }}" defer></script>
   {% block head %}{% endblock %}
+  {% if indexable %}
+  {{ json_ld(request.url.path, self.title() ~ " | ReadableSTEM", self.description()) }}
+  {% endif %}
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -91,6 +101,11 @@
           <li><a href="mailto:{{ contact_email }}?subject=ReadableSTEM%20feedback">Send feedback by email</a></li>
           {% endif %}
           <li><a href="{{ source_url }}">Source code</a></li>
+          {% if showcase_on %}
+          <li><a href="/showcase/examples/index.html">Worked examples</a></li>
+          <li><a href="/showcase/method/index.html">Method and limits</a></li>
+          {% endif %}
+          <li><a href="https://harishmanoharan.com">Made by Harish Manoharan</a></li>
         </ul>
       </nav>
       <p class="small">ReadableSTEM is free, open-source software. It uses PyMuPDF, which is licensed

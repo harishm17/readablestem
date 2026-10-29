@@ -33,6 +33,10 @@ COPY pyproject.toml uv.lock /app/
 RUN uv sync --locked --no-dev --no-editable --no-install-project --extra tracing
 
 COPY . /app
+# The showcase served at /showcase/ (web.seo): the static reviewer demo that site/build.py
+# writes from committed files (docs/site.md). No model, no network, no clock. It is written
+# into the package before the install below, so the installed package carries it.
+RUN PYTHONPATH=/app/src /app/.venv/bin/python site/build.py --out /app/src/readablestem/web/showcase
 RUN uv sync --locked --no-dev --no-editable --extra tracing
 
 # The SLANet-plus table-structure model (7.5 MB, Apache-2.0; see THIRD_PARTY_NOTICES.md),

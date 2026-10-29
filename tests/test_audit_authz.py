@@ -38,6 +38,14 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/status"): PUBLIC,
     ("GET", "/healthz"): PUBLIC,
     ("GET", "/readyz"): PUBLIC,  # is the database reachable; no document data
+    # Crawler files and the static showcase (routes/discovery.py): no user data.
+    ("GET", "/robots.txt"): PUBLIC,
+    ("GET", "/sitemap.xml"): PUBLIC,
+    ("GET", "/llms.txt"): PUBLIC,
+    ("GET", "/18149cf3a15bfa791042a3df7fdc0388.txt"): PUBLIC,  # IndexNow key
+    ("GET", "/favicon.ico"): PUBLIC,
+    ("GET", "/showcase"): PUBLIC,
+    ("GET", "/showcase/{rel:path}"): PUBLIC,
     ("GET", "/login"): PUBLIC,
     ("POST", "/login"): PUBLIC,
     ("POST", "/login/microsoft"): PUBLIC,

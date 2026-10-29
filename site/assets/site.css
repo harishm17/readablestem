@@ -128,6 +128,7 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", "Noto 
 .decision.optional { border-left-color: var(--accent); }
 .decision h3 { margin: 0 0 0.4rem; font-size: 1.1rem; }
 .decision .meta { color: var(--muted); font-size: 0.9375rem; margin: 0 0 0.6rem; }
+img.framed { max-width: 100%; height: auto; border: 1px solid var(--line); }
 .decision .crop { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); background: #fff; }
 .proposal { border: 1px dashed var(--line); padding: 0.5rem 0.75rem; margin: 0.4rem 0 0.75rem; overflow-x: auto; }
 .proposal math { font-size: 1.25em; }

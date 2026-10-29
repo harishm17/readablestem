@@ -128,7 +128,7 @@
     <p class="meta">{{ c.kind }}. {{ c.meta }}</p>
     {% if c.crop %}
     <p class="part-label">In the PDF</p>
-    <img class="crop" src="{{ c.crop }}" width="{{ c.crop_size[0] }}" height="{{ c.crop_size[1] }}" loading="lazy" alt="{{ c.crop_alt }}" style="max-width:100%;height:auto">
+    <img class="crop" src="{{ c.crop }}" width="{{ c.crop_size[0] }}" height="{{ c.crop_size[1] }}" loading="lazy" alt="{{ c.crop_alt }}">
     {% endif %}
     {% if c.mathml %}
     <p class="part-label">Proposal</p>

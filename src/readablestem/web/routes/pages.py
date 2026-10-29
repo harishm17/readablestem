@@ -11,7 +11,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import func, select
 
-from readablestem.web import office_convert
+from readablestem.web import office_convert, seo
 from readablestem.web.assets import static_url
 from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
@@ -50,6 +50,7 @@ def demo(request: Request) -> Response:
 
 
 DEMO_TITLE = "Demo: a physics textbook section converted | ReadableSTEM"
+DEMO_UPDATED = next(page.updated for page in seo.PUBLIC_PAGES if page.path == "/demo")
 DEMO_DESCRIPTION = (
     "A real conversion of OpenStax Physics 2.3 (CC BY 4.0): equations as MathML a screen "
     "reader can read, real headings and described figures. Open it with a screen reader."
@@ -57,9 +58,10 @@ DEMO_DESCRIPTION = (
 
 
 def _with_preview_tags(page: str, site: str) -> str:
-    """The demo file with link-preview tags added after <head>. The file is a converted
-    student document and stays as it is on disk; only the copy sent for /demo carries the
-    tags, so a shared demo link shows a title, description and picture."""
+    """The demo file with link-preview tags, its address and structured data added after
+    <head>, and the demo's title in <title>. The file is a converted student document and
+    stays as it is on disk; only the copy sent for /demo carries the tags, so a shared demo
+    link (or a search result) shows a title, description and picture."""
     image = f"{site}{static_url('social-card.png')}"
     tags = {
         "description": DEMO_DESCRIPTION,
@@ -81,6 +83,16 @@ def _with_preview_tags(page: str, site: str) -> str:
         f'content="{html.escape(value, quote=True)}">'
         for key, value in tags.items()
     ]
+    lines.insert(0, f'<link rel="canonical" href="{html.escape(site, quote=True)}/demo">')
+    data = seo.structured_data(site, "/demo", DEMO_TITLE, DEMO_DESCRIPTION, DEMO_UPDATED)
+    lines.append(str(seo.json_ld_tag(data)))
+    page = re.sub(
+        r"<title>.*?</title>",
+        f"<title>{html.escape(DEMO_TITLE)}</title>",
+        page,
+        count=1,
+        flags=re.S,
+    )
     return re.sub(r"<head[^>]*>", lambda m: m.group(0) + "\n" + "\n".join(lines), page, count=1)
 
 

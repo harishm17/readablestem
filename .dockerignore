@@ -22,6 +22,10 @@ private-inputs/
 .claude/
 tests/
 proof/
+# Except what the showcase build reads (site/build.py, Dockerfile): one example's PDF and
+# the limits each proof set states.
+!tests/fixtures/layout/lecture_notes.pdf
+!proof/sets/
 deploy/
 .railway/
 node_modules/
