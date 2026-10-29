@@ -23,8 +23,8 @@ converter, and it does not work from Word, LaTeX or PowerPoint sources: it start
 PDF.
 
 **Status.** Beta. The service is live at https://readablestem.com as a free beta run by Harish
-Manoharan. Anyone with a Google account can sign in and try it, with daily limits for new
-accounts (a server can instead be set to invitation only, `SIGNUP_MODE=allowlist`); the demo
+Manoharan. Anyone with a Google account can sign in and try it (the beta runs `SIGNUP_MODE=open`;
+the code's default is `allowlist`, invitation only), with daily limits for new accounts; the demo
 needs no sign-in. The code, the evaluation harness and the documentation
 are here. `uv run readablestem ops launch-check` lists the checks a deploy has to pass.
 
@@ -33,21 +33,25 @@ are here. `uv run readablestem ops launch-check` lists the checks a deploy has t
 A converted page is committed so you can judge the output without running anything: open
 [`src/readablestem/web/static/demo/index.html`](src/readablestem/web/static/demo/index.html) in a
 browser. It is OpenStax *Physics* section 2.3, converted with the real models; the PDF it
-came from sits beside it. The page shows the pipeline's proposals as they came, including a
-mistake that the review screen asks about (a plain *v* where the book has a bold vector).
+came from sits beside it. The page shows the pipeline's output as it came, with the two required
+decisions the review screen asks about (the repeated headings "Solution" and "Discussion"). The
+same demo is live at [readablestem.com/demo](https://readablestem.com/demo), and the site has two
+guides: [ADA Title II and STEM course materials](https://readablestem.com/guides/ada-title-ii-stem-course-materials)
+and [ReadableSTEM, Mathpix and LaTeXML compared](https://readablestem.com/guides/readablestem-mathpix-latexml).
 
 ## Results
 
 There are two kinds of number here, and they must not be mixed. The first kind is measured
 on documents the system had never been run on, with the protocol written down before the
-run. The second kind comes from the sample on which the checks were developed.
+run. The second kind comes from the sample on which the checks were developed. The scan
+numbers and the re-measurement below are neither, and say so where they appear.
 
 ### Held-out results (2026-10-14)
 
 > **Superseded for the current system, not for this run.** The table and text below are the
 > registered held-out results of the system as it was on 2026-10-14 (pipeline 0.4.0) and are kept as
 > they were. The system has changed since; a re-measurement on the same sections, which is **not a
-> blind result**, follows this section ("Re-measurement on the same sections, 2026-10-21").
+> blind result**, follows ("Re-measurement on the same sections, 2026-10-21").
 
 Fifteen sections of five OpenStax books (242 Letter pages, 1,369 equations, 509 headings,
 69 figures with an OpenStax alt text), chosen by a rule and registered before any system ran.
@@ -109,7 +113,7 @@ development-sample checks that priced the run (Addendum 7).
   which wrong equations change the meaning, so the development-sample statement that no
   meaning-level error was accepted silently cannot be repeated for these sections.
 - **Review load: 1.76 required decisions per PDF page** (853 decisions over 484 page-runs), against
-  0.23 on the development sample, plus 0.55 optional notes per page. Of the required fixes,
+  0.23 on the development sample, plus 0.55 optional notes per page. Of the required decisions,
   230 are repeated heading labels and 216 headings with weak evidence, 351 below the
   acceptance threshold and 296 symbol mismatches (a fix can have several reasons). At that rate a
   30-page document, the most the app takes, comes with about 53 decisions. This is the number
@@ -152,29 +156,34 @@ are one recording on Claude: model output varies run to run (the two document ru
 0.007 on equations, the two Opus chatbot runs by 0.007), and the OpenAI models the
 registration names were not used.
 
-### Scanned and handwritten pages, converted on request (2026-10-21)
+The interim report from before the model run, with the headings and parser inputs and outputs,
+is [`proof/interim/INTERIM-heldout-2026-10.md`](proof/interim/INTERIM-heldout-2026-10.md); its
+numbers are the same code's and are unchanged.
 
-Behind an option on the upload form ("Convert scanned or handwritten pages", offered when the
-server sets `FEATURE_IMAGE_PAGES`), each scanned or handwritten page is read from its picture by
-one call to the main model (`claude-opus-5-5`); its equations are read again from a cut of their
-place on the page, every equation and table is a decision for the instructor, and the original page
-is kept in the file for checking. The numbers, which are not the ones above (different documents and
-a different job; [docs/eval-image-pages.md](docs/eval-image-pages.md), [ADR 0007](docs/decisions/0007-image-pages.md)):
+What was fixed before the run, and can be checked now:
 
-- **Development pages made into scans** (36 pages of six development documents, degraded
-  by [`eval/scan.py`](src/readablestem/eval/scan.py)): 0.59 of the equations exactly right end to
-  end (0.83 on the symbols score), the same as the same pages as typed PDFs; words of the prose
-  wrong 3 to 5 % of the time; $0.106 a page. Handwriting was looked at on four public-domain pages
-  by eye only: the main model read them well, and a cheaper model misread two section numbers with
-  full confidence.
-- **Real papers as scans, never used to build the feature** (the real-world held-out set, 9 of 15
-  papers because the $9 spending cap for the run was reached; 42 pages, 1,147 equations, registered
-  before the run): 0.66 exactly right (0.69 on the symbols score) against 0.62 (0.66) for the typed
-  PDFs of the same papers, a difference inside the noise, with 5 wrong equations in every 100 not
-  asked about (10 for the typed PDFs); $0.136 a page.
-- It is slower (about 20 to 30 seconds a page), it costs four to six times a typed page, and a
-  model can misread handwriting and small symbols; the measurement is on synthetic scans, nine
-  papers and eight real pages, with no measurement of how long checking takes.
+| What | Value |
+|---|---|
+| Sections | 15 sections of 5 OpenStax books (College Physics, Chemistry, Precalculus, Introductory Statistics, Intermediate Algebra), 242 Letter pages |
+| Answer key | 1,369 equations, 509 headings, 70 figures (69 with an OpenStax alt text) |
+| Licence | the retired first editions, which are CC BY 4.0; the current editions are CC BY-NC-SA and were not used |
+| Choice | a seeded rule on input properties only, with every section used in development excluded; the rule's code, its inputs and its output are in [`proof/selection/`](proof/selection/), and `tests/test_proof_registered.py` re-runs the draw and compares it with the committed result |
+| Registration | [`proof/PREREGISTRATION.md`](proof/PREREGISTRATION.md), SHA-256 `d4d3af030b403a84da2c1a6787dc9773775a826cfa4f86edf9b48f7ec3f288ec` (version 2), and the answer key's manifest `9be8c5650fe492d0c5312199b3040aa6ea741595d5ba97df4b68e816455c9aa3`, checked before a run. This is version 2 of the registration: it differs from version 1 only in wording (the names of the people who asked for this evidence, an authorship line and paths on my machine were removed), and version 1's hashes are kept. Addendum 6, which moved the model-dependent parts to Claude, has SHA-256 `50fd995223017609e247bc9a2dc943f4fa9dd345d606cd075b851b32979e7c8a`, and Addendum 7, written after the run, `b38825ab165728273220e8685358328879db36437f1d1c3baafaaa6b817810d2`. The frozen files and how to check them are in [`proof/REGISTERED.md`](proof/REGISTERED.md); the only timestamps are the files' own and this repository's commits, there is no outside timestamp yet |
+| Scorer ceiling (answer key only, no model) | known-correct LaTeX written by hand for 40 of the 1,369 equations scores 28 of 40 under the lenient scorer (0.70, Wilson 95% 0.55 to 0.82), because OpenStax writes signs, degrees and units inside number or text tokens; a perfect transcriber is not scored 1.0, and a tool that writes LaTeX in its own style pays more (normalising markup alone moves MinerU from 0.174 to 0.197). I have not checked the 40 against the rendered gold yet |
+| Compared | ReadableSTEM against the chatbot recipe instructors copy (Purdue's one-sentence prompt, [quoted from its page](https://www.purdue.edu/innovativelearning/tools-resources/accessibility/digital-instructional-materials-accessibility-checklist/digital-math/) as of 2026-10-09, on claude-opus-5-5 and claude-haiku-5-5) and against Docling, MinerU and PyMuPDF4LLM, on equations, headings, figures and invented content |
+| Not measured | whether a wrong equation changes the meaning, and whether the figure judge agrees with a person: those labels are mine to make and do not exist yet |
+
+To make the recording again, `PROVIDER=anthropic ENV_FILE=/path/to/.env proof/record-heldout.sh`
+(the caps are in the script; this run's were $26 for ReadableSTEM and $13, $2.50 and $3.50
+for the chatbot arms and their judge, within a $45 ceiling), or `PROVIDER=openai` for the
+registration's OpenAI models. The recording code, the caps and the reproduction path are
+described in [docs/proof.md](docs/proof.md). `make proof` replays the committed recording and
+writes [PROOF.md](PROOF.md) (about ten minutes, no key) with the pipeline as it was when the
+run was recorded, so reproduce it from the tag: `git checkout proof-heldout-2026-10 && make
+proof` (later commits change the product, and a recording cannot be replayed through code that
+asks the models something else; `make proof-check` still checks its hashes anywhere). The report of the development sample is
+[`proof/PROOF-development-sample.md`](proof/PROOF-development-sample.md) (`make proof
+SET=smoke-physics-2 PROOF_EXTRA="--out proof/PROOF-development-sample.md"`).
 
 ### Re-measurement on the same sections, 2026-10-21 (not a blind result)
 
@@ -211,34 +220,29 @@ the symbols score. A replay of this run reproduces every number but one axe-core
 (`docs/remeasurement-2026-10-21.md`, deviation 1). The recording is not committed
 (`~/.cache/a11y-proof/heldout-remeasure-2026-10-21`).
 
-The interim report from before the model run, with the headings and parser inputs and outputs,
-is [`proof/interim/INTERIM-heldout-2026-10.md`](proof/interim/INTERIM-heldout-2026-10.md); its
-numbers are the same code's and are unchanged.
+### Scanned and handwritten pages, converted on request (2026-10-21)
 
-What was fixed before the run, and can be checked now:
+Behind an option on the upload form ("Convert scanned or handwritten pages", offered when the
+server sets `FEATURE_IMAGE_PAGES`), each scanned or handwritten page is read from its picture by
+one call to the main model (`claude-opus-5-5`); its equations are read again from a cut of their
+place on the page, every equation and table is a decision for the instructor, and the original page
+is kept in the file for checking. The numbers, which are not the ones above (different documents and
+a different job; [docs/eval-image-pages.md](docs/eval-image-pages.md), [ADR 0007](docs/decisions/0007-image-pages.md)):
 
-| What | Value |
-|---|---|
-| Sections | 15 sections of 5 OpenStax books (College Physics, Chemistry, Precalculus, Introductory Statistics, Intermediate Algebra), 242 Letter pages |
-| Answer key | 1,369 equations, 509 headings, 70 figures (69 with an OpenStax alt text) |
-| Licence | the retired first editions, which are CC BY 4.0; the current editions are CC BY-NC-SA and were not used |
-| Choice | a seeded rule on input properties only, with every section used in development excluded; the rule's code, its inputs and its output are in [`proof/selection/`](proof/selection/), and `tests/test_proof_registered.py` re-runs the draw and compares it with the committed result |
-| Registration | [`proof/PREREGISTRATION.md`](proof/PREREGISTRATION.md), SHA-256 `d4d3af030b403a84da2c1a6787dc9773775a826cfa4f86edf9b48f7ec3f288ec` (version 2), and the answer key's manifest `9be8c5650fe492d0c5312199b3040aa6ea741595d5ba97df4b68e816455c9aa3`, checked before a run. This is version 2 of the registration: it differs from version 1 only in wording (the names of the people who asked for this evidence, an authorship line and paths on my machine were removed), and version 1's hashes are kept. Addendum 6, which moved the model-dependent parts to Claude, has SHA-256 `50fd995223017609e247bc9a2dc943f4fa9dd345d606cd075b851b32979e7c8a`, and Addendum 7, written after the run, `b38825ab165728273220e8685358328879db36437f1d1c3baafaaa6b817810d2`. The frozen files and how to check them are in [`proof/REGISTERED.md`](proof/REGISTERED.md); the only timestamps are the files' own and this repository's commits, there is no outside timestamp yet |
-| Scorer ceiling (answer key only, no model) | known-correct LaTeX written by hand for 40 of the 1,369 equations scores 28 of 40 under the lenient scorer (0.70, Wilson 95% 0.55 to 0.82), because OpenStax writes signs, degrees and units inside number or text tokens; a perfect transcriber is not scored 1.0, and a tool that writes LaTeX in its own style pays more (normalising markup alone moves MinerU from 0.174 to 0.197). I have not checked the 40 against the rendered gold yet |
-| Compared | ReadableSTEM against the chatbot recipe instructors copy (Purdue's one-sentence prompt, [quoted from its page](https://www.purdue.edu/innovativelearning/tools-resources/accessibility/digital-instructional-materials-accessibility-checklist/digital-math/) as of 2026-10-09, on claude-opus-5-5 and claude-haiku-5-5) and against Docling, MinerU and PyMuPDF4LLM, on equations, headings, figures and invented content |
-| Not measured | whether a wrong equation changes the meaning, and whether the figure judge agrees with a person: those labels are mine to make and do not exist yet |
-
-To make the recording again, `PROVIDER=anthropic ENV_FILE=/path/to/.env proof/record-heldout.sh`
-(the caps are in the script; this run's were $26 for ReadableSTEM and $13, $2.50 and $3.50
-for the chatbot arms and their judge, within a $45 ceiling), or `PROVIDER=openai` for the
-registration's OpenAI models. The recording code, the caps and the reproduction path are
-described in [docs/proof.md](docs/proof.md). `make proof` replays the committed recording and
-writes [PROOF.md](PROOF.md) (about ten minutes, no key) with the pipeline as it was when the
-run was recorded, so reproduce it from the tag: `git checkout proof-heldout-2026-10 && make
-proof` (later commits change the product, and a recording cannot be replayed through code that
-asks the models something else; `make proof-check` still checks its hashes anywhere). The report of the development sample is
-[`proof/PROOF-development-sample.md`](proof/PROOF-development-sample.md) (`make proof
-SET=smoke-physics-2 PROOF_EXTRA="--out proof/PROOF-development-sample.md"`).
+- **Development pages made into scans** (36 pages of six development documents, degraded
+  by [`eval/scan.py`](src/readablestem/eval/scan.py)): 0.59 of the equations exactly right end to
+  end (0.83 on the symbols score), the same as the same pages as typed PDFs; words of the prose
+  wrong 3 to 5 % of the time; $0.106 a page. Handwriting was looked at on four public-domain pages
+  by eye only: the main model read them well, and a cheaper model misread two section numbers with
+  full confidence.
+- **Real papers as scans, never used to build the feature** (the real-world held-out set, 9 of 15
+  papers because the $9 spending cap for the run was reached; 42 pages, 1,147 equations, registered
+  before the run): 0.66 exactly right (0.69 on the symbols score) against 0.62 (0.66) for the typed
+  PDFs of the same papers, a difference inside the noise, with 5 wrong equations in every 100 not
+  asked about (10 for the typed PDFs); $0.136 a page.
+- It is slower (about 20 to 30 seconds a page), it costs four to six times a typed page, and a
+  model can misread handwriting and small symbols; the measurement is on synthetic scans, nine
+  papers and eight real pages, with no measurement of how long checking takes.
 
 ### Development sample (pipeline 0.4.0, 2026-10-12)
 
@@ -285,9 +289,9 @@ Method, definitions and every table: [docs/eval.md](docs/eval.md).
   sentence is a decision of its own. A tagged PDF's own headings count.
 - **Lists** become real `<ul>` and `<ol>` with their nesting and numbering, with no model call.
 - **Figures** get short alt text, or an explicit "needs a description" flag. Long
-  descriptions are built but off by default.
-- **Tables** are detected and rebuilt with header cells behind a feature flag that is off by
-  default, until they have been checked on real documents.
+  descriptions are built when `FEATURE_LONG_DESCRIPTIONS` is on (on in the beta, off by default in the code).
+- **Tables** are detected and rebuilt with header cells behind a feature flag
+  (`FEATURE_TABLES`): on in the beta since 2026-10-21, off by default in the code.
 - **Scans and handwriting** can be converted on request (an upload option, slower, every converted
   equation and table checked by a person, the original kept); without the request they are kept as
   images with a note, not guessed at.
@@ -301,7 +305,7 @@ flowchart LR
   L --> E[Equations: crop, LaTeX, checks against the text layer, MathML, speech text]
   L --> F[Figures: classify, short alt text, checks]
   E & F --> R[Router: cheap model for simple inline equations, main model otherwise, escalation on doubt]
-  R --> M[Anthropic Claude API: claude-haiku-5-5 and claude-opus-5-5; second check on claude-sonnet-5-5]
+  R --> M[Anthropic Claude API: claude-haiku-5-5 and claude-opus-5-5; second check on claude-sonnet-5-5, recorded only by default]
   H & E & F --> A[Assemble one HTML file and a report]
   A --> C[Static and axe-core checks]
   A --> V[Review screen: accept, edit or reject]
@@ -329,8 +333,8 @@ uv run readablestem convert tests/fixtures/layout/latex/problem_set.pdf --out ou
 `--fake` answers every model request offline with placeholder output, so the whole flow runs
 for free and shows the plumbing, not the quality. For real conversions, copy
 `.env.example` to `.env`, set `MODEL_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` (Claude is the
-provider the beta and the held-out evaluation use; `MODEL_PROVIDER=openai` with `OPENAI_API_KEY` is an
-optional alternative), and give every run a spend cap:
+provider the beta and the held-out evaluation use; the code's default is `MODEL_PROVIDER=openai`
+with `OPENAI_API_KEY`, which works as an alternative), and give every run a spend cap:
 
 ```
 uv run readablestem convert my.pdf --out my.html --max-usd 1.00 --report my.json
@@ -387,8 +391,9 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
   `store=False`) if you set `MODEL_PROVIDER=openai`. Models are not deterministic, so two runs on the same file can differ.
 - **Equations are the hard part.** On the development sample 23 of 30 equations match the
   answer key under the lenient scorer, and 5 of the 7 misses are gaps in the scorer, not in
-  the transcription. On the held-out sections 1,379 of 2,738 (two runs, 0.504) match through
-  the whole pipeline, and about 23 of every 100 equations are wrong and not flagged for review. A symbol, sign or relation that differs from the PDF's text layer is
+  the transcription. On the held-out sections 1,379 of 2,738 (two runs, 0.504, version 0.4.0) match through
+  the whole pipeline, and about 23 of every 100 equations are wrong and not flagged for review
+  (re-measured on the same sections, which is not a blind result: 0.596 and 22 of 100). A symbol, sign or relation that differs from the PDF's text layer is
   sent to review, but an error that agrees with the text layer, or a PDF with no usable text
   layer, can still pass.
 - **Scans and handwriting** are converted only on request (an upload option): a model reads the
@@ -396,8 +401,10 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
   is for a person to check and the original page stays in the file; the accuracy is measured on synthetic
   scans, nine papers and eight real pages ([docs/eval-image-pages.md](docs/eval-image-pages.md)).
   Without the request, and for drawings, such pages are kept as images and flagged.
-- **Tables** are off by default and have been checked on a local benchmark and the sample,
-  not on a broad set of real course PDFs.
+- **Tables** are on in the beta (off by default in the code) and have been checked on a local
+  benchmark, the sample and a small set of real documents (full-extent recall 0.56): a table the
+  detector misses stays as it was with the flag off, paragraph text or a picture
+  ([docs/tables.md](docs/tables.md)).
 - **Figure alt text is short.** It describes; it does not replace a long description for a
   complex diagram.
 - **Beta.** Sign-in is open to anyone with a Google account (or, with `SIGNUP_MODE=allowlist`,
