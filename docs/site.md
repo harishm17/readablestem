@@ -11,6 +11,20 @@ requests to other sites.
 The build needs no key, no network and no model call, and it costs nothing. The same inputs
 give the same bytes (CI builds it twice and compares).
 
+## Where it is served
+
+The app serves the build at `https://readablestem.com/showcase/` (`web/routes/discovery.py`).
+The Docker image runs `site/build.py` into `src/readablestem/web/showcase/` before installing the
+package (`.dockerignore` lets the lecture-notes PDF and `proof/sets/` through for it). The app adds
+each page's canonical address, link-preview tags and structured data as it sends it, and lists the
+pages in `/sitemap.xml`; the stored conversions and the stemcheck sample are sent sandboxed, like
+`/demo`, and marked `noindex`. Without a build (local development, tests) `/showcase/` is a 404
+and nothing links to it; `make site OUT=src/readablestem/web/showcase` makes one.
+
+Search engines and AI crawlers: `web/seo.py` lists the public pages once (the sitemap names them;
+every other page is `noindex`), and writes `/robots.txt`, `/llms.txt` and the IndexNow key file.
+When a public page's text changes, update its date in `PUBLIC_PAGES` (or `SHOWCASE_UPDATED`).
+
 ## Pages
 
 | Page | What it holds |

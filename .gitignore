@@ -43,3 +43,4 @@ site/_build_again/
 
 # Railway IaC SDK (.railway/package.json)
 node_modules/
+src/readablestem/web/showcase/

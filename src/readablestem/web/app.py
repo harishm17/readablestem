@@ -10,6 +10,7 @@ Run locally: `readablestem serve --reload` (see docs/web.md).
 
 from __future__ import annotations
 
+import functools
 import logging
 import secrets
 from collections.abc import AsyncGenerator
@@ -35,6 +36,7 @@ from readablestem.config import ConfigError, Settings, get_settings
 from readablestem.observability.logging import configure_logging, request_logging_middleware
 from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
+from readablestem.web import seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
@@ -57,6 +59,7 @@ from readablestem.web.routes import (
     bundle,
     courses,
     cron,
+    discovery,
     edits,
     email_login,
     feedback,
@@ -74,6 +77,7 @@ from readablestem.web.security import (
     SafeErrorMiddleware,
     SecurityHeadersMiddleware,
 )
+from readablestem.web.seo import CrawlerRequestsMiddleware
 from readablestem.web.spend import DbSpendGuard, largest_reservation_usd
 from readablestem.web.uploads import UploadGate
 from readablestem.web.worker import (
@@ -167,6 +171,10 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     # Absolute address for link previews (og:image and og:url must be absolute); empty in
     # tests, where the tags fall back to relative addresses.
     env.globals["site_url"] = site_url.rstrip("/")  # ty: ignore[invalid-assignment]
+    # Structured data for the public pages (web.seo), with the same absolute address.
+    env.globals["json_ld"] = functools.partial(  # ty: ignore[invalid-assignment]
+        seo.page_json_ld, site_url.rstrip("/")
+    )
     return Jinja2Templates(env=env)
 
 
@@ -387,7 +395,9 @@ def create_app(
     )
     app.state.ctx = ctx
 
-    # Added inner-first: SecurityHeaders > SafeError > RequestSizeLimit > Session > routes.
+    # Added inner-first: SecurityHeaders > SafeError > RequestSizeLimit > Session >
+    # CrawlerRequests (HEAD, www and trailing-slash redirects) > routes.
+    app.add_middleware(CrawlerRequestsMiddleware, base_url=settings.base_url)
     app.add_middleware(
         SessionMiddleware,
         secret_key=_session_secret(settings),
@@ -428,6 +438,7 @@ def create_app(
         courses,
         record,
         email_login,
+        discovery,
     ):
         app.include_router(module.router)
     app.include_router(auth_router)

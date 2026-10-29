@@ -22,6 +22,7 @@ from starlette.responses import Response
 
 from readablestem.config import Settings
 from readablestem.observability.tracing import Tracer
+from readablestem.web import seo
 from readablestem.web.abuse import RateLimiter, client_ip
 from readablestem.web.db import User, session_scope
 from readablestem.web.logsafe import log_event
@@ -308,6 +309,9 @@ def render(
         "signup_open": ctx.settings.signup_open,
         "open_page_quota": ctx.settings.open_tier_daily_page_quota,
         "open_rereads": ctx.settings.open_tier_daily_rereads,
+        # Search engines: only the public pages are indexed (web.seo).
+        "indexable": seo.is_indexable(request.url.path),
+        "showcase_on": seo.SHOWCASE_DIR.is_dir(),
     }
     return ctx.templates.TemplateResponse(
         request, template, base | (context or {}), status_code=status_code, headers=headers
