@@ -112,7 +112,7 @@ def test_every_page_has_the_shared_accessible_layout(pages):
         for link in ('href="/privacy"', 'href="/terms"', 'href="/limits"', 'href="/status"'):
             assert link in html, (name, link)
         assert 'href="https://github.com/harishm17/readablestem">Source code</a>' in html, name
-        assert "GNU Affero General Public License" in html, name
+        assert "offered under AGPL-3.0 terms" in html, name
 
 
 def test_every_form_control_has_a_label(pages):

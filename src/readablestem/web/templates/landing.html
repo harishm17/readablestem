@@ -5,10 +5,15 @@
 {# No deadline date is stated here: the rule is 28 CFR part 35, subpart H, and a date
    should only be added once it is checked against it and the university's own page
    (UX review BW9). #}
-<p class="lede">The Department of Justice's ADA Title II web rule asks public universities to
-  make their online course materials accessible to students with disabilities. In STEM the
-  hard part is the maths. ReadableSTEM assists with it: upload a PDF of your own notes, slides
-  or problem sets, and get back one web page where:</p>
+<p class="lede">ReadableSTEM assists instructors who need to turn a STEM course PDF into an
+  accessible web page. It reads the PDF, rebuilds equations as MathML a screen reader can
+  speak, restores headings, writes short alt text for figures, and returns one web page.
+  Every change it is unsure about goes to a review screen where the instructor accepts,
+  edits or rejects it.</p>
+<p>The Department of Justice's ADA Title II web rule asks public universities to make their
+  online course materials accessible to students with disabilities. In STEM the hard part is
+  the maths. Upload a PDF of your own notes, slides or problem sets, and get back one web page
+  where:</p>
 <ul>
   <li>equations are real maths (MathML) that a screen reader reads aloud, for example
     “v equals d over t”, and lets students explore,</li>
@@ -16,10 +21,12 @@
   <li>figures have short alt text, or a clear flag where a description is still needed.</li>
 </ul>
 
-{# The numbers below are the pre-registered held-out test in PROOF.md (tag
-   proof-heldout-2026-10, pipeline 0.4.0, 15 OpenStax sections): equations end to end
-   0.504, equations given one at a time 0.684, heading F1 0.961, figure judge pass 0.971,
-   1.76 required decisions per page. Update them only from a new registered test. #}
+{# The numbers below are the registered held-out test in PROOF.md (tag proof-heldout-2026-10,
+   run recorded 2026-10-14, pipeline 0.4.0, 15 OpenStax sections) and the later re-measurement
+   in README.md ("Re-measurement on the same sections", 2026-10-21, not blind). PROOF.md is
+   generated from the recorded run; tests/test_landing_facts.py fails when this page and
+   PROOF.md or the README disagree. Update them only from a new registered test, and say
+   when a number is not blind. #}
 <h2>How long it takes</h2>
 <p>Converting takes a few minutes. Then you decide only what could change what a student
   reads; everything else is accepted for you and listed, so you can look it over. Dense
@@ -28,13 +35,19 @@
 
 <h2>How accurate it is</h2>
 <p>It makes mistakes, so look over the equations your students rely on. In a
-  pre-registered test on 15 textbook sections it had not seen (version 0.4.0, October
-  2026), it found about as many equations as a general chatbot (89%), but fewer of them
+  pre-registered test on 15 textbook sections it had not seen (run on 2026-10-14, version
+  0.4.0), it found about as many equations as a general chatbot (89%), but fewer of them
   came out exactly right end to end (about half); given each equation on its own, about
   two in three did. Headings scored 0.96 and figure descriptions passed a model judge 97% of the time.
   Its checks against the PDF's own text catch some wrong equations, not all.
   <a href="{{ source_url }}/blob/main/PROOF.md">The full results, including where it
   loses to a general chatbot</a>.</p>
+<p>Later changes were measured again on the same 15 sections (2026-10-21, version 0.5.0 and
+  later): 0.596 of equations exactly right end to end, against 0.504. This is <strong>not a
+  blind result</strong>: those sections had been examined since the registered run, so the
+  numbers are optimistic.
+  <a href="{{ source_url }}/blob/main/README.md#re-measurement-on-the-same-sections-2026-10-21-not-a-blind-result">How
+  it was measured</a>.</p>
 
 <h2>What you do with the file</h2>
 <p>Post it in your course in place of the PDF. Students open it in any browser.
