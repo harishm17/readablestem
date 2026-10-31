@@ -407,3 +407,19 @@ def test_the_converted_document_keeps_the_sandbox_policy(on):
 
     assert client.get(f"/jobs/{job}/view").headers["content-security-policy"] == VIEW_CSP
     assert client.get("/demo").headers["content-security-policy"] == VIEW_CSP
+
+
+# --------------------------------------------------------------------------- footer credit
+
+CREDIT = 'Built by <a href="https://harishmanoharan.com/?ref=readablestem">Harish Manoharan</a>'
+
+
+def test_the_footer_credit_is_on_app_pages_and_not_in_generated_documents(off):
+    client = off.browser
+    login(client, ALICE)
+    for path in ("/", "/privacy", "/app"):
+        assert CREDIT in client.get(path).text, path
+    job = job_id_from(upload(client, make_pdf(1)))
+    off.run_worker()
+    for path in (f"/jobs/{job}/view", f"/jobs/{job}/download", "/demo"):
+        assert "Built by" not in client.get(path).text, path
