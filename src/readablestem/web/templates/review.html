@@ -373,7 +373,7 @@
   document.{% endif %}</p>
 <p><a href="/jobs/{{ job.id }}/review">Back to the review screen</a> ·
   <a href="/jobs/{{ job.id }}">Back to the results</a> ·
-  <a href="/jobs/{{ job.id }}/view">Open the accessible HTML</a></p>
+  <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Open the accessible HTML</a></p>
 
 {% if not groups %}
 <p>There is nothing to review in this document.</p>

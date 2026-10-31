@@ -107,6 +107,7 @@ DISALLOW = (
     "/uploads/",
     "/auth/",
     "/internal/",
+    "/m/",
     "/dev-login",
     "/login/email",
     "/logout",

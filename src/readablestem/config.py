@@ -312,6 +312,11 @@ class Settings(BaseSettings):
     feedback_questions_enabled: bool = True
     # Content-free usage events (`events` table: a name, a code, a number; never text).
     events_enabled: bool = True
+    # Product analytics (web/analytics.py): PostHog, loaded and sent through this app's own
+    # /m/ proxy; page views and a few named funnel events, no session replay, no autocapture,
+    # no document content. OFF until the privacy notice says so (its "Cookies" section
+    # currently promises no analytics); the script also runs only on readablestem.com.
+    analytics_enabled: bool = False
 
     # --- content features. Each is off until its eval
     # says it helps; ConversionOptions.from_settings reads them for every conversion.

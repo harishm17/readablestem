@@ -40,7 +40,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import Settings
-from readablestem.web import access, events, linked_emails, microsoft, tombstones
+from readablestem.web import access, analytics, events, linked_emails, microsoft, tombstones
 from readablestem.web.database import rowcount
 from readablestem.web.db import Job, JobStatus, User, session_scope, utcnow
 from readablestem.web.deps import (
@@ -352,6 +352,10 @@ def signed_in(
     if created:
         log_event(logger, "signup", user_id=user_id, provider=provider)
     events.record(ctx.factory, ctx.settings, user_id, events.SIGNED_IN)  # usage event
+    # Product analytics (web.analytics); after start_session, which clears the queue.
+    analytics.queue_event(
+        request, "signup_completed" if created else "login_completed", provider=provider
+    )
     return RedirectResponse(target, status_code=303)
 
 

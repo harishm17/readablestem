@@ -58,6 +58,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default |
 | `FEATURE_PAGE_MATH`, `PAGE_MATH_MODEL`, `ANTHROPIC_EFFORT_PAGE_MATH`, `PAGE_MATH_UNCONFIRMED_FACTOR` | The page math pass (ADR 0006, docs/eval-page-math.md): one cheap-model call per page places the equations; off by default |
 | `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table; see "Usage events"). Both on by default; the questions are stored as events, so they need both |
+| `ANALYTICS_ENABLED` | Product analytics (see "Product analytics"): PostHog loaded and sent through this app's own `/m/` proxy, page views plus a few named funnel events. **Off by default**: the privacy notice's "Cookies" section says there are no analytics, so it needs rewording before this is turned on |
 | `FEEDBACK_URL` | Where the footer's "Send feedback" link goes (http or https only). Unset: an email to `CONTACT_EMAIL`. A form service here is a new data processor: name it in the privacy notice first |
 | `BASE_URL` | Builds the OAuth redirect URIs, `${BASE_URL}/auth/callback` (Google) and `${BASE_URL}/auth/microsoft/callback` (Microsoft). Production: `https://readablestem.com`, so Google's redirect URI is `https://readablestem.com/auth/callback` |
 | `SIGNUP_MODE` | `allowlist` (the default: only people an admin added may sign in) or `open` (anyone with a verified Google identity, or an allowed Microsoft one, gets an account at the first sign-in). See "Sign-up modes and access tiers" |
@@ -685,6 +686,47 @@ records carries on. The events of a review decision are written in its transacti
 the start of the random user id, never an email). Events are deleted after 400 days by
 the hourly purge, and with their user (docs/operations.md, "Usage events").
 `EVENTS_ENABLED=false` writes nothing (and turns the questions off).
+
+## Product analytics (`web/analytics.py`, `web/static/analytics.js`)
+
+Off unless `ANALYTICS_ENABLED=true`. It answers one question: did a visitor who followed a
+link to the site only look at the landing page, or sign up and try the tool? PostHog Cloud (US,
+project 700458, the one `harishmanoharan.com` reports to), loaded and reported through this
+app's own `/m/` path so the policy stays `script-src 'self'; default-src 'self'` and nothing
+is requested from another host. With it off, `/m/` does not exist and no page includes the
+script.
+
+- **Proxy.** `/m/static/*` goes to PostHog's assets host (cacheable for an hour);
+  `/m/array/<token>/config(.js)` goes there too, with the browser's `Origin`, never cached;
+  everything else goes to the API host with cookies and the referrer removed, only a
+  `Bearer phc_...` authorization kept, and the caller's address in `X-Forwarded-For`
+  (the address as the rate limits see it). The same rules as the personal site's edge Worker.
+  An upstream error is a 502; nothing waits on analytics.
+- **Loader.** `static/analytics.js`, included by `base.html` (app pages only). Converted
+  documents, the demo, downloads and exports are built from other code and served under
+  `VIEW_CSP`; none carries it (`tests/test_analytics.py`). It does nothing unless the host is
+  `readablestem.com` (or `www.`), `navigator.webdriver` is false and the browser has not
+  opted out (`?notrack=1` stores `hm_notrack`, `?notrack=0` clears it, as on the personal
+  site). The visitor id is kept in `localStorage`; the loader sets no cookie.
+- **What is sent.** `site: readablestem` on every event; page views and page leaves; the
+  funnel events `signup_completed`, `login_completed` (`provider`), `document_uploaded`
+  (`page_count`, `source`), `conversion_completed` (`page_count`, `duration_s`, `status`,
+  `sample`), `result_opened`, `demo_opened`. No autocapture, replay, heatmaps, dead clicks,
+  exception or performance capture, no surveys or feature flags; no file name, title,
+  document text, note or email in any property, and `identify` is never called. The pages
+  announce events with a hidden `<span data-ph-event>` (sign-in and upload through a one-time
+  entry in the session; the conversion in the job status box) or a `data-ph-event` attribute
+  on a link; the loader copies only numbers, booleans and short strings from them. A direct
+  visit to `/demo` (no script runs there) with the personal site's `hm_id` is sent from the
+  server.
+- **From the personal site.** `?hm_id=<id>` becomes the PostHog `distinctID` (it must look
+  like an id) and `ref: harishmanoharan.com` is registered once; `?ref=<tag>` registers `ref`
+  and `first_ref`. Both, `notrack` and `utm_*` are then removed from the address bar.
+- **Before turning it on.** The privacy page's "Cookies" section says "There are no
+  analytics, advertising or third-party tracking cookies" and the usage-events paragraph
+  says "No cookies or scripts are used for this". Both need rewording first (the notice is
+  Harish's to write); a one-line disclosure belongs in the "Cookies" section, beside the
+  sentence about the sign-in cookie.
 
 ## After a download (`web/feedback.py`)
 

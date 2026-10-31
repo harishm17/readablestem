@@ -8,7 +8,7 @@
   <p>{{ pg.finish.sentence }}</p>
   <ul class="actions">
     <li><a class="button" href="/jobs/{{ job.id }}/download">Download the HTML file</a></li>
-    <li><a href="/jobs/{{ job.id }}/view">Preview the student version</a></li>
+    <li><a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a></li>
   </ul>
   {# For Canvas (pipeline/export_canvas.py): a plain GET form, so it works without
      JavaScript. The course number is optional; with it the zip also holds a page to paste. #}

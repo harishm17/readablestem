@@ -1,5 +1,14 @@
 # Changelog
 
+## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
+
+- `ANALYTICS_ENABLED` (default false): PostHog loaded from and reporting to the app's own `/m/` proxy
+  (`web/analytics.py`, `web/static/analytics.js`). Page views plus `signup_completed`, `login_completed`,
+  `document_uploaded`, `conversion_completed`, `result_opened`, `demo_opened`; no autocapture, replay or
+  document content. The policy is unchanged. Converted documents and downloads never carry the loader.
+  Not enabled in production until the privacy notice's "Cookies" section is reworded
+  ([docs/web.md](docs/web.md), "Product analytics").
+
 ## Equations on real papers, round 3: inline equations read with their line (2026-10-26, branch explore/span-edges)
 
 - Why ReadableSTEM trailed the chatbot recipe: reading A counted the chatbots' table formulas and not
