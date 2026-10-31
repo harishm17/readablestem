@@ -10,7 +10,7 @@ file. Every change it is unsure about goes to a review screen where the instruct
 edits or rejects it.
 
 It assists; it does not certify. Nothing here establishes conformance with WCAG, the ADA or
-any other standard, and the output still needs a person to look at it. That is what the
+any other standard, and the output still needs a person to look at it, which is what the
 review screen is for.
 
 The site is at readablestem.com.
@@ -116,7 +116,7 @@ development-sample checks that priced the run (Addendum 7).
   0.23 on the development sample, plus 0.55 optional notes per page. Of the required decisions,
   230 are repeated heading labels and 216 headings with weak evidence, 351 below the
   acceptance threshold and 296 symbol mismatches (a fix can have several reasons). At that rate a
-  30-page document, the most the app takes, comes with about 53 decisions. This is the number
+  30-page document, the most the app takes, comes with about 53 decisions, the number
   to weigh the others against.
 - **Headings: ReadableSTEM leads, by less than the intervals need.** F1 0.961 against 0.910 to
   0.932 for the others. The paired comparisons at the registered level (k = 8, 99.4%)
@@ -259,7 +259,7 @@ CI runs with them (`data/eval/baseline-*.json`).
 | Whole pages | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 without prose maths); 0 static and 0 axe-core violations; 0.233 required decisions per PDF page, of which 6 of 10 pointed at a real error | $0.0034 per PDF page; median 33 s per section (n = 3) |
 | Tables (local mode, no model; off by default) | 197 tables | recall 0.909 (CI 0.857 to 0.958), precision 0.984 (CI 0.953 to 0.994), TEDS 0.866 | no model call |
 
-What these numbers do not show is as important as the numbers.
+The numbers leave several things out.
 
 - **Small samples.** One equation is 3.3 points of `exact_lenient`. One figure is 7.7 points.
 - **Clean inputs.** Rendered equations and printed pages are tidier than real course PDFs:
