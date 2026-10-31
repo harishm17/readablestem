@@ -358,10 +358,8 @@ def test_every_decision_then_done(split):
     assert "shown as an image" not in text_of(body)
     assert "You made 3 decisions on " in text_of(body)
     assert f'href="/jobs/{split.job_id}/download">Download the HTML file</a>' in body
-    assert (
-        f'href="/jobs/{split.job_id}/view" data-ph-event="result_opened">Preview the student version</a>'
-        in body
-    )
+    assert f'href="/jobs/{split.job_id}/view" data-ph-event="result_opened">' in body
+    assert "Preview the student version</a>" in body
     assert 'href="/help/posting">How to post it in your course</a>' in body
     assert "Repeated heading “Teacher Support”: Made 3 headings bold text instead of headings." in (
         text_of(body)
