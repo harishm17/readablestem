@@ -1,0 +1,10 @@
+# Keep gitleaks' default rules and allow the one value they flag on purpose: PostHog's
+# project token (phc_...), which PostHog ships to every browser and which the analytics
+# loader (web/static/analytics.js, web/analytics.py) must contain. It can only add events
+# to the project; it reads nothing.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "PostHog public project token"
+regexes = ['''phc_nT2JxCxLcAiSQGP4d4iJ2mWef6k3gNa6ptFaEJmz5cJ9''']
