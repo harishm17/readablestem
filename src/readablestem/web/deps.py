@@ -22,7 +22,7 @@ from starlette.responses import Response
 
 from readablestem.config import Settings
 from readablestem.observability.tracing import Tracer
-from readablestem.web import seo
+from readablestem.web import analytics, seo
 from readablestem.web.abuse import RateLimiter, client_ip
 from readablestem.web.db import User, session_scope
 from readablestem.web.logsafe import log_event
@@ -312,6 +312,10 @@ def render(
         # Search engines: only the public pages are indexed (web.seo).
         "indexable": seo.is_indexable(request.url.path),
         "showcase_on": seo.SHOWCASE_DIR.is_dir(),
+        # Product analytics (web.analytics): off unless ANALYTICS_ENABLED; the events queued
+        # by the page before are handed to its loader once.
+        "analytics_on": ctx.settings.analytics_enabled,
+        "analytics_events": analytics.pop_events(request),
     }
     return ctx.templates.TemplateResponse(
         request, template, base | (context or {}), status_code=status_code, headers=headers

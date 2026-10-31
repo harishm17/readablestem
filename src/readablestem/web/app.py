@@ -36,7 +36,7 @@ from readablestem.config import ConfigError, Settings, get_settings
 from readablestem.observability.logging import configure_logging, request_logging_middleware
 from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
-from readablestem.web import seo
+from readablestem.web import analytics, seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
@@ -442,4 +442,6 @@ def create_app(
     ):
         app.include_router(module.router)
     app.include_router(auth_router)
+    if settings.analytics_enabled:  # the /m/ proxy to PostHog (web.analytics); absent when off
+        app.include_router(analytics.router)
     return app

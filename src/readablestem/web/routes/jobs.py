@@ -33,6 +33,7 @@ from readablestem.pipeline import export_canvas, export_cartridge, text_pass
 from readablestem.pipeline import language as languages
 from readablestem.web import (
     access,
+    analytics,
     documents,
     events,
     notation,
@@ -654,6 +655,14 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     placed = await run_in_threadpool(
         _place_files, ctx, user, form.files, mode, course_id, exam, revises, image_pages
     )
+    for item in placed:  # product analytics (web.analytics): counts only, never a file name
+        if item.job_id or item.pending_id:
+            analytics.queue_event(
+                request,
+                "document_uploaded",
+                page_count=item.pages,
+                source="image" if image_pages else "pdf",
+            )
     if len(placed) == 1:
         return await _answer_one(request, user, placed[0], chosen, revises or "")
     return await run_in_threadpool(_results_redirect, ctx, user, placed)
@@ -1027,6 +1036,7 @@ def status_context(job: JobView, outcome: JobOutcome | None) -> dict[str, Any]:
         "status_version": version,
         "headline": headline,
         "provider_down": down,
+        "conversion_event": analytics.conversion_props(job),  # product analytics, if enabled
     }
 
 

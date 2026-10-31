@@ -34,6 +34,11 @@
   <link rel="stylesheet" href="{{ static_url('app.css') }}">
   <script src="/static/vendor/htmx-2.0.11.min.js" integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg" defer></script>
   <script src="{{ static_url('app.js') }}" defer></script>
+  {# Product analytics (web/analytics.py): only when ANALYTICS_ENABLED, only on app pages;
+     converted documents and downloads are built from other templates and never carry it. #}
+  {% if analytics_on %}
+  <script src="{{ static_url('analytics.js') }}" defer></script>
+  {% endif %}
   {% block head %}{% endblock %}
   {% if indexable %}
   {{ json_ld(request.url.path, self.title() ~ " | ReadableSTEM", self.description()) }}
@@ -115,5 +120,8 @@
         "Source code" link above.</p>
     </div>
   </footer>
+  {% for event in analytics_events %}
+  <span hidden data-ph-event="{{ event.name }}" data-ph-props='{{ event.props|tojson }}'></span>
+  {% endfor %}
 </body>
 </html>

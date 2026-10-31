@@ -11,8 +11,9 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import func, select
+from starlette.background import BackgroundTask
 
-from readablestem.web import office_convert, seo
+from readablestem.web import analytics, office_convert, seo
 from readablestem.web.assets import static_url
 from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
@@ -43,9 +44,18 @@ def demo(request: Request) -> Response:
     """
     if DEMO_PAGE.is_file():
         site = get_ctx(request).settings.base_url.rstrip("/")
+        # The demo is a sandboxed document and runs no script, so a visit that arrives by
+        # the personal site's link (which carries the visitor's id) is noted from here.
+        visitor = analytics.visitor_id(request.query_params.get("hm_id"))
+        noted = (
+            BackgroundTask(analytics.capture, visitor, "demo_opened", {"direct": True})
+            if visitor and analytics.enabled(request)
+            else None
+        )
         return HTMLResponse(
             _with_preview_tags(DEMO_PAGE.read_text(encoding="utf-8"), site),
             headers={"Content-Security-Policy": VIEW_CSP},
+            background=noted,
         )
     return render(request, "demo_pending.html", {"active": "demo"})
 

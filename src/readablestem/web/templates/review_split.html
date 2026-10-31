@@ -485,7 +485,7 @@
     <p>{{ ready.finish }}{% if ready.sentence %} {{ ready.sentence }}{% endif %}</p>
     {% if ready.shareable %}
     <p class="done-actions"><a class="button" href="/jobs/{{ job.id }}/download">Download the HTML file</a>
-      <a href="/jobs/{{ job.id }}/view">Preview the student version</a></p>
+      <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a></p>
     <p>Before you share, read the student version through once: the automatic checks look at the structure of the file, not at whether each part says what you meant.{% if ready.notes %} {{ ready.notes }} {{ "item was" if ready.notes == 1 else "items were" }} accepted for you with a note; looking at {{ "it" if ready.notes == 1 else "them" }} is optional.{% endif %}</p>
     <p><a href="/help/posting">How to post it in your course</a> · <a href="/jobs/{{ job.id }}#ready">Back to the results</a></p>
     {% else %}
