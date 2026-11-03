@@ -1,0 +1,8 @@
+{
+ "candidates": [],
+ "papers_scanned": 100,
+ "rule": "first N of the seeded order of data/realworld/pool.json, CC BY 3.0/4.0 only",
+ "seed": "figures-v2-2026-11-02",
+ "set": "figures-v2",
+ "source": "arxiv"
+}

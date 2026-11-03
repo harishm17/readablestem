@@ -107,6 +107,17 @@
   `max-age` instead of `no-store` or `no-cache`.
 ## Unreleased
 
+### Figure gold v2 and a draft pre-registration for long descriptions
+
+- `data/gold-figures-v2/`: 50 figures (14 data charts, 14 diagrams, 10 photos and illustrations, 12 chemistry
+  structures) from CC BY OpenStax books, drawn by a seeded rule with licence and exclusion gates
+  (`gold/figures_v2.py`, `scripts/figures_v2_pool.py`, `scripts/figures_v2_build.py`); each has its source,
+  licence and a reference long description, and 4 of the charts a reference data table. 45 figures come from
+  retired editions ([decisions/0001-scope.md](docs/decisions/0001-scope.md), question 2). No model was run.
+- `gold/figures_v2_arxiv.py` reads plotted data from pgfplots TeX; 100 seeded CC BY papers held no usable
+  chart. `gold/figures_v2_table.py` scores table cells against a reference table.
+- [docs/eval-figures-long.md](docs/eval-figures-long.md): the set, and a draft pre-registration (arms, bars,
+  budget cap, judge calibration with human labels) awaiting sign-off.
 ### EPUB export
 
 - `readablestem export epub FILE.html OUT.epub`: an EPUB 3 from the finished HTML (`pipeline/export_epub.py`): XHTML with native MathML, images as files with their alt text, a contents list from the headings, a page list from page markers when present, language, title and accessibility metadata. No `conformsTo`; the summary makes no conformance claim; a feature is claimed only when every item has it. Scripts, frames, forms, remote pictures and `url()` styles are not carried. EPUBCheck and DAISY Ace run on it in `.github/workflows/epub.yml` and locally when installed ([docs/output.md](docs/output.md), "The EPUB export"). No route or button yet.
