@@ -500,6 +500,30 @@ plus the same for pass/fail (`pass_rate_delta`) and the mean length ratio. Figur
 either text was cut for the judge, or either call failed, are excluded (`excluded`). A
 positive delta means the judge rewards length.
 
+### Figure spot check (`eval figures-spotcheck`)
+
+Offline, no model call, no spend. After a figures run with long descriptions on, the long judge
+has graded each long description; this draws what a person reads (`eval/figures_spotcheck.py`):
+**every figure the judge failed** (the description not accurate and complete and free of invented
+values, or a data table with wrong values) **plus a seeded sample of its passes** (10 by default,
+`--passes`), drawn by SHA-256 of `seed|id`. Figures the judge did not grade (no long description,
+a failed judge call) are counted and left out.
+
+```
+uv run readablestem eval figures-spotcheck --items data/eval/judged.jsonl --sheet data/eval/spotcheck.csv
+# Fill human_accurate, human_complete, human_invented_values (yes/no); human_table_values_ok if a table is shown.
+uv run readablestem eval figures-spotcheck --key data/eval/spotcheck.key.json --labels data/eval/spotcheck.csv --out data/eval/spotcheck.json
+```
+
+The sheet shows the image URL, caption, long description and table in a seeded order that mixes
+fails and passes, and no verdict, so it cannot anchor the label; the verdicts are in the key file
+beside it. The report gives two counts, each with its n and a Wilson 95% interval: how many judge
+fails the person also fails, and how many sampled passes the person would fail (errors the judge
+let through). 0 misses in 10 passes still allows about 0.28, so this checks the judge, it does not
+measure its miss rate; the 25-item kappa calibration in
+[eval-figures-long.md](eval-figures-long.md) (section 3.6) is the measure. In the product, the review
+screen's per-item "Report this item" link (`web/report_item.py`) already collects spot reports on real documents.
+
 ### Regression gate (`eval gate`)
 
 Compares a current report with a baseline report of the same task.

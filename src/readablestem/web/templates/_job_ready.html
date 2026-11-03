@@ -46,7 +46,8 @@
   <p class="canvas-download"><a href="/jobs/{{ job.id }}/combine">Combine parts</a> into one
     HTML file: the {{ job.combinable }} finished parts of this file that you still have,
     in page order. A part you deleted, or one that is not finished or still has a decision
-    to make, is left out and the file names the missing pages.</p>
+    to make, is left out and the file names the missing pages. The same file as
+    {% if word_export|default(false) %}<a href="/jobs/{{ job.id }}/combine?format=docx">Word (.docx)</a> or {% endif %}<a href="/jobs/{{ job.id }}/combine?format=epub">EPUB</a>.</p>
   {% endif %}
   <h3 id="before-heading">Before you share</h3>
   <ul aria-labelledby="before-heading">
