@@ -4,25 +4,86 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "41 3 * * *"  # nightly, 03:41 UTC: the full suite on Python 3.14 (see `changes`)
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer push to the same pull request cancels the run it supersedes. Runs on main, the
+# nightly run and manual runs are never cancelled, so every main commit keeps its result.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Actions are pinned to full commit SHAs (tag in the comment). Tags and SHAs checked with
-# `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` on 2026-10-07. setup-uv publishes no
-# floating major tag (no `v10`), so it must be pinned to an exact release. Dependabot
-# (.github/dependabot.yml) proposes updates weekly.
+# `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` on 2026-10-07 (artifact actions on
+# 2026-11-03). setup-uv publishes no floating major tag (no `v10`), so it must be pinned to
+# an exact release. Dependabot (.github/dependabot.yml) proposes updates weekly.
 
 jobs:
-  lint-test:
-    name: ruff + ty + pytest (Python ${{ matrix.python-version }})
+  # Decides how much of the Python 3.14 leg runs, and builds the pytest matrix.
+  #   Python 3.12: always the full suite, in SHARDS shards.
+  #   Python 3.14: the full suite (same shards) on a push to main, the nightly schedule, a
+  #   manual run, and a pull request that touches pyproject.toml, uv.lock, .python-version or
+  #   this file. Any other pull request runs a smoke: one shard in SMOKE_OF of the suite
+  #   (a spread over every area, chosen by recorded duration), plus ruff, ty and an import
+  #   of every module on 3.14 in `static`. docs/development.md ("CI") states the rule.
+  changes:
+    name: plan (what runs on Python 3.14)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 5
+    env:
+      SHARDS: "4"
+      SMOKE_OF: "8"
+      EVENT: ${{ github.event_name }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      full314: ${{ steps.plan.outputs.full314 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: plan
+        run: |
+          set -euo pipefail
+          full=true
+          if [ "$EVENT" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE_SHA"
+            # The checkout is the PR's merge commit, so this diff is the PR's own change.
+            if git diff --name-only "$BASE_SHA" HEAD \
+                | grep -E -q '^(pyproject\.toml|uv\.lock|\.python-version|\.github/workflows/ci\.yml)$'; then
+              full=true
+            else
+              full=false
+            fi
+          fi
+          python3 - "$full" "$SHARDS" "$SMOKE_OF" >> "$GITHUB_OUTPUT" <<'PY'
+          import json, sys
+          full, shards, smoke_of = sys.argv[1] == "true", int(sys.argv[2]), int(sys.argv[3])
+          legs = [
+              {"python": "3.12", "shard": f"{i}/{shards}", "name": f"Python 3.12, shard {i}/{shards}"}
+              for i in range(1, shards + 1)
+          ]
+          if full:
+              legs += [
+                  {"python": "3.14", "shard": f"{i}/{shards}", "name": f"Python 3.14, shard {i}/{shards}"}
+                  for i in range(1, shards + 1)
+              ]
+          else:
+              legs.append(
+                  {"python": "3.14", "shard": f"1/{smoke_of}", "name": f"Python 3.14, smoke 1/{smoke_of}"}
+              )
+          print("matrix=" + json.dumps({"include": legs}))
+          print("full314=" + str(full).lower())
+          PY
+
+  static:
+    name: ruff + ty (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -48,10 +109,103 @@ jobs:
         run: uv run ruff format --check .
       - name: Type check
         run: uv run ty check src
+      # Catches a module that 3.14 refuses to compile or import, whatever the tests touch.
+      - name: Import every module of the package
+        run: |
+          uv run python - <<'PY'
+          import importlib, pkgutil
+          import readablestem
+          for info in pkgutil.walk_packages(readablestem.__path__, "readablestem."):
+              importlib.import_module(info.name)
+          PY
+
+  pytest:
+    name: pytest (${{ matrix.name }})
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
+    env:
+      PYTHON: ${{ matrix.python }}
+      SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - name: Install (locked)
+        run: uv sync --locked --all-extras --group browser
       # Includes tests/test_gold_sample.py: known-correct LaTeX must match the gold sample.
-      # On 3.12 the Postgres tests also run, against the embedded pgserver.
+      # On 3.12 the Postgres tests also run, against the embedded pgserver. The suite is
+      # split by `--shard` (tests/_sharding.py): files are dealt to the shards by recorded
+      # duration, tests/shard_durations.json. A file with no recorded time still lands in
+      # exactly one shard, and `shard-coverage` fails the run if any test ran in none.
       - name: Pytest (offline; live OpenStax and model tests are opt-in)
-        run: uv run pytest -n auto
+        run: |
+          mkdir -p shard-reports
+          uv run pytest -n auto --shard "$SHARD" \
+            --shard-report "shard-reports/shard-${PYTHON}-${SHARD%/*}.json"
+      - name: Keep the shard report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shard-report-${{ matrix.python }}-${{ strategy.job-index }}
+          path: shard-reports/
+          if-no-files-found: ignore
+          retention-days: 3
+
+  # Every test in the collection must have run in exactly one shard, on each Python that
+  # ran the full suite. This is what makes a new test file safe without touching the
+  # durations file. Standard library only: no install.
+  shard-coverage:
+    name: every test ran in exactly one shard
+    needs: [changes, pytest, browser]
+    if: ${{ !cancelled() && needs.pytest.result == 'success' && needs.browser.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      SHARDS: "4"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: shard-report-*
+          path: reports
+      - name: Python 3.12
+        run: |
+          mkdir r312 && cp reports/*/shard-3.12-*.json r312/
+          python3 scripts/check_shards.py r312 "$SHARDS"
+      - name: Browser tests
+        run: |
+          mkdir rbrowser && cp reports/*/shard-browser-*.json rbrowser/
+          python3 scripts/check_shards.py rbrowser 2
+      - name: Python 3.14 (full runs only)
+        if: ${{ needs.changes.outputs.full314 == 'true' }}
+        run: |
+          mkdir r314 && cp reports/*/shard-3.14-*.json r314/
+          python3 scripts/check_shards.py r314 "$SHARDS"
+
+  # One name for branch protection to require instead of each job above: it fails when any
+  # job that ran failed or was cancelled, and passes when the rest were skipped by design.
+  ci-passed:
+    name: CI passed
+    needs: [changes, static, pytest, shard-coverage, proof-replay, site, postgres, browser, dependency-audit, docker, eval-gate, secret-scan]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      RESULTS: ${{ join(needs.*.result, ' ') }}
+    steps:
+      - run: |
+          echo "job results: $RESULTS"
+          case " $RESULTS " in *" failure "*|*" cancelled "*) exit 1;; esac
 
   proof-replay:
     name: make proof (replay of the recorded run)
@@ -201,9 +355,15 @@ jobs:
         run: uv run pytest -m postgres
 
   browser:
-    name: pytest -m browser (Playwright Chromium)
+    name: pytest -m browser (Playwright Chromium, shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    env:
+      SHARD: ${{ matrix.shard }}/2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -214,6 +374,20 @@ jobs:
           enable-cache: true
       - name: Install (locked, with the browser group)
         run: uv sync --locked --all-groups --all-extras
+      # Chromium's download is cached by Playwright version (the lock pins it). On a hit
+      # `playwright install` finds the browser and only installs the system libraries.
+      - name: Cache the Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+      # tests/test_web_browser.py downloads axe-core once, checks its npm integrity hash and
+      # keeps it here; the cache saves that download on later runs.
+      - name: Cache axe-core
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/axe-core
+          key: axe-core-${{ hashFiles('tests/test_web_browser.py') }}
       - name: Install Chromium and its system libraries
         run: uv run playwright install --with-deps chromium
       # The fonts the eval renderer and the browser tests name (eval/render.py: Noto Sans
@@ -221,9 +395,25 @@ jobs:
       # printed PDFs differ from the ones the tests were written against.
       - name: Install the fonts the printed test pages use
         run: sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-liberation
+      # Two shards (`--shard`, by recorded duration), each with -n 3 on the 4-core runner:
+      # each worker runs its own Chromium, and `--dist loadfile` keeps a file's tests on one
+      # worker so its module-scoped server and browser start once. Every server binds its
+      # own free port and keeps its data in tmp_path_factory, so workers share nothing but
+      # the axe-core file, which is written atomically.
       - name: Pytest (browser-marked tests only, including axe-core checks)
         # Exit code 5 (no tests collected) fails the job.
-        run: uv run pytest -m browser
+        run: |
+          mkdir -p shard-reports
+          uv run pytest -m browser -n 3 --dist loadfile --shard "$SHARD" \
+            --shard-report "shard-reports/shard-browser-${SHARD%/*}.json"
+      - name: Keep the shard report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shard-report-browser-${{ matrix.shard }}
+          path: shard-reports/
+          if-no-files-found: ignore
+          retention-days: 3
 
   dependency-audit:
     name: pip-audit (locked dependencies)

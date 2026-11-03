@@ -20,7 +20,7 @@ printed pages read differently.
 | `make test-network` | Live OpenStax API test (`pytest -m network`) |
 | `make lint` | `ruff check` + `ruff format --check` |
 | `make fmt` | Format and auto-fix |
-| `make ci-local` | What CI's `lint-test` job runs (ruff, ty, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
+| `make ci-local` | What CI's `static` and `pytest` jobs run (ruff, ty, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
 | `make gold` | Fetch the sample gold set (3 sections of `physics`, chapter 2) into `data/gold/` |
 | `make gold-licenses` | Write every OpenStax book's license to `data/openstax-licenses.csv` |
 | `make reproduce` | Offline reproduction: gold files against their manifests, committed eval reports against the gold they were scored on, the scorer's ceiling, then the committed numbers. No key, no network, no browser |
@@ -46,6 +46,64 @@ Default paths (`data/gold`, `.cache/openstax`) resolve against the project root 
 nearest parent directory whose `pyproject.toml` names `readablestem`), so commands work from
 any subdirectory. Outside a checkout they fall back to the working directory. Bad input
 (missing file, page out of range, malformed JSONL) prints `error: ...` and exits 2.
+
+## CI
+
+`.github/workflows/ci.yml` runs on every pull request, every push to `main`, nightly (03:41
+UTC) and by hand. Jobs, by check name:
+
+| Check | Notes |
+|---|---|
+| `plan (what runs on Python 3.14)` | Builds the pytest matrix (below) |
+| `ruff + ty (Python 3.12)`, `(Python 3.14)` | ruff, ty and an import of every module; both Pythons on every run |
+| `pytest (Python 3.12, shard i/4)`, `(Python 3.14, ...)` | The offline suite, in four shards |
+| `every test ran in exactly one shard` | Fails if any collected test ran in no shard or in two |
+| `pytest -m browser (Playwright Chromium, shard i/2)` | Browser tests, two shards of three xdist workers each |
+| `CI passed` | Fails if any job failed or was cancelled; require this one in branch protection |
+
+The other jobs (`postgres`, `docker`, `make proof`, `make site`, `pip-audit`, `eval gate`,
+`gitleaks`) are described in [operations.md](operations.md). Branch protection is not
+configured on the repo today; before this split the checks were named
+`ruff + ty + pytest (Python 3.12)` and `(Python 3.14)`.
+
+**Python 3.14 rule.** The full suite runs on 3.14 on a push to `main`, on the nightly
+schedule, on a manual run, and on a pull request that changes `pyproject.toml`, `uv.lock`,
+`.python-version` or `ci.yml`. Any other pull request runs a smoke: ruff, ty and the import of
+every module on 3.14, plus one shard in eight of the suite (`Python 3.14, smoke 1/8`), so an
+incompatibility still shows up on the pull request. Python 3.12 always runs everything.
+`make ci-local` runs the full suite on both.
+
+**Shards.** `pytest --shard 2/4` runs the second of four shards (`tests/_sharding.py`,
+hooks in `tests/conftest.py`). Test files are dealt to shards longest first, by the durations
+in `tests/shard_durations.json` (tests of 0.05 s or more; every other test counts 0.02 s).
+A file is never split, so module-scoped servers and browsers start once. A new file needs no
+entry: it gets the default weight and lands in exactly one shard. Each shard writes a report
+with `--shard-report`, and `scripts/check_shards.py` (job `every test ran in exactly one
+shard`) fails if the shards collected different tests, or a collected test ran in none or in
+two. Refresh the durations now and then so the shards stay level (about 10 minutes with 16
+cores):
+
+```
+uv run pytest -n 4 --dist loadfile -m "not network and not live_model and not slow" \
+  --shard-record tests/shard_durations.json
+```
+
+To change the shard count, edit `SHARDS` in both `plan` and `shard-coverage` in `ci.yml`
+(a test checks that they agree).
+
+**Browser tests in parallel.** `pytest -m browser -n 3 --dist loadfile --shard i/2` (two
+jobs, also checked by `every test ran in exactly one shard`): each worker starts
+its own uvicorn server on a free port, keeps its files under `tmp_path_factory` and runs its
+own Chromium. The one shared file is the axe-core download in `.cache/axe-core`, written
+atomically. A new browser test must not use a fixed port, a fixed path or another test's
+state.
+
+**Caches.** `setup-uv` caches the uv download cache (key: Python version and `uv.lock`);
+Playwright's Chromium (`~/.cache/ms-playwright`) and axe-core are cached with `actions/cache`.
+
+**Cancelling.** A newer push to a pull request cancels that pull request's earlier runs of
+`ci.yml`, `codeql.yml` and `proof-interim.yml` (and `eval-guard.yml`). Runs on `main`, the
+nightly run and manual runs are never cancelled.
 
 ## Speech oracles (optional)
 
