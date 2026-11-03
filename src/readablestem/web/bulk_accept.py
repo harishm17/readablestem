@@ -119,12 +119,13 @@ def offers(result: DocumentResult) -> list[Offer]:
 
 def accept_all(result: DocumentResult, slug: str) -> list[ReviewChange]:
     """Accept every candidate, in place: one ordinary Accept per fix, each marked as one of
-    a bulk action in its record. Raises ReviewInvalid when there is none."""
+    a bulk action in its record (`BULK_KEY` holds the kind's slug). Raises ReviewInvalid when
+    there is none."""
     spec = BULK_KINDS[slug]
     waiting = candidates(result, slug)
     if not waiting:
         raise ReviewInvalid([FieldError(f"bulk-{slug}", spec.nothing)])
     changes = [apply_review(result, fix.element_id, "accept", {}) for fix in waiting]
     for change in changes:
-        change.after[BULK_KEY] = True
+        change.after[BULK_KEY] = slug
     return changes

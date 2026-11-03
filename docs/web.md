@@ -2116,7 +2116,7 @@ written by looking.
 *The decision.* `POST /jobs/{id}/accept/{kind}` is CSRF-checked and owner-only like every review
 route, and goes through the same path as a clean-tables accept (`routes/edits.write_review`):
 lock the job, apply an ordinary Accept to each item (`web.review.apply_review`, so every rule of
-a single accept holds), one `ReviewEdit` per item with `bulk: true` in its record, one write
+a single accept holds), one `ReviewEdit` per item with the kind under `bulk` in its record (the review record says "Accepted, together with the other equations whose checks passed, in one action"), one write
 (`result_version` + 1), one re-render, the usage event `decision_made` with `kind=group`. The
 form carries the review version the list was drawn at: a document changed since (another tab, an
 Undo) is refused with a 409 and nothing is accepted, so exactly what was listed is what is

@@ -167,7 +167,7 @@ def test_accept_all_marks_each_change_as_bulk_and_refuses_when_there_is_none():
     result = scaled_output().result
     changes = bulk_accept.accept_all(result, "equations")
     assert [c.element_id for c in changes] == EQUATION_CANDIDATES
-    assert all(c.after[BULK_KEY] is True and c.action == "accept" for c in changes)
+    assert all(c.after[BULK_KEY] == "equations" and c.action == "accept" for c in changes)
     assert all(result.fix_for(e).reviewed for e in EQUATION_CANDIDATES)
     with pytest.raises(ReviewInvalid) as refused:
         bulk_accept.accept_all(result, "equations")
@@ -233,7 +233,9 @@ def test_accepting_changes_only_the_listed_items_in_one_write_marked_bulk(scaled
     assert int(version(scaled)) == start + 1  # one write
     recorded = edits(scaled)
     assert [e.element_id for e in recorded] == EQUATION_CANDIDATES
-    assert all(e.after[BULK_KEY] is True and e.after[WRITE_KEY] == start + 1 for e in recorded)
+    assert all(
+        e.after[BULK_KEY] == "equations" and e.after[WRITE_KEY] == start + 1 for e in recorded
+    )
     assert all(e.action == "accept" and e.before["status"] == "needs_review" for e in recorded)
     fixes = {f.element_id: f for f in stored(scaled).fixes}
     assert all(fixes[e].reviewed for e in EQUATION_CANDIDATES)
@@ -268,6 +270,15 @@ def test_undo_takes_the_whole_action_back_as_one_step(scaled):
     undo_edits = [e for e in edits(scaled) if e.action == "undo"]
     assert sorted(e.element_id for e in undo_edits) == EQUATION_CANDIDATES
     assert not any(f.reviewed for f in stored(scaled).fixes if f.element_id in EQUATION_CANDIDATES)
+
+
+def test_the_review_record_says_which_bulk_action_each_decision_was_part_of(scaled):
+    accept(scaled, "equations")
+    accept(scaled, "figures")
+    page = " ".join(unescape(scaled.browser.get(f"/jobs/{scaled.job_id}/record").text).split())
+    assert "together with the other equations whose checks passed, in one action" in page
+    assert "together with the other figures with generated alt text, in one action" in page
+    assert "other clean tables" not in page
 
 
 def test_the_form_needs_the_csrf_token(scaled):
