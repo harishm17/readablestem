@@ -1,8 +1,8 @@
 # ReadableSTEM: information sheet for an accessibility or procurement office
 
 One page. It says what the tool does, what happens to a document, and where it falls short.
-It is written from how the beta behaves today, not from a contract or an audit by anyone
-outside the project. The command is `readablestem` (the old `ReadableSTEM` still works); the GitHub repository is `harishm17/readablestem`.
+It describes the beta as it behaves today; it is not a contract or an outside audit. The
+command is `readablestem`; the GitHub repository is `harishm17/readablestem`.
 
 ## What it does
 
@@ -29,7 +29,7 @@ checks ran, and what was not checked.
 | How long | Deleted automatically 24 hours after the instructor last worked on it; 7 days if the instructor keeps it; 30 days if the instructor also lets the developer look at results. Deleting by hand removes it from the database at once. Daily backups are kept about 6 days, so a deleted document can stay in one for up to a week. |
 | Where it goes | Railway hosts the application and its database. Images cut from the page, with a short piece of nearby text, are sent to the model provider's API (Anthropic or OpenAI, as configured) to propose LaTeX and descriptions. The whole PDF, the file name and the email address are not sent. The provider states that API data is not used to train its models by default. Anthropic's published policy is to delete API inputs and outputs within 30 days (longer for material its safety systems flag), so a deleted document can remain there that long. Optional tracing sends timings and counts only. |
 | Logs and usage notes | Event names, random ids, counts, timings, costs and error categories. No document text, images, file names or email addresses. |
-| Accounts | Email address, name and the sign-in provider's id for people on the list. One session cookie; no analytics or advertising cookies. When an account is deleted, a one-way hash of its random id and the time are kept so that an erasure can be repeated after a backup is restored (a deletion made after the newest backup is only covered while the current database can still be read). |
+| Accounts | Email address, name and the sign-in provider's id. One session cookie; no analytics or advertising cookies. A deleted account leaves only a one-way hash of its id and the time, to repeat the deletion after a restore. |
 | Who can see a document | Its owner. Other users get the same "not found" page as for a document that does not exist. The developer can look at results only when the instructor chose that, for 30 days. |
 
 ## Where it falls short
@@ -50,8 +50,8 @@ checks ran, and what was not checked.
   web application itself, and no independent security test. The developer reviewed the
   application against a written checklist and ran automated accessibility tests on its
   pages (`docs/security.md`, `docs/web.md`).
-- **One developer.** The beta is run by an individual developer (an independent project), not a company or a university, with
-  no support contract. The code is MIT; the hosted service is offered under AGPL-3.0 terms because it links PyMuPDF.
+- **Support.** Built and maintained by Harish Manoharan as an open-source project, with no
+  support contract. The code is MIT; the hosted service is offered under AGPL-3.0 terms because it links PyMuPDF.
 
 ## Where to read more
 

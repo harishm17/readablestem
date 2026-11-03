@@ -74,7 +74,7 @@ missing=$(printf '%s\n' "$live_tables" | grep -vxF -f <(printf '%s\n' "$restored
 [ -z "$missing" ] || fail missing_tables
 live_version=$(alembic_version "$PGURL") || fail read_live
 restored_version=$(alembic_version "$check") || fail read_restore
-[ -n "$live_version" ] && [ "$live_version" = "$restored_version" ] || fail alembic_mismatch
+if [ -z "$live_version" ] || [ "$live_version" != "$restored_version" ]; then fail alembic_mismatch; fi
 tables=$(printf '%s\n' "$live_tables" | wc -l)
 
 # Proved: put the dump in place.
