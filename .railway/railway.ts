@@ -130,12 +130,19 @@ const appVariables = [
 ];
 
 // Settings only the web service holds (the image-page switch and the per-page and per-job
-// spend caps added 2026-10-22; the worker thread runs inside web).
+// spend caps added 2026-10-22; the worker thread runs inside web). MS_* are the Microsoft
+// sign-in settings (docs/deploy-railway.md, "Microsoft sign-in on Railway"): declared before
+// they have values so a later `railway variable set` is not deleted by the next apply; the
+// app treats an unset variable as "Microsoft sign-in off", and a half-set group refuses to
+// start. Only web serves sign-in, so cron does not hold them.
 const webOnlyVariables = [
   "EQUATION_LINE_CONTEXT",
   "FEATURE_IMAGE_PAGES",
   "MAX_USD_PER_JOB",
   "MAX_USD_PER_PAGE",
+  "MS_ALLOWED_TENANTS",
+  "MS_CLIENT_ID",
+  "MS_CLIENT_SECRET",
   "PORT",
 ];
 
