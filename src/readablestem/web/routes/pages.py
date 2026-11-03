@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
-from readablestem.web import analytics, office_convert, seo
+from readablestem.web import analytics, office_convert, offices, seo
 from readablestem.web.assets import cached_html, static_url
 from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
@@ -126,6 +126,35 @@ def privacy(request: Request) -> Response:
 def terms(request: Request) -> Response:
     ms_on = get_ctx(request).settings.ms_sign_in_enabled
     return render(request, "terms.html", {"active": "terms", "microsoft_on": ms_on})
+
+
+@router.get(offices.PAGE_PATH)
+def for_accessibility_offices(request: Request) -> Response:
+    """What an accessibility or procurement office needs to decide: the data flow, who
+    receives what, retention, student records, what the tool does not do, a pilot checklist.
+    Public, and written from the settings (web.offices)."""
+    ctx = get_ctx(request)
+    context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
+    return render(request, "offices.html", context)
+
+
+@router.get(offices.SUMMARY_PATH)
+def for_accessibility_offices_summary(request: Request) -> Response:
+    """The same facts on one printable page, as a self-contained HTML file to download. It
+    carries inline style and no script, and is served sandboxed like a converted document."""
+    ctx = get_ctx(request)
+    context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
+    context["as_of"] = utcnow().date().isoformat()
+    context["style_tag"] = offices.summary_style_tag()
+    return render(
+        request,
+        "offices_summary.html",
+        context,
+        headers={
+            "Content-Security-Policy": VIEW_CSP,
+            "Content-Disposition": f'attachment; filename="{offices.SUMMARY_FILENAME}"',
+        },
+    )
 
 
 @router.get("/limits")

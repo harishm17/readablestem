@@ -1272,7 +1272,7 @@ def rerender_demo(report_path: Path, pdf_path: Path, html_path: Path, *, note: b
             xhtml="",
             authors=list(meta.get("authors") or []),
         )
-        # The note links to the source code (code MIT, service offered under AGPL-3.0 terms).
+        # The note links to the source code (the licence wording is on the Terms page).
         source_url = Settings(_env_file=None).source_url  # type: ignore[call-arg]
         html = render.wrap_demo_html(
             html, page, date=meta["date"], source_url=source_url, placeholder=False

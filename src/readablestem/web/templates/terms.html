@@ -1,13 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Terms of use{% endblock %}
-{% block description %}Terms of use for ReadableSTEM, a free beta run by Harish Manoharan, an individual developer: who can use it, the daily limits and what you may upload.{% endblock %}
+{% block description %}Terms of use for ReadableSTEM, a free beta built by Harish Manoharan: who can use it, the daily limits and what you may upload.{% endblock %}
 {% block content %}
 <h1>Terms of use</h1>
 <p class="hint">These terms describe how the beta works today.</p>
 
 <h2>The service</h2>
-<p>ReadableSTEM is a free beta run by Harish Manoharan, an individual developer
-  (an independent project, not a company or a university).
+<p>ReadableSTEM is a free beta built and maintained by Harish Manoharan.
   {% if signup_open %}It is open to anyone with a Google account{% if microsoft_on %} (or a Microsoft school
   or work account from a university that is set up for it){% endif %}.{% else %}It is open by invitation to a small group of instructors.{% endif %}
   It may change, pause or stop at any time. Daily limits apply to pages and uploads, and the
@@ -37,7 +36,7 @@
   process material you are not allowed to share. Access can be removed if the service is
   misused.</p>
 
-<h2>Open source</h2>
+<h2 id="open-source">Open source</h2>
 <p>The code is MIT. The hosted service links PyMuPDF, which is AGPL-3.0, so the service is
   offered under AGPL-3.0 terms and its complete source code is published at
   <a href="{{ source_url }}">{{ source_url }}</a>.</p>
@@ -56,8 +55,7 @@
 {% endif %}
 
 <h2>Your institution</h2>
-<p>This is an independent project, not a service of your university, and it is not
-  endorsed by it. Follow your institution's own rules for course materials and for
+<p>ReadableSTEM is not run or endorsed by your institution. Follow your institution's own rules for course materials and for
   student information.</p>
 
 <h2>Changes to these terms</h2>
