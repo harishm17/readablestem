@@ -46,11 +46,14 @@ _PARTICLES = frozenset({"e", "n", "p"})
 _GREEK_PARTICLES = frozenset({"α", "β", "γ"})
 _SIGNS = frozenset({"+", "−", "–", "-"})
 _STATE_TEXT = re.compile(r"^\((" + "|".join(sorted(STATE_SYMBOLS)) + r")\)$")
+# A state with a condition, `(aq, 0.10 M)`: MathCAT has no rule for it, so it stays one `mtext`
+# (our own reading takes it as it is), but it is evidence of chemistry like a plain state.
+_CONDITIONED_STATE = re.compile(r"^\((?:" + "|".join(sorted(STATE_SYMBOLS)) + r"),\s[^()]{1,24}\)$")
 _CLOSERS = frozenset({")", "]"})
 # Temporary marker on the `mi` this module writes, so its later passes know a single capital is a
 # symbol and not an italic variable; removed before `shape_chemistry` returns.
 _MARK = "data-chem-symbol"
-_FORMULA_OPERATORS = frozenset({"+", "(", ")", "[", "]", "·", INVISIBLE_SEPARATOR})
+_FORMULA_OPERATORS = frozenset({"+", "(", ")", "[", "]", "·", "↑", "↓", INVISIBLE_SEPARATOR})
 _SCRIPT_MARKS = frozenset({"*", "∗", "′", "•", "⋅", "∙"})
 _TWO_LETTER_SYMBOLS = frozenset(s for s in ELEMENTS if len(s) == 2)
 
@@ -249,7 +252,7 @@ def _has_evidence(kids: list[ET.Element], marked: _Marked) -> bool:
             return True
         if (
             _local(node) == "mtext"
-            and _STATE_TEXT.match(node.text or "")
+            and (_STATE_TEXT.match(node.text or "") or _CONDITIONED_STATE.match(node.text or ""))
             and i > 0
             and _is_species_node(kids[i - 1], marked)
         ):
@@ -366,10 +369,12 @@ def _shape_row(parent: ET.Element, marked: _Marked) -> bool:
         nuclide = _nuclide_symbol(following) if following is not None else None
         if _prefix_scripts(node) and nuclide is not None:
             token, wrapper = nuclide
-            if _symbols(token) is None and not _is_electron_prefix(node, token):
+            excited = wrapper is not None and not _scripts_ok(wrapper)
+            if excited or (_symbols(token) is None and not _is_electron_prefix(node, token)):
                 # MathCAT has no nuclide rule for a neutron, proton, positron, alpha, beta or
-                # gamma: it reads `mmultiscripts` of them no better, so they keep the converter's
-                # shape (an empty base with the numbers, then the symbol).
+                # gamma, nor for an excited nuclide (`Ni^*`): it reads `mmultiscripts` of them no
+                # better, so they keep the converter's shape (an empty base with the numbers,
+                # then the symbol).
                 out.extend(kids[i : i + 2])
             else:
                 out.append(_prescripted(node, _symbol_nodes(token)[0], wrapper))
@@ -417,7 +422,11 @@ def _only_chemistry(node: ET.Element) -> bool:
             _symbols(node) is not None or text in STATE_SYMBOLS or _is_particle(node)
         )
     if tag == "mtext":
-        return _is_particle(node)  # a neutron or a positron keeps the converter's shape
+        # kept as the converter wrote it: a particle, an excited nuclide's symbol, a state with a
+        # condition
+        return (
+            _is_particle(node) or _symbols(node) is not None or bool(_CONDITIONED_STATE.match(text))
+        )
     if tag == "mo":
         return text in ARROW_HEADS or text in _FORMULA_OPERATORS
     if tag in _ARROW_HOLDERS:

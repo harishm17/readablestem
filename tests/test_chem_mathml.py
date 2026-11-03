@@ -355,3 +355,32 @@ def test_a_hostile_nesting_is_refused_by_the_converter_not_by_the_interpreter() 
     assert not [
         c for c in check_mathml(convert("{" * 30 + ce_to_latex("H2O") + "}" * 30)) if not c.passed
     ]
+
+
+# ------------------------------------------------- the `\ce` forms of the subset, in this shape
+
+
+def test_a_state_with_a_condition_stays_one_mtext_and_is_evidence() -> None:
+    """MathCAT has no rule for `(aq, 0.10 M)`; our own reading takes it as one token."""
+    root = ce("Zn(aq, 0.10 M)")
+    assert [(local(n), "".join(n.itertext())) for n in root.iter() if len(n) == 0] == [
+        ("mi", "Zn"),
+        ("mtext", "(aq," + chr(0xA0) + "0.10" + chr(0xA0) + "M)"),
+    ]
+    assert root.get("intent") == ":chemical-formula"
+
+
+def test_an_excited_nuclide_keeps_the_converters_shape() -> None:
+    """MathCAT reads a star on a nuclide as "super times" and no longer as a nuclide at all."""
+    root = ce("^{60}_{28}Ni^*")
+    assert not [n for n in root.iter() if local(n) == "mmultiscripts"]
+    assert [local(n) for n in root.iter() if local(n) == "msubsup"]
+    assert any(local(n) == "mtext" and n.text == "Ni" for n in root.iter())
+
+
+def test_the_gas_and_precipitate_marks_are_operators_after_the_species() -> None:
+    gas = ce("CO2 ^")
+    assert [n.text for n in gas.iter() if local(n) == "mo"] == ["↑"]
+    precipitate = ce("Ag+(aq) + Cl-(aq) -> AgCl v")
+    assert "↓" in [n.text for n in precipitate.iter() if local(n) == "mo"]
+    assert precipitate.get("intent") == ":chemical-equation"

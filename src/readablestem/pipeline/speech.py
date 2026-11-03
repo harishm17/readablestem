@@ -532,7 +532,9 @@ def _speak_mtable(node: ET.Element) -> list[str]:
     aligned = any(_starts_with_relation(c) for cells in cells_by_row for c in cells)
     spoken_rows = []
     for cells in cells_by_row:
-        parts = [" ".join(_speak(cell)) for cell in cells]
+        # A row of half-reaction cells with an arrow in a cell of its own reads as one row.
+        row = speech_chem.row_parts(cells, _speak)
+        parts = row if row is not None else [" ".join(_speak(cell)) for cell in cells]
         spoken_rows.append((" " if aligned else ", ").join(p for p in parts if p))
     if len(spoken_rows) == 1:
         return [spoken_rows[0]] if spoken_rows[0] else []
@@ -662,13 +664,27 @@ def _nuclide(kids: list[ET.Element], i: int) -> tuple[list[str], int] | None:
     if numbers is None:
         return None
     for used in (2, 1):
-        parts = [_letters(k) for k in kids[i + 1 : i + 1 + used]]
+        siblings = kids[i + 1 : i + 1 + used]
+        excited = bool(siblings) and _is_excited(siblings[-1])
+        if excited:  # the star hangs on the last letters: `Ni^*`, `H` then `e^*`
+            siblings = [*siblings[:-1], siblings[-1][0]]
+        parts = [_letters(k) for k in siblings]
         if len(parts) < used or any(p is None for p in parts):
             continue
-        words = nuclide_words("".join(p for p in parts if p), *numbers)
+        words = nuclide_words("".join(p for p in parts if p), *numbers, excited=excited)
         if words is not None:
             return [words], used + 1
     return None
+
+
+def _is_excited(node: ET.Element) -> bool:
+    """`Ni^*`: letters with an asterisk as the only superscript."""
+    return (
+        node.tag == "msup"
+        and len(node) == 2
+        and speech_chem.is_star(node[1])
+        and _letters(node[0]) is not None
+    )
 
 
 def _speak_multiscripts(node: ET.Element) -> list[str]:
@@ -720,6 +736,22 @@ def _after_number(prev: ET.Element) -> str | None:
     return None
 
 
+def _join_pieces(pieces: list[str]) -> str:
+    """The pieces as one unit string. Two units side by side ("mol", "L^-1") are a product
+    in a chemistry rate or molar quantity ("mol L^-1 s^-1", "J mol^-1 K^-1": a mole and a
+    negative power); other side-by-side units stay as they were (not read as a unit)."""
+    chemical = any(p.startswith(("mol", "mmol", "μmol", "µmol")) for p in pieces)
+    if not chemical or not any("^-" in p or "^−" in p for p in pieces):
+        return "".join(pieces)
+    out = pieces[0]
+    for piece in pieces[1:]:
+        side_by_side = (out[-1].isalnum() or out[-1] == ")") and (
+            piece[0].isalpha() or piece[0] == "("
+        )
+        out += ("*" if side_by_side else "") + piece
+    return out
+
+
 def _unit_run(kids: list[ET.Element], i: int, count: str) -> tuple[list[str], int] | None:
     """A unit at kids[i:] after the number `count`: the longest run of siblings that
     reads wholly as one unit ("kg", "·", "m", "/", "s^2"). The words and the siblings."""
@@ -730,7 +762,7 @@ def _unit_run(kids: list[ET.Element], i: int, count: str) -> tuple[list[str], in
             break
         pieces.append(piece)
     for used in range(len(pieces), 0, -1):
-        words = unit_words("".join(pieces[:used]), count)
+        words = unit_words(_join_pieces(pieces[:used]), count)
         if words is not None:
             return [words], used
     return None
@@ -762,6 +794,27 @@ def _degrees(kids: list[ET.Element], i: int) -> tuple[list[str], int] | None:
     return ([count or "", unit] if own_number else [unit]), 2
 
 
+def _measured_unit(kids: list[ET.Element], i: int) -> tuple[list[str], int] | None:
+    """In a row that is chemistry, a unit after a decimal number ("0.0592 V": V is also
+    vanadium, C carbon, K potassium) is a unit when it is not the start of a formula: a
+    species symbol, a count or a charge follows it. A whole number stays a coefficient
+    ("2 K")."""
+    count = _after_number(kids[i - 1]) if i > 0 else None
+    if count is None or "." not in count:
+        return None
+    found = _unit_run(kids, i, count)
+    if found is None or found[1] != 1:
+        return None
+    if len(speech_chem.formula_symbols(kids[i]) or []) > 1:
+        return None  # "GeV" also parses as two element symbols: left to read as it is today
+    following = kids[i + found[1]] if i + found[1] < len(kids) else None
+    if following is not None and (
+        following.tag in _SCRIPTS or speech_chem.starts_species(kids, i + found[1])
+    ):
+        return None
+    return found
+
+
 def _speak_children(node: ET.Element) -> list[str]:
     words: list[str] = []
     kids = list(node)
@@ -769,6 +822,8 @@ def _speak_children(node: ET.Element) -> list[str]:
     i = 0
     while i < len(kids):
         found = _fenced_table(kids, i) or _nuclide(kids, i) or _degrees(kids, i)
+        if found is None and chemistry:
+            found = _measured_unit(kids, i)
         if found is None and chemistry:
             found = speech_chem.read_at(kids, i, _speak)
         if found is None and i > 0:

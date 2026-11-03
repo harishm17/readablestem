@@ -163,3 +163,17 @@ def test_tables_and_limits_are_read_as_rows_columns_and_limits(
     got = reading(latex, [CLEAR, "sre:mathspeak"])
     assert all(w in got.speech[CLEAR] for w in mathcat_words), got.speech[CLEAR]
     assert all(w in got.speech["sre:mathspeak"] for w in sre_words), got.speech["sre:mathspeak"]
+
+
+@needs_mathcat
+def test_mathcat_reads_the_gas_and_precipitate_marks_as_chemistry_and_cannot_read_a_condition() -> (
+    None
+):
+    marks = reading(ce_to_latex("Ag+(aq) + Cl-(aq) -> AgCl v"), [CLEAR])
+    assert marks.chemistry and marks.errors == {}
+    assert "aqueous" in marks.speech[CLEAR] and "down arrow" in marks.speech[CLEAR]
+    # MathCAT has no rule for a state with a condition (nor for an excited nuclide): both are
+    # read, not failed on, and the rest of the equation is still chemistry.
+    for source in ("Zn(s) + Cu^2+(aq, 0.10 M) -> Zn^2+(aq, 1.0 M) + Cu(s)", "^{60}_{28}Ni^*"):
+        got = reading(ce_to_latex(source), [CLEAR])
+        assert got.errors == {} and got.speech[CLEAR], source

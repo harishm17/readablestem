@@ -317,7 +317,11 @@ gains `metrics.long_descriptions` and a "Long descriptions" table:
 | `colour_only` | figures flagged as telling things apart by colour alone |
 | `required_decisions`, `tables_offered` | figures needing a decision; data tables read from the image, offered as optional extras (not in the file until a reviewer adds them, never a decision; `required_for_values` in reports before 2026-10-09, when each was a decision) |
 
-The long judge is not calibrated against human labels yet.
+The long judge is not calibrated against human labels yet. The 13 gold figures are too few for a
+pass-rate claim; a 50-figure set (`data/gold-figures-v2/`, drawn by a written seeded rule from CC BY
+sources) and a draft pre-registration with the judge-calibration plan are in
+[eval-figures-long.md](eval-figures-long.md). `gold/figures_v2_table.py` scores a data table cell by
+cell against a reference table, with no model.
 
 ### document
 
@@ -345,6 +349,7 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `secondary_stream_v2` | the labelled secondary scorer (see "equations"): `matched_exact`, `matched_mean_similarity`, `end_to_end_exact`, `end_to_end_exact_with_credit` (split and merged gold credited) and `credited_split`, `credited_merged` |
 | `prose_classes` | only with dev-v2 gold: the scripts, code, glossary and hyphen scorers (see "Extended development set") |
 | `split_gold_equations` | gold equations the pipeline found as several pieces |
+| `chemistry` | only when the gold has chemistry equations (ids with `chemistry`); report fields beside the scorers, never in their place. `chem_right_excl_times`: `n`, `right`, `rate` of chemically right (`exact_chem`) with the lone multiplication sign gold left out of both (the sentence around it says "times"), `lone_times` (how many were left out) and `chem_right_n`, `chem_right`, `chem_right_rate` with them kept. `silent_harm`: `n`, `n_gold` and `per_100_gold` (counts only: no item ids, so a held-out report names no items) of aligned equations that are wrong on `exact_chem`, not a required decision, and spoken differently from the gold (a reading that lacks only a prefix nuclide's atomic number the page does not show is not harm). Neither number is read by `eval gate`, a floor or a tolerance: they are for reading, not for passing or failing a change. Per pair: `silent_harm`; per page: `chem_lone_times_gold_ids` (`eval/equations_chem.py`) |
 | `static_violations` | failed error-level checks from `html_checks.static_checks` on the output HTML, summed over pages (warnings excluded) |
 | `axe_violations` | same for `html_checks.axe_checks`, over the pages where axe ran |
 | `axe_checked_pages` | pages where axe-core really ran (`axe_violations` is over these) |
@@ -418,12 +423,16 @@ defaults) and SRE 4.1.5 (`clearspeak` and `mathspeak` domains). Build them once;
 installed system-wide:
 
 ```
-scripts/speech_oracles/build.sh      # rustup into ~/.cargo if needed, MathCAT at tag v0.7.7
-                                     # (commit checked), a small batch tool, SRE from npm;
-                                     # all under .local/speech-oracles/ (SPEECH_ORACLES_DIR moves it)
+scripts/speech_oracles/build.sh      # MathCAT at tag v0.7.7 (commit checked), a small batch tool
+                                     # built with the toolchain pinned in rust-toolchain.toml,
+                                     # SRE from the committed package-lock.json (npm ci
+                                     # --ignore-scripts); all under .local/speech-oracles/
+                                     # (SPEECH_ORACLES_DIR moves it); versions: versions.env
 ```
 
-It needs git, node and npm, and about a minute of compile time. Without the build, the script
+It needs git, node and npm, and about a minute of compile time. Rust comes from an existing
+rustup or cargo; if there is none, `build.sh` downloads a pinned `rustup-init`, checks its
+SHA-256 against `versions.env`, and installs into `~/.cargo` (no sudo). Without the build, the script
 and `--speech` say so (`speech oracles skipped: ... run scripts/speech_oracles/build.sh`) and
 produce nothing; the tests that speak MathML skip.
 
@@ -447,7 +456,10 @@ MathML) on each side, a word diff, and a class (`chemistry`, `table or matrix`, 
 engine (case, pauses and spacing ignored) with a 95% Wilson interval and n, once counting an
 equation with no proposal as different and once over proposals only, the worst classes over
 proposals (at least 3 equations), and the most common word-level differences. The report's
-`speech` block holds these aggregates only: no ids and no speech strings.
+`speech` block holds aggregates only: no ids, no speech strings and no per-book numbers. The
+script refuses held-out and sealed gold (and rows kept under the cache home), as
+`eval pipeline --set heldout` does. An engine that fails reports only its exit code, and each
+engine process is killed after 15 minutes.
 
 What it does not show. Equal speech means two markups read the same under that engine; it is
 not a listening test and not a statement that the reading is right. The gold's own markup can
@@ -533,6 +545,7 @@ with or without a baseline (see "Tables": "Gate").
 | `n_planned`, `n`, `complete`, `stopped_reason` | `stopped_reason` is a budget category (e.g. `budget_job_usd`) when spend ran out |
 | `metrics` | per task, as above |
 | `cost`, `latency_ms` | as above |
+| `recording` | a real run only: `run` (`<set>/runs/<timestamp>`), `sha` (commit, `+dirty` when the tree had changes) and `files` kept there: "Runs keep their recordings" |
 
 `--items PATH` also writes one JSON line per item (per page for headings and document),
 including predicted LaTeX, MathML or alt text. These come from public OpenStax pages; the
@@ -771,6 +784,66 @@ short note saying it is a precomputed demo of an OpenStax CC BY page, with attri
 and a link to the original), `report.json` (the `DocumentResult` without the HTML) and
 `source.pdf` (the exact input) to `src/readablestem/web/static/demo/`. Pages outside the
 gold set are looked up live and pass the same license gate as `gold fetch`.
+
+### Runs keep their recordings
+
+A run that calls a real model leaves its recording behind, so its numbers can be scored again and
+its classes replayed without paying twice (the 2026-10-21 chemistry held-out run did not, and its
+answers could not be recovered). `eval pipeline` (every task and set), `eval sample` and
+`eval calibrate --probes` write
+
+```
+~/.cache/readablestem/<set>/runs/<UTC timestamp>/
+    answers.jsonl   every model answer (replay with --answers, --answers-offline)
+    items.jsonl     the per-item rows
+    report.json     a copy of the report
+    run.json        the commit the code was at, and whether the tree had changes
+```
+
+`<set>` is the set's cache folder: `heldout`, `dev-v2`, `gold` (the repository's `data/gold`, for
+`sample` and `calibrate` too), or the folder given to `--heldout-dir` (for example
+`chem-heldout`, so its runs are in `~/.cache/readablestem/chem-heldout/runs/`). The report names
+the folder and the commit under `recording` (`run`: `<set>/runs/<timestamp>`, `sha`, `files`),
+never a home path; the command prints the full path (`kept: ...`). `$XDG_CACHE_HOME` replaces
+`~/.cache` as everywhere else.
+
+`--answers FILE` and `--items FILE` still choose other files and are not copied. Nothing is kept
+for a `--fake` run, a replay (`--answers-offline`), the tables task in local mode (no model), or
+the sealed dev-v2 check part (its items are not listed, by design). A folder is made fresh for
+each run, so a held-out run never replays an earlier one. `scripts/dev_chatbot.py score` always
+writes its items (default `items-<arm>.jsonl` in `--out-dir`). The scripts that already keep an
+answers file and items per run (`scripts/realworld_run.py`, `handwriting_eval.py`,
+`typed_scans_check.py`, `dev_spans.py`) are unchanged.
+
+Read a kept run with the chemistry classes script, which accepts the run folder:
+
+```
+uv run python scripts/dev_chem_classes.py --gold data/dev-v2/dev --speech \
+  run=~/.cache/readablestem/dev-v2/runs/20261103T120000Z
+```
+
+`--speech` adds what a listener hears (`pipeline/speech.py`): whether each reading is spoken as the
+gold is, the spoken defects it adds, and the silent harm per 100 gold. Without it the script prints
+the outcome classes and how many of them harm a listener. The script lists equations one by one,
+so it is for development sets only: it refuses a run folder of a held-out or sealed set (the
+`set` in its `run.json`, or a held-out/sealed word in the path) and a held-out gold folder. A
+held-out run's report holds counts only (the chemistry block names no item ids); read its
+numbers there.
+
+**Privacy and pruning.** A recording holds the text layers of the evaluated PDFs and the model's
+answers: `runs/` and each run folder are mode 0700 and every file in them 0600. Delete old runs
+with
+
+```
+uv run readablestem eval prune --older-than 90 --dry-run
+uv run readablestem eval prune --older-than 90 [--set dev-v2 ...]
+```
+
+which removes the runs of `~/.cache/readablestem/<set>/runs/` older than that many days (by the
+timestamp in the folder name; any other folder is left alone) and keeps every run a committed
+report names under `recording.run` (it reads the tracked `*.json` files of the repository).
+`--dry-run` lists what would go. The chemistry block's `chem_right_excl_times` and `silent_harm`
+are report fields to read; no gate, floor or tolerance uses them.
 
 ### Weekly live run (`eval-live.yml`)
 
@@ -2454,6 +2527,9 @@ the machine, which changed the layout of 2.1; it is not used.
 |---|---|
 | `src/readablestem/eval/render.py` | equation PNGs, printable page HTML and PDF, image cache, demo wrapper |
 | `src/readablestem/eval/pipeline_eval.py` | the four tasks, metrics, report, markdown summary |
+| `src/readablestem/eval/run_record.py` | the folder a live run keeps its answers, rows and report in, with the commit |
+| `src/readablestem/eval/equations_chem.py` | the chemistry scorer and the chemistry report fields (`chem_right_excl_times`, `silent_harm`) |
+| `scripts/dev_chem_classes.py` | the outcome classes of a chemistry run, what harms a listener, `--speech` |
 | `src/readablestem/eval/judge.py` | figure judge request, schema, pass rule; the long-description judge (`judge_long`) |
 | `src/readablestem/models/prompts/judge_long_description.md` | the long-description and data-table rubric (versioned by hash) |
 | `data/eval/figures-long-descriptions.json` | the figures report with long descriptions on (2026-10-09) |

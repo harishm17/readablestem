@@ -18,10 +18,10 @@ from readablestem.web.assets import cached_html, static_url
 from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import get_ctx, render
-from readablestem.web.events import EVENT_RETENTION_DAYS
 from readablestem.web.health import ops_freshness, readiness
 from readablestem.web.provider_health import HEALTH
 from readablestem.web.quota import next_day_start
+from readablestem.web.recipients import privacy_context
 from readablestem.web.security import VIEW_CSP
 
 router = APIRouter()
@@ -117,25 +117,8 @@ def _with_preview_tags(page: str, site: str) -> str:
 
 @router.get("/privacy")
 def privacy(request: Request) -> Response:
-    # The page names Langfuse only when traces are actually sent there, and usage events
-    # only when they are recorded.
     ctx = get_ctx(request)
-    context = {
-        "active": "privacy",
-        "tracing": ctx.tracer is not None,
-        "events_on": ctx.settings.events_enabled,
-        "event_days": EVENT_RETENTION_DAYS,
-        # What the content features send and keep, only when they are on.
-        "tables_on": ctx.settings.feature_tables,
-        "notation_on": ctx.settings.feature_notation_memory,
-        "image_pages_on": ctx.settings.feature_image_pages,
-        "microsoft_on": ctx.settings.ms_sign_in_enabled,
-        # Word and PowerPoint uploads are taken (T3-30): the page says how they are handled.
-        "office_on": bool(office_convert.input_kinds(ctx.settings)),
-        "email_login_on": ctx.settings.email_login_enabled,
-        # Which company receives the images and nearby text (MODEL_PROVIDER).
-        "provider": ctx.settings.model_provider,
-    }
+    context = privacy_context(ctx.settings, tracer_on=ctx.tracer is not None)
     return render(request, "privacy.html", context)
 
 

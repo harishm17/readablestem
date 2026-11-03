@@ -185,3 +185,25 @@ def test_the_symbols_scorer_calls_an_upright_symbol_and_an_mtext_one_alike_only_
     d_up = f"<math {ns}><mi mathvariant='normal'>d</mi></math>"
     d_text = f"<math {ns}><mi>d</mi></math>"
     assert not sym.score_symbols(d_up, d_text).exact  # an upright d is still not a plain d
+
+
+@pytest.mark.parametrize(
+    ("source", "words"),
+    [
+        ("Zn^2+(aq, 0.10 M)", "Z n 2 plus aqueous, 0.10 molar"),
+        ("Zn(aq, 0.10 M)", "Z n aqueous, 0.10 molar"),
+        ("^{60}_{28}Ni^*", "nickel 60, atomic number 28, excited state"),
+        (
+            "CaCO3(s) -> CaO(s) + CO2 ^",
+            "C a C O 3 solid, reacts to form C a O solid, plus C O 2 gas given off",
+        ),
+        (
+            "Ag+(aq) + Cl-(aq) -> AgCl v",
+            "A g plus aqueous, plus C l minus aqueous, reacts to form A g C l precipitate",
+        ),
+    ],
+)
+def test_the_speech_rules_for_conditions_marks_and_excited_nuclides_read_the_new_shape(
+    source: str, words: str
+) -> None:
+    assert mathml_to_speech(convert(ce_to_latex(source))) == words
