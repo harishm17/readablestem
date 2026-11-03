@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: sandbox probe (branch latex/x0-sandbox-probe)
+
+- `readablestem ops sandbox-probe`: checks on the running image that the sandbox for uploaded TeX
+  works (bubblewrap, user namespaces, no network, empty environment, hidden `/proc/1/environ`,
+  memory, wall-clock and output caps), times a tiny LaTeXML run when LaTeXML is installed, reports
+  the kernel's seccomp mode, Landlock ABI and same-UID `/proc/<pid>/environ` readability, and
+  prints PASS or FAIL (exit 1). Nothing it prints is document content. Docs: docs/operations.md,
+  "Sandbox probe"; docs/security.md, "Running uploaded TeX".
+- New `core/sandbox.py` (the bubblewrap runner the probe tests and a later LaTeX upload uses) and
+  `source/latexml.py` (the `latexml` and `latexmlpost` calls). Nothing in the app calls them yet.
+  Tests: `tests/test_sandbox.py`, `tests/test_ops_sandbox_probe.py`.
+
 ## Unreleased: slide decks (branch layout/beamer-slides)
 
 - Slide decks (`pipeline/slides.py`, docs/layout.md "Slide decks"): a Beamer file, or a slide-shaped

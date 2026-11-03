@@ -206,6 +206,20 @@ never an address): a proxy is missing from the setting, or a client is forging t
 visitor share the platform's address. Launch-check runs from the repo and the settings, so it
 cannot see the live header; the log line is the only live check.
 
+### Running uploaded TeX (sandbox)
+
+A `.tex` file is a program, so a LaTeX upload (a later change; the switch is `FEATURE_LATEX_SOURCE`)
+runs LaTeXML only inside `core/sandbox.py`: bubblewrap with a minimal read-only root (no
+application, no `/home`, `/proc/1/environ` hidden), the project mounted read-only and one output
+folder writable, a new network namespace (no network), a new pid namespace that dies with the
+caller, an empty environment, and `prlimit` caps on address space (1.5 GB), CPU time (120 s) and
+the size of any one file (50 MB). The caller kills the group at a wall-clock limit (120 s) or when
+the output folder passes 200 MB. If bubblewrap or user namespaces are not available the run is
+refused; there is no unsandboxed fallback (a plain child of the web process shares its user, so
+it could read the web process's files). Whether the platform allows it is checked on the deployed
+image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"); a FAIL there means
+LaTeX upload must stay off.
+
 ### Rotating the session secret
 
 `SESSION_SECRET` signs the session cookie. To change it without signing everyone out:
