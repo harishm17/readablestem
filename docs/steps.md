@@ -66,7 +66,7 @@ hallucinations.
 
 | Step | First model | Escalates to `main_model` when |
 |---|---|---|
-| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence` (but not when that is the only reason and it is 0.80 or more, see below), it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `number_mismatch`, `case_mismatch`, `style_mismatch`, `sign_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
+| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence` (but not when that is the only reason and it is 0.80 or more, see below), it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `number_mismatch`, `case_mismatch`, `style_mismatch`, `sign_mismatch`, `species_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
 | Figure | `cheap_model` with `image_detail="low"` if the figure is tiny (no side longer than 72 pt, one inch on the page); otherwise `main_model` with `image_detail="high"` | confidence is below the accept bar (higher for decorative, see below), the alt text fails an error-level check, or a decorative answer contradicts itself (`decorative_conflict`) |
 
 **The skipped second reading (equations).** A cheap answer whose only reason to be asked
@@ -241,6 +241,75 @@ the compare table says them as "Number" and "Case" rows. Table cells are not cov
 (docs/eval.md, "`symbol_mismatch` on perfect transcriptions"): 1 false number flag and 0
 case flags on 1,748 gold equations compared with their own print; on synthetic errors, 457
 of 481 digit swaps and 1,438 of 1,438 case flips are found.
+
+## Chemistry species check (equations)
+
+`pipeline/chem_check.py`, check `equation.text_layer_species`, code `species_mismatch`. The
+symbol bag counts letters and digits, so it cannot see the order of an element and its count
+(`H2O` and `2HO` have the same bag), and the signs check sees a flipped charge only when the
+rest agrees. This check reads both sides, the text layer and the reading's MathML, as
+*species* (a coefficient, a formula with its counts, a charge, a state: `2 SO42−(aq)`) and
+*arrows*, and compares them.
+
+Both sides go through one parser. The text layer is flat (a lowered 4 and a raised 2 print
+as `SO42−`), and the MathML is flattened the same way (a script glued to its base, an
+operator between spaces, a nuclide's prescripts first), so the check never asks a reading
+to tell `Fe3+` from `Fe3 +` when the page cannot. Where the text layer breaks a formula at a
+script change (`H2 O`, `SO4 2−`, `Na[Al(OH)4 ](aq)`) the pieces are joined; a state with
+conditions (`(aq, 1 M)`) is its state; a charge the text layer put before its formula
+(`−CH3 CO2`) does not count as a difference unless the page's signs, counted, differ too;
+the species on one side of an arrow are compared as a multiset (a fraction's numerator and
+denominator come out of the text layer in an order of their own), the sides in order.
+
+What it finds: another element or a moved count; a subscript read as a coefficient (and the
+reverse); a charge's sign flipped, dropped or added; a state changed, dropped or added; an
+arrow read as another (`→` for `⇌`), missing or extra; a neighbour word taken into a formula
+(a species the text layer lacks, or letters stuck to a formula so it is no longer one); and a
+reaction cut mid-way (species or an arrow at either end that the reading lacks).
+
+**When it runs.** Only when the text layer has evidence only chemistry has: a state symbol,
+a formula of two element symbols with a count (`H2O`), two charged species, or a charged
+species in a reaction. A lone `Na+` or `B+` is not enough, a text with a variable and a
+number that is no element (`T1`, `x2`) is mathematics, and a letter in a math italic or bold
+style (what TeX and Chromium print for variables) is never an element. Anything the parser
+cannot read is left out, never failed. Bare formulas (`HCl`, `NaOH`) and one-letter words (a
+unit, a variable) count only inside a reaction. Not for table cells (`table_step` has its own
+rules, docs/tables.md), and not when the symbol check found a strong mismatch (another
+equation).
+
+**Verdict.** As the signs check: meaning-level, review `required`, confidence scaled by 0.6
+once with the other meaning-level checks, and a cheap-model answer escalates to the main
+model. A reviewer's edit gets the check too (`web.edit_check`), and the compare table names
+the species ("Species" rows).
+
+**Measured (2026-11-03, $0).** `scripts/chem_check_replay.py`, on the recorded development
+answers (`round4/on.jsonl`, 1,519 aligned pairs of 28 documents):
+
+- applied to 149 pairs (all chemistry: the two documents that are not chemistry's own hold
+  five chemistry equations among their 48 pairs); flagged 1, a real error already a required
+  decision; 0 flags on the 140 right readings it applied to (a count of the development set
+  it was written on);
+- 0 of the 1,262 pairs of the non-chemistry documents (algebra, the authored exercises, matrices
+  and Word documents) got the check, and for them the step's checks and confidence are
+  identical with the check off (`--step-diff`); in the chemistry documents the only change is
+  the added check, passed, on the 149 pairs it applies to;
+- the gold readings of the 1,369 equations of the registered held-out set against their own
+  print (15 sections, 3 of them chemistry; the set is used for this count only, nothing was
+  tuned on it afterwards): the check applied to 35 of the 97 chemistry equations and to none of
+  the 1,272 others, and flagged 1 of the 35 (a unit letter stuck to a formula by the text
+  layer, `MCH3 CO2`);
+- errors written into the 149 right readings it applies to (`--mutate`): a subscript read as
+  a coefficient 77 of 77 (the other text-layer checks: 0), an arrow changed 89 of 91 (0), a
+  charge dropped 78 of 78 (77), and the same-bag errors the symbol and signs checks already
+  catch (a neighbour formula 134 of 134, a flipped sign 78 of 78, a cut reaction 85 of 85,
+  a state 91 of 91, an element 73 of 73).
+
+What it cannot see: a reading that is wrong where the text layer is as wrong (`H2O(g) → H2O(l)`
+cut to `H2O(g)` when layout's text itself stops at `H2O(g)`), a word the text layer does not
+hold (`average mass` with "mass" missing), and how a right transcription is spoken (an arrow
+read "right arrow" in an array cell is a speech defect, docs/chemistry.md). The 2026-10-21
+chemistry held-out answers are in no cache (docs/eval-chemistry-heldout.md), so the check could
+not be replayed on them.
 
 ## Letter-style check (equations)
 

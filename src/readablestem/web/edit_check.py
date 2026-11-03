@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from readablestem.core.types import Check, Element, EquationFix, Fix, Kind
+from readablestem.pipeline.chem_check import compare_species
 from readablestem.web.messages import explain_check
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ MEANING_CODES = frozenset(
         "sign_mismatch",
         "number_mismatch",
         "case_mismatch",
+        "species_mismatch",
     }
 )
 # What the compare sentences (`web.compare`) are about, for each meaning-level code.
@@ -55,6 +57,7 @@ _SAID_FOR = {
     "sign_mismatch": ("sign",),
     "number_mismatch": ("number",),
     "case_mismatch": ("case",),
+    "species_mismatch": ("species",),
 }
 MAX_NAMED = 3  # unknown commands named in one message
 Display = Literal["block", "inline"]
@@ -149,7 +152,7 @@ def check_cell_edit(layer: str | None, typed: str, *, current: str | None = None
         id="cell", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=0,
         text=layer or None, display="inline",
     )  # fmt: skip
-    out.mathml, out.speech, out.checks = evaluate(latex, "inline", stand_in)
+    out.mathml, out.speech, out.checks = evaluate(latex, "inline", stand_in, species=False)
     if out.mathml is None:
         out.blocking = latex_problems(latex, out.failed)
         return out
@@ -168,11 +171,11 @@ def _same(typed: str, stored: str) -> bool:
 
 
 def evaluate(
-    latex: str, display: str, element: Element | None
+    latex: str, display: str, element: Element | None, *, species: bool = True
 ) -> tuple[str | None, str, list[Check]]:
     """(MathML or None, speech, checks) for already cleaned LaTeX: the equation step's
     `_evaluate` without a model answer, step by step in the same order with the same
-    check names and codes."""
+    check names and codes. `species`: also the chemistry check (a table's cell has none)."""
     from readablestem.pipeline import equation_step, notation_memory, signs, validate
 
     # The course notation in force (web.notation.in_force), as the step reads it: its
@@ -231,6 +234,16 @@ def evaluate(
                 passed=not compared.mismatch,
                 severity="warning",
                 code="sign_mismatch" if compared.mismatch else None,
+            )
+        )
+    found = None if mismatch or not species else compare_species(text, mathml)
+    if found is not None:
+        checks.append(
+            Check(
+                name="equation.text_layer_species",
+                passed=not found.differ,
+                severity="warning",
+                code="species_mismatch" if found.differ else None,
             )
         )
     return mathml, speech, checks
