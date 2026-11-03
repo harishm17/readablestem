@@ -619,6 +619,17 @@ uv run python scripts/typed_scans_check.py compare --arms base new   # docs/eval
 The fresh set's live runs refuse to start unless the registered files hash as registered
 (`data/handwriting/REGISTRATION-ACCURACY.sha256`), and a second live run of an arm.
 
+## A set of real iPad ink with answer keys nobody typed
+
+Every page measured above is MathWriting ink drawn onto a page and degraded like a scan. Notes
+exported from an iPad are vector, and this set has none. The kit in
+[data/handwriting-copy](../data/handwriting-copy/README.md) (`scripts/handwriting_copy_set.py`) has a
+few volunteers copy CC BY OpenStax worked examples by hand in their own notes apps. It picks the
+passages with a written, seeded rule behind a licence gate, writes each writer a brief, matches the
+PDFs they send back to passages, and builds the answer key from the textbook's published MathML. A
+writer's pages are published, under CC BY 4.0 and a pseudonymous id, only if that writer said yes and a person has looked at the page; the
+manifest keeps counts for the rest. No page has been collected and no number comes from it yet.
+
 ## Own handwritten notes
 
 The measured set above is other people's ink on composed pages. `scripts/handwriting_own.py` and
