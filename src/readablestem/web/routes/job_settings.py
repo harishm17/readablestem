@@ -101,12 +101,13 @@ def set_title(
         return _job_page_with_errors(request, job_id, user, "title", str(exc), title)
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user, lock=True)
+        owned_id = job.id  # redirects are built from the owned row, not the request
         require_done(job)
         result = DocumentResult.model_validate(job.result_json or {})
         chosen = typed if typed and typed != page_rules.suggested_title(result) else None
         if chosen == job.title_override:
             flash(request, "The title is already set to that.", undo=False)
-            return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+            return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
         job.title_override = chosen
         _remake_html(session, job, ctx.settings)
         retention.restart_clock(job, ctx.settings)
@@ -117,7 +118,7 @@ def set_title(
         f"The title students hear is now “{now_title}”. The HTML file was made again with it.",
         undo=False,
     )
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+    return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
 
 # --------------------------------------------------------------------------- contact
@@ -135,10 +136,11 @@ def set_contact(
         return _job_page_with_errors(request, job_id, user, "contact", str(exc), contact)
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user, lock=True)
+        owned_id = job.id  # redirects are built from the owned row, not the request
         require_done(job)
         if (line or None) == job.contact_line:
             flash(request, "The contact line is already set to that.", undo=False)
-            return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+            return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
         job.contact_line = line or None
         _remake_html(session, job, ctx.settings)
         retention.restart_clock(job, ctx.settings)
@@ -149,7 +151,7 @@ def set_contact(
         else "The contact line was removed from the student file."
     )
     flash(request, message, undo=False)
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+    return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
 
 # --------------------------------------------------------------------------- keep
@@ -163,6 +165,7 @@ def keep_longer(request: Request, job_id: str, user: UserDep) -> Response:
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user, lock=True)
+        owned_id = job.id  # the redirect is built from the owned row, not the request
         if retention.can_keep_longer(job):
             others = live_job_count(session, user.id, utcnow(), excluding=job.id)
             if others + 1 > MAX_LIVE_JOBS_PER_USER:
@@ -183,4 +186,4 @@ def keep_longer(request: Request, job_id: str, user: UserDep) -> Response:
         )
     else:
         flash(request, "This document is already kept for longer than 7 days.", undo=False)
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+    return RedirectResponse(f"/jobs/{owned_id}", status_code=303)

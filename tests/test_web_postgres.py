@@ -537,7 +537,7 @@ def test_only_one_of_20_tabs_writing_from_the_same_version_gets_through(factory)
             with db.session_scope(factory) as session:
                 job = owned_job(session, job_id, user, lock=True)
                 if is_stale(job.result_version, "0"):
-                    raise ReviewStale()
+                    raise ReviewStale(job.id)
                 bump_result_version(job)
             outcome = "saved"
         except ReviewStale:

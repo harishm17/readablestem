@@ -150,11 +150,19 @@ class ReviewInvalid(Exception):
         # The edit was refused only because it differs from the PDF where that changes the
         # meaning: the form offers "Use my edit anyway" (`apply_review(..., anyway=True)`).
         self.override = False
+        # The id of the job row the write found for its owner, set by the writer
+        # (`routes/edits.write_review`, `write_structure`) once the ownership check has
+        # passed: a redirect after a refusal is built from it, never from the request.
+        self.job_id = ""
 
 
 class ReviewStale(Exception):
     """The form was drawn before the job's last review write (another tab or window):
     nothing is applied (`is_stale`)."""
+
+    def __init__(self, job_id: str) -> None:
+        super().__init__("review form out of date")
+        self.job_id = job_id  # the owned job row's id, as on `ReviewInvalid`
 
 
 # --------------------------------------------------------------------------- versions

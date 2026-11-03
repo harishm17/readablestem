@@ -24,7 +24,7 @@ from readablestem.core.notation import canonical_symbol
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline.notation_memory import describe, phrase
 from readablestem.web import documents, notation
-from readablestem.web.db import Course, CourseNotation, session_scope, utcnow
+from readablestem.web.db import Course, CourseNotation, Job, session_scope, utcnow
 from readablestem.web.deps import (
     ELEMENT_ID,
     JOB_ID,
@@ -108,7 +108,7 @@ def create_course(request: Request, user: UserDep, name: Field = "") -> Response
         return _courses_page(request, user, extra, status=422)
     log_event(logger, "course_created", course_id=course_id)
     flash(request, "Course added. Add the symbols your course uses below.")
-    return RedirectResponse(f"/courses/{course_id}", status_code=303)
+    return RedirectResponse(f"/courses/{course_id}", status_code=303)  # the new row's own id
 
 
 # --------------------------------------------------------------------------- one course
@@ -160,13 +160,15 @@ def rename_course(request: Request, course_id: str, user: UserDep, name: Field =
     _require_feature(request)
     try:
         with session_scope(get_ctx(request).factory) as session:
-            notation.rename_course(session, _course(session, course_id, user), name)
+            course = _course(session, course_id, user)
+            owned_id = course.id  # redirects are built from the owned row, not the request
+            notation.rename_course(session, course, name)
     except notation.NotationInvalid as exc:
         extra = _errors(exc) | {"rename_value": exc.values.get("rename", name)}
         return _course_page(request, course_id, user, extra, status=422)
     log_event(logger, "course_renamed", course_id=course_id)
     flash(request, "Course renamed.")
-    return RedirectResponse(f"/courses/{course_id}", status_code=303)
+    return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
 def _confirm_delete_page(request: Request, course_id: str, user: CurrentUser) -> Response:
@@ -212,13 +214,15 @@ def add_entry(
     try:
         entry = notation.parse_entry(symbol, meaning, note)
         with session_scope(get_ctx(request).factory) as session:
-            notation.add_entry(session, _course(session, course_id, user), entry)
+            course = _course(session, course_id, user)
+            owned_id = course.id  # redirects are built from the owned row, not the request
+            notation.add_entry(session, course, entry)
     except notation.NotationInvalid as exc:
         extra = _errors(exc) | {"values": exc.values}
         return _course_page(request, course_id, user, extra, status=422)
     log_event(logger, "notation_added", course_id=course_id, source="user")
     flash(request, f"Added: {phrase(entry.canonical, entry.meaning)}.")
-    return RedirectResponse(f"/courses/{course_id}", status_code=303)
+    return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
 def _entry_page(
@@ -264,13 +268,14 @@ def save_entry(
         entry = notation.parse_entry(symbol, meaning, note)
         with session_scope(get_ctx(request).factory) as session:
             course = _course(session, course_id, user)
+            owned_id = course.id  # redirects are built from the owned row, not the request
             notation.update_entry(session, course, _entry(course, entry_id), entry)
     except notation.NotationInvalid as exc:
         extra = _errors(exc) | {"values": exc.values}
         return _entry_page(request, course_id, entry_id, user, extra, status=422)
     log_event(logger, "notation_changed", course_id=course_id)
     flash(request, f"Saved: {phrase(entry.canonical, entry.meaning)}.")
-    return RedirectResponse(f"/courses/{course_id}", status_code=303)
+    return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
 @router.post("/courses/{course_id}/entries/{entry_id}/delete", dependencies=[Depends(require_csrf)])
@@ -278,12 +283,13 @@ def remove_entry(request: Request, course_id: str, entry_id: str, user: UserDep)
     _require_feature(request)
     with session_scope(get_ctx(request).factory) as session:
         course = _course(session, course_id, user)
+        owned_id = course.id  # the redirect is built from the owned row, not the request
         row = _entry(course, entry_id)
         words = describe(row.canonical)
         session.delete(row)
     log_event(logger, "notation_removed", course_id=course_id)
     flash(request, f"Removed {words}. To keep it after all, add it again below.")
-    return RedirectResponse(f"/courses/{course_id}", status_code=303)
+    return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
 # --------------------------------------------------------------------------- suggestions
@@ -305,13 +311,13 @@ def add_suggestions(
     (the offer is worked out again here), and nothing is added when none is ticked."""
     _require_feature(request)
     ctx = get_ctx(request)
-    back = f"/courses/{course_id}"
     chosen: dict[str, str] = {}
     for number in pick:
         if number.isascii() and number.isdigit() and int(number) < min(len(key), len(meaning)):
             chosen[key[int(number)]] = meaning[int(number)]
     with session_scope(ctx.factory) as session:
         course = _course(session, course_id, user)
+        back = f"/courses/{course.id}"  # from the owned rows, not the request
         row = None
         if job:
             if not JOB_ID.match(job):
@@ -344,6 +350,13 @@ def add_suggestions(
 # --------------------------------------------------------------------------- remember
 
 
+def _stored_element_id(job: Job, wanted: str) -> str | None:
+    """The id of the stored result's element that `wanted` names, taken from the stored
+    result itself; None when there is no such element."""
+    elements = (job.result_json or {}).get("elements") or []
+    return next((e["id"] for e in elements if e.get("id") == wanted), None)
+
+
 @router.post("/courses/{course_id}/remember", dependencies=[Depends(require_csrf)])
 def remember(
     request: Request,
@@ -361,8 +374,6 @@ def remember(
 
     if not JOB_ID.match(job):
         raise PageError(404, *NOT_FOUND)
-    item_key = item if ELEMENT_ID.match(item) else None
-    back = review_url(job, item=item_key, anchor="decision-title")
     canonical = canonical_symbol(symbol)
     if canonical is None or canonical != symbol or meaning not in notation.MEANINGS:
         raise PageError(400, "That could not be saved", "Go back and try again.")
@@ -371,6 +382,9 @@ def remember(
         course = _course(session, course_id, user)
         if owned.course_id != course.id:
             raise PageError(404, *NOT_FOUND)
+        # The redirect is built from the owned row and from the item the stored result
+        # knows (None when the form named none of them), not from the request's values.
+        back = review_url(owned.id, item=_stored_element_id(owned, item), anchor="decision-title")
         entry = notation.EntryInput(
             symbol=describe(canonical),
             canonical=canonical,
