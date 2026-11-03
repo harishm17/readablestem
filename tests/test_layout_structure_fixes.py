@@ -519,3 +519,24 @@ def test_inline_maths_in_the_later_part_keeps_its_own_page():
     assert host.page == 0
     assert [(e.page, e.parent_id) for e in equations] == [(1, host.id)]
     assert inline_marker(equations[0].id) in host.text
+
+
+def test_a_repeated_label_at_its_own_columns_margin_stays_a_heading():
+    # Two columns: the right column's text edge is not the page's. A label set at that edge
+    # is at its margin, as in the left column, not inside a box.
+    short = "The cart rolls down the ramp and speeds"
+
+    def fill(number, page):
+        y = 72
+        for _ in range(3):
+            y = para(page, y, short, lines=4)
+        y = 72
+        y = para(page, y, short, lines=4, x=330)
+        y = one(page, y, "Solution", "hebo", x=330)
+        y = para(page, y, short, lines=4, x=330)
+        y = one(page, y, "Solution", "hebo", x=330)
+        para(page, y, short, lines=4, x=330)
+
+    layout = analyze(pdf_of(fill))
+    assert texts(layout, Kind.HEADING) == ["Solution", "Solution"]
+    assert not any(REASON_RUN_IN_LABEL in e.reasons for e in layout.elements)

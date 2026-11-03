@@ -8414,14 +8414,21 @@ LABEL_SIZE_TOLERANCE = 0.05  # of the body size: "exactly body size"
 LABEL_INSET = 3.0  # pt a label sits in from its page's text edge: inside a box, not a section
 
 
-def _text_edge(page: _PageBlocks) -> float | None:
-    """Left edge of the page's body text: the leftmost x where at least three paragraphs of
-    two lines or more start (within 2.5 pt), else the leftmost such paragraph's, else None."""
-    starts = sorted(b.bbox[0] for b in page.blocks if b.kind == Kind.PARAGRAPH and len(b.rows) >= 2)
-    return next(
-        (x for i, x in enumerate(starts) if bisect.bisect_right(starts, x + 2.5) - i >= 3),
-        starts[0] if starts else None,
-    )
+def _text_edges(page: _PageBlocks) -> dict[str, float]:
+    """Left edge of the body text of each column of a page: the leftmost x where at least
+    three paragraphs of two lines or more start (within 2.5 pt), else the leftmost such
+    paragraph's (a column with none has no entry)."""
+    starts: dict[str, list[float]] = {}
+    for block in page.blocks:
+        if block.kind == Kind.PARAGRAPH and len(block.rows) >= 2:
+            starts.setdefault(block.rows[0].column, []).append(block.bbox[0])
+    edges: dict[str, float] = {}
+    for column, xs in starts.items():
+        xs.sort()
+        edges[column] = next(
+            (x for i, x in enumerate(xs) if bisect.bisect_right(xs, x + 2.5) - i >= 3), xs[0]
+        )
+    return edges
 
 
 def _mark_run_in_labels(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
@@ -8432,14 +8439,15 @@ def _mark_run_in_labels(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
     would stop at each. The rule is narrow on purpose (docs/layout.md "Run-in labels"): a
     heading found only by the bold body-size rule (no larger font, no number, no tag), one
     line, at body size, whose text is one of `RUN_IN_LABELS` (a trailing full stop or colon
-    aside), set in from its page's text edge (`LABEL_INSET`: inside a box, where an author
+    aside), set in from its column's text edge (`LABEL_INSET`: inside a box, where an author
     sets labels; a section heading sits at the margin, as LaTeX's `\\subsubsection*{Solution}`
     and a Word heading style do), and the same label at least `MIN_LABEL_COPIES` times in
     the document."""
     found: dict[str, list[_Block]] = {}
     for page in pages:
-        edge = _text_edge(page)
+        edges = _text_edges(page)
         for block in page.blocks:
+            edge = edges.get(block.rows[0].column) if block.rows else None
             if (
                 edge is not None
                 and block.kind == Kind.HEADING
