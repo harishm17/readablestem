@@ -760,6 +760,16 @@ OpenStax print from Chromium, where emphasis is italic and the unit is inside th
   text) cannot be told from one formula by the glyphs, accents drawn as a separate glyph that PyMuPDF
   puts in another line (`\widetilde W`) still end a run, and a top-level comma between two variables
   (`S, M \to \infty`) still ends it.
+- **Short formulas the runs miss** (`glyph_math.relation_runs`, `layout._with_simple_maths`, 2026-11-03). A relation
+  glyph in a maths font (`\approx`, `\sim`, `\le`, `\ge`, `\ll`, `\gg`, `<`, `>`) and the number after it (`\approx 0.14`,
+  `\geq 2`, `\geq 90\%`) is one inline formula when the glyph before the relation is no maths and no digit: the run finder
+  dropped such a relation as the tail of a formula that a line break cut, and the number had no evidence of its own. A
+  run that is only the number is replaced by the whole; a longer run is left alone. Measured, with the evidence that was
+  tried and left out, in [eval-equation-diagnostics.md](eval-equation-diagnostics.md), "Simple inline maths": a number
+  with a percent sign, a number with a unit, an equation reference `(1)`, a bare number and an upright letter have no
+  glyph that tells the author's `$...$` from text (a percent rule predicted 20 and aligned 4), so none is a formula
+  here; a page number, a citation, a list marker, a year and a figure number are never taken
+  (`tests/fixtures/layout/latex/short_maths.pdf`).
 - **Figure captions** are cut like paragraphs (`_attach_captions`): `Element.caption` stays plain text,
   `Element.caption_marked` has an inline marker where each formula was, and each formula is an
   equation element whose `parent_id` is the figure (id right after the figure's). `assemble` writes the

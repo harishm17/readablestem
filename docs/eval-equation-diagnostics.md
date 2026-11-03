@@ -232,12 +232,12 @@ a figure or an algorithm: `in_float`) is the nearest the gold has to "typed in a
 
 | part | inline gold | recall (found) | gold in floats found | precision (predicted) | cell equations: predicted, aligned |
 |---|---|---|---|---|---|
-| dev2 (tuned on) | 2,153 | 0.814 to 0.844 (1,752 to 1,818) | 186 to 247 of 442 | 0.902 to 0.902 | 75, 68 (0.907) |
-| held-out | 1,739 | 0.780 to 0.819 (1,357 to 1,424) | 94 to 161 of 326 | 0.880 to 0.881 | 69, 61 (0.884) |
-| fresh2 | 1,555 | 0.767 to 0.803 (1,193 to 1,249) | 112 to 167 of 329 | 0.910 to 0.905 | 46, 42 (0.913) |
-| fresh3 | 1,637 | 0.725 to 0.751 (1,187 to 1,229) | 85 to 125 of 473 | 0.898 to 0.898 | 73, 67 (0.918) |
+| dev2 (tuned on) | 2,153 | 0.814 to 0.844 (1,752 to 1,818) | 186 to 247 of 442 | 0.902 to 0.902 | 73, 67 (0.918) |
+| held-out | 1,739 | 0.780 to 0.819 (1,357 to 1,424) | 94 to 161 of 326 | 0.880 to 0.881 | 75, 68 (0.907) |
+| fresh2 | 1,555 | 0.767 to 0.803 (1,193 to 1,249) | 112 to 167 of 329 | 0.910 to 0.905 | 69, 61 (0.884) |
+| fresh3 | 1,637 | 0.725 to 0.751 (1,187 to 1,229) | 85 to 125 of 473 | 0.898 to 0.898 | 46, 42 (0.913) |
 | fresh4 | 1,513 | 0.658 to 0.679 (996 to 1,028) | 180 to 208 of 583 | 0.931 to 0.892 | 83, 34 (0.410) |
-| held-out and fresh2 to 4 (replay only) | 6,444 | 0.734 to 0.765 (4,733 to 4,930) | 471 to 661 of 1,711 | 0.902 to 0.893 (5,245 to 5,518) | 271, 204 (0.753) |
+| held-out and fresh2 to 4 (replay only) | 6,444 | 0.734 to 0.765 (4,733 to 4,930) | 471 to 661 of 1,711 | 0.902 to 0.893 (5,245 to 5,518) | 273, 205 (0.751) |
 
 Only dev2 was read to build the rule. Overall precision of the predicted inline equations falls on one part, fresh4
 (0.931 to 0.892), and the reason is one paper: 2309.04589 sets 39 results as `68.8±0.7`, whose gold types only the
@@ -255,6 +255,63 @@ whose glyphs say it is maths, so nothing in them moves.
 Not measured here: whether the equation step reads these cells right (it needs a model: they go through the same step,
 checks and review as any inline equation), the cost (one model call per cell equation, at most 60 a table: the 346 cells
 of the five parts are about 4 a paper) and the effect on exact and spoken-equal scores.
+
+## Simple inline maths (2026-11-03)
+
+The question: which short inline formulas do authors set in maths mode that the layout does not find, and does the
+page carry glyph evidence that tells them from plain text? `scripts/eq_short_missed.py PART` takes the inline gold
+equations of at most 3 symbols outside floats that the layout alone does not find (125 of dev2's 2,153 inline gold after
+this change; 131 before) and says where their text stands and what the glyphs there are. dev2 (the one part the layout was read on to
+write the rule):
+
+| What the layout has at that place | dev2 | What it says |
+|---|---|---|
+| inside a longer run | 50 | a span edge (the author typed `$n$/2` or `$a$ = 5`), not a missed formula |
+| plain text glyphs | 30 | `A`, `-`, `_{ex}`: nothing on the page says it was typed in maths mode |
+| a number | 16 | `1`, `9`, `0.3`: the same |
+| not in any paragraph row | 16 | a display, a caption or a cell, or text that is not in a paragraph |
+| a number with a percent sign | 6 | `95%`, `3%`: set in the text font |
+| a maths glyph and a script | 3 | `4^{N}`, `^{-2}`: a unit exponent |
+| partly in a run | 2 | `\text{Growth}_i` |
+| a maths glyph (a relation before a number) | 4 before the rule, 1 after | `\approx 0.14`, `\ge 2`; the one left is a lone vertical bar |
+
+The other four parts, replay only, split the same way: plain text glyphs and numbers are most of what is missed (held-out
+64 and 12, fresh2 12 and 54, fresh3 9 and 6, fresh4 17 and 17), and the percent signs are 6, 9, 2 and 16. So the headroom
+for a rule from glyph evidence is the 4 relation cases of dev2 and 3 in fresh4; the rest has no glyph that separates it.
+
+What was tried, by evidence, on dev2 with the precision of the predictions that carry it (aligned to a gold equation over
+predicted): a **number with a percent sign** (`95%` standing clear of words) predicted 20 and aligned 4, precision 0.20, and
+was left out. A **relation in a maths font before a number** (`\approx 0.14`, `\geq 90\%`, `\geq 2`) is kept: 3 new
+predictions on dev2, 3 aligned; 3 new on fresh4, 3 aligned; none on held-out, fresh2 and fresh3. Numbers with units, equation
+references, bare numbers and an upright letter were not tried as rules because the accounting above shows no glyph for
+them. The evidence already in the layout, on dev2 after this change (`scripts/eq_span_edges.py` prints it): maths font or
+symbol 1,734 predicted, 1,588 aligned (0.916); italic variable in prose 77, 72 (0.935); table cell maths 73, 67
+(0.918); italic variable with an operator 42, 32 (0.762); stacked fraction 23, 22; nuclide 23, 12 (0.522); bold letter in
+prose 14, 11; letter with a script 9, 8; **relation between operands 9, 1 (0.111)** and power of ten 4, 1 (0.250), the two
+weakest classes, not changed here. (The relation-before-a-number reason shows 9 predicted, 5 aligned: six of the nine
+are runs that were already found, their number, and now carry the relation too; the three new ones are all aligned.)
+
+| part | inline gold | recall (found) | precision (predicted) |
+|---|---|---|---|
+| dev2 (tuned on) | 2,153 | 0.844 to 0.846 (1,818 to 1,821) | 0.902 to 0.902 |
+| held-out | 1,739 | 0.819 to 0.819 | 0.881 to 0.881 |
+| fresh2 | 1,555 | 0.803 to 0.803 | 0.905 to 0.905 |
+| fresh3 | 1,637 | 0.751 to 0.751 | 0.898 to 0.898 |
+| fresh4 | 1,513 | 0.679 to 0.681 (1,028 to 1,031) | 0.892 to 0.892 |
+| held-out and fresh2 to 4 (replay only) | 6,444 | 0.765 to 0.766 | 0.893 to 0.893 |
+
+6 gold equations are found that were not and none is lost, in 3 papers of 85 (dev2 2412.12319 and 2501.06896, fresh4
+2407.06788). The layout identity check over the 148 PDFs of `scripts/layout_identity.py` finds every one identical; the one
+new fixture, `short_maths.pdf`, holds the three formulas and the text that looks like them (a percentage, a year, a number
+with a unit, a citation, a figure and a page number, a list marker), none of which is taken. Not computed: exact and
+spoken-equal scores (a model reads the new spans) and what a model would read for them.
+
+What this says: the short maths that is missed is mostly maths the author typed and the page prints in the text font. A
+rule that takes percentages, numbers with units or equation references would take every one of them in the document
+(precision 0.20 for the percent sign), so a person or a model that sees the page has to decide, as the page witness does
+([eval-equation-round5.md](eval-equation-round5.md)); the glyphs cannot. A Tectonic-made PDF (`xdvipdfmx` producer) is not
+read with the TeX conventions at all (`page_type.producer_hint` looks for "tex" in the producer and creator; a Tectonic file
+says `tectonic`), which is why the fixture sets a creator.
 
 ## Limits
 

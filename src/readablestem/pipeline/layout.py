@@ -3396,7 +3396,29 @@ def _inline_runs(
             reasons = _inline_evidence(chars, info, start, end, kinds)
             if reasons:
                 runs.append((start, end, reasons))
-    return _with_chemistry(row, kinds, _with_nuclides(row, kinds, _join_signatures(chars, runs)))
+    joined = _with_simple_maths(row, info, _join_signatures(chars, runs))
+    return _with_chemistry(row, kinds, _with_nuclides(row, kinds, joined))
+
+
+def _with_simple_maths(
+    row: _Row, info: _CharInfo, runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """`runs` and the short formulas of `glyph_math` that no run covers: a relation set in a
+    maths font before a number. TeX-made PDFs only; a candidate that touches a longer run is
+    left to the run, and a run that is only its number is replaced by it."""
+    if not _TEX_MADE:
+        return runs
+    chars = row.chars
+    out = list(runs)
+    for start, end, reason in glyph_math.relation_runs(chars, [c.math for c in chars], info.script):
+        touching = [r for r in out if r[0] < end and start < r[1]]
+        if any(r[0] < start or r[1] > end for r in touching):
+            continue  # part of a longer run: it stays as it is
+        # A run inside the candidate is its number: the run finder dropped the relation before it.
+        reasons = [reason, *(x for r in touching for x in r[2] if x != reason)]
+        out = [r for r in out if r not in touching]
+        out.append((start, end, reasons))
+    return sorted(out)
 
 
 _SIGNATURE_ARROWS = frozenset("\u2192\u21a6\u27f6\u27fc\u2208\u2282\u2286")
