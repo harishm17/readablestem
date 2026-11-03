@@ -1,0 +1,5153 @@
+{
+ "seed": "fresh5-D",
+ "date": "2026-11-02",
+ "rule": {
+  "licence": "read live (archive book JSON and CMS) for every book whose slug has 'chemistry': CC BY books are public tier 0; chemistry-2e and chemistry-atoms-first-2e (CC BY-NC-SA, both places) are private tier 1 and organic-chemistry private tier 2, used only if the first tiers do not give enough; anything else is refused",
+  "private_tier": "CC BY-NC-SA sections are a private measurement: their PDFs and gold are in the cache outside the repository, this file holds ids, counts and hashes only, and only aggregate numbers with attribution and the licence named are published",
+  "stop": "the walk stops at 4 sections with at least 100 chemistry gold equations, never above 8",
+  "retired_editions": "allowed (proof/DECISION-retired-editions-2026-10-13.md)",
+  "unused": "section not named by any earlier set; sibling editions folded; a section whose title (slug without numbers) an earlier set has is out; so is any section of dev-v2's books that could be in its sealed check part, and any with a title one of those has",
+  "topics_out": [
+   "balanc",
+   "precipitat",
+   "galvanic",
+   "decay",
+   "nernst",
+   "rate-law",
+   "bronsted",
+   "nuclear-equation",
+   "measurement",
+   "thermodynamic",
+   "noble-gas",
+   "representative-metal",
+   "lewis",
+   "titration",
+   "coordination"
+  ],
+  "min_equations": 25,
+  "min_chemistry_share": 0.4,
+  "max_overlap_8gram": 0.2,
+  "max_pdf_pages": 15,
+  "overlap_reference": "word 8-grams outside maths of every used or sealed section of the pool's books and of the sections already taken",
+  "order": "tier, then SHA-256 of 'fresh5-D|book|section', smallest first; each that passes is taken"
+ },
+ "books_refused": [],
+ "n_used_sections": 717,
+ "n_sealed_possible": 18,
+ "n_reference_sections": 114,
+ "skipped_before_gates": {
+  "topic": 9,
+  "used": 410
+ },
+ "n_ranked": 343,
+ "visits": [
+  {
+   "book": "chemistry-atoms-first",
+   "section": "4-5-formal-charges-and-resonance",
+   "gate": "equations",
+   "equations": 8,
+   "chemistry": 7,
+   "lone_times": 0,
+   "overlap_8gram": 0.0044,
+   "records_by_kind": {
+    "equation": 8,
+    "heading": 21
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry",
+   "section": "3-1-formula-mass-and-the-mole-concept",
+   "gate": "equations",
+   "equations": 8,
+   "chemistry": 2,
+   "lone_times": 15,
+   "overlap_8gram": 0.9136,
+   "records_by_kind": {
+    "equation": 23,
+    "figure": 9,
+    "table": 1,
+    "heading": 49
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry",
+   "section": "3-4-other-units-for-solution-concentrations",
+   "gate": "equations",
+   "equations": 9,
+   "chemistry": 0,
+   "lone_times": 1,
+   "overlap_8gram": 0.0054,
+   "records_by_kind": {
+    "equation": 10,
+    "figure": 3,
+    "heading": 26
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry",
+   "section": "2-6-molecular-and-ionic-compounds",
+   "gate": "pass",
+   "equations": 35,
+   "chemistry": 33,
+   "lone_times": 0,
+   "overlap_8gram": 0.0048,
+   "records_by_kind": {
+    "equation": 35,
+    "figure": 4,
+    "table": 1,
+    "heading": 30
+   },
+   "pdf_pages": 11,
+   "tier": "public"
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "section": "2-1-early-ideas-in-atomic-theory",
+   "gate": "equations",
+   "equations": 10,
+   "chemistry": 0,
+   "lone_times": 1,
+   "overlap_8gram": 0.0086,
+   "records_by_kind": {
+    "equation": 11,
+    "figure": 4,
+    "table": 1,
+    "heading": 13
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry",
+   "section": "2-1-early-ideas-in-atomic-theory",
+   "gate": "equations",
+   "equations": 10,
+   "chemistry": 0,
+   "lone_times": 1,
+   "overlap_8gram": 0.0082,
+   "records_by_kind": {
+    "equation": 11,
+    "figure": 4,
+    "table": 1,
+    "heading": 13
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry",
+   "section": "1-3-physical-and-chemical-properties",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.01,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 4
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "section": "12-4-free-energy",
+   "gate": "chemistry_share",
+   "equations": 43,
+   "chemistry": 10,
+   "lone_times": 0,
+   "overlap_8gram": 0.0141,
+   "records_by_kind": {
+    "equation": 43,
+    "table": 3,
+    "heading": 13
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry",
+   "section": "7-4-formal-charges-and-resonance",
+   "gate": "equations",
+   "equations": 8,
+   "chemistry": 7,
+   "lone_times": 0,
+   "overlap_8gram": 0.0044,
+   "records_by_kind": {
+    "equation": 8,
+    "heading": 21
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "section": "13-3-shifting-equilibria-le-chateliers-principle",
+   "gate": "equations",
+   "equations": 10,
+   "chemistry": 10,
+   "lone_times": 0,
+   "overlap_8gram": 0.0119,
+   "records_by_kind": {
+    "equation": 10,
+    "figure": 1,
+    "heading": 8
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "section": "6-4-other-units-for-solution-concentrations",
+   "gate": "equations",
+   "equations": 9,
+   "chemistry": 0,
+   "lone_times": 1,
+   "overlap_8gram": 0.0054,
+   "records_by_kind": {
+    "equation": 10,
+    "figure": 3,
+    "heading": 26
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "section": "3-7-molecular-and-ionic-compounds",
+   "gate": "overlap",
+   "equations": 35,
+   "chemistry": 33,
+   "lone_times": 0,
+   "overlap_8gram": 0.9482,
+   "records_by_kind": {
+    "equation": 35,
+    "figure": 4,
+    "table": 1,
+    "heading": 30
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry",
+   "section": "16-4-free-energy",
+   "gate": "chemistry_share",
+   "equations": 67,
+   "chemistry": 22,
+   "lone_times": 0,
+   "overlap_8gram": 0.529,
+   "records_by_kind": {
+    "equation": 67,
+    "figure": 3,
+    "table": 4,
+    "heading": 35
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "section": "1-3-physical-and-chemical-properties",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.01,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 4
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry",
+   "section": "13-3-shifting-equilibria-le-chateliers-principle",
+   "gate": "equations",
+   "equations": 14,
+   "chemistry": 14,
+   "lone_times": 0,
+   "overlap_8gram": 0.3837,
+   "records_by_kind": {
+    "equation": 14,
+    "figure": 3,
+    "heading": 11
+   },
+   "tier": "public"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "17-3-electrode-and-cell-potentials",
+   "gate": "pass",
+   "equations": 51,
+   "chemistry": 46,
+   "lone_times": 0,
+   "overlap_8gram": 0.0545,
+   "records_by_kind": {
+    "equation": 51,
+    "figure": 2,
+    "table": 1,
+    "heading": 13
+   },
+   "pdf_pages": 7,
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "16-4-free-energy",
+   "gate": "chemistry_share",
+   "equations": 75,
+   "chemistry": 29,
+   "lone_times": 0,
+   "overlap_8gram": 0.4151,
+   "records_by_kind": {
+    "equation": 75,
+    "figure": 3,
+    "table": 4,
+    "heading": 42
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "section": "1-3-physical-and-chemical-properties",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0103,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "17-1-review-of-redox-chemistry",
+   "gate": "pass",
+   "equations": 37,
+   "chemistry": 36,
+   "lone_times": 0,
+   "overlap_8gram": 0.0128,
+   "records_by_kind": {
+    "equation": 37,
+    "heading": 14
+   },
+   "pdf_pages": 6,
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "section": "13-3-shifting-equilibria-le-chateliers-principle",
+   "gate": "equations",
+   "equations": 18,
+   "chemistry": 11,
+   "lone_times": 0,
+   "overlap_8gram": 0.0192,
+   "records_by_kind": {
+    "equation": 18,
+    "figure": 1,
+    "heading": 7
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "section": "14-4-hydrolysis-of-salts",
+   "gate": "overlap",
+   "equations": 50,
+   "chemistry": 44,
+   "lone_times": 8,
+   "overlap_8gram": 0.2662,
+   "records_by_kind": {
+    "equation": 58,
+    "figure": 1,
+    "heading": 26
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "2-1-early-ideas-in-atomic-theory",
+   "gate": "equations",
+   "equations": 10,
+   "chemistry": 0,
+   "lone_times": 1,
+   "overlap_8gram": 0.009,
+   "records_by_kind": {
+    "equation": 11,
+    "figure": 4,
+    "table": 1,
+    "heading": 12
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "section": "16-4-potential-free-energy-and-equilibrium",
+   "gate": "equations",
+   "equations": 21,
+   "chemistry": 10,
+   "lone_times": 1,
+   "overlap_8gram": 0.0626,
+   "records_by_kind": {
+    "equation": 22,
+    "figure": 1,
+    "table": 1,
+    "heading": 20
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "7-4-formal-charges-and-resonance",
+   "gate": "equations",
+   "equations": 7,
+   "chemistry": 6,
+   "lone_times": 0,
+   "overlap_8gram": 0.0044,
+   "records_by_kind": {
+    "equation": 7,
+    "heading": 21
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "15-3-coupled-equilibria",
+   "gate": "overlap",
+   "equations": 39,
+   "chemistry": 38,
+   "lone_times": 3,
+   "overlap_8gram": 0.3583,
+   "records_by_kind": {
+    "equation": 42,
+    "figure": 3,
+    "heading": 15
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "section": "16-3-electrode-and-cell-potentials",
+   "gate": "overlap",
+   "equations": 51,
+   "chemistry": 46,
+   "lone_times": 0,
+   "overlap_8gram": 0.9283,
+   "records_by_kind": {
+    "equation": 51,
+    "figure": 2,
+    "table": 1,
+    "heading": 13
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "section": "2-1-early-ideas-in-atomic-theory",
+   "gate": "equations",
+   "equations": 10,
+   "chemistry": 0,
+   "lone_times": 1,
+   "overlap_8gram": 0.009,
+   "records_by_kind": {
+    "equation": 11,
+    "figure": 4,
+    "table": 1,
+    "heading": 12
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "3-4-other-units-for-solution-concentrations",
+   "gate": "equations",
+   "equations": 9,
+   "chemistry": 0,
+   "lone_times": 1,
+   "overlap_8gram": 0.0062,
+   "records_by_kind": {
+    "equation": 10,
+    "figure": 3,
+    "heading": 26
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "14-4-hydrolysis-of-salts",
+   "gate": "overlap",
+   "equations": 50,
+   "chemistry": 44,
+   "lone_times": 8,
+   "overlap_8gram": 0.2662,
+   "records_by_kind": {
+    "equation": 58,
+    "figure": 1,
+    "heading": 26
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "3-1-formula-mass-and-the-mole-concept",
+   "gate": "equations",
+   "equations": 8,
+   "chemistry": 2,
+   "lone_times": 15,
+   "overlap_8gram": 0.868,
+   "records_by_kind": {
+    "equation": 23,
+    "figure": 9,
+    "table": 1,
+    "heading": 49
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "section": "6-4-other-units-for-solution-concentrations",
+   "gate": "equations",
+   "equations": 9,
+   "chemistry": 0,
+   "lone_times": 1,
+   "overlap_8gram": 0.0062,
+   "records_by_kind": {
+    "equation": 10,
+    "figure": 3,
+    "heading": 26
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "17-4-potential-free-energy-and-equilibrium",
+   "gate": "equations",
+   "equations": 21,
+   "chemistry": 10,
+   "lone_times": 1,
+   "overlap_8gram": 0.0626,
+   "records_by_kind": {
+    "equation": 22,
+    "figure": 1,
+    "table": 1,
+    "heading": 20
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "section": "12-4-free-energy",
+   "gate": "chemistry_share",
+   "equations": 51,
+   "chemistry": 17,
+   "lone_times": 0,
+   "overlap_8gram": 0.0113,
+   "records_by_kind": {
+    "equation": 51,
+    "table": 3,
+    "heading": 20
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "section": "4-5-formal-charges-and-resonance",
+   "gate": "equations",
+   "equations": 7,
+   "chemistry": 6,
+   "lone_times": 0,
+   "overlap_8gram": 0.0044,
+   "records_by_kind": {
+    "equation": 7,
+    "heading": 21
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "section": "3-7-ionic-and-molecular-compounds",
+   "gate": "overlap",
+   "equations": 35,
+   "chemistry": 33,
+   "lone_times": 0,
+   "overlap_8gram": 0.9417,
+   "records_by_kind": {
+    "equation": 35,
+    "figure": 4,
+    "table": 1,
+    "heading": 30
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "13-3-shifting-equilibria-le-chateliers-principle",
+   "gate": "equations",
+   "equations": 18,
+   "chemistry": 11,
+   "lone_times": 0,
+   "overlap_8gram": 0.0161,
+   "records_by_kind": {
+    "equation": 18,
+    "figure": 3,
+    "heading": 8
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "section": "16-1-review-of-redox-chemistry",
+   "gate": "overlap",
+   "equations": 37,
+   "chemistry": 36,
+   "lone_times": 0,
+   "overlap_8gram": 0.9833,
+   "records_by_kind": {
+    "equation": 37,
+    "heading": 14
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "section": "15-3-coupled-equilibria",
+   "gate": "overlap",
+   "equations": 39,
+   "chemistry": 38,
+   "lone_times": 3,
+   "overlap_8gram": 0.3583,
+   "records_by_kind": {
+    "equation": 42,
+    "figure": 3,
+    "heading": 15
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "1-3-physical-and-chemical-properties",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0103,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "chemistry-2e",
+   "section": "2-6-ionic-and-molecular-compounds",
+   "gate": "overlap",
+   "equations": 35,
+   "chemistry": 33,
+   "lone_times": 0,
+   "overlap_8gram": 0.9928,
+   "records_by_kind": {
+    "equation": 35,
+    "figure": 4,
+    "table": 1,
+    "heading": 30
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "10-6-reactions-of-alkyl-halides-grignard-reagents",
+   "gate": "equations",
+   "equations": 4,
+   "chemistry": 2,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 4,
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-12-biological-reductions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "1-7-sp3-hybrid-orbitals-and-the-structure-of-ethane",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "7-10-the-hammond-postulate",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "6-1-kinds-of-organic-reactions",
+   "gate": "equations",
+   "equations": 5,
+   "chemistry": 3,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 5,
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "2-5-rules-for-resonance-forms",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0018,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "24-3-basicity-of-amines",
+   "gate": "equations",
+   "equations": 5,
+   "chemistry": 3,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 5,
+    "figure": 4,
+    "table": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "1-12-drawing-chemical-structures",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "1-9-sp-hybrid-orbitals-and-the-structure-of-acetylene",
+   "gate": "equations",
+   "equations": 5,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 5,
+    "figure": 2,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "5-4-pasteurs-discovery-of-enantiomers",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0031,
+   "records_by_kind": {
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-5-nucleophilic-addition-of-h2o-hydration",
+   "gate": "equations",
+   "equations": 7,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 7,
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "7-6-stability-of-alkenes",
+   "gate": "equations",
+   "equations": 10,
+   "chemistry": 7,
+   "lone_times": 0,
+   "overlap_8gram": 0.0025,
+   "records_by_kind": {
+    "equation": 10,
+    "figure": 8,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-13-some-biological-carbonyl-condensation-reactions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "10-5-preparing-alkyl-halides-from-alcohols",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "12-1-mass-spectrometry-of-small-molecules-magnetic-sector-instruments",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "17-9-phenols-and-their-uses",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "26-8-automated-peptide-synthesis-the-merrifield-solid-phase-method",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-3-halohydrins-from-alkenes-addition-of-ho-x",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "2-8-acid-and-base-strength",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 2,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "25-5-cyclic-structures-of-monosaccharides-anomers",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 6,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-13-reaction-stereochemistry-addition-of-h2o-to-a-chiral-alkene",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "11-6-biological-substitution-reactions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-2-halogenation-of-alkenes-addition-of-x2",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 7,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "29-1-an-overview-of-metabolism-and-biochemical-energy",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 9,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "9-1-naming-alkynes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "4-1-naming-cycloalkanes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 7,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "2-4-resonance",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "17-6-reactions-of-alcohols",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 12,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "24-10-spectroscopy-of-amines",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 6,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "24-4-basicity-of-arylamines",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-3-oxidation-of-aldehydes-and-ketones",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "15-2-structure-and-stability-of-benzene",
+   "gate": "equations",
+   "equations": 6,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 6,
+    "figure": 6,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "14-4-the-diels-alder-cycloaddition-reaction",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-6-spin-spin-splitting-in-1h-nmr-spectra",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 8,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "11-8-the-e2-reaction-and-the-deuterium-isotope-effect",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 7,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "30-7-sigmatropic-rearrangements",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "1-4-development-of-chemical-bonding-theory",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.003,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "17-3-preparation-of-alcohols-a-review",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "27-6-steroids",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 8,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "14-1-stability-of-conjugated-dienes-molecular-orbital-theory",
+   "gate": "equations",
+   "equations": 13,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 13,
+    "figure": 8,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "24-9-heterocyclic-amines",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 15,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-1-carbonyl-condensations-the-aldol-reaction",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-13-uses-of-13c-nmr-spectroscopy",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "28-8-the-polymerase-chain-reaction",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "25-4-configurations-of-the-aldoses",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "31-5-olefin-metathesis-polymerization",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "2-2-polar-covalent-bonds-and-dipole-moments",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 3,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "30-9-a-summary-of-rules-for-pericyclic-reactions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "16-4-substituent-effects-in-electrophilic-substitutions",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 11,
+    "table": 2,
+    "heading": 11
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "22-7-alkylation-of-enolate-ions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 22,
+    "heading": 17
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "27-7-biosynthesis-of-steroids",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 9,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "30-3-stereochemistry-of-thermal-electrocyclic-reactions",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "24-8-reactions-of-arylamines",
+   "gate": "equations",
+   "equations": 4,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 4,
+    "figure": 16,
+    "heading": 8
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "4-3-stability-of-cycloalkanes-ring-strain",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "26-3-synthesis-of-amino-acids",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "9-5-reduction-of-alkynes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "4-9-conformations-of-polycyclic-molecules",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "30-2-electrocyclic-reactions",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 2,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 6,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "7-11-evidence-for-the-mechanism-of-electrophilic-additions-carbocation-rearrangements",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "2-12-noncovalent-interactions-between-molecules",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "30-5-cycloaddition-reactions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "29-10-some-conclusions-about-biological-chemistry",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "6-7-describing-a-reaction-equilibria-rates-and-energy-changes",
+   "gate": "equations",
+   "equations": 10,
+   "chemistry": 5,
+   "lone_times": 0,
+   "overlap_8gram": 0.0024,
+   "records_by_kind": {
+    "equation": 10,
+    "figure": 3,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "5-6-diastereomers",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "4-4-conformations-of-cycloalkanes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "7-5-alkene-stereochemistry-and-the-e-z-designation",
+   "gate": "equations",
+   "equations": 7,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0026,
+   "records_by_kind": {
+    "equation": 7,
+    "figure": 5,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-9-uses-of-1h-nmr-spectroscopy",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-7-1h-nmr-spectroscopy-and-proton-equivalence",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "15-3-aromaticity-and-the-huckel-4n-2-rule",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "26-6-peptide-sequencing-the-edman-degradation",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "6-5-using-curved-arrows-in-polar-reaction-mechanisms",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 9,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "17-5-alcohols-from-carbonyl-compounds-grignard-reaction",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 10,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-5-integration-of-1h-nmr-absorptions-proton-counting",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "15-6-polycyclic-aromatic-compounds",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 6,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "6-4-an-example-of-a-polar-reaction-addition-of-hbr-to-ethylene",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "31-4-step-growth-polymers",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 5,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "3-7-conformations-of-other-alkanes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0019,
+   "records_by_kind": {
+    "figure": 7,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "12-7-interpreting-infrared-spectra",
+   "gate": "equations",
+   "equations": 15,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.001,
+   "records_by_kind": {
+    "equation": 15,
+    "figure": 2,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "17-4-alcohols-from-carbonyl-compounds-reduction",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0014,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 11,
+    "heading": 7
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "5-1-enantiomers-and-the-tetrahedral-carbon",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-4-using-aldol-reactions-in-synthesis",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "9-8-alkylation-of-acetylide-anions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-12-dept-13c-nmr-spectroscopy",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "11-9-the-e2-reaction-and-cyclohexane-conformation",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "7-9-carbocation-structure-and-stability",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "16-6-nucleophilic-aromatic-substitution",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "26-1-structures-of-amino-acids",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0009,
+   "records_by_kind": {
+    "figure": 6,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "2-3-formal-charges",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0016,
+   "records_by_kind": {
+    "figure": 5,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "25-10-some-other-important-carbohydrates",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "27-2-soap",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "16-1-electrophilic-aromatic-substitution-reactions-bromination",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "21-6-chemistry-of-esters",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 14,
+    "heading": 7
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "7-8-orientation-of-electrophilic-additions-markovnikovs-rule",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0017,
+   "records_by_kind": {
+    "figure": 8,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "21-1-naming-carboxylic-acid-derivatives",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 8,
+    "table": 1,
+    "heading": 7
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "5-10-chirality-at-nitrogen-phosphorus-and-sulfur",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "16-7-benzyne",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "28-7-dna-synthesis",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 6,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "18-1-names-and-properties-of-ethers",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "31-7-polymer-structure-and-physical-properties",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 7,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-7-nucleophilic-addition-of-hydride-and-grignard-reagents-alcohol-formation",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "9-3-reactions-of-alkynes-addition-of-hx-and-x2",
+   "gate": "equations",
+   "equations": 5,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 5,
+    "figure": 6,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "11-11-biological-elimination-reactions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "7-4-cis-trans-isomerism-in-alkenes",
+   "gate": "equations",
+   "equations": 6,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0063,
+   "records_by_kind": {
+    "equation": 6,
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "29-5-catabolism-of-carbohydrates-glycolysis",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 13,
+    "heading": 8
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "26-11-how-do-enzymes-work-citrate-synthase",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "21-7-chemistry-of-amides",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 10,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "25-7-the-eight-essential-monosaccharides",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-3-dehydration-of-aldol-products-synthesis-of-enones",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 5,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "28-4-transcription-of-dna",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "5-7-meso-compounds",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "9-2-preparation-of-alkynes-elimination-reactions-of-dihalides",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "14-2-electrophilic-additions-to-conjugated-dienes-allylic-carbocations",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 6,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-11-carbonyl-condensations-with-enamines-the-stork-enamine-reaction",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 5,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "24-2-structure-and-properties-of-amines",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0024,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "3-6-conformations-of-ethane",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "28-3-replication-of-dna",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "21-2-nucleophilic-acyl-substitution-reactions",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 8,
+    "table": 1,
+    "heading": 6
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "26-7-peptide-synthesis",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "31-1-chain-growth-polymers",
+   "gate": "equations",
+   "equations": 11,
+   "chemistry": 3,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 11,
+    "figure": 6,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "5-5-sequence-rules-for-specifying-configuration",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 11,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "6-3-polar-reactions",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0008,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 5,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "5-11-prochirality",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 7,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "20-7-chemistry-of-nitriles",
+   "gate": "equations",
+   "equations": 5,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 5,
+    "figure": 14,
+    "heading": 10
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "30-8-some-examples-of-sigmatropic-rearrangements",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 2,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 8,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "3-4-naming-alkanes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0028,
+   "records_by_kind": {
+    "figure": 18,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "11-7-elimination-reactions-zaitsevs-rule",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 7,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "3-5-properties-of-alkanes",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "28-2-base-pairing-in-dna",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "31-6-intramolecular-olefin-metathesis",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-2-preparing-aldehydes-and-ketones",
+   "gate": "equations",
+   "equations": 6,
+   "chemistry": 4,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 6,
+    "figure": 5,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "17-1-naming-alcohols-and-phenols",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "4-6-axial-and-equatorial-bonds-in-cyclohexane",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 7,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "15-5-aromatic-heterocycles-pyridine-and-pyrrole",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-9-intramolecular-claisen-condensations-the-dieckmann-cyclization",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "11-2-the-sn2-reaction",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 2,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "5-2-the-reason-for-handedness-in-molecules-chirality",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 6,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-13-conjugate-nucleophilic-addition-to-a-b-unsaturated-aldehydes-and-ketones",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 11,
+    "heading": 8
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "1-8-sp2-hybrid-orbitals-and-the-structure-of-ethylene",
+   "gate": "equations",
+   "equations": 6,
+   "chemistry": 2,
+   "lone_times": 0,
+   "overlap_8gram": 0.0012,
+   "records_by_kind": {
+    "equation": 6,
+    "figure": 3,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "18-4-cyclic-ethers-epoxides",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-6-nucleophilic-addition-of-hcn-cyanohydrin-formation",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "5-8-racemic-mixtures-and-the-resolution-of-enantiomers",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0027,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "22-3-alpha-halogenation-of-aldehydes-and-ketones",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "30-1-molecular-orbitals-of-conjugated-pi-systems",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "27-3-phospholipids",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-9-nucleophilic-addition-of-hydrazine-the-wolff-kishner-reaction",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 2,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-8-nucleophilic-addition-of-amines-imine-and-enamine-formation",
+   "gate": "equations",
+   "equations": 6,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 6,
+    "figure": 7,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "10-3-preparing-alkyl-halides-from-alkenes-allylic-bromination",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "12-3-mass-spectrometry-of-some-common-functional-groups",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 13,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-2-the-nature-of-nmr-absorptions",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "7-3-naming-alkenes",
+   "gate": "equations",
+   "equations": 4,
+   "chemistry": 4,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 4,
+    "figure": 6,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "30-6-stereochemistry-of-cycloadditions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-10-radical-additions-to-alkenes-chain-growth-polymers",
+   "gate": "equations",
+   "equations": 11,
+   "chemistry": 9,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 11,
+    "figure": 9,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "5-3-optical-activity",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 2,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "10-8-oxidation-and-reduction-in-organic-chemistry",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 5,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "10-2-preparing-alkyl-halides-from-alkanes-radical-halogenation",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 6,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "16-3-alkylation-and-acylation-of-aromatic-rings-the-friedel-crafts-reaction",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 11,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "14-5-characteristics-of-the-diels-alder-reaction",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 12,
+    "heading": 7
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "22-1-keto-enol-tautomerism",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "12-4-mass-spectrometry-in-biological-chemistry-time-of-flight-tof-instruments",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "26-4-peptides-and-proteins",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "12-8-infrared-spectra-of-some-common-functional-groups",
+   "gate": "equations",
+   "equations": 12,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 12,
+    "figure": 19,
+    "heading": 19
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "1-11-describing-chemical-bonds-molecular-orbital-theory",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-6-intramolecular-aldol-reactions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "21-8-chemistry-of-thioesters-and-acyl-phosphates-biological-carboxylic-acid-derivatives",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "28-5-translation-of-rna-protein-biosynthesis",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "20-1-naming-carboxylic-acids-and-nitriles",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 5,
+    "table": 1,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "11-5-characteristics-of-the-sn1-reaction",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 9,
+    "table": 1,
+    "heading": 10
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "22-6-reactivity-of-enolate-ions",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-6-reduction-of-alkenes-hydrogenation",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 7,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "4-7-conformations-of-monosubstituted-cyclohexanes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "21-5-chemistry-of-acid-anhydrides",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "16-9-reduction-of-aromatic-compounds",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 4,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "6-10-describing-a-reaction-intermediates",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "25-6-reactions-of-monosaccharides",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 15,
+    "heading": 8
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-1-naming-aldehydes-and-ketones",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 2,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 6,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "6-2-how-organic-reactions-occur-mechanisms",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-11-characteristics-of-13c-nmr-spectroscopy",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "24-6-synthesis-of-amines",
+   "gate": "equations",
+   "equations": 6,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 6,
+    "figure": 18,
+    "heading": 13
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "5-12-chirality-in-nature-and-chiral-environments",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "14-6-diene-polymers-natural-and-synthetic-rubbers",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "29-9-catabolism-of-proteins-deamination",
+   "gate": "equations",
+   "equations": 5,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 5,
+    "figure": 6,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "24-5-biological-amines-and-the-henderson-hasselbalch-equation",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "1-6-sp3-hybrid-orbitals-and-the-structure-of-methane",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "6-9-describing-a-reaction-energy-diagrams-and-transition-states",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-8-more-complex-spin-spin-splitting-patterns",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-2-carbonyl-condensations-versus-alpha-substitutions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "29-8-carbohydrate-biosynthesis-gluconeogenesis",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 11,
+    "heading": 8
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "28-1-nucleotides-and-nucleic-acids",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "26-10-enzymes-and-coenzymes",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 2,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "9-6-oxidative-cleavage-of-alkynes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "15-4-aromatic-ions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "10-7-organometallic-coupling-reactions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 9,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "24-7-reactions-of-amines",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 7,
+    "heading": 7
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "18-3-reactions-of-ethers-acidic-cleavage",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "20-5-preparing-carboxylic-acids",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 6,
+    "heading": 7
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "2-1-polar-covalent-bonds-and-electronegativity",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.001,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "1-1-atomic-structure-the-nucleus",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0099,
+   "records_by_kind": {
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "4-8-conformations-of-disubstituted-cyclohexanes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.001,
+   "records_by_kind": {
+    "figure": 4,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "22-5-acidity-of-alpha-hydrogen-atoms-enolate-ion-formation",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 6,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "11-10-the-e1-and-e1cb-reactions",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 4,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "29-6-conversion-of-pyruvate-to-acetyl-coa",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 6,
+    "heading": 6
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "16-8-oxidation-of-aromatic-compounds",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 7,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "18-2-preparing-ethers",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 7,
+    "heading": 7
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "20-8-spectroscopy-of-carboxylic-acids-and-nitriles",
+   "gate": "equations",
+   "equations": 5,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 5,
+    "figure": 4,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "26-2-amino-acids-and-the-henderson-hasselbalch-equation-isoelectric-points",
+   "gate": "equations",
+   "equations": 4,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 4,
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "25-9-polysaccharides-and-their-synthesis",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 7,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "11-12-a-summary-of-reactivity-sn1-sn2-e1-e1cb-and-e2",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "25-8-disaccharides",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "16-5-trisubstituted-benzenes-additivity-of-effects",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "14-9-conjugation-color-and-the-chemistry-of-vision",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-12-reaction-stereochemistry-addition-of-h2o-to-an-achiral-alkene",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "26-5-amino-acid-analysis-of-peptides",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-7-the-claisen-condensation-reaction",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "12-5-spectroscopy-and-the-electromagnetic-spectrum",
+   "gate": "equations",
+   "equations": 5,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 5,
+    "figure": 3,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "1-10-hybridization-of-nitrogen-oxygen-phosphorus-and-sulfur",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "9-7-alkyne-acidity-formation-of-acetylide-anions",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 2,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 2,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "10-1-names-and-structures-of-alkyl-halides",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-10-conjugate-carbonyl-additions-the-michael-reaction",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-4-nucleophilic-addition-reactions-of-aldehydes-and-ketones",
+   "gate": "equations",
+   "equations": 6,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 6,
+    "figure": 6,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "27-1-waxes-fats-and-oils",
+   "gate": "equations",
+   "equations": 7,
+   "chemistry": 5,
+   "lone_times": 0,
+   "overlap_8gram": 0.0032,
+   "records_by_kind": {
+    "equation": 7,
+    "figure": 5,
+    "table": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "14-7-ultraviolet-spectroscopy",
+   "gate": "equations",
+   "equations": 4,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0012,
+   "records_by_kind": {
+    "equation": 4,
+    "figure": 3,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-10-nucleophilic-addition-of-alcohols-acetal-formation",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 7,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "29-3-catabolism-of-triacylglycerols-b-oxidation",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.003,
+   "records_by_kind": {
+    "figure": 9,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "29-4-biosynthesis-of-fatty-acids",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 8,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "11-4-the-sn1-reaction",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.001,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 6,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-11-biological-additions-of-radicals-to-alkenes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "21-9-polyamides-and-polyesters-step-growth-polymers",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 5,
+    "table": 1,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "11-1-the-discovery-of-nucleophilic-substitution-reactions",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 6,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-5-mixed-aldol-reactions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "20-4-substituent-effects-on-acidity",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "10-4-stability-of-the-allyl-radical-resonance-revisited",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "3-3-alkyl-groups",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "22-2-reactivity-of-enols-a-substitution-reactions",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "17-10-reactions-of-phenols",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "30-4-photochemical-electrocyclic-reactions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 1,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "29-7-the-citric-acid-cycle",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 9,
+    "heading": 8
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "17-7-oxidation-of-alcohols",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 7,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "5-9-a-review-of-isomerism",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0051,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "21-10-spectroscopy-of-carboxylic-acid-derivatives",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 1,
+    "table": 2,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-12-the-robinson-annulation-reaction",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "14-8-interpreting-ultraviolet-spectra-the-effect-of-conjugation",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-5-hydration-of-alkenes-addition-of-h2o-by-hydroboration",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 9,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "23-8-mixed-claisen-condensations",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "1-3-atomic-structure-electron-configurations",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0066,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 1,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "7-7-electrophilic-addition-reactions-of-alkenes",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 6,
+    "heading": 2
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-7-oxidation-of-alkenes-epoxidation-and-hydroxylation",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 7,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "26-9-protein-structure",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "16-10-synthesis-of-polysubstituted-benzenes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 10,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "1-2-atomic-structure-orbitals",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0027,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "9-9-an-introduction-to-organic-synthesis",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 14,
+    "heading": 13
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "18-7-thiols-and-sulfides",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 11,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-1-nuclear-magnetic-resonance-spectroscopy",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-9-addition-of-carbenes-to-alkenes-cyclopropane-synthesis",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "31-2-stereochemistry-of-polymerization-ziegler-natta-catalysts",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 2,
+   "lone_times": 0,
+   "overlap_8gram": 0.002,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "24-1-naming-amines",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0023,
+   "records_by_kind": {
+    "figure": 8,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "7-2-calculating-the-degree-of-unsaturation",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "15-7-spectroscopy-of-aromatic-compounds",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 7,
+    "table": 1,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "18-6-crown-ethers",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "18-8-spectroscopy-of-ethers",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "7-1-industrial-preparation-and-use-of-alkenes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-14-spectroscopy-of-aldehydes-and-ketones",
+   "gate": "equations",
+   "equations": 5,
+   "chemistry": 2,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 5,
+    "figure": 6,
+    "table": 1,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "27-4-prostaglandins-and-other-eicosanoids",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "29-2-catabolism-of-triacylglycerols-the-fate-of-glycerol",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "2-9-predicting-acid-base-reactions-from-pka-values",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.002,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 3,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "25-3-d-l-sugars",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "12-6-infrared-spectroscopy",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-10-13c-nmr-spectroscopy-signal-averaging-and-ft-nmr",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "4-5-conformations-of-cyclohexane",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "20-6-reactions-of-carboxylic-acids-an-overview",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-1-preparing-alkenes-a-preview-of-elimination-reactions",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-4-chemical-shifts-in-1h-nmr-spectroscopy",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "table": 2,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-8-oxidation-of-alkenes-cleavage-to-carbonyl-compounds",
+   "gate": "equations",
+   "equations": 8,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 8,
+    "figure": 6,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "21-3-reactions-of-carboxylic-acids",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0014,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 16,
+    "heading": 11
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "2-6-drawing-resonance-forms",
+   "gate": "equations",
+   "equations": 7,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 7,
+    "figure": 10,
+    "heading": 9
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "28-6-dna-sequencing",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "19-11-nucleophilic-addition-of-phosphorus-ylides-the-wittig-reaction",
+   "gate": "equations",
+   "equations": 6,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 6,
+    "figure": 6,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "22-4-alpha-bromination-of-carboxylic-acids",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "31-3-copolymers",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "6-6-radical-reactions",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 6,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "6-8-describing-a-reaction-bond-dissociation-energies",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 2,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "15-1-naming-aromatic-compounds",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 6,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "2-10-organic-acids-and-organic-bases",
+   "gate": "equations",
+   "equations": 3,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0018,
+   "records_by_kind": {
+    "equation": 3,
+    "figure": 7,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "27-5-terpenoids",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 14,
+    "heading": 11
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "12-2-interpreting-mass-spectra",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0007,
+   "records_by_kind": {
+    "figure": 6,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "17-11-spectroscopy-of-alcohols-and-phenols",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 8,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "25-2-representing-carbohydrate-stereochemistry-fischer-projections",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 8,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "25-1-classification-of-carbohydrates",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "4-2-cis-trans-isomerism-in-cycloalkanes",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0016,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "6-11-a-comparison-between-biological-reactions-and-laboratory-reactions",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 3,
+    "table": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "16-2-other-aromatic-substitutions",
+   "gate": "equations",
+   "equations": 4,
+   "chemistry": 4,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 4,
+    "figure": 11,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "3-1-functional-groups",
+   "gate": "equations",
+   "equations": 13,
+   "chemistry": 3,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 13,
+    "figure": 4,
+    "table": 1,
+    "heading": 4
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "3-2-alkanes-and-alkane-isomers",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 6,
+    "table": 2,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "8-4-hydration-of-alkenes-addition-of-h2o-by-oxymercuration",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "17-8-protection-of-alcohols",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "1-5-describing-chemical-bonds-valence-bond-theory",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 4,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "17-2-properties-of-alcohols-and-phenols",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 10,
+    "table": 1,
+    "heading": 5
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "20-3-biological-acids-and-the-henderson-hasselbalch-equation",
+   "gate": "equations",
+   "equations": 5,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 5,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "18-5-reactions-of-epoxides-ring-opening",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "figure": 10,
+    "heading": 7
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "11-3-characteristics-of-the-sn2-reaction",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 13,
+    "table": 2,
+    "heading": 6
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "20-2-structure-and-properties-of-carboxylic-acids",
+   "gate": "equations",
+   "equations": 10,
+   "chemistry": 4,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 10,
+    "figure": 6,
+    "table": 2,
+    "heading": 1
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "9-4-hydration-of-alkynes",
+   "gate": "equations",
+   "equations": 2,
+   "chemistry": 1,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 2,
+    "figure": 6,
+    "heading": 3
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "21-4-chemistry-of-acid-halides",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0009,
+   "records_by_kind": {
+    "figure": 13,
+    "heading": 13
+   },
+   "tier": "private"
+  },
+  {
+   "book": "organic-chemistry",
+   "section": "13-3-chemical-shifts",
+   "gate": "equations",
+   "equations": 1,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.0,
+   "records_by_kind": {
+    "equation": 1,
+    "figure": 1,
+    "heading": 1
+   },
+   "tier": "private"
+  }
+ ],
+ "sections": [
+  {
+   "book": "chemistry",
+   "book_title": "Chemistry",
+   "book_state": "retired",
+   "section": "2-6-molecular-and-ionic-compounds",
+   "title": "2.6 Molecular and Ionic Compounds",
+   "licence": "Creative Commons Attribution License",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "licence_tier": "public",
+   "archive_version": "20260604.144757",
+   "book_version": "741a7af",
+   "equations": 35,
+   "chemistry": 33,
+   "lone_times": 0,
+   "overlap_8gram": 0.0048,
+   "records_by_kind": {
+    "equation": 35,
+    "figure": 4,
+    "table": 1,
+    "heading": 30
+   },
+   "pdf_pages": 11,
+   "pdf_paper": "Letter",
+   "pdf_sha256": "b868e135bbe56fbce750bc046748133d9139384f6812b5ff02f928d96d973e46",
+   "gold_sha256": "e3e23332289dfd4a74531ab58e0d9b5d2bb7d6ffe1c7c2bbda55c459c1ead5b5"
+  },
+  {
+   "book": "chemistry-2e",
+   "book_title": "Chemistry 2e",
+   "book_state": "live",
+   "section": "17-3-electrode-and-cell-potentials",
+   "title": "17.3 Electrode and Cell Potentials",
+   "licence": "Creative Commons Attribution-NonCommercial-ShareAlike License",
+   "licence_url": "http://creativecommons.org/licenses/by-nc-sa/4.0/",
+   "licence_tier": "private",
+   "archive_version": "20260604.144757",
+   "book_version": "3be4b60",
+   "equations": 51,
+   "chemistry": 46,
+   "lone_times": 0,
+   "overlap_8gram": 0.0545,
+   "records_by_kind": {
+    "equation": 51,
+    "figure": 2,
+    "table": 1,
+    "heading": 13
+   },
+   "pdf_pages": 7,
+   "pdf_paper": "Letter",
+   "pdf_sha256": "871cddd1c6fd648bf74532e199ca9c247c032985bb26f68b7b488139e723723f",
+   "gold_sha256": "c3ed65c1f24f152f844d9f04f6197129bf3696ed2f9549ee561d7a1d3e8c3f1d"
+  },
+  {
+   "book": "chemistry-2e",
+   "book_title": "Chemistry 2e",
+   "book_state": "live",
+   "section": "17-1-review-of-redox-chemistry",
+   "title": "17.1 Review of Redox Chemistry",
+   "licence": "Creative Commons Attribution-NonCommercial-ShareAlike License",
+   "licence_url": "http://creativecommons.org/licenses/by-nc-sa/4.0/",
+   "licence_tier": "private",
+   "archive_version": "20260604.144757",
+   "book_version": "3be4b60",
+   "equations": 37,
+   "chemistry": 36,
+   "lone_times": 0,
+   "overlap_8gram": 0.0128,
+   "records_by_kind": {
+    "equation": 37,
+    "heading": 14
+   },
+   "pdf_pages": 6,
+   "pdf_paper": "Letter",
+   "pdf_sha256": "a2f70d2e6bc14bd2c562bc117c096f1172069bea1c85ce30763fd2d624cfef26",
+   "gold_sha256": "d9c45d8e40ae8250a724b3316143e426d877c82783cf3f232a952b0613b85c91"
+  }
+ ],
+ "n_pdf_pages": 24,
+ "n_chemistry_equations": 115
+}

@@ -300,6 +300,9 @@
   (no links or unsafe paths, size and file caps, atomic) and compiles downloaded TeX (sandbox, `-norc`, no network or shell
   escape, no environment from the parent, a cap on what a compile writes); `realworld_build.py` and
   `figures_v2_arxiv.py` unpack and compile through it too.
+  Stratum D (`fresh5_select.py chemistry`): never-used OpenStax chemistry sections from the CC BY first editions, then the CC BY-NC-SA
+  2e editions as a private measurement (licence read live; their PDFs and gold only in the cache, ids and hashes in the repository),
+  with measured text overlap and page gates, and a chemistry-aware success rule in the draft registration; the rule fills 3 of 4 places. The used-section scan skips the selection files of B and D.
   [docs/eval-realworld.md](docs/eval-realworld.md).
 ### Figure gold v2 and a draft pre-registration for long descriptions
 
