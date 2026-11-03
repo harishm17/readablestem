@@ -165,6 +165,46 @@ What Canvas still removes, and why that is accepted:
   that happens in the browser and is not tested here.
 - Not tested against a live Canvas, UT Dallas's included; the README says so.
 
+### The EPUB export (`pipeline/export_epub.py`)
+
+A third form of the same document, made from the finished HTML alone like the two above
+(no pipeline step changes). `readablestem export epub FILE.html OUT.epub [--title T]` writes an
+EPUB 3 (no route or button yet). Nothing is read but the file: no network, no model.
+
+| File | What it is |
+|---|---|
+| `EPUB/content.xhtml` | The whole document as XHTML, in one content document. Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet stays. Scripts are not carried. |
+| `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); and a `page-list` from `role="doc-pagebreak"` markers when the document has them (hidden in the book, used by reading systems). |
+| `EPUB/images/image-NN.png` | Each `data:` image as a file (one per distinct picture), `alt` kept on the `<img>`. |
+| `EPUB/package.opf` | Title, language, a UUID made from the document, `dcterms:modified`, accessibility metadata, manifest, spine. |
+
+- **MathML stays native.** Each `<math>` gets the MathML namespace and the content document is
+  listed with `properties="mathml"`. Equations kept as pictures stay pictures with their alt
+  text, as in the HTML.
+- **Links.** `#` links, `http(s):` and `mailto:` are kept. Any other `href` (the demo page's
+  "Back to ReadableSTEM" is `/`) points at nothing inside a book, so the link is written
+  without its address and the words stay.
+- **ARIA and DPUB.** Roles stay; `doc-pagebreak`, `doc-noteref`, `doc-footnote` and
+  `doc-backlink` also get the matching `epub:type`. The contents `nav` has `role="doc-toc"`.
+- **Metadata is written from what is in the document:** `schema:accessMode` (textual, and
+  visual when there are pictures), `accessibilityFeature` (`tableOfContents`,
+  `structuralNavigation`, `MathML`, `describedMath` when a `<math>` has `alttext`,
+  `alternativeText`, `longDescription` for figure descriptions, `pageNavigation` for the page
+  list), `accessibilityHazard` `none` (no script, audio or video is written) and an
+  `accessibilitySummary`. `accessModeSufficient` (`textual`) is left out while the document
+  still has flagged items, because then a person has not yet made it sufficient. A page list also
+  adds `dc:source` ("Source PDF", `source-of` pagination).
+- **No claim of conformance.** The package has no `dcterms:conformsTo` and the summary says the
+  tool assists and does not certify. The tests run EPUBCheck 5.4 (no errors or warnings) and
+  DAISY Ace (no serious or critical violation) on the golden documents, the demo, the LaTeX
+  conversions and a synthetic page with page markers, when both are installed
+  (`.github/workflows/epub.yml` installs them in CI and fails if they are missing). That shows
+  those two programs found nothing on those documents; it does not show a reading system reads
+  the file well. The page list is built from `role="doc-pagebreak"` markers; a file
+  without them has none.
+- One content document, not one per chapter: ids and links inside the file keep working as they
+  are. A very long document is one long file.
+
 ## How each element is written
 
 | Element | Converted | Not converted (ABSTAINED, FAILED, REJECTED, no fix) |
@@ -901,6 +941,8 @@ generation (with tokens and cost), so per-request cost shows in Langfuse's cost 
 `step` span carries `model` only when the step used one model.
 
 ## CLI
+
+`readablestem export epub FILE.html OUT.epub` is described under "The EPUB export" above.
 
 ```
 readablestem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [--concurrency 4]
