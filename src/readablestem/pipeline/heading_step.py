@@ -310,7 +310,8 @@ def _fix(element: Element, raw_level: int, level: int) -> Fix:
     sentence = not evidence.strong and sentence_like(text)
     checks.append(_check("heading.sentence", not sentence, "heading.sentence_like"))
     unconfirmed = REASON_NUMBERED_UNCONFIRMED in element.reasons and not evidence.strong
-    checks.append(_check("heading.numbered", not unconfirmed, "heading.numbered_unconfirmed"))
+    if unconfirmed:  # only when it fails: every stored heading fix keeps exactly its checks
+        checks.append(_check("heading.numbered", False, "heading.numbered_unconfirmed"))
     sentence = sentence or unconfirmed
     # Accepted either way, except a sentence-like line with weak evidence or a numbered line
     # that only its neighbours' numbers made a heading (a decision);
