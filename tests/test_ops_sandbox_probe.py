@@ -11,6 +11,7 @@ import pytest
 from readablestem.cli.main import main
 from readablestem.core import sandbox
 from readablestem.ops import sandbox_probe
+from readablestem.source import latexml
 
 needs_sandbox = pytest.mark.skipif(
     not (shutil.which("bwrap") and shutil.which("prlimit") and sandbox.available()),
@@ -73,15 +74,13 @@ def test_real_probe_passes_and_prints_no_secret(monkeypatch, capsys):
 @needs_sandbox
 def test_require_latexml_fails_when_it_is_missing(monkeypatch, capsys):
     monkeypatch.delenv("READABLESTEM_LATEXML_ROOT", raising=False)
-    monkeypatch.setattr("readablestem.source.latexml.installed", lambda: False)
+    monkeypatch.setattr(latexml, "installed", lambda: False)
     assert main(["ops", "sandbox-probe"]) == 0
     assert "latexml=missing" in capsys.readouterr().out
     assert main(["ops", "sandbox-probe", "--require-latexml"]) == 1
 
 
-@pytest.mark.skipif(
-    not (shutil.which("latexml") and shutil.which("latexmlpost")), reason="needs LaTeXML"
-)
+@pytest.mark.skipif(not latexml.installed(), reason="needs LaTeXML")
 @needs_sandbox
 def test_probe_times_a_latexml_run(capsys):
     assert main(["ops", "sandbox-probe", "--require-latexml"]) == 0
