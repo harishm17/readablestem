@@ -317,7 +317,11 @@ gains `metrics.long_descriptions` and a "Long descriptions" table:
 | `colour_only` | figures flagged as telling things apart by colour alone |
 | `required_decisions`, `tables_offered` | figures needing a decision; data tables read from the image, offered as optional extras (not in the file until a reviewer adds them, never a decision; `required_for_values` in reports before 2026-10-09, when each was a decision) |
 
-The long judge is not calibrated against human labels yet.
+The long judge is not calibrated against human labels yet. The 13 gold figures are too few for a
+pass-rate claim; a 50-figure set (`data/gold-figures-v2/`, drawn by a written seeded rule from CC BY
+sources) and a draft pre-registration with the judge-calibration plan are in
+[eval-figures-long.md](eval-figures-long.md). `gold/figures_v2_table.py` scores a data table cell by
+cell against a reference table, with no model.
 
 ### document
 

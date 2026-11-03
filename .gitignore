@@ -45,5 +45,10 @@ site/_build_again/
 node_modules/
 src/readablestem/web/showcase/
 
+# Private handwriting notes and their answer keys (scripts/handwriting_own.py keeps them outside the repo; these guard against a stray copy)
+readablestem-private/
+handwriting-own/
+handwriting-private/
+
 # Local re-score of the interim held-out report (make proof-interim); the committed one is registered
 proof/interim/rebuilt-here.md
