@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased: chemistry speech fixes
+
+- The review screen's "read aloud roughly as" text (and the checks that compare readings) now
+  reads a state with conditions, `(aq, 0.10 M)`, as "aqueous, 0.10 molar"; a redox couple
+  `Cu²⁺/Cu` as "C u 2 plus slash C u" (it said "divided by"); the arrow in its own cell of a
+  half-reaction table as "reacts to form" (it said "right arrow" with the species cut off from it);
+  an excited nuclide `⁶⁰₂₈Ni*` as "nickel 60, atomic number 28, excited state"; and units after a
+  decimal in a chemistry row consistently (`0.000 V − 0.0592 V` both "volts"; `mol L⁻¹ s⁻¹` as one unit).
+  Speech for sets that are not chemistry is unchanged (`docs/chemistry.md`, "Reading it aloud").
+
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)
 
 - The whole conversion (`convert_pdf`) now runs in a child process the worker can kill

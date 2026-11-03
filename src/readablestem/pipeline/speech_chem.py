@@ -18,6 +18,9 @@ OpenStax's (one `mtext` for "HSO" or "2e", `mn` for a count or a charge).
 | `->` between species | "reacts to form" |
 | `<=>` between species | "is in equilibrium with" |
 | an arrow with `\\Delta` or `heat` over it | "reacts, with heat, to form" |
+| `(aq, 0.10 M)`, `(g, 1 atm)` (a state with conditions) | "aqueous, 0.10 molar" |
+| `Cu`, 2+, `/`, `Cu` (a redox couple) | "C u 2 plus slash C u", never "divided by" |
+| an arrow in a table cell of its own | read with the cells around it (`row_parts`) |
 | `[`, a species, `]` | "the concentration of H 3 O plus" |
 | the electron `e` (with a raised minus) | "e minus" |
 
@@ -34,6 +37,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Callable
 
 from readablestem.pipeline.speech_nuclides import ELEMENTS
+from readablestem.pipeline.speech_units import unit_words
 
 STATE_WORDS = {"aq": "aqueous", "s": "solid", "l": "liquid", "g": "gas"}
 EQUILIBRIUM = {"⇌", "⇋", "⇄"}
@@ -132,6 +136,11 @@ def _formula_text(node: ET.Element) -> list[str] | None:
     return _symbols_in(re.sub(r"\d", "", match.group(2)))
 
 
+def formula_symbols(node: ET.Element) -> list[str] | None:
+    """The element symbols of an `mtext` formula ("NaCl" -> ["Na", "Cl"]), or None."""
+    return _formula_text(node)
+
+
 def _is_electron(node: ET.Element) -> bool:
     """The electron: an upright `e` (an `mtext`, or an `mi` set upright), with a coefficient
     in front when OpenStax puts it in the same token ("2e"). An italic e is Euler's number."""
@@ -179,12 +188,42 @@ def _scripted_species(node: ET.Element) -> bool:
     return node.tag in _SCRIPTS and len(node) > 0 and _species_base(node[0])
 
 
+_CONDITION = re.compile(r"^(\d+(?:\.\d+)?)\s*([A-Za-zΩ°/]+)$")
+_STATE_WITH = re.compile(r"^\(\s*(aq|s|l|g)\s*,(.+)\)$")
+_MAX_STATE_SIBLINGS = 10
+
+
+def _condition_words(text: str) -> str | None:
+    """One condition of a state, a number and its unit: "0.10 M" -> "0.10 molar",
+    "1 atm" -> "1 atmosphere". None when it is anything else."""
+    match = _CONDITION.match(text.strip())
+    if not match:
+        return None
+    count, unit = match.groups()
+    name = "molar" if unit == "M" else unit_words(unit, count)
+    return f"{count} {name}" if name else None
+
+
+def _conditions_words(conditions: list[str]) -> str | None:
+    """The conditions after a state, comma-separated; None when any one is not read."""
+    spoken = [_condition_words(c) for c in conditions]
+    if not spoken or any(w is None for w in spoken):
+        return None
+    return ", ".join(w for w in spoken if w)
+
+
 def _state_at(kids: list[ET.Element], i: int) -> tuple[str, int] | None:
-    """`( aq )` at kids[i], or one `mtext` "(aq)": the state word and the siblings used."""
+    """`( aq )` at kids[i], or one `mtext` "(aq)", with conditions after a comma
+    (`(aq, 0.10 M)`): the state words ("aqueous, 0.10 molar") and the siblings used."""
     if kids[i].tag in {"mtext", "mi"}:
         text = _text(kids[i])
         if text.startswith("(") and text.endswith(")") and text[1:-1] in STATE_WORDS:
             return STATE_WORDS[text[1:-1]], 1
+        with_conditions = _STATE_WITH.match(text) if kids[i].tag == "mtext" else None
+        if with_conditions:
+            state, rest = with_conditions.groups()
+            spoken = _conditions_words(rest.split(","))
+            return (f"{STATE_WORDS[state]}, {spoken}", 1) if spoken else None
     if i + 2 >= len(kids) or not (kids[i].tag == "mo" and _text(kids[i]) == "("):
         return None
     for used in (1, 2):
@@ -195,7 +234,40 @@ def _state_at(kids: list[ET.Element], i: int) -> tuple[str, int] | None:
         word = "".join(_text(k) for k in inner)
         if word in STATE_WORDS and all(k.tag in {"mi", "mtext"} for k in inner):
             return STATE_WORDS[word], used + 2
-    return None
+    return _flat_state_with_conditions(kids, i)
+
+
+def _flat_state_with_conditions(kids: list[ET.Element], i: int) -> tuple[str, int] | None:
+    """`( a q , 0.10 M )` as flat siblings: the state, then comma-separated conditions."""
+    end = next(
+        (
+            j
+            for j in range(i + 2, min(len(kids), i + _MAX_STATE_SIBLINGS))
+            if kids[j].tag == "mo" and _text(kids[j]) == ")"
+        ),
+        None,
+    )
+    if end is None:
+        return None
+    inner = kids[i + 1 : end]
+    is_comma = [node.tag == "mo" and _text(node) == "," for node in inner]
+    if not any(is_comma):
+        return None
+    first = is_comma.index(True)
+    word = "".join(_text(k) for k in inner[:first])
+    if word not in STATE_WORDS or not all(k.tag in {"mi", "mtext"} for k in inner[:first]):
+        return None
+    groups: list[list[ET.Element]] = [[]]
+    for node, comma in zip(inner[first + 1 :], is_comma[first + 1 :], strict=True):
+        if comma:
+            groups.append([])
+        else:
+            groups[-1].append(node)
+    if any(node.tag not in {"mn", "mi", "mtext"} for group in groups for node in group):
+        return None
+    texts = [" ".join(t for t in (_text(n) for n in group) if t) for group in groups]
+    spoken = _conditions_words(texts)
+    return (f"{STATE_WORDS[word]}, {spoken}", end - i + 1) if spoken else None
 
 
 def _bracketed(kids: list[ET.Element], i: int) -> int | None:
@@ -289,6 +361,14 @@ def _ends_species(node: ET.Element) -> bool:
 def _letters(text: str) -> str:
     """ "Na" -> "N a": each letter said on its own, capitals as they are."""
     return " ".join(text)
+
+
+STARS = {"*", "∗", "⋆"}
+
+
+def is_star(node: ET.Element) -> bool:
+    """The asterisk written after a species or a nuclide (an excited state)."""
+    return node.tag in {"mo", "mi", "mtext"} and _text(node) in STARS
 
 
 def _charge_words(node: ET.Element) -> list[str] | None:
@@ -388,6 +468,44 @@ def _arrow_words(node: ET.Element) -> list[str] | None:
     return None
 
 
+def _ends_with_state(kids: list[ET.Element], end: int) -> bool:
+    """Does a state symbol ("(aq)", or "(", "aq", ")") end at kids[end]?"""
+    for start in range(max(end - _MAX_STATE_SIBLINGS, 1), end + 1):
+        state = _state_at(kids, start)
+        if state and start + state[1] - 1 == end and _ends_species(kids[start - 1]):
+            return True
+    return False
+
+
+def starts_species(kids: list[ET.Element], i: int) -> bool:
+    node = kids[i]
+    return (
+        _is_species_token(node)
+        or _scripted_species(node)
+        or _flat_pair(kids, i)
+        or _split_pair(kids, i) is not None
+        or _group_of_species(node)
+    )
+
+
+def _couple(kids: list[ET.Element], i: int) -> bool:
+    """A `/` between two species is a redox couple (`Cu²⁺/Cu`, `Cl₂/Cl⁻`), not a quotient.
+    It needs a species (or its state symbol) on both sides; a bracket or a closing
+    parenthesis before it is a quotient (`[A]/[B]`) and reads as one."""
+    node = kids[i]
+    if node.tag != "mo" or _text(node) not in {"/", "∕"} or not 0 < i < len(kids) - 1:
+        return False
+    before = kids[i - 1]
+    ends = (
+        _is_species_token(before)
+        or _scripted_species(before)
+        or _is_charge_script(before)
+        or (_upright_letter(before) and _text(before).islower())
+        or _ends_with_state(kids, i - 1)
+    )
+    return ends and starts_species(kids, i + 1)
+
+
 def _over_arrow(node: ET.Element) -> list[str] | None:
     """An arrow with a label over it: "reacts, with heat, to form"."""
     if node.tag != "mover" or len(node) != 2:
@@ -467,4 +585,48 @@ def read_at(kids: list[ET.Element], i: int, speak: Speak) -> tuple[list[str], in
     arrow = _over_arrow(node) or _arrow_words(node)
     if arrow is not None:
         return arrow, 1
+    if _couple(kids, i):
+        return ["slash"], 1
     return None
+
+
+def _is_arrow(node: ET.Element) -> bool:
+    return _arrow_words(node) is not None or _over_arrow(node) is not None
+
+
+def _cell_parts(cell: ET.Element) -> list[ET.Element]:
+    if not len(cell):  # a cell that is one bare token
+        return [cell]
+    return list(cell[0]) if len(cell) == 1 and cell[0].tag == "mrow" else list(cell)
+
+
+def _is_arrow_cell(cell: ET.Element) -> bool:
+    parts = _cell_parts(cell)
+    return len(parts) == 1 and _is_arrow(parts[0])
+
+
+def row_parts(cells: list[ET.Element], speak: Speak) -> list[str] | None:
+    """The readings of the cells of a table row that has an arrow in a cell of its own (a
+    half-reaction: species, arrow, species). The arrow cell, the cell before it and the cell
+    after it read as one run, so the arrow gets the species around it ("reacts to form") and
+    a state symbol knows the species before it; the other cells read alone. None when the row
+    has no such arrow or the run is not chemistry; the caller then reads every cell alone."""
+    arrows = {k for k, cell in enumerate(cells) if _is_arrow_cell(cell)}
+    if not arrows:
+        return None
+    spoken: list[str] = []
+    k = 0
+    while k < len(cells):
+        if k in arrows or k + 1 in arrows:
+            end = min(k + (2 if k in arrows else 3), len(cells))
+            flat = [part for cell in cells[k:end] for part in _cell_parts(cell)]
+            if not is_chem_row(flat):
+                return None
+            row = ET.Element("mrow")
+            row.extend(flat)
+            spoken.append(" ".join(speak(row)))
+            k = end
+        else:
+            spoken.append(" ".join(speak(cells[k])))
+            k += 1
+    return spoken
