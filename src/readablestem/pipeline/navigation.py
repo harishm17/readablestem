@@ -5,11 +5,12 @@ What the output looks like and why is in docs/output.md ("Navigation"). The asse
 writes the markup and holds the words, so both can be tested and changed on their own.
 
 - `skip_link`: the first thing in the file, hidden until it is focused, jumping over the
-  contents list to the empty `<span id="main-content">` just before `<main>` (WCAG 2.4.1,
-  Bypass Blocks). The id is on a span, not on `<main>` itself, because other code and tests
-  read the file by the literal `<main>` tag and its first child. No `tabindex` is needed:
-  browsers move keyboard focus to a fragment's target, and Canvas removes `tabindex` from a
-  pasted page anyway.
+  contents list to the empty `<span id="main-content" tabindex="-1">` just before `<main>`
+  (WCAG 2.4.1, Bypass Blocks). The id is on a span, not on `<main>` itself, because about 60
+  places (code, tests, the committed demo) read the file by the literal `<main>` tag. The
+  `tabindex="-1"` makes the span focusable by script and by following the link, so Firefox
+  and VoiceOver move there (a link to an element that cannot take focus only scrolls); it is
+  not a tab stop. Canvas removes `tabindex` from a pasted page, which also drops the skip link.
 - `contents_nav`: `<nav aria-label="Contents">` with nested links to the headings, made from
   the outline as written (after the repair that never skips a level), when there are at
   least `MIN_TOC_HEADINGS` of them and the PDF has no contents page of its own (two lists
@@ -53,10 +54,13 @@ def skip_link(authored_class: str) -> str:
     return f'<a class="skip-link {authored_class}" href="#{MAIN_ID}">{SKIP_TEXT}</a>'
 
 
-def contents_nav(entries: Sequence[TocEntry], authored_class: str) -> str:
+def contents_nav(
+    entries: Sequence[TocEntry], authored_class: str, document_lang: str | None = None
+) -> str:
     """The contents list: nested `<ul>`s by heading level, one link per heading. A heading
     more than one level below the one before it nests one level only; one above the first
-    heading is a sibling of it."""
+    heading is a sibling of it. `document_lang`: given when the document is not in English;
+    the label (an English `aria-label`) is then marked English and the entries the document's."""
     out: list[str] = []
     stack: list[int] = []
     for entry in entries:
@@ -70,16 +74,21 @@ def contents_nav(entries: Sequence[TocEntry], authored_class: str) -> str:
                 stack.pop()
         out.append(f'<li><a href="#{escape(entry.id, quote=True)}">{escape(entry.text)}</a>')
     out.append("</li>" + "</ul></li>" * (len(stack) - 1) + "</ul>")
+    items = "".join(out)
+    nav_lang = ""
+    if document_lang:
+        nav_lang = ' lang="en"'
+        items = f'<div lang="{escape(document_lang, quote=True)}">{items}</div>'
     return (
-        f'<nav class="toc" aria-label="{CONTENTS_LABEL}">\n'
+        f'<nav class="toc"{nav_lang} aria-label="{CONTENTS_LABEL}">\n'
         f'<p class="toc-title {authored_class}" aria-hidden="true">{CONTENTS_LABEL}</p>\n'
-        f"{''.join(out)}\n</nav>"
+        f"{items}\n</nav>"
     )
 
 
-def pagebreak(label: str, element_id: str | None, authored_class: str) -> str:
-    """A page marker. `label` is the page's printed label, or its position in the PDF."""
-    said = f"Page {label}"
+def pagebreak(said: str, element_id: str | None, authored_class: str) -> str:
+    """A page marker. `said` is "Page 12" (the printed label), "PDF page 5" (the position in
+    the PDF, for a page without a printed label among pages that have one) or "Page 5"."""
     attrs = f' id="{escape(element_id, quote=True)}"' if element_id else ""
     return (
         f'<div class="pagebreak {authored_class}">'

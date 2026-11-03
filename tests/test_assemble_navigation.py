@@ -86,7 +86,20 @@ def test_the_skip_link_comes_first_and_jumps_to_the_start_of_main():
     # the target is the empty anchor just before <main>, which keeps its plain tag
     assert body.index('id="main-content"') < body.index("<main>")
     assert html.count('id="main-content"') == 1
-    assert "tabindex" not in html  # Canvas removes it, and browsers do not need it
+    # focusable by the link (Firefox, VoiceOver), but not a tab stop; the only tabindex
+    assert re.findall(r"tabindex=\"[^\"]*\"", html) == ['tabindex="-1"']
+    assert '<span id="main-content" tabindex="-1"></span>' in html
+
+
+def test_the_contents_label_is_english_and_its_entries_the_documents_language():
+    pairs = three_headings()
+    elements = [p[0] if isinstance(p, tuple) else p for p in pairs]
+    fixes = [p[1] for p in pairs if isinstance(p, tuple)]
+    html = render_html(title="Doc", lang="de", elements=elements, fixes=fixes, crops={})
+    assert '<nav class="toc" lang="en" aria-label="Contents">' in html
+    assert '<div lang="de"><ul>' in contents_nav(html)
+    english = render(three_headings())
+    assert 'lang="' not in contents_nav(english)
 
 
 def test_the_skip_link_is_hidden_until_it_is_focused():
@@ -233,8 +246,21 @@ def test_the_page_is_also_written_as_visible_text_for_readers_that_drop_the_role
 
 def test_the_printed_label_is_used_where_there_is_one():
     html = render(two_pages(), page_labels={0: "iv", 1: "12"})
-    assert re.findall(r'aria-label="(Page [^"]+)"', html) == ["Page iv", "Page 12", "Page 3"]
+    assert re.findall(r'aria-label="(P[^"]+)"', html) == ["Page iv", "Page 12", "PDF page 3"]
     assert 'id="pagebreak-2"' in html  # the id is by position, so it never repeats
+
+
+def test_a_page_without_a_printed_label_never_reads_like_one():
+    # page 3 is not "Page 3" next to a page printed "3" (the cover came first)
+    html = render(two_pages(), page_labels={1: "3"})
+    assert re.findall(r'aria-label="(P[^"]+)"', html) == ["PDF page 1", "Page 3", "PDF page 3"]
+    # a part of a longer file: its pages are the source's, by position
+    part = render(two_pages(), pdf_pages={0: 30, 1: 31, 2: 32})
+    assert re.findall(r'aria-label="(P[^"]+)"', part) == ["Page 31", "Page 32", "Page 33"]
+    labelled = render(two_pages(), pdf_pages={0: 30, 1: 31, 2: 32}, page_labels={0: "12"})
+    assert re.findall(r'aria-label="(P[^"]+)"', labelled) == [
+        "Page 12", "PDF page 32", "PDF page 33",
+    ]  # fmt: skip
 
 
 def test_a_one_page_document_has_no_markers():

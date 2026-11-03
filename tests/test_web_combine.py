@@ -14,7 +14,8 @@ from fixtures.web.support import BOB, fake_output
 from readablestem.core.types import ConversionOutput, Status
 from readablestem.web import ranges
 from readablestem.web.combine import number_part_pages
-from readablestem.web.db import Job, JobStatus, User, session_scope, utcnow
+from readablestem.web.database import as_utc
+from readablestem.web.db import Event, Job, JobStatus, User, session_scope, utcnow
 from test_web_parts import choose, jobs_of, keep_big, text_of, web  # noqa: F401
 
 
@@ -78,30 +79,22 @@ def test_the_parts_are_joined_in_page_order_with_unique_ids_and_markers_that_con
 def test_each_part_stores_where_its_pages_are_in_the_source(web):  # noqa: F811
     _, jobs = three_finished_parts(web)
     with session_scope(web.ctx.factory) as session:
-        labels = [session.get(Job, j.id).result_json["page_labels"] for j in jobs]
-    assert labels == [{"0": "1"}, {"0": "5"}, {"0": "9"}]
+        stored = [session.get(Job, j.id).result_json for j in jobs]
+    assert [r["source_pages"] for r in stored] == [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]
+    assert all("page_labels" not in r for r in stored)  # a position is not a printed label
 
 
-def test_only_the_label_pages_with_elements_are_numbered_and_printed_labels_win():
-    class Result:
-        def __init__(self):
-            from readablestem.core.types import DocumentResult, DocumentStats, Element, Kind
+def test_a_part_records_the_pages_of_its_source_once():
+    from readablestem.core.types import DocumentResult, DocumentStats
 
-            self.value = DocumentResult(
-                pipeline_version="t",
-                stats=DocumentStats(pages=3, cost_usd=0, latency_ms=0, model_calls=0),
-                elements=[
-                    Element(id=f"p{n + 1}-e0", kind=Kind.PARAGRAPH, page=n, bbox=(0, 0, 1, 1),
-                            order=n, text="x")
-                    for n in (0, 2)
-                ],
-                page_labels={0: "iv"},
-            )  # fmt: skip
-
+    result = DocumentResult(
+        pipeline_version="t",
+        stats=DocumentStats(pages=3, cost_usd=0, latency_ms=0, model_calls=0),
+        page_labels={0: "iv"},
+    )
     job = Job(part_label="31-33")
-    result = Result().value
     assert number_part_pages(job, result) is True
-    assert result.page_labels == {0: "iv", 2: "33"}  # page 1 has no elements: no label
+    assert result.source_pages == [30, 31, 32] and result.page_labels == {0: "iv"}
     assert number_part_pages(job, result) is False  # nothing more to add
     assert number_part_pages(Job(part_label=None), result) is False
 
@@ -183,22 +176,48 @@ def test_a_document_that_is_not_a_part_has_nothing_to_combine(web):  # noqa: F81
     assert web.alice.get(f"/jobs/{job_id}/combine").status_code == 409
 
 
-def test_combining_changes_nothing_and_needs_no_token(web):  # noqa: F811
+def test_combining_follows_download_all_clock_restarted_and_downloads_counted(web):  # noqa: F811
+    from readablestem.web import events
+
     _, jobs = three_finished_parts(web)
-    with session_scope(web.ctx.factory) as session:
-        before = [
-            (j.retain_until, j.result_version, j.html_stale)
-            for j in (session.get(Job, x.id) for x in jobs)
-        ]
+    soon = utcnow() + timedelta(hours=1)
+    for job in jobs:
+        change(web, job, retain_until=soon)
     assert combine(web, jobs[0]).status_code == 200
     with session_scope(web.ctx.factory) as session:
-        after = [
-            (j.retain_until, j.result_version, j.html_stale)
-            for j in (session.get(Job, x.id) for x in jobs)
-        ]
-    assert after == before
-    # a POST (which would carry a token if state changed) is not a way to ask
+        rows = [session.get(Job, x.id) for x in jobs]
+        assert all(as_utc(r.retain_until) > soon for r in rows)  # the clock of each part it took
+        counted = session.scalars(
+            select(Event.job_ref).where(Event.name == events.DOWNLOADED)
+        ).all()
+    assert sorted(counted) == sorted(j.id for j in jobs)
+    # a POST (which would carry a token if it were a form) is not a way to ask
     assert web.alice.post(f"/jobs/{jobs[0].id}/combine").status_code in {403, 405}
+
+
+def test_a_part_with_a_decision_open_is_held_back_like_in_download_all(web):  # noqa: F811
+    _, jobs = three_finished_parts(web)
+    with session_scope(web.ctx.factory) as session:
+        row = session.get(Job, jobs[1].id)
+        result = dict(row.result_json)
+        result["fixes"] = [
+            dict(f, status="needs_review", review="required") for f in result["fixes"]
+        ]
+        row.result_json = result
+    html = combine(web, jobs[0]).text
+    assert "p5-e0" not in ids_of(html) and {"p1-e0", "p9-e0"} <= set(ids_of(html))
+    assert "Pages 5, 6, 7 and 8 of the original PDF were left out of this file." in html
+    page = text_of(web.alice.get(f"/jobs/{jobs[0].id}").text)
+    assert "the 2 finished parts" in page  # the link counts what the file would hold
+
+
+def test_two_parts_with_a_page_in_common_keep_the_newest_not_a_409(web):  # noqa: F811
+    _, jobs = three_finished_parts(web)
+    change(web, jobs[1], part_label="3-6", created_at=utcnow() + timedelta(minutes=1))
+    html = combine(web, jobs[0]).text  # the part "5-8" and the newer "3-6" share pages 5 and 6
+    ids = set(ids_of(html))
+    assert {"p3-e0", "p9-e0"} <= ids and not ({"p1-e0", "p5-e0"} & ids)  # 1-4 and 5-8 are older
+    assert "Pages 7 and 8 of the original PDF were left out of this file." in html
 
 
 # ----------------------------------------------------------------------------- the link
@@ -211,7 +230,8 @@ def test_the_results_page_of_a_part_links_to_combine_when_two_parts_are_finished
     assert page.count("/combine") == 1  # one link
     text = text_of(page)
     assert "the 3 finished parts of this file that you still have, in page order" in text
-    assert "A part you deleted, or one that is not finished, is left out" in text
+    assert "A part you deleted, or one that is not finished or still has a" in text
+    assert "decision to make, is left out" in text
     change(web, jobs[0], retain_until=utcnow() - timedelta(minutes=1))
     assert "the 2 finished parts" in text_of(web.alice.get(f"/jobs/{jobs[1].id}").text)
     change(web, jobs[2], status=JobStatus.RUNNING)

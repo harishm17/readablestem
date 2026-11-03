@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline import combine
-from readablestem.web import ranges
+from readablestem.web import documents, ranges
 from readablestem.web.db import Blob, Job, JobStatus, utcnow
 
 # A part's file name is "<name> (pages 31-59).pdf" (`web.routes.parts.part_filename`).
@@ -44,23 +44,33 @@ class KeptPart:
 
 def kept_parts(session: Session, job: Job, now: datetime | None = None) -> list[KeptPart]:
     """The finished parts of `job`'s source that its owner still keeps, in page order.
-    `job` must be a part; one that is not has none."""
+    `job` must be a part; one that is not has none. A part with a decision still open is a
+    draft and is held back, as "Download all" holds it back (`web.routes.bundle`). When two
+    parts name a page in common (the same pages converted twice) the newest is kept and the
+    older one left out, so the file never holds a page twice."""
     if not job.part_group:
         return []
     rows = session.scalars(
-        select(Job).where(
+        select(Job)
+        .where(
             Job.part_group == job.part_group,
             Job.user_id == job.user_id,  # never another person's, even in the same group
             Job.status == JobStatus.DONE,
             Job.retain_until > (now or utcnow()),
             Job.result_json.is_not(None),
         )
+        .order_by(Job.created_at.desc(), Job.id)
     ).all()
-    kept = []
-    for row in rows:
+    kept: list[KeptPart] = []
+    taken: set[int] = set()
+    for row in rows:  # newest first
         pages = ranges.pages_of_label(row.part_label)
-        if pages is not None and len(pages) == row.page_count:
-            kept.append(KeptPart(row, pages))
+        if pages is None or len(pages) != row.page_count or taken & set(pages):
+            continue
+        if documents.open_decisions((row.result_json or {}).get("fixes")):
+            continue
+        taken.update(pages)
+        kept.append(KeptPart(row, pages))
     return sorted(kept, key=lambda k: k.pages[0])
 
 
@@ -94,17 +104,13 @@ def combined_html(
 
 
 def number_part_pages(job: Job, result: DocumentResult) -> bool:
-    """For a part of a longer file: label each page that has no printed label with its page
-    number in that file ("31" for the part's first page of "31-59"), so the part's page
-    markers, like the combined file's, say where a page is in the source. True if a label
-    was added (the file written before is then out of date). Pages that have a label (the
-    PDF's own, kept when the part was cut out, or a number read from the page) keep it."""
+    """For a part of a longer file: record which page of that file each page of the part is
+    (`DocumentResult.source_pages`), so the part's page markers, like the combined file's,
+    say "PDF page 31" for a page that has no printed label. Printed labels (the PDF's own,
+    kept when the part was cut out, or a number read from the page) are not touched. True if
+    this changed the result (the file written before is then out of date)."""
     pages = ranges.pages_of_label(job.part_label)
-    if pages is None:
+    if pages is None or result.source_pages == list(pages):
         return False
-    added = False
-    for local, source in enumerate(pages):
-        if local not in result.page_labels and any(e.page == local for e in result.elements):
-            result.page_labels[local] = str(source + 1)
-            added = True
-    return added
+    result.source_pages = list(pages)
+    return True

@@ -66,9 +66,11 @@ def test_the_source_has_every_piece(html):
 def test_the_file_in_the_zip_keeps_all_of_it_and_adds_no_tab_stop(export):
     page = export.index_html
     assert 'href="#main-content"' in page and 'id="main-content"' in page
-    assert "tabindex" not in page and export.notes.scroll_boxes == 0
+    # the one tabindex is the skip link's target, which is not a scroll box
+    assert re.findall(r'tabindex="[^"]*"', page) == ['tabindex="-1"']
+    assert export.notes.scroll_boxes == 0
     link_targets_exist(page)
-    assert re.findall(r'aria-label="(Page [^"]+)"', page) == ["Page 1", "Page 12", "Page 13"]
+    assert re.findall(r'aria-label="(P[^"]+)"', page) == ["PDF page 1", "Page 12", "Page 13"]
 
 
 def test_the_skip_link_is_a_plain_visible_link_there_because_canvas_keeps_no_pseudo_rules(export):
@@ -91,7 +93,7 @@ def test_the_page_to_paste_keeps_the_contents_markers_and_note_links(export):
     assert '<nav class="toc" aria-label="Contents"' in page
     for text in ("Motion", "Speed", "Velocity"):
         assert f">{text}</a>" in page
-    assert re.findall(r'aria-label="(Page [^"]+)"', page) == ["Page 1", "Page 12", "Page 13"]
+    assert re.findall(r'aria-label="(P[^"]+)"', page) == ["PDF page 1", "Page 12", "Page 13"]
     assert 'role="doc-noteref"' in page and 'role="doc-backlink"' in page
     assert "tabindex" not in page
 
@@ -116,8 +118,9 @@ def test_the_headings_go_down_a_level_in_the_page_but_the_contents_list_does_not
 def test_the_readme_says_the_page_has_no_skip_link(export):
     text = " ".join(readme(export).split())
     assert "has no “Skip to main content” link" in text
+    assert "always visible at the top" in text  # in index.html, where Canvas cannot hide it
     plain = export_canvas(document(), title="Doc", folder=FOLDER)
-    assert "Skip to main content" not in readme(plain)  # no page to paste: nothing to say
+    assert "has no “Skip to main content” link" not in " ".join(readme(plain).split())
 
 
 def strip_like_a_strict_purifier(markup: str) -> str:
@@ -130,7 +133,7 @@ def test_if_an_lms_strips_roles_and_labels_the_pages_and_links_are_still_text(ex
     for text in (export.index_html, export.page_html or ""):
         plain = cs.content(cs.parse(strip_like_a_strict_purifier(text)))
         squashed = plain.text
-        for label in ("Page 1", "Page 12", "Page 13", "Back to the text", "Contents"):
+        for label in ("PDF page 1", "Page 12", "Page 13", "Back to the text", "Contents"):
             assert label in squashed, label
         links = {href: shown for href, shown in plain.links}
         assert links["#p1-e1"] == "Speed"  # the contents entry is still a link

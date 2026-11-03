@@ -33,11 +33,12 @@ _LABEL = re.compile(rf"[A-Za-z0-9][A-Za-z0-9.\-]{{0,{MAX_LABEL - 1}}}")
 # The margin bands where a page number is printed, as a share of the page's height (the
 # running-header rule of `layout` uses the same 7 %).
 BAND = 0.07
-# A line that is nothing but a page number: "7", "Page 7", "p. 7", "- 7 -", "7 of 30", "iv".
+# A line that is nothing but a page number: "7", "Page 7", "p. 7", "- 7 -", "7 of 30",
+# "7 / 30" (a slide footer), "iv".
 _NUMBER_LINE = re.compile(
     r"""^\W*(?:page\s+|p\.\s*)?
         (?P<n>\d{1,4}|[ivxlc]{1,7}|[IVXLC]{1,7})
-        \W*(?:of\s+\d{1,4})?\W*$""",
+        \W*(?:(?:of|/)\s*\d{1,4})?\W*$""",
     re.IGNORECASE | re.VERBOSE,
 )
 _ROMAN = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100}

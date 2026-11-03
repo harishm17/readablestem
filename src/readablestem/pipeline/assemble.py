@@ -677,6 +677,9 @@ class _Renderer:
     # footnotes: their element ids, and the id of the mark that links to each.
     toc: list[navigation.TocEntry] = field(default_factory=list)
     page_labels: Mapping[int, str] = field(default_factory=dict)
+    # Page of the PDF each of the document's pages is, when it is not its own number (a part of
+    # a longer file: 0-based local page to 0-based page of the source).
+    pdf_pages: Mapping[int, int] = field(default_factory=dict)
     mark_pages: bool = False
     last_page: int | None = None
     footnote_ids: Collection[str] = ()
@@ -717,11 +720,16 @@ class _Renderer:
         if not self.mark_pages or element.page == self.last_page:
             return ""
         self.last_page = element.page
-        label = self.page_labels.get(element.page) or str(element.page + 1)
+        position = self.pdf_pages.get(element.page, element.page) + 1
+        printed = self.page_labels.get(element.page)
+        if printed:
+            said = f"Page {printed}"
+        elif self.page_labels:  # others have printed labels: never let this one read as one
+            said = f"PDF page {position}"
+        else:
+            said = f"Page {position}"
         self.add_style("pagebreak", navigation.PAGEBREAK_CSS)
-        return navigation.pagebreak(
-            label, self.claim_id(f"pagebreak-{element.page + 1}"), AUTHORED_CLASS
-        )
+        return navigation.pagebreak(said, self.claim_id(f"pagebreak-{position}"), AUTHORED_CLASS)
 
     def link_attrs(self, link: Link) -> str:
         """The mark of a footnote is a `doc-noteref`; the first one for a note also gets the
@@ -1490,6 +1498,7 @@ def render_html(
     math_alttext: bool | None = None,
     omitted_pages: list[int] | None = None,
     page_labels: Mapping[int, str] | None = None,
+    pdf_pages: Mapping[int, int] | None = None,
     footnote_ids: Collection[str] = (),
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
@@ -1511,9 +1520,11 @@ def render_html(
     `alttext` of its <math> (None: `Settings.mathml_alttext`, off by default).
     `omitted_pages`: 0-based pages the instructor left out (T3-16); the elements are not
     here, and the student note says so. `page_labels`: the printed label of each 0-based page
-    that has one (`DocumentResult.page_labels`), for the page markers, which say the page's
-    position in the PDF for a page without one. `footnote_ids`: the element ids of footnotes
-    (`Notice` code "footnote"), whose marks and notes are linked both ways.
+    that has one (`DocumentResult.page_labels`), for the page markers. A page without one says its
+    position in the PDF ("PDF page 5") when any page has a printed label, so two pages never
+    both read "Page 5", and "Page 5" when none has. `pdf_pages` maps a page of this document to
+    its page in the PDF it was cut from (a part of a longer file). `footnote_ids`: the element
+    ids of footnotes (`Notice` code "footnote"), whose marks and notes are linked both ways.
     """
     ordered = _without_dead_links(sorted(elements, key=lambda e: e.order))
     first_fix: dict[str, Fix] = {}
@@ -1533,6 +1544,7 @@ def render_html(
         demote=shift,
         scale_of=equation_scale.scaler(ordered),
         page_labels=page_labels or {},
+        pdf_pages=pdf_pages or {},
         mark_pages=len({e.page for e in ordered}) >= 2,
         footnote_ids=set(footnote_ids),
     )
@@ -1570,7 +1582,13 @@ def render_html(
     contents = ""
     if len(renderer.toc) >= navigation.MIN_TOC_HEADINGS and not printed_contents:
         renderer.add_style("contents", navigation.TOC_CSS)
-        contents = _authored_in_english(navigation.contents_nav(renderer.toc, AUTHORED_CLASS), lang)
+        english = _clean_lang(lang).split("-", 1)[0].lower() == "en"
+        contents = _authored_in_english(
+            navigation.contents_nav(
+                renderer.toc, AUTHORED_CLASS, None if english else _clean_lang(lang)
+            ),
+            lang,
+        )
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
     return "\n".join(
@@ -1587,7 +1605,7 @@ def render_html(
             "<body>",
             _authored_in_english(navigation.skip_link(AUTHORED_CLASS), lang),
             *([contents] if contents else []),
-            f'<span id="{navigation.MAIN_ID}"></span>',
+            f'<span id="{navigation.MAIN_ID}" tabindex="-1"></span>',
             "<main>",
             *([_authored_in_english(note, lang)] if (note := _notice(notice)) else []),
             *(_authored_in_english(part, lang) for part in body),

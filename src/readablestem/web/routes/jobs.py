@@ -1362,8 +1362,10 @@ def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response
 def combine_parts(request: Request, job_id: str, user: UserDep) -> Response:
     """One HTML file from the finished parts of this document's source that the owner still
     keeps (`web.combine`, `pipeline.combine`). A GET like the other downloads, for the owner
-    only; it reads and changes nothing, so it needs no CSRF token. A part the person deleted
-    (or that expired) is not in it, and the file names the pages that are missing."""
+    only, so it needs no CSRF token. It follows "Download all" (`web.routes.bundle`): a part
+    with a decision still open is held back, each part that is in the file restarts its
+    deletion clock and counts as downloaded. A part the person deleted (or that expired) is
+    not in it either, and the file names the pages that are missing."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user)
@@ -1374,7 +1376,8 @@ def combine_parts(request: Request, job_id: str, user: UserDep) -> Response:
                 409,
                 "Nothing to combine yet",
                 "Combining needs at least two finished parts of this file that you still "
-                "have. A part you deleted, or one that has not finished, cannot be joined.",
+                "have. A part you deleted, or one that has not finished or still has a "
+                "decision to make, cannot be joined.",
                 context={"job_id": job.id},
             )
         try:
@@ -1391,6 +1394,13 @@ def combine_parts(request: Request, job_id: str, user: UserDep) -> Response:
                 context={"job_id": job.id},
             ) from None
         name = download_filename(f"{title} combined", job.part_group or job.id)
+        taken = [k.job.id for k in kept]
+        for item in kept:
+            retention.restart_clock(item.job, ctx.settings)
+    for part_id in taken:
+        events.record_download(
+            ctx.factory, ctx.settings, user_id=user.id, job_id=part_id, open_decisions=0
+        )
     return Response(
         html,
         media_type="text/html; charset=utf-8",

@@ -99,7 +99,7 @@ The job page's three settings, `POST /jobs/{id}/title`, `/contact` and `/keep`, 
 and CSRF-checked like every other write on a job. They are not rate limited: each costs one
 re-render of the person's own document (the same as a review decision or a language change,
 which are not limited either), the body limit applies, and the number of documents a person
-can hold is capped. `/jobs/{id}/download/canvas` and `/jobs/{id}/download/cartridge` (the same page as an IMS Common Cartridge) are GETs for the owner, like `/download`. A
+can hold is capped. `/jobs/{id}/download/canvas` and `/jobs/{id}/download/cartridge` (the same page as an IMS Common Cartridge) are GETs for the owner, like `/download`. So is `/jobs/{id}/combine` (one file from the person's own finished, still-kept parts of one source; another person's part in the same group is never included, a part with a decision open is held back, and it restarts the clock of the parts it took and records the downloads, as "Download all" does). A
 download restarts the deletion clock of the person's own document (`retention.restart_clock`),
 which is the one thing a GET changes; `test_get_requests_change_nothing` allows that and no
 other change.

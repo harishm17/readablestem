@@ -32,12 +32,11 @@
     <a href="/help/posting#cartridge">see the steps</a>.</p>
   {# T3-3: one file from the finished parts of a long source (GET /jobs/{id}/combine,
      web/combine.py). Only on a part, and only when two or more finished parts are kept. #}
-  {% set finished_parts = job.parts|selectattr("status", "equalto", "done")|list %}
-  {% if job.part_label and finished_parts|length > 1 %}
+  {% if job.part_label and job.combinable > 1 %}
   <p class="canvas-download"><a href="/jobs/{{ job.id }}/combine">Combine parts</a> into one
-    HTML file: the {{ finished_parts|length }} finished parts of this file that you still have,
-    in page order. A part you deleted, or one that is not finished, is left out and the file
-    names the missing pages.</p>
+    HTML file: the {{ job.combinable }} finished parts of this file that you still have,
+    in page order. A part you deleted, or one that is not finished or still has a decision
+    to make, is left out and the file names the missing pages.</p>
   {% endif %}
   <h3 id="before-heading">Before you share</h3>
   <ul aria-labelledby="before-heading">

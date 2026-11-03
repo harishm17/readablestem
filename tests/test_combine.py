@@ -191,8 +191,8 @@ def test_printed_page_labels_travel_with_their_pages():
     first.result.page_labels = {0: "iv", 1: "v"}
     second.result.page_labels = {1: "12"}
     html = combine_html([first, second], title="Chapter")
-    assert re.findall(r'aria-label="(Page [^"]+)"', html) == [
-        "Page iv", "Page v", "Page 3", "Page 12",
+    assert re.findall(r'aria-label="(P[^"]+)"', html) == [
+        "Page iv", "Page v", "PDF page 3", "Page 12",
     ]  # fmt: skip
 
 

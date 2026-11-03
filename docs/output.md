@@ -18,7 +18,7 @@ on it. The pipeline that feeds it is in docs/steps.md.
 <body>
 <a class="skip-link readablestem" href="#main-content">Skip to main content</a>
 <nav class="toc" aria-label="Contents">...</nav>       (3 or more headings, see "Navigation")
-<span id="main-content"></span>
+<span id="main-content" tabindex="-1"></span>
 <main>
   <p class="notice readablestem" role="note">...</p>   (only when a notice is given)
   ... the document, in reading order ...
@@ -215,11 +215,13 @@ document in another language marks it `lang="en"`).
 
 - **Skip link.** The first thing in `<body>`: `<a class="skip-link" href="#main-content">`
   "Skip to main content" (WCAG 2.4.1). It is hidden until focused (`.skip-link:not(:focus)`)
-  and jumps over the contents list to the empty `<span id="main-content">` just before
-  `<main>`. The id is on a span, not on `<main>`, because other code reads the file by the
-  literal `<main>` tag and its first child. No `tabindex` is used (Canvas removes it, and
-  browsers move focus to a fragment's target without one). It is the first tab stop of the
-  file, so a test that tabs through a file presses Tab once more.
+  and jumps over the contents list to the empty `<span id="main-content" tabindex="-1">` just
+  before `<main>`. The id is on a span, not on `<main>`, because about 60 places (code, tests,
+  the committed demo) read the file by the literal `<main>` tag. `tabindex="-1"` makes the span
+  focusable by following the link, so Firefox and VoiceOver move there (a link to an element
+  that cannot take focus only scrolls), without making it a tab stop. Canvas removes `tabindex`
+  from a pasted page, one more reason the paste version has no skip link. The skip link is the
+  first tab stop of the file, so a test that tabs through a file presses Tab once more.
 - **Contents list.** `<nav class="toc" aria-label="Contents">` after the skip link and before
   `<main>`: nested `<ul>` of links to the headings, made from the outline as written (after
   the repair above, and after the move down of "One h1": the title written as the `<h1>`
@@ -240,20 +242,24 @@ document in another language marks it `lang="en"`).
   inside a block of text: a paragraph that runs over a page boundary is one element and
   stays whole (layout joins it), a list that runs over one keeps one `<ul>` and the marker
   stands at the start of the item that begins the page, and the same for a glossary entry. A
-  document with blocks on one page only has none. The label of a page is, in order:
+  document with blocks on one page only has none. The words of a marker are one of:
+  "Page 12" for a printed label; "PDF page 5" for a page without one, when any page of the
+  document has one (so two different pages never both read "Page 5"); "Page 5" (the position
+  in the PDF) when no page has a printed label. The printed label of a page is, in order:
   1. the PDF's own page label (`/PageLabels`: "iv", "12"; `Page.get_label`);
   2. the number printed alone in the top or bottom 7 % of the page ("7", "Page 7", "- 7 -",
-     "7 of 30", a roman numeral), when at least two pages show a number at the same offset
+     "7 of 30", "7 / 30", a roman numeral), when at least two pages show a number at the same offset
      from the PDF's position (so one figure number in a margin is not taken for a page
      number); an arabic offset also labels the pages between them that print none;
-  3. the page's position in the PDF, 1-based.
+  3. none: the marker then says the page's position in the PDF, 1-based, as above.
 
   `pipeline/page_labels.py` reads 1 and 2 once after layout (`DocumentResult.page_labels`,
   0-based page to label, only pages that have one; left out of the JSON when empty). The
   label is a convenience, so a failure there loses nothing. A part of a long PDF is cut
-  out with its pages' labels (`web/pdf_probe.py extract`), and a page without one is labelled
-  with its number in the whole source (`web.combine.number_part_pages`, "31" for the first
-  page of "31-59"; the file is made again when the first render was before that). A page
+  out with its pages' labels (`web/pdf_probe.py extract`), and records which page of the whole
+  source each of its pages is (`DocumentResult.source_pages`, `web.combine.number_part_pages`:
+  "PDF page 31" for the first page of "31-59" when it has no printed label; the file is made
+  again when the first render was before that). A page
   the instructor left out has no marker, and the student note names it.
 - **Footnotes.** A footnote (the notice `footnote`, `layout._layout_notices`) stays where
   it falls. Its mark in the text above it already linked to it (`layout._footnote_links`);
@@ -288,8 +294,7 @@ removes roles, aria attributes, classes, styles and `hr` and checks that.
 A source over the page limit is converted in parts of at most 30 pages, each a document of
 its own (web.md, "Large files in parts"). The results page of a part links "Combine parts" when
 two or more finished parts of the same source are kept: `GET /jobs/{id}/combine` (owner only;
-a GET like the other downloads that reads and changes nothing, so it needs no token) returns
-one HTML file. `pipeline/combine.py` joins the parts' elements, decisions and pictures and
+a GET like the other downloads, so it needs no token) returns one HTML file. `pipeline/combine.py` joins the parts' elements, decisions and pictures and
 writes them with the same assembler, so the file has one contents list from all the headings,
 page markers that continue (a part's pages are renumbered to the source's), one student note,
 and each part's equations, figures and tables as in the part.
@@ -297,9 +302,16 @@ and each part's equations, figures and tables as in the part.
 - **Which parts.** `web/combine.py` `kept_parts`: the same `part_group`, the same owner
   (`user_id`: another person's part is never in it, whatever the group), finished, not past
   `retain_until` (an expired part counts as deleted before the purge, as `owned_job` does),
-  and whose `part_label` names as many pages as the part has. In page order. With fewer than
-  two it is a 409 page. Parts still converting, or deleted, are not joined, and the results
-  page says so.
+  and whose `part_label` names as many pages as the part has; a part with a decision still
+  open is a draft and is held back, as "Download all" holds it back. When two parts name a
+  page in common (the same pages converted twice) the newest is kept and the older left out.
+  In page order. The "Combine parts" link counts exactly these (`JobView.combinable`), so it is
+  never offered when the file would be a 409 page; with fewer than two (reached by an old link)
+  it is one. Parts still converting, deleted or held back are not joined, and the results page
+  says so.
+- **Like "Download all".** Each part that is in the file restarts its deletion clock
+  (`retention.restart_clock`) and counts as downloaded (`events.record_download`); the file is
+  not stored.
 - **Gaps.** Source pages between the first and last part that no joined part holds are named
   in the student note ("Pages 5, 6, 7 and 8 of the original PDF were left out of this file.",
   the sentence for a page the instructor left out), so the file never reads as complete when
@@ -310,7 +322,7 @@ and each part's equations, figures and tables as in the part.
   colour runs, raised and lowered runs and a glossary term's end move with them) and the pictures.
 - **Title.** The title the instructor chose for the first part, else the source file's name
   without the part tag and extension; the contact line is the first part's that has one.
-- **Not done.** The file is made when it is asked for and is not stored; it is not offered as
+- **Not done.** It is not offered as
   a Canvas zip or cartridge (download the parts one by one for those).
 
 ## Tables

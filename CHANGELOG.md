@@ -6,8 +6,8 @@
 
 - The converted file now has a skip link, a contents list (`<nav aria-label="Contents">`, nested links to the
   headings, from 3 headings, and not when the PDF has a contents page of its own), page markers at each source
-  page boundary (`role="doc-pagebreak"`, "Page N": the PDF's page label, else the number printed in the margin,
-  else the PDF position) and footnote links both ways (`doc-noteref`, `doc-footnote`, `doc-backlink`)
+  page boundary (`role="doc-pagebreak"`, "Page N": the PDF's page label, else the number printed in the margin;
+  a page with neither says "PDF page N" when other pages have a label, "Page N" when none does) and footnote links both ways (`doc-noteref`, `doc-footnote`, `doc-backlink`)
   (`pipeline/navigation.py`, `pipeline/page_labels.py`; docs/output.md "Navigation"). Every heading has an id.
   Every converted file changes by the skip link; golden files regenerated.
 - Canvas page to paste: the skip link is left out (its target, `<main>`, is removed by Canvas); the contents list,
@@ -15,7 +15,9 @@
   `index.html`, unchanged.
 - axe in `html_checks.axe_checks` also runs the `wcag22aa` tag; no output fixture failed it.
 - "Combine parts": one HTML file from a person's own finished, still-kept parts of the same long source, in page
-  order, with one contents list, continuous page markers and ids that cannot clash (`GET /jobs/{id}/combine`,
+  order, with one contents list, continuous page markers and ids that cannot clash; parts with a decision open are held
+  back, overlapping parts keep the newest, and the download restarts the parts' clocks like "Download all"
+  (`GET /jobs/{id}/combine`,
   `pipeline/combine.py`, `web/combine.py`; docs/output.md "Combining the parts of a long source"). A part cut from a
   long PDF keeps its pages' labels.
 - The committed demo (`web/static/demo/index.html`) was not regenerated: that needs a paid conversion run. Its
