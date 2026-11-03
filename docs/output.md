@@ -184,24 +184,44 @@ EPUB 3 (no route or button yet). Nothing is read but the file: no network, no mo
 - **MathML stays native.** Each `<math>` gets the MathML namespace and the content document is
   listed with `properties="mathml"`. Equations kept as pictures stay pictures with their alt
   text, as in the HTML.
-- **Links.** `#` links, `http(s):` and `mailto:` are kept. Any other `href` (the demo page's
-  "Back to ReadableSTEM" is `/`) points at nothing inside a book, so the link is written
-  without its address and the words stay.
+- **What is carried, exactly.** The book fetches nothing and runs nothing.
+  - Dropped with their contents: `<script>`, `<iframe>`, `<frame>`, `<object>`, `<embed>`,
+    `<applet>`, `<audio>`, `<video>`, `<source>`, `<track>`, `<canvas>`, `<noscript>`, `<link>`,
+    `<base>`, `<meta>` (so `http-equiv` too) and event-handler attributes (`on...`).
+  - Forms are unwrapped: their words stay, `<input>`, `<button>`, `<select>`, `<textarea>`
+    go, so nothing can be submitted.
+  - Links: on `<a>`, `#` links, `http(s):` and `mailto:` are kept; any other `href` (the demo
+    page's "Back to ReadableSTEM" is `/`; `javascript:`, `data:`, relative files) is written
+    without its address and the words stay. Other address attributes (`src`, `srcset`,
+    `action`, `formaction`, `poster`, `data`, `xlink:href`) are kept only as `#` references
+    to the same file.
+  - Pictures: only a `data:` image (PNG, JPEG, GIF or WebP, valid base64) becomes a file. An
+    `<img>` that points anywhere else (remote, protocol-relative, relative) is replaced by its
+    alt text as plain text, or removed when it has none. A `data:` image of another type
+    (SVG, for example) or with invalid base64 stops the export: the command prints
+    `cannot write an EPUB: ...` and exits 2, and no file is written.
+  - Styles: `@import` and any declaration with `url(...)` are removed, in the stylesheet and
+    in `style` attributes. The rest of the page's stylesheet stays.
 - **ARIA and DPUB.** Roles stay; `doc-pagebreak`, `doc-noteref`, `doc-footnote` and
   `doc-backlink` also get the matching `epub:type`. The contents `nav` has `role="doc-toc"`.
-- **Metadata is written from what is in the document:** `schema:accessMode` (textual, and
-  visual when there are pictures), `accessibilityFeature` (`tableOfContents`,
-  `structuralNavigation`, `MathML`, `describedMath` when a `<math>` has `alttext`,
-  `alternativeText`, `longDescription` for figure descriptions, `pageNavigation` for the page
-  list), `accessibilityHazard` `none` (no script, audio or video is written) and an
+- **Metadata is written from what is in the document.** A feature is claimed only when every
+  item it applies to has it: `tableOfContents` and `structuralNavigation` only when the
+  document has headings (a document with none gets a one-entry contents list, because the
+  format needs one, and neither feature); `MathML` when there is a `<math>`; `describedMath`
+  only when every `<math>` has an `alttext`; `alternativeText` only when every picture has
+  non-empty alt text; `longDescription` only when every `<figure>` has a figure description
+  (a `<details class="figure-description">` inside it or right after it); `pageNavigation`
+  when there is a page list. Also `schema:accessMode` (textual, and visual when there are
+  pictures), `accessibilityHazard` `none` (no script, audio or video is written) and an
   `accessibilitySummary`. `accessModeSufficient` (`textual`) is left out while the document
-  still has flagged items, because then a person has not yet made it sufficient. A page list also
-  adds `dc:source` ("Source PDF", `source-of` pagination).
+  still has flagged items, because then a person has not yet made it sufficient. A page list
+  also adds `dc:source` ("Source PDF", `source-of` pagination).
 - **No claim of conformance.** The package has no `dcterms:conformsTo` and the summary says the
   tool assists and does not certify. The tests run EPUBCheck 5.4 (no errors or warnings) and
   DAISY Ace (no serious or critical violation) on the golden documents, the demo, the LaTeX
   conversions and a synthetic page with page markers, when both are installed
-  (`.github/workflows/epub.yml` installs them in CI and fails if they are missing). That shows
+  (`.github/workflows/epub.yml` installs them in CI, Ace from the lockfile in `.github/ace`,
+  and fails if they are missing). That shows
   those two programs found nothing on those documents; it does not show a reading system reads
   the file well. The page list is built from `role="doc-pagebreak"` markers; a file
   without them has none.
@@ -1068,7 +1088,9 @@ generation (with tokens and cost), so per-request cost shows in Langfuse's cost 
 
 ## CLI
 
-`readablestem export epub FILE.html OUT.epub` is described under "The EPUB export" above.
+`readablestem export epub FILE.html OUT.epub` is described under "The EPUB export" above;
+it exits 0 when the file is written and 2 when the input cannot be read or turned into an
+EPUB or the output cannot be written (a message on stderr, no traceback).
 
 ```
 readablestem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [--concurrency 4]

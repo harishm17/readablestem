@@ -18,7 +18,7 @@ from defusedxml import ElementTree
 
 import readablestem.cli.main as cli
 from readablestem.pipeline import export_epub as ee
-from readablestem.pipeline.export_canvas import _parse
+from readablestem.pipeline.export_canvas import CanvasExportError, _parse
 from test_export_canvas import DATA_URI, source_html, source_ids
 
 MODIFIED = datetime(2026, 11, 2, 12, 0, tzinfo=UTC)
@@ -153,12 +153,12 @@ def _flat(node):
 
 
 def test_metadata_makes_no_conformance_claim(made):
-    _, _, parts = made
+    _, export, parts = made
     meta = metadata(parts)
     assert meta["schema:accessMode"][0] == "textual"
     assert meta["schema:accessibilityHazard"] == ["none"]
     assert meta["schema:accessibilitySummary"] == [ee.ACCESSIBILITY_SUMMARY]
-    assert "tableOfContents" in meta["schema:accessibilityFeature"]
+    assert ("tableOfContents" in meta["schema:accessibilityFeature"]) == (export.headings > 0)
     assert "dcterms:conformsTo" not in meta
     for name in (ee.PACKAGE, ee.NAV, ee.CONTENT):
         assert b"conformsTo" not in parts[name] and b"EPUB Accessibility" not in parts[name]
@@ -331,3 +331,98 @@ def test_cli_reports_a_missing_file_without_a_traceback(tmp_path, capsys):
     bad.write_text("plain", encoding="utf-8")
     assert cli.main(["export", "epub", str(bad), str(tmp_path / "o.epub")]) == 2
     assert not (tmp_path / "o.epub").exists()
+
+
+# ------------------------------------------------------------- what the book does not carry
+
+
+DIRTY = (
+    '<html lang="en"><head><title>T</title>'
+    '<meta http-equiv="refresh" content="0;url=https://evil.example">'
+    '<link rel="stylesheet" href="https://evil.example/a.css">'
+    "<style>@import url(https://evil.example/b.css); p { color: red; background: url(x.png) }"
+    " h1 { margin: 0 }</style></head><body><main><h1>Title</h1>"
+    '<p style="color: blue; background-image: url(https://evil.example/t.gif)" onclick="x()">'
+    'Text <a href="javascript:alert(1)">js</a> <a href="data:text/html,hi">data</a> '
+    '<a href="relative.html">rel</a> <a href="mailto:a@b.example">mail</a></p>'
+    '<iframe src="https://evil.example"><p>inside</p></iframe><object data="x.swf"></object>'
+    '<embed src="x"><video src="v.mp4"></video><audio src="a.mp3"></audio>'
+    '<form action="https://evil.example/post"><label>Name <input name="n"></label>'
+    "<button>Send</button></form>"
+    '<p><img src="https://evil.example/pic.png" alt="A remote chart">'
+    '<img src="//evil.example/p2.png" alt=""><img src="local.png" alt="A local one"></p>'
+    '<svg viewbox="0 0 2 2"><use xlink:href="javascript:alert(1)"></use>'
+    '<a xlink:href="#h"><circle r="1"></circle></a></svg></main></body></html>'
+)
+
+
+def test_nothing_loads_runs_or_submits():
+    export, parts = make(DIRTY)
+    text = parts[ee.CONTENT].decode()
+    for gone in (
+        "iframe", "object", "embed", "<video", "<audio", "<form", "<input", "<button", "<link",
+        "http-equiv", "javascript:", "data:", "evil.example", "@import", "url(", "onclick",
+        "relative.html", "inside",
+    ):  # fmt: skip
+        assert gone not in text, gone
+    assert "mailto:a@b.example" in text
+    assert "Name " in text  # the words of the form stay
+    assert not export.images
+    content = xml(parts, ee.CONTENT)
+    assert [e.tag for e in content.iter(f"{XHTML}img")] == []
+    assert "A remote chart" in text and "A local one" in text  # alt text stays as text
+    assert "color: red" in text and "margin: 0" in text and "color: blue" in text
+    assert 'xlink:href="#h"' in text
+
+
+def test_remote_pictures_do_not_count_as_alt_text_or_pictures():
+    _, parts = make(DIRTY)
+    meta = metadata(parts)
+    assert "alternativeText" not in meta["schema:accessibilityFeature"]
+    assert meta["schema:accessMode"] == ["textual"]
+
+
+def test_features_need_every_item_to_have_them():
+    two_maths = PAGE.replace("<mspace", "<mi>x</mi></math><math><mi>y</mi><mspace")
+    features = metadata(make(two_maths)[1])["schema:accessibilityFeature"]
+    assert "MathML" in features and "describedMath" not in features
+    one_blank_alt = PAGE.replace("</main>", f'<img src="{DATA_URI}" alt=""></main>')
+    assert "alternativeText" not in metadata(make(one_blank_alt)[1])["schema:accessibilityFeature"]
+    bare = PAGE.replace("</main>", "<figure><p>x</p></figure></main>")
+    assert "longDescription" not in metadata(make(bare)[1])["schema:accessibilityFeature"]
+    assert "longDescription" in metadata(make(PAGE)[1])["schema:accessibilityFeature"]
+
+
+def test_contents_feature_needs_a_real_contents_list():
+    plain = '<html lang="en"><body><main><p>Just text.</p></main></body></html>'
+    assert "schema:accessibilityFeature" not in metadata(make(plain)[1])
+
+
+# ------------------------------------------------------------------- bad pictures
+
+
+def test_malformed_base64_is_refused():
+    src = "data:image/png;base64,AAAAAAA=!="
+    bad = f'<html lang="en"><body><img src="{src}" alt="x"></body></html>'
+    with pytest.raises(CanvasExportError):
+        ee.export_epub(bad)
+    truncated = DATA_URI[:-3]  # wrong padding
+    with pytest.raises(CanvasExportError):
+        ee.export_epub(f'<html lang="en"><body><img src="{truncated}" alt="x"></body></html>')
+
+
+def test_cli_refuses_an_svg_data_image_and_bad_base64_cleanly(tmp_path, capsys):
+    for src in ("data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=", "data:image/png;base64,AAA*"):
+        page = tmp_path / "in.html"
+        page.write_text(f'<html lang="en"><body><img src="{src}" alt="x"></body></html>')
+        out = tmp_path / "o.epub"
+        assert cli.main(["export", "epub", str(page), str(out)]) == 2
+        assert "cannot write an EPUB" in capsys.readouterr().err
+        assert not out.exists()
+
+
+def test_cli_reports_an_unwritable_output(tmp_path, capsys):
+    page = tmp_path / "in.html"
+    page.write_text(PAGE)
+    assert cli.main(["export", "epub", str(page), str(tmp_path / "no" / "o.epub")]) == 2
+    assert "cannot write" in capsys.readouterr().err

@@ -10,6 +10,8 @@ on:
     branches: [main]
     paths:
       - "src/readablestem/pipeline/export_epub.py"
+      - "src/readablestem/cli/export.py"
+      - ".github/ace/**"
       - "src/readablestem/pipeline/export_canvas.py"
       - "src/readablestem/pipeline/assemble.py"
       - "tests/test_export_epub*.py"
@@ -17,6 +19,8 @@ on:
   pull_request:
     paths:
       - "src/readablestem/pipeline/export_epub.py"
+      - "src/readablestem/cli/export.py"
+      - ".github/ace/**"
       - "src/readablestem/pipeline/export_canvas.py"
       - "src/readablestem/pipeline/assemble.py"
       - "tests/test_export_epub*.py"
@@ -34,7 +38,6 @@ env:
   EPUBCHECK_VERSION: "5.4.0"
   # sha256 of epubcheck-5.4.0.zip from the w3c/epubcheck release, checked 2026-11-02.
   EPUBCHECK_SHA256: "33350c61038e71dfb3d45a76aed04bf5481e6d5500cb780f6e98db8bbd15a28c"
-  ACE_VERSION: "1.4.6"
 
 jobs:
   validate:
@@ -63,12 +66,13 @@ jobs:
           echo "${EPUBCHECK_SHA256}  $RUNNER_TEMP/epubcheck.zip" | sha256sum -c -
           unzip -q "$RUNNER_TEMP/epubcheck.zip" -d "$RUNNER_TEMP/epubcheck"
           echo "EPUBCHECK_JAR=$RUNNER_TEMP/epubcheck/epubcheck-${EPUBCHECK_VERSION}/epubcheck.jar" >> "$GITHUB_ENV"
-      - name: Install DAISY Ace
-        run: npm install --global "@daisy/ace@${ACE_VERSION}"
+      # Ace and everything it pulls in come from the committed lockfile (.github/ace).
+      - name: Install DAISY Ace (npm ci)
+        run: npm ci --prefix .github/ace
       - name: Install (locked)
         run: uv sync --locked --all-extras --group browser
       - name: EPUBCheck and Ace on the golden documents
         env:
           REQUIRE_EPUB_VALIDATORS: "1"
-          ACE: xvfb-run -a ace  # Ace drives Electron, which needs a display
+          ACE: xvfb-run -a ${{ github.workspace }}/.github/ace/node_modules/.bin/ace  # Ace drives Electron, which needs a display
         run: uv run pytest tests/test_export_epub.py tests/test_export_epub_validators.py

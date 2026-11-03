@@ -64,7 +64,6 @@ CONTENT = "EPUB/content.xhtml"
 NAV = "EPUB/nav.xhtml"
 PACKAGE = "EPUB/package.opf"
 
-# Said in the owner's words (a copy-review item). It makes no claim of conformance.
 ACCESSIBILITY_SUMMARY = (
     "Made from a PDF by ReadableSTEM, which assists with accessibility and does not certify "
     "it. Equations are MathML, pictures have text descriptions, and the headings make the "
@@ -148,12 +147,88 @@ def _serialize(node: _Node | str) -> str:
 _MATHML_EMPTY = frozenset(["mspace", "none", "mprescripts", "malignmark", "maligngroup"])
 
 
-def _prepare(root: _Node) -> tuple[bool, bool]:
+# Elements the book does not carry: they load or run something, or play something.
+_DROPPED = frozenset(
+    [
+        *("script", "iframe", "frame", "frameset", "object", "embed", "applet"),
+        *("audio", "video", "source", "track", "link", "base", "meta", "canvas", "noscript"),
+    ]
+)
+# Forms and their controls: nothing can be submitted. The words of a form stay; controls go.
+_FORM_PARTS = frozenset(["form", "fieldset", "legend", "label"])
+_CONTROLS = frozenset(["input", "button", "select", "textarea", "option", "optgroup", "datalist"])
+# Attributes that hold an address. A `#` address is inside the file.
+_ADDRESS = ("href", "xlink:href", "src", "srcset", "action", "formaction", "poster", "data")
+_CSS_IMPORT = re.compile(r"@import\b[^;]*;?", re.IGNORECASE)
+_CSS_URL_DECLARATION = re.compile(r"[^;{}]*url\s*\([^)]*\)[^;{}]*;?", re.IGNORECASE)
+_SCRIPT_URL = re.compile(r"\s*(javascript|vbscript|data):", re.IGNORECASE)
+
+
+def _clean_css(css: str) -> str:
+    """The stylesheet without `@import` and without any declaration that loads a file
+    (`url(...)`): the book fetches nothing."""
+    return _CSS_URL_DECLARATION.sub("", _CSS_IMPORT.sub("", css))
+
+
+def _remove(node: _Node, replacement: list[_Node | str] | None = None) -> None:
+    """Take `node` out of its parent, putting `replacement` where it was."""
+    assert node.parent is not None
+    siblings = node.parent.children
+    at = siblings.index(node)
+    siblings[at : at + 1] = replacement or []
+    for child in replacement or []:
+        if isinstance(child, _Node):
+            child.parent = node.parent
+    node.parent = None
+
+
+def _sanitise(root: _Node, images: set[str]) -> None:
+    """Take out what loads, runs, submits or plays, in place. The page is the pipeline's own,
+    but text from a PDF and a reviewer's edits still went through it.
+
+    - elements in `_DROPPED` go with their children; forms are unwrapped (their words stay)
+      and their controls go, so nothing can be submitted;
+    - an address attribute is kept only if it is inside the file (`#...`), a web or mail link
+      on `<a>`, or a picture already in the package; `javascript:` and `data:` never stay;
+    - an `<img>` still pointing anywhere but the package (remote, relative) becomes its alt
+      text, so the book fetches nothing; with no alt text it goes;
+    - event handlers go; `@import` and `url()` go from stylesheets and `style` attributes."""
+    for node in list(root.walk()):
+        if node.parent is None:
+            continue  # taken out with an ancestor
+        if node.tag in _DROPPED or node.tag in _CONTROLS:
+            _remove(node)
+        elif node.tag in _FORM_PARTS:
+            _remove(node, list(node.children))
+    for node in list(root.walk()):
+        if node.parent is None:
+            continue
+        if node.tag == "style":
+            node.children = [_clean_css(c) if isinstance(c, str) else c for c in node.children]
+        if "style" in node.attrs:
+            node.attrs["style"] = _clean_css(node.attrs["style"])
+        for name in [n for n in node.attrs if n.startswith("on")]:
+            del node.attrs[name]
+        if node.tag == "img" and node.attrs.get("src", "") not in images:
+            alt = " ".join(node.attrs.get("alt", "").split())
+            _remove(node, [alt] if alt else [])
+            continue
+        for name in [n for n in node.attrs if n in _ADDRESS]:
+            value = node.attrs[name].strip()
+            if name == "src" and node.tag == "img":
+                continue
+            if name == "href" and node.tag == "a":
+                keep = bool(_KEPT_LINK.match(value))  # others point at nothing in a book
+            else:
+                keep = value.startswith("#") and name in ("href", "xlink:href")
+            if not keep or _SCRIPT_URL.match(value):
+                del node.attrs[name]
+
+
+def _prepare(root: _Node, images: set[str]) -> tuple[bool, bool]:
     """Namespaces, `epub:type` and attribute fixes, in place. Returns (has math, has svg)."""
+    _sanitise(root, images)
     has_math = has_svg = False
-    for script in [n for n in root.walk() if n.tag == "script"]:
-        assert script.parent is not None
-        script.parent.children.remove(script)
     for node in root.walk():
         if node.tag == "math":
             has_math = True
@@ -161,11 +236,7 @@ def _prepare(root: _Node) -> tuple[bool, bool]:
         elif node.tag == "svg":
             has_svg = True
             node.attrs["xmlns"] = NS_SVG
-        for name in [n for n in node.attrs if n.startswith("on")]:
-            del node.attrs[name]  # event handlers are script
-        href = node.attrs.get("href")
-        if node.tag == "a" and href is not None and not _KEPT_LINK.match(href):
-            del node.attrs["href"]  # a site-relative link points at nothing inside a book
+            node.attrs["xmlns:xlink"] = "http://www.w3.org/1999/xlink"
         if node.tag == "svg" or _inside(node, "svg"):
             for name in [n for n in node.attrs if n in _SVG_ATTRS]:
                 node.attrs[_SVG_ATTRS[name]] = node.attrs.pop(name)
@@ -267,6 +338,18 @@ def _nav_document(
 # ------------------------------------------------------------------------ the metadata
 
 
+def _has_description(figure: _Node) -> bool:
+    """A figure has a long description when a `<details class="figure-description">` is inside
+    it or is the element right after it."""
+    if any(n.tag == "details" and "figure-description" in n.classes() for n in figure.walk()):
+        return True
+    kids = figure.parent.children if figure.parent else []
+    siblings = [c for c in kids if isinstance(c, _Node)]
+    i = siblings.index(figure)
+    nxt = siblings[i + 1] if i + 1 < len(siblings) else None
+    return nxt is not None and nxt.tag == "details" and "figure-description" in nxt.classes()
+
+
 def _features(
     *,
     root: _Node,
@@ -279,16 +362,19 @@ def _features(
     modes = ["textual"]
     if images:
         modes.append("visual")
-    features = ["tableOfContents"]
-    if n_headings:
-        features.append("structuralNavigation")
+    # A feature is claimed only when every item it applies to has it.
+    features = []
+    if n_headings:  # the one-entry fallback is not a contents list
+        features += ["tableOfContents", "structuralNavigation"]
+    maths = [n for n in root.walk() if n.tag == "math"]
     if has_math:
         features.append("MathML")
-        if any(n.tag == "math" and n.attrs.get("alttext") for n in root.walk()):
+        if maths and all(n.attrs.get("alttext", "").strip() for n in maths):
             features.append("describedMath")
-    if any(n.attrs.get("alt", "").strip() for n in images):
+    if images and all(n.attrs.get("alt", "").strip() for n in images):
         features.append("alternativeText")
-    if any("figure-description" in n.classes() for n in root.walk() if n.tag == "details"):
+    figures = [n for n in root.walk() if n.tag == "figure"]
+    if figures and all(_has_description(f) for f in figures):
         features.append("longDescription")
     if n_pages:
         features.append("pageNavigation")
@@ -385,7 +471,7 @@ def export_epub(
     )
 
     images = _extract_images(root, Notes(), lambda name: name)
-    has_math, has_svg = _prepare(root)
+    has_math, has_svg = _prepare(root, set(images))
     stylesheets = [_text(n) for n in root.walk() if n.tag == "style"]
 
     taken = {n.attrs["id"] for n in body.walk() if n.attrs.get("id")}

@@ -11,7 +11,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from readablestem.pipeline.export_epub import EpubExportError, build_epub, export_epub
+from readablestem.pipeline.export_canvas import CanvasExportError
+from readablestem.pipeline.export_epub import build_epub, export_epub
 
 
 def register(group: argparse._SubParsersAction) -> None:
@@ -33,10 +34,15 @@ def _cmd_epub(args: argparse.Namespace) -> int:
         return 2
     try:
         result = export_epub(html, title=args.title)
-    except EpubExportError as exc:
+        data = build_epub(result)
+    except CanvasExportError as exc:  # also EpubExportError: a picture the book cannot hold
         print(f"cannot write an EPUB: {exc}", file=sys.stderr)
         return 2
-    args.out.write_bytes(build_epub(result))
+    try:
+        args.out.write_bytes(data)
+    except OSError as exc:
+        print(f"cannot write {args.out}: {exc.__class__.__name__}", file=sys.stderr)
+        return 2
     print(
         f"wrote {args.out}: {result.headings} contents entries, {len(result.images)} images, "
         f"{result.page_labels} page labels"
