@@ -408,7 +408,7 @@ What follows from it:
   while a 30-page conversion ran on the single CPU.
 - **Concurrency** `20` requests per instance is far above need; nothing is CPU bound in a
   request. `--max-instances=2` keeps database connections under db-f1-micro's 25 (each
-  instance pools up to 5: 3 plus 2 overflow), and a second instance would only take pages, not a job.
+  instance pools up to 10: 5 plus 5 overflow), and a second instance would only take pages, not a job.
 - **Request timeout** `300` seconds: it covers the upload request (a 20 MB file on a slow
   link) and every page; the conversion runs on the worker thread, which a request timeout
   does not stop. It was 900.
@@ -846,7 +846,7 @@ Log queries: Logs Explorer with `resource.type="cloud_run_revision"` and
 | `/readyz` shows `model_provider: no_key` | The `anthropic-api-key` secret has a version and the service reads `:latest` | Add the secret version and redeploy |
 | "cron not running" or "cron or purge problem" alert | `jsonPayload.message=("cron_done" OR "cron_refused" OR "aggregate_failed" OR "purge_backstop_deleted")`; Cloud Scheduler > job history | The worker's backstop keeps purging meanwhile; fix the scheduler anyway |
 | Cron returns 403 | `cron_refused` in logs | The scheduler's token differs from the secret, usually after a rotation: `./deploy/deploy.sh cron` |
-| Too many connections | Cloud SQL connection count (25 on db-f1-micro) | Each instance pools up to 5 connections (3 plus 2 overflow); keep `--max-instances=2` or move to `db-g1-small` (50) |
+| Too many connections | Cloud SQL connection count (25 on db-f1-micro) | Each instance pools up to 10 connections (5 plus 5 overflow) and two instances can reach 20 of the 25: keep `--max-instances=2` (not more) or move to `db-g1-small` (50) |
 
 The `decisions_canary_drift` ERROR line has no alert policy. To be emailed, add it to the
 `$SERVICE-cron-problems` log metric in `deploy/deploy.sh`, or give it a policy of its own.
