@@ -77,9 +77,7 @@ def test_sixty_thousand_strokes_cluster_in_seconds():
         boxes.append((x, y, x + rnd.uniform(1, 8), y + rnd.uniform(1, 8)))
     started = time.monotonic()
     groups = layout._cluster(boxes, layout.DRAWING_CLUSTER_GAP)
-    assert (
-        time.monotonic() - started < 60
-    )  # the plain scan took minutes
+    assert time.monotonic() - started < 60  # the plain scan took minutes
     assert sorted(i for group in groups for i in group) == list(range(60_000))
 
 
