@@ -43,6 +43,7 @@ MEANING_CODES = frozenset(
         "symbol_mismatch",
         "text_layer_mismatch",
         "style_mismatch",
+        "glyph_style_mismatch",
         "sign_mismatch",
         "number_mismatch",
         "case_mismatch",
@@ -52,6 +53,7 @@ MEANING_CODES = frozenset(
 # What the compare sentences (`web.compare`) are about, for each meaning-level code.
 _SAID_FOR = {
     "style_mismatch": ("style",),
+    "glyph_style_mismatch": ("style",),
     "symbol_mismatch": ("symbol",),
     "text_layer_mismatch": ("symbol",),
     "sign_mismatch": ("sign",),
@@ -197,7 +199,12 @@ def evaluate(
         return None, "", checks
     speech, speech_check = _speech(mathml, spoken)
     checks.append(speech_check)
-    text = element.text if element is not None else None
+    layer = (
+        equation_step.reading_layer(element, mathml)
+        if element is not None
+        else equation_step.TextLayer(None)
+    )
+    text = layer.text
     regular = element.regular_letters if element is not None else None
     mismatch = False
     differ = equation_step.text_layer_symbols_differ(text, mathml)
@@ -226,6 +233,10 @@ def evaluate(
                 name="equation.text_layer_style", passed=code is None, severity="warning", code=code
             )
         )
+    if differ is False and style != "meaning":
+        glyph_style = equation_step.glyph_style_check(layer, latex)
+        if glyph_style is not None:
+            checks.append(glyph_style)
     compared = signs.compare_signs(text, mathml) if differ is not None and not mismatch else None
     if compared is not None:
         checks.append(

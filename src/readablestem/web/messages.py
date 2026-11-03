@@ -102,6 +102,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.text_layer_style", "style_mismatch"): "A style that carries meaning differs "
     "from the PDF (a bold letter, a vector, is plain here, a plain one became bold, or a "
     "double-struck letter such as the R of the reals became plain), so check those letters.",
+    ("equation.glyph_style", "glyph_style_mismatch"): "A letter's style differs from the PDF's "
+    "font (upright in the PDF but italic here, bold against bold italic, plain against "
+    "script or double-struck), so check those letters against the image.",
     ("equation.text_layer_style", "style_cosmetic"): "A letter's style differs from the PDF "
     "only where it does not change the meaning (a bold subscript or digit, or a style such "
     "as double-struck that the PDF's text cannot show), so this was accepted as it is.",

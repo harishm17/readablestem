@@ -273,6 +273,12 @@ def bold_letter_fix(element: Element, *, spoken: Mapping[str, str] | None = None
     latex = bold_letter_latex(element.text or "")
     if latex is None:
         return None
+    if element.glyphs is not None and r"\mathbf" in latex:
+        # A Latin letter the PDF draws in a bold italic font (`\bm`, `\boldsymbol`: its text layer
+        # says only "bold") is written the way the author did (`equation_step.restyle_bold_italic`).
+        styles = {style for char, style in element.glyphs.span_glyphs if char.strip()}
+        if styles == {"bold-italic"}:
+            latex = latex.replace(r"\mathbf", r"\boldsymbol")
     from readablestem.pipeline.speech import SpeechError, mathml_to_speech
     from readablestem.pipeline.validate import (
         LatexConversionError,

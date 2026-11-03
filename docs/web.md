@@ -1691,7 +1691,7 @@ plain ω where the PDF has a bold one, was saved without a word and the warning 
 for the decision went away. Now an edit gets what the equation step runs on a proposal:
 the same cleaning, the LaTeX validators, the conversion, the MathML checks, the spoken
 version, and the cross-checks against the PDF's own text (letters, digits and Greek
-letters; letter styles, such as a vector's bold; signs and relations), with the step's
+letters; letter styles, such as a vector's bold, and with `EQUATION_GLYPH_CHECKS` the style of each letter against its glyph's font; signs and relations; a reading that goes on past the box is compared with the glyphs it covers, `docs/steps.md`), with the step's
 check names and codes. With FEATURE_NOTATION_MEMORY and a job read for a course, the
 check runs with that course's notation in force (`web.notation.in_force`, the options
 the run had): a letter the course writes bold is evidence for the style check where the
@@ -1703,7 +1703,7 @@ as for the proposal. What fails is said in plain words, in three kinds:
   ("Your LaTeX was not saved. It has one more { than }: add the missing }.", "\omegaa is
   not a command this tool supports");
 - *differs from the PDF where that changes the meaning* (the codes that make a proposal a
-  required decision: `symbol_mismatch`, `text_layer_mismatch`, `style_mismatch`,
+  required decision: `symbol_mismatch`, `text_layer_mismatch`, `style_mismatch`, `glyph_style_mismatch`,
   `sign_mismatch`, `number_mismatch`, `case_mismatch`, `species_mismatch`): not used. The card says what differs, in the compare table's words
   ("The ω is bold in the PDF (a vector) but plain in your edit."), and offers **Use my
   edit anyway** (the PDF's text is sometimes wrong). Choosing it saves the edit with the
