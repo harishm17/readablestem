@@ -223,7 +223,7 @@ the worker, and again on each retry) down. The child has no API key, no database
 token; it asks the parent for model requests and progress over a socket, and what it sends is
 JSON and bytes that the parent validates and never unpickles, so a compromised child can
 only do what a conversion of that document could: ask for requests under the job's spend caps
-(a model that has no price is refused), and return a result. The parent kills it at the job's
+(only models the deployment is configured with, only the steps' own schemas, a bounded number of requests, bounded frames), and return a result. The parent kills it at the job's
 time limit, when the job is deleted or taken over, and at shutdown. The exposure that remains is
 the model request itself: a compromised child could choose its text and images.
 `test_audit_uploads.py` feeds it a decompression bomb, a page tree that points at itself, a

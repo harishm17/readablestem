@@ -1093,7 +1093,8 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   | `access_removed` | The owner was removed from the allowlist |
   | `timeout` | The conversion ran past its time limit (or, in its child, its CPU limit) |
   | `conversion_crashed` | The conversion's child process died of a signal or exited without an answer (MuPDF aborting, a segfault). Failed at once, not retried; not offered "Try again" |
-  | `conversion_oom` | The conversion's child ran out of memory (`MemoryError` under its address-space cap, or killed by SIGKILL, which is what the kernel's OOM killer sends). Failed at once; not offered "Try again" |
+  | `conversion_unavailable` | The conversion's child could not start (an import failed, a library or the table model file is missing; exit status 1 or 72, or a "startup" error from it). The service's fault, not the PDF's: logged at ERROR (`conversion_child_unavailable`, type only); offered "Try again"; a self-check at worker start (`conversion_child_check_ok` or `_failed`) says so early |
+  | `conversion_oom` | The conversion's child ran out of memory (`MemoryError` under its address-space cap), or killed by SIGKILL that this process did not send (the kernel's OOM killer, with other work on the host using the memory): that is run once more before the job fails, so a job is not blamed on its PDF for another request's memory. Failed at once; not offered "Try again" |
   | `store_failed` | The result could not be written to the database |
   | `lease_expired` | The job was interrupted 3 times (since it was last tried again) |
   | `upload_missing` | The upload blob was gone |
@@ -1185,7 +1186,7 @@ is `convert_isolated`, which has `convert_pdf`'s signature.
   in the parent, against the job caps and the daily cap, and every database write is the
   parent's. Child to parent messages are JSON plus raw bytes, validated (a model request
   is bounded in images, tokens and size; its schema must be a pydantic model of this package);
-  the parent never unpickles what the child sends. The result comes back as JSON
+  the parent never unpickles what the child sends. A model request is sent only for a model the deployment is configured with (every `*_model` setting and the fallbacks) and a schema one of the steps defines; progress must satisfy 0 <= done <= total <= `MAX_PAGES_PER_JOB`; at most `max(4, 2 x concurrency)` requests are open at once. The parent holds at most 128 MB of the child's output at once (a frame over that is refused and the job fails `conversion_crashed`, `conversion_child_frame_refused`; later frames wait on the socket), read in place without a second copy. The result comes back as JSON
   (`DocumentResult`) and PNG crops, and is the same as an in-process run's apart from the
   timings (`tests/test_web_isolated_convert.py`). A model call still running when the child is
   killed finishes and settles in the parent; its spend counts, as an abandoned thread's did.
@@ -1194,7 +1195,7 @@ is `convert_isolated`, which has `convert_pdf`'s signature.
   `glibc` arenas capped at 2 (`MALLOC_ARENA_MAX`; without it the same runs peaked at 4.7-6 GB of
   address space); below about 1.5 GB the ONNX runtime of the table
   detector hangs instead of failing, which ends as `timeout`), plus twice the PDF; CPU time
-  4 times the job's wall-clock limit (a backstop); no core file (it would hold the PDF); the
+  4 times the job's wall-clock limit (a backstop; the table model's thread pools are capped at 4 threads, `conversion_child.MAX_THREADS`, whatever the host's core count, so address space does not grow with cores and 4 busy threads cannot reach the CPU limit before the wall clock); `oom_score_adj` 1000, so the kernel prefers the child to the web process; no core file (it would hold the PDF); the
   child dies with the web process (`PR_SET_PDEATHSIG` on Linux, and the end of its socket).
   Its own process group is killed with it, which takes the render probes (`layout._probe_pages`)
   too.

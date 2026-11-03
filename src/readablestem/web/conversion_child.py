@@ -37,15 +37,18 @@ import struct
 import sys
 import threading
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from readablestem.core.types import Element, Fix, ModelCall, ProgressEvent
     from readablestem.models.base import VisionRequest
 
-# The largest frame either side reads: a result with its crops is tens of megabytes.
-MAX_FRAME_BYTES = 512 * 1024 * 1024
+# The largest frame the parent reads from the child: a result with its crops is tens of
+# megabytes (the parent holds at most this much of the child's output at once). The child
+# reads the parent's frames, which are trusted and carry one PDF (at most 30 MB): a looser cap.
+MAX_FRAME_BYTES = 128 * 1024 * 1024
+MAX_PARENT_FRAME_BYTES = 512 * 1024 * 1024
 MAX_PARTS = 100_000
 _COUNT = struct.Struct(">I")
 _LENGTH = struct.Struct(">Q")
@@ -56,6 +59,13 @@ FAULTS = ("abort", "segv", "hang", "oom", "exit", "kill9")
 FAULT_AT = ("start", "progress", "model")
 EXIT_PARENT_GONE = 70
 EXIT_OOM = 71
+# The child itself is broken (an import failed, a library is missing, the table model file is
+# not readable): not a bad PDF. The interpreter's own failure to start the module is 1.
+EXIT_BROKEN = 72
+# The most threads the child's numeric libraries may use, whatever the host's core count: with
+# the address-space cap, every thread's stack and arena counts. `isolated_convert.CPU_FACTOR`
+# is this number, so the CPU limit allows all of them to be busy for the whole wall clock.
+MAX_THREADS = 4
 
 
 # --------------------------------------------------------------------------- frames
@@ -68,8 +78,9 @@ def write_frame(sock: socket.socket, parts: Sequence[bytes]) -> None:
         sock.sendall(part)
 
 
-def _read_exact(sock: socket.socket, size: int) -> bytes | None:
-    """`size` bytes, or None when the other end closed first."""
+def _read_exact(sock: socket.socket, size: int) -> bytearray | None:
+    """`size` bytes, or None when the other end closed first. A bytearray, filled in place:
+    no second copy of a large part."""
     buffer = bytearray(size)
     view = memoryview(buffer)
     got = 0
@@ -78,12 +89,19 @@ def _read_exact(sock: socket.socket, size: int) -> bytes | None:
         if read == 0:
             return None
         got += read
-    return bytes(buffer)
+    return buffer
 
 
-def read_frame(sock: socket.socket, *, limit: int = MAX_FRAME_BYTES) -> list[bytes] | None:
+def read_frame(
+    sock: socket.socket,
+    *,
+    limit: int | None = None,
+    admit: Callable[[int], bool] | None = None,
+) -> list[bytearray] | None:
     """The parts of the next frame; None at the end of the stream (a frame cut short is
-    the end too). Raises ValueError for a frame larger than `limit` or with too many parts."""
+    the end too). Raises ValueError for a frame larger than `limit` or with too many parts.
+    `admit(total_size)` is called once the sizes are known, before any part is allocated: it
+    may wait (to bound what is held) and returns False to stop reading (the stream ends)."""
     raw = _read_exact(sock, _COUNT.size)
     if raw is None:
         return None
@@ -94,8 +112,10 @@ def read_frame(sock: socket.socket, *, limit: int = MAX_FRAME_BYTES) -> list[byt
     if raw is None:
         return None
     sizes = [_LENGTH.unpack_from(raw, i * _LENGTH.size)[0] for i in range(count)]
-    if sum(sizes) > limit:
+    if sum(sizes) > (MAX_FRAME_BYTES if limit is None else limit):
         raise ValueError("frame too large")
+    if admit is not None and not admit(sum(sizes)):
+        return None
     parts = []
     for size in sizes:
         part = _read_exact(sock, size)
@@ -168,12 +188,12 @@ class Link:
     def _read(self) -> None:
         try:
             while True:
-                parts = read_frame(self._sock)
+                parts = read_frame(self._sock, limit=MAX_PARENT_FRAME_BYTES)
                 if parts is None:
                     break
-                message = pickle.loads(parts[0])
+                message = pickle.loads(bytes(parts[0]))
                 if message.get("op") == "init":
-                    message["pdf"] = parts[1]
+                    message["pdf"] = bytes(parts[1])
                     self.init = message
                     self._ready.set()
                     continue
@@ -339,6 +359,11 @@ def _harden(memory_bytes: int, cpu_seconds: int) -> None:
     except (ImportError, ValueError, OSError):
         pass
     if sys.platform.startswith("linux"):
+        # If the host runs short of memory, the kernel's OOM killer should take this process
+        # (one job) before the web process (every session). Before dumpable is cleared below:
+        # /proc/self is root's after that.
+        with contextlib.suppress(OSError), open("/proc/self/oom_score_adj", "w") as handle:
+            handle.write("1000")
         try:
             import ctypes
 
@@ -381,15 +406,39 @@ def _settings_from(values: dict[str, Any]):
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Exit status: 0 (an answer was sent, whatever it was), `EXIT_PARENT_GONE`,
-    `EXIT_OOM` (out of memory even for the error report) or 1."""
+    """Exit status: 0 (an answer was sent, whatever it was), `EXIT_PARENT_GONE`, `EXIT_OOM`
+    (out of memory even for the error report) or `EXIT_BROKEN` (this process failed, not
+    the PDF). `--check` only imports what a conversion needs: 0 or `EXIT_BROKEN`."""
     args = sys.argv[1:] if argv is None else argv
     try:
+        if args and args[0] == "--check":
+            _prepare({"settings": {}})
+            return 0
         return _main(args)
     except MemoryError:
         return EXIT_OOM
     except BaseException:
-        return 1
+        return EXIT_BROKEN
+
+
+def _prepare(init: dict[str, Any]):
+    """Everything a conversion needs before it reads the PDF: the settings, the pipeline's
+    imports, the thread cap. Returns `convert_pdf` and the settings. A failure here is the
+    child's own (a missing library, an unreadable model file), reported as "startup"."""
+    settings = _settings_from(init["settings"])
+    # Modules that read `get_settings()` (the assembler) get the parent's settings, not a
+    # fresh read of this process's stripped environment. Set before any pipeline import.
+    from readablestem import config
+
+    config.get_settings = lambda: settings  # ty: ignore[invalid-assignment]
+
+    from readablestem.pipeline import tables
+    from readablestem.pipeline.run import convert_pdf
+
+    # The ONNX runtime sizes its thread pools from this: not from the host's core count.
+    host_allowance = tables.cpu_allowance
+    tables.cpu_allowance = lambda: min(host_allowance(), MAX_THREADS)  # ty: ignore[invalid-assignment]
+    return convert_pdf, settings
 
 
 def _main(args: list[str]) -> int:
@@ -400,7 +449,14 @@ def _main(args: list[str]) -> int:
     faults = _Faults(init.get("fault"), init.get("fault_at", "start"), int(args[1]))
     faults.at_point("start")
     try:
-        output = _convert(link, init, faults)
+        try:
+            convert_pdf, settings = _prepare(init)
+        except MemoryError:
+            raise
+        except Exception as exc:  # the child's own failure: the type, never the message
+            link.send({"op": "error", "kind": "startup", "type": type(exc).__name__})
+            return 0
+        output = _convert(link, init, faults, convert_pdf, settings)
         header = {
             "op": "done",
             "result": output.result.model_dump(mode="json"),
@@ -417,17 +473,8 @@ def _main(args: list[str]) -> int:
     return 0
 
 
-def _convert(link: Link, init: dict[str, Any], faults: _Faults):
+def _convert(link: Link, init: dict[str, Any], faults: _Faults, convert_pdf, settings):
     """Build the callbacks the parent asked for, then `convert_pdf`."""
-    settings = _settings_from(init["settings"])
-    # Modules that read `get_settings()` (the assembler) get the parent's settings, not a
-    # fresh read of this process's stripped environment. Set before any pipeline import.
-    from readablestem import config
-
-    config.get_settings = lambda: settings  # ty: ignore[invalid-assignment]
-
-    from readablestem.pipeline.run import convert_pdf
-
     kwargs: dict[str, Any] = {}
     if init["progress"]:
 

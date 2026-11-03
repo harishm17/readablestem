@@ -12,6 +12,7 @@ import logging
 import os
 import socket
 import subprocess
+import sys
 import threading
 import time
 from datetime import timedelta
@@ -195,7 +196,7 @@ MODEL_HEADER = {
     "op": "model",
     "id": 1,
     "step": "equation",
-    "model": "m",
+    "model": offline_settings().main_model,
     "prompt_version": "v",
     "instructions": "i",
     "context_text": None,
@@ -235,6 +236,7 @@ def test_a_frame_that_is_not_the_protocol_is_refused(header):
         {"max_output_tokens": 10**9},
         {"max_output_tokens": True},
         {"model": 5},
+        {"model": "gpt-not-configured"},
         {"timeout_s": "soon"},
         {"schema": "os:system"},
     ],
@@ -612,7 +614,7 @@ def test_a_child_flooding_the_parent_with_requests_is_refused(monkeypatch):
     c._reply = lambda *a, **k: None  # type: ignore[method-assign]
     frame = [json.dumps(MODEL_HEADER).encode()]
     try:
-        for _ in range(isolated_convert.MAX_IN_FLIGHT):
+        for _ in range(c.max_in_flight):
             c._handle(frame)
         with pytest.raises(_Protocol, match="flood"):
             c._handle(frame)
@@ -643,3 +645,207 @@ def test_try_again_is_not_offered_for_a_file_that_crashed_or_exhausted_its_child
 
     assert code not in retry.RETRYABLE_FAILURES
     assert retry.offer(status="failed", error_code=code, result_json=None, retries=0) is None
+
+
+# --------------------------------------------------------------------------- review fixes
+
+
+def test_the_parent_refuses_a_frame_over_the_child_limit_without_reading_it(monkeypatch):
+    monkeypatch.setattr(protocol, "MAX_FRAME_BYTES", 1000)
+    a, b = socket.socketpair()
+    with a, b:
+        protocol.write_frame(a, [b"x" * 2000])
+        with pytest.raises(ValueError, match="too large"):
+            protocol.read_frame(
+                b, limit=protocol.MAX_FRAME_BYTES, admit=lambda n: pytest.fail("read")
+            )
+
+
+def test_an_oversized_done_frame_fails_the_call_as_a_crash_and_is_logged(monkeypatch, caplog):
+    caplog.set_level(logging.INFO)
+    monkeypatch.setattr(protocol, "MAX_FRAME_BYTES", 50_000)  # a real result is larger
+    settings = offline_settings()
+    client, _ = offline_client(settings)
+    with pytest.raises(ConversionCrashed):
+        convert_isolated(LECTURE_NOTES.read_bytes(), settings=settings, client=client)
+    assert any(r.getMessage() == "conversion_child_frame_refused" for r in caplog.records)
+
+
+def test_what_is_held_of_the_childs_output_is_bounded_in_bytes(monkeypatch):
+    monkeypatch.setattr(isolated_convert, "HELD_BYTES", 100)
+    c = conversion()
+    assert c._admit(80)  # nothing held: admitted
+    results: list[bool] = []
+    waiter = threading.Thread(target=lambda: results.append(c._admit(60)))
+    waiter.start()
+    waiter.join(0.7)
+    assert waiter.is_alive() and not results  # 80 + 60 > 100: waits
+    c._release(80)
+    waiter.join(5)
+    assert results == [True] and c.held == 60
+    c.closed.set()
+    assert c._admit(1000) is False
+
+
+def test_a_sigkill_from_outside_is_run_once_more_and_then_called_out_of_memory(monkeypatch):
+    runs: list[str | None] = []
+    real = isolated_convert._Conversion
+
+    def conversion_killed_each_time(*args, **kwargs):
+        runs.append(kwargs["fault"])
+        return real(*args, **{**kwargs, "fault": "kill9"})
+
+    monkeypatch.setattr(isolated_convert, "_Conversion", conversion_killed_each_time)
+    settings = offline_settings()
+    client, _ = offline_client(settings)
+    with pytest.raises(ConversionOom) as caught:
+        convert_isolated(b"%PDF-1.4", settings=settings, client=client)
+    assert isinstance(caught.value, isolated_convert.ConversionExternalKill)
+    assert error_code_for(caught.value) == "conversion_oom" and len(runs) == 2
+
+
+def test_a_sigkill_from_outside_that_does_not_come_back_costs_the_job_nothing(monkeypatch):
+    real = isolated_convert._Conversion
+    made: list[int] = []
+
+    def killed_the_first_time(*args, **kwargs):
+        made.append(1)
+        return real(*args, **{**kwargs, "fault": "kill9" if len(made) == 1 else None})
+
+    monkeypatch.setattr(isolated_convert, "_Conversion", killed_the_first_time)
+    settings = offline_settings()
+    client, _ = offline_client(settings)
+    out = convert_isolated(LECTURE_NOTES.read_bytes(), settings=settings, client=client)
+    assert len(made) == 2 and out.result.html
+
+
+def test_this_process_killing_the_child_is_not_an_external_kill(spawned):
+    settings = offline_settings()
+    client, _ = offline_client(settings)
+    flag = threading.Event()
+    threading.Timer(0.5, flag.set).start()
+    with pytest.raises(BudgetExceeded):  # not retried, not "out of memory"
+        convert_isolated(
+            b"%PDF-1.4", settings=settings, client=client, cancelled=flag.is_set, fault="hang"
+        )
+    assert len(spawned.processes) == 1
+
+
+@pytest.mark.parametrize("status", [1, protocol.EXIT_BROKEN])
+def test_a_child_that_cannot_start_is_unavailable_not_a_bad_pdf(monkeypatch, caplog, status):
+    caplog.set_level(logging.INFO)
+    monkeypatch.setattr(
+        isolated_convert,
+        "child_command",
+        lambda fd, memory, cpu: [sys.executable, "-c", f"import sys; sys.exit({status})"],
+    )
+    settings = offline_settings()
+    client, _ = offline_client(settings)
+    with pytest.raises(isolated_convert.ConversionUnavailable) as caught:
+        convert_isolated(b"%PDF-1.4", settings=settings, client=client)
+    assert error_code_for(caught.value) == "conversion_unavailable"
+    assert any(r.getMessage() == "conversion_child_unavailable" for r in caplog.records)
+
+
+def test_a_startup_error_frame_is_unavailable_and_logs_only_the_type(caplog):
+    caplog.set_level(logging.INFO)
+    c = conversion()
+    with pytest.raises(isolated_convert.ConversionUnavailable):
+        c._handle([b'{"op": "error", "kind": "startup", "type": "ModuleNotFoundError"}'])
+    line = next(r for r in caplog.records if r.getMessage() == "conversion_child_unavailable")
+    fields = getattr(line, "fields", None) or next(
+        v for k, v in vars(line).items() if isinstance(v, dict) and "error_type" in v
+    )
+    assert line.levelno == logging.ERROR and fields["error_type"] == "ModuleNotFoundError"
+
+
+def test_try_again_is_offered_for_an_unavailable_converter():
+    from readablestem.web import retry
+
+    assert "conversion_unavailable" in retry.RETRYABLE_FAILURES
+    assert job_error_message("conversion_unavailable") != job_error_message("no such code")
+
+
+def test_the_self_check_starts_a_child_and_reports_when_it_cannot(monkeypatch, caplog):
+    caplog.set_level(logging.INFO)
+    assert isolated_convert.self_check() is True
+    monkeypatch.setattr(isolated_convert.sys, "executable", "/bin/false")
+    assert isolated_convert.self_check() is False
+    assert any(r.getMessage() == "conversion_child_check_failed" for r in caplog.records)
+
+
+def run_python(code: str) -> str:
+    done = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=True,
+        env=child_environment(),
+    )
+    return done.stdout.strip()
+
+
+def test_the_childs_thread_allowance_is_capped_whatever_the_host_has():
+    code = (
+        "from readablestem.web import conversion_child as c\n"
+        "c._prepare({'settings': {}})\n"
+        "from readablestem.pipeline import tables\n"
+        "print(tables.cpu_allowance())"
+    )
+    assert 1 <= int(run_python(code)) <= protocol.MAX_THREADS
+    assert isolated_convert.CPU_FACTOR == protocol.MAX_THREADS
+
+
+def test_the_child_asks_the_kernel_to_kill_it_before_the_web_process():
+    code = (
+        "from readablestem.web import conversion_child as c\n"
+        "c._harden(8 << 30, 0)\n"
+        "print(open('/proc/self/oom_score_adj').read().strip())"
+    )
+    assert run_python(code) == "1000"
+
+
+def test_a_bug_in_a_parent_callback_is_not_reported_as_a_broken_child():
+    def progress(done: int, total: int) -> None:
+        raise ValueError("a bug here")
+
+    c = conversion(progress=progress)
+    frame = b'{"op": "progress", "id": 1, "done": 1, "total": 2}'
+    with pytest.raises(ValueError, match="a bug here"):
+        c._handle([frame])
+
+
+@pytest.mark.parametrize(
+    "frame",
+    [
+        b'{"op": "progress", "id": 1, "done": 3, "total": 2}',
+        b'{"op": "progress", "id": 1, "done": -1, "total": 2}',
+        b'{"op": "progress", "id": 1, "done": 1, "total": 999999}',
+        b'{"op": "progress", "id": true, "done": 1, "total": 2}',
+    ],
+)
+def test_progress_outside_zero_to_total_to_the_page_limit_is_refused(frame):
+    c = conversion(progress=lambda *_: None)
+    with pytest.raises(_Protocol):
+        c._handle([frame])
+
+
+def test_a_model_the_deployment_is_not_set_up_with_is_not_sent():
+    settings = offline_settings()
+    assert settings.main_model in isolated_convert.allowed_models(settings)
+    assert settings.fallback_for and set(settings.fallback_for.values()) <= (
+        isolated_convert.allowed_models(settings)
+    )
+    assert "gpt-not-configured" not in isolated_convert.allowed_models(settings)
+
+
+def test_a_failed_start_still_cleans_up(monkeypatch):
+    def broken(*args, **kwargs):
+        raise OSError("no processes")
+
+    monkeypatch.setattr(isolated_convert.subprocess, "Popen", broken)
+    settings = offline_settings()
+    client, _ = offline_client(settings)
+    with pytest.raises(OSError, match="no processes"):
+        convert_isolated(b"x", settings=settings, client=client)

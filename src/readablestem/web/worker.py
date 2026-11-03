@@ -101,7 +101,7 @@ from readablestem.web import access, carry_edits, events
 from readablestem.web import retry as retry_rules
 from readablestem.web.database import as_utc, rowcount
 from readablestem.web.db import Blob, Job, JobStatus, ReviewEdit, User, session_scope, utcnow
-from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
+from readablestem.web.isolated_convert import ConversionFailed, convert_isolated, self_check
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.provider_health import HEALTH
 from readablestem.web.spend import DbSpendGuard, largest_reservation_usd
@@ -1360,6 +1360,12 @@ class Worker:
         # Holds left by a process that died (a restart, a crash) are given back now, not at
         # midnight. Those of a job still marked running are released when its lease runs out.
         self.release_holds(older_than_s=self.stale_hold_s())
+        # A conversion child that cannot start (a missing library, an unreadable model
+        # file) would fail every job as "conversion_unavailable": say so once, now.
+        if self.settings.env == "prod" and self.converter is convert_isolated:
+            threading.Thread(
+                target=self_check, name="readablestem-child-check", daemon=True
+            ).start()
         # (Not when conversions run in a child process: it loads its own models, and a copy
         # here would only take memory.)
         if (
