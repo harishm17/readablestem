@@ -1677,7 +1677,8 @@ def _text_layer_supported(element: Element, fix: Fix | None, reason: str) -> boo
     proposal = fix.equation if fix is not None else None
     if reason == "fragment" or proposal is None:
         return False
-    return equation_step.text_layer_symbols_differ(element.text, proposal.mathml) is False
+    layer = equation_step.reading_layer(element, proposal.mathml)  # the glyphs it covers
+    return equation_step.text_layer_symbols_differ(layer.text, proposal.mathml) is False
 
 
 def _formula_evidence(element: Element, text: str) -> bool:

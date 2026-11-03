@@ -403,6 +403,15 @@ purpose: MSBM (double-struck), EUSM and RSFS (script), EUFM (fraktur), CMSY
 style and is not listed. On the two-column handout: `𝐯 ∈ Rn` gives `n` (R is MSBM), the
 bold omega gives nothing.
 
+**Glyph evidence** (`Element.glyphs`, `layout.line_glyphs`; only with `EQUATION_GLYPH_CHECKS`). For
+the checks of a reading against the PDF the glyphs under an equation's box are kept with it, each as its
+character (as `Element.text` writes it) and the style its font gives a letter (`glyph_style`: italic,
+upright, bold, bold italic, script, double-struck, fraktur, or none). For an inline equation read with its
+line, the glyphs left and right of the box on its row (within half the box's height, 24 either side,
+nearest first) in the region of `crop_line` too (`_line_clip` is the one rule for that region, so the glyphs
+kept are what the model saw): a reading that goes past the box is compared with them. A turned page, and an
+equation with no glyph under its box (a picture), have none. Display equations keep their own glyphs only.
+
 ### Lists
 
 - **A line of key terms.** Right under a heading that ends in "Key Terms", a paragraph of

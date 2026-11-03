@@ -75,7 +75,16 @@ import pymupdf
 from readablestem.core.childenv import child_env
 from readablestem.core.mathchars import base_char, char_variant, styled_char
 from readablestem.core.notation import canonical_from_parts
-from readablestem.core.types import BBox, Element, Kind, Link, Notice, TableGrid, inline_marker
+from readablestem.core.types import (
+    BBox,
+    Element,
+    GlyphContext,
+    Kind,
+    Link,
+    Notice,
+    TableGrid,
+    inline_marker,
+)
 from readablestem.pipeline import (
     chem,
     equation_images,
@@ -529,6 +538,23 @@ LINE_SIDE = 150.0  # pt either side of the span when it has no paragraph to take
 LINE_MARK = (0xD0, 0x10, 0x10)  # the box drawn round the span, in sRGB
 
 
+def _line_clip(
+    page: pymupdf.Page, element: Element, across: tuple[float, float] | None
+) -> pymupdf.Rect:
+    """The region of the line an inline equation sits in: the extent `crop_line` shows the
+    model and `line_glyphs` reads the glyphs of (so the two never disagree about what the
+    model could see). From `across` (the paragraph's x-range; LINE_SIDE either side of the
+    span without one), and LINE_BAND span heights above and below the span."""
+    x0, y0, x1, y1 = element.bbox
+    band = LINE_BAND * max(y1 - y0, 4.0)
+    left, right = across if across is not None else (x0 - LINE_SIDE, x1 + LINE_SIDE)
+    clip = pymupdf.Rect(min(left, x0) - 2, y0 - band, max(right, x1) + 2, y1 + band)
+    clip &= page.rect
+    if clip.is_empty or clip.width < 0.5 or clip.height < 0.5:
+        raise ValueError("line region is empty or outside the page")
+    return clip
+
+
 def crop_line(
     pdf_bytes: bytes,
     element: Element,
@@ -553,12 +579,7 @@ def crop_line(
             _ensure_probed(pdf_bytes, key, [element.page])
             page = doc[element.page]
             x0, y0, x1, y1 = element.bbox
-            band = LINE_BAND * max(y1 - y0, 4.0)
-            left, right = across if across is not None else (x0 - LINE_SIDE, x1 + LINE_SIDE)
-            clip = pymupdf.Rect(min(left, x0) - 2, y0 - band, max(right, x1) + 2, y1 + band)
-            clip &= page.rect
-            if clip.is_empty or clip.width < 0.5 or clip.height < 0.5:
-                raise ValueError("line region is empty or outside the page")
+            clip = _line_clip(page, element, across)
             zoom = min(dpi / 72.0, (max_side_px - 1) / max(clip.width, clip.height))
             pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
             ox, oy = pixmap.x, pixmap.y  # the clip's origin in pixels at this zoom
@@ -579,6 +600,127 @@ def crop_line(
                     box = pymupdf.IRect(left + ox, top + oy, right + ox, bottom + oy)
                     pixmap.set_rect(box, LINE_MARK)
             return pixmap.tobytes("png")
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()
+
+
+# The letter styles `glyph_style` names (the equation step compares them with the reading's).
+STYLE_ITALIC = "italic"
+STYLE_UPRIGHT = "upright"
+STYLE_BOLD = "bold"
+STYLE_BOLD_ITALIC = "bold-italic"
+# Math-italic faces that no font-name rule above calls italic: CMMI, Latin Modern and TeX
+# Gyre math italics, newtx and pxfonts' math italic.
+_MATH_ITALIC_FONT = re.compile(
+    r"^(?:cmmi\d|lmmi\d|lmmathitalic|txmi|pxmi|newtxmi|mathit|stixmathital|stixgeneral-?ital)",
+    re.IGNORECASE,
+)
+_CODE_POINT_STYLE = {
+    "italic": STYLE_ITALIC,
+    "bold": STYLE_BOLD,
+    "bold-italic": STYLE_BOLD_ITALIC,
+    "script": "script",
+    "bold-script": "script",
+    "double-struck": "double-struck",
+    "fraktur": "fraktur",
+    "bold-fraktur": "fraktur",
+}
+LINE_GLYPH_REACH = 24  # glyphs either side of the span `line_glyphs` keeps, nearest first
+LINE_GLYPH_ROW = 0.5  # x the span's height: how far off the span's row a neighbour may sit
+
+
+def glyph_style(c: _Char) -> str | None:
+    """The style of one printed letter, or None for anything but an ASCII letter and for a
+    letter whose font says nothing: italic (CMMI, an italic face, a Unicode math italic
+    letter), upright (a regular face: CMR, Times), bold (CMBX), bold-italic (CMMIB, what
+    `\\bm` and `\\boldsymbol` print), script (CMSY and EUSM capitals), double-struck (MSBM) or
+    fraktur. The fonts `_Char.styled` writes into `Element.text`, and those it leaves plain."""
+    base = base_char(c.c)
+    if not (len(base) == 1 and base.isascii() and base.isalpha()):
+        return None
+    if (variant := char_variant(c.c)) is not None:
+        return _CODE_POINT_STYLE.get(variant)
+    style = _letter_style(c.font)
+    if style is not None and (base.isupper() or not style[1]):
+        return style[0]
+    if _bold_italic(c.font) or (c.bold and c.italic):
+        return STYLE_BOLD_ITALIC
+    if c.bold:
+        return STYLE_BOLD
+    face = c.font.split("+", 1)[-1].replace(" ", "")
+    if c.italic or _MATH_ITALIC_FONT.match(face):
+        return STYLE_ITALIC
+    if c.mono:
+        return None
+    return STYLE_UPRIGHT if _REGULAR_FACE.match(face) else None
+
+
+def line_glyphs(
+    pdf_bytes: bytes,
+    element: Element,
+    across: tuple[float, float] | None = None,
+    *,
+    reach: bool = True,
+) -> GlyphContext | None:
+    """The glyphs of an equation's span and, for an inline equation, of the line it sits in
+    (the region of `crop_line`, `_line_clip`): those on the span's own row, left and right of
+    it, nearest first (`LINE_GLYPH_REACH` each; `reach` False: none). A display equation has its
+    own glyphs only.
+    None when the page is turned, or no glyph lies under the span (a picture)."""
+    with _LOCK:
+        _quiet_mupdf()
+        try:
+            key, doc = _CACHE.document(pdf_bytes)
+            if not 0 <= element.page < doc.page_count:
+                raise ValueError(f"element page {element.page} is not in the PDF")
+            _ensure_probed(pdf_bytes, key, [element.page])
+            page = doc[element.page]
+            if page.rotation % 360:
+                return None
+            x0, y0, x1, y1 = element.bbox
+            inline = element.display == "inline" and reach
+            clip = _line_clip(page, element, across) if inline else pymupdf.Rect(element.bbox)
+            clip += (-1, -1, 1, 1)
+            height = max(y1 - y0, 4.0)
+            row = (y0 - LINE_GLYPH_ROW * height, y1 + LINE_GLYPH_ROW * height)
+            span: list[tuple[str, str | None]] = []
+            left: list[tuple[float, tuple[str, str | None]]] = []
+            right: list[tuple[float, tuple[str, str | None]]] = []
+            for block in page.get_text("rawdict", flags=TEXT_FLAGS, clip=clip)["blocks"]:
+                if block.get("type") != 0:
+                    continue
+                for line in block["lines"]:
+                    for piece in line["spans"]:
+                        if page_type.span_hidden(piece):
+                            continue
+                        size, font, flags = float(piece["size"]), piece["font"], int(piece["flags"])
+                        for ch in piece["chars"]:
+                            text = ch["c"].translate(_TEXT_MAP)
+                            gx0, gy0, gx1, gy1 = ch["bbox"]
+                            cx, cy = (gx0 + gx1) / 2, (gy0 + gy1) / 2
+                            if not text or not (
+                                clip.x0 <= cx <= clip.x1 and clip.y0 <= cy <= clip.y1
+                            ):
+                                continue
+                            glyph = _Char(
+                                text, gx0, gy0, gx1, gy1, ch["origin"][1], size, font, flags
+                            )
+                            entry = (" " if glyph.blank else glyph.styled, glyph_style(glyph))
+                            if x0 - 0.5 <= cx <= x1 + 0.5 and y0 - 0.5 <= cy <= y1 + 0.5:
+                                span.append(entry)
+                            elif inline and row[0] <= cy <= row[1]:
+                                (left if cx < x0 else right).append(
+                                    (abs(cx - (x0 if cx < x0 else x1)), entry)
+                                )
+            if not any(c.strip() for c, _ in span):
+                return None
+            left.sort(key=lambda pair: pair[0])
+            right.sort(key=lambda pair: pair[0])
+            return GlyphContext(
+                span=GlyphContext.encode(span),
+                before=GlyphContext.encode(g for _, g in left[:LINE_GLYPH_REACH]),
+                after=GlyphContext.encode(g for _, g in right[:LINE_GLYPH_REACH]),
+            )
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()
 

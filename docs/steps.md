@@ -66,7 +66,7 @@ hallucinations.
 
 | Step | First model | Escalates to `main_model` when |
 |---|---|---|
-| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence` (but not when that is the only reason and it is 0.80 or more, see below), it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `number_mismatch`, `case_mismatch`, `style_mismatch`, `sign_mismatch`, `species_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
+| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence` (but not when that is the only reason and it is 0.80 or more, see below), it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `number_mismatch`, `case_mismatch`, `style_mismatch`, `glyph_style_mismatch`, `sign_mismatch`, `species_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
 | Figure | `cheap_model` with `image_detail="low"` if the figure is tiny (no side longer than 72 pt, one inch on the page); otherwise `main_model` with `image_detail="high"` | confidence is below the accept bar (higher for decorative, see below), the alt text fails an error-level check, or a decorative answer contradicts itself (`decorative_conflict`) |
 
 **The skipped second reading (equations).** A cheap answer whose only reason to be asked
@@ -364,6 +364,57 @@ neither changes a verdict on the 181 recorded real answers). `tests/test_style_c
 pins each. On 2026-10-09 layout started reading the TeX style fonts (above), so the
 handout's `\mathbb{R}^n` is now a match, not a cosmetic note, and `\mathbb{R}` read as
 `R` there is meaning-level (`tests/test_letter_style_fonts.py`, on a Tectonic PDF).
+
+## Glyph checks (equations; `EQUATION_GLYPH_CHECKS`, off)
+
+The checks above read `Element.text`, the text layer of the equation's box. Two things that text
+cannot say are read from the glyphs themselves (`layout.line_glyphs`, kept on the element as
+`Element.glyphs`, `core.types.GlyphContext`: each glyph as its character and a one-letter style
+code). With the setting on, `run.py` reads them for every equation that has text (the neighbours
+of an inline equation only with `EQUATION_LINE_CONTEXT`), and every check of one reading goes
+through `equation_step.reading_layer`: the step's `_evaluate`, a reviewer's edit
+(`web.edit_check.evaluate`), the review screen's table (`web.compare`) and the eval's
+"supported" test (`pipeline_eval._text_layer_supported`), so they agree about what the PDF says.
+
+**The extent.** A reading of the line (`EQUATION_LINE_CONTEXT`) goes on past the box when the maths
+does: `T = 2\pi` boxed, `\sqrt{m/k}` right after it. The box's text then has fewer letters than
+the reading, and every text-layer check (symbols, numbers, case, style, signs, species) compared
+the reading with the wrong glyphs. `text_layer_compare.extend_text_layer` finds the glyphs the
+reading covers: the glyphs next to the box on its row (the region of `crop_line`, `_line_clip`,
+24 either side, nearest first) that make up exactly the letters and digits the reading has
+beyond the box's. The least such extent is the one, and the checks compare the reading with the
+box's text plus those glyphs. When the reading has a letter that no extent makes (or less than the
+box has) the box's text stands and the difference is a difference, so a wrong letter in the
+extended part is still the `symbol_mismatch` decision. Not for a reading that agrees with the box,
+and not for a display equation (its box is its own).
+
+**Letter styles from the glyph fonts.** `glyph_style` names the style of each ASCII letter from its
+font: CMMI and any italic face (and the flags) are italic, CMR and the regular faces of
+`layout._REGULAR_FACE` upright, CMBX bold, CMMIB or a face with both the bold and the italic flag
+(`LMMathItalic10-Bold`) bold italic, CMSY and EUSM capitals script, MSBM double-struck, EUFM
+fraktur; a font that says nothing (an unknown name, a symbol font, Greek letters) is no style.
+`text_layer_compare.latex_letter_styles` reads the reading's letters from its LaTeX (the MathML
+loses what the glyph says: latex2mathml writes `\mathrm{d}` as a plain `<mi>d</mi>`): a bare letter
+is italic, `\mathrm`, `\text`, `\operatorname` and function names such as `\sin` upright, `\mathbf`
+bold, `\boldsymbol`/`\bm` bold italic, `\mathbb`, `\mathcal`/`\mathscr`, `\mathfrak` as their names;
+sans-serif and monospace letters are left out. `compare_letter_styles` pairs each letter's glyphs
+with the reading's letters of the same style; a glyph of a known style left over against a letter
+of another style is a difference (a glyph of unknown style may stand for the reading's spare
+letter, so it never makes one).
+
+A difference is the check `equation.glyph_style`, code `glyph_style_mismatch`: meaning-level, like
+`style_mismatch` (confidence scaled by 0.6 once, a cheap answer escalates, the fix needs a
+decision). It is made only when the symbols agree (`differ is False`) and the text-based style
+check has not already said `style_mismatch`. The review screen says it in a row of the compare
+table ("The d is upright in the PDF but italic in the proposal.") and a reviewer's edit gets it too.
+
+**Bold italic is written as the page has it.** `restyle_bold_italic` and the bold-letter fix of
+running text (`notation_memory.bold_letter_fix`) write `\boldsymbol{w}` instead of `\mathbf{w}` when
+the glyphs say bold italic, including fonts whose name the text layer does not call bold italic
+(Latin Modern's `LMMathItalic10-Bold`: its letters come out as plain bold code points). Without
+glyphs nothing changes.
+
+Measured by replay on the recorded fresh4 run (docs/eval-equation-glyph-checks.md).
 
 ### Edges and faces the reading gets from the text layer (2026-10-21)
 

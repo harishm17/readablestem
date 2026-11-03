@@ -136,6 +136,7 @@ const appVariables = [
 // app treats an unset variable as "Microsoft sign-in off", and a half-set group refuses to
 // start. Only web serves sign-in, so cron does not hold them.
 const webOnlyVariables = [
+  "EQUATION_GLYPH_CHECKS",
   "EQUATION_LINE_CONTEXT",
   "FEATURE_IMAGE_PAGES",
   "MAX_USD_PER_JOB",
