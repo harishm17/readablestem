@@ -467,19 +467,134 @@ def test_chemistry_licence_gate_refuses_a_cms_that_disagrees_with_the_archive():
         ox.check_public_license(book)
 
 
-def test_the_recorded_chemistry_selection_has_only_cc_by_sections():
+def _book(slug, licence, cms=None):
+    from readablestem.gold import openstax as ox
+
+    fetcher = FakeFetcher({slug: licence})
+    book = ox.resolve_book(slug, fetcher)
+    if cms is not None:
+        book.cms_license_url = cms
+    return book
+
+
+def test_licence_tier_public_private_and_refused(sel):
+    from readablestem.gold import openstax as ox
+
+    assert sel.licence_tier(_book("chemistry", CC_BY)) == "public"
+    for slug in ("chemistry-2e", "chemistry-atoms-first-2e", "organic-chemistry"):
+        assert sel.licence_tier(_book(slug, CC_BY_NC_SA)) == "private"
+    # an NC-SA book that is not on the allowed list, a CMS that disagrees, other NC licences
+    with pytest.raises(ox.LicenseError):
+        sel.licence_tier(_book("chemistry-other", CC_BY_NC_SA))
+    with pytest.raises(ox.LicenseError):
+        sel.licence_tier(_book("chemistry-2e", CC_BY_NC_SA, cms=CC_BY[1]))
+    nd = ("CC BY-NC-ND", "https://creativecommons.org/licenses/by-nc-nd/4.0/")
+    with pytest.raises(ox.LicenseError):
+        sel.licence_tier(_book("chemistry-2e", nd))
+    sa = ("CC BY-SA", "https://creativecommons.org/licenses/by-sa/4.0/")
+    with pytest.raises(ox.LicenseError):
+        sel.licence_tier(_book("chemistry-2e", sa))
+
+
+def test_public_sections_come_before_private_and_organic_last(sel):
+    sections = [
+        ("organic-chemistry", "1-1-a"),
+        ("chemistry-2e", "1-1-a"),
+        ("chemistry", "1-1-a"),
+        ("chemistry-atoms-first-2e", "1-1-b"),
+        ("chemistry-atoms-first", "1-1-b"),
+    ]
+    order = sel.order_d(sections)
+    books = [b for b, _ in order]
+    assert set(books[:2]) == {"chemistry", "chemistry-atoms-first"}
+    assert set(books[2:4]) == {"chemistry-2e", "chemistry-atoms-first-2e"}
+    assert books[4] == "organic-chemistry"
+
+
+def test_chemistry_walk_stops_when_enough_and_not_before(sel):
+    order = [("chemistry", f"{i}-1-s") for i in range(1, 9)]
+    got = sel.pick_chemistry(order, lambda b, s: None, target=8, done=lambda taken: len(taken) >= 3)
+    assert len(got) == 3
+    # `done` never true: the walk takes what passes, up to the cap, and no more
+    assert len(sel.pick_chemistry(order, lambda b, s: None, target=5, done=lambda t: False)) == 5
+
+
+def test_private_gold_refuses_a_folder_inside_the_repository(sel, tmp_path):
+    from readablestem.gold import openstax as ox
+
+    book = _book("chemistry-2e", CC_BY_NC_SA)
+    page = ox.PageRef(uuid="u", slug="1-1-x", title="1.1 X", chapter=1, section=1)
+    with pytest.raises(ValueError, match="inside the repository"):
+        sel.write_private_gold(book, page, [], sel.REPO / "data" / "gold-private")
+    path = sel.write_private_gold(book, page, [{"kind": "equation"}], tmp_path / "gold")
+    assert path.is_file()
+    attribution = (tmp_path / "gold" / "ATTRIBUTION.md").read_text(encoding="utf-8")
+    assert "CC BY-NC-SA" in attribution and "Not redistributed" in attribution
+
+
+def test_the_recorded_chemistry_selection_licences_and_gates():
     import json
 
     data = Path(__file__).resolve().parent.parent / "data" / "realworld"
     selection = json.loads((data / "selection-fresh5-D.json").read_text(encoding="utf-8"))
-    assert selection["sections"], "no section selected"
-    for section in selection["sections"]:
-        assert section["licence_url"].split("://")[1] == "creativecommons.org/licenses/by/4.0/"
-        assert section["book"] in {"chemistry", "chemistry-atoms-first"}
+    sections = selection["sections"]
+    assert sections and sections[0]["licence_tier"] == "public"
+    for section in sections:
+        url = section["licence_url"].split("://")[1]
+        if section["licence_tier"] == "public":
+            assert url == "creativecommons.org/licenses/by/4.0/"
+            assert section["book"] in {"chemistry", "chemistry-atoms-first"}
+        else:
+            assert url == "creativecommons.org/licenses/by-nc-sa/4.0/"
+            assert section["book"] in {
+                "chemistry-2e",
+                "chemistry-atoms-first-2e",
+                "organic-chemistry",
+            }
         assert section["pdf_pages"] <= 15
         assert section["overlap_8gram"] <= 0.2
         assert section["equations"] >= 25 and section["chemistry"] >= 0.4 * section["equations"]
-    assert {b["book"] for b in selection["books_refused"]} >= {"chemistry-2e", "organic-chemistry"}
+    assert selection["n_chemistry_equations"] >= 100
+    assert selection["n_chemistry_equations"] == sum(x["chemistry"] for x in sections)
+
+
+def test_nothing_non_commercial_lands_in_the_repository(sel):
+    """The selection file holds ids, counts and hashes only; the private gold and PDFs are in
+    the cache, which is outside the repository."""
+    import json
+
+    root = Path(__file__).resolve().parent.parent
+    selection = json.loads((root / "data/realworld/selection-fresh5-D.json").read_text("utf-8"))
+    allowed = {
+        "book", "book_title", "book_state", "section", "title", "licence", "licence_url",
+        "licence_tier", "archive_version", "book_version", "equations", "chemistry",
+        "lone_times", "overlap_8gram", "records_by_kind", "pdf_pages", "pdf_paper",
+        "pdf_sha256", "gold_sha256",
+    }  # fmt: skip
+    private = [x for x in selection["sections"] if x["licence_tier"] == "private"]
+    assert private, "the recorded selection has no private section to check"
+    for section in selection["sections"]:
+        assert set(section) <= allowed
+        for key, value in section.items():
+            if key == "records_by_kind":
+                assert all(isinstance(v, int) for v in value.values())
+            else:
+                assert isinstance(value, str | int | float | None) and len(str(value)) < 120
+    visit_keys = {"book", "section", "gate", "tier", "equations", "chemistry", "lone_times"}
+    visit_keys |= {"overlap_8gram", "records_by_kind", "pdf_pages"}
+    for visit in selection["visits"]:
+        assert set(visit) <= visit_keys
+    # the gold and PDFs go to the cache, outside the repository
+    assert root not in (sel.ROOT, *sel.ROOT.parents)
+    assert sel.REPO not in sel.ROOT.parents
+    # and no gold file or PDF of a private section is anywhere under the repository
+    names = {f"{x['book']}-{x['section']}.pdf" for x in private} | {
+        f"{x['section']}.jsonl" for x in private
+    }
+    for path in root.rglob("*"):
+        if ".git" in path.parts or ".venv" in path.parts or not path.is_file():
+            continue
+        assert path.name not in names, path
 
 
 def test_chemistry_order_is_seeded_and_ignores_input_order(sel):

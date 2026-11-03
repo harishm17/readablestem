@@ -16,10 +16,12 @@ Four strata, each a rule and a seed, never a choice (`PREREGISTRATION-FRESH5.md`
 - C, course-style LaTeX (`gold/course_corpus.py`): a pool of GitHub repositories found by a fixed
   query set and a licence gate, drawn in the seeded order, 8 documents of which at least 3 are
   Beamer decks.
-- D, OpenStax chemistry (reported apart, never pooled): sections of the CC BY first editions only
-  (Chemistry, Chemistry: Atoms First; the live licence is read for every book), never used before,
-  off the topics earlier chemistry sets cover, with enough chemistry equations, a measured 8-gram
-  overlap with every used section of at most 20%, and at most 15 printed pages, ranked by SHA-256.
+- D, OpenStax chemistry (reported apart, never pooled): never-used sections, off the topics earlier
+  chemistry sets cover, with enough chemistry equations, a measured 8-gram overlap with every used
+  section of at most 20% and at most 15 printed pages, ranked by SHA-256. The CC BY first editions
+  come first; the CC BY-NC-SA 2e editions (Organic Chemistry last, only if needed) fill the rest
+  as a private measurement: their PDFs and gold stay in the cache outside the repository and the
+  repository gets section ids, counts and hashes only. The live licence is read for every book.
 
 Gold, downloads and compiled PDFs stay under ROOT (default ~/.cache/readablestem/realworld; outside
 the repository). The repository gets manifests, candidate logs, the pool and the selection: ids,
@@ -580,6 +582,13 @@ D_MIN_CHEM_SHARE = 0.40  # of those, the share that is chemistry (`chemistry_equ
 D_MAX_OVERLAP = 0.20  # 8-gram overlap with the text of every used section
 D_MAX_PAGES = 15  # printed Letter pages
 D_POOL_WORD = "chemistry"  # every book whose slug has it is looked at; the licence gate decides
+D_MIN_TOTAL = 4  # sections wanted in all, and
+D_MIN_TOTAL_CHEMISTRY = 100  # chemistry gold equations wanted in all, before the walk stops
+D_MAX_TOTAL = 8  # the walk never takes more than this many
+# CC BY-NC-SA books allowed as a private measurement, in the order their tier is walked (after every
+# CC BY section). Nothing else under a non-commercial licence is ever touched.
+D_PRIVATE_TIERS = {"chemistry-2e": 1, "chemistry-atoms-first-2e": 1, "organic-chemistry": 2}
+NC_SA_URL = re.compile(r"^https?://creativecommons\.org/licenses/by-nc-sa/\d+(\.\d+)?/?$")
 
 # Sections on the topics the development and held-out chemistry sets cover (a stem of the title).
 D_TOPIC_STEMS = (
@@ -652,7 +661,43 @@ def rank_key_d(book: str, slug: str) -> str:
 
 
 def order_d(sections: Iterable[tuple[str, str]]) -> list[tuple[str, str]]:
-    return sorted(sections, key=lambda bs: rank_key_d(*bs))
+    """The seeded order inside a tier; the CC BY books are tier 0 and walked first, then the
+    private tiers of `D_PRIVATE_TIERS`."""
+    return sorted(sections, key=lambda bs: (D_PRIVATE_TIERS.get(bs[0], 0), rank_key_d(*bs)))
+
+
+def write_private_gold(book: ox.Book, page: ox.PageRef, records: list[dict], out_dir: Path) -> Path:
+    """The gold of one CC BY-NC-SA section, written under `out_dir` (which must be outside the
+    repository) with a manifest and attribution that name the licence."""
+    if REPO in (out_dir.resolve(), *out_dir.resolve().parents):
+        raise ValueError(f"{out_dir} is inside the repository; non-commercial gold stays out of it")
+    book_dir = out_dir / "openstax" / book.slug
+    book_dir.mkdir(parents=True, exist_ok=True)
+    path = book_dir / f"{page.slug}.jsonl"
+    ox._write_jsonl(path, records)
+    meta = book.metadata() | {"private_use": "CC BY-NC-SA; never committed or published"}
+    dump(book_dir / "_book.json", meta)
+    files = sorted(out_dir.glob("openstax/*/*.jsonl"))
+    dump(
+        out_dir / "manifest.json",
+        {
+            "licence": "CC BY-NC-SA (private measurement; not for redistribution)",
+            "source": "OpenStax (https://openstax.org)",
+            "books": {b.parent.name: b.parent.name for b in files},
+            "files": [
+                {"path": f.relative_to(out_dir).as_posix(), "sha256": file_sha256(f)} for f in files
+            ],
+        },
+    )
+    (out_dir / "ATTRIBUTION.md").write_text(
+        "OpenStax, "
+        + ", ".join(sorted({f.parent.name for f in files}))
+        + " (Rice University), licensed CC BY-NC-SA. Equations extracted and restructured as JSON "
+        "records for a private, non-commercial measurement; no wording edited. "
+        "Not redistributed.\n",
+        encoding="utf-8",
+    )
+    return path
 
 
 def overlap_share(words: Sequence[str], reference: set[tuple[str, ...]]) -> float:
@@ -673,18 +718,38 @@ def chemistry_gate(counts: dict[str, int], overlap: float, pages: int | None = N
     return None
 
 
+def licence_tier(book: ox.Book) -> str:
+    """ "public" for a book that is CC BY in the archive and the CMS; "private" for one of
+    `D_PRIVATE_TIERS` that is CC BY-NC-SA in both. Anything else (another book, a mixed or
+    different licence) raises LicenseError."""
+    try:
+        ox.check_public_license(book)
+        return "public"
+    except ox.LicenseError:
+        pass
+    both = all(u and NC_SA_URL.match(u.strip()) for u in (book.license_url, book.cms_license_url))
+    if book.slug in D_PRIVATE_TIERS and both:
+        return "private"
+    raise ox.LicenseError(
+        f"{book.slug!r} is neither CC BY nor an allowed CC BY-NC-SA book "
+        f"(archive: {book.license_url}; cms: {book.cms_license_url})."
+    )
+
+
 def pick_chemistry(
     order: Sequence[tuple[str, str]],
     judge: Callable[[str, str], str | None],
     *,
     target: int = D_TARGET,
     log: list[dict] | None = None,
+    done: Callable[[list[tuple[str, str]]], bool] | None = None,
 ) -> list[tuple[str, str]]:
-    """Walk the seeded order and take what `judge` passes (None) until `target`. A failing section
-    is logged with its gate and skipped, never swapped by choice."""
+    """Walk the seeded order and take what `judge` passes (None) until `target`, or until `done`
+    says the taken list is enough. A failing section is logged with its gate and skipped, never
+    swapped by choice."""
     taken: list[tuple[str, str]] = []
     for book, slug in order:
-        if len(taken) >= target:
+        if len(taken) >= target or (done is not None and done(taken)):
             break
         gate = judge(book, slug)
         if log is not None:
@@ -719,12 +784,13 @@ def cmd_chemistry(args: argparse.Namespace) -> int:
     ]
     refused: list[dict] = []
     books: dict[str, ox.Book] = {}
+    tiers: dict[str, str] = {}
     for row in ox.license_table(fetcher):
         if D_POOL_WORD not in row["slug"]:
             continue
         try:
             book = ox.resolve_book(row["slug"], fetcher)
-            ox.check_public_license(book)  # CC BY in the archive and in the CMS, read now
+            tiers[row["slug"]] = licence_tier(book)  # the live licence, archive and CMS
         except ox.GoldError as exc:
             refused.append(
                 {
@@ -773,12 +839,17 @@ def cmd_chemistry(args: argparse.Namespace) -> int:
         if book_slug in books and (book_slug, page_slug) in pages:
             reference |= devset.ngrams(words_of(book_slug, page_slug))
             n_reference += 1
-    out_dir = args.root / "gold" / "fresh5d"
-    for old in sorted(out_dir.rglob("*")) if out_dir.is_dir() else []:
-        if old.is_file():
-            old.unlink()  # a rerun writes the gold of this selection only
-    pdf_dir = out_dir / "pdfs"
-    pdf_dir.mkdir(parents=True, exist_ok=True)
+    out_dirs = {
+        "public": args.root / "gold" / "fresh5d",
+        "private": args.root
+        / "gold"
+        / "fresh5d-private",  # CC BY-NC-SA: cache only, never the repo
+    }
+    for out_dir in out_dirs.values():
+        for old in sorted(out_dir.rglob("*")) if out_dir.is_dir() else []:
+            if old.is_file():
+                old.unlink()  # a rerun writes the gold of this selection only
+        (out_dir / "pdfs").mkdir(parents=True, exist_ok=True)
     images = render.ImageCache(args.root / "render" / "images")
     measured: dict[tuple[str, str], dict] = {}
     printed: dict[tuple[str, str], tuple[int, str]] = {}
@@ -803,17 +874,22 @@ def cmd_chemistry(args: argparse.Namespace) -> int:
             gate = chemistry_gate(counts, overlap)
             if gate:
                 return gate
-            ox.fetch_gold(
-                book_slug,
-                1,
-                out_dir,
-                fetcher,
-                page_slugs=[page_slug],
-                retrieved_at=args.date,
-                allow_retired=True,
-                pin=ox.BookPin(book.archive_version, book.version),
-            )
-            gold = out_dir / "openstax" / book_slug / f"{page_slug}.jsonl"
+            out_dir = out_dirs[tiers[book_slug]]
+            pdf_dir = out_dir / "pdfs"
+            if tiers[book_slug] == "public":
+                ox.fetch_gold(
+                    book_slug,
+                    1,
+                    out_dir,
+                    fetcher,
+                    page_slugs=[page_slug],
+                    retrieved_at=args.date,
+                    allow_retired=True,
+                    pin=ox.BookPin(book.archive_version, book.version),
+                )
+                gold = out_dir / "openstax" / book_slug / f"{page_slug}.jsonl"
+            else:
+                gold = write_private_gold(book, page, records, out_dir)
             mine = [
                 r
                 for r in load_gold(out_dir)
@@ -843,14 +919,21 @@ def cmd_chemistry(args: argparse.Namespace) -> int:
             return None
 
         visits: list[dict] = []
-        taken = pick_chemistry(order, judge, log=visits)
+
+        def enough(taken: list[tuple[str, str]]) -> bool:
+            chem = sum(measured[t]["chemistry"] for t in taken)
+            return len(taken) >= D_MIN_TOTAL and chem >= D_MIN_TOTAL_CHEMISTRY
+
+        taken = pick_chemistry(order, judge, target=D_MAX_TOTAL, log=visits, done=enough)
     for visit in visits:
         visit.update(measured.get((visit["book"], visit["section"]), {}))
-    ox.write_manifest(out_dir)
+        visit["tier"] = tiers[visit["book"]]
+    if any(tiers[b] == "public" for b, _ in taken):
+        ox.write_manifest(out_dirs["public"])
     selected = []
     for book_slug, page_slug in taken:
         book = books[book_slug]
-        gold = out_dir / "openstax" / book_slug / f"{page_slug}.jsonl"
+        gold = out_dirs[tiers[book_slug]] / "openstax" / book_slug / f"{page_slug}.jsonl"
         n_pages, pdf_hash = printed[(book_slug, page_slug)]
         selected.append(
             {
@@ -861,6 +944,7 @@ def cmd_chemistry(args: argparse.Namespace) -> int:
                 "title": pages[(book_slug, page_slug)].title,
                 "licence": book.license_name,
                 "licence_url": book.license_url,
+                "licence_tier": tiers[book_slug],
                 "archive_version": book.archive_version,
                 "book_version": book.version,
                 **measured[(book_slug, page_slug)],
@@ -875,9 +959,20 @@ def cmd_chemistry(args: argparse.Namespace) -> int:
         "date": args.date,
         "rule": {
             "licence": (
-                "CC BY in both the archive book JSON and the CMS, read live for every book whose "
-                "slug has 'chemistry' (the first editions pass; 2e and Organic Chemistry are "
-                "NC-SA and are refused)"
+                "read live (archive book JSON and CMS) for every book whose slug has 'chemistry': "
+                "CC BY books are public tier 0; chemistry-2e and chemistry-atoms-first-2e "
+                "(CC BY-NC-SA, both places) are private tier 1 and organic-chemistry "
+                "private tier 2, "
+                "used only if the first tiers do not give enough; anything else is refused"
+            ),
+            "private_tier": (
+                "CC BY-NC-SA sections are a private measurement: their PDFs and gold are in the "
+                "cache outside the repository, this file holds ids, counts and hashes only, and "
+                "only aggregate numbers with attribution and the licence named are published"
+            ),
+            "stop": (
+                f"the walk stops at {D_MIN_TOTAL} sections with at least "
+                f"{D_MIN_TOTAL_CHEMISTRY} chemistry gold equations, never above {D_MAX_TOTAL}"
             ),
             "retired_editions": "allowed (proof/DECISION-retired-editions-2026-10-13.md)",
             "unused": (
@@ -896,7 +991,10 @@ def cmd_chemistry(args: argparse.Namespace) -> int:
                 "books and "
                 "of the sections already taken"
             ),
-            "order": "SHA-256 of 'fresh5-D|book|section', smallest first; the first 4 that pass",
+            "order": (
+                "tier, then SHA-256 of 'fresh5-D|book|section', smallest first; "
+                "each that passes is taken"
+            ),
         },
         "books_refused": refused,
         "n_used_sections": len(used),
@@ -907,12 +1005,20 @@ def cmd_chemistry(args: argparse.Namespace) -> int:
         "visits": visits,
         "sections": selected,
         "n_pdf_pages": sum(s["pdf_pages"] for s in selected),
+        "n_chemistry_equations": sum(s["chemistry"] for s in selected),
     }
     path = REPO_DATA / "selection-fresh5-D.json"
     dump(path, selection)
     print(path, len(selected), "sections,", selection["n_pdf_pages"], "pages")
     for s in selected:
-        print(s["book"], s["section"], s["licence"], s["equations"], s["chemistry"], s["pdf_pages"])
+        print(
+            s["book"],
+            s["section"],
+            s["licence_tier"],
+            s["equations"],
+            s["chemistry"],
+            s["pdf_pages"],
+        )
     return 0
 
 
