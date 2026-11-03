@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Figure gold v2 and a draft pre-registration for long descriptions
+
+- `data/gold-figures-v2/`: 50 figures (14 data charts, 14 diagrams, 10 photos and illustrations, 12 chemistry
+  structures) from CC BY OpenStax books, drawn by a seeded rule with licence and exclusion gates
+  (`gold/figures_v2.py`, `scripts/figures_v2_pool.py`, `scripts/figures_v2_build.py`); each has its source,
+  licence and a reference long description, and 4 of the charts a reference data table. 45 figures come from
+  retired editions ([decisions/0001-scope.md](docs/decisions/0001-scope.md), question 2). No model was run.
+- `gold/figures_v2_arxiv.py` reads plotted data from pgfplots TeX; 100 seeded CC BY papers held no usable
+  chart. `gold/figures_v2_table.py` scores table cells against a reference table.
+- [docs/eval-figures-long.md](docs/eval-figures-long.md): the set, and a draft pre-registration (arms, bars,
+  budget cap, judge calibration with human labels) awaiting sign-off.
+
 ### Monitoring and recovery
 
 - The daily backup keeps a dump only after it has been proved: gzip reads it back, it ends with pg_dump's completion line, it restores with errors fatal, every live table is in the restore and `alembic_version` matches. A failure prints `backup_failed reason=...`, removes the file and fails the run. The command is a readable bash script (`set -euo pipefail`) with tests (`tests/test_railway_backup_script.py`). `railway config apply` is needed to put it live.

@@ -23,6 +23,7 @@ arrived at; read them by question, not front to back.
 | Why did it lose equations to the chatbot recipe on real papers, what was fixed, and what did a fresh set of papers say? | [eval-equation-rootcause.md](eval-equation-rootcause.md) |
 | What did the second round of equation fixes do, on a third registered set of papers? | [eval-equation-round2.md](eval-equation-round2.md) |
 | Why did it trail a chatbot on equations, and what did reading each inline equation with its line do? | [eval-equation-round3.md](eval-equation-round3.md) |
+| Which 50 figures will long descriptions and chart data tables be judged on, how were they drawn, and what is pre-registered (draft)? | [eval-figures-long.md](eval-figures-long.md) |
 
 ## If you want to know how it is built
 
