@@ -47,7 +47,8 @@ def handwritten_output():
     fix.equation = EquationFix(latex=latex, mathml=mathml or "", speech="capital X plus y equals 2",
                                display="block")  # fmt: skip
     fix.checks = [
-        Check(name="equation.no_text_layer", passed=False, severity="warning", code="no_text_layer"),
+        Check(name="equation.no_text_layer", passed=False, severity="warning",
+              code="no_text_layer"),
         Check(name="image_page.second_reader", passed=False, severity="warning",
               code="second_reader_differs"),
     ]  # fmt: skip

@@ -332,7 +332,8 @@ class Settings(BaseSettings):
 
     # --- handwriting: reader B (models/math_readers, docs/math-readers.md). A second reading
     # of one handwritten expression, made to differ from the page pass's. Both readers are OFF
-    # and nothing in the pipeline calls one yet. Each sends the crop to a model provider, so a
+    # and the pipeline calls one only when `image_pages_second_reader` names it. Each sends the
+    # crop to a model provider, so a
     # production start is refused while one is on and the privacy notice does not name that
     # provider (`ops.launch.recipients_notice_problem`). Timeout and retries are
     # `model_timeout_s` and `model_max_retries`.

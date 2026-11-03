@@ -103,7 +103,8 @@ def test_the_choices_are_operated_from_the_keyboard_and_nothing_is_preselected(s
     assert chip.get_attribute("aria-pressed") is None
     # Tab order: the choice comes before the edit box and the decision buttons.
     order = page.evaluate(
-        """() => [...document.querySelectorAll('#decision button, #decision summary, #decision textarea')]
+        """() => [...document.querySelectorAll(
+            '#decision button, #decision summary, #decision textarea')]
             .map(e => e.dataset.role || e.tagName.toLowerCase())"""
     )
     assert order.index("chip") < order.index("save") < order.index("reject")
