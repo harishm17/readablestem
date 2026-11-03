@@ -22,7 +22,7 @@ dependencies = [
     "numpy>=2.3",
     "onnxruntime>=1.31.0,<1.32",
     "openai>=3.26.0",
-    "pillow>=12.0",
+    "pillow>=13.0",
     "psycopg[binary]>=3.3.6",
     "py3langid>=0.4.0",
     "pydantic>=2.13.5",
@@ -56,6 +56,8 @@ dev = [
     "ty>=0.0.85",
     # Embedded Postgres for local tests (no wheels for 3.13+; CI uses a service container).
     "pgserver>=0.1.4; python_version < '3.13'",
+    "pytest-xdist>=3.8.0",
+    "pytest-timeout>=2.4.0",
 ]
 # Headless Chromium: axe-core checks on generated HTML, and rendering gold equations to
 # images for the end-to-end eval. Install browsers with: uv run playwright install chromium

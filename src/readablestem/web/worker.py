@@ -90,6 +90,7 @@ from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation, Spe
 from readablestem.core.types import ConversionOutput, DocumentResult, ProgressEvent
 from readablestem.ops import limits
 from readablestem.web import access, carry_edits, events
+from readablestem.web import combine as combine_rules
 from readablestem.web import retry as retry_rules
 from readablestem.web.database import as_utc, rowcount
 from readablestem.web.db import Blob, Job, JobStatus, ReviewEdit, User, session_scope, utcnow
@@ -1062,9 +1063,12 @@ class Worker:
                 )
             if earlier is not None:
                 self._carry_decisions(session, job, result, output.crops, earlier)
+            # A part of a longer file: its pages are numbered as in that file, and the file
+            # is made again from the result (lazily, `current_html`) to say so.
+            numbered = combine_rules.number_part_pages(job, result)
             job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
             job.html = db_safe(result.html)
-            job.html_stale = False  # the file is made from this result
+            job.html_stale = numbered  # False: the file is made from this result
             # The row already counts every reservation (`_hold_on_job`). A converter that
             # reports more than went through the budget (a test fake) is counted as well.
             # The steps given back by the cache cost this much when they were first run: it

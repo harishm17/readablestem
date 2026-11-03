@@ -1,0 +1,37 @@
+name: Eval guard
+
+# A pull request that changes a model constant in config.py or a prompt under
+# src/readablestem/models/prompts/ must also change the matching data/eval/latest-*.json
+# report(s), so the change was measured. Logic and the report mapping: scripts/eval_guard.py
+# (tests: tests/test_eval_guard.py). Opt-out for a change that does not alter what a model
+# is asked or which model answers: the label `eval-unchanged`, or a commit trailer
+# `Eval-Unchanged: <reason>` (docs/eval.md, "Eval guard"). Spends nothing.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: model and prompt changes carry their eval report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Values from the event reach the shell as environment variables, never pasted into
+      # the script (a label or branch name is attacker-controlled text).
+      - name: Check the change against the committed reports
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: python3 scripts/eval_guard.py --base "origin/${BASE_REF}" --head HEAD --labels-json "$LABELS_JSON"

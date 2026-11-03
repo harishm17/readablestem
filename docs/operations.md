@@ -612,13 +612,19 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 
 | Job | What it checks |
 |---|---|
-| `lint-test` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, `pytest` (offline; Postgres tests use the embedded server on 3.12) |
-| `postgres` | `pytest -m postgres` against a Postgres 16 service container |
-| `browser` | `pytest -m browser` with Playwright Chromium (axe-core checks) |
+| `lint-test` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, `pytest -n auto` (offline, parallel; Postgres tests use the embedded server on 3.12) |
+| `postgres` | `alembic upgrade head` and `alembic check` (models match migrations), then `pytest -m postgres`, against a Postgres 18 service container (the major the backup image uses). Zero collected tests fails the job |
+| `browser` | `pytest -m browser` with Playwright Chromium (axe-core checks); zero collected tests fails the job |
+| `dependency-audit` | `pip-audit` over the exported lock (all groups and extras); any known vulnerability fails the job. An unfixable one needs a commented ignore entry in the workflow |
+| `CodeQL` (own workflow) | CodeQL for Python and GitHub Actions on push to main, on pull requests and weekly |
 | `docker` | Builds the image (no push) with BuildKit and again with the legacy builder (`DOCKER_BUILDKIT=0`, as the Cloud Run path's Cloud Build `--tag` build may use), and checks the entry point and non-root user |
 | `eval-gate` | `readablestem eval gate --require-current` for every committed `data/eval/baseline-<task>.json` against its `latest-<task>.json` (skips while none is committed). Fails on a regression, a changed judge, or a latest report the current prompts did not produce |
 | `secret-scan` | gitleaks over the full history |
 
 Every action is pinned to a commit SHA with its tag in a comment; Dependabot proposes
-updates weekly. `eval-live.yml` (manual, costs money) runs the equations eval against
-the live models with a `max_usd` cap and uploads the report as an artifact.
+updates weekly. `eval-guard.yml` fails a pull request that changes a model constant or a
+prompt without the matching `data/eval/latest-*.json` (label `eval-unchanged` or trailer
+`Eval-Unchanged: <reason>` to opt out). `eval-live.yml` (costs money; weekly and by hand)
+runs every eval task against the production provider with a hard cap per task (at most
+$2.95 a week), gates each report against its baseline and uploads it as an artifact; it
+skips with a notice while `ANTHROPIC_API_KEY` is not set. Both: `docs/eval.md`.

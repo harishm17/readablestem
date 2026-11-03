@@ -65,6 +65,11 @@ On the job page, download both: **For Canvas (zip with images)** with your cours
    column header with each cell?) and the equation (does it read as maths?). A pasted page
    loses `headers` on irregular tables and `tabindex` on scroll boxes: the README says so;
    note whether it matters in practice.
+9. Navigation: in the saved page, do the contents list's links jump to the headings, are the
+   "Page N" markers visible between pages (and does a screen reader find them as page
+   breaks), and do a footnote's mark and its "Back to the text" link work? The paste version
+   has no "Skip to main content" link on purpose (the README says so); in `index.html`
+   from Files it should be a plain link at the top.
 
 ## B. The Common Cartridge
 

@@ -15,6 +15,7 @@ printed pages read differently.
 |---|---|
 | `uv sync` | Create `.venv` and install locked dependencies |
 | `make test` | `uv run pytest` (offline) |
+| `make test-fast` | Unit tests in parallel (`pytest -n auto`, pytest-xdist), without the Postgres, browser, network, live-model and slow markers |
 | `make test-network` | Live OpenStax API test (`pytest -m network`) |
 | `make lint` | `ruff check` + `ruff format --check` |
 | `make fmt` | Format and auto-fix |

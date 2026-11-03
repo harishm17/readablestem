@@ -35,6 +35,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/terms"): PUBLIC,
     ("GET", "/limits"): PUBLIC,
     ("GET", "/help/posting"): PUBLIC,
+    ("GET", "/guides"): PUBLIC,
     ("GET", "/guides/ada-title-ii-stem-course-materials"): PUBLIC,
     ("GET", "/guides/readablestem-mathpix-latexml"): PUBLIC,
     ("GET", "/status"): PUBLIC,
@@ -99,6 +100,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/download"): USER,
     ("GET", "/jobs/{job_id}/download/canvas"): USER,  # the same file, packaged for Canvas
     ("GET", "/jobs/{job_id}/download/cartridge"): USER,  # T3-8: the same file as a cartridge
+    ("GET", "/jobs/{job_id}/combine"): USER,  # T3-3: the finished parts of a source, joined
     ("GET", "/jobs/{job_id}/draft"): USER,
     ("GET", "/jobs/{job_id}/feedback"): USER,
     ("POST", "/jobs/{job_id}/feedback"): USER,
@@ -119,6 +121,10 @@ ROUTES: dict[tuple[str, str], str] = {
     # T3-11: accept the clean tables in one write; read a table's maths cell with the model
     # (rate limited, one at a time, spend capped).
     ("POST", "/jobs/{job_id}/tables/accept-clean"): USER,
+    # Accept many at once: the list of what would be accepted, and the decision. CSRF, owner
+    # only, review version checked.
+    ("GET", "/jobs/{job_id}/accept/{slug}"): USER,
+    ("POST", "/jobs/{job_id}/accept/{slug}"): USER,
     ("POST", "/jobs/{job_id}/tables/{element_id}/read-cell"): USER,
     ("GET", "/jobs/{job_id}/progress"): USER,
     ("GET", "/jobs/{job_id}/record"): USER,  # T3-6: owner only, changes nothing
@@ -209,6 +215,7 @@ def site(tmp_path):
             "course_id": course_id,
             "entry_id": entry_id,
             "element_id": "p1-e3",
+            "slug": "equations",
             "number": "1",
         }
         yield env

@@ -36,7 +36,9 @@ is.
   that output is accessible, or a checked result, in code, docs or the interface.
 - **Numbers carry their sample size and an interval,** and say what they do not show.
   Changing a prompt or a model means re-running the relevant eval task and committing the
-  new report (`docs/eval.md`, "How to rerun"); CI's eval gate fails on a regression.
+  new report (`docs/eval.md`, "How to rerun"); CI's eval gate fails on a regression and the
+  eval guard fails a pull request that changes a model constant or a prompt without its
+  `latest-*` report (opt-out for refactors: `docs/eval.md`, "Eval guard").
 - **`--max-usd` caps reservations, not spend.** Each model call reserves its worst case
   (a main-model call reserves far more than it costs), so a cap near the expected spend
   stops a run part-way. Set it to at least four times the expected spend, keep

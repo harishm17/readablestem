@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import subprocess
+import sys
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -11,6 +14,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 INTERIM = ROOT / "proof" / "interim"
 REPORT = INTERIM / "INTERIM-heldout-2026-10.md"
+TAG = "proof-heldout-2026-10"  # the Makefile's PROOF_TAG (tests/test_proof_pin.py keeps them equal)
 
 
 def _load():
@@ -26,10 +30,20 @@ def report():
     return _load()
 
 
-def _gold_dir() -> Path:
+def _tag_gold_dir() -> Path | None:
+    """The answer key as the code at the tag fetches it (`make heldout-gold-at-tag`), or None.
+    It is not the folder `make heldout-gold` fills: the rename changed the key's text."""
+    explicit = os.environ.get("HELDOUT_GOLD_AT_TAG")
     base = os.environ.get("XDG_CACHE_HOME")
-    root = Path(base) if base else Path.home() / ".cache"
-    return Path(os.environ.get("HELDOUT_GOLD", root / "readablestem" / "heldout" / "gold"))
+    cache = (Path(base) if base else Path.home() / ".cache") / "readablestem" / "at-tag"
+    folders = [Path(explicit)] if explicit else sorted(cache.glob("*/heldout/gold"))
+    return next((f for f in folders if (f / "manifest.json").is_file()), None)
+
+
+def _skip_or_fail(reason: str) -> None:
+    if os.environ.get("PROOF_INTERIM_REQUIRE_GOLD"):  # set by .github/workflows/proof-interim.yml
+        pytest.fail(reason)
+    pytest.skip(reason)
 
 
 def test_a_missing_answer_key_says_how_to_get_it_instead_of_a_traceback(report, tmp_path):
@@ -136,12 +150,46 @@ def test_the_readme_numbers_are_the_reports_numbers():
     assert "make heldout-gold" in readme or "INTERIM-heldout-2026-10.md" in readme
 
 
-def test_the_report_is_what_the_committed_data_produce(report):
-    gold = _gold_dir()
-    if not (gold / "manifest.json").is_file():
-        pytest.skip("the held-out answer key is not fetched (make heldout-gold)")
-    built = report.build(INTERIM / "heldout-2026-10", gold)
-    assert built == REPORT.read_text(encoding="utf-8")
+def test_the_report_is_what_the_tag_produces_from_the_committed_data(tmp_path):
+    """Replay the report at the tag, as `make proof` replays the recorded run.
+
+    The committed report is a registered record (Addendum 5 pins its SHA-256), so it is
+    reproduced by the code that made it, not by this checkout's. Run on this checkout it
+    differs, for two known reasons: the scorer converts each parser's LaTeX with the
+    production converter, which the chemistry work changed on purpose (mineru-basic's exact
+    equations 238 -> 241 of 1,369), and the rename of Addendum 8 changed the footer of the
+    parsers' outputs but not the printed PDFs (coverage 32,906 -> 32,696 of 45,467). Run at
+    the tag, with the key that the tag's own code fetches, the file is reproduced byte for
+    byte. That the committed file is the tag's file with only the name renewed is checked
+    by `proof/verify-rename.py` (tests/test_proof_registered.py)."""
+    tagged = subprocess.run(
+        ["git", "show", f"{TAG}:proof/interim/{REPORT.name}"],
+        cwd=ROOT,
+        capture_output=True,
+        check=False,
+    )
+    if tagged.returncode != 0:
+        _skip_or_fail(f"the tag {TAG} is not in this clone (fetch tags)")
+    gold = _tag_gold_dir()
+    if gold is None:
+        _skip_or_fail("the held-out key at the tag is not fetched (make heldout-gold-at-tag)")
+        return
+    archive = tmp_path / "tag.tar"
+    subprocess.run(["git", "archive", "-o", str(archive), TAG], cwd=ROOT, check=True)
+    tree = tmp_path / "tree"
+    with tarfile.open(archive) as tar:
+        tar.extractall(tree, filter="data")
+    out = tmp_path / "report.md"
+    done = subprocess.run(
+        [sys.executable, "proof/interim/report.py", "--gold", str(gold), "--out", str(out)],
+        cwd=tree,
+        env={**os.environ, "PYTHONPATH": str(tree / "src")},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert out.read_bytes() == tagged.stdout
 
 
 def test_addendum_5_names_the_hash_of_the_committed_report():

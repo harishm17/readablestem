@@ -12,7 +12,7 @@ file in it:
   parts as the limit allows, of nearly equal size (59 pages with a limit of 30 are two
   parts, 30 and 29 pages; 61 pages are three, 21, 20 and 20).
 - `label` writes a set of pages the way people write them ("1-30", "1-5, 9") for a part's
-  name and for the lists on the pages.
+  name and for the lists on the pages; `pages_of_label` reads one back.
 
 Pages inside this module are 0-based sets, like everywhere in the pipeline; text is 1-based.
 """
@@ -56,6 +56,22 @@ def label(pages: tuple[int, ...] | list[int]) -> str:
         else:
             spans.append((page, page))
     return ", ".join(f"{a + 1}" if a == b else f"{a + 1}-{b + 1}" for a, b in spans)
+
+
+def pages_of_label(text: str | None) -> tuple[int, ...] | None:
+    """The 0-based pages a part's `label` names ("31-59" or "1-5, 9"), ascending; None when
+    it is not a label `label` wrote. The inverse of `label`, for putting a part back among
+    the pages of its source."""
+    pages: set[int] = set()
+    for piece in (text or "").split(","):
+        match = _RANGE.match(piece.strip())
+        if match is None:
+            return None
+        first, last = int(match.group(1)), int(match.group(2) or match.group(1))
+        if first < 1 or last < first:
+            return None
+        pages.update(range(first - 1, last))
+    return tuple(sorted(pages)) or None
 
 
 def parse_parts(text: str, *, total: int, limit: int, taken: set[int] | None = None) -> list[Part]:

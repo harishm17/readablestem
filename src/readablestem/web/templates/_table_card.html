@@ -32,7 +32,7 @@
 <form method="post" action="/jobs/{{ job.id }}/tables/accept-clean" class="inline-form accept-clean">
   {{ table_fields(view) }}
   <button type="submit" class="button-secondary" data-role="accept-clean" aria-describedby="accept-clean-note">Accept all {{ count }} clean tables</button>
-  <p class="hint" id="accept-clean-note">The tables where the checks found nothing wrong. You can still change any of them afterwards.</p>
+  <p class="hint" id="accept-clean-note">The tables where the checks found nothing wrong. You can still change any of them afterwards.{% if decision_filter is defined and decision_filter.active %} This covers all {{ count }} clean tables, not only the ones the filter shows.{% endif %}</p>
 </form>
 {% endif %}
 {% endmacro %}

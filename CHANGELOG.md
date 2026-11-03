@@ -1,5 +1,52 @@
 # Changelog
 
+## Unreleased: dependency and CI hardening
+
+- Locked dependencies upgraded for known advisories: pillow 12.3.0 to 13.0.0 (floor now `>=13.0`),
+  certifi to 2026.10.23, joserfc to 1.7.7.
+- CI: a `dependency-audit` job (`pip-audit` over the exported lock), a CodeQL workflow (Python and
+  GitHub Actions; push to main, pull requests, weekly), `alembic upgrade head` plus `alembic check` in
+  the `postgres` job, which now runs Postgres 18 (the backup image's major). Zero collected tests in the
+  `postgres` and `browser` jobs now fails them. The main `pytest` step runs in parallel (`-n auto`).
+- `make test-fast`; pytest-xdist and pytest-timeout in the dev group. The review-UX browser tests wait
+  with Playwright's `expect` and have a 120 s per-test timeout.
+## The interim held-out report is replayed at the tag, and CI runs it (2026-11-02, branch fix/proof-interim-repro)
+
+- `tests/test_proof_interim.py` used to rebuild the registered report with the current scorer, and
+  skipped without the held-out key, which CI never fetches. With the key it failed on main: the
+  chemistry converter change moved one parser's exact equations (238 to 241 of 1,369) and the rename
+  of Addendum 8 moved coverage by 210 6-grams. It now replays `report.py` at the tag
+  `proof-heldout-2026-10` with the key the tag's code fetches (`make heldout-gold-at-tag`) and
+  requires the registered bytes. No registered number or file changed.
+- `make proof-interim` writes `proof/interim/rebuilt-here.md` instead of the registered file.
+- `.github/workflows/proof-interim.yml` fetches the key and runs the test (a missing key fails) on
+  pull requests touching `proof/`, the scorer modules, the dependencies or the test, and weekly.
+## Unreleased: security hardening
+
+- The `/m/` analytics relay is rate limited per address (`analytics`, 300 per 10 minutes) and no
+  longer forwards the visitor's address to PostHog.
+- Production refuses `ANALYTICS_ENABLED=true` until the privacy notice names PostHog and no
+  longer says there are no analytics. The notice text is unchanged.
+- Production requires a `CRON_TOKEN` of at least 32 characters.
+- A one-time `proxy_hops_unexpected` log line when `X-Forwarded-For` has more entries than
+  `TRUSTED_PROXY_HOPS + 1`; `launch-check` flags `TRUSTED_PROXY_HOPS=0` in production.
+- `SESSION_SECRET_PREVIOUS`: earlier session secrets accepted for verification only, so the
+  secret can be rotated without signing everyone out ([docs/security.md](docs/security.md)).
+## Unreleased: review at scale, finish notice, guides, caching
+
+- Review: "Accept all remaining equations whose checks passed" and "Accept all figures that have
+  generated alt text", each after a list of what would be accepted; one write, one Undo
+  (`web/bulk_accept.py`). The list view's decisions can be filtered by kind and by page. Every card
+  has "Report this item" (job and item ids only). Pages kept as images have the documented "Leave
+  this page out of the HTML" button. Undo is 44 px, and the marks on the page image grow to 44 px
+  where there is room ([docs/web.md](docs/web.md), "Review at scale").
+- Job page: the tab title changes and an opt-in browser notice shows when a conversion finishes.
+  "Upload a revised version" is on the results page and on each finished row of My documents.
+- The landing page says what review costs (decisions per page, a full job, a new account's day,
+  deletion after 24 hours). `/guides` lists the guides; the sitemap names the showcase pages by their
+  canonical address.
+- `/demo`, the showcase pages and unhashed static files are served with an ETag and a one hour
+  `max-age` instead of `no-store` or `no-cache`.
 ## Unreleased
 
 - Fifth fresh real-world split, builder only (no system run): `scripts/fresh5_select.py` (arXiv continuation, OpenStax
@@ -8,6 +55,39 @@
   (`data/realworld/PREREGISTRATION-FRESH5.md`). `arxiv_gold.analyse` takes `min_equations` (default unchanged, 5).
   [docs/eval-realworld.md](docs/eval-realworld.md).
 
+### Navigation in the output, and combining the parts of a long source (branch feat/output-navigation)
+
+- The converted file now has a skip link, a contents list (`<nav aria-label="Contents">`, nested links to the
+  headings, from 3 headings, and not when the PDF has a contents page of its own), page markers at each source
+  page boundary (`role="doc-pagebreak"`, "Page N": the PDF's page label, else the number printed in the margin;
+  a page with neither says "PDF page N" when other pages have a label, "Page N" when none does) and footnote links both ways (`doc-noteref`, `doc-footnote`, `doc-backlink`)
+  (`pipeline/navigation.py`, `pipeline/page_labels.py`; docs/output.md "Navigation"). Every heading has an id.
+  Every converted file changes by the skip link; golden files regenerated.
+- Canvas page to paste: the skip link is left out (its target, `<main>`, is removed by Canvas); the contents list,
+  markers and note links are kept. The README in the zip says so. The Common Cartridge page is the zip's
+  `index.html`, unchanged.
+- axe in `html_checks.axe_checks` also runs the `wcag22aa` tag; no output fixture failed it.
+- "Combine parts": one HTML file from a person's own finished, still-kept parts of the same long source, in page
+  order, with one contents list, continuous page markers and ids that cannot clash; parts with a decision open are held
+  back, overlapping parts keep the newest, and the download restarts the parts' clocks like "Download all"
+  (`GET /jobs/{id}/combine`,
+  `pipeline/combine.py`, `web/combine.py`; docs/output.md "Combining the parts of a long source"). A part cut from a
+  long PDF keeps its pages' labels.
+- The committed demo (`web/static/demo/index.html`) was not regenerated: that needs a paid conversion run. Its
+  golden test renders the stored result and was regenerated.
+- `eval-live.yml` runs weekly (Monday 06:17 UTC) and by hand, for the production provider (Claude):
+  equations, headings, figures, document and tables, each with its own hard `--max-usd` (total at most
+  $2.95 a week, about $0.70 expected), each report gated with `eval gate --require-current` against its
+  committed baseline (tables: floors), reports uploaded as artifacts and never committed. It needs the
+  secret `ANTHROPIC_API_KEY` (was `OPENAI_API_KEY`, equations only); a scheduled run without it skips
+  with a notice. Chromium fonts are installed as in `ci.yml`.
+- `eval-guard.yml` and `scripts/eval_guard.py`: a pull request that changes a model constant in
+  `config.py` or a prompt under `models/prompts/` fails without the matching `data/eval/latest-*.json`.
+  Opt-out: label `eval-unchanged` or commit trailer `Eval-Unchanged: <reason>`.
+- Docs: `docs/eval.md` says which pipeline version and date made each committed report (0.5.0, Claude,
+  2026-10-14 and 2026-10-21; it said 0.4.0) and tells `PIPELINE_VERSION` (`pipeline/run.py`, what reports
+  record) from the package `__version__` (0.1.0); `tests/test_eval_docs.py` keeps the table true. The 0.4.0
+  results sections are labelled as historical and are not rewritten.
 ### Monitoring and recovery
 
 - The daily backup keeps a dump only after it has been proved: gzip reads it back, it ends with pg_dump's completion line, it restores with errors fatal, every live table is in the restore and `alembic_version` matches. A failure prints `backup_failed reason=...`, removes the file and fails the run. The command is a readable bash script (`set -euo pipefail`) with tests (`tests/test_railway_backup_script.py`). `railway config apply` is needed to put it live.
