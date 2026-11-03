@@ -453,6 +453,7 @@ def test_at_320_px_a_wide_table_scrolls_in_its_focusable_box_and_the_page_does_n
             page = browser.new_page(viewport={"width": 320, "height": 640})
             page.set_content(html)
             facts = page.evaluate(MEASURE)
+            page.keyboard.press("Tab")  # the skip link is the first tab stop
             page.keyboard.press("Tab")
             focused = page.evaluate("() => document.activeElement.id")
         finally:

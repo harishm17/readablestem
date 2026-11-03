@@ -598,7 +598,7 @@ def test_fake_models_answer_offline_and_are_refused_in_production(tmp_path):
         session_secret="s" * 40,
         google_client_id="id",
         google_client_secret="secret",
-        cron_token="t",
+        cron_token="t" * 32,
         openai_api_key="k",
         contact_email="c@example.org",
         database_url="postgresql+psycopg://x@localhost/db",

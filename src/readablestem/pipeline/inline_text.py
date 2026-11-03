@@ -55,6 +55,7 @@ from readablestem.pipeline.safe_html import escape_text
 EquationHtml = Callable[[str], str | None]
 # Adds CSS to the document's stylesheet, once per name (`_Renderer.add_style`).
 AddStyle = Callable[[str, str], None]
+LinkAttrs = Callable[[Link], str]
 
 COLOUR_CLASS_PREFIX = "tc-"
 # A lowered and a raised run side by side, written one above the other as they are
@@ -136,6 +137,7 @@ def render_inline_text(
     element: Element | None,
     equation: EquationHtml,
     add_style: AddStyle | None = None,
+    link_attrs: LinkAttrs | None = None,
 ) -> str:
     """`text` as HTML: escaped, with inline-equation markers replaced by `equation(id)`,
     and the element's links and colour runs written (see the module docstring).
@@ -143,7 +145,9 @@ def render_inline_text(
     `element` is the element whose stored `text` this is, or None when the text is
     something else (a caption, a heading a reviewer retyped): only then do the offsets
     of its links and colour runs apply. `add_style` adds the CSS colour runs need; with
-    none, colour runs are not written.
+    none, colour runs are not written. `link_attrs` gives the extra attributes (with a
+    leading space, already escaped) of the `<a>` written for a link, e.g. a footnote mark's
+    role; it is called once per link that is written.
     """
     markers = [(m.start(), m.end()) for m in INLINE_MARKER_RE.finditer(text)]
     placed: dict[int, tuple[int, str]] = {}
@@ -170,7 +174,7 @@ def render_inline_text(
             add_style(f"colour-{colour_class(rgb)}", colour_css(rgb))
     if add_style is not None and _stacked(segments):
         add_style(STACK_CLASS, STACK_CSS)
-    return _write(text, segments, [href for _, href in links])
+    return _write(text, segments, [href for _, href in links], [k for k, _ in links], link_attrs)
 
 
 def _plain(text: str, placed: dict[int, tuple[int, str]]) -> str:
@@ -261,7 +265,13 @@ def _coloured(text: str, segments: Sequence[_Segment]) -> str:
     return "".join(out)
 
 
-def _write(text: str, segments: list[_Segment], hrefs: list[str]) -> str:
+def _write(
+    text: str,
+    segments: list[_Segment],
+    hrefs: list[str],
+    links: Sequence[Link] = (),
+    link_attrs: LinkAttrs | None = None,
+) -> str:
     out: list[str] = []
     i = 0
     while i < len(segments):
@@ -272,7 +282,8 @@ def _write(text: str, segments: list[_Segment], hrefs: list[str]) -> str:
         link = segments[i].link
         shown = "".join(text[s.start : s.end] for s in segments[i:j])
         if link is not None and shown.strip():
-            out.append(f'<a href="{escape_text(hrefs[link])}">{inner}</a>')
+            extra = link_attrs(links[link]) if link_attrs is not None and links else ""
+            out.append(f'<a href="{escape_text(hrefs[link])}"{extra}>{inner}</a>')
         else:
             out.append(inner)
         i = j

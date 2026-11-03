@@ -174,7 +174,7 @@ def test_the_site_config_is_never_cached_and_gets_the_browsers_origin(on, upstre
     assert json_config.headers["cache-control"] == "no-store"
 
 
-def test_events_go_to_the_api_host_without_cookies_and_with_the_callers_address(on, upstream):
+def test_events_go_to_the_api_host_without_cookies_or_the_callers_address(on, upstream):
     body = b'{"api_key": "x", "event": "e"}'
     response = on.browser.post(
         "/m/i/v0/e/?ip=0&_=1",
@@ -184,6 +184,8 @@ def test_events_go_to_the_api_host_without_cookies_and_with_the_callers_address(
             "Cookie": "readablestem_session=secret",
             "Authorization": "Bearer phc_abc",
             "X-Forwarded-For": "198.51.100.7",
+            "X-Real-IP": "198.51.100.7",
+            "Forwarded": "for=198.51.100.7",
             "Referer": "https://readablestem.com/jobs/abc",
         },
     )
@@ -193,8 +195,7 @@ def test_events_go_to_the_api_host_without_cookies_and_with_the_callers_address(
     assert request.method == "POST" and request.content == body
     assert request.headers["content-type"] == "application/json"
     assert request.headers["authorization"] == "Bearer phc_abc"
-    assert request.headers["x-forwarded-for"] == "198.51.100.7"
-    for dropped in ("cookie", "referer"):
+    for dropped in ("cookie", "referer", "x-forwarded-for", "x-real-ip", "forwarded"):
         assert dropped not in request.headers
     assert "set-cookie" not in response.headers  # PostHog's cookie is not passed to the browser
     assert response.headers["cache-control"] == "no-store"
@@ -423,3 +424,13 @@ def test_the_footer_credit_is_on_app_pages_and_not_in_generated_documents(off):
     off.run_worker()
     for path in (f"/jobs/{job}/view", f"/jobs/{job}/download", "/demo"):
         assert "Built by" not in client.get(path).text, path
+
+
+def test_the_relay_is_rate_limited_per_address(tmp_path, upstream):
+    env = WebEnv(tmp_path, analytics_enabled=True, rate_limits_enabled=True)
+    with env.running() as client:
+        rule = env.ctx.limiter.rules["analytics"]
+        env.ctx.limiter.rules["analytics"] = type(rule)(3, rule.window_s)
+        codes = [client.post("/m/i/v0/e/", content=b"{}").status_code for _ in range(5)]
+        assert codes == [200, 200, 200, 429, 429]
+        assert len(upstream) == 3  # refused calls never reach PostHog

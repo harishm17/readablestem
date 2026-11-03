@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{# Accept many at once (routes/bulk.py, web/bulk_accept.py): what would be accepted, listed,
+   and the form that does it. Without JavaScript it is the same two steps. #}
+{% block title %}{{ spec.title }}: {{ job.filename }}{% endblock %}
+{% block content %}
+<h1>{{ spec.title }}</h1>
+<p class="lede">{{ job.filename }}</p>
+{% if not count %}
+<p>{{ spec.nothing }}</p>
+<p><a href="{{ back_href }}">Back to the review</a></p>
+{% else %}
+<p id="bulk-summary">{{ counted|capitalize }} {{ "is" if count == 1 else "are" }} waiting for your decision with
+  {% if spec.slug == "equations" %}every check passed{% else %}alt text the tool wrote and every check passed{% endif %}.
+  Accepting uses {{ "its" if count == 1 else "each" }} proposal as it is. Anything with a failed check, and anything the second check flagged,
+  is not in this list and stays for you to decide.</p>
+<p>Look through the list below. {{ "It stays" if count == 1 else "They stay" }} editable afterwards,
+  and Undo takes the whole action back in one step.</p>
+
+<form method="post" action="/jobs/{{ job.id }}/accept/{{ spec.slug }}" class="bulk-confirm">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  <input type="hidden" name="version" value="{{ result_version }}">
+  <input type="hidden" name="view" value="{{ view }}">
+  <div class="button-row">
+    <button type="submit" class="button" aria-describedby="bulk-summary">Accept {{ "this " ~ spec.one if count == 1 else "all " ~ count ~ " " ~ spec.many }}</button>
+    <a class="button-secondary" href="{{ back_href }}">Cancel</a>
+  </div>
+</form>
+
+<h2 id="bulk-list-title">What would be accepted ({{ count }})</h2>
+<ol class="bulk-preview" aria-labelledby="bulk-list-title">
+  {% for item in items %}
+  <li id="bulk-{{ item.element_id }}">
+    <p><strong>{{ item.label }}</strong>{% if item.page %}, page {{ item.page }}{% endif %}.
+      <a href="/jobs/{{ job.id }}/review?item={{ item.element_id }}">Open {{ item.label|lower }} on the review screen<span class="visually-hidden"> to decide it on its own</span></a></p>
+    <div class="fix-body">
+    <figure class="crop">
+      {% if item.crop_url %}
+      <img src="{{ item.crop_url }}" loading="lazy" alt="The original {{ item.label|lower }} from page {{ item.page }} of the PDF, as an image.">
+      {% else %}
+      <p>No image of the original is available.</p>
+      {% endif %}
+      <figcaption>Original in the PDF</figcaption>
+    </figure>
+    <div class="proposal">
+    {% if item.kind == "equation" %}
+    {% if item.mathml %}<div class="mathml-preview" tabindex="0" role="group" aria-label="Proposed {{ item.label|lower }}">{{ item.mathml }}</div>{% endif %}
+    {% if item.speech %}<p>Read aloud roughly as: {{ item.speech }}</p>{% endif %}
+    {% else %}
+    <p class="alt-proposal"><span class="part-label">Alt text:</span> {{ item.alt }}</p>
+    {% endif %}
+    </div>
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+{% endif %}
+{% endblock %}

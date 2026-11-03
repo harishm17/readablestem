@@ -374,7 +374,8 @@ feature on, and on the replay of the committed proof bundle):
 - the text pass and the heading decisions, which no step reads, run while the models
   answer instead of before the first request;
 - the worker loads the table models when it starts (`PRELOAD_TABLE_MODELS`, production
-  only), while it waits for its first job: the first conversion after a start no longer
+  only; since conversions run in a child process, which loads them itself, this applies only to a
+  conversion run in the web process), while it waits for its first job: the first conversion after a start no longer
   pays for them (6 pages: 9.3 s to 8.2 s here, 1.7 s of CPU moved out of the job; measured
   on a busy 16-core machine, so on one vCPU the saving is the 4-5 s the model load takes
   there).
@@ -712,9 +713,10 @@ A second instance (`--max-instances=2`) only runs, and costs, under load.
   `uptime.yml` workflow then fetches `/readyz` and `/demo` and fails (GitHub emails you)
   if either does not answer 2xx. In a public repository GitHub disables scheduled
   workflows after 60 days without activity; re-enable it from the Actions tab.
-- **Live eval**: repository secret `OPENAI_API_KEY`, from a separate OpenAI project with
-  its own small hard limit. `eval-live.yml` runs only when started by hand and refuses a
-  `max_usd` above 10.
+- **Live eval**: repository secret `ANTHROPIC_API_KEY`, from a separate Anthropic workspace
+  with its own small hard limit (the weekly run spends at most $2.95, about $0.70 expected).
+  `eval-live.yml` runs weekly and by hand; without the secret a scheduled run skips with a
+  notice. Each task has its own `--max-usd` (`docs/eval.md`, "Weekly live run").
 
 ## Before the first real users
 
