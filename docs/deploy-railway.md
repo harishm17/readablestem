@@ -161,6 +161,7 @@ production if a required one is missing, and logs the reason):
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | Defaults 24 hours and 30 days. | Leave unset. If you set them, the cron service needs the same values (reference the web service's). |
 | `CLAUDE_CANARY` | Daily drift check of the Claude second check. Only the HTTP cron route runs it, so with the cron service it never runs and this variable does nothing. | Leave unset. |
 | `INSTALL_LIBREOFFICE` | Build argument, see decision 4. | Unset. |
+| `INSTALL_MATH_READER` | Build argument: adds the local handwriting reader's model files (0.6 GB; `docs/math-readers.md`, "The local reader"). Nothing calls the reader yet, and `MATH_READER_LOCAL_ENABLED` is off. With it, allow 2 GB of memory. | Unset. |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | How long Railway waits between SIGTERM and SIGKILL for the old deployment (its documented default is 0). The worker stops claiming at once on SIGTERM and gives its running job back; uvicorn waits up to 5 s for open connections, then the worker stop up to 3 s. | `10`, set as `deploy.drainingSeconds` on `web` in `.railway/railway.ts` |
 | `TRACING_ENABLED` and the Langfuse keys | Off. | Leave off. |
 
@@ -423,7 +424,8 @@ has its own address-space cap of 768 MB plus twice the PDF. Each conversion runs
 web process plus a child of about 0.3-0.5 GB resident. Recommendation:
 **allow 1 GB, expect 0.4 to 0.6 GB resident, and do not set a limit below 1 GB**; with
 `INSTALL_LIBREOFFICE=true` allow 2 GB (LibreOffice adds about 300 MB while a Word or PowerPoint file
-converts). Railway bills memory by use, not by what is allowed, so a higher allowance costs nothing
+converts); with `INSTALL_MATH_READER=true` and the reader enabled, a child that has loaded it holds
+about 1.1 GB resident (measured, 74 crops), so allow 2 GB there too. Railway bills memory by use, not by what is allowed, so a higher allowance costs nothing
 until it is used. Railway's Hobby plan lists up to 48 GB per service in its pricing page;
 a service memory limit is a setting only if you want to cap it (Settings > Resource limits, **confirm**).
 Watch the Metrics tab during the first real conversions and the first 300-page upload.
