@@ -78,7 +78,9 @@ Element conventions:
    content and stays. A fixed text (`PHYS 101 Lecture Notes`) goes whatever its size. The
    reference pages are the analysed pages plus their neighbours, up to 24 pages, so
    analysing one page of a long PDF still recognises its header. Bare page numbers (`7`,
-   `Page 3 of 9`, `iv`, `- 12 -`) in the band are always dropped. Figures in the band
+   `Page 3 of 9`, `iv`, `- 12 -`) in the band are always dropped from the text (the page markers of
+   the output still carry them: `pipeline/page_labels.py` reads the PDF's page labels and the
+   numbers printed in the margins separately, docs/output.md "Navigation"). Figures in the band
    (raster images, and drawings clustered within the band) whose box, rounded to a point,
    repeats on half of the reference pages are logos and are dropped too. Watermarks go:
    diagonal text at least 2 x body size, and rotated text repeated at the same place on
@@ -1025,7 +1027,7 @@ equations are). A box drawn round one line of code is its frame, not a figure
 code keeps its line breaks and indentation but not its highlighting.
 
 **Footnotes.** A footnote (the notice `footnote`) is still found as before; since T2-16
-its mark in the text above it also links to it: the mark is found again in the element's
+its mark in the text above it also links to it (the output writes the mark as `doc-noteref`, the note as `doc-footnote`, with a `doc-backlink`, docs/output.md "Navigation"): the mark is found again in the element's
 text by the ten characters printed before it, and a mark that cannot be found exactly once
 gets no link (`_footnote_links`; an internal `Link` made by layout, which the text pass
 keeps and which wins over a PDF link on the same text).
@@ -1035,8 +1037,9 @@ an ellipsis counting for three) is a contents page (`_contents_rows`). Each such
 list item of its own with its title only: the leaders go, and so does the page number (at
 the end of the line, or a line of its own at the right edge on the same baseline); a line
 with no leaders whose number stands at that right edge is an entry too (a chapter line in
-bold). Items nest by indent (`list_level`). The page numbers are the printed book's, which
-nothing in the converted file has. An entry links to the one heading later in the document
+bold). Items nest by indent (`list_level`). The page numbers are the printed book's; the
+converted file marks its source pages instead (docs/output.md "Navigation"), and its own
+contents list is not written when the PDF has a contents page. An entry links to the one heading later in the document
 whose title is the same once section numbers are left out (`_contents_links`); when the
 PDF's own links already say where it goes, the text pass keeps those. Before, the
 chapter lines became headings with their numbers as stray paragraphs, and the section

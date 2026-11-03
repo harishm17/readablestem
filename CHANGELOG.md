@@ -10,6 +10,28 @@
   `postgres` and `browser` jobs now fails them. The main `pytest` step runs in parallel (`-n auto`).
 - `make test-fast`; pytest-xdist and pytest-timeout in the dev group. The review-UX browser tests wait
   with Playwright's `expect` and have a 120 s per-test timeout.
+## The interim held-out report is replayed at the tag, and CI runs it (2026-11-02, branch fix/proof-interim-repro)
+
+- `tests/test_proof_interim.py` used to rebuild the registered report with the current scorer, and
+  skipped without the held-out key, which CI never fetches. With the key it failed on main: the
+  chemistry converter change moved one parser's exact equations (238 to 241 of 1,369) and the rename
+  of Addendum 8 moved coverage by 210 6-grams. It now replays `report.py` at the tag
+  `proof-heldout-2026-10` with the key the tag's code fetches (`make heldout-gold-at-tag`) and
+  requires the registered bytes. No registered number or file changed.
+- `make proof-interim` writes `proof/interim/rebuilt-here.md` instead of the registered file.
+- `.github/workflows/proof-interim.yml` fetches the key and runs the test (a missing key fails) on
+  pull requests touching `proof/`, the scorer modules, the dependencies or the test, and weekly.
+## Unreleased: security hardening
+
+- The `/m/` analytics relay is rate limited per address (`analytics`, 300 per 10 minutes) and no
+  longer forwards the visitor's address to PostHog.
+- Production refuses `ANALYTICS_ENABLED=true` until the privacy notice names PostHog and no
+  longer says there are no analytics. The notice text is unchanged.
+- Production requires a `CRON_TOKEN` of at least 32 characters.
+- A one-time `proxy_hops_unexpected` log line when `X-Forwarded-For` has more entries than
+  `TRUSTED_PROXY_HOPS + 1`; `launch-check` flags `TRUSTED_PROXY_HOPS=0` in production.
+- `SESSION_SECRET_PREVIOUS`: earlier session secrets accepted for verification only, so the
+  secret can be rotated without signing everyone out ([docs/security.md](docs/security.md)).
 ## Unreleased: review at scale, finish notice, guides, caching
 
 - Review: "Accept all remaining equations whose checks passed" and "Accept all figures that have
@@ -27,6 +49,26 @@
   `max-age` instead of `no-store` or `no-cache`.
 ## Unreleased
 
+### Navigation in the output, and combining the parts of a long source (branch feat/output-navigation)
+
+- The converted file now has a skip link, a contents list (`<nav aria-label="Contents">`, nested links to the
+  headings, from 3 headings, and not when the PDF has a contents page of its own), page markers at each source
+  page boundary (`role="doc-pagebreak"`, "Page N": the PDF's page label, else the number printed in the margin;
+  a page with neither says "PDF page N" when other pages have a label, "Page N" when none does) and footnote links both ways (`doc-noteref`, `doc-footnote`, `doc-backlink`)
+  (`pipeline/navigation.py`, `pipeline/page_labels.py`; docs/output.md "Navigation"). Every heading has an id.
+  Every converted file changes by the skip link; golden files regenerated.
+- Canvas page to paste: the skip link is left out (its target, `<main>`, is removed by Canvas); the contents list,
+  markers and note links are kept. The README in the zip says so. The Common Cartridge page is the zip's
+  `index.html`, unchanged.
+- axe in `html_checks.axe_checks` also runs the `wcag22aa` tag; no output fixture failed it.
+- "Combine parts": one HTML file from a person's own finished, still-kept parts of the same long source, in page
+  order, with one contents list, continuous page markers and ids that cannot clash; parts with a decision open are held
+  back, overlapping parts keep the newest, and the download restarts the parts' clocks like "Download all"
+  (`GET /jobs/{id}/combine`,
+  `pipeline/combine.py`, `web/combine.py`; docs/output.md "Combining the parts of a long source"). A part cut from a
+  long PDF keeps its pages' labels.
+- The committed demo (`web/static/demo/index.html`) was not regenerated: that needs a paid conversion run. Its
+  golden test renders the stored result and was regenerated.
 - `eval-live.yml` runs weekly (Monday 06:17 UTC) and by hand, for the production provider (Claude):
   equations, headings, figures, document and tables, each with its own hard `--max-usd` (total at most
   $2.95 a week, about $0.70 expected), each report gated with `eval gate --require-current` against its
