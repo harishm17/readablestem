@@ -2097,6 +2097,15 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   source; rebuild with `uv run python tests/fixtures/layout/latex/make_pdfs.py --tectonic
   PATH` (deterministic, byte-identical with the same Tectonic version; PDFs must stay
   under 300 KB).
+- `tests/test_layout_beamer_math.py` checks four small Beamer decks
+  (`latex/beamer_*.tex`: frame titles, itemize with inline maths, display equations and
+  `align`, `\pause` and `\item<n->` overlays, two columns, a table with maths, slide
+  numbers, a theme with header and footer bars) against `beamer_*.gold.json`, the frames
+  and equations read from the `.tex` (`latex/make_beamer_gold.py`, using
+  `gold/arxiv_tex.py`). Slide numbers and footer bars are dropped and display equations
+  are found; what still fails (repeated overlay pages, the overlay frame title dropped as
+  a running header, a theme header bar kept as content, two columns read out of order,
+  table-cell maths without latex) is a strict xfail with its reason.
 - The text pass: `tests/test_text_pass.py` (alignment with inline markers, link
   rectangles, unsafe schemes, destinations, cross-reference edge cases, colour rules,
   the language and its change, on glyphs built in the test), `tests/test_text_language.py`
