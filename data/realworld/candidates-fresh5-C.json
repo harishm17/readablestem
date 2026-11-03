@@ -1,0 +1,3885 @@
+{
+ "seed": "realworld-fresh5-2026-11-02",
+ "pool_sha256": "a96fa4ae4ce9cc9c46dcb1b1185d89af0a0f73b6227f5f6e4a99d2b387b28c3a",
+ "visits": [
+  {
+   "repo": "will702/latex-curriculum",
+   "path": "templates/curriculum-template/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "EdmundWhis/Topology-II",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "marius-ebel/lecture",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "AlbertEMC2Stein/ComputationalGeometry",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "accepted"
+  },
+  {
+   "repo": "jonpas/beamer-feri",
+   "path": "template.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "48a/hse-se-lecture-notes",
+   "path": "25-26_1course/cpp/colloquium/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "48a/hse-se-lecture-notes",
+   "path": "25-26_1course/algebra/colloquium-2/intro.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "48a/hse-se-lecture-notes",
+   "path": "25-26_1course/discret-math/seminar notes/discret-math_25-26_1course.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "48a/hse-se-lecture-notes",
+   "path": "25-26_1course/economics/cheatsheet/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "48a/hse-se-lecture-notes",
+   "path": "25-26_1course/calculus/colloquium/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.16"
+  },
+  {
+   "repo": "48a/hse-se-lecture-notes",
+   "path": "25-26_1course/algebra/lecture notes/algebra_25-26_1course.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "liangchenn/ntu-beamer-template",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "SamSeven777/IlliniBeamer",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "AmirrezaFarnamTaheri/beamer-template",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "lawrge-math/lawrge-2022",
+   "path": "LAWRGe_2022_notes.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "lawrge-math/lawrge-2022",
+   "path": "Knutson 9.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "Eran-Rehani/Equation-of-mathematical-physics",
+   "path": "Exercises/Sol_12.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Eran-Rehani/Equation-of-mathematical-physics",
+   "path": "Lectures/08-01-2026-ai.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Eran-Rehani/Equation-of-mathematical-physics",
+   "path": "Additional/guest_Lecture_Difusion.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Eran-Rehani/Equation-of-mathematical-physics",
+   "path": "Procedures_Guide.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "2"
+  },
+  {
+   "repo": "Eran-Rehani/Equation-of-mathematical-physics",
+   "path": "Exercises/Sol_13.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Eran-Rehani/Equation-of-mathematical-physics",
+   "path": "Exercises/Sol_10.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "rixmape/oxblue-beamer",
+   "path": "example.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "WoWaster/lecture-notes",
+   "path": "bachelor-1/semester-1/algebra-and-number-theory/04_divisibility.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "WoWaster/lecture-notes",
+   "path": "bachelor-1/semester-1/algebra-and-number-theory/08_ftoa.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "WoWaster/lecture-notes",
+   "path": "bachelor-2/semester-4/mathematical-logic/01_propositionals_formulas.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "WoWaster/lecture-notes",
+   "path": "bachelor-2/semester-4/analysis/09_fourier_series.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "WoWaster/lecture-notes",
+   "path": "bachelor-1/semester-1/algebra-and-number-theory/06_gcd.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "WoWaster/lecture-notes",
+   "path": "bachelor-2/semester-4/analysis/03_cauchy_formula.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "piazzai/arguelles",
+   "path": "demo-arguelles.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.33"
+  },
+  {
+   "repo": "hayashi-workshop/multiFlowKobe",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "fabianbosshard/usi-informatics-course-summaries",
+   "path": "summaries/usi-stochastic-methods-summary.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "fabianbosshard/usi-informatics-course-summaries",
+   "path": "summaries/usi-fourier-analysis-summary.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "fabianbosshard/usi-informatics-course-summaries",
+   "path": "summaries/usi-optimization-methods-summary.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "fabianbosshard/usi-informatics-course-summaries",
+   "path": "summaries/usi-quantum-computing-summary.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "fabianbosshard/usi-informatics-course-summaries",
+   "path": "summaries/usi-algorithms-and-complexity/usi-algorithms-and-complexity-summary.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "fabianbosshard/usi-informatics-course-summaries",
+   "path": "summaries/usi-probability-and-measure-summary.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "LoicGrobol/presentation-template",
+   "path": "slides/slides.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "erfanhamdi/beamer_template",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Eran-Rehani/77605-Quantum-Theory-2-",
+   "path": "Exercise/Sol_08.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Eran-Rehani/77605-Quantum-Theory-2-",
+   "path": "Exercise/Sol_12.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Eran-Rehani/77605-Quantum-Theory-2-",
+   "path": "Additional/H atom.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Eran-Rehani/77605-Quantum-Theory-2-",
+   "path": "Exercise/Sol_01.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Eran-Rehani/77605-Quantum-Theory-2-",
+   "path": "Exercise/Sol_05.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Eran-Rehani/77605-Quantum-Theory-2-",
+   "path": "Exercise/Sol_10.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "md-arif-shaikh/gw-summer-school-icts-2021",
+   "path": "sgwb-early-universe.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "2"
+  },
+  {
+   "repo": "Yusername05/ICL_UG",
+   "path": "Year 3/Galois Theory/galtest.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.21"
+  },
+  {
+   "repo": "Yusername05/ICL_UG",
+   "path": "Year 3/Group Representation Theory/MATH60039.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.27"
+  },
+  {
+   "repo": "Yusername05/ICL_UG",
+   "path": "Year 3/Algebra 3/MATH60035.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.18"
+  },
+  {
+   "repo": "Yusername05/ICL_UG",
+   "path": "Year 3/Mathematical Logic/Math60132.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.13"
+  },
+  {
+   "repo": "Yusername05/ICL_UG",
+   "path": "Year 3/Functional Analysis/MATH60029.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Yusername05/ICL_UG",
+   "path": "Year 3/Algebraic Curves/MATH60033.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "aianniezhou-0529/COMPSCI-ECON206_Problem-Set-1-2_Ai-Zhou",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "jjmccollum/open-cbgm-sbl-talk",
+   "path": "tex/main/open-cbgm-sbl-talk.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "saxarona/slides-nail",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "edoars/latex-notes-cls",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "anish-sk/MIT-6006-PS9",
+   "path": "ps9-template.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "BruceZhaoR/Zh-beamer",
+   "path": "beamer_default.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "alpenwasser/TeX",
+   "path": "fonts/latex-fonts.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "alpenwasser/TeX",
+   "path": "booklet/signature8.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "alpenwasser/TeX",
+   "path": "guides/miktex/miktex.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "no_text_layer",
+   "detail": ""
+  },
+  {
+   "repo": "alpenwasser/TeX",
+   "path": "plotting/matlab/Main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "alpenwasser/TeX",
+   "path": "beamer/intro/code/simplest.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "alpenwasser/TeX",
+   "path": "bibliography/Main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "2"
+  },
+  {
+   "repo": "sanhacheong/stanford_beamer_poster",
+   "path": "example_poster.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "roaked/programming-lectures",
+   "path": "intermediate.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "roaked/programming-lectures",
+   "path": "beginner.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "vlipovac/UiB-CSD-latex-template",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "niklas-letz/fraunhofer-devops-day-2024",
+   "path": "CICD_Rollouts_auf_Rancher_mit_Terraform.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "Multramate/Cam-GANT",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "Bagehu/Ensicaen_Beamer",
+   "path": "Ensi-example.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "eLearningHub/quarto-concordia-presentation-starter",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "anish-sk/MIT-6006-PS8",
+   "path": "ps8-template.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "4"
+  },
+  {
+   "repo": "int28t/hse-se-lecture-notes",
+   "path": "25-26_1course/discret-math/seminar notes/discret-math_25-26_1course.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "int28t/hse-se-lecture-notes",
+   "path": "26-27_2course/algo/читлист/algorithms-cheat-sheet.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "4"
+  },
+  {
+   "repo": "int28t/hse-se-lecture-notes",
+   "path": "25-26_1course/calculus/lecture notes/calculus_25-26_1course.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.34"
+  },
+  {
+   "repo": "int28t/hse-se-lecture-notes",
+   "path": "25-26_1course/algebra/lecture notes/algebra_25-26_1course.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "int28t/hse-se-lecture-notes",
+   "path": "26-27_2course/algo/seminars/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "int28t/hse-se-lecture-notes",
+   "path": "25-26_1course/calculus/colloquium/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.16"
+  },
+  {
+   "repo": "Wesley-Fisher/Beamer_Presentation_Skeleton",
+   "path": "ExamplePresentation.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_text_layer",
+   "detail": ""
+  },
+  {
+   "repo": "The-Shaikh-Ayaz-University-Shikarpur/SAUS-Branding",
+   "path": "word/source/art/architecture.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "The-Shaikh-Ayaz-University-Shikarpur/SAUS-Branding",
+   "path": "latex/saus-certificate-starter.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "The-Shaikh-Ayaz-University-Shikarpur/SAUS-Branding",
+   "path": "latex/saus-exam-starter.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "3"
+  },
+  {
+   "repo": "The-Shaikh-Ayaz-University-Shikarpur/SAUS-Branding",
+   "path": "latex/saus-thesis-demo.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "The-Shaikh-Ayaz-University-Shikarpur/SAUS-Branding",
+   "path": "latex/saus-certificate-demo.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "3"
+  },
+  {
+   "repo": "The-Shaikh-Ayaz-University-Shikarpur/SAUS-Branding",
+   "path": "latex/saus-letter-starter.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "jmoldow/errorhandling",
+   "path": "errorhandling.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "anton-petrunin/topology",
+   "path": "book.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "anton-petrunin/topology",
+   "path": "math429.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "texstremists/Document-design",
+   "path": "unsorted/baposterGrelier/doc/cornerPeakHTT.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "texstremists/Document-design",
+   "path": "unsorted/baposterHaberstich/BaposterHaberstich.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "texstremists/Document-design",
+   "path": "unsorted/abbreviation-spacing.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "texstremists/Document-design",
+   "path": "typefaces/text-in-math.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "texstremists/Document-design",
+   "path": "presentations/multicolumnTOC.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "texstremists/Document-design",
+   "path": "typefaces/fontastic.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "BruceZhao0728/SJTU-NIS3329-Notes",
+   "path": "polynomials-and-fields/polynomials-and-fields.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "BruceZhao0728/SJTU-NIS3329-Notes",
+   "path": "elementary-number-theory/elementary-number-theory.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "greenthree/usts-beamer-theme",
+   "path": "example.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "greenthree/usts-beamer-theme",
+   "path": "tests/regression.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_text_layer",
+   "detail": ""
+  },
+  {
+   "repo": "greenthree/usts-beamer-theme",
+   "path": "template.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "joaobuibergen/geof211_lectures",
+   "path": "lax-wendroff.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "DotStefano/Beamer-template",
+   "path": "Paleta-1-Navy-Gold/Paleta-1-Navy-Gold.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "DotStefano/Beamer-template",
+   "path": "Paleta-2-Blue-Red/Paleta-2-Blue-Red.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "domschrei/KIT-SAT-LectureNotes",
+   "path": "2017-05-08.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "paulinelemenkova/ml-landcover-change-classification-talk",
+   "path": "Acta_Polytechnica_ML_20250629.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "paulinelemenkova/ml-landcover-change-classification-talk",
+   "path": "Acta_Polytechnica_ML_20250423.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "wenh06/Math-Course-Slides",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "demanasta/pres-templates",
+   "path": "phd_pres.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "demanasta/pres-templates",
+   "path": "pub_pres.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "demanasta/pres-templates",
+   "path": "lct_pres.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Frigus27/lwwnote",
+   "path": "examples/quick-start-cn.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Frigus27/lwwnote",
+   "path": "examples/theorem-demo.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Frigus27/lwwnote",
+   "path": "examples/quick-start-en.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Frigus27/lwwnote",
+   "path": "examples/cover-demo.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "lance1416/Template-LectureNotes",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "no_text_layer",
+   "detail": ""
+  },
+  {
+   "repo": "mbannick/uw-neurology-fellows",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "kmaed/kmbeamer",
+   "path": "kmbeamer_bg/kmbeamer_bg_Blackboard.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "kmaed/kmbeamer",
+   "path": "kmbeamer_bg/kmbeamer_bg_Notebook.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "joseph-nagel/latex-slides",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "vasishth/FGME_Stan_2017",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "mateomics/PopGen_Problem_set_LCG4_2026",
+   "path": "2_ProblemSet_pt1_JimenezMateo.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "huangjunjie-cs/simple-ucas-beamer",
+   "path": "examples/dasfaa2023-example.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "huangjunjie-cs/simple-ucas-beamer",
+   "path": "examples/demo-chinese.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "adamtopaz/UAlberta-412-512-lecture-notes",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "2"
+  },
+  {
+   "repo": "newell/projects-slide-deck",
+   "path": "deck.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "ivanmurashko/courseragalois",
+   "path": "galois.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "ondrejch/PHANES-course",
+   "path": "mod/04/lecture04.tex",
+   "beamer": true,
+   "outcome": "accepted"
+  },
+  {
+   "repo": "ondrejch/PHANES-course",
+   "path": "mod/06/lecture06.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "ondrejch/PHANES-course",
+   "path": "mod/03/lecture03.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "ondrejch/PHANES-course",
+   "path": "mod/02/lecture02.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "ondrejch/PHANES-course",
+   "path": "mod/07/lecture07.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "ondrejch/PHANES-course",
+   "path": "mod/01/lecture01.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "wyphan/qft",
+   "path": "tex/02-canonical-formalism-quantization-procedure.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "wyphan/qft",
+   "path": "tex/05-quantum-linear-chain.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "4"
+  },
+  {
+   "repo": "wyphan/qft",
+   "path": "tex/06a-continuum-limit-linear-chain.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "2"
+  },
+  {
+   "repo": "wyphan/qft",
+   "path": "tex/06b-classical-field-theory.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "2"
+  },
+  {
+   "repo": "wyphan/qft",
+   "path": "tex/07a-noethers-theorem.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.58"
+  },
+  {
+   "repo": "wyphan/qft",
+   "path": "tex/01-why-qft.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "wickles/phys-ucla-f14",
+   "path": "classical/lec11.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "wickles/phys-ucla-f14",
+   "path": "geometry/lec03.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "wickles/phys-ucla-f14",
+   "path": "quantum/hw06.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "wickles/phys-ucla-f14",
+   "path": "classical/lec06.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "wickles/phys-ucla-f14",
+   "path": "quantum/lec08.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "wickles/phys-ucla-f14",
+   "path": "classical/lec18.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "flaricy/math-in-ai-notes",
+   "path": "notes/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "agormp/evolintro",
+   "path": "evolintro.tex",
+   "beamer": false,
+   "outcome": "accepted"
+  },
+  {
+   "repo": "hanlulong/econ-slides-skill",
+   "path": "tests/baseline-regression-base.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "hanlulong/econ-slides-skill",
+   "path": "tests/violations-test.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "hanlulong/econ-slides-skill",
+   "path": "tests/nav-overlap-test.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "hanlulong/econ-slides-skill",
+   "path": "tests/script-sync/mini-deck.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "hanlulong/econ-slides-skill",
+   "path": "templates/theory-talk.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "hanlulong/econ-slides-skill",
+   "path": "tests/baseline-regression-shifted.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "KuntzeM/LaTex-Beamer-Template",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "UCL/ucl-beamer",
+   "path": "sample-poster.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "UCL/ucl-beamer",
+   "path": "sample.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "iadisirza-bkk/general-slide-template",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "GitHubAvailable/math-analysis-ii-grad",
+   "path": "chapters/ch1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.13"
+  },
+  {
+   "repo": "GitHubAvailable/math-analysis-ii-grad",
+   "path": "chapters/ch3.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "GitHubAvailable/math-analysis-ii-grad",
+   "path": "chapters/ch4.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "GitHubAvailable/math-analysis-ii-grad",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "GitHubAvailable/math-analysis-ii-grad",
+   "path": "chapters/ch2.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "GitHubAvailable/math-analysis-ii-grad",
+   "path": "chapters/ch5.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.11"
+  },
+  {
+   "repo": "gmartinezramirez-old/Beamer-Template-USACH",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "robmelfi/PatternRecognitionLectureNotes",
+   "path": "book.tex",
+   "beamer": false,
+   "outcome": "accepted"
+  },
+  {
+   "repo": "fliptanedo/paper-template-2025",
+   "path": "sample_paper_ADA.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "fliptanedo/paper-template-2025",
+   "path": "sample_paper.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "fliptanedo/paper-template-2025",
+   "path": "examples/examples_listings.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "fliptanedo/paper-template-2025",
+   "path": "experimentalADA.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "okayama-daiki/latex-skeleton",
+   "path": "report.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "okayama-daiki/latex-skeleton",
+   "path": "slides.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "inclyc/template-beamer",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "Stupid-Benz/MATH2131",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "Gabriel-98/Problem-Set",
+   "path": "Templates/Statement/statement (english).tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "Gabriel-98/Problem-Set",
+   "path": "Templates/Statement/statement (spanish).tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "Gabriel-98/Problem-Set",
+   "path": "Author/A02 - Rectangular Sum/Statement/statement (english).tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "2"
+  },
+  {
+   "repo": "anishathalye/auriga",
+   "path": "presentation.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "cionx/foundations-in-representation-theory-notes-ws-18-19",
+   "path": "notes.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "wangxb96/beamer-academic-template",
+   "path": "slide_template.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_text_layer",
+   "detail": ""
+  },
+  {
+   "repo": "wangxb96/beamer-academic-template",
+   "path": "example_presentation.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "AdolfoBanchio/famaf_slides_template",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "pl33/dcs-lecture-notes",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "lance1416/CSC336-Lecture-Notes",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "erick-beamers/bp_brasil",
+   "path": "presentation.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "ZhenhHuang/Lecture-Notes",
+   "path": "Convex Optimization/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "4"
+  },
+  {
+   "repo": "ZhenhHuang/Lecture-Notes",
+   "path": "Differential Geometric Loring W. TU/Chapter 01/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "MinhMPA/paper-to-talk",
+   "path": "examples/desi-act-ksz-stacking/journal_club_desi_act_ksz_stacking.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "MinhMPA/paper-to-talk",
+   "path": "examples/pairwise-ksz-gravity/journal_club_pairwise_ksz_gravity.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "2"
+  },
+  {
+   "repo": "MinhMPA/paper-to-talk",
+   "path": "skills/paper-to-talk/template-beamer-16x9.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "Junwei-Lao/TAMU_ECEN325-326_extra_practice_schematics",
+   "path": "src/lecture2/tex/L2_2A_opamp_blocks.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "Junwei-Lao/TAMU_ECEN325-326_extra_practice_schematics",
+   "path": "src/lecture2/tex/L2_2E_slew_rate.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "Junwei-Lao/TAMU_ECEN325-326_extra_practice_schematics",
+   "path": "src/lecture4/tex/L4_4B_current_mirrors.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "Junwei-Lao/TAMU_ECEN325-326_extra_practice_schematics",
+   "path": "src/lecture4/tex/L4_4E_amplifier_design.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "Junwei-Lao/TAMU_ECEN325-326_extra_practice_schematics",
+   "path": "src/lecture3/tex/L3_3B_diode_opamp.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "Junwei-Lao/TAMU_ECEN325-326_extra_practice_schematics",
+   "path": "src/lecture1/tex/L1_1C_dependent_sources.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "offroad-robotics/ingenuitylabs-slides",
+   "path": "ingenuitylabs-slides-example.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "sbh4th/pphs-617",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "holevasdimitrios/computational-learning-theory",
+   "path": "assignment1-rank_estimation/rank_estimation_solution.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "2"
+  },
+  {
+   "repo": "holevasdimitrios/computational-learning-theory",
+   "path": "assignment4-learning_rectangles/learning_rectangles_solution.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "4"
+  },
+  {
+   "repo": "holevasdimitrios/computational-learning-theory",
+   "path": "assignment6-truncated_statistics_sgd/truncated_statistics_solution.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "3"
+  },
+  {
+   "repo": "holevasdimitrios/computational-learning-theory",
+   "path": "assignment3-kolmogorov_distance/kolmogorov_distance_solution.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "3"
+  },
+  {
+   "repo": "holevasdimitrios/computational-learning-theory",
+   "path": "assignment2-query_counting/query_counting_solution.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "4"
+  },
+  {
+   "repo": "holevasdimitrios/computational-learning-theory",
+   "path": "assignment7-perceptron_lower_bound/perceptron_lower_bound_solution.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "3"
+  },
+  {
+   "repo": "nworbmot/esm-lectures",
+   "path": "esm-lecture-8.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "nworbmot/esm-lectures",
+   "path": "esm-lecture-14.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "nworbmot/esm-lectures",
+   "path": "esm-lecture-1.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "nworbmot/esm-lectures",
+   "path": "esm-lecture-12.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "nworbmot/esm-lectures",
+   "path": "esm-lecture-16.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "nworbmot/esm-lectures",
+   "path": "esm-lecture-2.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "4b8wsfdk7y-cloud/whuppt",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "samuel-stidham/mat230-snhu-problem-set-template",
+   "path": "template.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "2"
+  },
+  {
+   "repo": "g-rocket/gsypset",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "moll-re/analysis",
+   "path": "kap14.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.16"
+  },
+  {
+   "repo": "moll-re/analysis",
+   "path": "kap2.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "moll-re/analysis",
+   "path": "kap4.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "moll-re/analysis",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "moll-re/analysis",
+   "path": "kap8.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.15"
+  },
+  {
+   "repo": "moll-re/analysis",
+   "path": "kap1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.14"
+  },
+  {
+   "repo": "NousernameSG/FurtherQ-Problem-Sets",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "Wang-Zichuan/quasi-1d-nozzle-cfd",
+   "path": "paper/nozzle_cfd_paper.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "Wang-Zichuan/quasi-1d-nozzle-cfd",
+   "path": "slides/nozzle_cfd_beamer.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Zyranix/ADM2-Lecture-Notes",
+   "path": "full.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Zyranix/ADM2-Lecture-Notes",
+   "path": "master.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "linear-algebra-sut/lecture-notes",
+   "outcome": "skipped",
+   "reason": "download_too_large",
+   "detail": ""
+  },
+  {
+   "repo": "klubFITpp/OSS",
+   "path": "lectures/2026-02-19-PSI-setup/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "klubFITpp/OSS",
+   "path": "lectures/2026-03-05-PA2-intro/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "klubFITpp/OSS",
+   "path": "lectures/2025-10-09-PA1-intro/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "klubFITpp/OSS",
+   "path": "lectures/2025-11-27-DML-zapocet/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "onurerenarpaci/uwaterloo-beamer-claude",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "asassoye/ESI-dev1-slides",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "adzetto/University",
+   "path": "CE224_Mechanics-of-Materials/CE224_HW_5_290204042-main/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "adzetto/University",
+   "path": "CE224_Mechanics-of-Materials/CE224_HW_2_290204042-main/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "adzetto/University",
+   "path": "CE204_Engineering-Surveying/CE204_FP3_G6/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "adzetto/University",
+   "path": "solutions-assignment-2-discrete-random-variables-main/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "adzetto/University",
+   "path": "EE222_Electromagnetic-Thory-Past-Exams/EMTFINAL/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "adzetto/University",
+   "path": "CE204_Engineering-Surveying/CE204_FP1_G6/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "yegor256/lecture-notes",
+   "path": "test.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "WHULai/WHUBeamer-PolyU",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "yegor256/pmba",
+   "path": "02-scope/02-scope.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "yegor256/pmba",
+   "path": "04-cost/04-cost.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "yegor256/pmba",
+   "path": "05-quality/05-quality.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "yegor256/pmba",
+   "path": "01-integration/01-integration.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "yegor256/pmba",
+   "path": "08-risk/08-risk.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "yegor256/pmba",
+   "path": "03-time/03-time.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "eriqande/eca-bioinf-handbook",
+   "path": "docs/eca-bioinf-handbook.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "dev-aditya/course-notes-core",
+   "path": "MTH102: Real-analysis/MTH102_-_Real_analysis.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "dev-aditya/course-notes-core",
+   "path": "PHY202: Statistical-Mechanics and Thermodynamics/PHY202_-_Statistical Mechanics.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "dev-aditya/course-notes-core",
+   "path": "MTH201: Differential-Geometry/MTH201_-_Differential_Geometry.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "dev-aditya/course-notes-core",
+   "path": "PHY102: Electromagnetism/PHY102_-_Electromagnetism.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "dev-aditya/course-notes-core",
+   "path": "Misc/Periodic-table/periodic_table.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "dev-aditya/course-notes-core",
+   "path": "Misc/Pi:3.14.../pi.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "jola2048/latex-presentation-pedagogy",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "courses-at-hnu-by-hfwei/math4cs-problem-sets-plus",
+   "path": "problems.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "AdrianTseng/beamer-seed",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "gshstexsociety/An-Introduction-to-LaTeX",
+   "path": "workshop_20191016/workshop_1016.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "no_text_layer",
+   "detail": ""
+  },
+  {
+   "repo": "gshstexsociety/An-Introduction-to-LaTeX",
+   "path": "old/An Introduction to LaTeX_ver1.9/An Introduction to LaTeX_ver1.9.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "gshstexsociety/An-Introduction-to-LaTeX",
+   "path": "old/An Introduction to LaTeX_ver1.0/An Introduction to LaTeX.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "gshstexsociety/An-Introduction-to-LaTeX",
+   "path": "workshop_20191016/pdfs/ex1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "gshstexsociety/An-Introduction-to-LaTeX",
+   "path": "workshop_20190604/pdfs/ex1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "gshstexsociety/An-Introduction-to-LaTeX",
+   "path": "workshop_20190604/pdfs/ex.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "gmarciani/research",
+   "path": "marciani-normal-form/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "3"
+  },
+  {
+   "repo": "gmarciani/research",
+   "path": "artificial-intelligence/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "2"
+  },
+  {
+   "repo": "gmarciani/research",
+   "path": "sostream-paper/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "gmarciani/research",
+   "path": "computer-security/main.tex",
+   "beamer": false,
+   "outcome": "accepted"
+  },
+  {
+   "repo": "gmarciani/research",
+   "path": "thesis-msc-new/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "gmarciani/research",
+   "path": "botnet/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "ECUTMathematicalModelingAssociation/ECUT-Beamer-Presentation-Template",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "gianluca-tisci/Latex_Template_Economics_ProblemSet",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "3"
+  },
+  {
+   "repo": "eggplantbren/STATS331",
+   "path": "NewSlides/lecture19.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "eggplantbren/STATS331",
+   "path": "NewSlides/lecture01.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "eggplantbren/STATS331",
+   "path": "NewSlides/lecture07.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "eggplantbren/STATS331",
+   "path": "NewSlides/lecture06.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "eggplantbren/STATS331",
+   "path": "NewSlides/lecture10.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "eggplantbren/STATS331",
+   "path": "NewSlides/lecture16.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "sim1-99/medical-physics-notes",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "accepted"
+  },
+  {
+   "repo": "jankapunkt/latex-presentation-with-handouts",
+   "path": "main-handouts.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "jankapunkt/latex-presentation-with-handouts",
+   "path": "main-presentation.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "leonlan/vu-beamer",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "reasner/purdue_beamer_template",
+   "path": "template.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "3"
+  },
+  {
+   "repo": "Skird/mipt-lectures",
+   "path": "4/algtop/algtop5.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Skird/mipt-lectures",
+   "path": "5/graphs/graphs.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Skird/mipt-lectures",
+   "path": "4/crypto/crypt2.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Skird/mipt-lectures",
+   "path": "3/diopheq/lecture1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Skird/mipt-lectures",
+   "path": "4/crypto/derandom5.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Skird/mipt-lectures",
+   "path": "3/discropt/algo.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "xiongpc520-hub/xmum-beamer-deck",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "foo-dogsquared/a-remote-repo-full-of-notes-of-things-i-do-not-know-about",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "fwilhelmy/ift6135-representationlearning-coursenotes",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "jkperin/DSP",
+   "path": "lectures/lecture05.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "jkperin/DSP",
+   "path": "homework/hw3_solutions.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "jkperin/DSP",
+   "path": "lectures/lecture08.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "jkperin/DSP",
+   "path": "lectures/lecture10.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "jkperin/DSP",
+   "path": "homework/hw4_assignment.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "jkperin/DSP",
+   "path": "homework/practice_final.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "longdoheun/academic-beamer-skill",
+   "path": "assets/starter/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "kinginu/cs6290-notes",
+   "path": "ja/lessons/10-compiler-ilp.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "kinginu/cs6290-notes",
+   "path": "ja/lessons/18-multi-processing.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "kinginu/cs6290-notes",
+   "path": "ja/lessons/12-cache-review.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "kinginu/cs6290-notes",
+   "path": "ja/lessons/05-predication.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "kinginu/cs6290-notes",
+   "path": "en/lessons/01-introduction.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "kinginu/cs6290-notes",
+   "path": "en/lessons/03-pipelining.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "MiriamH98/bodendynamik_tex",
+   "path": "v07_measurement.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "MiriamH98/bodendynamik_tex",
+   "path": "v02_harmonic_oscillator.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "MiriamH98/bodendynamik_tex",
+   "path": "tmp_exercise_slides.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "MiriamH98/bodendynamik_tex",
+   "path": "v05_wave1d.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "MiriamH98/bodendynamik_tex",
+   "path": "exercises.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "MiriamH98/bodendynamik_tex",
+   "path": "fig_tikz/haus1dof_pt3.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "mlnjsh/phd-survival-kit",
+   "path": "templates/beamer-presentation/template.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "mlnjsh/phd-survival-kit",
+   "path": "templates/cover-letter/template.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "mlnjsh/phd-survival-kit",
+   "path": "templates/response-to-reviewers/template.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "mlnjsh/phd-survival-kit",
+   "path": "templates/latex-paper/template.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "MooersLab/slideshowTemplateLaTeX",
+   "path": "slideshowTemplate.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "ufcqxd-ed2/ed2-anotacoes",
+   "path": "src/rn-bal/EDA - 2022.1 - Rubro-Negras sao balanceadas.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "ufcqxd-ed2/ed2-anotacoes",
+   "path": "src/rot-avl/EDA - 2022.1 - Rotações e Balanceamento de AVLs.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "ufcqxd-ed2/ed2-anotacoes",
+   "path": "src/avl-bal/EDA - 2022.1 - AVL sao balanceadas.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "ninux-fi/ninux_beamer_template",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "Adarsh-Barik/SimpleBeamerTheme",
+   "path": "sample.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Jose-luis-echemendia/latex-projects",
+   "path": "Thesis/example.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "kelszo/ki-beamer-theme",
+   "path": "example.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "EliNaig/usc-poster-template",
+   "path": "poster.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "wuji-technology/robotics-rigid-body-mechanics",
+   "path": "sections/screw.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "wuji-technology/robotics-rigid-body-mechanics",
+   "path": "sections/multibody.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "wuji-technology/robotics-rigid-body-mechanics",
+   "path": "sections/cover.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "wuji-technology/robotics-rigid-body-mechanics",
+   "path": "sections/rotation.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "wuji-technology/robotics-rigid-body-mechanics",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "wuji-technology/robotics-rigid-body-mechanics",
+   "path": "sections/dynamics.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Joaquim-mph/beamer_nanolab_template",
+   "path": "metropolis_main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "1"
+  },
+  {
+   "repo": "inscrive-io/latex-presentation-template",
+   "path": "figures/logo-placeholder.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "inscrive-io/latex-presentation-template",
+   "path": "figures/logo-placeholder-mark.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "inscrive-io/latex-presentation-template",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "jamesquinlan/cos-470-usm",
+   "path": "control.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "dekeract01/sotonlatex",
+   "path": "beamer/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "dekeract01/sotonlatex",
+   "path": "poster/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "dekeract01/sotonlatex",
+   "path": "thesis/thesis.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "hengxin/rvsi-srds-2017-hk",
+   "path": "rvsi-srds17.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "shinyypig/Simple-Beamer",
+   "path": "beamer.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "LabCidades/Beamer-UNINOVE",
+   "path": "beamer_UNINOVE.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "3"
+  },
+  {
+   "repo": "LabCidades/Beamer-UNINOVE",
+   "path": "Graph_Theory.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "lid-ufpa/lid-slides",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "fenggeorgeyu/markdown_beamer_template",
+   "path": "template/default.beamer.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "fenggeorgeyu/markdown_beamer_template",
+   "path": "template/my-beamer-template.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "anish-sk/MIT-6006-PS3",
+   "path": "ps3-template/ps3-template.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "AddisonHowe/beamer-slides-template",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "uh-comp-methods2/lectures",
+   "path": "lec_notes.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "trisct/MathLectureNotes",
+   "path": "tex/TopologyAndGeometry/TopologyAndGeometryDefs.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "trisct/MathLectureNotes",
+   "path": "tex/Analysis/MathematicalAnalysis/AnalysisExamplesAndProblems.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "trisct/MathLectureNotes",
+   "path": "tex/Analysis/RealAnalysis/RealAnalysis.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "trisct/MathLectureNotes",
+   "path": "tex/Alphabet/Alphabet.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "trisct/MathLectureNotes",
+   "path": "tex/Analysis/ComplexAnalysis/ComplexAnalysis.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "trisct/MathLectureNotes",
+   "path": "tex/Algebra/GeneralAlgebra/AbstractAlgebraII.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Eran-Rehani/Intro.-to-statistical-mechanics-77307",
+   "path": "Exercises/ex1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Eran-Rehani/Intro.-to-statistical-mechanics-77307",
+   "path": "Exercises/Num_Ex1/Numerical exercise_1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Eran-Rehani/Intro.-to-statistical-mechanics-77307",
+   "path": "Exercises/Num_Ex3/Numerical_Ex3_Results.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Eran-Rehani/Intro.-to-statistical-mechanics-77307",
+   "path": "Additional/Partition_function_calc.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Eran-Rehani/Intro.-to-statistical-mechanics-77307",
+   "path": "Exercises/Sol_09.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Eran-Rehani/Intro.-to-statistical-mechanics-77307",
+   "path": "Lectures/Lectue#7satsmech.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "corentinartaud/lboro-beamer-template",
+   "path": "example.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "qubd/SN1_Notes",
+   "path": "201-SN1_Notes.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "MDBrodskiy/Calculus_III",
+   "path": "Exam/FinalExamEquationSheet.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "dlfivefifty/M3M6AppliedComplexAnalysis",
+   "path": "output/Lecture26.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "dlfivefifty/M3M6AppliedComplexAnalysis",
+   "path": "output/Lecture16.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "dlfivefifty/M3M6AppliedComplexAnalysis",
+   "path": "output/Lecture21.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "dlfivefifty/M3M6AppliedComplexAnalysis",
+   "path": "output/Solutions4.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "dlfivefifty/M3M6AppliedComplexAnalysis",
+   "path": "output/Solutions1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "dlfivefifty/M3M6AppliedComplexAnalysis",
+   "path": "output/Lecture1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "HuanPP/TeXDeck",
+   "path": "templates/emerald/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "HuanPP/TeXDeck",
+   "path": "templates/execushares/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "HuanPP/TeXDeck",
+   "path": "templates/simpleplus/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "HuanPP/TeXDeck",
+   "path": "docs/demo/gold-price-2024.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "HuanPP/TeXDeck",
+   "path": "templates/scholar/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "HuanPP/TeXDeck",
+   "path": "templates/academic/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "TomoakiYamada/beamer-lecture-slide",
+   "path": "beamer-lecture-slide.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "ami-null/qmd_beamer-seahorse",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "hcslayer/ENT",
+   "path": "ENT1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "hcslayer/ENT",
+   "path": "ENT2.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "hcslayer/ENT",
+   "path": "ENT0.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "hcslayer/ENT",
+   "path": "ENT5.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "hcslayer/ENT",
+   "path": "ENT6.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "hcslayer/ENT",
+   "path": "ENT3.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "pv-ca/latex-ops",
+   "path": "skills/latex-ops/assets/templates/functional/31_abnt_academic.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "pv-ca/latex-ops",
+   "path": "skills/latex-ops/assets/templates/presets/02_tufte_editorial.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "pv-ca/latex-ops",
+   "path": "examples/paper.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "pv-ca/latex-ops",
+   "path": "skills/latex-ops/assets/templates/functional/20_sop_procedure.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "pv-ca/latex-ops",
+   "path": "skills/latex-ops/assets/templates/functional/29_research_proposal.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "pv-ca/latex-ops",
+   "path": "skills/latex-ops/evals/inputs/report.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "jurihock/dhbw-beamer",
+   "path": "Index.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "KevinyWu/math-reu-2021",
+   "path": "problem_set_3/images/7c.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "KevinyWu/math-reu-2021",
+   "path": "problem_set_5/problem_set_5.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "KevinyWu/math-reu-2021",
+   "path": "problem_set_4/images/2.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "KevinyWu/math-reu-2021",
+   "path": "problem_set_5/images/2c_1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "KevinyWu/math-reu-2021",
+   "path": "problem_set_6/images/2.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "KevinyWu/math-reu-2021",
+   "path": "problem_set_4/images/3_1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yegor256/osbp",
+   "path": "00-syllabus/00-syllabus.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yegor256/osbp",
+   "path": "02-reporting-bugs/02-reporting-bugs.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yegor256/osbp",
+   "path": "05-setting-guidelines/05-setting-guidelines.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yegor256/osbp",
+   "path": "07-releasing/07-releasing.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yegor256/osbp",
+   "path": "03-making-changes/03-making-changes.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yegor256/osbp",
+   "path": "01-debating/01-debating.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yegor256/ppa",
+   "path": "10-machine-learning/10-machine-learning.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yegor256/ppa",
+   "path": "00-syllabus/00-syllabus.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yegor256/ppa",
+   "path": "02-syntax/02-syntax.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yegor256/ppa",
+   "path": "03-ast/03-ast.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yegor256/ppa",
+   "path": "01-grammar/01-grammar.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yegor256/ppa",
+   "path": "08-symbolic-execution/08-symbolic-execution.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "bacTlink/PkuCampusTemplate",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "ojdo/thesis-defense",
+   "path": "defense.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "jo4nymj/TFG-presentation",
+   "path": "presentacion.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "paulinelemenkova/latex-beamer-presentation-template",
+   "path": "Lemenkova_etal_Present_Yamal2012.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "MKupperman/uw-beamer-theme",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "ShriKaranHanda/ashoka-beamer",
+   "path": "src/template.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "3"
+  },
+  {
+   "repo": "st--/beamer-lecture-template-example",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "MDBrodskiy/Vector_Calculus",
+   "path": "Lecture Notes/Lecture13.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "MDBrodskiy/Vector_Calculus",
+   "path": "Lecture Notes/Lecture1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "MDBrodskiy/Vector_Calculus",
+   "path": "Lecture Notes/Lecture4.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "MDBrodskiy/Vector_Calculus",
+   "path": "Lecture Notes/Lecture5.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "MDBrodskiy/Vector_Calculus",
+   "path": "Lecture Notes/Lecture17.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "MDBrodskiy/Vector_Calculus",
+   "path": "Lecture Notes/Lecture3.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "marromlam/beamer-compostela",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "ishanpranav/finc-2-foundations-of-finance",
+   "path": "src/Homework2.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "ishanpranav/finc-2-foundations-of-finance",
+   "path": "src/Homework7.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "ishanpranav/finc-2-foundations-of-finance",
+   "path": "src/Homework5.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "ishanpranav/finc-2-foundations-of-finance",
+   "path": "src/Homework4.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "ishanpranav/finc-2-foundations-of-finance",
+   "path": "src/Homework3.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "ishanpranav/finc-2-foundations-of-finance",
+   "path": "src/Homework6.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "dettanym/SPISE-Camp-Lecture-Slides",
+   "path": "src/ex-data-anonymization.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "usami-k/mathematics",
+   "path": "2019/DynkinDiagrams/DynkinDiagrams.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "usami-k/mathematics",
+   "path": "2021/Octonion/Octonion.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "usami-k/mathematics",
+   "path": "2024/root-system-classification/root-system-classification.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "usami-k/mathematics",
+   "path": "2023/onsager-algebra-tsudoi/onsager-algebra-tsudoi.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "usami-k/mathematics",
+   "path": "2022/QuaternionRotationTsudoi/abstract.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "usami-k/mathematics",
+   "path": "2019/OnsagerAlgebra/OnsagerAlgebra.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "tetutaro/knit_markdown",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "GauravJain28/TOC-Problem-Sets",
+   "path": "PS-4/sol_LaTeX/ps3.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "GauravJain28/TOC-Problem-Sets",
+   "path": "PS-4/sol_LaTeX/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "GauravJain28/TOC-Problem-Sets",
+   "path": "PS-1/sol_LaTeX/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "GauravJain28/TOC-Problem-Sets",
+   "path": "PS-3/sol_LaTeX/ps3.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "GauravJain28/TOC-Problem-Sets",
+   "path": "PS-2/sol_LaTeX/main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "GauravJain28/TOC-Problem-Sets",
+   "path": "PS-2/sol_LaTeX/ps2.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "amy-tabb/video-beamer-mwe",
+   "path": "videoMWE.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "2"
+  },
+  {
+   "repo": "leingang/cookiecutter-problemset",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "TomoakiYamada/tikz-econ-figure",
+   "path": "tikz/Fig_supply_demand.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "TomoakiYamada/tikz-econ-figure",
+   "path": "tikz/Fig_bc_cycle.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "TomoakiYamada/tikz-econ-figure",
+   "path": "tikz/Fig_adas_sr.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "TomoakiYamada/tikz-econ-figure",
+   "path": "tikz/Fig_did.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "TomoakiYamada/tikz-econ-figure",
+   "path": "tikz/Fig_flow_stock.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "TomoakiYamada/tikz-econ-figure",
+   "path": "tikz/Fig_adas_lr.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Lippitz-Lab/Spectroscopy",
+   "path": "2_quantum/2_FID/blochsphere_pi_half.tikz.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Lippitz-Lab/Spectroscopy",
+   "path": "2_quantum/2_FID/blochsphere_pi.tikz.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Lippitz-Lab/Spectroscopy",
+   "path": "Spectroscopy.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "ykonyshev/bisection-method",
+   "path": "slides/bisection_method.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "paulinelemenkova/africa-remote-sensing-mapping-slides",
+   "path": "Africa_11032024.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "paulinelemenkova/africa-remote-sensing-mapping-slides",
+   "path": "Africa_Polina.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "paulinelemenkova/africa-remote-sensing-mapping-slides",
+   "path": "Presentation_13062024_Polina.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "vimaaan/ISI-Latex-Template",
+   "path": "slide.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "martinhelso/UiB",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "jgaltidor/twelf_slides",
+   "path": "twelf_slides.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "KusaReMKN/slide-20250516",
+   "path": "slide.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "grussorusso/markdown-slides",
+   "path": "full/slides.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "juliapath/representation-theory",
+   "path": "Representation_Theory_Lecture_Notes.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "tiagobotelh0/18.06",
+   "path": "pset6.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "tiagobotelh0/18.06",
+   "path": "pset7.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "tiagobotelh0/18.06",
+   "path": "pset19.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "tiagobotelh0/18.06",
+   "path": "pset1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "tiagobotelh0/18.06",
+   "path": "pset2.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "tiagobotelh0/18.06",
+   "path": "pset24.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "sara-venkatraman/LaTeX-Templates",
+   "path": "Research Paper/Main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "sara-venkatraman/LaTeX-Templates",
+   "path": "CV - Version 2/CVTemplate2.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "sara-venkatraman/LaTeX-Templates",
+   "path": "Lecture Notes/Main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "sara-venkatraman/LaTeX-Templates",
+   "path": "Resume/ResumeTemplate.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "sara-venkatraman/LaTeX-Templates",
+   "path": "Presentation/PresentationTemplate.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "sara-venkatraman/LaTeX-Templates",
+   "path": "Essay/EssayTemplate.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "cococo2000/ICT-Beamer",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "hengxin/algorithm-lectures",
+   "path": "algorithm-lecture-bubblesort-for-cs-application/bubble-sort.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "unconvertible_equations",
+   "detail": "0.13"
+  },
+  {
+   "repo": "hengxin/algorithm-lectures",
+   "path": "algorithm-lecture-mst/mst.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "wurahara/PolyU-Beamer-Slides",
+   "path": "main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "0"
+  },
+  {
+   "repo": "vhbelvadi/LaTeX-lecture-notes-class",
+   "path": "doc/lecturenotes-doc.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "vhbelvadi/LaTeX-lecture-notes-class",
+   "path": "sample/lecturenotes-sample.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "lkoolik/latex_template",
+   "path": "latex_template.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "vishallama/categories-and-categorical-logic",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "darijgr/nogra",
+   "path": "hw5.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "darijgr/nogra",
+   "path": "hw3.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "darijgr/nogra",
+   "path": "mt3.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "darijgr/nogra",
+   "path": "mt2.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "darijgr/nogra",
+   "path": "nogra.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "darijgr/nogra",
+   "path": "hw1.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "A-PachecoT/uni-beamer-claude",
+   "path": "skills/beamer-presentations/UNI Beamer Template/beamer_template.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "pdf_page_count",
+   "detail": "5"
+  },
+  {
+   "repo": "A-PachecoT/uni-beamer-claude",
+   "path": "skills/beamer-presentations/UNI Beamer Template/example_main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "auburn-comp-math/math-5650-6650",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "jcbopit/talks-and-notes",
+   "path": "stochastic-processes/notes.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "jcbopit/talks-and-notes",
+   "path": "stochastic-processes/slides.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "Bili-Sakura/Latex-Slides-Template-GenAI",
+   "outcome": "skipped",
+   "reason": "unsafe_member",
+   "detail": "link or special file"
+  },
+  {
+   "repo": "pawelboczek/TeX-presentation",
+   "path": "inz.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "shreysrins/pset-template",
+   "path": "pset.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "Project2100/Cryptography-2018_19",
+   "path": "main.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "jacksonllee/uchicago-beamer",
+   "path": "sample-doc.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "fyqqyf/WHU-Beamer-Theme",
+   "path": "2/whu-beamer2015.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "compile_failed",
+   "detail": ""
+  },
+  {
+   "repo": "fyqqyf/WHU-Beamer-Theme",
+   "path": "1/slide.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "no_equations",
+   "detail": ""
+  },
+  {
+   "repo": "courses-at-nju-by-hfwei/compilers-problem-set",
+   "path": "2024/problem-set/hw-8/hw8.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "courses-at-nju-by-hfwei/compilers-problem-set",
+   "path": "2020/solution/hw-5/hw5.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "courses-at-nju-by-hfwei/compilers-problem-set",
+   "path": "2022/problem-set/hw-2/hw2.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "courses-at-nju-by-hfwei/compilers-problem-set",
+   "path": "2024/problem-set/hw-3/hw3.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "courses-at-nju-by-hfwei/compilers-problem-set",
+   "path": "2024/problem-set/hw-4/hw4.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "courses-at-nju-by-hfwei/compilers-problem-set",
+   "path": "2021/problem-set/hw-4/hw4.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "karlstroetmann/Lineare-Algebra",
+   "path": "Skript/lineare-algebra.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "mo-karbalaee/DSA-SBU-fall-2022",
+   "path": "transcriptions/1st-session/document.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yigengjiang/paper-to-slides",
+   "path": "examples/attention-oral-10min-original-figures/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "yigengjiang/paper-to-slides",
+   "path": "assets/template/figures/synthetic-method.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "yigengjiang/paper-to-slides",
+   "path": "assets/template/main.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "ahmetuysal/KU-LaTeX-Beamer-Template",
+   "outcome": "skipped",
+   "reason": "no_documents",
+   "detail": ""
+  },
+  {
+   "repo": "fairyflies9/Fluid-Dynamics-and-IBM-Theory",
+   "path": "5-Turbulence/5-4-Transition-Turbulence-Pipes.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "2"
+  },
+  {
+   "repo": "fairyflies9/Fluid-Dynamics-and-IBM-Theory",
+   "path": "Sample Oral Exam Questions/1-4-Discretization-IBM.tex",
+   "beamer": false,
+   "outcome": "skipped",
+   "reason": "non_beamer_full"
+  },
+  {
+   "repo": "fairyflies9/Fluid-Dynamics-and-IBM-Theory",
+   "path": "2-Solid-Mechanics-Under-Construction/2-3-Displacement-Velocity.tex",
+   "beamer": true,
+   "outcome": "skipped",
+   "reason": "fewer_than_4_usable_pages",
+   "detail": "1"
+  },
+  {
+   "repo": "fairyflies9/Fluid-Dynamics-and-IBM-Theory",
+   "path": "5-Turbulence/5-2-Intro-RANS-Part2.tex",
+   "beamer": true,
+   "outcome": "accepted"
+  },
+  {
+   "repo": "fairyflies9/Fluid-Dynamics-and-IBM-Theory",
+   "path": "1-Immersed-Boundary-Method/1-3-Integral-Transform.tex",
+   "beamer": true,
+   "outcome": "accepted"
+  }
+ ]
+}

@@ -1,0 +1,253 @@
+{
+ "part": "fresh5a",
+ "seed": "realworld-fresh-2026-10-21",
+ "papers": [
+  {
+   "id": "2303.13230",
+   "title": "Volumes of Solid Objects in Elamite Mathematics",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:HO",
+   "style": "research",
+   "pages_chosen": [
+    5,
+    8,
+    9,
+    14
+   ],
+   "equations": 30,
+   "display": 3,
+   "pdf_sha256": "d471cd4ef618e661b1023a6a623491d649107cc19a77b4fc87d8adf25e737944",
+   "source_sha256": "ef8a3e657c96163b1cdacf2a1ea9953f35794591c244679b2ad4adb72d66df25",
+   "extract_pdf_sha256": "d0b26d96ce47763a75eda010c5a49f51baaae79725e15046354c6ed32f90029a",
+   "gold_sha256": "f50ca0427aaab5d507a2eb8a9dc34681c08c08cf4f93c12e827fe3462c78a86b"
+  },
+  {
+   "id": "2306.03073",
+   "title": "Inference for Local Projections",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "econ:econ:EM",
+   "style": "research",
+   "pages_chosen": [
+    7,
+    13,
+    18,
+    31
+   ],
+   "equations": 62,
+   "display": 12,
+   "pdf_sha256": "63c1734d30db74bf8488400c1406a85fc2e2517038a95521b5d90190e6e1b671",
+   "source_sha256": "4a73306c2883839d4f37ff93b8b5a41cf834deb8cdc91bcc4d252275f1fe48ed",
+   "extract_pdf_sha256": "c1de6f0aec7f86ebe5d9993dfe6a6b3859153ea284acc346dd2d11b80f07941c",
+   "gold_sha256": "2085fd5cc5745de3cd169f6cc5ceb1da6dc2ad04b4307a7f7bf02267f629f7b3"
+  },
+  {
+   "id": "2401.11352",
+   "title": "A Connection Between Covariate Adjustment and Stratified Randomization in Randomized Clinical Trials",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:ME",
+   "style": "research",
+   "pages_chosen": [
+    7,
+    9,
+    16,
+    20
+   ],
+   "equations": 93,
+   "display": 2,
+   "pdf_sha256": "8ff3ffae94dcc1d4a371aeedf1b3bcb531a1dfb2afbabbfd38895db6dd6db171",
+   "source_sha256": "2e6bce514251593ba9073e8b189e6c35810c7441a7b7ddca160ccaf5f73500f9",
+   "extract_pdf_sha256": "a3c24df0bad8bdc3a242d1045f67a4b727944035a73251845a4c77360e73e70a",
+   "gold_sha256": "410d9064ad5832a8edeeacde18043fb11513096ea5e879a673b817c2fd47a06b"
+  },
+  {
+   "id": "2405.05818",
+   "title": "Fine-grained Analysis and Faster Algorithms for Iteratively Solving Linear Systems",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "cs:cs:DS",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    6,
+    12,
+    13
+   ],
+   "equations": 167,
+   "display": 9,
+   "pdf_sha256": "5b24ddba478e804c906a1b6e723bdd38d01961bb1152af5d001a07c81496512b",
+   "source_sha256": "004c3fd3d66da8a654c54c3dbb013c0d96f462b837561dba0d4c27748197ff5e",
+   "extract_pdf_sha256": "861244f1b87084db688ec14e8493f6ec99e43af8effb8b43c307a6581835e6d3",
+   "gold_sha256": "4577a878915fad65f4b77d1ef1b82692a25c22780a9ba42986b31745d58f795b"
+  },
+  {
+   "id": "2406.12076",
+   "title": "Berezinskii-Kosterlitz-Thouless transition in the XY model on the honeycomb lattice: A comprehensive Monte Carlo analysis",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:cond-mat:stat-mech",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    5,
+    6,
+    8
+   ],
+   "equations": 79,
+   "display": 5,
+   "pdf_sha256": "49c0aee07be6eab760999bbcee3a2d7e30e1f283ab31d611411a072f7432018f",
+   "source_sha256": "e091e78d200a5f460e8dd9a85e2e471660cd9f49833f299c91b828ce181f7da6",
+   "extract_pdf_sha256": "1e3830a679458fe37f6fc5d5f911ed0f88331d4c889ee0962efc5e0f3bfc3184",
+   "gold_sha256": "63564aca3a8518723eed6db98a068a02d27888a86b3107c7a51a5bbc890ae6d2"
+  },
+  {
+   "id": "2406.15398",
+   "title": "The EM Algorithm in Information Geometry",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:HO",
+   "style": "research",
+   "pages_chosen": [
+    2,
+    3,
+    10,
+    32,
+    34,
+    35
+   ],
+   "equations": 80,
+   "display": 22,
+   "pdf_sha256": "4d3cf9d9caca3d6b3856ae5e944c1337838e08489bbc3880bb768ad47ed0d511",
+   "source_sha256": "68798b8782890a27b3685507b038097d1c086e0f2df696de0bdd86d7e24f7976",
+   "extract_pdf_sha256": "54de76e39f69d9b230415d1d796874322b4f5cefa6d5063e118485f49c670ccd",
+   "gold_sha256": "27d05ef24d9b2b75921cb7a83687837ded89ab461f0b9fc5e8ab18bfece2ecd8"
+  },
+  {
+   "id": "2407.08468",
+   "title": "Matching-Based Policy Learning",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:TH",
+   "style": "research",
+   "pages_chosen": [
+    4,
+    5,
+    7,
+    18,
+    40
+   ],
+   "equations": 39,
+   "display": 8,
+   "pdf_sha256": "d70a6ed3e94e201f80b4179777e4026cb213da75909c2405e39bc09b984750fb",
+   "source_sha256": "7455457af11e9bf172cf3d86ed9c5f9e1559694a49f794d9f9b436f2e13b3f49",
+   "extract_pdf_sha256": "f9c912e35a22c5beec65abc0bd6d5428118a8985f130b33e812ab4b909156b2a",
+   "gold_sha256": "4de6c1e17023b2b071b07bc52e1900f2ecad9620d88aea6dbc2d450ba982d78c"
+  },
+  {
+   "id": "2408.10825",
+   "title": "Conditional nonparametric variable screening by neural factor regression",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "stat:stat:TH",
+   "style": "research",
+   "pages_chosen": [
+    8,
+    9,
+    36,
+    67
+   ],
+   "equations": 110,
+   "display": 11,
+   "pdf_sha256": "fd4aae2033d81e289910c739a00f9d348bddce5ad0ad38cd3255805ed98a44d1",
+   "source_sha256": "f398660eddd10a7b56e73cac098b1fe1eaef0c3d88d07e61775bf874e95cfdc6",
+   "extract_pdf_sha256": "dbe74ef193ca7b7b238e4db3e3fe585a728f45cb91723165e129228461a8201f",
+   "gold_sha256": "d6ae1c28035656978c9dde0a63bbcabd503fb2d352229df874f4e86cdf0eb2eb"
+  },
+  {
+   "id": "2410.14431",
+   "title": "Machine-learning-assisted Blending of Data-Driven Turbulence Models",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:physics:flu-dyn",
+   "style": "research",
+   "pages_chosen": [
+    9,
+    12,
+    13,
+    15
+   ],
+   "equations": 64,
+   "display": 3,
+   "pdf_sha256": "27c330f70707a9dfc3558ad1f0c8506626bbb845224b9c77ef910ef3f14631cc",
+   "source_sha256": "db6711ee66c9d70717116e6dd4c1e6bdf1ee6cd54ebe6c475bf716d8c1262e40",
+   "extract_pdf_sha256": "0b8e5309d85849572a483f52dc9a1f8a3dbe1e202fd392bdfea6774ba315d4b7",
+   "gold_sha256": "e4c47352c31a0df18dcca67668538522e98586d9b87c3df93338e45dfeefa01f"
+  },
+  {
+   "id": "2501.16660",
+   "title": "A structure-preserving parametric finite element method with optimal energy stability condition for anisotropic surface diffusion",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:NA",
+   "style": "research",
+   "pages_chosen": [
+    8,
+    9,
+    17,
+    20
+   ],
+   "equations": 74,
+   "display": 14,
+   "pdf_sha256": "0962dec212e8acc238aa1805fad287c85da5a9399515b8d8461d3fb1de908ba9",
+   "source_sha256": "53fd622c7cb4bbc85f87507357f1002e9ce423a8ec52eb23b42fecf08f127772",
+   "extract_pdf_sha256": "38682b21753ece44e91905a56971a8ba49e03be9063862b9ea0886cf6141d222",
+   "gold_sha256": "825ba0faf774f286301b396a39efd6ccd1705defd485e517671f0b5933a75948"
+  },
+  {
+   "id": "2503.17870",
+   "title": "Accelerating and enhancing thermodynamic simulations of electrochemical interfaces",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "physics:cond-mat:stat-mech",
+   "style": "research",
+   "pages_chosen": [
+    9,
+    11,
+    12,
+    27,
+    29
+   ],
+   "equations": 40,
+   "display": 0,
+   "pdf_sha256": "3aa25568a16db61e3319b97a946df3a98385431d2082d5cfbd3b09553fe4c270",
+   "source_sha256": "e42230f9ea8ac99b718e90a88937e46010206f15886a4241e7b9ac034cbea0e2",
+   "extract_pdf_sha256": "6d0928bba059a6ca3e181fdbdaa2c909102224ca6424b6ab1252ad84fa4e52e7",
+   "gold_sha256": "aa606573211d17f81807e6c206707c2fe013164c03866ad05d8afc00d4a69697"
+  },
+  {
+   "id": "2505.04942",
+   "title": "Randomized Routing to Remote Queues",
+   "licence": "CC BY 4.0",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "set": "math:math:PR",
+   "style": "research",
+   "pages_chosen": [
+    7,
+    13,
+    16,
+    29
+   ],
+   "equations": 105,
+   "display": 14,
+   "pdf_sha256": "dadee5f5b637a1da7189f163c65e1de3e0c6f9b2ba8ad18986a8b0de08ab6dbe",
+   "source_sha256": "f52223db88e29bfb876d1716a9d43adfb18789c2f16faa9f78abcd4891d8c0f9",
+   "extract_pdf_sha256": "ce3545ead0acb952b055b0e9c9ef0f36858fbdb52e4ea355f502d14e865904cd",
+   "gold_sha256": "f0e6c838323fa364dd5ac3860ff7485f0e93a625b5fd4f48bf410eee1047f136"
+  }
+ ],
+ "n_papers": 12,
+ "n_equations": 943,
+ "n_pages": 52
+}

@@ -29,6 +29,15 @@ printed pages read differently.
 | `make eval-latex-check` | Scorer check: known-correct LaTeX for every sample equation (`tests/fixtures/sample_latex_predictions.jsonl`) must match leniently; also runs in CI via `pytest` |
 | `make proof` | Replay the recorded run in `proof/bundles/` and write `PROOF.md` (no key, no network, no cost). `proof-check`, `proof-sources`, `proof-live`: see docs/proof.md |
 
+The course-style stratum of the fifth real-world split fetches and compiles other people's LaTeX
+(`scripts/fresh5_select.py course-draw`). Downloaded TeX is untrusted: archives are unpacked and documents
+compiled only through `src/readablestem/gold/safe_tex.py`, which needs [bubblewrap](https://github.com/containers/bubblewrap)
+(`bwrap`; there is no unsandboxed fallback), a user-level TeX Live (`install-tl` with scheme-full into
+`~/.local/texlive/<year>`, no root; `latexmk` is found there or on `PATH`) and, as the last engine,
+[Tectonic](https://tectonic-typesetting.github.io/) (the official release binary in `~/.local/bin`, run from its package
+cache). A compile has no network, no rc file, no shell escape and sees only the TeX Live tree, the source as a discarded
+overlay and an output folder. Nothing else needs any of this; the compile tests in `tests/test_safe_tex.py` skip without it.
+
 CLI:
 
 ```
