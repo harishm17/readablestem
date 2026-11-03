@@ -110,7 +110,7 @@ _NOTATION = {
     ),
     "delimiter": re.compile(r"\\(?:left|lfloor|lceil|rfloor|rceil|langle|rangle|\|)|[|]"),
 }
-_TAGS = re.compile(r"<[^>]*>")
+_TAGS = re.compile(r"<[^<>]*>")  # `[^<>]`: many "<" with no ">" stay linear
 _DOTLESS = str.maketrans({"\u0131": "i", "\u0237": "j", "\u2206": "\u0394"})
 
 

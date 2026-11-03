@@ -721,8 +721,11 @@ ALT_MAX_CHARS = 300
 _REDUNDANT_PREFIX = re.compile(
     r"^\s*(an?\s+|the\s+)?(image|picture|graphic|photo|photograph)\s+of\b", re.I
 )
+# A name starts where a run of name characters starts (the lookbehind), so a long run with no
+# extension is scanned once, not once per position in it (linear, CodeQL py/polynomial-redos).
 _FILE_EXTENSION = re.compile(
-    r"\b[\w\-]+\.(png|jpe?g|gif|svg|bmp|tiff?|webp|heic|pdf|eps|emf|wmf|ai|psd)\b", re.I
+    r"(?<![\w\-])[\w\-]+\.(png|jpe?g|gif|svg|bmp|tiff?|webp|heic|pdf|eps|emf|wmf|ai|psd)\b",
+    re.I,
 )
 # Single-token camera, scan and export names: IMG_2041, DSC0042, figure_3_2, scan-0001.
 _FILE_STEM = re.compile(
@@ -730,9 +733,10 @@ _FILE_STEM = re.compile(
     r"|^\w+_\w+$",
     re.I,
 )
-# URLs, script URLs, data URIs, HTML tags or entities, Markdown links, LaTeX commands.
+# URLs, script URLs, data URIs, HTML tags or entities, Markdown links, LaTeX commands. A tag's
+# body is `[^<>]*`: a failed match stops at the next "<", so many "<a" with no ">" stay linear.
 _URL_OR_MARKUP = re.compile(
-    r"https?://|\bwww\.|\b(?:javascript|vbscript):|\bdata:[a-z]+/[a-z]|</?[A-Za-z!][^>]*>"
+    r"https?://|\bwww\.|\b(?:javascript|vbscript):|\bdata:[a-z]+/[a-z]|</?[A-Za-z!][^<>]*>"
     r"|&#?\w+;|\]\(|\\[A-Za-z]+",
     re.I,
 )
