@@ -7644,8 +7644,16 @@ def _claim_tables(
     from its last one is marked, and the end of a row the page break split is joined to
     that row (`tables.join_split_row`)."""
     if TABLE_PREFILTER and not tables.may_hold_table(page, frags[number], paths[number]):
-        return []  # nothing the detector could find would be kept (`may_hold_table`)
-    found = tables.find(page, frags[number], paths[number], clean=_clean, budget=budget)
+        found = []  # nothing the detector could find would be kept (`may_hold_table`)
+    else:
+        found = tables.find(page, frags[number], paths[number], clean=_clean, budget=budget)
+    if previous and not (found and tables.continues(previous[-1], found[0], page.rect.width)):
+        # The rest of an unruled table has too few lines to be found on its own page.
+        rest = tables.find_continued(
+            page, frags[number], paths[number], previous[-1], found, clean=_clean, budget=budget
+        )
+        if rest is not None:
+            found = [rest, *found]
     if not found:
         return found
     lines = set().union(*(t.lines for t in found))
