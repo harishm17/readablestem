@@ -1282,6 +1282,7 @@ def convert_pdf(
     step_cache: StepCache | None = None,
     call_observer: Callable[[ModelCall], None] | None = None,
     readers: Mapping[str, MathReader] | None = None,
+    time_limit_s: float | None = None,
 ) -> ConversionOutput:
     """Convert one PDF (0-based `pages`, all by default) into a `PipelineOutput`.
 
@@ -1311,7 +1312,8 @@ def convert_pdf(
     `readers` are the second readers of handwriting (`models.math_readers.build_readers`) for
     `Settings.image_pages_second_reader`; without them the local reader is built when it is
     the chosen one (`image_page_reconcile.default_readers`), which is all the conversion child
-    can do (it has no keys and no network).
+    can do (it has no keys and no network). `time_limit_s` is the job's own wall-clock limit when
+    the caller has one: the second readings are kept inside what it leaves.
     """
     if options is None:
         options = ConversionOptions.from_settings(settings)
@@ -1331,6 +1333,7 @@ def convert_pdf(
             step_cache=step_cache,
             call_observer=call_observer,
             readers=readers,
+            time_limit_s=time_limit_s,
         )
 
 
@@ -1339,6 +1342,8 @@ def _second_readings(
     run: _Run,
     settings: Settings,
     readers: Mapping[str, MathReader] | None,
+    *,
+    share_s: float,
 ) -> image_page_reconcile.Summary | None:
     """Compare each handwritten equation's reading with the second reader's, when one is
     chosen and can be built. Optional: whatever goes wrong here leaves every item as it was."""
@@ -1346,8 +1351,12 @@ def _second_readings(
         pool = readers if readers is not None else image_page_reconcile.default_readers(settings)
         reader = image_page_reconcile.chosen(settings, pool)
         if reader is None:
+            # (a reader that only the parent can build, with no way to reach it from here)
+            log.warning("second_reader_not_built: %s", settings.image_pages_second_reader)
             return None
-        return image_page_reconcile.reconcile(elements, run.fixes, run.crops, reader, settings)
+        return image_page_reconcile.reconcile(
+            elements, run.fixes, run.crops, reader, settings, share_s=share_s
+        )
     except Exception as exc:
         log.warning("second readings failed: %s", type(exc).__name__)
         return None
@@ -1516,6 +1525,7 @@ def _convert(
     step_cache: StepCache | None = None,
     call_observer: Callable[[ModelCall], None] | None = None,
     readers: Mapping[str, MathReader] | None = None,
+    time_limit_s: float | None = None,
 ) -> ConversionOutput:
     """`convert_pdf`'s body, with its options already in force."""
     tracer = tracer or NoopTracer()
@@ -1641,11 +1651,18 @@ def _convert(
         if settings.image_pages_vector_checks and vector_pages and image_built:
             image_page_vector.add_checks(elements, run.fixes, vector_pages)
         reading_cost = 0.0
+        reading_notices: list[Notice] = []
         if image_built and settings.image_pages_second_reader != "off":
             with _span(tracer, "second_readings") as reading_span:
-                reconciled = _second_readings(elements, run, settings, readers)
+                share = image_page_reconcile.share_s(
+                    settings, time_limit_s, time.perf_counter() - started
+                )
+                reconciled = _second_readings(elements, run, settings, readers, share_s=share)
                 if reconciled is not None:
                     reading_cost = reconciled.cost_usd
+                    reading_notices = reconciled.notices()
+                    if image_summary is not None:
+                        image_summary.second_reader = reconciled.record()
                     _annotate(
                         reading_span,
                         considered=reconciled.considered,
@@ -1725,7 +1742,12 @@ def _convert(
     # each feature adds its notices here (the text pass's first); those that follow from
     # the fixes are derived once, then everything is merged (one notice per code and
     # element, or code and page) and ordered by page and reading order.
-    notices: list[Notice] = [*text.notices, *doc.notices, *image_page.notices(image_built)]
+    notices: list[Notice] = [
+        *text.notices,
+        *doc.notices,
+        *image_page.notices(image_built),
+        *reading_notices,
+    ]
     derived = notice_rules.from_fixes(
         elements, ordered, long_descriptions=options.long_descriptions
     )

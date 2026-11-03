@@ -706,6 +706,11 @@ class Settings(BaseSettings):
                     "Update the notice (web/templates/privacy.html) and the vendor sheet "
                     "(docs/vendor-information.md) first"
                 )
+        if self.image_pages_second_reader != "off":
+            from readablestem.ops.launch import second_reader_problem
+
+            if (problem := second_reader_problem(self)) is not None:
+                raise ConfigError(f"production start refused: {problem}")
         if self.dev_login_enabled:
             raise ConfigError("DEV_LOGIN_ENABLED must be false in production")
         if self.fake_models:

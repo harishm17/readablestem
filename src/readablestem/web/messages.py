@@ -134,12 +134,6 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("image_page.second_reader", "second_reader_agrees"): "A second reader looked at the "
     "picture of this equation and read it the same way; the original page is still the only "
     "thing that can confirm it.",
-    ("image_page.second_reader", "second_reader_unavailable"): "A second reading of this "
-    "equation could not be made, so only the first reading is here: compare it with the "
-    "original page symbol by symbol.",
-    ("image_page.second_reader", "budget_reader_usd"): "The second reading of this equation "
-    "was skipped because its share of this document's budget was used, so the first reading "
-    "stands and still needs your decision.",
     ("image_page.maths_always_checked", "maths_checked"): "This was read from an image and holds "
     "maths, and every such block is checked, however sure the reader was: compare each formula "
     "with the original page symbol by symbol.",
@@ -437,6 +431,11 @@ NOTICE_MESSAGES: dict[str, str] = {
     "image_page_converted": "A scanned or handwritten page was converted from an image of "
     "it: nothing in the PDF can confirm the reading, so check it against the original, which "
     "is kept with the page.",
+    "second_reader_unavailable": "A second reader could not read some handwritten equations, "
+    "so they have only the first reading, and each one is still a decision for you.",
+    "second_reader_budget": "The second reader's share of this document's budget ran out before "
+    "some handwritten equations, so they have only the first reading, and each one is still a "
+    "decision for you.",
     "page_omitted": "You left this page out of the student file and of the review, and the "
     "file says that it is not there.",
 }

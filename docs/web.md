@@ -1514,8 +1514,8 @@ the results".
   **A second reading** (a handwritten display equation whose second reader read it differently
   in a few symbols; `Element.alternatives`, `web/reading_chips.py`, `pipeline/image_page_reconcile.py`):
   under the proposal, "A second reading differs" with one button for each other reading,
-  grouped by the symbol of the page reading it replaces ("Where the page reading has `X` (said
-  "capital X"), the other reader had:"). A button's words say what the choice means ("Use capital X",
+  grouped by the symbol of the page reading it replaces ("Where the proposal above has `X` (said
+  "capital X"), the other reader had:"; "the 2nd `x`" when the symbol stands more than once). A button's words say what the choice means ("Use capital X",
   "Use Greek rho", "Use the digit 1": from the choice's kind and the way the symbol is spoken) and
   a hidden "in equation 3" says which item; beside it, how the whole equation would then be read
   aloud, tied to the button with `aria-describedby`. At most three symbols of three options. Each is
@@ -1530,7 +1530,12 @@ the results".
   Undo to another reading, they are not shown), and only when there are alternatives, so nothing
   changes with the second reader off. The crop beside it is the equation's own, as for any
   equation: no box for the single symbol is stored, so the symbol is named in words and not
-  outlined on the picture. Tests: `tests/test_web_review_chips.py`,
+  outlined on the picture. A chosen reading is recorded as such in the review record
+  (`ReviewEdit.after["second_reader_choice"]`, "Edited: chose the reading a second reader gave for
+  one symbol"), only when the form says it was a choice and the LaTeX is one the card offered.
+  Items read from an image of a page (`IMAGE_PAGE_REASON`) are never part of a bulk accept
+  ("Accept all equations ...", "Accept all clean tables"): `bulk_accept.is_bulk_candidate` and
+  `review.is_clean_table` leave them out whatever their checks say (ADR 0007, point 12). Tests: `tests/test_web_review_chips.py`,
   `tests/test_web_review_chips_browser.py` (axe, keyboard, target size, forced-colors).
 - *Figure*: its image (the stored crop), the caption, and the alt text field with
   Accept, Save edit and **Keep without a description**. With long descriptions on (docs/steps.md), a chart's

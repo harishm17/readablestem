@@ -143,11 +143,11 @@
   <h3 id="chips-title-{{ eid }}" class="part-label">A second reading differs</h3>
   <p class="hint" id="chips-hint-{{ eid }}">Another reader read this picture differently. Look at the picture, then choose a reading, or leave this and edit the LaTeX below. Nothing is chosen for you.</p>
   <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="chips-form">
-    {{ hidden_fields() }}<input type="hidden" name="action" value="edit">
+    {{ hidden_fields() }}<input type="hidden" name="action" value="edit"><input type="hidden" name="origin" value="second_reader_choice">
     {% for group in p.chips.groups %}
     {% set gid = "chip-group-" ~ eid ~ "-" ~ loop.index %}
     <div class="chip-group" role="group" aria-labelledby="{{ gid }}">
-      <p class="chip-lead" id="{{ gid }}">Where the page reading has <code class="latex">{{ group.symbol }}</code> (said “{{ group.said }}”), the other reader had:</p>
+      <p class="chip-lead" id="{{ gid }}">Where the proposal above has {{ group.which }}<code class="latex">{{ group.symbol }}</code> (said “{{ group.said }}”), the other reader had:</p>
       <ul class="chip-list">
         {% for chip in group.chips %}
         {% set cid = gid ~ "-" ~ loop.index %}
