@@ -230,23 +230,20 @@ def test_draw_tries_at_most_visits_per_repo_documents_in_one_repository():
 
 
 def test_compile_falls_back_to_the_next_engine_and_records_it(tmp_path, monkeypatch):
+    """Fallback order and the cache only; the sandbox itself is tested in test_safe_tex.py."""
     src = tmp_path / "src"
     src.mkdir()
-    (src / "a.tex").write_text(NOTES, encoding="utf-8")
     monkeypatch.setattr(cc, "engines", lambda: [("pdflatex", "pdfTeX 1"), ("xelatex", "XeTeX 2")])
-    monkeypatch.setattr(cc, "texlive_bin", lambda: tmp_path / "bin")
     tried: list[str] = []
 
-    def fake_run(command, **kwargs):
-        engine = "xelatex" if "-xelatex" in command else "pdflatex"
+    def fake_compile(src, main, out, engine, *, timeout):
         tried.append(engine)
-        out = next(c for c in command if c.startswith("-outdir=")).split("=", 1)[1]
         ok = engine == "xelatex"
         if ok:
-            (Path(out) / "a.pdf").write_bytes(b"%PDF")
-        return type("R", (), {"returncode": 0 if ok else 1})()
+            (out / "a.pdf").write_bytes(b"%PDF")
+        return cc.safe_tex.Result(0 if ok else 1, False)
 
-    monkeypatch.setattr(cc.subprocess, "run", fake_run)
+    monkeypatch.setattr(cc.safe_tex, "compile_tex", fake_compile)
     pdf, label = cc.compile_document(src, "a.tex", tmp_path / "out")
     assert tried == ["pdflatex", "xelatex"]
     assert label == "xelatex: XeTeX 2" and pdf.is_file()
@@ -255,22 +252,30 @@ def test_compile_falls_back_to_the_next_engine_and_records_it(tmp_path, monkeypa
     assert tried == ["pdflatex", "xelatex"]
 
 
-def test_compile_refuses_shell_escape_and_reports_failure(tmp_path, monkeypatch):
+def test_compile_reports_failure_and_timeout_by_category(tmp_path, monkeypatch):
     src = tmp_path / "src"
     src.mkdir()
     monkeypatch.setattr(cc, "engines", lambda: [("pdflatex", "v")])
-    monkeypatch.setattr(cc, "texlive_bin", lambda: tmp_path / "bin")
-    seen: list[list[str]] = []
-
-    def fake_run(command, **kwargs):
-        seen.append(command)
-        return type("R", (), {"returncode": 1})()
-
-    monkeypatch.setattr(cc.subprocess, "run", fake_run)
+    result = {"value": cc.safe_tex.Result(1, False)}
+    monkeypatch.setattr(cc.safe_tex, "compile_tex", lambda *a, **k: result["value"])
     with pytest.raises(cc.Skip) as info:
         cc.compile_document(src, "a.tex", tmp_path / "out")
     assert info.value.code == "compile_failed"
-    assert "-no-shell-escape" in seen[0]
+    result["value"] = cc.safe_tex.Result(-9, True)
+    with pytest.raises(cc.Skip) as info:
+        cc.compile_document(src, "a.tex", tmp_path / "out2")
+    assert info.value.code == "compile_timeout"
+
+
+def test_a_missing_sandbox_stops_the_run_instead_of_skipping(tmp_path, monkeypatch):
+    monkeypatch.setattr(cc, "engines", lambda: [("pdflatex", "v")])
+
+    def refuse(*args, **kwargs):
+        raise cc.safe_tex.SandboxUnavailable("bubblewrap (bwrap) is required")
+
+    monkeypatch.setattr(cc.safe_tex, "compile_tex", refuse)
+    with pytest.raises(cc.CourseError):
+        cc.compile_document(tmp_path, "a.tex", tmp_path / "out")
 
 
 def test_unit_id_has_no_extension():

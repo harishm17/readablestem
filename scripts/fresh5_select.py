@@ -444,7 +444,7 @@ def cmd_course_harvest(args: argparse.Namespace) -> int:
 def cmd_course_draw(args: argparse.Namespace) -> int:
     pool = json.loads((REPO_DATA / "pool-fresh5-course.json").read_text(encoding="utf-8"))
     repos = [cc.Repo(**r) for r in pool["repos"]]
-    base = args.root / "course"
+    base = args.root / "course-v2"  # fetched and compiled through safe_tex only
     gold_dir = args.root / "gold" / "fresh5c"
     log: list[dict] = []
     headers = {"User-Agent": cc.USER_AGENT, "Accept": "application/vnd.github+json"}
@@ -478,6 +478,9 @@ def cmd_course_draw(args: argparse.Namespace) -> int:
             return docs, build
 
         accepted = cc.draw(repos, SEED, documents, log)
+    for old in sorted(gold_dir.rglob("*")) if gold_dir.is_dir() else []:
+        if old.is_file():
+            old.unlink()  # a rerun writes the gold of this draw only
     (gold_dir / "pdfs").mkdir(parents=True, exist_ok=True)
     papers = []
     for entry in sorted(accepted, key=lambda e: cc.unit_id(e["repo"], e["doc"].path)):

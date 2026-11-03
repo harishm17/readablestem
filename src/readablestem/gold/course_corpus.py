@@ -11,13 +11,15 @@ Steps, each a function here and a subcommand of `scripts/fresh5_select.py`:
    accepted licence qualifier). A repository is kept only if GitHub reports a licence that
    `licence_gate` accepts (CC BY, CC BY-SA or MIT), and it is not a fork or archived.
 2. `order_repos` / `order_documents`: SHA-256 of seed and name, never a choice.
-3. `fetch_repo`: the tarball of the default branch's commit (pinned by SHA), unpacked with tarfile's
-   `data` filter into a folder of its own; the licence is read again from the repository record.
+3. `fetch_repo`: the tarball of the default branch's commit (pinned by SHA), unpacked by
+   `safe_tex.extract_tar` (no links, no unsafe paths, size and file caps, renamed into place only
+   when complete); the licence is read again from the repository record.
 4. `discover`: the files with `\\documentclass` and `\\begin{document}`; Beamer is `beamer` as the
    class (or a `\\usepackage{beamer}`).
-5. `compile_document`: pdflatex, xelatex or lualatex from a user-level TeX Live (latexmk), then
-   Tectonic (`--untrusted`) if none compiles it; shell escape is off for all; the engine and its
-   version are recorded.
+5. `compile_document`: pdflatex or xelatex from a user-level TeX Live (latexmk), then Tectonic if
+   neither compiles it, all through `safe_tex.compile_tex` (sandboxed, no network, no rc file, no
+   shell escape, reads and writes only below the working tree); the engine and its version are
+   recorded.
 6. `draw`: walk repositories in the seeded order and their documents in the seeded order, accept a
    document that passes the gates, at most `PER_REPO` per repository and `VISITS_PER_REPO` tried
    in one, stop at `TARGET` documents;
@@ -31,13 +33,8 @@ in no-shell-escape mode.
 
 from __future__ import annotations
 
-import io
 import json
-import os
 import re
-import shutil
-import subprocess
-import tarfile
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field
@@ -47,6 +44,7 @@ from typing import Any
 import httpx
 
 from readablestem.gold import arxiv_gold as ag
+from readablestem.gold import safe_tex
 from readablestem.gold.arxiv_corpus import stable_key
 
 USER_AGENT = "readablestem-eval/0.1 (research; contact: harishm6250@gmail.com)"
@@ -261,19 +259,6 @@ def repo_licence(client: httpx.Client, repo: Repo) -> Licence:
     return require_licence(spdx)
 
 
-def unpack_tar(data: bytes, folder: Path) -> None:
-    """A repository tarball into the empty `folder`, without its single top-level directory."""
-    folder.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
-        archive.extractall(folder, filter="data")
-    entries = [p for p in folder.iterdir()]
-    if len(entries) == 1 and entries[0].is_dir():
-        top = entries[0]
-        for child in list(top.iterdir()):
-            child.rename(folder / child.name)
-        top.rmdir()
-
-
 def fetch_repo(client: httpx.Client, repo: Repo, base: Path) -> tuple[Path, str, Licence]:
     """(source folder, commit SHA, licence) of the repository, from the cache if present."""
     licence = repo_licence(client, repo)
@@ -290,9 +275,9 @@ def fetch_repo(client: httpx.Client, repo: Repo, base: Path) -> tuple[Path, str,
         if len(response.content) > MAX_DOWNLOAD:
             raise Skip("download_too_large")
         try:
-            unpack_tar(response.content, src)
-        except (tarfile.TarError, OSError) as exc:
-            raise Skip("bad_archive", type(exc).__name__) from None
+            safe_tex.extract_tar(response.content, src, strip_top=True)
+        except safe_tex.UnsafeArchive as exc:
+            raise Skip(exc.code, exc.detail) from None
     return src, sha, licence
 
 
@@ -330,94 +315,37 @@ def sources_for(sources: dict[str, str], main: str) -> dict[str, str]:
 # ------------------------------------------------------------------------------- compile
 
 
-def texlive_bin() -> Path | None:
-    """The `bin` folder of the `latexmk` on PATH, or of a user-level TeX Live
-    (`~/.local/texlive/<year>/bin/<arch>`), or None."""
-    found = shutil.which("latexmk")
-    if found:
-        return Path(found).parent
-    for candidate in sorted((Path.home() / ".local" / "texlive").glob("*/bin/*"), reverse=True):
-        if (candidate / "latexmk").is_file():
-            return candidate
-    return None
-
-
-def tectonic_path() -> str | None:
-    found = shutil.which("tectonic") or str(Path.home() / ".local" / "bin" / "tectonic")
-    return found if Path(found).is_file() else None
-
-
-def _env(bin_dir: Path | None, src: Path, main: str) -> dict[str, str]:
-    env = dict(os.environ)
-    if bin_dir is not None:
-        env["PATH"] = f"{bin_dir}{os.pathsep}{env.get('PATH', '')}"
-    # the document's folder and the repository root, so that a class or style file kept next to the
-    # source (or in the root) is found as it is on the author's machine
-    env["TEXINPUTS"] = os.pathsep.join([str((src / main).parent), str(src), ""])
-    return env
-
-
-def _first_line(command: list[str], env: dict[str, str] | None = None) -> str:
-    try:
-        run = subprocess.run(command, capture_output=True, text=True, timeout=30, env=env)
-    except (OSError, subprocess.TimeoutExpired):
-        return ""
-    lines = (run.stdout or run.stderr).strip().splitlines()
-    return lines[0] if lines else ""
-
-
-def engines() -> list[tuple[str, str]]:
-    """(name, version line) of the engines to try, in order: pdflatex, xelatex and lualatex from
-    TeX Live (through latexmk), then Tectonic. A document that one engine cannot compile is tried
-    with the next; the first PDF wins and the engine and its version are recorded."""
-    out: list[tuple[str, str]] = []
-    bin_dir = texlive_bin()
-    if bin_dir is not None:
-        env = _env(bin_dir, bin_dir, "x")
-        for name in ("pdflatex", "xelatex", "lualatex"):
-            out.append((name, _first_line([str(bin_dir / name), "--version"], env)))
-    exe = tectonic_path()
-    if exe:
-        out.append(("tectonic", _first_line([exe, "--version"])))
-    if not out:
-        raise CourseError("no TeX engine: install TeX Live or Tectonic (docs/development.md)")
-    return out
+texlive_bin = safe_tex.texlive_bin
+tectonic_path = safe_tex.tectonic_path
+engines = safe_tex.engines
 
 
 def compile_document(
     src: Path, main: str, out: Path, *, timeout: int = COMPILE_TIMEOUT
 ) -> tuple[Path, str]:
-    """(the PDF of `src/main`, "engine: version") from the first engine that compiles it. Shell
-    escape is off. The engine is written beside the PDF so that a cached build reports it too."""
+    """(the PDF of `src/main`, "engine: version") from the first engine that compiles it, run by
+    `safe_tex.compile_tex` (sandboxed, no network, no rc file, no shell escape, reads and writes
+    only below the working tree). The engine is written beside the PDF so that a cached build
+    reports it too."""
     out.mkdir(parents=True, exist_ok=True)
     target = out / (Path(main).stem + ".pdf")
     record = out / (Path(main).stem + ".engine")
     if target.is_file() and record.is_file():
         return target, record.read_text(encoding="utf-8").strip()
-    bin_dir = texlive_bin()
-    cwd = (src / main).parent
-    env = _env(bin_dir, src, main)
     timed_out = False
-    for name, version in engines():
+    try:
+        available = engines()
+    except safe_tex.SandboxUnavailable as exc:
+        raise CourseError(str(exc)) from None
+    for name, version in available:
         for old in out.glob("*"):
             if old.is_file():
                 old.unlink()
-        if name == "tectonic":
-            command = [tectonic_path() or "", "-X", "compile", "--untrusted"]
-            command += ["--outdir", str(out), Path(main).name]
-        else:
-            assert bin_dir is not None
-            flag = {"pdflatex": "-pdf", "xelatex": "-xelatex", "lualatex": "-lualatex"}[name]
-            command = [
-                str(bin_dir / "latexmk"), flag, "-interaction=nonstopmode", "-halt-on-error",
-                "-no-shell-escape", f"-outdir={out}", Path(main).name,
-            ]  # fmt: skip
         try:
-            run = subprocess.run(
-                command, cwd=cwd, env=env, capture_output=True, timeout=timeout, check=False,
-                stdin=subprocess.DEVNULL,
-            )  # fmt: skip
-        except subprocess.TimeoutExpired:
+            run = safe_tex.compile_tex(src, main, out, name, timeout=timeout)
+        except safe_tex.SandboxUnavailable as exc:
+            raise CourseError(str(exc)) from None
+        if run.timed_out:
             timed_out = True
             continue
         if run.returncode == 0 and target.is_file():

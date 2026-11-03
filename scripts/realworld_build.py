@@ -14,19 +14,17 @@ held-out part (`--held-out` papers). Gold (JSON lines), the cut PDFs (the chosen
 PDF) and the downloads go under ROOT (default ~/.cache/readablestem/realworld; outside the
 repository). The repository gets only manifests: ids, licences, hashes, chosen pages, counts.
 
-Downloaded files are untrusted data: archives are unpacked with tarfile's `data` filter into a
-folder of their own, and nothing in them is executed or compiled.
+Downloaded files are untrusted data: archives are unpacked by `safe_tex.extract_tar` (no links or
+unsafe paths, size and file caps, renamed into place only when complete), and nothing in them is
+run or compiled.
 """
 
 from __future__ import annotations
 
 import argparse
-import gzip
 import hashlib
-import io
 import json
 import sys
-import tarfile
 import time
 from pathlib import Path
 
@@ -35,6 +33,7 @@ import httpx
 from readablestem.gold import arxiv_corpus as ac
 from readablestem.gold import arxiv_gold as ag
 from readablestem.gold import arxiv_tex as tex
+from readablestem.gold import safe_tex
 
 ROOT = Path.home() / ".cache" / "readablestem" / "realworld"
 REPO_DATA = Path(__file__).resolve().parent.parent / "data" / "realworld"
@@ -72,20 +71,17 @@ def download(client: httpx.Client, url: str, target: Path, pause: float) -> byte
 
 def unpack(data: bytes, folder: Path) -> None:
     """Source archive (tar.gz), a single gzipped .tex, or a plain tar, into the empty `folder`."""
-    folder.mkdir(parents=True, exist_ok=True)
     if data[:4] == b"%PDF":
         raise Skip("source_is_pdf")
     try:
-        raw = gzip.decompress(data) if data[:2] == b"\x1f\x8b" else data
-    except OSError as exc:
-        raise Skip("bad_archive", str(exc)) from None
-    try:
-        with tarfile.open(fileobj=io.BytesIO(raw)) as archive:
-            archive.extractall(folder, filter="data")
-        return
-    except tarfile.TarError:
-        pass
-    (folder / "main.tex").write_bytes(raw)
+        try:
+            safe_tex.extract_tar(data, folder)
+        except safe_tex.UnsafeArchive as exc:
+            if exc.code != "bad_archive":
+                raise
+            safe_tex.extract_single_file(data, folder, "main.tex")  # one gzipped .tex
+    except safe_tex.UnsafeArchive as exc:
+        raise Skip(exc.code, exc.detail) from None
 
 
 def process(
