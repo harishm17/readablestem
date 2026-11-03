@@ -126,6 +126,9 @@ class PageMathHook:
 
     plan: MathPlan | None = None
     rows: dict[int, list[PageRow]] = field(default_factory=dict)
+    # Page -> row id -> layout's row (its characters carry the geometry and fonts the page
+    # witness's reconciliation reads, `pipeline.witness_reconcile`).
+    objects: dict[int, dict[str, Any]] = field(default_factory=dict)
     stats: HookStats = field(default_factory=HookStats)
     _checked: set[int] = field(default_factory=set)
 
@@ -137,6 +140,7 @@ class PageMathHook:
         try:
             rows, objects = page_rows(ordered)
             self.rows[number] = rows
+            self.objects[number] = objects
             self.stats.pages_seen += 1
             page = self.plan.pages.get(number) if self.plan is not None else None
             if page is None or page.failed is not None:

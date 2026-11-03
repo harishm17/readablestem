@@ -119,6 +119,7 @@ from readablestem.core.types import (
     Notice,
     PageMathSummary,
     PageStats,
+    PageWitnessSummary,
     ProgressEvent,
     SourceFacts,
     Stage,
@@ -142,9 +143,11 @@ from readablestem.pipeline import (
     page_math,
     page_math_reconcile,
     page_type,
+    page_witness,
     table_step,
     tagged,
     text_pass,
+    witness_reconcile,
 )
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline import options as run_options
@@ -1363,6 +1366,82 @@ def _page_math_pass(
     return doc, summary
 
 
+def _page_witness_pass(
+    pdf_bytes: bytes,
+    doc: Any,
+    collector: page_math_reconcile.PageMathHook,
+    *,
+    client: VisionClient,
+    settings: Settings,
+    concurrency: int,
+    tracer: Tracer,
+) -> tuple[list[Element], PageWitnessSummary]:
+    """The page witness (`pipeline/page_witness.py`) over the document's maths pages and its
+    reconciliation with the elements layout found (`pipeline/witness_reconcile.py`): the
+    elements back, each equation with its witness reading and any formula only the witness
+    found as a new element. Fails open: a page the model could not answer, a cap that stopped
+    the pass, or a reconciliation that fails leaves the elements as layout has them.
+    `ConfigError` and `UnknownModelError` propagate like they do from every step."""
+    elements: list[Element] = list(doc.elements)
+    kept = set(getattr(doc, "kept_pages", None) or {})
+    equations = Counter(e.page for e in elements if e.kind is Kind.EQUATION)
+    offered = {
+        number: (collector.rows[number], partial(_witness_image, pdf_bytes, number))
+        for number in collector.rows
+        if number not in kept
+        and page_witness.is_maths_page(
+            collector.objects.get(number, {}), equations=equations.get(number, 0)
+        )
+    }
+    with _span(tracer, "page_witness", pages=len(offered)) as span:
+        result = page_witness.run(client, settings, offered, concurrency=concurrency)
+        plan = result.plan
+        calls = result.calls
+        reconciled = witness_reconcile.ReconcileStats()
+        try:
+            done = witness_reconcile.reconcile(elements, plan, collector.rows, collector.objects)
+            elements, reconciled = done.elements, done.stats
+        except Exception as exc:  # the elements as layout has them stand
+            log.warning("page witness: reconciliation failed: %s", type(exc).__name__)
+        stats = plan.stats
+        summary = PageWitnessSummary(
+            pages=len(plan.pages),
+            failed=sum(p.failed is not None for p in plan.pages.values()),
+            refused=stats.refused,
+            calls=len(calls),
+            split_pages=sum(p.stats.windows > 1 or p.stats.splits > 0 for p in plan.pages.values()),
+            unoffered_rows=stats.unoffered_rows,
+            cost_usd=round(sum(c.cost_usd for c in calls), 8),
+            proposed=stats.proposed,
+            verified=stats.verified,
+            dropped=stats.dropped + stats.overlapped,
+            matched=reconciled.matched,
+            extent_differs=reconciled.extent_differs,
+            added=reconciled.added,
+            no_glyph_evidence=reconciled.no_glyph_evidence,
+            inside_text=reconciled.inside_text,
+            stopped_by=result.stopped.scope if result.stopped is not None else None,
+        )
+        _annotate(
+            span,
+            cost_usd=summary.cost_usd,
+            calls=summary.calls,
+            verified=summary.verified,
+            added=summary.added,
+        )
+    return elements, summary
+
+
+def _witness_image(pdf_bytes: bytes, number: int) -> bytes:
+    """The page's picture for the witness: as large as the vision models read it."""
+    return layout.render_page(
+        pdf_bytes,
+        number,
+        dpi=page_witness.IMAGE_DPI,
+        max_side_px=page_witness.IMAGE_MAX_SIDE_PX,
+    )
+
+
 def _image_pages_pass(
     pdf_bytes: bytes,
     kept: dict[int, str],
@@ -1459,7 +1538,11 @@ def _convert(
         cached = _CachedDocument(pdf_bytes)
         try:
             _send(stage_progress, "layout")
-            collector = page_math_reconcile.PageMathHook() if options.page_math else None
+            collector = (
+                page_math_reconcile.PageMathHook()
+                if options.page_math or options.page_witness
+                else None
+            )
             # (`page_math` only when asked for: stand-ins for `analyze` take no such argument)
             doc = layout.analyze(
                 pdf_bytes,
@@ -1468,7 +1551,9 @@ def _convert(
                 **({} if collector is None else {"page_math": collector}),
             )
             page_math_summary: PageMathSummary | None = None
-            if collector is not None:
+            witness_summary: PageWitnessSummary | None = None
+            witnessed: list[Element] | None = None
+            if collector is not None and options.page_math:
                 doc, page_math_summary = _page_math_pass(
                     pdf_bytes,
                     doc,
@@ -1479,7 +1564,19 @@ def _convert(
                     concurrency=concurrency,
                     tracer=tracer,
                 )
-            elements = sorted(doc.elements, key=lambda e: e.order)
+            if collector is not None and options.page_witness:
+                witnessed, witness_summary = _page_witness_pass(
+                    pdf_bytes,
+                    doc,
+                    collector,
+                    client=client,
+                    settings=settings,
+                    concurrency=concurrency,
+                    tracer=tracer,
+                )
+            elements = sorted(
+                doc.elements if witnessed is None else witnessed, key=lambda e: e.order
+            )
             kept: dict[int, str] = dict(getattr(doc, "kept_pages", None) or {})
             sizes = dict(zip(doc.pages, getattr(doc, "page_sizes", None) or [], strict=False))
             boxes = _page_boxes(pdf_bytes, kept, sizes)
@@ -1595,6 +1692,13 @@ def _convert(
                     "model_calls": stats.model_calls + page_math_summary.calls,
                 }
             )
+        if witness_summary is not None:
+            stats = stats.model_copy(
+                update={
+                    "cost_usd": round(stats.cost_usd + witness_summary.cost_usd, 8),
+                    "model_calls": stats.model_calls + witness_summary.calls,
+                }
+            )
         if image_summary is not None:
             costs = {r.page: r.cost_usd for r in image_summary.per_page}
             stats = stats.model_copy(
@@ -1661,10 +1765,13 @@ def _convert(
             for page, kind in sorted((getattr(doc, "page_types", None) or {}).items())
         ],
         page_math=page_math_summary,
+        page_witness=witness_summary,
         image_pages=image_summary,
     )
     if page_math_summary is not None:
         result.prompt_versions["page_math"] = page_math.PROMPT_VERSION
+    if witness_summary is not None:
+        result.prompt_versions["page_witness"] = page_witness.PROMPT_VERSION
     if image_summary is not None:
         result.prompt_versions["image_page"] = image_page.PROMPT_VERSION
         if settings.image_pages_second_reading:

@@ -119,6 +119,7 @@ _SCHEMA_MODULES = frozenset(
         "figure_step",
         "table_step",
         "page_math",
+        "page_witness",
         "image_page",
         "image_page_check",
     )
