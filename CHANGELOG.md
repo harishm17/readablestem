@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: handwriting harness for the owner's own notes (branch eq/handwriting-own)
+
+- `scripts/handwriting_own.py`: intake of PDFs from a folder outside the repo, a hash-based dev and
+  held-out split registered privately, a blank answer-key form served on 127.0.0.1
+  (`scripts/handwriting_gold_form.html`, no model draft) and a `run` command capped by `--max-usd`
+  (at most 2.00). Every command refuses a path inside a git repository; `.gitignore` guards the usual
+  private folder names. Use: [docs/eval-handwriting.md](docs/eval-handwriting.md), "Your own notes".
+
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 
 - `ANALYTICS_ENABLED` (default false): PostHog loaded from and reporting to the app's own `/m/` proxy

@@ -44,3 +44,8 @@ site/_build_again/
 # Railway IaC SDK (.railway/package.json)
 node_modules/
 src/readablestem/web/showcase/
+
+# Private handwriting notes and their answer keys (scripts/handwriting_own.py keeps them outside the repo; these guard against a stray copy)
+readablestem-private/
+handwriting-own/
+handwriting-private/
