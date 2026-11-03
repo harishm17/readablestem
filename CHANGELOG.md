@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased: keyboard walk and draft ACR
+
+- New keyboard-only walk of the web app (`tests/test_web_keyboard_browser.py`, browser-marked,
+  helpers in `tests/fixtures/web/keyboard.py`): Tab through every page at 1280, 390 and 320 CSS px
+  (skip link, focus visible and not covered, names, no trap, no change on focus, landmark order)
+  and the main flows by key alone, with where focus lands after each redirect.
+  `tests/test_web_focus_style.py` checks the focus ring's colours offline.
+- Fix (found by the walk): after leaving a page out, putting it back, or choosing a line to change
+  in the page tools, focus stayed on the page itself because the redirect named a fragment that was
+  not focusable (a browser skips `autofocus` when the address has a fragment). The redirects and
+  links now name `#page-tools-summary`, and the tool sections take focus (`tabindex="-1"`).
+- Draft accessibility conformance report in `docs/acr/` (VPAT 2.5Rev WCAG edition layout, WCAG 2.2
+  A and AA), not published and not a claim of conformance: each row names its test or code, and
+  rows that need a screen reader session are "Not yet evaluated". `tests/test_acr_draft.py` holds
+  the report to its own rules.
 ## Unreleased: development baseline (branch eval/dev-baseline-2026-11-03)
 
 - Measurement report `docs/eval-dev-baseline-2026-11-03.md`: ReadableSTEM at pipeline 0.5.3 with production flags on the 25

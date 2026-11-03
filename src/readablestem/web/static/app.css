@@ -763,6 +763,7 @@ input[type="number"].input-short { width: 6rem; }
 .notice-actions { margin: 0.6rem 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
 .page-tools > summary { cursor: pointer; padding: 0.65rem 0; font-weight: 700; font-size: 1.05rem; }
 .tool-section { padding: 0.5rem 0 0.75rem; border-top: 1px solid var(--rule); }
+.tool-section:focus { outline: none; }  /* a link or redirect to a tool lands focus on it */
 .tool-section:first-of-type { border-top: 0; }
 .tool-section h3 { margin: 0 0 0.35rem; }
 .page-left-out { border-left: 5px solid var(--mark-optional); padding-left: 0.6rem; }
