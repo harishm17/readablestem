@@ -5,6 +5,20 @@
 - Measurement report `docs/eval-dev-baseline-2026-11-03.md`: ReadableSTEM at pipeline 0.5.3 with production flags on the 25
   real-world development papers, against the recorded Opus (6 papers) and Haiku (25) chatbot answers. One
   run, $0.1186 of model spend; no code, prompt or setting changed.
+## Unreleased: figures spot check
+
+- `eval figures-spotcheck` (`eval/figures_spotcheck.py`, docs/eval.md "Figure spot check"): offline,
+  no model call. From a figures run with long descriptions on, writes a blind sheet of every
+  long-judge fail plus a seeded sample of 10 passes for a person to label, and scores the labels
+  against a key (judge fails confirmed, sampled passes the person would fail, each with n and a
+  Wilson interval). Tests: `tests/test_eval_figures_spotcheck.py`.
+## Unreleased: fair queue
+
+- The worker takes queued jobs round-robin by person (`web/fair_queue.py`, docs/web.md "Worker"):
+  fewest attempts first as before, then the owner served longest ago, then oldest. Someone with ten
+  queued documents no longer keeps another person's single one waiting behind all ten; a person
+  alone is served in the same order as before. The job page's "documents ahead of yours" replays the
+  same order. Tests: `tests/test_web_fair_queue.py`, one Postgres test in `tests/test_web_postgres.py`.
 ## Unreleased: Word and EPUB in "Download all" (branch export/w3-download-all-formats)
 
 - "Download all" (My documents and the course page) and "Combine parts" offer Word (.docx, where pandoc is

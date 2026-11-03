@@ -200,6 +200,12 @@ The long judge has never been compared with a person. Before a bar is claimed:
    it. A judge from the same model family as the writer can favour its own wording; the human
    labels are the check on that.
 
+After the confirmatory run C, a short spot check reads what the judge decided on that run:
+`eval figures-spotcheck` ([eval.md](eval.md#figure-spot-check-eval-figures-spotcheck)) writes a
+blind sheet of every judge fail and 10 sampled passes, offline and free, and reports how many fails
+the person confirms and how many of the passes they would fail, each with n and an interval. It
+adds no bar and does not replace the kappa calibration above.
+
 ### 3.7 Not claimed
 
 - No claim that a long description is *useful to a student* beyond the judge and the 25 human labels

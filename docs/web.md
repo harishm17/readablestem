@@ -1061,9 +1061,13 @@ conservative. A model call now costs one more INSERT to hold and a SELECT and a 
 
 A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
 
-- **Claiming.** Fewest attempts first, then oldest (then id), so a retried job goes
-  behind fresh ones. The queue position on the job page ("2 documents ahead of yours",
-  `views.queue_ahead`) counts in the same order, also skipping the jobs of people no
+- **Claiming.** Fewest attempts first, so a retried job goes behind fresh ones; within
+  that, people take turns (`web/fair_queue.py`): the owner whose latest job started
+  longest ago goes first (someone never served, first of all), then oldest, then id. One
+  person's ten documents never keep another person's one waiting behind all ten, and a
+  person alone is served oldest first as before. The caps, retries and attempt limits are
+  untouched. The queue position on the job page ("2 documents ahead of yours",
+  `views.queue_ahead`) replays the same claims, also skipping the jobs of people no
   longer allowed. Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` then an UPDATE in the same
   transaction. SQLite: a conditional UPDATE (`WHERE status = 'queued'`) whose rowcount
   says who won. Jobs of people no longer on the allowlist are not claimed; removing
