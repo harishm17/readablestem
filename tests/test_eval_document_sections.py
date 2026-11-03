@@ -138,3 +138,20 @@ def test_several_sections_at_once_take_less_time_than_one_after_the_other():
 
     one, four = timed(1), timed(4)
     assert four < 0.75 * one, (one, four)
+
+
+def test_the_page_witness_cost_is_part_of_the_items_cost_and_reported_apart():
+    defaults = {**OFFLINE_DEFAULTS, "page_witness": {"formulas": []}}
+    witness_client = FakeVisionClient(defaults=defaults)
+    cfg = config(witness_client, workers=1)
+    cfg.settings = cfg.settings.model_copy(update={"feature_page_witness": True})
+    items, stop = pe._eval_document(cfg, units(1), [PDFS[1]])
+    assert stop is None
+    item = items[0]
+    asked = [r for r in witness_client.requests if r.step == "page_witness"]
+    assert asked and item["page_witness"]["calls"] == len(asked)
+    assert item["page_witness_cost_usd"] > 0
+    assert item["cost_usd"] >= item["page_witness_cost_usd"]
+    cost = pe._cost("document", items, None)
+    assert cost["page_witness_usd"] == item["page_witness_cost_usd"]
+    assert cost["page_witness_per_pdf_page_usd"] > 0
