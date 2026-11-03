@@ -705,6 +705,7 @@ The second track (root causes, fixes, the fresh set):
 ```
 uv run python scripts/handwriting_accuracy.py build-fresh   # compose the fresh set (needs `fetch`)
 uv run python scripts/handwriting_accuracy.py verify-fresh  # rebuild and compare with data/handwriting/manifest-fresh.json
+uv run python scripts/handwriting_accuracy.py build-vector --verify  # vector-ink dev set, $0 (needs `fetch`)
 uv run python scripts/handwriting_analysis.py classes --part heldout --arm control   # needs the recorded run
 uv run python scripts/handwriting_errors.py [--arm NAME] [--part PART] [--json FILE]   # every recorded arm, $0
 uv run --env-file .env python scripts/handwriting_accuracy.py run --part dev --arm NAME --max-usd 1 \
@@ -714,6 +715,48 @@ uv run python scripts/typed_scans_check.py compare --arms base new   # docs/eval
 
 The fresh set's live runs refuse to start unless the registered files hash as registered
 (`data/handwriting/REGISTRATION-ACCURACY.sha256`), and a second live run of an arm.
+
+## A vector-ink dev set
+
+The sets above are raster, and the pipeline's stroke reader (`pipeline/ink_strokes.py`) reads only
+vector ink. `src/readablestem/eval/handwriting_vector.py` builds the matching dev set: MathWriting
+expressions (the `test` split, none that a registered part used, by id or by label) drawn into
+PDFs as paths, the way notes apps export. No model is called and the cost is nothing.
+
+```
+uv run python scripts/handwriting_accuracy.py build-vector [--verify] [--units N] [--seed S] [--out DIR]
+```
+
+- **Three drawing styles**, the three `ink_strokes` reads: `path` (one stroked polyline per
+  stroke, round pen), `samples` (one small filled disc per pen sample) and `outline` (one filled
+  pen outline per stroke). Units of two pages cycle through the styles, then plain and ruled paper
+  (pale rules and a margin line: furniture a reader must drop), and every second unit has a short
+  typed header on its first page (at most `page_type.BODY_MAX` characters, so it does not make the
+  page typed). There is no text layer under the ink.
+- **Layout:** one expression to a line, so every gold record is display; there are no typed
+  sentences (the raster sets have them). Pen width and letter size follow the ink.
+- **Gold:** one JSONL file per unit, the same records as the raster sets' (LaTeX label, MathML made
+  by the pipeline's own path), with the drawing style and the stroke count added, so the document
+  task reads the folder as it reads the others.
+- **`manifest.json`** has the identifiers, ink hashes, boxes and stroke counts, and `rebuild_hash`,
+  a SHA-256 over all of it, including each PDF's page content hash (the PDF container's own bytes
+  carry a document id, so the hash is over the drawing operations and the text). `--verify`
+  builds again into a temporary folder and compares. It is not a registered part: no registration,
+  nothing committed. The seed and the pool size are in the script.
+
+The pages, gold and manifest are CC BY-NC-SA 4.0 material (see
+[data/handwriting/ATTRIBUTION.md](../data/handwriting/ATTRIBUTION.md)). They go to
+`~/.cache/readablestem/handwriting-vector/` and the command refuses a folder inside the repository.
+
+**What the first build shows** (default seed, 6 units, 12 pages, 69 expressions; one build, no
+repeats). `ink_strokes.extract_ink` recovers every stroke of the `path` and `outline` pages, and
+the ruled paper is dropped as `rule`. On the 4 `samples` pages it finds 380 strokes for the 374
+drawn, and only 4 of 6 expressions exactly on the worst page (a fast curve splits, and crossing
+strokes join). `page_type.classify` says `handwritten` for all 8 `path` and `outline` pages and
+`vector_no_text` for all 4 `samples` pages: its stroke test takes a closed shape for a pen stroke
+only if it wiggles, and a filled disc is a dot to it. Whether a real GoodNotes page does the same
+is for the probe on real exports to settle. The test that expects `handwritten` for these pages is
+marked as an expected failure, so it fails when `page_type` starts to call them that.
 
 ## A set of real iPad ink with answer keys nobody typed
 

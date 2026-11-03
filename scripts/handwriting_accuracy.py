@@ -2,6 +2,7 @@
 
     uv run python scripts/handwriting_accuracy.py build-fresh    # compose the fresh held-out set
     uv run python scripts/handwriting_accuracy.py verify-fresh   # rebuild, compare with manifest
+    uv run python scripts/handwriting_accuracy.py build-vector [--verify]   # vector-ink dev set
     uv run --env-file .env python scripts/handwriting_accuracy.py run --part dev --arm NAME \
         --max-usd 1 [--prompt FILE] [--env KEY=VALUE ...] [--offline]
     uv run python scripts/handwriting_accuracy.py report --part dev --arm NAME
@@ -18,6 +19,10 @@ original: MathWriting ink composed on pages, scored by the document task) and ad
 The data is Google's MathWriting dataset (CC BY-NC-SA 4.0): it stays in
 `~/.cache/readablestem/handwriting`, never committed. Committed: the fresh manifest
 (`data/handwriting/manifest-fresh.json`: identifiers and hashes) and the registration.
+
+`build-vector` builds the vector-ink dev set (`eval/handwriting_vector.py`): expressions drawn as
+paths, per-sample shapes and filled outlines, into `~/.cache/readablestem/handwriting-vector/`.
+Nothing of it is committed, and it is not a registered part.
 """
 
 from __future__ import annotations
@@ -29,6 +34,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -188,6 +194,43 @@ def cmd_verify_fresh() -> int:
     return 1
 
 
+# ------------------------------------------------------------------------- the vector set
+
+VECTOR_ROOT = hwe.CACHE.parent / "handwriting-vector"
+VECTOR_SEED = "handwriting-vector-2026-11-03"
+VECTOR_SPLIT = "test"
+VECTOR_POOL = 120
+
+
+def cmd_build_vector(args: argparse.Namespace) -> int:
+    from readablestem.eval import handwriting_vector as hv
+
+    raw = hwe.RAW / "mathwriting-2024"
+    ink = raw / VECTOR_SPLIT
+    if not ink.is_dir():
+        raise SystemExit(f"no MathWriting ink in {ink} (run `handwriting_eval.py fetch`)")
+    ids, labels = hv.used_samples([hwe.MANIFEST, FRESH_MANIFEST], raw)
+    found = hv.pick_candidates(ink, args.seed, VECTOR_POOL, exclude_ids=ids, exclude_labels=labels)
+    out = Path(args.out) if args.out else VECTOR_ROOT
+    if REPO in (out.resolve(), *out.resolve().parents):
+        raise SystemExit("the vector set is CC BY-NC-SA ink: build it outside the repository")
+    manifest = hv.build_set(found, out, seed=args.seed, units=args.units)
+    print(
+        f"vector: {manifest['n_units']} units, {manifest['n_pages']} pages, "
+        f"{manifest['n_expressions']} expressions, in {out}"
+    )
+    print(f"rebuild hash {manifest['rebuild_hash']}")
+    if not args.verify:
+        return 0
+    with tempfile.TemporaryDirectory() as tmp:
+        again = hv.build_set(found, Path(tmp), seed=args.seed, units=args.units)
+    if again["rebuild_hash"] != manifest["rebuild_hash"]:
+        print("a second build gave another hash")
+        return 1
+    print("verified: a second build gave the same hash")
+    return 0
+
+
 # --------------------------------------------------------------------------------- arms
 
 
@@ -307,6 +350,11 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("build-fresh")
     sub.add_parser("verify-fresh")
+    vec = sub.add_parser("build-vector", help="build the vector-ink dev set")
+    vec.add_argument("--out", help=f"output folder (default {VECTOR_ROOT}); not inside the repo")
+    vec.add_argument("--seed", default=VECTOR_SEED)
+    vec.add_argument("--units", type=int, default=6, help="units of two pages (default 6)")
+    vec.add_argument("--verify", action="store_true", help="build again and compare the hash")
     for name in ("run", "report"):
         p = sub.add_parser(name)
         p.add_argument("--part", choices=PARTS, required=True)
@@ -323,6 +371,8 @@ def main() -> int:
         return cmd_build_fresh()
     if args.command == "verify-fresh":
         return cmd_verify_fresh()
+    if args.command == "build-vector":
+        return cmd_build_vector(args)
     if args.command == "report":
         return cmd_report(args)
     return cmd_run(args)

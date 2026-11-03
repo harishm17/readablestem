@@ -15,6 +15,13 @@
   shipped: on 74 expressions it read 44 exactly against 49 for the current prompt, 50 carried
   alternatives, and the right reading was one choice away for 7 of 18 one-symbol errors. docs/eval-handwriting.md,
   "Doubtful symbols: tried, not shipped".
+## Unreleased: a vector-ink handwriting dev set (branch hw/vector-devset)
+
+- `scripts/handwriting_accuracy.py build-vector` and `eval/handwriting_vector.py` build a dev set of
+  MathWriting expressions drawn into PDFs as vector ink (stroked paths, filled per-sample shapes,
+  filled pen outlines), on plain and ruled paper, some with a typed header, with gold LaTeX per
+  expression and a manifest with a rebuild hash. The pages stay in `~/.cache/readablestem`; the
+  ink is CC BY-NC-SA. No model is called. Documented in docs/eval-handwriting.md.
 
 ## Unreleased: the MathML shape for screen readers (branch mathml/screenreader-shape)
 
@@ -308,6 +315,9 @@
   (no links or unsafe paths, size and file caps, atomic) and compiles downloaded TeX (sandbox, `-norc`, no network or shell
   escape, no environment from the parent, a cap on what a compile writes); `realworld_build.py` and
   `figures_v2_arxiv.py` unpack and compile through it too.
+  Stratum D (`fresh5_select.py chemistry`): never-used OpenStax chemistry sections from the CC BY first editions, then the CC BY-NC-SA
+  2e editions as a private measurement (licence read live; their PDFs and gold only in the cache, ids and hashes in the repository),
+  with measured text overlap and page gates, and a chemistry-aware success rule in the draft registration; the rule fills 3 of 4 places. The used-section scan skips the selection files of B and D.
   [docs/eval-realworld.md](docs/eval-realworld.md).
 ### Figure gold v2 and a draft pre-registration for long descriptions
 
