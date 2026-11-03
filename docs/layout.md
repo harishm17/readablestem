@@ -737,6 +737,25 @@ OpenStax print from Chromium, where emphasis is italic and the unit is inside th
   On the 25 development papers 27 of 31 formulas cut inside a pair of parentheses had the pair
   outside the author's maths, and of the formulas that ended in an upright unit 37 were span failures
   against 2 that were exact.
+- **Inline span edges from glyphs** (`pipeline/glyph_math.py`, 2026-11-03). Five more rules read what the
+  page shows at an edge, and only move the edge of a run that was already maths (none makes text a formula,
+  so no text is lost: what leaves a run stays in the paragraph). (1) A comma, colon or semicolon that is
+  raised or lowered between two raised or lowered glyphs is part of the index: `\rho_{m,q}` was read as
+  `q(x)`, `g_{1:T}` as `g_1`. (2) A blank whose two neighbours touch (gap under 0.1 em) is no space: the
+  text layer puts one between a radical and its radicand, and `O(\sqrt T)` was cut at the radical.
+  (3) An upright word of two to eight letters that touches an opening parenthesis, is no English word
+  (`hyphens.words()`) and no chemical formula (element symbols only, `Pr` excepted) is a function name:
+  `\operatorname{CTCS}(n)`, `\mathrm{supp}(\psi)`, `\Pr(A)`; the formula goes on through it. (4) A percent
+  sign after a digit is part of the formula (`\phi = 5\%`), and a word space after it ends it. (5) The tail
+  of a run that is a unit after a number (upright letters of the text font, a factor's raised or lowered
+  exponent figures, other factors after a space: `24h`, `5 m`, `10^{-11} m^3 kg^{-1}`) is out of it,
+  except raised figures with no number before them (`15O`, a nuclide). The unit rule replaces the old
+  one-letter case (`_tail_outside_maths`). Measured with `scripts/eq_span_edges.py` on the development
+  gold, layout alone: [eval-equation-diagnostics.md](eval-equation-diagnostics.md), "Inline span edges".
+  What it does not do: a formula the author split in two (`h = $1.0 \times 10^7$`, the relation set as
+  text) cannot be told from one formula by the glyphs, accents drawn as a separate glyph that PyMuPDF
+  puts in another line (`\widetilde W`) still end a run, and a top-level comma between two variables
+  (`S, M \to \infty`) still ends it.
 - **Figure captions** are cut like paragraphs (`_attach_captions`): `Element.caption` stays plain text,
   `Element.caption_marked` has an inline marker where each formula was, and each formula is an
   equation element whose `parent_id` is the figure (id right after the figure's). `assemble` writes the

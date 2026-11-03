@@ -92,6 +92,7 @@ from readablestem.core.types import (
 from readablestem.pipeline import (
     chem,
     equation_images,
+    glyph_math,
     hyphens,
     outline,
     page_labels,
@@ -2876,9 +2877,16 @@ def _word_lengths(
         word = "".join(c.c for c in chars[i:j]).lower()
         if italic_variables and italic_text and j - i > 1 and word in hyphens.words():
             italic_variables = False
+        named = (
+            _TEX_MADE
+            and not italic_variables
+            and not script[i]
+            and not any(c.italic for c in chars[i:j])
+            and glyph_math.function_name(chars, i, j, known_word=word in hyphens.words())
+        )
         for k in range(i, j):
             lengths[k] = 1 if italic_variables else j - i
-            maths_word[k] = word in _MATH_WORDS
+            maths_word[k] = named or word in _MATH_WORDS
         i = j
     return lengths, maths_word
 
@@ -3365,14 +3373,18 @@ def _inline_runs(
                 or (c == "," and (depth > 0 or _ellipsis_comma(chars, i)))
                 or (c in _ELLIPSIS_CHARS and _in_ellipsis(chars, i))
                 or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
+                or glyph_math.script_punctuation(chars, info.script, i)  # m,q of rho_{m,q}
+                or glyph_math.percent_of_number(chars, i)  # the 5% of "phi = 5%"
             )
             accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
             # The degree sign of E°cell or ΔG°, a raised glyph of the text font after a symbol.
             accent = accent or (
                 c in _DEGREE_SIGNS and info.script[i] and i > start and info.mathy(i - 1)
             )
-            if chars[i].blank and (
-                _between_formulas(chars, i) or _word_space_between_operands(chars, info, i)
+            if (
+                chars[i].blank
+                and (_between_formulas(chars, i) or _word_space_between_operands(chars, info, i))
+                and not glyph_math.touching(chars, i)
             ):
                 break
             if info.mathy(i) or chars[i].blank or inside or accent:
@@ -3761,7 +3773,7 @@ def _reaction_row(row: _Row, info: _CharInfo) -> bool:
 # gap there is a word space of the sentence, and the formula ends before it: "eps(k) (i = 1)" is
 # two formulas, as the author typed them. A thin space ("dx \\, dy", 0.17 em) is narrower.
 WORD_SPACE = 0.25  # x font size: the narrowest gap that is a word space
-_OPERAND_END = frozenset(")]}'\u2032!\u221e")
+_OPERAND_END = frozenset(")]}'\u2032!\u221e%")
 _OPERAND_START = frozenset("([{\u2202\u2207\u221a\u222b\u2211\u220f\u221e")
 
 
@@ -3928,15 +3940,11 @@ def _tail_outside_maths(chars: list[_Char], info: _CharInfo, start: int, end: in
     cite = _CITATION_TAIL.search(text)
     if cite is not None and cite.start() > 0 and text[cite.start() - 1].isspace():
         return start + cite.start()
-    last = end - 1
-    if not (chars[last].c.isalpha() and info.classes[last] == "L" and not chars[last].italic):
-        return None
-    if info.script[last] or chars[last].math or last - 1 < start or not chars[last - 1].blank:
-        return None
-    back = next((k for k in range(last - 1, start - 1, -1) if not chars[k].blank), None)
-    if back is None or not chars[back].c.isdigit():
-        return None
-    return back + 1
+    upright = [
+        c.c.isalpha() and info.classes[k] == "L" and not (c.italic or c.math or info.script[k])
+        for k, c in enumerate(chars)
+    ]
+    return glyph_math.trailing_unit(chars, start, end, upright=upright, script=info.script)
 
 
 def _article(chars: list[_Char], info: _CharInfo, start: int, end: int, blank: int) -> bool:
