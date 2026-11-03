@@ -894,6 +894,11 @@ class DocumentResult(BaseModel):
     # Pages the reviewer left out (`OmittedPage`); empty for every result before the
     # option existed, and left out of the JSON then.
     omitted: list[OmittedPage] = Field(default_factory=list, exclude_if=lambda v: not v)
+    # 0-based page -> the page's printed label ("iv", "12"): the PDF's own page label, else
+    # the number printed in the margin (`pipeline.page_labels`). Only pages that have one;
+    # the output's page markers say the PDF position for the rest. Left out of the JSON when
+    # empty, so a result stored before it existed reads the same.
+    page_labels: dict[int, str] = Field(default_factory=dict, exclude_if=lambda v: not v)
     # The page math pass (ADR 0006); None when the flag was off, and left out of the JSON.
     page_math: PageMathSummary | None = Field(default=None, exclude_if=lambda v: v is None)
     # The image page pass (ADR 0007); None when the flag was off, and left out of the JSON.

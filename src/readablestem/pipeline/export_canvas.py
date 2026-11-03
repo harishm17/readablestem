@@ -40,6 +40,8 @@ from html import escape
 from html.parser import HTMLParser
 from io import BytesIO
 
+from readablestem.pipeline import navigation
+
 # Canvas stores a Page's body in a column of at most this many characters
 # (`maximum_long_text_length` = 500 KB - 1, config/initializers/active_record.rb;
 # WikiPage validates :body with it). A longer page is not offered for pasting.
@@ -393,6 +395,9 @@ class Notes:
     scroll_boxes: int = 0
     headings_shifted: bool = False
     page_too_large: bool = False
+    # The paste version has no "Skip to main content" link: it jumps to the start of
+    # `<main>`, which Canvas removes, and Canvas's own page has a skip link already.
+    skip_link_left_out: bool = False
 
 
 @dataclass
@@ -520,7 +525,12 @@ def export_canvas(
     if page_tree is not None:
         base = f"/courses/{course_number}/file_contents/course%20files/{folder}/"
         _extract_images(page_tree, Notes(), lambda name: base + name)
-        for node in page_tree.walk():
+        for node in list(page_tree.walk()):
+            if "skip-link" in node.classes() or node.attrs.get("id") == navigation.MAIN_ID:
+                if node.parent is not None:
+                    node.parent.children.remove(node)
+                    notes.skip_link_left_out = True
+                continue
             if HIDDEN_CLASS in node.classes():
                 node.attrs["class"] = f"{node.attrs['class']} {CANVAS_HIDDEN_CLASS}"
             node.attrs.pop("tabindex", None)
@@ -643,6 +653,11 @@ def readme(export: CanvasExport) -> str:
             "here). Canvas removes the setting that lets a keyboard user move into a box, "
             "so in a pasted page they may need a mouse or touch to scroll it. index.html keeps "
             "the setting."
+        )
+    if paste and n.skip_link_left_out:
+        changes.append(
+            "The page to paste has no “Skip to main content” link: it would jump to a "
+            "landmark Canvas removes, and Canvas's own page has one."
         )
     changes.append("Bold labels (such as “Not converted.”) show in normal weight.")
     if changes:

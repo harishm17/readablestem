@@ -183,7 +183,9 @@ def test_the_keyboard_reaches_and_scrolls_a_wide_equation():
     script = """() => [document.activeElement.id,
                        document.getElementById('p1-e0').scrollLeft]"""
     scrolled = "document.getElementById('p1-e0').scrollLeft > 0"
-    before, after = in_chromium(html, script, keys=["Tab", "ArrowRight"], until=scrolled)
+    before, after = in_chromium(
+        html, script, keys=["Tab", "Tab", "ArrowRight"], until=scrolled
+    )  # skip link, then the box
     assert before == ["", 0]
     assert after[0] == "p1-e0" and after[1] > 0
 
@@ -213,9 +215,9 @@ def test_a_wide_inline_equation_scrolls_in_its_box_and_the_page_does_not():
               overflows: box.scrollWidth > box.clientWidth + 1,
               active: document.activeElement.className};
     }"""
-    before, after = in_chromium(paragraph_with([SHORT, long_sum()]), script, keys=["Tab"])
+    before, after = in_chromium(paragraph_with([SHORT, long_sum()]), script, keys=["Tab", "Tab"])
     assert before["page"][0] <= before["page"][1] and before["overflows"]
-    assert after["active"] == "equation-scroll"  # the first tab stop on the page
+    assert after["active"] == "equation-scroll"  # the first tab stop after the skip link
 
 
 @pytest.mark.browser

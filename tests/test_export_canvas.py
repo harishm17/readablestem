@@ -113,6 +113,7 @@ def test_the_only_styles_left_behind_are_known(made):
     assert notes.uncarried_selectors <= {
         ":root",
         ":focus-visible",
+        ".skip-link:not(:focus)",  # with the rule gone the link is plainly visible
         "@media (min-width: 44rem)",
         "@media print",
         "@media screen and (prefers-color-scheme: dark)",  # Canvas has its own colours

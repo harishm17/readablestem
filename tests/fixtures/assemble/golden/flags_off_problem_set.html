@@ -47,17 +47,32 @@ figcaption { margin-top: 0.5em; }
 @media (min-width: 44rem) { .about { margin: 0 auto; } }
 .about-title { font-size: 1.5em; font-weight: 700; line-height: 1.25; margin: 1.6em 0 0.5em; }
 :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
-@media print { .flagged { break-inside: avoid; } }
+.skip-link { display: inline-block; margin: 0.5rem; padding: 0.5em 1em; background: #ffffff;
+  color: #0b57d0; }
+.skip-link:not(:focus) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media print { .flagged { break-inside: avoid; } .skip-link { display: none; } }
 @media screen and (prefers-color-scheme: dark) {
   body { background: #121212; color: #ececec; }
   .flagged, .notice, .flagged-inline { border-color: #ffa066; }
   .about { border-top-color: #ececec; }
   :focus-visible { outline-color: #8ab4f8; }
+  .skip-link { background: #121212; color: #8ab4f8; }
   img { outline: 1px solid #8c8c8c; outline-offset: -1px; }
 }
+.toc { margin: 1rem auto; max-width: 42rem; padding: 0 1rem; }
+.toc-title { font-weight: 700; margin: 0 0 0.25em; }
+.toc ul { margin: 0; padding-left: 1.25em; }
+.toc li { margin: 0.15em 0; }
 </style>
 </head>
 <body>
+<a class="skip-link readablestem" href="#main-content">Skip to main content</a>
+<nav class="toc" aria-label="Contents">
+<p class="toc-title readablestem" aria-hidden="true">Contents</p>
+<ul><li><a href="#p1-e0">Problem Set 2: Kinematics</a><ul><li><a href="#p1-e1">Problem 1</a></li><li><a href="#p1-e10">Problem 2</a></li><li><a href="#p1-e23">Problem 3</a></li></ul></li></ul>
+</nav>
+<span id="main-content"></span>
 <main>
 <h1 id="p1-e0">Problem Set 2: Kinematics</h1>
 <h2 id="p1-e1">Problem 1</h2>
