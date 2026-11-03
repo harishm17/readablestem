@@ -891,8 +891,16 @@ def test_without_tracing_the_converter_gets_no_tracer_argument(env):
     worker.converter = converter
     worker.run_once()
     # live progress for the job page, the steps to run at once, the job's finished steps
-    # and what the AI service is doing; no tracer
-    assert set(seen) == {"stage_progress", "concurrency", "step_cache", "call_observer"}
+    # and what the AI service is doing, the cancel flag and the time limit for a converter
+    # that runs in a child process; no tracer
+    assert set(seen) == {
+        "stage_progress",
+        "concurrency",
+        "step_cache",
+        "call_observer",
+        "cancelled",
+        "limit_s",
+    }
 
 
 # --------------------------------------------------------------------------- concurrency

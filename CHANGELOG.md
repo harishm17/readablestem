@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: conversions run in a child process (branch fix/worker-child-process)
+
+- The whole conversion (`convert_pdf`) now runs in a child process the worker can kill
+  (`web/isolated_convert.py`, `web/conversion_child.py`), with an address-space cap
+  (`CONVERSION_MEMORY_MB`, default 3072), a CPU limit and the job's wall-clock limit. A PDF that
+  passes the upload probe and still crashes, exhausts memory or hangs MuPDF now fails that one job
+  (`conversion_crashed`, `conversion_oom`, `timeout`) instead of taking the web process, every
+  session and the worker down, three times over. The child has no keys or database URL: model
+  requests, spend reservations, progress and the step cache stay in the web process, so spend
+  accounting and the database writes are as before. Results are unchanged
+  (`tests/test_web_isolated_convert.py`). `PRELOAD_TABLE_MODELS` no longer loads models in the web
+  process. Details and measurements: [docs/web.md](docs/web.md), "The conversion runs in a child process".
 ## Unreleased: dependency and CI hardening
 
 - Locked dependencies upgraded for known advisories: pillow 12.3.0 to 13.0.0 (floor now `>=13.0`),
@@ -55,6 +67,45 @@
   (`data/realworld/PREREGISTRATION-FRESH5.md`). `arxiv_gold.analyse` takes `min_equations` (default unchanged, 5).
   [docs/eval-realworld.md](docs/eval-realworld.md).
 
+### Layout structure: bookmarks, numbered and run-in headings, joins (2026-11-02, branch fix/layout-structure)
+
+- The PDF's outline (bookmarks) is the first signal for headings when it matches the page text
+  (`pipeline/outline.py`): a line that is a bookmark's title becomes a heading at the bookmark's level
+  (a tag still wins), the heading takes the bookmark's text, and an outline that does not match, or is
+  flat where the type is not, is ignored. dev-v2 heading level accuracy 0.898 to 0.914 (28 documents,
+  683 gold headings).
+- Plain body-size numbered lines in sequence (`3 Forces`, `4 Energy`, with a paragraph between) are
+  headings, as weak evidence; one alone stays a paragraph. Repeated bold run-in labels (`Solution`,
+  `Answer`, `Discussion`, `Procedure`, `Proof`, `Hint`) set in from their column's edge are bold text,
+  not headings: original gold set heading precision 0.850 to 0.914 at the same recall.
+  A paragraph that is a bookmark's title becomes a heading only if it is short, has no sentence end and is
+  bold, larger or set off by space; the plain ones are weak evidence (an optional note), and an outline
+  that bookmarks most of a document's paragraphs promotes none. Numbered exercises (`1 Find the final
+  speed`) are never headings; a numbered sequence that does not start at 1 or 2, or has a long title, is
+  a decision (new check text in `web/messages.py`).
+- Math-italic and bold variable letters in a heading or a caption's plain text are plain letters; the
+  number sets and letterlike symbols stay.
+- A paragraph (not a list item) that goes on over a page break is one element (`Element.last_page` is its
+  last page, and the page markers of the pages it runs over are written after it); inline maths that wraps at a relation
+  sign is one equation; at a line break a hyphenated compound follows the document's own spelling
+  (`eigen-vector` written elsewhere keeps its hyphen, `antiderivative` written whole elsewhere loses
+  it). Details and what stays open: [docs/layout.md](docs/layout.md), "Known failure modes".
+- Pipeline version 0.5.0 to 0.5.1 (ids shift after a join; review carry matches by content, so revised
+  uploads still carry what is unchanged).
+- Offline heading, document and structure evals before and after: [docs/eval.md](docs/eval.md),
+  "Structure fixes, 2026-11-02".
+
+- Tables, structure (`pipeline/tables.py`; [docs/tables.md](docs/tables.md), "Known misses"): the rest of an unruled
+  table that a page break carried over is found by its repeated header and joined (a split row is merged, the
+  repeated header dropped); a booktabs table with text in only one column is kept; an unruled box that holds two
+  tables is split at a caption or a clear gap; a booktabs table read without the model file (a fallback: production has it, so production
+  grids are unchanged) no longer gets a column for a cell with a gap in it. A new "Table N" caption over a repeated
+  header is a new table, not a continuation. Maths in cells is unchanged: it needs the equation step's model calls.
+- Local table eval, gold (45 documents, 197 gold tables): with the model file TEDS 0.941 and detection recall and
+  precision 0.985 and 0.985, unchanged; without it TEDS 0.912 to 0.928. The continued-table, sparse-table and split-box fixes change nothing on any PDF
+  of the repository's fixtures, the three real-document sets and the eval's prints (128 PDFs, 245 tables); the
+  fixes are pinned by generated pages. Real-document sets unchanged (25, 39 and 58 labelled tables, precision 1.000).
+  `make fuzz-tables`: 300 of 300 mutants ok, as before.
 ### Navigation in the output, and combining the parts of a long source (branch feat/output-navigation)
 
 - The converted file now has a skip link, a contents list (`<nav aria-label="Contents">`, nested links to the

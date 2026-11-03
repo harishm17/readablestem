@@ -374,7 +374,8 @@ feature on, and on the replay of the committed proof bundle):
 - the text pass and the heading decisions, which no step reads, run while the models
   answer instead of before the first request;
 - the worker loads the table models when it starts (`PRELOAD_TABLE_MODELS`, production
-  only), while it waits for its first job: the first conversion after a start no longer
+  only; since conversions run in a child process, which loads them itself, this applies only to a
+  conversion run in the web process), while it waits for its first job: the first conversion after a start no longer
   pays for them (6 pages: 9.3 s to 8.2 s here, 1.7 s of CPU moved out of the job; measured
   on a busy 16-core machine, so on one vCPU the saving is the 4-5 s the model load takes
   there).

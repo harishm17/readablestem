@@ -19,7 +19,7 @@ and for other systems) has its own page: [eval-invented.md](eval-invented.md).
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.0 today; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.1 today; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
@@ -31,7 +31,8 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-figures.json`, `latest-headings.json` | 2026-10-14 | 0.5.0 | same |
+| `latest-figures.json` | 2026-10-14 | 0.5.0 | same |
+| `latest-headings.json` | 2026-11-02 | 0.5.1 | same (the task calls no model; run with the fake client, model fields kept from the earlier run; `baseline-headings.json` stays the 2026-10-14 file) |
 | `latest-equations.json`, `latest-document.json`, `latest-tables-local.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`) |
 
 The dates are when the runs were made, not when the code was last changed: what keeps a
@@ -1505,10 +1506,9 @@ decision, so "wrong cells not flagged" is 0 by construction; the floor matters f
 runs, which were not repeated. The wrapped last row of the orders-of-magnitude table is
 joined in the `grid` print (17 rows, "the known universe", "(current upper limit)");
 in the `booktabs` print the page break falls between rows; in the `norules` print the
-next page's part (one row under a repeated header, no rules) is not detected, so the
-row ends "(current" and the rest is read as headings and paragraphs (a detection miss of
-unruled tables, docs/tables.md "Known misses"; not fixed: tables get no further work
-for now).
+next page's part (one row under a repeated header, no rules) was not detected when this
+was measured, so the row ended "(current" and the rest was read as headings and
+paragraphs; `tables.find_continued` now finds it (docs/tables.md, "Continued tables").
 
 ## Page types (2026-10-09, no model)
 
@@ -2021,6 +2021,83 @@ development set (`data/gold`, 3 sections of Physics) F1 is unchanged, 0.9344 (pr
 0.877, recall 1.000, level accuracy 0.992) and the 9 group decisions are unchanged. Whether
 repeated-label groups should stay decisions was measured in four variants on both sets:
 docs/layout.md "Review tiers" has the table and the choice (one decision per group).
+
+### Structure fixes (2026-11-02)
+
+Six layout fixes (docs/layout.md: "The PDF's outline", plain numbered lines, run-in labels,
+maths in headings, page and line joins, the document's spelling of compounds), measured with
+the offline tasks only: `eval pipeline --task headings --fake`, `--task document --fake` (no
+model call; every call is refused, so its equation numbers are 0 and only layout, headings
+and the HTML checks mean anything) and `eval.structure_check`, before (3e2b7cd, a clean
+checkout of main) and after (this branch). Gold: the original development set (3 OpenStax
+Physics sections, 43 PDF pages, 121 gold headings) and the dev part of dev-v2 (28
+documents, 338 PDF pages, 683 gold headings; nothing from the sealed check part). No
+held-out data was used.
+
+| | Original set, before | after | dev-v2 dev, before | after |
+|---|---|---|---|---|
+| heading precision | 0.850 | 0.914 | 0.922 | 0.922 |
+| heading recall | 0.793 | 0.793 | 0.917 | 0.917 |
+| F1 | 0.821 | 0.850 | 0.919 | 0.919 |
+| level accuracy | 0.740 | 0.740 | 0.898 | 0.914 |
+| predicted headings | 113 | 105 | 679 | 679 |
+| required decisions (headings) | 6 | 4 | 59 | 59 |
+
+- Precision on the original set: the 8 fewer predicted headings are repeated "Solution",
+  "Discussion" and "Procedure" labels inside boxes on sections 2.2 and 2.3 (the gold counts
+  them as not headings); the 9 other predicted headings the gold lacks stay, among them the
+  labels on 2.1, a page set mostly in boxes. Recall does not move. 2 fewer required
+  decisions (their groups), and the document task's required decisions go 63 to 61 for the
+  same reason.
+- Level accuracy on dev-v2: the bookmarks of the authored Word and LaTeX documents
+  (`word-lecture`: 17 of its headings, `word-eq-images`: 6) give the author's own levels. The
+  OpenStax pages are printed by Chromium without an outline, so the original set cannot
+  move from this fix.
+- Document task: detection precision, detection recall, split gold equations, static and
+  axe violations are identical on both sets (0.732 / 1.000 on 3 sections; 0.672 / 0.870 on 28
+  documents). Structure check: identical (40 of 40 code blocks exact, 112 of 126 glossary
+  terms found).
+- A first version of the label rule (no inset test) lost 10 gold headings of the authored
+  documents and cost dev-v2 recall 0.9165 to 0.9019 (F1 0.9192 to 0.9112), and a second
+  (inset against the page's edge, not the column's) 2 of them (recall 0.9136). Both were
+  dropped for the inset against the column's edge, which loses none: docs/layout.md "Run-in
+  labels".
+- Not measured by these tasks: page joins, wrapped inline maths and compounds (no gold of
+  their own). A survey of the 67 PDFs in the repository (authored dev-v2 documents and test
+  fixtures, 1 to 8 pages) changed 8 of them: 2 paragraphs joined over a page break (both
+  reading right: "... Aluminium" / "sulfate has the formula ..."), no wrapped inline
+  equation (none occurs in them), and outline reasons on 35 headings in 6 PDFs. The unit
+  tests (`tests/test_layout_structure_fixes.py`) pin each fix on PDFs drawn in the test.
+- **The review-load flags moved the wrong way on the original set**, and this is not a
+  gain. Flag recall (the share of wrong headings that were in a required decision) fell
+  from 0.333 to 0.176 and flag precision from 0.833 to 0.750 (`review_load.flags`, not
+  gated). Why: the 8 repeated labels the run-in rule turned into bold text were wrong
+  headings that sat in required group decisions; they are now not headings at all, so wrong
+  headings fall from 42 to 34 and the wrong ones inside required decisions from 14 to 6,
+  but the 28 wrong headings that no decision asks about are unchanged, so the share asked
+  about is smaller. A person is asked about fewer headings (6 to 4 required decisions) and
+  fewer of them are wrong, which is the point of the rule; what it does not do is catch the
+  other wrong headings. On dev-v2 dev the same flags rose (precision 0.305 to 0.424, recall
+  0.248 to 0.393, 59 required decisions both times: the bookmarks put some headings right
+  that were wrong-level decisions). In the document task on the original set (fake client)
+  flag recall goes 0.611 to 0.562 and flag precision 0.972 to 0.971, the same effect.
+- `data/eval/latest-headings.json` is replaced with the new run (pipeline 0.5.1, fake
+  client; model fields kept from the earlier run because the task calls no model).
+  `baseline-headings.json` is **not** replaced: the gate (`heading_recall` -0.030 and
+  `heading_precision` -0.030 allowed) passes against the 2026-10-14 baseline (precision
+  0.850 to 0.914, recall the same; it notes the pipeline version change), and the ungated
+  flags above are the old baseline's to compare with. The document and equation baselines
+  and `latest-document.json` come from recorded model runs ($0.28 and up) that cannot be
+  made again offline: the document task's required decisions and flags with a real model
+  will be a little lower on heading decisions (2 of the original set's heading decisions
+  went; the fake run's 63 to 61 is that, not a model number), and are not re-recorded
+  here. `make reproduce-rerun` already failed on a clean checkout of main when run here
+  with no key (its headings re-run exited with status 2, and its tables numbers differ from
+  `latest-tables-local.json`); `eval pipeline --task headings --fake` reproduces the
+  numbers above.
+- Sample sizes are small and the gold is OpenStax Physics plus authored documents; none of
+  this is a rate on other documents. The outline fix needs a PDF that has bookmarks, which
+  no OpenStax page print has.
 
 ### Prose scripts, nuclides and pictures of equations (T2-3, T2-4, T2-5, 2026-10-14)
 

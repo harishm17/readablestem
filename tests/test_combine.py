@@ -271,3 +271,17 @@ def test_joining_does_not_change_the_parts():
     before = [p.result.model_dump_json() for p in parts]
     join(parts)
     assert [p.result.model_dump_json() for p in parts] == before
+
+
+def test_the_last_page_of_a_joined_paragraph_moves_with_its_part():
+    first, second = parts_of(("A", [0, 1]), ("B", [2, 3]))
+    # the last element of the part's first page is the one that runs over the page break
+    last = max(i for i, e in enumerate(first.result.elements) if e.page == 0)
+    first.result.elements[last] = first.result.elements[last].model_copy(update={"last_page": 1})
+    html = combine_html([first, second], title="Chapter")
+    assert re.findall(r'aria-label="(Page \d+)"', html) == [f"Page {n}" for n in range(1, 5)]
+    moved = next(e for e in join([first, second]).elements if e.last_page is not None)
+    assert (moved.page, moved.last_page) == (0, 1)
+    first.result.elements[last] = first.result.elements[last].model_copy(update={"last_page": 5})
+    with pytest.raises(CombineError):
+        join([first, second])
