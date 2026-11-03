@@ -37,6 +37,19 @@ TIERS = (INVITED, OPEN)
 POOL_OPEN = "open"
 
 
+# Files in one upload, and documents waiting or converting at once, by tier: a batch (several
+# files, or a zip of documents) fits for people who were invited, and is smaller for accounts
+# made by open sign-up (docs/web.md, "Zip of documents and the batch page").
+OPEN_FILES_PER_UPLOAD = 10
+INVITED_FILES_PER_UPLOAD = 30
+
+
+def files_per_upload(tier: str) -> int:
+    """Files (documents) one upload may hold, and the documents one person may have waiting or
+    converting at once: 10 for the open tier, 30 for invited people and pilots."""
+    return OPEN_FILES_PER_UPLOAD if is_open(tier) else INVITED_FILES_PER_UPLOAD
+
+
 def tier_of(session: Session, user_id: str) -> str:
     """The tier of a user; "invited" for one that does not exist (a deleted account's jobs
     are gone with it, so nothing is limited by this answer)."""

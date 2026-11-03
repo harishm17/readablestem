@@ -277,7 +277,7 @@ def test_what_was_typed_wrongly_is_explained_and_kept_in_the_box(web):
 
 
 def test_the_caps_on_documents_still_hold_for_parts(web):
-    from readablestem.web.intake import MAX_ACTIVE_JOBS_PER_USER
+    from readablestem.web.access import INVITED_FILES_PER_UPLOAD as MAX_ACTIVE_JOBS_PER_USER
 
     web.settings.per_user_daily_page_quota = 500
     for n in range(MAX_ACTIVE_JOBS_PER_USER - 1):
@@ -285,7 +285,9 @@ def test_the_caps_on_documents_still_hold_for_parts(web):
     upload_id = keep_big(web, 12)
     response = choose(web, upload_id, "1-4\n5-8\n9-12")
     assert response.status_code == 429
-    assert "You already have 10 documents waiting" in text_of(response.text)
+    assert f"You already have {MAX_ACTIVE_JOBS_PER_USER} documents waiting" in text_of(
+        response.text
+    )
     assert "Part 2 (pages 5-8) was not started" in text_of(response.text)
     [row] = pending_rows(web)  # the file is kept for later
     assert row.done_pages == [0, 1, 2, 3]

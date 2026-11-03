@@ -38,6 +38,7 @@ from readablestem.source import latexml
 from readablestem.web import (
     access,
     analytics,
+    batch_intake,
     documents,
     events,
     notation,
@@ -86,7 +87,6 @@ from readablestem.web.quota import next_day_start, pages_left
 from readablestem.web.security import VIEW_CSP
 from readablestem.web.uploads import (
     INSPECT_TIMEOUT_S,
-    MAX_FILES_PER_UPLOAD,
     UploadedFile,
     UploadRejected,
     convert_office_isolated,
@@ -168,8 +168,8 @@ def upload_error_message(
         if word
         else f"{name} is larger than {s.upload_limit_mb} MB. Split it into smaller "
         "PDFs and upload each one.",
-        "too_many_files": f"You chose more than {MAX_FILES_PER_UPLOAD} files. Upload "
-        f"{MAX_FILES_PER_UPLOAD} or fewer at a time.",
+        "too_many_files": f"You chose more than {access.files_per_upload(tier)} files. Upload "
+        f"{access.files_per_upload(tier)} or fewer at a time.",
         "revise_one_file": "A revised version replaces one document: choose one file. To "
         "upload several documents, use “Convert a PDF” on My documents.",
         "revision_too_large": f"{name} has more pages or is larger than one conversion takes, "
@@ -235,10 +235,11 @@ def upload_error_message(
         "unknown_revision": "The document you wanted to replace with a new version was not "
         f"found. It may have been deleted. Upload {name} as a new document, or choose "
         "another document to revise.",
-        "too_many_active": f"You already have {MAX_ACTIVE_JOBS_PER_USER} documents waiting or "
+        "too_many_active": f"You already have {access.files_per_upload(tier)} documents waiting or "
         f"still being converted. Wait for one to finish, then upload {name} again. Nothing was "
         "uploaded.",
         **source_messages(name, s.max_pages_per_job),
+        **batch_messages(name, access.files_per_upload(tier)),
         "too_many_stored": f"You are keeping {MAX_LIVE_JOBS_PER_USER} documents, the most "
         f"allowed. Delete one you no longer need, then upload {name} again. Nothing was "
         "uploaded.",
@@ -278,6 +279,25 @@ def source_messages(name: str, max_pages: int) -> dict[str, str]:
         "source yet. Upload the compiled PDF.",
         "source_too_many_pages": f"{name} is longer than one conversion takes (about "
         f"{max_pages} pages). Split the project into parts, or {pdf}",
+    }
+
+
+def batch_messages(name: str, limit: int) -> dict[str, str]:
+    """What went wrong with a zip of documents (`web.batch_intake`) or one of its documents."""
+    return {
+        "zip_bad": f"{name} could not be opened as a zip file. It may be damaged or protected "
+        "with a password. Zip the files again without a password, or upload them one by one.",
+        "zip_limits": f"{name} is too big or has too many files. A zip may be up to 20 MB, "
+        "80 MB unpacked and 500 files. Split it into smaller zips, or upload the files one by one.",
+        "zip_unsafe": f"{name} has a file with a path or a link this tool will not open. Zip the "
+        "files again as plain files, or upload them one by one.",
+        "zip_unsupported": f"{name} has a kind of file this tool does not read (such as another "
+        "zip or an .eps picture). Take it out and zip the files again, or upload them one by one.",
+        "zip_empty": f"{name} has no PDF and no LaTeX project in it. Check that you chose the "
+        "right zip.",
+        "batch_limit": f"{name} was not uploaded: one upload takes {limit} documents at a time "
+        "for your account. Upload it again after the others are done. Nothing was converted "
+        "for it.",
     }
 
 
@@ -440,7 +460,8 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "sample_available": sample.available(),
         "sample_job": sample_job,
         "own_documents": any(not row.is_sample for row in listing.rows),
-        "max_files": MAX_FILES_PER_UPLOAD,
+        "max_files": access.files_per_upload(user.access_tier),
+        "batch_zip": ctx.settings.feature_batch_zip,
         "upload_limit_mb": ctx.settings.upload_limit_mb,
         "source_pages": ctx.settings.source_page_limit,
         "ready_documents": sum(
@@ -648,7 +669,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
             request,
             max_bytes=s.upload_limit_bytes,
             max_total_bytes=s.upload_limit_bytes,
-            max_files=MAX_FILES_PER_UPLOAD,
+            max_files=access.files_per_upload(user.access_tier),
         )
     except UploadRejected as exc:
         return await run_in_threadpool(_upload_error_page, request, user, exc.code, exc.status_code)
@@ -705,7 +726,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
                 page_count=item.pages,
                 source="image" if image_pages else "pdf",
             )
-    if len(placed) == 1:
+    if len(placed) == 1 and not placed.batch:  # a zip of documents is answered by the batch page
         return await _answer_one(request, user, placed[0], chosen, revises or "")
     return await run_in_threadpool(_results_redirect, ctx, user, placed)
 
@@ -720,13 +741,14 @@ def _place_files(
     revises: str | None,
     image_pages: bool = False,
     main_file: str | None = None,
-) -> list[Placed]:
+) -> PlacedList:
     """Check each file and queue it, or keep it for choosing its pages, or say why not.
     A refusal of one file does not stop the others: each is its own document."""
     s = ctx.settings
     deadline = time.monotonic() + INSPECT_BUDGET_S
     office_left = OFFICE_BUDGET_S
-    placed: list[Placed] = []
+    placed = PlacedList()
+    files = _expand_batches(ctx, user, files, placed)
     for file in files:
         # A LaTeX source (a .tex file or a zip of a project) is converted by LaTeXML in a
         # sandbox (`readablestem.source`); it has its own checks and never becomes a PDF.
@@ -847,8 +869,48 @@ def _place_files(
     return placed
 
 
+class PlacedList(list[Placed]):
+    """What became of each file of an upload; `batch`: a zip of documents was opened, so the
+    answer is the batch page even when it held one document."""
+
+    batch: bool = False
+
+
+def _expand_batches(
+    ctx: AppContext, user: CurrentUser, files: list[UploadedFile], placed: PlacedList
+) -> list[UploadedFile]:
+    """With `FEATURE_BATCH_ZIP`, a `.zip` that is a batch (PDFs and LaTeX projects in folders,
+    `web.batch_intake`) is replaced by its documents, each placed like an uploaded file; a zip
+    that is one LaTeX project, and every other file, stays as it is. A zip that is refused is
+    one refusal in `placed`; documents past the person's limit (`access.files_per_upload`) are
+    refused one by one, not started."""
+    if not ctx.settings.feature_batch_zip:
+        return files
+    limit = access.files_per_upload(user.access_tier)
+    out: list[UploadedFile] = []
+    for file in files:
+        members = batch_intake.split(file.filename, file.data) if _is_zip_name(file) else None
+        if members is None:
+            out.append(file)
+        elif isinstance(members, str):
+            placed.batch = True
+            placed.append(
+                Placed(file.filename, code=members, status=SOURCE_STATUS.get(members, 422))
+            )
+        else:
+            placed.batch = True
+            out.extend(members)
+    for extra in out[limit:]:
+        placed.append(Placed(extra.filename, code="batch_limit", status=400))
+    return out[:limit]
+
+
+def _is_zip_name(file: UploadedFile) -> bool:
+    return file.filename.lower().endswith(".zip")
+
+
 # The upload route's status for each refusal of a LaTeX source (`source.intake`).
-SOURCE_STATUS = {"source_zip_limits": 413, "source_unavailable": 503}
+SOURCE_STATUS = {"source_zip_limits": 413, "source_unavailable": 503, "zip_limits": 413}
 
 
 def _place_source(
@@ -987,45 +1049,19 @@ def _results_redirect(ctx: AppContext, user: CurrentUser, placed: list[Placed]) 
             log_event(logger, "upload_rejected", code=item.code)
     with session_scope(ctx.factory) as session:
         result_id = upload_result.store(session, user.id, [asdict(item) for item in placed])
-    return RedirectResponse(f"/app/upload/{result_id}", status_code=303)
+    return RedirectResponse(f"/app/batch/{result_id}", status_code=303)
 
 
 @router.get("/app/upload/{result_id}")
 def upload_results_page(request: Request, result_id: str, user: UserDep) -> Response:
-    """What became of the files of an upload of several: what was queued, what waits for the
-    person to choose its pages, and what was refused and why. Owner only, for an hour."""
-    ctx = get_ctx(request)
-    with session_scope(ctx.factory) as session:
-        items = upload_result.load(session, user.id, result_id)
-    if items is None:
+    """The old address of the answer to an upload of several files (before the batch page):
+    the same page, now `/app/batch/{id}` (`routes/batch.py`). Someone else's, a stale and a
+    malformed id answer the same 404 as there."""
+    with session_scope(get_ctx(request).factory) as session:
+        found = JOB_ID.match(result_id) and upload_result.load(session, user.id, result_id)
+    if not found:
         raise PageError(404, *UPLOAD_RESULT_GONE)
-    placed = [Placed(**item) for item in items]
-    queued = [i for i in placed if i.job_id]
-    choose = [i for i in placed if i.pending_id]
-    refused = [
-        {
-            "message": upload_error_message(
-                i.code,
-                ctx,
-                i.filename,
-                i.pages or None,
-                i.left,
-                office=i.office,
-                tier=user.access_tier,
-            )
-        }
-        for i in placed
-        if i.code
-    ]
-    context = {
-        "queued": [{"id": i.job_id, "filename": i.filename, "pages": i.pages} for i in queued],
-        "choose": [{"id": i.pending_id, "filename": i.filename, "pages": i.pages} for i in choose],
-        "refused": refused,
-        "received": len(queued) + len(choose),  # a large file kept for its pages is uploaded
-        "total": len(placed),
-        "active": "app",
-    }
-    return render(request, "upload_results.html", context)
+    return RedirectResponse(f"/app/batch/{result_id}", status_code=303)
 
 
 UPLOAD_RESULT_GONE = (
@@ -1300,7 +1336,7 @@ RETRY_REFUSED = {
     "too_many_active": (
         429,
         "Too many documents in progress",
-        f"You already have {MAX_ACTIVE_JOBS_PER_USER} documents waiting or being converted. "
+        "You already have as many documents waiting or being converted as one person may. "
         "Wait for one to finish, then try again. Nothing was changed.",
     ),
 }
@@ -1332,7 +1368,9 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
             or 0
         )
         try:
-            retry_rules.start(job, active_others=others, max_active=MAX_ACTIVE_JOBS_PER_USER)
+            retry_rules.start(
+                job, active_others=others, max_active=access.files_per_upload(user.access_tier)
+            )
         except retry_rules.RetryRefused as exc:
             refused, tries = exc.code, job.retries or 0
         else:
