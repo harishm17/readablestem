@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: calibrated flag policy (branch eq/flag-policy)
+
+- Flag policy (off: `FLAG_POLICY`): `pipeline/flag_policy.py` turns an accepted equation that nobody is asked
+  about into a required decision when a small logistic model over content-free features (second reading, notes,
+  extension past the span, size, notation classes) puts it with the readings that turned out wrong. It only adds
+  decisions, makes no model call, and its weights and threshold are constants fitted on the development splits
+  (`flag-policy-1`; `eval/flag_features.py` dumps the features of recorded runs and fits them at $0). New check
+  `equation.flag_policy`, code `flag_policy`, with a review sentence. `scripts/realworld_run.py rs` takes
+  `--flag-policy`. Replayed on the recorded runs: on fresh2 to fresh4 (validation, 45 papers, 5,018 gold) silent wrong
+  8.83 to 7.77 per 100 gold, flag recall 0.29 to 0.38, decisions a page 3.55 to 3.92; the goal (silent 4 per 100 at
+  4 decisions a page) is not reachable with these features. docs/eval-flag-policy.md, docs/steps.md.
 ## Unreleased: both readings on the review card (branch eq/review-both-readings)
 
 - Review card: a typed equation the page witness read differently (`witness_mismatch`,

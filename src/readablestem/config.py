@@ -116,6 +116,12 @@ class Settings(BaseSettings):
     # bold italic, script, double-struck) against the glyph's font. Off until the review load it
     # adds has been looked at (docs/steps.md, "Letter styles from the glyphs").
     equation_glyph_checks: bool = False
+    # A calibrated rule on top of the checks (`pipeline/flag_policy.py`): an accepted equation
+    # that looks like the readings that turned out wrong (a small logistic model over content-free
+    # features, fitted on the development splits) becomes a required decision. It only adds
+    # decisions. Off until someone decides the added review load is worth it
+    # (docs/eval-flag-policy.md).
+    flag_policy: bool = False
     # A figure crop is scaled down to this many pixels on its long side before it goes to the
     # model (T3-24); review and the HTML keep the full crop. None: sent as it is.
     figure_model_max_edge_px: int | None = Field(default=None, ge=256)

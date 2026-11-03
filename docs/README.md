@@ -28,6 +28,7 @@ arrived at; read them by question, not front to back.
 | Which 50 figures will long descriptions and chart data tables be judged on, how were they drawn, and what is pre-registered (draft)? | [eval-figures-long.md](eval-figures-long.md) |
 | Why are maths in table cells missed, do the misses carry glyph evidence the rules ignore, and why were wrong equations not flagged? (no model, recorded runs) | [eval-equation-diagnostics.md](eval-equation-diagnostics.md) |
 | What do the glyph checks (a reading's extent past its box, letter styles from the fonts) do to flag recall and decisions, replayed on recorded runs? | [eval-equation-glyph-checks.md](eval-equation-glyph-checks.md) |
+| Which accepted equations does a small calibrated rule (`FLAG_POLICY`) ask a person about, fitted on development and replayed on fresh2 to fresh4? | [eval-flag-policy.md](eval-flag-policy.md) |
 
 ## If you want to know how it is built
 

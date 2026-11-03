@@ -433,6 +433,25 @@ replays to the same result (docs/eval-equation-rootcause.md):
   `CMMIB`, newtx's `bmi`, Nimbus `MediItal`, any `BoldItalic`). A crop shows a bold vector as bold and the model
   writes `\mathbf`; `\bm` and `\boldsymbol` are what the author typed (62 equations of the development set).
 
+## Flag policy (equations; `FLAG_POLICY`, off)
+
+The checks above find a wrong reading only when it differs from the text layer in letters, digits,
+signs or styles. Most wrong readings nobody is asked about do not (diagnostics D4). `pipeline/flag_policy.py`
+adds one more rule after `_fix`: an accepted equation that is not a decision already becomes a required
+decision when a small logistic model says it looks like the readings that turned out wrong. The
+features are content-free numbers the step has at that point (what the second reading did, the notes
+the checks left, whether the reading reaches past the text layer's span or the span has symbols the
+reading lacks, the number of symbols, which notations it uses); the weights, the bias and the
+threshold are constants in the module, versioned (`VERSION`), fitted on the development splits only
+by `readablestem.eval.flag_features`. There is no model call at run time.
+
+It can only add: a fix that is required, failed, abstained, edited or rejected comes back as it is, and
+nothing is taken off a fix that has a decision. An added decision is `NEEDS_REVIEW` with the proposal
+as it was and a failed warning `equation.flag_policy` (code `flag_policy`), which the review screen says
+in a sentence (`web/messages.py`). A reviewer's edit is checked on its own, as before (the policy
+is not applied to an edit). Measured by replay of recorded runs, with the numbers and the limits, in
+docs/eval-flag-policy.md.
+
 ## Sign and relation check (equations)
 
 The symbol check compares letters, digits and Greek letters, so before pipeline 0.3.0 a
