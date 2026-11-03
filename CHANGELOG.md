@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: speech under screen-reader engines (branch sr/speech-oracle)
+
+- `scripts/screenreader_speech.py` and `eval/speech_oracle.py` run any set's MathML (ours and the
+  gold's: OpenStax, authored, chemistry, handwriting, arXiv) through MathCAT 0.7.7 (NVDA 2026.1,
+  JAWS; ClearSpeak and SimpleSpeak) and Speech Rule Engine 4.1.5 (MathJax, ChromeVox). Per
+  equation: the spoken strings, whether MathCAT recognised chemistry, a word diff. Per set: the
+  share of ours that sounds like the gold under each engine, with an interval, and the worst
+  classes. `eval pipeline --speech` adds the aggregates to an equations or document report.
+  `scripts/speech_oracles/build.sh` builds the engines (rustup into `~/.cargo`, no sudo); without
+  them everything skips with a message. Offline, $0. See `docs/eval.md`, `docs/chemistry.md`.
+
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)
 
 - The whole conversion (`convert_pdf`) now runs in a child process the worker can kill
