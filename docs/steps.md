@@ -660,7 +660,9 @@ out. The equation step then compares its crop reading with the witness's:
 - **disagree**: a required decision. The reading whose symbols are closer to the glyphs of the extent (Dice
   similarity of the symbol bags of the text layer and the reading) is proposed; the other is kept as
   `EquationFix.other_latex` with `other_source` (`crop` or `page_witness`); within 0.05 it is a tie and the crop's
-  reading stays. Check `equation.witness_reading`, code `witness_mismatch`.
+  reading stays, unless the two differ in a slash: the bag holds letters, digits and Greek letters only, so two
+  readings of one formula nearly always tie on it, and a tie is then broken by the slashes in the glyphs (a written
+  `-2/3` against a drawn fraction, `marks_dice`). Check `equation.witness_reading`, code `witness_mismatch`.
 - **extent differs** and the readings are not equal: a required decision (`witness_extent_differs`), the
   witness's reading as the other reading.
 - **witness-only**: a new element is always a required decision (`witness_added`).

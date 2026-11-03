@@ -129,8 +129,8 @@ now carry `page_witness` (counts) and `page_witness_cost_usd`, and the report's 
   noise.
 - Sonnet only. A stronger witness might read more formulas right and so disagree on different ones; its
   readings could still not win a disagreement in this integration.
-- Detection additions are 0 because of the glyph gate; the 71 witness formulas it left out were not
-  checked against the gold.
+- Detection additions are 0 because of the glyph gate; the 71 witness formulas it left out are checked
+  against the gold in "Diagnosis" below.
 - Flag precision under 0.33 means two of three new decisions are on equations that are right.
 
 ## Reproduce
@@ -141,7 +141,91 @@ $R papers
 $R run control --offline                  # replay only, spends nothing
 $R report --reading cells                 # add --neutral or --spoken for the secondaries
 $R witness                                # what the witness changed against the control
+$R run witness-sonnet-r2 --offline        # the recorded Sonnet answers settled by today's rule
+$R witness --tag e1-sonnet-r2
 ```
 
 A paid start needs a key (`railway run -s web -- $R run witness-sonnet --max-usd 1 --concurrency 2`) and
 a cap sized for the reservations in flight, not for the expected cost.
+
+## Diagnosis (2026-11-03): why the witness changed nothing
+
+$0: the recorded Sonnet answers replayed offline (`run witness-sonnet-r2 --offline`; the replay reproduces
+the arm's 914 of 914 final readings), with each witness reading converted by the pipeline's own path and scored
+against the gold as the crop's is. Development papers only (12 papers, 1,096 gold, 914 aligned): nothing here
+is an estimate for new papers.
+
+**Adjudication.** 24 elements had a witness reading that differed from the crop's (18 aligned to a gold
+equation). Against the gold, of the 18: witness right and crop wrong 7, crop right and witness wrong 2, both
+right (a difference the scorer sees and the glyphs do not, such as `\ldots` for `...` or `\left\langle` for
+`\langle`) 5, both wrong 4. The rule kept the crop's reading 24 times: 23 of the 24 were exact ties and one a
+crop win (0.881 against 0.595); the witness won none. Cause: the glyph distance is the Dice similarity of the
+bags of letters, digits and Greek letters, and two readings of one formula nearly always have the same ones,
+so it is 1.0 against 1.0 whatever the operators, relations, slashes or structure say; the 0.05 near-tie rule then
+keeps the crop. It is not a conversion or extent bug (a `match` extent is the element's within one glyph, the
+witness reading goes through the same conversion and clean-up as the crop's, the text it is compared with is
+the element's), and not the normalisation: the metric cannot see what the readings differ on. Whether the
+witness is right in such a disagreement is mixed (7 against 2 among the aligned ones, plus 5 notation-only
+cases), so letting it win every disagreement would be worth +5 equations of 914, and the
+"extent differs" cases (65 aligned: crop right 37, witness right 21, witness only 4, crop only 20) show the witness
+quotes the wrong stretch more often than the layout does.
+
+**What the glyphs can separate.** The one case the text layer settles is a written slash against a drawn
+fraction (`-2/3` read as `-\frac{2}{3}`: the text layer has the slash, a fraction bar is never text); in 2 of the
+7 witness-right cases the crop made that mistake. Brackets do not separate: the text of an element often holds the
+bracket of its neighbour (`(R_{*,1})` against gold `R_{*,1}`), which the crop's clean-up drops on purpose; a
+bracket mark picked the witness there and was removed again. The other witness-right cases (a relation read as
+`\succsim` for `\asymp`, `\ldots`, `\left` delimiters) are not told apart by the bag or the slash.
+
+**The change.** `witness_reconcile.adjudicate`: when the letters tie (within `TIE_BELOW`), the slashes in the
+glyphs decide (`marks_dice`, `MARKS = "/"`). The readings are shown and the formula is a required decision as
+before. Re-scored on the same recorded answers, with the same crop answers:
+
+| 12 dev papers (1,096 gold) | witness, as run | witness, slash tie-break |
+|---|---|---|
+| exact_lenient (reading B) | 0.753 [0.710, 0.792] | 0.755 [0.712, 0.793] |
+| readings changed from the control | 0 of 914 | 2 of 914 (both wrong to right) |
+| silent wrong per 100 gold | 8.58 [5.01, 12.39] | 8.58 [5.01, 12.39] |
+| required decisions per PDF page | 4.35 [3.02, 5.83] | 4.35 [3.02, 5.83] |
+| flag recall / precision | 0.411 / 0.328 | 0.400 / 0.313 |
+
+Two equations, +0.2 points: the two readings were already decisions, so decisions and silent errors do not
+move (the flag recall falls because two flagged equations are no longer wrong). Agreement stays a note: of the
+581 aligned equations where the witness's extent matched and it agreed, 57 (9.8%) were wrong in both.
+
+**Detection.** 818 verified formulas: 726 were taken by an element, 71 had no glyph evidence and 21 had it
+but lay inside another element (paragraph, table, figure; left to that element). Checked against the gold on
+the same page (exact under the lenient comparison, or tree similarity of 0.6 or more for "near"):
+
+| the witness-only formula | no glyph evidence (71) | glyph evidence, inside text (21) |
+|---|---|---|
+| equals a gold equation the run missed | 11 (`95\%` x2, `3\%`, `10\%`, `20\%`, three decimals, `(1)`, `(2)`, `g`) | 2 |
+| resembles a missed one (units, subscripts) | 6 | 6 (`\text{EPR}_{ex}` x6, one paper) |
+| equals a gold equation already read | 21 | 1 |
+| no gold equation | 33 (21 of them a number and a unit) | 11 (block formulas the run reads elsewhere) |
+
+So 17 to 25 of 182 missed gold equations (1.6 to 2.3 points of recall) lie in the 92 formulas, at about a quarter
+precision. Nothing in the data separates them: the maths-glyph counts are the same (0 to 3 characters of 3 to
+11) on the right and wrong ones, since a plain number, a percentage or a unit is typeset in the text font
+whether or not the author put it in `$...$`; whether a quantity is gold is the author's convention, and "a number
+and a unit" is on both sides (`9.8 m/s^2` is gold, `0.5 s` is not). The D3 evidence (docs/eval-equation-diagnostics.md:
+45 to 70% of undetected running-text equations carry some, against 4% background) does not reach these, which are
+the ones with none. The gate ("maths glyphs and clear of every other element") is therefore not buggy and
+loosening it would add about 90 required decisions (1.6 a page) for 17 to 25 true ones; it was left as it is.
+
+**Sonnet against Opus, at $0** (6 papers with the recorded Opus chatbot, 546 gold). On the 269 equations that
+have a witness reading: ours right 241 (89.6%), Sonnet witness 233 (86.6%), Opus chatbot 238 (88.5%). Where ours is
+wrong (28 of them) the chatbot is right on 8 and the Sonnet witness on 3; where ours is right the chatbot is
+wrong on 11 and the witness on 11. So an Opus witness would read about 5 more equations right than Sonnet in
+these papers (1.9 points of the witnessed ones, 0.9 of all 546), and a perfect chooser between ours and it
+would gain 8 (1.5 points), under the +2 the plan needed; an Opus witness that always won would lose more than it
+gains. The chatbot's lead on these six papers (426 right against ours 370 of 546) is mostly detection: 53 of the
+126 gold equations we did not align are read right by it (the witness's formulas equal 12 of them), plus 15
+readings that were wrong. How much of those 53 is alignment (the chatbot is aligned by sequence, ours by
+position, and repeated equations such as `n = 10^4` are counted once per gold) was not separated. The
+oracle's +9.3 points is that: detection and alignment of a whole-page reading, not better readings of the
+equations we find.
+
+Not answered: the Opus witness itself (it needs a paid run), and whether a different witness prompt (asked
+for every formula with no row anchors) would find the 53; the witness is offered rows of the text layer and can
+only quote them.
