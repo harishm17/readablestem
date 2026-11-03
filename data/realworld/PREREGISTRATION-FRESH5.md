@@ -1,7 +1,7 @@
 # Registration of the fifth fresh real-world split (fresh5): the candidate against the chatbot recipe
 
 **DRAFT. UNSIGNED. NOT HASHED.** Nothing in this file is registered until Harish signs it off. Until
-then `REGISTRATION-fresh5.sha256` does not exist, the sections marked "to settle before signing" in
+then `REGISTRATION-fresh5.sha256` does not exist, the items in
 section 8 are open, and no model has been run on any unit of this split. On signing, section 8 is
 deleted, the candidate commit and settings are written into section 3, the file is hashed with
 `scripts/realworld_register.py --set fresh5`, and that is committed before the first request of
@@ -47,49 +47,71 @@ section; books are taken in turn in the seeded order, at most 2 per family, and 
 equations in its answer key. 294 section gates were run (`selection-fresh5-B.json`, which also lists the
 refused books and every gate result). The pages are pinned to archive release 20260604.144757.
 
-| Book | State | Section | Equations in the key |
-|---|---|---|---|
-| Introductory Business Statistics | retired | 5-2 The Uniform Distribution | 12 |
-| Principles of Microeconomics for AP Courses | retired | 5-1 Price Elasticity of Demand and Price Elasticity of Supply | 14 |
-| Principles of Economics 2e | retired | 5-4 Elasticity in Areas Other Than Price | 11 |
-| Statistics | live | 12-2 The Regression Equation | 20 |
-| College Physics | retired | 31-4 Nuclear Decay and Conservation Laws | 183 |
-| Biology | retired | 39-2 Gas Exchange across Respiratory Surfaces | 30 |
+| Book | State | Section | Equations in the key | Letter pages |
+|---|---|---|---|---|
+| Introductory Business Statistics | retired | 5-2 The Uniform Distribution | 12 | 5 |
+| Principles of Microeconomics for AP Courses | retired | 5-1 Price Elasticity of Demand and Price Elasticity of Supply | 14 | 5 |
+| Principles of Economics 2e | retired | 5-4 Elasticity in Areas Other Than Price | 11 | 5 |
+| Statistics | live | 12-2 The Regression Equation | 20 | 12 |
+| College Physics | retired | 31-4 Nuclear Decay and Conservation Laws | 183 | 10 |
+| Biology | retired | 39-2 Gas Exchange across Respiratory Surfaces | 30 | 6 |
 
-All six are CC BY 4.0. The sections are printed to PDF with the renderer of the held-out set
-(`readablestem eval render`); their page counts and the hashes of the printed PDFs go into the manifest
-before signing (to settle, section 8).
+All six are CC BY 4.0, 43 pages. They are printed to Letter PDF with the renderer of the held-out set
+(`eval.render`, `scripts/fresh5_select.py openstax-render`); the SHA-256 of each printed PDF is in
+`selection-fresh5-B.json`.
 
-**C. Course-style LaTeX: 5 documents of the 8 planned, 26 PDF pages, 372 gold equations (38 display), no
-Beamer deck.** The pool is the result of a fixed set of GitHub repository searches
-(`pool-fresh5-course.json`: six topic phrases, each against `license:cc-by-4.0`, `license:cc-by-sa-4.0` and
-`license:mit`, `language:TeX`, not a fork, not archived, at most 50 results each, by stars; 255
-repositories after the licence gate). The licence is GitHub's SPDX id and is read again when the repository
-is fetched; only CC BY 3.0/4.0, CC BY-SA 3.0/4.0 and MIT pass, and anything else (non-commercial,
-no-derivatives, copyleft software licences, none, "other") is refused. The repositories are taken in the
-seeded order (SHA-256 of seed and name), their documents in the seeded order, at most 2 accepted and 6 tried per
-repository, non-Beamer documents capped at 5 so that 3 Beamer slots stay open. Each document is compiled from
-its source with Tectonic 0.17.0 (`--untrusted`, no shell escape), so the PDF and the answer key come from the
-same source, and the gold is made by the arXiv path (`arxiv_gold`) with its gates; for a Beamer deck the floor
-is 100 characters of text per slide (300 for notes) and 3 equations on a usable slide (5 for notes). 579 visits
-(`candidates-fresh5-C.json`): 5 accepted; the pool was exhausted. Accepted (`manifest-fresh5c.json`, with the
-commit each was read from):
+**C. Course-style LaTeX: 8 documents (3 Beamer decks), 36 PDF pages, 502 gold equations (49 display), CC BY (3),
+CC BY-SA (2) or MIT (3).** The pool is the result of a fixed set of GitHub repository searches
+(`pool-fresh5-course.json`, 446 repositories after the licence gate): for each of `license:cc-by-4.0`,
+`license:cc-by-sa-4.0` and `license:mit` (GitHub has no 3.0 qualifier), `language:TeX`, not a fork, not
+archived, at most 100 results by stars, the seven phrases "lecture notes", "lecture slides", "course slides",
+"beamer slides", "beamer lecture", "beamer presentation" and "problem set", and the three topics `beamer`,
+`beamer-slides` and `lecture-notes` (30 queries). The licence is GitHub's SPDX id and is read again when the
+repository is fetched; only CC BY 3.0/4.0, CC BY-SA 3.0/4.0 and MIT pass, and anything else (non-commercial,
+no-derivatives, copyleft software licences, none, "other") is refused. The repositories are taken in the seeded
+order (SHA-256 of seed and name), their documents in the seeded order, at most 2 accepted and 6 tried per
+repository, non-Beamer documents capped at 5 so that 3 Beamer slots stay open. Each document is compiled from its
+source and the gold is made by the arXiv path (`arxiv_gold`) from the same source, so the PDF and the answer key
+agree. Engines, in order: pdflatex, xelatex and lualatex from a user-level TeX Live 2026 (latexmk, shell escape off),
+then Tectonic 0.17.0 (`--untrusted`); the first that compiles the document wins and each document's engine and
+version are in the manifest (`tex_engine`). Gates are those of the arXiv path (at most 10% unconvertible
+equations, at least 4 usable pages, 4 to 6 pages drawn by hash) with a text floor of 300 characters per page (100
+per Beamer slide) and 5 equations on a usable page (3 on a slide).
 
-| Document | Licence | Pages | Gold equations |
-|---|---|---|---|
-| agormp/evolintro `evolintro` | CC BY-SA 4.0 | 11, 14, 18, 29 | 46 |
-| gmarciani/research `computer-security/main` | MIT | 9, 16, 21, 22 | 87 |
-| qubd/SN1_Notes `201-SN1_Notes` | CC BY-SA 4.0 | 5, 11, 13, 16, 82, 119 | 95 |
-| robmelfi/PatternRecognitionLectureNotes `book` | CC BY 4.0 | 20, 21, 23, 39, 94, 102 | 105 |
-| sim1-99/medical-physics-notes `main` | CC BY-SA 4.0 | 25, 51, 60, 69, 102, 104 | 39 |
+Changes to the rule while this file was a draft, all made before any system ran and before signing, each
+recorded so the signed text can be read against them:
 
-Of the 164 Beamer documents visited, none accepted, 103 did not compile with Tectonic (a package or a theme it cannot load), 24 had
-fewer than 4 usable pages, 17 a page count outside 6 to 200, 11 no equations, 5 too little text and 4 too
-many unconvertible equations. The stratum is therefore short by 3 documents and by the Beamer requirement
-(to settle, section 8). The licence of a repository does not cover third-party material inside a
-document; the gold is equations only.
+1. The first pool (180 repositories, 4 phrases) and Tectonic alone produced 5 documents and no Beamer deck, because
+   103 of the Beamer sources did not compile in it (a package or a theme it cannot load); a compile failure is a
+   limit of the tool, not a property of the document, so a TeX Live engine is tried first.
+2. The pool was widened with the phrases "lecture slides", "course slides", "beamer lecture", "beamer
+   presentation", the three topics, and 100 results per query instead of 50, and regenerated before signing. The
+   pool changes with time on GitHub, so `pool-fresh5-course.json` is the registered pool and is not harvested again.
+3. With TeX Live and the wider pool, the slide gates as first written (300 characters and 5 equations on a slide)
+   gave 7 documents with 2 Beamer decks, both from one repository, and the pool was exhausted
+   (`candidates-fresh5-C-slidegates-300-5.json`: 98 Beamer documents failed the text floor, because a slide carries
+   little text). The slide floors were then set to 100 characters and 3 equations, which is the rule of the final draw
+   above (`candidates-fresh5-C.json`, 514 visits: 8 accepted; the Beamer sources that still failed: 71 compile, 34
+   too few usable pages, 19 no equations, 17 page count outside 6 to 200, 3 text floor, 2 unconvertible). The notes' gates
+   did not change. The relaxation is a choice made to fill the Beamer slots, and the report states it.
 
-As the pool stands: 23 units (12 + 6 + 5), 78 PDF pages in A and C plus the pages of B.
+Accepted (`manifest-fresh5c.json`, with the commit each was read from and the engine):
+
+| Document | Licence | Style | Pages | Gold equations | Engine |
+|---|---|---|---|---|---|
+| AlbertEMC2Stein/ComputationalGeometry `main` | MIT | notes | 17, 27, 41, 50 | 158 | pdflatex |
+| agormp/evolintro `evolintro` | CC BY-SA 4.0 | notes | 11, 14, 18, 29 | 46 | pdflatex |
+| fairyflies9/Fluid-Dynamics-and-IBM-Theory `1-3-Integral-Transform` | CC BY 4.0 | Beamer | 19, 26, 32, 36 | 12 | pdflatex |
+| fairyflies9/Fluid-Dynamics-and-IBM-Theory `5-2-Intro-RANS-Part2` | CC BY 4.0 | Beamer | 14, 15, 16, 23 | 37 | pdflatex |
+| gmarciani/research `computer-security/main` | MIT | notes | 9, 16, 21, 22 | 87 | Tectonic |
+| ondrejch/PHANES-course `mod/04/lecture04` | MIT | Beamer | 7, 10, 16, 18 | 15 | pdflatex |
+| robmelfi/PatternRecognitionLectureNotes `book` | CC BY 4.0 | notes | 20, 21, 23, 39, 94, 102 | 105 | xelatex |
+| sim1-99/medical-physics-notes `main` | CC BY-SA 4.0 | notes | 12, 25, 47, 68, 82, 102 | 42 | pdflatex |
+
+Two Beamer decks come from one repository (the per-repository cap of 2). The licence of a repository does not cover
+third-party material inside a document; the gold is equations only.
+
+Totals: 26 units (12 + 6 + 8), 131 PDF pages (52 + 43 + 36).
 
 ## 3. Arms
 
@@ -158,15 +180,14 @@ reason. It will not say whether a wrong equation changes the meaning, whether a 
 anything about scans, Word files or handwriting, or about maths in embedded figures. One run per arm gives no
 run-to-run variation. arXiv gold is dominated by table cells and the authors' `$` boundaries, so a win there may
 not carry to course materials, which is why the strata have a floor and are reported apart. The Beamer
-requirement and the OpenStax pages are open (section 8); with fewer than the planned units the detectable
-difference is larger than 3 points, and the report says so.
+slide gates were relaxed during the draft to fill the Beamer slots (section 2 C), which the report states. Two of
+the three Beamer decks share a repository, and a deck's maths letters sit in a text font, so glyph evidence is weak
+there.
 
 ## 8. To settle before signing (delete on signing)
 
-1. **Stratum C is short.** 5 documents, no Beamer deck, the pool exhausted. Options for Harish: widen the pool with
-   more queries; compile with a pinned older Tectonic bundle, since 103 of the Beamer sources failed in the current
-   one; relax the slide gates further; or run fresh5 with 5 course documents and no Beamer, adding Beamer decks as
-   fixtures with gold instead. Whatever is chosen is decided before any system runs and is written here.
-2. **Stratum B:** print the six sections, record their page counts and PDF hashes, add them to a manifest.
-3. **Candidate commit and settings;** whether the strong-prompt arm is included; the cap split.
-4. **The hash file** (`REGISTRATION-fresh5.sha256`) is written only after 1 to 3, by Harish's decision.
+1. **Slide floors.** Section 2 C records that the slide gates were relaxed (100 characters, 3 equations) after the
+   strict ones left the Beamer slots unfilled. Harish confirms this stands, or asks for the strict result (7
+   documents, 2 Beamer decks) to be used instead.
+2. **Candidate commit and settings;** whether the strong-prompt arm is included; the cap split.
+3. **The hash file** (`REGISTRATION-fresh5.sha256`) is written only after 1 and 2, by Harish's decision.

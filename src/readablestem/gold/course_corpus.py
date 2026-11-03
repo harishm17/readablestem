@@ -15,7 +15,9 @@ Steps, each a function here and a subcommand of `scripts/fresh5_select.py`:
    `data` filter into a folder of its own; the licence is read again from the repository record.
 4. `discover`: the files with `\\documentclass` and `\\begin{document}`; Beamer is `beamer` as the
    class (or a `\\usepackage{beamer}`).
-5. `compile_document`: Tectonic with `--untrusted` (no shell escape) in the document's folder.
+5. `compile_document`: pdflatex, xelatex or lualatex from a user-level TeX Live (latexmk), then
+   Tectonic (`--untrusted`) if none compiles it; shell escape is off for all; the engine and its
+   version are recorded.
 6. `draw`: walk repositories in the seeded order and their documents in the seeded order, accept a
    document that passes the gates, at most `PER_REPO` per repository and `VISITS_PER_REPO` tried
    in one, stop at `TARGET` documents;
@@ -31,6 +33,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -64,22 +67,25 @@ LICENCE_QUALIFIERS = ("cc-by-4.0", "cc-by-sa-4.0", "mit")  # GitHub has no 3.0 q
 TOPIC_PHRASES = (
     "lecture notes",
     "lecture slides",
+    "course slides",
     "beamer slides",
     "beamer lecture",
     "beamer presentation",
     "problem set",
 )
+# GitHub topics (what authors tag a repository with), searched the same way.
+TOPICS = ("beamer", "beamer-slides", "lecture-notes")
 QUERY_SUFFIX = "language:TeX fork:false archived:false"
-PER_QUERY = 50  # repositories kept from each query (one page, sorted by stars)
+PER_QUERY = 100  # repositories kept from each query (one page of 100, sorted by stars)
 
 MAX_REPO_KB = 120_000
 MAX_DOWNLOAD = 120_000_000
-COMPILE_TIMEOUT = 240
+COMPILE_TIMEOUT = 150
 MIN_PDF_PAGES, MAX_PDF_PAGES = 6, 200
 MIN_TEXT_PER_PAGE = 300  # characters of text layer per page (a page of notes)
-MIN_TEXT_PER_SLIDE = 100  # the same for a Beamer slide, which carries less text
+MIN_TEXT_PER_SLIDE = 100  # a Beamer slide carries less text than a page of notes
 MIN_EQUATIONS_PAGE = 5  # equations on a usable page (as for papers)
-MIN_EQUATIONS_SLIDE = 3  # a slide shows fewer
+MIN_EQUATIONS_SLIDE = 3  # a slide shows fewer equations than a page of notes
 MAX_UNCONVERTIBLE = 0.10
 PER_REPO = 2
 VISITS_PER_REPO = 6  # documents tried in one repository, accepted or not
@@ -147,12 +153,16 @@ class Repo:
 
 
 def search_queries() -> list[tuple[str, str]]:
-    """(label, GitHub `q`) for every phrase and licence: the fixed query set."""
+    """(label, GitHub `q`) for every phrase and topic against every licence: the fixed query set."""
     out = []
     for phrase in TOPIC_PHRASES:
         for qualifier in LICENCE_QUALIFIERS:
             label = f"{phrase}|{qualifier}"
             out.append((label, f'"{phrase}" license:{qualifier} {QUERY_SUFFIX}'))
+    for topic in TOPICS:
+        for qualifier in LICENCE_QUALIFIERS:
+            label = f"topic:{topic}|{qualifier}"
+            out.append((label, f"topic:{topic} license:{qualifier} {QUERY_SUFFIX}"))
     return out
 
 
@@ -320,32 +330,101 @@ def sources_for(sources: dict[str, str], main: str) -> dict[str, str]:
 # ------------------------------------------------------------------------------- compile
 
 
-def tectonic_path() -> str:
+def texlive_bin() -> Path | None:
+    """The `bin` folder of the `latexmk` on PATH, or of a user-level TeX Live
+    (`~/.local/texlive/<year>/bin/<arch>`), or None."""
+    found = shutil.which("latexmk")
+    if found:
+        return Path(found).parent
+    for candidate in sorted((Path.home() / ".local" / "texlive").glob("*/bin/*"), reverse=True):
+        if (candidate / "latexmk").is_file():
+            return candidate
+    return None
+
+
+def tectonic_path() -> str | None:
     found = shutil.which("tectonic") or str(Path.home() / ".local" / "bin" / "tectonic")
-    if not Path(found).is_file():
-        raise CourseError("tectonic is not installed (see docs/development.md)")
-    return found
+    return found if Path(found).is_file() else None
 
 
-def compile_document(src: Path, main: str, out: Path, *, timeout: int = COMPILE_TIMEOUT) -> Path:
-    """The PDF of `src/main`, compiled with Tectonic (no shell escape)."""
+def _env(bin_dir: Path | None, src: Path, main: str) -> dict[str, str]:
+    env = dict(os.environ)
+    if bin_dir is not None:
+        env["PATH"] = f"{bin_dir}{os.pathsep}{env.get('PATH', '')}"
+    # the document's folder and the repository root, so that a class or style file kept next to the
+    # source (or in the root) is found as it is on the author's machine
+    env["TEXINPUTS"] = os.pathsep.join([str((src / main).parent), str(src), ""])
+    return env
+
+
+def _first_line(command: list[str], env: dict[str, str] | None = None) -> str:
+    try:
+        run = subprocess.run(command, capture_output=True, text=True, timeout=30, env=env)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    lines = (run.stdout or run.stderr).strip().splitlines()
+    return lines[0] if lines else ""
+
+
+def engines() -> list[tuple[str, str]]:
+    """(name, version line) of the engines to try, in order: pdflatex, xelatex and lualatex from
+    TeX Live (through latexmk), then Tectonic. A document that one engine cannot compile is tried
+    with the next; the first PDF wins and the engine and its version are recorded."""
+    out: list[tuple[str, str]] = []
+    bin_dir = texlive_bin()
+    if bin_dir is not None:
+        env = _env(bin_dir, bin_dir, "x")
+        for name in ("pdflatex", "xelatex", "lualatex"):
+            out.append((name, _first_line([str(bin_dir / name), "--version"], env)))
+    exe = tectonic_path()
+    if exe:
+        out.append(("tectonic", _first_line([exe, "--version"])))
+    if not out:
+        raise CourseError("no TeX engine: install TeX Live or Tectonic (docs/development.md)")
+    return out
+
+
+def compile_document(
+    src: Path, main: str, out: Path, *, timeout: int = COMPILE_TIMEOUT
+) -> tuple[Path, str]:
+    """(the PDF of `src/main`, "engine: version") from the first engine that compiles it. Shell
+    escape is off. The engine is written beside the PDF so that a cached build reports it too."""
     out.mkdir(parents=True, exist_ok=True)
     target = out / (Path(main).stem + ".pdf")
-    if target.is_file():
-        return target
-    command = [
-        tectonic_path(), "-X", "compile", "--untrusted",
-        "--outdir", str(out), (src / main).name,
-    ]  # fmt: skip
-    try:
-        run = subprocess.run(
-            command, cwd=(src / main).parent, capture_output=True, timeout=timeout, check=False
-        )
-    except subprocess.TimeoutExpired:
-        raise Skip("compile_timeout") from None
-    if run.returncode != 0 or not target.is_file():
-        raise Skip("compile_failed", f"exit {run.returncode}")
-    return target
+    record = out / (Path(main).stem + ".engine")
+    if target.is_file() and record.is_file():
+        return target, record.read_text(encoding="utf-8").strip()
+    bin_dir = texlive_bin()
+    cwd = (src / main).parent
+    env = _env(bin_dir, src, main)
+    timed_out = False
+    for name, version in engines():
+        for old in out.glob("*"):
+            if old.is_file():
+                old.unlink()
+        if name == "tectonic":
+            command = [tectonic_path() or "", "-X", "compile", "--untrusted"]
+            command += ["--outdir", str(out), Path(main).name]
+        else:
+            assert bin_dir is not None
+            flag = {"pdflatex": "-pdf", "xelatex": "-xelatex", "lualatex": "-lualatex"}[name]
+            command = [
+                str(bin_dir / "latexmk"), flag, "-interaction=nonstopmode", "-halt-on-error",
+                "-no-shell-escape", f"-outdir={out}", Path(main).name,
+            ]  # fmt: skip
+        try:
+            run = subprocess.run(
+                command, cwd=cwd, env=env, capture_output=True, timeout=timeout, check=False,
+                stdin=subprocess.DEVNULL,
+            )  # fmt: skip
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            continue
+        if run.returncode == 0 and target.is_file():
+            label = f"{name}: {version}"
+            record.write_text(label + "\n", encoding="utf-8")
+            return target, label
+    raise Skip("compile_timeout" if timed_out else "compile_failed")
 
 
 # --------------------------------------------------------------------------------- gold
@@ -363,7 +442,7 @@ def build_document(
     sources: dict[str, str], doc: Doc, src: Path, work: Path, seed: str, unit_id: str
 ) -> Built:
     """Compile, check the gates, analyse and choose pages. Raises `Skip` with a category."""
-    pdf = compile_document(src, doc.path, work)
+    pdf, engine = compile_document(src, doc.path, work)
     try:
         texts = ag.page_texts_of(pdf)
     except Exception as exc:
@@ -389,6 +468,7 @@ def build_document(
     info = {
         "pdf_pages": len(texts),
         "pdf_sha256": ag.sha256_file(pdf),
+        "tex_engine": engine,
         "main_tex": result.main,
         "equations": len(result.equations),
         "unconvertible": len(result.bad),

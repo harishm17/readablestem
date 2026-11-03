@@ -452,17 +452,18 @@ No command reads a gold file's content. The registration is `data/realworld/PRER
 | Stratum | Units | Rule | Command |
 |---|---|---|---|
 | A, arXiv LaTeX | 12 papers | the fresh4 order continued after its last visited candidate, same gates as above | `arxiv-order`, `arxiv-build` |
-| B, OpenStax | 6 sections | CC BY books (archive and CMS), sections no earlier set used, a title no earlier set used, sibling editions folded, at most 2 per book family, seeded by SHA-256 | `openstax` |
-| C, course-style LaTeX | 8 documents, at least 3 Beamer decks | GitHub repositories from a fixed query set, licence gate (CC BY, CC BY-SA, MIT), seeded order, compiled with Tectonic, gold by the arXiv path | `course-harvest`, `course-draw` |
+| B, OpenStax | 6 sections | CC BY books (archive and CMS), sections no earlier set used, a title no earlier set used, sibling editions folded, at most 2 per book family, seeded by SHA-256 | `openstax`, `openstax-render` |
+| C, course-style LaTeX | 8 documents, at least 3 Beamer decks | GitHub repositories from a fixed query set, licence gate (CC BY, CC BY-SA, MIT), seeded order, compiled with TeX Live (Tectonic as fallback), gold by the arXiv path | `course-harvest`, `course-draw` |
 
 Stratum C (`src/readablestem/gold/course_corpus.py`). The licence is GitHub's SPDX id for the repository and is read again
 when the repository is fetched; forks, archived repositories and anything else (NC, ND, GPL, no licence) are refused. Documents
 are the files with `\documentclass` and `\begin{document}`; Beamer is the class or the package. A document is compiled with
-`tectonic -X compile --untrusted` (no shell escape), so the PDF and the answer key come from the same source; a source that
-Tectonic cannot compile is skipped and logged, never replaced by choice. The gates are those of the arXiv path (at most 10%
-unconvertible equations, at least 4 usable pages, 4 to 6 pages drawn by hash), with a lower text and equation floor for slides.
-At most 2 documents per repository are taken and at most 6 tried. Tectonic is installed from the official release
-binary into `~/.local/bin` (no root); its package bundle is fetched on first use. The licence of a repository does not cover
+pdflatex, xelatex or lualatex from a user-level TeX Live (latexmk, shell escape off), then Tectonic (`--untrusted`); the first
+that compiles it wins, and its engine and version are in the manifest. A source no engine can compile is skipped and logged,
+never replaced by choice. The gates are those of the arXiv path (at most 10% unconvertible equations, at least 4 usable
+pages, 4 to 6 pages drawn by hash), with a lower text and equation floor for slides (100 characters and 3 equations,
+against 300 and 5); the draft registration records why. At most 2 documents per repository are taken and at most 6 tried.
+The licence of a repository does not cover
 third-party material inside a document (figures, quotations); the gold holds equations only.
 
 ## What it does not say

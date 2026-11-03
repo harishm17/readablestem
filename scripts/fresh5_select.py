@@ -378,6 +378,52 @@ def github_token() -> str | None:
     return run.stdout.strip() or None
 
 
+def cmd_openstax_render(args: argparse.Namespace) -> int:
+    """Print the selected sections to Letter PDFs with the renderer the held-out set uses
+    (`eval.render`), and record page counts and SHA-256 values in the selection file. The
+    answer key is read by the renderer only to build the page; nothing is shown or scored."""
+    from readablestem.eval import render
+    from readablestem.eval.pipeline_eval import load_gold
+
+    path = REPO_DATA / "selection-fresh5-B.json"
+    selection = json.loads(path.read_text(encoding="utf-8"))
+    gold_dir = args.root / "gold" / "fresh5b"
+    out_dir = gold_dir / "pdfs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fetcher = ox.HttpFetcher(cache_dir=args.root / "archive")
+    images = render.ImageCache(args.root / "render" / "images")
+    records = load_gold(gold_dir)
+    import pymupdf
+
+    with render.ChromiumRenderer() as browser:
+        for section in selection["sections"]:
+            mine = [
+                r
+                for r in records
+                if r["book_slug"] == section["book"] and r["page_slug"] == section["section"]
+            ]
+            authors = render.book_authors(gold_dir, section["book"])
+            page = render.page_source_from_records(mine, fetcher, authors=authors)
+            pdf = render.render_page_pdf(
+                page,
+                out_dir / f"{section['book']}-{section['section']}.pdf",
+                images=images,
+                renderer=browser,
+                paper="Letter",
+                cache_dir=args.root / "render" / "pages",
+            )
+            with pymupdf.open(stream=pdf, filetype="pdf") as doc:
+                section["pdf_pages"] = doc.page_count
+            section["pdf_sha256"] = hashlib.sha256(pdf).hexdigest()
+            section["pdf_paper"] = "Letter"
+    selection["n_pdf_pages"] = sum(s["pdf_pages"] for s in selection["sections"])
+    dump(path, selection)
+    for s in selection["sections"]:
+        print(s["book"], s["section"], s["pdf_pages"], s["pdf_sha256"][:12])
+    print("total", selection["n_pdf_pages"], "pages")
+    return 0
+
+
 def cmd_course_harvest(args: argparse.Namespace) -> int:
     repos, counts = cc.harvest(github_token(), pause=args.pause)
     pool = {
@@ -417,7 +463,7 @@ def cmd_course_draw(args: argparse.Namespace) -> int:
 
             def build(doc: cc.Doc) -> dict:
                 uid = cc.unit_id(repo.full_name, doc.path)
-                work = base / slug / "pdf" / ag.paper_slug(uid)
+                work = base / slug / "build" / ag.paper_slug(uid)
                 built = cc.build_document(sources, doc, src, work, SEED, uid)
                 return {
                     "repo": repo.full_name,
@@ -467,6 +513,7 @@ def cmd_course_draw(args: argparse.Namespace) -> int:
                 "equations": len(rows),
                 "display": sum(1 for r in rows if r["display"] == "block"),
                 "pdf_sha256": built.info["pdf_sha256"],
+                "tex_engine": built.info["tex_engine"],
                 "source_sha256": sha,
                 "extract_pdf_sha256": ag.sha256_file(gold_dir / pdf_rel),
                 "gold_sha256": ag.sha256_file(gold_path),
@@ -478,6 +525,7 @@ def cmd_course_draw(args: argparse.Namespace) -> int:
         "papers": papers,
         "n_papers": len(papers),
         "n_beamer": sum(1 for p in papers if p["style"] == "beamer"),
+        "tex_engines": sorted({p["tex_engine"] for p in papers}),
         "n_equations": sum(p["equations"] for p in papers),
         "n_pages": sum(len(p["pages_chosen"]) for p in papers),
     }
@@ -507,6 +555,7 @@ def main() -> int:
     a.add_argument("--pause", type=float, default=3.0)
     a.set_defaults(func=cmd_arxiv_build)
     sub.add_parser("openstax").set_defaults(func=cmd_openstax)
+    sub.add_parser("openstax-render").set_defaults(func=cmd_openstax_render)
     h = sub.add_parser("course-harvest")
     h.add_argument("--pause", type=float, default=7.0)
     h.set_defaults(func=cmd_course_harvest)

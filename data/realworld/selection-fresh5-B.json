@@ -1573,7 +1573,10 @@
     "table": 1,
     "heading": 11
    },
-   "gold_sha256": "a9bb2a5f59771cdbb6c2442d1f269d17278f6e99e6aa5aff01b1e19181dd3c34"
+   "gold_sha256": "a9bb2a5f59771cdbb6c2442d1f269d17278f6e99e6aa5aff01b1e19181dd3c34",
+   "pdf_pages": 5,
+   "pdf_sha256": "25e26c9553e1badde16c6ba31893497a1057a3a0f134691318343c6d43b975bb",
+   "pdf_paper": "Letter"
   },
   {
    "book": "principles-microeconomics-ap-courses",
@@ -1591,7 +1594,10 @@
     "table": 1,
     "heading": 9
    },
-   "gold_sha256": "6a38c0fea13255d05c86577e5db70fdc9572021f2df6e6b2b08eecc5add63d0b"
+   "gold_sha256": "6a38c0fea13255d05c86577e5db70fdc9572021f2df6e6b2b08eecc5add63d0b",
+   "pdf_pages": 5,
+   "pdf_sha256": "94eb206ef96d1b45578cc476d160b79e461188ec99ae31785df35730161d0313",
+   "pdf_paper": "Letter"
   },
   {
    "book": "principles-economics-2e",
@@ -1608,7 +1614,10 @@
     "table": 1,
     "heading": 8
    },
-   "gold_sha256": "417621609f867c7230e04ac3d59afb417a613873ab411cb85cde879066eb5ab6"
+   "gold_sha256": "417621609f867c7230e04ac3d59afb417a613873ab411cb85cde879066eb5ab6",
+   "pdf_pages": 5,
+   "pdf_sha256": "f5f42fce43a92d01f669cae9d685ecc714db46397df55890d11decf53b9028ca",
+   "pdf_paper": "Letter"
   },
   {
    "book": "statistics",
@@ -1626,7 +1635,10 @@
     "table": 5,
     "heading": 13
    },
-   "gold_sha256": "33fff0a2e054d593ef0b3b95b7d86337bc0e3534aaa35d51c4f84c8d5b9cbb5b"
+   "gold_sha256": "33fff0a2e054d593ef0b3b95b7d86337bc0e3534aaa35d51c4f84c8d5b9cbb5b",
+   "pdf_pages": 12,
+   "pdf_sha256": "9915b788a71554a1a48dfe5421c020b08a4827de6f87dbc6ddcd5c73ebc5e911",
+   "pdf_paper": "Letter"
   },
   {
    "book": "college-physics",
@@ -1643,7 +1655,10 @@
     "figure": 5,
     "heading": 14
    },
-   "gold_sha256": "b1fd5cd7a79b6bb4b57e0d8c5ab552784f116bca83fba13e5765abf917982cf7"
+   "gold_sha256": "b1fd5cd7a79b6bb4b57e0d8c5ab552784f116bca83fba13e5765abf917982cf7",
+   "pdf_pages": 10,
+   "pdf_sha256": "5250fc39936b2d77c3f5a7ca017a5fa2fed94b52f7c3a5793a0c28b5ac645455",
+   "pdf_paper": "Letter"
   },
   {
    "book": "biology",
@@ -1661,7 +1676,11 @@
     "table": 1,
     "heading": 10
    },
-   "gold_sha256": "760aa70e7e61cbceeec79a5480dc2470a48de35e85ce0d7f5dd09cb64d2c8186"
+   "gold_sha256": "760aa70e7e61cbceeec79a5480dc2470a48de35e85ce0d7f5dd09cb64d2c8186",
+   "pdf_pages": 6,
+   "pdf_sha256": "868570d65545b75cd77116e07b12a71909b296d79c7287b5c103a9673e2ea374",
+   "pdf_paper": "Letter"
   }
- ]
+ ],
+ "n_pdf_pages": 43
 }

@@ -26,6 +26,7 @@ FRESH5_FILES = (  # hashed when Harish signs PREREGISTRATION-FRESH5.md, not befo
     "selection-fresh5-B.json",
     "pool-fresh5-course.json",
     "candidates-fresh5-C.json",
+    "candidates-fresh5-C-slidegates-300-5.json",
     "manifest-fresh5c.json",
     "pool.json",
     "../../scripts/fresh5_select.py",

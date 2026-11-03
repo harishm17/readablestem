@@ -3,10 +3,11 @@
 ## Unreleased
 
 - Fifth fresh real-world split, builder only (no system run): `scripts/fresh5_select.py` (arXiv continuation, OpenStax
-  sections never used, course-style LaTeX incl. Beamer decks from GitHub under CC BY, CC BY-SA or MIT, compiled with
-  Tectonic), `gold/course_corpus.py`, and the registration as an unsigned draft
+  sections never used and printed to PDF, course-style LaTeX incl. Beamer decks from GitHub under CC BY, CC BY-SA
+  or MIT, compiled with a user-level TeX Live and Tectonic as fallback), `gold/course_corpus.py`, and the registration as an unsigned draft
   (`data/realworld/PREREGISTRATION-FRESH5.md`). `arxiv_gold.analyse` takes `min_equations` (default unchanged, 5).
   [docs/eval-realworld.md](docs/eval-realworld.md).
+
 ### Monitoring and recovery
 
 - The daily backup keeps a dump only after it has been proved: gzip reads it back, it ends with pg_dump's completion line, it restores with errors fatal, every live table is in the restore and `alembic_version` matches. A failure prints `backup_failed reason=...`, removes the file and fails the run. The command is a readable bash script (`set -euo pipefail`) with tests (`tests/test_railway_backup_script.py`). `railway config apply` is needed to put it live.
