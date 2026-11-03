@@ -1664,6 +1664,11 @@ def rerender_html(
         source_note=None,
         checked_on=checked_on or datetime.now(UTC).date(),
         math_alttext=math_alttext,
+        page_labels=result.page_labels,
+        pdf_pages=dict(enumerate(result.source_pages)),
+        footnote_ids=[
+            n.element_id for n in result.notices if n.code == "footnote" and n.element_id
+        ],
         **({"omitted_pages": result.omitted_pages} if result.omitted else {}),
     )
     result.html_checks = html_checks.static_checks(html)

@@ -40,6 +40,8 @@ from html import escape
 from html.parser import HTMLParser
 from io import BytesIO
 
+from readablestem.pipeline import navigation
+
 # Canvas stores a Page's body in a column of at most this many characters
 # (`maximum_long_text_length` = 500 KB - 1, config/initializers/active_record.rb;
 # WikiPage validates :body with it). A longer page is not offered for pasting.
@@ -393,6 +395,9 @@ class Notes:
     scroll_boxes: int = 0
     headings_shifted: bool = False
     page_too_large: bool = False
+    # The paste version has no "Skip to main content" link: it jumps to the start of
+    # `<main>`, which Canvas removes, and Canvas's own page has a skip link already.
+    skip_link_left_out: bool = False
 
 
 @dataclass
@@ -500,7 +505,11 @@ def export_canvas(
         for t in standalone.walk()
         if t.tag == "table" and any("headers" in c.attrs for c in t.walk())
     )
-    notes.scroll_boxes = sum(1 for n in standalone.walk() if "tabindex" in n.attrs)
+    notes.scroll_boxes = sum(
+        1
+        for n in standalone.walk()
+        if "tabindex" in n.attrs and n.attrs.get("id") != navigation.MAIN_ID
+    )
 
     # The paste version is its own copy of the tree: it differs in image addresses, in
     # which rules are carried, and in what Canvas removes anyway.
@@ -520,7 +529,12 @@ def export_canvas(
     if page_tree is not None:
         base = f"/courses/{course_number}/file_contents/course%20files/{folder}/"
         _extract_images(page_tree, Notes(), lambda name: base + name)
-        for node in page_tree.walk():
+        for node in list(page_tree.walk()):
+            if "skip-link" in node.classes() or node.attrs.get("id") == navigation.MAIN_ID:
+                if node.parent is not None:
+                    node.parent.children.remove(node)
+                    notes.skip_link_left_out = True
+                continue
             if HIDDEN_CLASS in node.classes():
                 node.attrs["class"] = f"{node.attrs['class']} {CANVAS_HIDDEN_CLASS}"
             node.attrs.pop("tabindex", None)
@@ -644,6 +658,15 @@ def readme(export: CanvasExport) -> str:
             "so in a pasted page they may need a mouse or touch to scroll it. index.html keeps "
             "the setting."
         )
+    if paste and n.skip_link_left_out:
+        changes.append(
+            "The page to paste has no “Skip to main content” link: it would jump to a "
+            "landmark Canvas removes, and Canvas's own page has one."
+        )
+    changes.append(
+        "In index.html the “Skip to main content” link is always visible at the top: Canvas "
+        "cannot hide it until it is focused."
+    )
     changes.append("Bold labels (such as “Not converted.”) show in normal weight.")
     if changes:
         lines += ["", "WHAT CANVAS STILL CHANGES"]
