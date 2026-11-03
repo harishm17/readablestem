@@ -25,7 +25,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from readablestem.pipeline import export_docx, export_epub
-from readablestem.web import documents, events, retention
+from readablestem.web import bundle, documents, events, retention
 from readablestem.web.db import session_scope
 from readablestem.web.deps import PageError, UserDep, get_ctx
 from readablestem.web.logsafe import log_event
@@ -80,6 +80,30 @@ def _recorded(request: Request, user, job_id: str, still_open: int, file_type: s
     )
 
 
+class Busy(Exception):
+    """Every Word turn is taken and none came free within `WAIT_S`."""
+
+
+def make_file(file_type: str, html: str, title: str) -> bytes:
+    """The Word (`docx`) or EPUB (`epub`) file of finished HTML, in memory. Raises `Busy`,
+    `export_docx.DocxExportError` or `export_epub.CanvasExportError` (a picture the EPUB
+    cannot hold); the callers say it in words. Shared by the single downloads, "Download all"
+    and "Combine parts" (`routes.bundle`, `routes.jobs.combine_parts`), so they cannot drift
+    apart."""
+    if file_type == "docx":
+        if not _turns.acquire(timeout=WAIT_S):
+            raise Busy
+        try:
+            return export_docx.export_docx(html, title=title).data
+        finally:
+            _turns.release()
+    return export_epub.build_epub(export_epub.export_epub(html, title=title))
+
+
+def media_type(file_type: str) -> str:
+    return export_docx.DOCX_MEDIA_TYPE if file_type == "docx" else EPUB_MEDIA_TYPE
+
+
 @router.get("/jobs/{job_id}/download.docx")
 def download_docx(request: Request, job_id: str, user: UserDep) -> Response:
     """The document as a Word file with native equations (pipeline/export_docx.py)."""
@@ -92,16 +116,16 @@ def download_docx(request: Request, job_id: str, user: UserDep) -> Response:
             context={"job_id": job_id},
         )
     html, title, still_open = _source(request, job_id, user)
-    if not _turns.acquire(timeout=WAIT_S):
+    try:
+        data = make_file("docx", html, title)
+    except Busy:
         raise PageError(
             503,
             "Busy right now",
             "Other Word files are being made. Wait a minute and try again.",
             context={"job_id": job_id},
             headers={"Retry-After": "60"},
-        )
-    try:
-        export = export_docx.export_docx(html, title=title)
+        ) from None
     except export_docx.DocxExportError as exc:
         log_event(logger, "docx_export_failed", code=exc.code)
         raise PageError(
@@ -111,11 +135,9 @@ def download_docx(request: Request, job_id: str, user: UserDep) -> Response:
             "available from the job page.",
             context={"job_id": job_id},
         ) from None
-    finally:
-        _turns.release()
     _recorded(request, user, job_id, still_open, "docx")
     return Response(
-        export.data,
+        data,
         media_type=export_docx.DOCX_MEDIA_TYPE,
         headers={
             "Content-Disposition": content_disposition(_filename(title, job_id, ".docx")),
@@ -129,7 +151,7 @@ def download_epub(request: Request, job_id: str, user: UserDep) -> Response:
     """The document as an EPUB 3 publication with MathML (pipeline/export_epub.py)."""
     html, title, still_open = _source(request, job_id, user)
     try:
-        data = export_epub.build_epub(export_epub.export_epub(html, title=title))
+        data = make_file("epub", html, title)
     except export_epub.CanvasExportError:  # EpubExportError is one: a picture it cannot hold
         log_event(logger, "epub_export_failed", code="image_type")
         raise PageError(
@@ -147,4 +169,33 @@ def download_epub(request: Request, job_id: str, user: UserDep) -> Response:
             "Content-Disposition": content_disposition(_filename(title, job_id, ".epub")),
             "Content-Security-Policy": VIEW_CSP,
         },
+    )
+
+
+def checked_format(value: str) -> str:
+    """The file type of a "Download all" or "Combine parts" request: `html` (the default),
+    `docx` or `epub`. Anything else is a 400 page; Word is a 503 page where pandoc is not
+    installed, as on the single download."""
+    if value not in bundle.FORMATS:
+        raise PageError(
+            400,
+            "Unknown file type",
+            "Choose the HTML file, Word (.docx) or EPUB from the page that offered the link.",
+        )
+    if value == "docx" and not export_docx.available():
+        raise PageError(
+            503,
+            "Word files are not available here",
+            "This server cannot make a Word file. The HTML file is still available from the "
+            "job page.",
+        )
+    return value
+
+
+def busy_page() -> PageError:
+    return PageError(
+        503,
+        "Busy right now",
+        "Other Word files are being made. Wait a minute and try again.",
+        headers={"Retry-After": "60"},
     )
