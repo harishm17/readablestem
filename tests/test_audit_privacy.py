@@ -31,6 +31,7 @@ from fixtures.web.support import (
 )
 from readablestem.ops import retention
 from readablestem.web import db
+from readablestem.web import retention as web_retention
 from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
 from readablestem.web.routes import cron as cron_routes
 from readablestem.web.routes import jobs as job_routes
@@ -88,6 +89,9 @@ def clock(monkeypatch):
     monkeypatch.setattr(job_routes, "utcnow", moving)
     monkeypatch.setattr(cron_routes, "utcnow", moving)
     monkeypatch.setattr(db, "utcnow", moving)
+    # Review writes restart the retention clock (retention.restart_clock); it must read
+    # the same clock, or the test depends on the real date.
+    monkeypatch.setattr(web_retention, "utcnow", moving)
     return moving
 
 
