@@ -227,7 +227,7 @@ def zip_with_attr(name: str, data: bytes, attr: int) -> bytes:
         "no-main",
         "too-many-entries",
         "unpacked-too-big",
-    ],  # fmt: skip
+    ],
 )
 def test_a_bad_zip_is_refused_with_a_plain_message(web, data, words):
     text = refused(web, data, "project.zip")
