@@ -330,6 +330,21 @@ class Settings(BaseSettings):
     # currently promises no analytics); the script also runs only on readablestem.com.
     analytics_enabled: bool = False
 
+    # --- handwriting: reader B (models/math_readers, docs/math-readers.md). A second reading
+    # of one handwritten expression, made to differ from the page pass's. Both readers are OFF
+    # and nothing in the pipeline calls one yet. Each sends the crop to a model provider, so a
+    # production start is refused while one is on and the privacy notice does not name that
+    # provider (`ops.launch.math_reader_notice_problem`). Timeout and retries are
+    # `model_timeout_s` and `model_max_retries`.
+    # Claude reader (ANTHROPIC_API_KEY): another model than the page pass, a prompt of its own
+    # and one high-resolution crop of the expression, with no page text.
+    math_reader_claude_enabled: bool = False
+    math_reader_claude_model: str = "claude-sonnet-5-5"
+    math_reader_claude_effort: Effort = "medium"
+    # OpenAI reader (OPENAI_API_KEY); the model must be priced in models/pricing.py.
+    math_reader_openai_enabled: bool = False
+    math_reader_openai_model: str = "gpt-6-luna"
+
     # --- content features. Each is off until its eval
     # says it helps; ConversionOptions.from_settings reads them for every conversion.
     # Rebuild data tables as <table> (off: a detected table is kept as an image of the
@@ -581,6 +596,18 @@ class Settings(BaseSettings):
             raise ConfigError("OPENAI_API_KEY is not set (put it in .env; never commit it)")
         return self.openai_api_key.get_secret_value()
 
+    @property
+    def math_readers_on(self) -> list[str]:
+        """The enabled reader B names (each sends the crop to its provider), fixed order."""
+        return [
+            name
+            for name, on in (
+                ("claude", self.math_reader_claude_enabled),
+                ("openai", self.math_reader_openai_enabled),
+            )
+            if on
+        ]
+
     def check_production(self) -> None:
         """Fail fast on a production start that would run without its safety limits.
 
@@ -621,6 +648,16 @@ class Settings(BaseSettings):
                 raise ConfigError(
                     f"ANALYTICS_ENABLED=true is refused in production: {problem}. "
                     "Update the notice (web/templates/privacy.html) first"
+                )
+        if self.math_readers_on:
+            from readablestem.ops.launch import math_reader_notice_problem
+
+            if (problem := math_reader_notice_problem(self.math_readers_on)) is not None:
+                raise ConfigError(
+                    "a handwriting reader (MATH_READER_CLAUDE_ENABLED, "
+                    f"MATH_READER_OPENAI_ENABLED) is refused in production: {problem}. "
+                    "Update the notice (web/templates/privacy.html) and the vendor sheet "
+                    "(docs/vendor-information.md) first"
                 )
         if self.dev_login_enabled:
             raise ConfigError("DEV_LOGIN_ENABLED must be false in production")

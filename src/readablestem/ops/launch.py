@@ -5,8 +5,9 @@ page anyone can open), a missing or placeholder demo, and a missing eval baselin
 gate skips without one). Given the settings, it also lists what a setting turns on that
 the public pages do not describe yet (Microsoft sign-in and the privacy notice; open
 sign-up, which makes an account at the first sign-in, and the privacy notice that must say
-so and how to delete it), and whether the production settings are complete and the spend
-limits fit the model provider
+so and how to delete it; a handwriting reader, which sends crops to a model provider, and the
+notice that must name that provider), and whether the production settings are complete and
+the spend limits fit the model provider
 (`ops.limits`: the same errors that stop a production start, plus warnings).
 `readablestem ops launch-check` prints the list and exits 1 while it is not empty; the web
 app logs `launch_blockers` with the count at a production start.
@@ -84,6 +85,30 @@ def analytics_notice_problem() -> str | None:
     return None
 
 
+# Reader B providers (settings.math_readers_on) -> the word the privacy notice must
+# carry while that reader is on: each one receives the crop of an expression.
+MATH_READER_NOTICE_WORDS = {"claude": "Anthropic", "openai": "OpenAI"}
+
+
+def math_reader_notice_problem(readers: list[str]) -> str | None:
+    """Why the privacy notice cannot stand with these handwriting readers on,
+    or None when it names each provider. Matched as text on the template as written, like
+    the analytics check; it does not know that a template block may show a name only for
+    one model provider, so read the rendered page too (docs/math-readers.md)."""
+    privacy = TEMPLATES_DIR / "privacy.html"
+    if not privacy.is_file():
+        return "web/templates/privacy.html is missing"
+    text = privacy.read_text(encoding="utf-8")
+    missing = [
+        MATH_READER_NOTICE_WORDS[name]
+        for name in readers
+        if MATH_READER_NOTICE_WORDS[name] not in text
+    ]
+    if missing:
+        return "the privacy notice does not name " + ", ".join(missing)
+    return None
+
+
 def launch_blockers(
     repo_root: Path | None = None, *, settings: Settings | None = None
 ) -> list[str]:
@@ -121,6 +146,13 @@ def launch_blockers(
             if on and word not in notice:
                 items.append(
                     f"web/templates/privacy.html: {what} but the privacy notice does not say so"
+                )
+        for name in settings.math_readers_on:
+            word = MATH_READER_NOTICE_WORDS[name]
+            if word not in notice:
+                items.append(
+                    f"web/templates/privacy.html: the {name} handwriting reader is on and sends "
+                    f"handwriting to {word}, but the privacy notice does not name {word}"
                 )
     if settings is not None and settings.signup_open and notice is not None:
         for phrase, what in OPEN_SIGNUP_NOTICE:

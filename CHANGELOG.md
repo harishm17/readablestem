@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: reader B adapters for handwritten expressions (branch hw/math-readers)
+
+- `models/math_readers/`: one small `MathReader` protocol (a PNG crop in, LaTeX candidates with
+  reported confidences out) and two adapters, a Claude reader built to differ from the page pass
+  (another model, its own instructions, one high-resolution crop, no page text) and an OpenAI
+  vision reader (`store: false`). Worst-case reservation before every send, timeout, retries,
+  refusal and error mapping as in the step clients, no content in logs. Settings
+  `MATH_READER_CLAUDE_*` and `MATH_READER_OPENAI_*`, all off; nothing in the pipeline calls them
+  yet (`docs/math-readers.md`).
+- A production start is refused while a reader is on and the privacy notice does not name its
+  provider (`ops.launch.math_reader_notice_problem`); `ops launch-check` lists the same.
+
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)
 
 - The whole conversion (`convert_pdf`) now runs in a child process the worker can kill
