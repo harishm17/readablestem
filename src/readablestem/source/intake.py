@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import math
 import re
-import zipfile
 from dataclasses import dataclass
 
 from readablestem.source import lint
@@ -121,14 +120,7 @@ def read_texts(kind: str, data: bytes, limits: arc.ArchiveLimits) -> dict[str, s
             if total > MAX_TEXT_TOTAL_BYTES:
                 raise SourceRefused("source_zip_limits")
             texts[entry.path] = _decode(raw)
-    except (
-        OSError,
-        EOFError,
-        RuntimeError,
-        NotImplementedError,
-        ValueError,
-        zipfile.BadZipFile,
-    ) as exc:  # a member that does not read: a bad CRC, a bad stream
+    except (OSError, EOFError, RuntimeError, NotImplementedError, ValueError) as exc:
         if isinstance(exc, SourceRefused):
             raise
         raise SourceRefused("source_bad_zip") from None

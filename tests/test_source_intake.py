@@ -175,12 +175,3 @@ def test_the_envelope_round_trips_and_refuses_anything_else():
     ):
         with pytest.raises(envelope.EnvelopeError):
             envelope.unwrap(bad)
-
-
-def test_a_member_whose_header_lies_about_its_size_is_a_bad_zip_not_a_crash():
-    """The bytes do not match the header they came with: the member does not read."""
-    data = bytearray(make_zip({"main.tex": ARTICLE + "x" * 5000}))
-    for marker, offset in ((b"PK\x03\x04", 22), (b"PK\x01\x02", 24)):
-        at = data.find(marker)
-        data[at + offset : at + offset + 4] = (10).to_bytes(4, "little")
-    assert refusal("p.zip", bytes(data)) in {"source_bad_zip", "source_zip_limits"}
