@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased: vector ink to strokes (branch hw/ink-strokes)
+
+- New `pipeline/ink_strokes.py`: reads a PDF page's vector ink into ordered strokes (stroked
+  paths, one filled shape per pen sample, filled outlines), keeps colour and paint order, drops
+  page furniture (ruled and squared paper, dot grids, dashed lines, frames, backgrounds), groups
+  strokes into lines and regions, and writes each region as normalised point lists or InkML.
+  It uses `page_type`'s caps and `InkBudget` and groups with a grid hash (near linear), so a
+  hostile page cannot stall a worker. Nothing in the pipeline calls it yet, so conversions are
+  unchanged. What is read and the limits:
+  [docs/layout.md](docs/layout.md), "Vector ink and strokes" (`tests/test_ink_strokes.py`).
 ## Unreleased: text layers that do not cover the page, and the maths rule as a guard (branch fix/handwriting-skip-and-flags)
 
 - A visible text layer no longer makes a page "typed" when it does not cover the page's content

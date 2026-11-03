@@ -1628,6 +1628,72 @@ which keeps some `vector_no_text` pages of dense ink as images, is not counted.
 - Time: median 6 ms a page, 95th percentile 0.14 s, at most about 1 s on the densest
   synthetic ink (this machine); the real iPad notes (4 pages) are refused at upload in 0.5 s.
 
+### Vector ink and strokes (`pipeline/ink_strokes.py`)
+
+A handwritten page that a notes app exported as vector paths still holds the pen's trace.
+`ink_strokes.extract_ink(page)` reads it into ordered strokes (pure PyMuPDF and numpy, no model
+call, no network). Nothing in the pipeline calls it yet: such pages are still kept as their
+image, or read from it on request, as above. It exists so a later step can give a recogniser
+strokes, or a sharp re-render of only the ink, instead of a pixel crop.
+
+**What is extracted**, from `page.get_cdrawings()` in paint order and in display space (the page
+rotation applied):
+
+| Drawn as | Stroke |
+|---|---|
+| stroked polylines and Bezier paths with a pen width, one per stroke, or one short segment per path object (as Xournal++ writes them) | `source="path"`: the path itself; consecutive two-point segments that continue each other, in one colour and width, are chained |
+| one small filled shape per pen sample (as GoodNotes writes them) | `source="samples"`: three or more touching shapes of one colour in a row of paint order are one stroke through the shape centres |
+| a filled outline of the whole stroke, several to a path object (as the committed `ios_notes.pdf` fixture imitates PencilKit) | `source="outline"`: the two edges are paired and averaged; the centre-line is the stroke, and the mean gap is the pen width |
+
+A `Stroke` has `points` (page points, y down), `colour` (`#rrggbb`), `opacity`, `width` and
+`order` (paint order, which is the pen order). A short filled mark on its own is a one-point
+stroke (a dot) or, when thin, a short tick. Wide see-through strokes (width at least 5 pt,
+opacity at most 0.85: a highlighter) are returned apart, in `PageInk.highlights`. Fully
+transparent paint is not read.
+
+**What is dropped as page furniture**, counted by reason in `PageInk.dropped`, never by colour
+(pastel ink on a pastel template stays): `rule` (an exactly axis-aligned line at least half the
+page across), `grid` (four or more evenly spaced parallel axis-aligned lines, or four or more
+equal exact rectangles, whatever their length), `dashed` (a dashed straight line), `frame` (an
+exact rectangle at least 30% of the page across), `background` (an exact filled rectangle at
+least a quarter of the page across), `dot_grid` (filled shapes on a lattice), `blob` (a filled
+shape that is neither a pen sample nor a pen outline), `hidden` and `off_page`.
+
+**Grouping.** `PageInk.regions` (reading order) holds `InkRegion`s. Strokes join into a line when
+they overlap vertically and sit within four median-stroke sizes of each other horizontally;
+lines that stack within half a stroke size and overlap horizontally join into one region (a
+fraction, a matrix, a multi-line equation). Sizes are relative, so large and small writing
+group alike. `InkRegion.strokes` is in pen order and `lines` indexes them row by row.
+`InkRegion.normalised(size)` gives each stroke's points with the region's top left at the origin,
+scaled evenly so the longer side is `size` (default 1000), and `to_inkml(size)` writes the same
+as InkML (one trace per stroke, one brush per colour and opacity, no time channel).
+
+**Limits.** Checked on synthetic ink in each style and on the two committed fixtures only; no real
+GoodNotes, Notability, OneNote or Xournal++ export has been read yet.
+
+- The direction of an outline's centre-line is a guess (the outline's first point is taken as the
+  stroke's start). A closed loop such as a handwritten o can come out either way: on the seeded
+  writer behind `ios_notes.pdf`, 139 of 150 strokes ran the right way and the 11 misses were
+  closed loops.
+- Fast pen samples whose shapes do not touch split into single dots. Three or more thin ticks
+  that touch in a row join into one stroke. There is no pressure or time.
+- A filled shape over 12 pt across that is not a long thin outline is dropped as a blob.
+- A rule drawn by hand, exactly level, across more than half the page is taken for paper.
+  A stroke whose outline crosses itself can pair its edges wrongly.
+- Regions are a proximity guess: tightly spaced lines become one region (use `lines`), and a far
+  superscript or answer can be a region of its own.
+- Limits and time: the caps and the budget are `page_type`'s (`PAGE_MAX_PATHS`, `INK_MAX_ITEMS`,
+  `InkBudget`, `INK_BUDGET_S`); `extract_ink` takes the document's `InkBudget`, checks it in
+  every phase and inside the loops, and over a cap, more than 20,000 strokes (`MAX_STROKES`) or
+  the budget returns an empty result with `analysed` false. Grouping finds neighbours with a
+  grid hash, so it is near linear: 50,000 strokes in a column, a row or at random group in
+  1 to 3 s on this machine; strokes piled on one spot (over 1,000 in one grid cell) are an
+  overrun, not a stall. Reading outlines costs about 3 ms a stroke (0.5 s for the 150 strokes
+  of `ios_notes.pdf`; 0.03 s for the 270 polylines of `ink_no_layer.pdf`).
+- Strokes wholly off the page are dropped (`off_page`), and a region's box is clipped to the page.
+- On the seeded outline writer (150 strokes, 7 pt writing), the centre-line lies a median 0.4 pt
+  (at most 1.4 pt) from the pen path; its ends can fall up to 2 pt short.
+
 ## The text pass (`pipeline/text_pass.py`, pipeline 0.4.0)
 
 After layout and before any step, `run` calls `text_pass.apply` once. It reads the PDF
@@ -2003,6 +2069,10 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   in sequence, run-in labels, math-italic in a heading, paragraphs over a page break (a
   footnote and a running header between, a hyphen at the break, each reason not to join),
   the document's spelling of compounds and inline maths that wraps.
+- `tests/test_ink_strokes.py` draws ink in each export style (stroked paths, filled shapes per
+  pen sample, filled outlines) on ruled, squared and dotted paper and in pastel ink, and
+  checks the recovered strokes against the drawn paths, in pen order; it also reads the two
+  ink fixtures (`ios_notes.pdf`, `ink_no_layer.pdf`) and the seeded writer that made them.
 - `tests/test_layout_lists.py` (bullets, ordered markers, siblings, nesting, false lists),
   `tests/test_layout_equations.py` (display-equation regions and equation numbers) and
   `tests/test_layout_fragments.py` (inline fragments and the punctuation after inline
