@@ -142,9 +142,9 @@ def cmd_render(args: argparse.Namespace) -> int:
         tex_file = target / f"{stem}.tex"
         tex_file.write_text(figure.standalone(), encoding="utf-8")
         result = subprocess.run(
-            ["tectonic", "--outdir", str(target), str(tex_file)],
+            ["tectonic", "--untrusted", "--outdir", str(target), str(tex_file)],
             capture_output=True,
-            timeout=180,
+            timeout=120,
             check=False,
         )
         pdf = target / f"{stem}.pdf"

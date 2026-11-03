@@ -1,6 +1,6 @@
 # Figure gold v2 and the long-description pre-registration (draft)
 
-Status: **DRAFT for Harish's sign-off.** The gold set is built and checked offline. No model has
+Status: **DRAFT, awaiting owner sign-off.** The gold set is built and checked offline. No model has
 run on it, and none will until section 3 is signed (the date and the hash of this file are then
 written at the bottom, as the other pre-registrations do).
 
@@ -28,15 +28,22 @@ and its manifest are untouched.
 2. **Exclusion gate.** No figure from a page whose slug is a registered held-out section (any
    book, so a later edition of a held-out section is out too), or that another gold, development
    or held-out set under `data/` already uses (54 slugs). 47 pages were dropped this way.
-3. **Reference gate.** One image; the OpenStax alt text (the reference long description) at least
+3. **Credit gate.** The book's CC BY does not override a figure's own credit line. A caption
+   credit that names another licence, permission, copyright, Wikimedia Commons or Flickr takes
+   the figure out, and so does a credit to a person or a body not on a short free list (US
+   government bodies, whose works are public domain, and ESO, CC BY): its terms are not stated.
+   Every credit of a kept figure is recorded in `ATTRIBUTION.md` as the caption prints it
+   (`third_party_licence`; 7 of the 50 carry one). 3 figures drawn earlier were redrawn in
+   order after this gate.
+4. **Reference gate.** One image; the OpenStax alt text (the reference long description) at least
    120 characters; for charts at least four numbers of two digits or with a decimal point in it
    (readable values: a proxy, not a check); no maths in the caption.
-4. **Stratum** from the first 90-200 characters of the alt text, by a fixed keyword list
+5. **Stratum** from the first 90-200 characters of the alt text, by a fixed keyword list
    (`classify_openstax`): chart (graph, plot, histogram, pie chart, ...), chemistry (structures,
    Lewis symbols, ball-and-stick and space-filling models, structural formulas), photo or
    illustration, diagram (circuit, schematic, cycle, cross section, flow chart, ...). Anything
    else is not a candidate. The same image in two editions counts once.
-5. **Draw.** Inside each stratum, order by SHA-256 of `seed|stratum|id` (seed
+6. **Draw.** Inside each stratum, order by SHA-256 of `seed|stratum|id` (seed
    `figures-v2-2026-11-02`); charts from arXiv with plotted data would go first, since only they
    have an exact reference table. Walk the order; keep a figure unless its page already gave one or
    its book already gave 3 to the stratum (6 for chemistry, which has few books). Stop at the quota.
@@ -47,14 +54,14 @@ and its manifest are untouched.
 
 | Stratum | Quota | Drawn | Pool after the gates | Analysis / held half |
 |---|---|---|---|---|
-| Data charts and graphs | 14 | 14 | 164 | 7 / 7 |
-| Diagrams | 14 | 14 | 788 | 7 / 7 |
-| Photos and illustrations | 10 | 10 | 1,016 | 5 / 5 |
-| Chemistry structures | 12 | 12 | 140 | 6 / 6 |
-| **Total** | 50 | 50 | 2,108 | 25 / 25 |
+| Data charts and graphs | 14 | 14 | 159 | 7 / 7 |
+| Diagrams | 14 | 14 | 740 | 7 / 7 |
+| Photos and illustrations | 10 | 10 | 628 | 5 / 5 |
+| Chemistry structures | 12 | 12 | 126 | 6 / 6 |
+| **Total** | 50 | 50 | 1,653 | 25 / 25 |
 
-By book: Chemistry: Atoms First 13, Biology 11, Astronomy 8, College Physics 7, Statistics 4,
-Principles of Macroeconomics 2e 3, Anatomy and Physiology 3, Physics 1. **45 of the 50 come from
+By book: Chemistry: Atoms First 12, Biology 11, Astronomy 8, College Physics 7, Statistics 4,
+Anatomy and Physiology 4, Principles of Macroeconomics 2e 3, Physics 1. **45 of the 50 come from
 retired editions** (CC BY, but whether a retired edition may serve as ground truth is still open:
 [decisions/0001-scope.md](decisions/0001-scope.md), question 2). Only Physics and Statistics are
 live CC BY STEM books, and their pages were mostly used in development; no live CC BY book has
@@ -80,8 +87,8 @@ the committed file.
 - **Reference tables, 4 of 14 charts** (`tables-from-alt.json`): where the alt text states the
   values and the figure prints them (an ideal-gas table, bar labels of the Kepler planet
   counts, water shares, two production frontiers' end points), a table was written from the alt text and
-  checked against the image by the set builder. They are not yet checked by Harish
-  (`verified_by_harish: false`). The other 10 charts have no reference table: their values are
+  checked against the image by the set builder. They are not yet checked by a person other than the builder
+  (`verified_by_person: false`). The other 10 charts have no reference table: their values are
   curves with no printed numbers.
 
 ### The arXiv strand found nothing
@@ -178,15 +185,15 @@ The long judge has never been compared with a person. Before a bar is claimed:
    draw allows. Oversampling fails is deliberate (a sample of all passes cannot show the judge
    missing an error); the report gives sensitivity and specificity next to kappa, because kappa
    depends on how many fails the sample holds.
-2. Harish labels them **blind**: per item he sees the image, the long description and the
+2. A person labels them **blind**: per item they see the image, the long description and the
    table (no judge verdict, no arm, no reference text) and answers three questions: accurate,
    complete, invented values (yes or no). About 90 seconds each, 40 minutes in all.
 3. Report, per field and for pass/fail: raw agreement, Cohen's kappa with the seeded bootstrap
    interval (`eval calibrate`, [eval.md](eval.md#judge-calibration-eval-calibrate)), and the
    confusion matrix. 25 items give a wide interval; it is printed.
 4. **Accepted** when kappa for pass/fail is at least 0.6 and the judge missed no more than a
-   quarter of the fails Harish found. Otherwise revise the judge prompt once and re-judge the same
-   outputs (no new figure runs); Harish re-labels only the items the revision changed. If kappa
+   quarter of the fails the person found. Otherwise revise the judge prompt once and re-judge the same
+   outputs (no new figure runs); the person re-labels only the items the revision changed. If kappa
    is still under 0.6, the numbers are published as "judge not agreed with a person" and no bar is
    claimed.
 5. The judge is the run's main model unless the registration names another; the report records
@@ -195,15 +202,15 @@ The long judge has never been compared with a person. Before a bar is claimed:
 
 ### 3.7 Not claimed
 
-- No claim that a long description is *useful to a student* beyond the judge and Harish's 25 labels
+- No claim that a long description is *useful to a student* beyond the judge and the 25 human labels
   (no user study).
 - No claim about figures unlike these strata (screenshots, tables as images, handwriting).
 - The references are alt text that varies in quality (section 2); a low pass rate may be the
   judge or the reference, which the labels separate only on the 25 sampled items.
-- Retired editions: if Harish rules against them (decision 0001, question 2), 45 of the 50 figures
+- Retired editions: if they are ruled out (decision 0001, question 2), 45 of the 50 figures
   go and the set must be redrawn before any run.
 
-### 3.8 Open for sign-off
+### 3.8 Open for sign-off (owner decisions)
 
 1. May retired CC BY OpenStax editions serve as references (45 of the 50)?
 2. The bars in 3.4, and the cell-accuracy measure being reported without a bar (n = 4 charts).
@@ -212,4 +219,4 @@ The long judge has never been compared with a person. Before a bar is claimed:
 5. Whether to spend a round on a larger arXiv or repository scan first, to get more charts with
    an exact table.
 
-Signed: _(not yet)_
+Decisions on the points above are recorded here, with a date and the hash of this file, before any run.

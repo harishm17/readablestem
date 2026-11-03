@@ -86,6 +86,7 @@ def openstax_record(
             "height": source["images"][0].get("height"),
         },
         "caption": source.get("caption"),
+        "credits": fv.credits_of(source.get("caption")),
         "figure_number": source.get("figure_number"),
         "reference_alt": alt,
         "reference_long_description": alt,
@@ -99,7 +100,7 @@ def openstax_record(
             "source": "alt-text",
             "read_by": table["read_by"],
             "checked_against_image_by": table["checked_against_image_by"],
-            "verified_by_harish": False,
+            "verified_by_person": False,
         }
     return record
 
@@ -240,11 +241,19 @@ def write_attribution(records: list[dict], pool_ox: dict) -> None:
         "OpenStax alt text (unchanged) or text built from the plotted data of the arXiv "
         "source. ReadableSTEM is not affiliated with or endorsed by OpenStax.",
         "",
-        "| id | stratum | licence | source |",
-        "|---|---|---|---|",
+        "The book-level CC BY licence does not override a figure's own credit line. Figures whose "
+        "credit names another licence, permission or copyright are excluded by the draw "
+        "(`figures_v2.third_party_licence`); the credits of the figures kept are listed here as "
+        "the captions print them.",
+        "",
+        "| id | stratum | licence | source | credit lines |",
+        "|---|---|---|---|---|",
     ]
     for r in records:
-        lines.append(f"| {r['id']} | {r['stratum']} | {r['licence_name']} | {r['attribution']} |")
+        credit = "; ".join(r.get("credits") or []).replace("|", "/") or "none printed"
+        lines.append(
+            f"| {r['id']} | {r['stratum']} | {r['licence_name']} | {r['attribution']} | {credit} |"
+        )
     (OUT / "ATTRIBUTION.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

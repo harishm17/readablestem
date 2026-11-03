@@ -226,6 +226,40 @@ def test_a_chart_needs_readable_values_in_its_reference() -> None:
     assert [cand.id for cand, _ in out] == ["b"]
 
 
+@pytest.mark.parametrize(
+    ("caption", "out"),
+    [
+        ("A graph. (credit: NASA/JPL)", False),
+        ("A graph. (credit: modification of work by ESO)", False),
+        ("A graph (credit a: work by CDC; credit b: work by USFWS)", False),
+        ("A graph, no credit.", False),
+        ("A photo. (credit: modification of work by “X”/Wikimedia Commons)", True),
+        ("A photo. (credit: Jane Doe, CC BY-SA 2.0)", True),
+        ("A photo. (credit: used with permission)", True),
+        ("A photo. (credit: James St. John)", True),
+        ("A photo. (credit a: NASA; credit b: Scott Bauer)", True),
+    ],
+)
+def test_third_party_credit_gate(caption: str, out: bool) -> None:
+    assert fv.third_party_licence(caption) is out
+
+
+def test_credit_gate_removes_a_candidate_and_credits_are_listed() -> None:
+    bad = _figure("a", caption="Photo (credit: Jane Doe, CC BY-SA 2.0)")
+    good = _figure("b", caption="Photo (credit: NASA)")
+    out = fv.openstax_candidates("physics", "p", [bad, good], licence_url=CC_BY, excluded_pages=[])
+    assert [c.id for c, _ in out] == ["b"]
+    assert fv.credits_of("Photo (credit: NASA)") == ["credit: NASA"]
+
+
+def test_one_page_gives_one_figure_across_strata() -> None:
+    pool = [
+        fv.Candidate("openstax/b/p/fig-0", fv.CHART, "openstax", "b", "p"),
+        fv.Candidate("openstax/b/p/fig-1", fv.DIAGRAM, "openstax", "b", "p"),
+    ]
+    assert len(fv.select(pool)) == 1
+
+
 def test_chemistry_stratum_only_from_a_chemistry_book() -> None:
     alt = "The structure of ethanol is shown with a hydroxyl group and a methyl group."
     assert fv.classify_openstax("physics", alt) != fv.CHEMISTRY

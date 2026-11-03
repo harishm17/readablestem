@@ -18,6 +18,10 @@ The rule (also written in docs/eval-figures-long.md; changing either changes the
 2. Exclusion gate. No figure from a page whose slug is one of the held-out sections (in any
    book, so a later edition of a held-out section is out too), none from a page that already
    has figures in the v1 gold, tables gold or development set (`DEV_PAGE_SLUGS` passed in).
+2b. Credit gate. The book's CC BY does not override a figure's own credit line: a
+   caption credit naming another licence, permission, copyright or Wikimedia Commons or Flickr
+   (`third_party_licence`) takes the figure out; so does a credit to a person or a body not on
+   a short free list (US government bodies, ESO). Every credit is recorded in ATTRIBUTION.md.
 3. Reference gate. OpenStax figures need one image and a reference text of at least
    `MIN_REFERENCE_CHARS` characters (the OpenStax alt text is the reference long description;
    a shorter one cannot grade a 100-1,200 character description); a chart's reference must
@@ -69,7 +73,7 @@ CC_BY_URL = re.compile(r"^https?://creativecommons\.org/licenses/by/(3\.0|4\.0)/
 # student must read. Only two live STEM books are CC BY (Physics, Statistics); the others are
 # retired editions, which are CC BY but whose use as ground truth is still an open decision
 # (docs/decisions/0001-scope.md, question 2), so each record carries `book_state` and the
-# pre-registration asks Harish to sign it off. Chemistry structures can only come from the
+# pre-registration asks for a sign-off. Chemistry structures can only come from the
 # retired Chemistry. Held-out and development pages are removed by the exclusion gate.
 OPENSTAX_BOOKS: Mapping[str, str] = {
     "physics": "physics",
@@ -168,6 +172,42 @@ def licence_ok(source: str, licence_url: str | None) -> bool:
     return False
 
 
+# A figure's own credit line can name a licence that is not the book's. These credits are out:
+# an explicit licence other than plain CC BY, "permission", "copyright", or a source whose
+# images carry their own licence terms (Wikimedia Commons, Flickr) with none stated. Credits to
+# Credits that name a person or a body not on the free list are out too (their terms are not
+# stated); credits to US government bodies and ESO are kept, and every credit is recorded.
+_CREDIT = re.compile(r"\(credit[^)]*(?:\([^)]*\)[^)]*)*\)", re.I)
+_NON_CC_BY_CREDIT = re.compile(
+    r"by-?(?:sa|nc|nd)|share ?alike|non-?commercial|permission|copyright|\u00a9|"
+    r"wikimedia|wikipedia|flickr|cc0|public domain|getty|shutterstock|istock",
+    re.I,
+)
+
+
+_FREE_CREDIT_BODIES = re.compile(
+    r"\b(NASA|NOAA|CDC|USFWS|USDA|USGS|NIH|NIST|NSSDC|JPL|ESO|U\.?S\.? (?:Army|Navy|Air Force)|"
+    r"Department of Energy|DOE|FEMA|EPA)\b"
+)
+
+
+def credits_of(caption: str | None) -> list[str]:
+    """The `(credit ...)` parts of a caption, as written."""
+    return [m.group(0).strip("()") for m in _CREDIT.finditer(caption or "")]
+
+
+def third_party_licence(caption: str | None) -> bool:
+    """True when a credit line points to terms other than the book's CC BY, or names a source
+    whose terms cannot be told from the caption: every credit must name a body on
+    `_FREE_CREDIT_BODIES` (US government bodies, whose works are public domain, and ESO, CC BY)."""
+    for credit in credits_of(caption):
+        if _NON_CC_BY_CREDIT.search(credit):
+            return True
+        if not all(_FREE_CREDIT_BODIES.search(part) for part in credit.split(";")):
+            return True
+    return False
+
+
 def is_held_out(page_slug: str, held_out_slugs: Iterable[str]) -> bool:
     return page_slug in set(held_out_slugs)
 
@@ -197,6 +237,8 @@ def openstax_candidates(
         if len(alt) < MIN_REFERENCE_CHARS:
             continue
         if record.get("caption_has_math"):
+            continue
+        if third_party_licence(record.get("caption")):
             continue
         stratum = classify_openstax(book, alt)
         if stratum is None:
@@ -238,9 +280,9 @@ def select(
     skipped = set(skip)
     pool = list(candidates)
     chosen: list[Candidate] = []
+    pages: set[tuple[str, str]] = set()  # one figure per page across all strata
     for stratum in STRATA:
         quota = quotas.get(stratum, 0)
-        pages: set[tuple[str, str]] = set()
         per_source: Counter[str] = Counter()
         taken = 0
         for cand in order_stratum(pool, stratum, seed):

@@ -137,19 +137,12 @@
   }
  },
  "by_stratum": {
-  "chart": 164,
-  "chemistry": 140,
-  "diagram": 788,
-  "photo": 1016
+  "chart": 159,
+  "chemistry": 126,
+  "diagram": 740,
+  "photo": 628
  },
  "candidates": [
-  {
-   "id": "openstax/anatomy-and-physiology/1-1-overview-of-anatomy-and-physiology/fig-000",
-   "page_key": "1-1-overview-of-anatomy-and-physiology",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
   {
    "id": "openstax/anatomy-and-physiology/1-2-structural-organization-of-the-human-body/fig-000",
    "page_key": "1-2-structural-organization-of-the-human-body",
@@ -167,20 +160,6 @@
   {
    "id": "openstax/anatomy-and-physiology/1-3-functions-of-human-life/fig-000",
    "page_key": "1-3-functions-of-human-life",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/1-4-requirements-for-human-life/fig-000",
-   "page_key": "1-4-requirements-for-human-life",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/1-4-requirements-for-human-life/fig-001",
-   "page_key": "1-4-requirements-for-human-life",
    "source": "openstax",
    "source_key": "anatomy-and-physiology",
    "stratum": "photo"
@@ -240,20 +219,6 @@
    "source": "openstax",
    "source_key": "anatomy-and-physiology",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/1-7-medical-imaging/fig-000",
-   "page_key": "1-7-medical-imaging",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/1-7-medical-imaging/fig-001",
-   "page_key": "1-7-medical-imaging",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/anatomy-and-physiology/10-2-skeletal-muscle/fig-000",
@@ -317,20 +282,6 @@
    "source": "openstax",
    "source_key": "anatomy-and-physiology",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/12-1-basic-structure-and-function-of-the-nervous-system/fig-001",
-   "page_key": "12-1-basic-structure-and-function-of-the-nervous-system",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/12-1-basic-structure-and-function-of-the-nervous-system/fig-002",
-   "page_key": "12-1-basic-structure-and-function-of-the-nervous-system",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/anatomy-and-physiology/12-1-basic-structure-and-function-of-the-nervous-system/fig-003",
@@ -627,25 +578,11 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/anatomy-and-physiology/16-1-overview-of-the-neurological-exam/fig-001",
-   "page_key": "16-1-overview-of-the-neurological-exam",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/anatomy-and-physiology/16-3-the-cranial-nerve-exam/fig-002",
    "page_key": "16-3-the-cranial-nerve-exam",
    "source": "openstax",
    "source_key": "anatomy-and-physiology",
    "stratum": "photo"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/16-4-the-sensory-and-motor-exams/fig-001",
-   "page_key": "16-4-the-sensory-and-motor-exams",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "diagram"
   },
   {
    "id": "openstax/anatomy-and-physiology/16-5-the-coordination-and-gait-exams/fig-001",
@@ -790,20 +727,6 @@
   {
    "id": "openstax/anatomy-and-physiology/18-3-erythrocytes/fig-003",
    "page_key": "18-3-erythrocytes",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/18-3-erythrocytes/fig-004",
-   "page_key": "18-3-erythrocytes",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/18-5-hemostasis/fig-000",
-   "page_key": "18-5-hemostasis",
    "source": "openstax",
    "source_key": "anatomy-and-physiology",
    "stratum": "diagram"
@@ -1103,13 +1026,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/anatomy-and-physiology/23-5-the-small-and-large-intestines/fig-001",
-   "page_key": "23-5-the-small-and-large-intestines",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/anatomy-and-physiology/23-5-the-small-and-large-intestines/fig-002",
    "page_key": "23-5-the-small-and-large-intestines",
    "source": "openstax",
@@ -1248,27 +1164,6 @@
    "source": "openstax",
    "source_key": "anatomy-and-physiology",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/26-1-body-fluids-and-fluid-compartments/fig-004",
-   "page_key": "26-1-body-fluids-and-fluid-compartments",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/26-1-body-fluids-and-fluid-compartments/fig-006",
-   "page_key": "26-1-body-fluids-and-fluid-compartments",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/26-1-body-fluids-and-fluid-compartments/fig-007",
-   "page_key": "26-1-body-fluids-and-fluid-compartments",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/anatomy-and-physiology/26-2-water-balance/fig-000",
@@ -1712,25 +1607,11 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/anatomy-and-physiology/5-1-layers-of-the-skin/fig-005",
-   "page_key": "5-1-layers-of-the-skin",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/anatomy-and-physiology/5-1-layers-of-the-skin/fig-006",
    "page_key": "5-1-layers-of-the-skin",
    "source": "openstax",
    "source_key": "anatomy-and-physiology",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/5-1-layers-of-the-skin/fig-008",
-   "page_key": "5-1-layers-of-the-skin",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/anatomy-and-physiology/5-2-accessory-structures-of-the-skin/fig-000",
@@ -1740,60 +1621,11 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/anatomy-and-physiology/5-2-accessory-structures-of-the-skin/fig-001",
-   "page_key": "5-2-accessory-structures-of-the-skin",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/anatomy-and-physiology/5-2-accessory-structures-of-the-skin/fig-003",
    "page_key": "5-2-accessory-structures-of-the-skin",
    "source": "openstax",
    "source_key": "anatomy-and-physiology",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/5-3-functions-of-the-integumentary-system/fig-000",
-   "page_key": "5-3-functions-of-the-integumentary-system",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/5-3-functions-of-the-integumentary-system/fig-001",
-   "page_key": "5-3-functions-of-the-integumentary-system",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/5-3-functions-of-the-integumentary-system/fig-002",
-   "page_key": "5-3-functions-of-the-integumentary-system",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/5-4-diseases-disorders-and-injuries-of-the-integumentary-system/fig-000",
-   "page_key": "5-4-diseases-disorders-and-injuries-of-the-integumentary-system",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/5-4-diseases-disorders-and-injuries-of-the-integumentary-system/fig-001",
-   "page_key": "5-4-diseases-disorders-and-injuries-of-the-integumentary-system",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/5-4-diseases-disorders-and-injuries-of-the-integumentary-system/fig-003",
-   "page_key": "5-4-diseases-disorders-and-injuries-of-the-integumentary-system",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/anatomy-and-physiology/5-4-diseases-disorders-and-injuries-of-the-integumentary-system/fig-004",
@@ -1811,13 +1643,6 @@
   },
   {
    "id": "openstax/anatomy-and-physiology/6-1-the-functions-of-the-skeletal-system/fig-001",
-   "page_key": "6-1-the-functions-of-the-skeletal-system",
-   "source": "openstax",
-   "source_key": "anatomy-and-physiology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/anatomy-and-physiology/6-1-the-functions-of-the-skeletal-system/fig-003",
    "page_key": "6-1-the-functions-of-the-skeletal-system",
    "source": "openstax",
    "source_key": "anatomy-and-physiology",
@@ -2174,13 +1999,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/1-6-a-tour-of-the-universe/fig-004",
-   "page_key": "1-6-a-tour-of-the-universe",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/1-6-a-tour-of-the-universe/fig-005",
    "page_key": "1-6-a-tour-of-the-universe",
    "source": "openstax",
@@ -2189,13 +2007,6 @@
   },
   {
    "id": "openstax/astronomy/1-7-the-universe-on-the-large-scale/fig-000",
-   "page_key": "1-7-the-universe-on-the-large-scale",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/1-7-the-universe-on-the-large-scale/fig-001",
    "page_key": "1-7-the-universe-on-the-large-scale",
    "source": "openstax",
    "source_key": "astronomy",
@@ -2274,13 +2085,6 @@
   {
    "id": "openstax/astronomy/10-5-water-and-life-on-mars/fig-006",
    "page_key": "10-5-water-and-life-on-mars",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/10-6-divergent-planetary-evolution/fig-000",
-   "page_key": "10-6-divergent-planetary-evolution",
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "photo"
@@ -2384,22 +2188,8 @@
    "stratum": "chart"
   },
   {
-   "id": "openstax/astronomy/13-1-asteroids/fig-002",
-   "page_key": "13-1-asteroids",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/13-1-asteroids/fig-009",
    "page_key": "13-1-asteroids",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/13-2-asteroids-and-planetary-defense/fig-000",
-   "page_key": "13-2-asteroids-and-planetary-defense",
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "photo"
@@ -2426,29 +2216,8 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/13-3-the-long-haired-comets/fig-007",
-   "page_key": "13-3-the-long-haired-comets",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/13-3-the-long-haired-comets/fig-008",
-   "page_key": "13-3-the-long-haired-comets",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/13-4-the-origin-and-fate-of-comets-and-related-objects/fig-000",
    "page_key": "13-4-the-origin-and-fate-of-comets-and-related-objects",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/astronomy/14-1-meteors/fig-001",
-   "page_key": "14-1-meteors",
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "diagram"
@@ -2462,13 +2231,6 @@
   },
   {
    "id": "openstax/astronomy/14-2-meteorites-stones-from-heaven/fig-001",
-   "page_key": "14-2-meteorites-stones-from-heaven",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/14-2-meteorites-stones-from-heaven/fig-002",
    "page_key": "14-2-meteorites-stones-from-heaven",
    "source": "openstax",
    "source_key": "astronomy",
@@ -2510,13 +2272,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/astronomy/15-1-the-structure-and-composition-of-the-sun/fig-000",
-   "page_key": "15-1-the-structure-and-composition-of-the-sun",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/astronomy/15-1-the-structure-and-composition-of-the-sun/fig-002",
    "page_key": "15-1-the-structure-and-composition-of-the-sun",
    "source": "openstax",
@@ -2547,13 +2302,6 @@
   {
    "id": "openstax/astronomy/15-1-the-structure-and-composition-of-the-sun/fig-007",
    "page_key": "15-1-the-structure-and-composition-of-the-sun",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/15-2-the-solar-cycle/fig-000",
-   "page_key": "15-2-the-solar-cycle",
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "photo"
@@ -2650,28 +2398,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/16-4-the-solar-interior-observations/fig-000",
-   "page_key": "16-4-the-solar-interior-observations",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/astronomy/16-4-the-solar-interior-observations/fig-001",
-   "page_key": "16-4-the-solar-interior-observations",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/16-4-the-solar-interior-observations/fig-002",
-   "page_key": "16-4-the-solar-interior-observations",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/16-4-the-solar-interior-observations/fig-003",
    "page_key": "16-4-the-solar-interior-observations",
    "source": "openstax",
    "source_key": "astronomy",
@@ -2697,13 +2424,6 @@
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "chart"
-  },
-  {
-   "id": "openstax/astronomy/17-3-the-spectra-of-stars-and-brown-dwarfs/fig-002",
-   "page_key": "17-3-the-spectra-of-stars-and-brown-dwarfs",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
   },
   {
    "id": "openstax/astronomy/17-4-using-spectra-to-measure-stellar-radius-composition-and-motion/fig-000",
@@ -2797,20 +2517,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/19-2-surveying-the-stars/fig-003",
-   "page_key": "19-2-surveying-the-stars",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/19-2-surveying-the-stars/fig-004",
-   "page_key": "19-2-surveying-the-stars",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "chart"
-  },
-  {
    "id": "openstax/astronomy/19-3-variable-stars-one-key-to-cosmic-distances/fig-000",
    "page_key": "19-3-variable-stars-one-key-to-cosmic-distances",
    "source": "openstax",
@@ -2874,20 +2580,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/astronomy/2-1-the-sky-above/fig-006",
-   "page_key": "2-1-the-sky-above",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/2-2-ancient-astronomy/fig-000",
-   "page_key": "2-2-ancient-astronomy",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/2-2-ancient-astronomy/fig-001",
    "page_key": "2-2-ancient-astronomy",
    "source": "openstax",
@@ -2921,13 +2613,6 @@
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/astronomy/2-4-the-birth-of-modern-astronomy/fig-001",
-   "page_key": "2-4-the-birth-of-modern-astronomy",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
   },
   {
    "id": "openstax/astronomy/2-4-the-birth-of-modern-astronomy/fig-002",
@@ -3063,13 +2748,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/21-4-planets-beyond-the-solar-system-search-and-discovery/fig-005",
-   "page_key": "21-4-planets-beyond-the-solar-system-search-and-discovery",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/21-5-exoplanets-everywhere-what-we-are-learning/fig-000",
    "page_key": "21-5-exoplanets-everywhere-what-we-are-learning",
    "source": "openstax",
@@ -3119,13 +2797,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/22-1-evolution-from-the-main-sequence-to-red-giants/fig-002",
-   "page_key": "22-1-evolution-from-the-main-sequence-to-red-giants",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/22-1-evolution-from-the-main-sequence-to-red-giants/fig-003",
    "page_key": "22-1-evolution-from-the-main-sequence-to-red-giants",
    "source": "openstax",
@@ -3161,13 +2832,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/22-3-checking-out-the-theory/fig-004",
-   "page_key": "22-3-checking-out-the-theory",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/astronomy/22-3-checking-out-the-theory/fig-005",
    "page_key": "22-3-checking-out-the-theory",
    "source": "openstax",
@@ -3194,13 +2858,6 @@
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "chart"
-  },
-  {
-   "id": "openstax/astronomy/22-4-further-evolution-of-stars/fig-003",
-   "page_key": "22-4-further-evolution-of-stars",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "diagram"
   },
   {
    "id": "openstax/astronomy/22-5-the-evolution-of-more-massive-stars/fig-001",
@@ -3266,13 +2923,6 @@
    "stratum": "chart"
   },
   {
-   "id": "openstax/astronomy/23-4-pulsars-and-the-discovery-of-neutron-stars/fig-002",
-   "page_key": "23-4-pulsars-and-the-discovery-of-neutron-stars",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/23-4-pulsars-and-the-discovery-of-neutron-stars/fig-003",
    "page_key": "23-4-pulsars-and-the-discovery-of-neutron-stars",
    "source": "openstax",
@@ -3282,13 +2932,6 @@
   {
    "id": "openstax/astronomy/23-5-the-evolution-of-binary-star-systems/fig-000",
    "page_key": "23-5-the-evolution-of-binary-star-systems",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/23-6-the-mystery-of-the-gamma-ray-bursts/fig-001",
-   "page_key": "23-6-the-mystery-of-the-gamma-ray-bursts",
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "photo"
@@ -3364,20 +3007,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/24-7-gravitational-wave-astronomy/fig-000",
-   "page_key": "24-7-gravitational-wave-astronomy",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/24-7-gravitational-wave-astronomy/fig-002",
-   "page_key": "24-7-gravitational-wave-astronomy",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "chart"
-  },
-  {
    "id": "openstax/astronomy/25-1-the-architecture-of-the-galaxy/fig-001",
    "page_key": "25-1-the-architecture-of-the-galaxy",
    "source": "openstax",
@@ -3397,13 +3026,6 @@
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/astronomy/25-1-the-architecture-of-the-galaxy/fig-005",
-   "page_key": "25-1-the-architecture-of-the-galaxy",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
   },
   {
    "id": "openstax/astronomy/25-1-the-architecture-of-the-galaxy/fig-006",
@@ -3441,32 +3063,11 @@
    "stratum": "chart"
   },
   {
-   "id": "openstax/astronomy/25-4-the-center-of-the-galaxy/fig-000",
-   "page_key": "25-4-the-center-of-the-galaxy",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/25-5-stellar-populations-in-the-galaxy/fig-000",
    "page_key": "25-5-stellar-populations-in-the-galaxy",
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/astronomy/25-5-stellar-populations-in-the-galaxy/fig-001",
-   "page_key": "25-5-stellar-populations-in-the-galaxy",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/25-6-the-formation-of-the-galaxy/fig-001",
-   "page_key": "25-6-the-formation-of-the-galaxy",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
   },
   {
    "id": "openstax/astronomy/25-6-the-formation-of-the-galaxy/fig-002",
@@ -3476,25 +3077,11 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/26-2-types-of-galaxies/fig-000",
-   "page_key": "26-2-types-of-galaxies",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/astronomy/26-2-types-of-galaxies/fig-002",
    "page_key": "26-2-types-of-galaxies",
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/astronomy/26-2-types-of-galaxies/fig-005",
-   "page_key": "26-2-types-of-galaxies",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
   },
   {
    "id": "openstax/astronomy/26-5-the-expanding-universe/fig-002",
@@ -3513,27 +3100,6 @@
   {
    "id": "openstax/astronomy/26-5-the-expanding-universe/fig-004",
    "page_key": "26-5-the-expanding-universe",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/27-1-quasars/fig-000",
-   "page_key": "27-1-quasars",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/27-1-quasars/fig-001",
-   "page_key": "27-1-quasars",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/27-1-quasars/fig-002",
-   "page_key": "27-1-quasars",
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "photo"
@@ -3567,25 +3133,11 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/astronomy/27-2-supermassive-black-holes-what-quasars-really-are/fig-005",
-   "page_key": "27-2-supermassive-black-holes-what-quasars-really-are",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/27-3-quasars-as-probes-of-evolution-in-the-universe/fig-000",
    "page_key": "27-3-quasars-as-probes-of-evolution-in-the-universe",
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/astronomy/27-3-quasars-as-probes-of-evolution-in-the-universe/fig-002",
-   "page_key": "27-3-quasars-as-probes-of-evolution-in-the-universe",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "chart"
   },
   {
    "id": "openstax/astronomy/27-3-quasars-as-probes-of-evolution-in-the-universe/fig-003",
@@ -3611,20 +3163,6 @@
   {
    "id": "openstax/astronomy/28-1-observations-of-distant-galaxies/fig-004",
    "page_key": "28-1-observations-of-distant-galaxies",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/28-2-galaxy-mergers-and-active-galactic-nuclei/fig-001",
-   "page_key": "28-2-galaxy-mergers-and-active-galactic-nuclei",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/astronomy/28-2-galaxy-mergers-and-active-galactic-nuclei/fig-004",
-   "page_key": "28-2-galaxy-mergers-and-active-galactic-nuclei",
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "photo"
@@ -3721,13 +3259,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/29-4-the-cosmic-microwave-background/fig-003",
-   "page_key": "29-4-the-cosmic-microwave-background",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/astronomy/29-5-what-is-the-universe-really-made-of/fig-000",
    "page_key": "29-5-what-is-the-universe-really-made-of",
    "source": "openstax",
@@ -3784,13 +3315,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/30-2-astrobiology/fig-000",
-   "page_key": "30-2-astrobiology",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/30-2-astrobiology/fig-002",
    "page_key": "30-2-astrobiology",
    "source": "openstax",
@@ -3813,13 +3337,6 @@
   },
   {
    "id": "openstax/astronomy/4-1-earth-and-sky/fig-000",
-   "page_key": "4-1-earth-and-sky",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/4-1-earth-and-sky/fig-002",
    "page_key": "4-1-earth-and-sky",
    "source": "openstax",
    "source_key": "astronomy",
@@ -3884,13 +3401,6 @@
   {
    "id": "openstax/astronomy/4-6-ocean-tides-and-the-moon/fig-003",
    "page_key": "4-6-ocean-tides-and-the-moon",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/5-1-the-behavior-of-light/fig-001",
-   "page_key": "5-1-the-behavior-of-light",
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "photo"
@@ -3966,13 +3476,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/astronomy/6-1-telescopes/fig-001",
-   "page_key": "6-1-telescopes",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/6-1-telescopes/fig-002",
    "page_key": "6-1-telescopes",
    "source": "openstax",
@@ -4022,13 +3525,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/astronomy/6-4-radio-telescopes/fig-001",
-   "page_key": "6-4-radio-telescopes",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/6-4-radio-telescopes/fig-003",
    "page_key": "6-4-radio-telescopes",
    "source": "openstax",
@@ -4041,13 +3537,6 @@
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/astronomy/6-4-radio-telescopes/fig-005",
-   "page_key": "6-4-radio-telescopes",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
   },
   {
    "id": "openstax/astronomy/6-5-observations-outside-earths-atmosphere/fig-000",
@@ -4114,13 +3603,6 @@
   },
   {
    "id": "openstax/astronomy/7-1-overview-of-our-planetary-system/fig-006",
-   "page_key": "7-1-overview-of-our-planetary-system",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/7-1-overview-of-our-planetary-system/fig-007",
    "page_key": "7-1-overview-of-our-planetary-system",
    "source": "openstax",
    "source_key": "astronomy",
@@ -4204,13 +3686,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/8-2-earths-crust/fig-004",
-   "page_key": "8-2-earths-crust",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/8-3-earths-atmosphere/fig-000",
    "page_key": "8-3-earths-atmosphere",
    "source": "openstax",
@@ -4220,20 +3695,6 @@
   {
    "id": "openstax/astronomy/8-3-earths-atmosphere/fig-001",
    "page_key": "8-3-earths-atmosphere",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/8-3-earths-atmosphere/fig-002",
-   "page_key": "8-3-earths-atmosphere",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/8-4-life-chemical-evolution-and-climate-change/fig-000",
-   "page_key": "8-4-life-chemical-evolution-and-climate-change",
    "source": "openstax",
    "source_key": "astronomy",
    "stratum": "photo"
@@ -4260,21 +3721,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/8-5-cosmic-influences-on-the-evolution-of-earth/fig-001",
-   "page_key": "8-5-cosmic-influences-on-the-evolution-of-earth",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/8-5-cosmic-influences-on-the-evolution-of-earth/fig-002",
-   "page_key": "8-5-cosmic-influences-on-the-evolution-of-earth",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/astronomy/8-5-cosmic-influences-on-the-evolution-of-earth/fig-003",
    "page_key": "8-5-cosmic-influences-on-the-evolution-of-earth",
    "source": "openstax",
    "source_key": "astronomy",
@@ -4344,13 +3791,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/astronomy/9-3-impact-craters/fig-005",
-   "page_key": "9-3-impact-craters",
-   "source": "openstax",
-   "source_key": "astronomy",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/astronomy/9-3-impact-craters/fig-006",
    "page_key": "9-3-impact-craters",
    "source": "openstax",
@@ -4386,13 +3826,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/1-1-the-science-of-biology/fig-004",
-   "page_key": "1-1-the-science-of-biology",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/1-1-the-science-of-biology/fig-006",
    "page_key": "1-1-the-science-of-biology",
    "source": "openstax",
@@ -4407,34 +3840,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/biology/1-2-themes-and-concepts-of-biology/fig-001",
-   "page_key": "1-2-themes-and-concepts-of-biology",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/1-2-themes-and-concepts-of-biology/fig-002",
-   "page_key": "1-2-themes-and-concepts-of-biology",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/1-2-themes-and-concepts-of-biology/fig-006",
-   "page_key": "1-2-themes-and-concepts-of-biology",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/1-2-themes-and-concepts-of-biology/fig-008",
-   "page_key": "1-2-themes-and-concepts-of-biology",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/10-1-cell-division/fig-001",
    "page_key": "10-1-cell-division",
    "source": "openstax",
@@ -4443,13 +3848,6 @@
   },
   {
    "id": "openstax/biology/10-2-the-cell-cycle/fig-000",
-   "page_key": "10-2-the-cell-cycle",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/10-2-the-cell-cycle/fig-001",
    "page_key": "10-2-the-cell-cycle",
    "source": "openstax",
    "source_key": "biology",
@@ -4486,20 +3884,6 @@
   {
    "id": "openstax/biology/10-3-control-of-the-cell-cycle/fig-003",
    "page_key": "10-3-control-of-the-cell-cycle",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/10-4-cancer-and-the-cell-cycle/fig-000",
-   "page_key": "10-4-cancer-and-the-cell-cycle",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/10-5-prokaryotic-cell-division/fig-000",
-   "page_key": "10-5-prokaryotic-cell-division",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -4548,20 +3932,6 @@
   },
   {
    "id": "openstax/biology/11-2-sexual-reproduction/fig-000",
-   "page_key": "11-2-sexual-reproduction",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/11-2-sexual-reproduction/fig-001",
-   "page_key": "11-2-sexual-reproduction",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/11-2-sexual-reproduction/fig-002",
    "page_key": "11-2-sexual-reproduction",
    "source": "openstax",
    "source_key": "biology",
@@ -4666,20 +4036,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/13-2-chromosomal-basis-of-inherited-disorders/fig-008",
-   "page_key": "13-2-chromosomal-basis-of-inherited-disorders",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/14-1-historical-basis-of-modern-understanding/fig-001",
-   "page_key": "14-1-historical-basis-of-modern-understanding",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/14-1-historical-basis-of-modern-understanding/fig-002",
    "page_key": "14-1-historical-basis-of-modern-understanding",
    "source": "openstax",
@@ -4694,21 +4050,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/14-2-dna-structure-and-sequencing/fig-001",
-   "page_key": "14-2-dna-structure-and-sequencing",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/14-2-dna-structure-and-sequencing/fig-002",
-   "page_key": "14-2-dna-structure-and-sequencing",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/14-2-dna-structure-and-sequencing/fig-004",
    "page_key": "14-2-dna-structure-and-sequencing",
    "source": "openstax",
    "source_key": "biology",
@@ -4731,20 +4073,6 @@
   {
    "id": "openstax/biology/14-3-basics-of-dna-replication/fig-000",
    "page_key": "14-3-basics-of-dna-replication",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/14-3-basics-of-dna-replication/fig-001",
-   "page_key": "14-3-basics-of-dna-replication",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/14-4-dna-replication-in-prokaryotes/fig-000",
-   "page_key": "14-4-dna-replication-in-prokaryotes",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -4848,21 +4176,7 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/biology/17-1-biotechnology/fig-000",
-   "page_key": "17-1-biotechnology",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/17-1-biotechnology/fig-001",
-   "page_key": "17-1-biotechnology",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/17-1-biotechnology/fig-002",
    "page_key": "17-1-biotechnology",
    "source": "openstax",
    "source_key": "biology",
@@ -4871,13 +4185,6 @@
   {
    "id": "openstax/biology/17-1-biotechnology/fig-003",
    "page_key": "17-1-biotechnology",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/17-2-mapping-genomes/fig-001",
-   "page_key": "17-2-mapping-genomes",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -4911,20 +4218,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/18-1-understanding-evolution/fig-006",
-   "page_key": "18-1-understanding-evolution",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/18-2-formation-of-new-species/fig-000",
-   "page_key": "18-2-formation-of-new-species",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/18-2-formation-of-new-species/fig-002",
    "page_key": "18-2-formation-of-new-species",
    "source": "openstax",
@@ -4953,13 +4246,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/19-2-population-genetics/fig-000",
-   "page_key": "19-2-population-genetics",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/19-2-population-genetics/fig-002",
    "page_key": "19-2-population-genetics",
    "source": "openstax",
@@ -4969,13 +4255,6 @@
   {
    "id": "openstax/biology/19-2-population-genetics/fig-003",
    "page_key": "19-2-population-genetics",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/19-3-adaptive-evolution/fig-002",
-   "page_key": "19-3-adaptive-evolution",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -5016,34 +4295,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/20-1-organizing-life-on-earth/fig-003",
-   "page_key": "20-1-organizing-life-on-earth",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/20-1-organizing-life-on-earth/fig-004",
-   "page_key": "20-1-organizing-life-on-earth",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/20-2-determining-evolutionary-relationships/fig-000",
-   "page_key": "20-2-determining-evolutionary-relationships",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/20-2-determining-evolutionary-relationships/fig-001",
-   "page_key": "20-2-determining-evolutionary-relationships",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/20-2-determining-evolutionary-relationships/fig-003",
    "page_key": "20-2-determining-evolutionary-relationships",
    "source": "openstax",
@@ -5051,21 +4302,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/20-3-perspectives-on-the-phylogenetic-tree/fig-000",
-   "page_key": "20-3-perspectives-on-the-phylogenetic-tree",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/20-3-perspectives-on-the-phylogenetic-tree/fig-002",
-   "page_key": "20-3-perspectives-on-the-phylogenetic-tree",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/20-3-perspectives-on-the-phylogenetic-tree/fig-004",
    "page_key": "20-3-perspectives-on-the-phylogenetic-tree",
    "source": "openstax",
    "source_key": "biology",
@@ -5079,13 +4316,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/21-1-viral-evolution-morphology-and-classification/fig-000",
-   "page_key": "21-1-viral-evolution-morphology-and-classification",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/21-1-viral-evolution-morphology-and-classification/fig-001",
    "page_key": "21-1-viral-evolution-morphology-and-classification",
    "source": "openstax",
@@ -5094,27 +4324,6 @@
   },
   {
    "id": "openstax/biology/21-1-viral-evolution-morphology-and-classification/fig-002",
-   "page_key": "21-1-viral-evolution-morphology-and-classification",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/21-1-viral-evolution-morphology-and-classification/fig-003",
-   "page_key": "21-1-viral-evolution-morphology-and-classification",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/21-1-viral-evolution-morphology-and-classification/fig-004",
-   "page_key": "21-1-viral-evolution-morphology-and-classification",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/21-1-viral-evolution-morphology-and-classification/fig-005",
    "page_key": "21-1-viral-evolution-morphology-and-classification",
    "source": "openstax",
    "source_key": "biology",
@@ -5135,43 +4344,8 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/biology/21-2-virus-infections-and-hosts/fig-003",
-   "page_key": "21-2-virus-infections-and-hosts",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/21-3-prevention-and-treatment-of-viral-infections/fig-000",
-   "page_key": "21-3-prevention-and-treatment-of-viral-infections",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/21-3-prevention-and-treatment-of-viral-infections/fig-002",
-   "page_key": "21-3-prevention-and-treatment-of-viral-infections",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/biology/21-3-prevention-and-treatment-of-viral-infections/fig-003",
    "page_key": "21-3-prevention-and-treatment-of-viral-infections",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/22-1-prokaryotic-diversity/fig-000",
-   "page_key": "22-1-prokaryotic-diversity",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/22-2-structure-of-prokaryotes/fig-000",
-   "page_key": "22-2-structure-of-prokaryotes",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -5185,13 +4359,6 @@
   },
   {
    "id": "openstax/biology/22-2-structure-of-prokaryotes/fig-006",
-   "page_key": "22-2-structure-of-prokaryotes",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/22-2-structure-of-prokaryotes/fig-007",
    "page_key": "22-2-structure-of-prokaryotes",
    "source": "openstax",
    "source_key": "biology",
@@ -5212,20 +4379,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/22-3-prokaryotic-metabolism/fig-001",
-   "page_key": "22-3-prokaryotic-metabolism",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/22-4-bacterial-diseases-in-humans/fig-001",
-   "page_key": "22-4-bacterial-diseases-in-humans",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/22-4-bacterial-diseases-in-humans/fig-002",
    "page_key": "22-4-bacterial-diseases-in-humans",
    "source": "openstax",
@@ -5233,36 +4386,8 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/22-4-bacterial-diseases-in-humans/fig-003",
-   "page_key": "22-4-bacterial-diseases-in-humans",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/biology/22-4-bacterial-diseases-in-humans/fig-005",
    "page_key": "22-4-bacterial-diseases-in-humans",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/22-5-beneficial-prokaryotes/fig-002",
-   "page_key": "22-5-beneficial-prokaryotes",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/23-1-eukaryotic-origins/fig-000",
-   "page_key": "23-1-eukaryotic-origins",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/23-1-eukaryotic-origins/fig-001",
-   "page_key": "23-1-eukaryotic-origins",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -5277,13 +4402,6 @@
   {
    "id": "openstax/biology/23-2-characteristics-of-protists/fig-000",
    "page_key": "23-2-characteristics-of-protists",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/23-3-groups-of-protists/fig-001",
-   "page_key": "23-3-groups-of-protists",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -5304,20 +4422,6 @@
   },
   {
    "id": "openstax/biology/23-3-groups-of-protists/fig-005",
-   "page_key": "23-3-groups-of-protists",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/23-3-groups-of-protists/fig-006",
-   "page_key": "23-3-groups-of-protists",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/23-3-groups-of-protists/fig-007",
    "page_key": "23-3-groups-of-protists",
    "source": "openstax",
    "source_key": "biology",
@@ -5345,50 +4449,8 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/biology/23-3-groups-of-protists/fig-014",
-   "page_key": "23-3-groups-of-protists",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/23-3-groups-of-protists/fig-015",
-   "page_key": "23-3-groups-of-protists",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/23-3-groups-of-protists/fig-018",
-   "page_key": "23-3-groups-of-protists",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/23-3-groups-of-protists/fig-019",
-   "page_key": "23-3-groups-of-protists",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/23-4-ecology-of-protists/fig-003",
-   "page_key": "23-4-ecology-of-protists",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/23-4-ecology-of-protists/fig-004",
    "page_key": "23-4-ecology-of-protists",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/24-1-characteristics-of-fungi/fig-000",
-   "page_key": "24-1-characteristics-of-fungi",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -5401,39 +4463,11 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/24-1-characteristics-of-fungi/fig-003",
-   "page_key": "24-1-characteristics-of-fungi",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/24-1-characteristics-of-fungi/fig-004",
-   "page_key": "24-1-characteristics-of-fungi",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/24-1-characteristics-of-fungi/fig-005",
-   "page_key": "24-1-characteristics-of-fungi",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/24-1-characteristics-of-fungi/fig-006",
    "page_key": "24-1-characteristics-of-fungi",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/24-1-characteristics-of-fungi/fig-007",
-   "page_key": "24-1-characteristics-of-fungi",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/biology/24-2-classifications-of-fungi/fig-000",
@@ -5457,71 +4491,8 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/biology/24-2-classifications-of-fungi/fig-004",
-   "page_key": "24-2-classifications-of-fungi",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/24-2-classifications-of-fungi/fig-006",
    "page_key": "24-2-classifications-of-fungi",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/24-2-classifications-of-fungi/fig-007",
-   "page_key": "24-2-classifications-of-fungi",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/24-3-ecology-of-fungi/fig-003",
-   "page_key": "24-3-ecology-of-fungi",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/24-4-fungal-parasites-and-pathogens/fig-001",
-   "page_key": "24-4-fungal-parasites-and-pathogens",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/25-1-early-plant-life/fig-000",
-   "page_key": "25-1-early-plant-life",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/25-1-early-plant-life/fig-003",
-   "page_key": "25-1-early-plant-life",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/25-2-green-algae-precursors-of-land-plants/fig-000",
-   "page_key": "25-2-green-algae-precursors-of-land-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/25-4-seedless-vascular-plants/fig-002",
-   "page_key": "25-4-seedless-vascular-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/25-4-seedless-vascular-plants/fig-008",
-   "page_key": "25-4-seedless-vascular-plants",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "diagram"
@@ -5534,74 +4505,11 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/26-1-evolution-of-seed-plants/fig-003",
-   "page_key": "26-1-evolution-of-seed-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/26-2-gymnosperms/fig-000",
    "page_key": "26-2-gymnosperms",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/26-2-gymnosperms/fig-001",
-   "page_key": "26-2-gymnosperms",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/26-2-gymnosperms/fig-002",
-   "page_key": "26-2-gymnosperms",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/26-2-gymnosperms/fig-004",
-   "page_key": "26-2-gymnosperms",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/26-3-angiosperms/fig-001",
-   "page_key": "26-3-angiosperms",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/26-3-angiosperms/fig-003",
-   "page_key": "26-3-angiosperms",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/26-3-angiosperms/fig-004",
-   "page_key": "26-3-angiosperms",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/26-4-the-role-of-seed-plants/fig-000",
-   "page_key": "26-4-the-role-of-seed-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/26-4-the-role-of-seed-plants/fig-002",
-   "page_key": "26-4-the-role-of-seed-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/biology/27-1-features-of-the-animal-kingdom/fig-001",
@@ -5667,13 +4575,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/biology/28-1-phylum-porifera/fig-002",
-   "page_key": "28-1-phylum-porifera",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/28-2-phylum-cnidaria/fig-000",
    "page_key": "28-2-phylum-cnidaria",
    "source": "openstax",
@@ -5688,49 +4589,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/28-2-phylum-cnidaria/fig-003",
-   "page_key": "28-2-phylum-cnidaria",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/28-2-phylum-cnidaria/fig-004",
-   "page_key": "28-2-phylum-cnidaria",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/28-2-phylum-cnidaria/fig-005",
-   "page_key": "28-2-phylum-cnidaria",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/28-2-phylum-cnidaria/fig-006",
-   "page_key": "28-2-phylum-cnidaria",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/28-2-phylum-cnidaria/fig-007",
-   "page_key": "28-2-phylum-cnidaria",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/28-3-superphylum-lophotrochozoa/fig-000",
-   "page_key": "28-3-superphylum-lophotrochozoa",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/28-3-superphylum-lophotrochozoa/fig-001",
    "page_key": "28-3-superphylum-lophotrochozoa",
    "source": "openstax",
    "source_key": "biology",
@@ -5742,13 +4601,6 @@
    "source": "openstax",
    "source_key": "biology",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/28-3-superphylum-lophotrochozoa/fig-003",
-   "page_key": "28-3-superphylum-lophotrochozoa",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/biology/28-3-superphylum-lophotrochozoa/fig-004",
@@ -5766,13 +4618,6 @@
   },
   {
    "id": "openstax/biology/28-3-superphylum-lophotrochozoa/fig-007",
-   "page_key": "28-3-superphylum-lophotrochozoa",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/28-3-superphylum-lophotrochozoa/fig-010",
    "page_key": "28-3-superphylum-lophotrochozoa",
    "source": "openstax",
    "source_key": "biology",
@@ -5800,28 +4645,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/28-4-superphylum-ecdysozoa/fig-000",
-   "page_key": "28-4-superphylum-ecdysozoa",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/28-4-superphylum-ecdysozoa/fig-001",
-   "page_key": "28-4-superphylum-ecdysozoa",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/28-4-superphylum-ecdysozoa/fig-002",
-   "page_key": "28-4-superphylum-ecdysozoa",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/28-4-superphylum-ecdysozoa/fig-004",
    "page_key": "28-4-superphylum-ecdysozoa",
    "source": "openstax",
    "source_key": "biology",
@@ -5835,35 +4659,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/28-4-superphylum-ecdysozoa/fig-010",
-   "page_key": "28-4-superphylum-ecdysozoa",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/28-4-superphylum-ecdysozoa/fig-011",
-   "page_key": "28-4-superphylum-ecdysozoa",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/28-4-superphylum-ecdysozoa/fig-012",
-   "page_key": "28-4-superphylum-ecdysozoa",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/28-5-superphylum-deuterostomia/fig-000",
-   "page_key": "28-5-superphylum-deuterostomia",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/28-5-superphylum-deuterostomia/fig-001",
    "page_key": "28-5-superphylum-deuterostomia",
    "source": "openstax",
    "source_key": "biology",
@@ -5886,13 +4682,6 @@
   {
    "id": "openstax/biology/29-1-chordates/fig-003",
    "page_key": "29-1-chordates",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/29-2-fishes/fig-006",
-   "page_key": "29-2-fishes",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -5921,20 +4710,6 @@
   {
    "id": "openstax/biology/29-5-birds/fig-000",
    "page_key": "29-5-birds",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/29-5-birds/fig-002",
-   "page_key": "29-5-birds",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/29-6-mammals/fig-000",
-   "page_key": "29-6-mammals",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -6024,13 +4799,6 @@
    "stratum": "chemistry"
   },
   {
-   "id": "openstax/biology/3-4-proteins/fig-005",
-   "page_key": "3-4-proteins",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/3-4-proteins/fig-006",
    "page_key": "3-4-proteins",
    "source": "openstax",
@@ -6052,13 +4820,6 @@
    "stratum": "chemistry"
   },
   {
-   "id": "openstax/biology/3-5-nucleic-acids/fig-001",
-   "page_key": "3-5-nucleic-acids",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "chemistry"
-  },
-  {
    "id": "openstax/biology/3-5-nucleic-acids/fig-003",
    "page_key": "3-5-nucleic-acids",
    "source": "openstax",
@@ -6073,35 +4834,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/30-1-the-plant-body/fig-001",
-   "page_key": "30-1-the-plant-body",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/30-2-stems/fig-000",
-   "page_key": "30-2-stems",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-2-stems/fig-001",
-   "page_key": "30-2-stems",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-2-stems/fig-002",
-   "page_key": "30-2-stems",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-2-stems/fig-004",
    "page_key": "30-2-stems",
    "source": "openstax",
    "source_key": "biology",
@@ -6115,99 +4848,8 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/30-2-stems/fig-007",
-   "page_key": "30-2-stems",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-3-roots/fig-000",
-   "page_key": "30-3-roots",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-3-roots/fig-002",
-   "page_key": "30-3-roots",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-3-roots/fig-005",
-   "page_key": "30-3-roots",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/30-4-leaves/fig-000",
    "page_key": "30-4-leaves",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-4-leaves/fig-001",
-   "page_key": "30-4-leaves",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-4-leaves/fig-002",
-   "page_key": "30-4-leaves",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-4-leaves/fig-003",
-   "page_key": "30-4-leaves",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-4-leaves/fig-004",
-   "page_key": "30-4-leaves",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-4-leaves/fig-005",
-   "page_key": "30-4-leaves",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-4-leaves/fig-006",
-   "page_key": "30-4-leaves",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-4-leaves/fig-008",
-   "page_key": "30-4-leaves",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-4-leaves/fig-009",
-   "page_key": "30-4-leaves",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-5-transport-of-water-and-solutes-in-plants/fig-000",
-   "page_key": "30-5-transport-of-water-and-solutes-in-plants",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -6221,13 +4863,6 @@
   },
   {
    "id": "openstax/biology/30-5-transport-of-water-and-solutes-in-plants/fig-003",
-   "page_key": "30-5-transport-of-water-and-solutes-in-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/30-5-transport-of-water-and-solutes-in-plants/fig-004",
    "page_key": "30-5-transport-of-water-and-solutes-in-plants",
    "source": "openstax",
    "source_key": "biology",
@@ -6255,13 +4890,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/biology/30-6-plant-sensory-systems-and-responses/fig-001",
-   "page_key": "30-6-plant-sensory-systems-and-responses",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/31-1-nutritional-requirements-of-plants/fig-000",
    "page_key": "31-1-nutritional-requirements-of-plants",
    "source": "openstax",
@@ -6274,13 +4902,6 @@
    "source": "openstax",
    "source_key": "biology",
    "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/biology/31-1-nutritional-requirements-of-plants/fig-002",
-   "page_key": "31-1-nutritional-requirements-of-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/biology/31-2-the-soil/fig-000",
@@ -6304,57 +4925,8 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/31-3-nutritional-adaptations-of-plants/fig-000",
-   "page_key": "31-3-nutritional-adaptations-of-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/31-3-nutritional-adaptations-of-plants/fig-001",
-   "page_key": "31-3-nutritional-adaptations-of-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/31-3-nutritional-adaptations-of-plants/fig-003",
-   "page_key": "31-3-nutritional-adaptations-of-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/31-3-nutritional-adaptations-of-plants/fig-004",
-   "page_key": "31-3-nutritional-adaptations-of-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/31-3-nutritional-adaptations-of-plants/fig-006",
    "page_key": "31-3-nutritional-adaptations-of-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/31-3-nutritional-adaptations-of-plants/fig-007",
-   "page_key": "31-3-nutritional-adaptations-of-plants",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/32-1-reproductive-development-and-structure/fig-000",
-   "page_key": "32-1-reproductive-development-and-structure",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/32-1-reproductive-development-and-structure/fig-001",
-   "page_key": "32-1-reproductive-development-and-structure",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -6367,35 +4939,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/32-1-reproductive-development-and-structure/fig-004",
-   "page_key": "32-1-reproductive-development-and-structure",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/32-1-reproductive-development-and-structure/fig-005",
-   "page_key": "32-1-reproductive-development-and-structure",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/32-1-reproductive-development-and-structure/fig-006",
-   "page_key": "32-1-reproductive-development-and-structure",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/32-1-reproductive-development-and-structure/fig-007",
-   "page_key": "32-1-reproductive-development-and-structure",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/32-1-reproductive-development-and-structure/fig-009",
    "page_key": "32-1-reproductive-development-and-structure",
    "source": "openstax",
    "source_key": "biology",
@@ -6410,13 +4954,6 @@
   },
   {
    "id": "openstax/biology/32-2-pollination-and-fertilization/fig-006",
-   "page_key": "32-2-pollination-and-fertilization",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/32-2-pollination-and-fertilization/fig-007",
    "page_key": "32-2-pollination-and-fertilization",
    "source": "openstax",
    "source_key": "biology",
@@ -6451,13 +4988,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/32-3-asexual-reproduction/fig-003",
-   "page_key": "32-3-asexual-reproduction",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/33-1-animal-form-and-function/fig-000",
    "page_key": "33-1-animal-form-and-function",
    "source": "openstax",
@@ -6474,20 +5004,6 @@
   {
    "id": "openstax/biology/33-1-animal-form-and-function/fig-003",
    "page_key": "33-1-animal-form-and-function",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/33-1-animal-form-and-function/fig-004",
-   "page_key": "33-1-animal-form-and-function",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/33-2-animal-primary-tissues/fig-000",
-   "page_key": "33-2-animal-primary-tissues",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -6549,20 +5065,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/33-3-homeostasis/fig-000",
-   "page_key": "33-3-homeostasis",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/33-3-homeostasis/fig-002",
-   "page_key": "33-3-homeostasis",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/33-3-homeostasis/fig-003",
    "page_key": "33-3-homeostasis",
    "source": "openstax",
@@ -6584,21 +5086,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/34-1-digestive-systems/fig-007",
-   "page_key": "34-1-digestive-systems",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/34-1-digestive-systems/fig-008",
-   "page_key": "34-1-digestive-systems",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/34-1-digestive-systems/fig-009",
    "page_key": "34-1-digestive-systems",
    "source": "openstax",
    "source_key": "biology",
@@ -6647,25 +5135,11 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/35-1-neurons-and-glial-cells/fig-004",
-   "page_key": "35-1-neurons-and-glial-cells",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/35-1-neurons-and-glial-cells/fig-005",
    "page_key": "35-1-neurons-and-glial-cells",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/35-1-neurons-and-glial-cells/fig-006",
-   "page_key": "35-1-neurons-and-glial-cells",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
   },
   {
    "id": "openstax/biology/35-2-how-neurons-communicate/fig-004",
@@ -6698,13 +5172,6 @@
   {
    "id": "openstax/biology/35-2-how-neurons-communicate/fig-009",
    "page_key": "35-2-how-neurons-communicate",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/35-3-the-central-nervous-system/fig-000",
-   "page_key": "35-3-the-central-nervous-system",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -6759,57 +5226,8 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/36-1-sensory-processes/fig-001",
-   "page_key": "36-1-sensory-processes",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/36-2-somatosensation/fig-000",
-   "page_key": "36-2-somatosensation",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/36-2-somatosensation/fig-001",
    "page_key": "36-2-somatosensation",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/36-2-somatosensation/fig-002",
-   "page_key": "36-2-somatosensation",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/36-2-somatosensation/fig-003",
-   "page_key": "36-2-somatosensation",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/36-3-taste-and-smell/fig-000",
-   "page_key": "36-3-taste-and-smell",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/36-3-taste-and-smell/fig-002",
-   "page_key": "36-3-taste-and-smell",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/36-4-hearing-and-vestibular-sensation/fig-001",
-   "page_key": "36-4-hearing-and-vestibular-sensation",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -6837,13 +5255,6 @@
   },
   {
    "id": "openstax/biology/36-5-vision/fig-001",
-   "page_key": "36-5-vision",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/36-5-vision/fig-002",
    "page_key": "36-5-vision",
    "source": "openstax",
    "source_key": "biology",
@@ -6892,21 +5303,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/37-3-regulation-of-body-processes/fig-000",
-   "page_key": "37-3-regulation-of-body-processes",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/biology/38-1-types-of-skeletal-systems/fig-005",
-   "page_key": "38-1-types-of-skeletal-systems",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/38-1-types-of-skeletal-systems/fig-006",
    "page_key": "38-1-types-of-skeletal-systems",
    "source": "openstax",
    "source_key": "biology",
@@ -6997,27 +5394,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/38-3-joints-and-skeletal-movement/fig-004",
-   "page_key": "38-3-joints-and-skeletal-movement",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/38-3-joints-and-skeletal-movement/fig-005",
-   "page_key": "38-3-joints-and-skeletal-movement",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/38-3-joints-and-skeletal-movement/fig-008",
-   "page_key": "38-3-joints-and-skeletal-movement",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/38-4-muscle-contraction-and-locomotion/fig-001",
    "page_key": "38-4-muscle-contraction-and-locomotion",
    "source": "openstax",
@@ -7060,28 +5436,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/39-1-systems-of-gas-exchange/fig-005",
-   "page_key": "39-1-systems-of-gas-exchange",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/39-1-systems-of-gas-exchange/fig-006",
-   "page_key": "39-1-systems-of-gas-exchange",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/39-1-systems-of-gas-exchange/fig-007",
-   "page_key": "39-1-systems-of-gas-exchange",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/39-1-systems-of-gas-exchange/fig-008",
    "page_key": "39-1-systems-of-gas-exchange",
    "source": "openstax",
    "source_key": "biology",
@@ -7090,27 +5445,6 @@
   {
    "id": "openstax/biology/39-2-gas-exchange-across-respiratory-surfaces/fig-001",
    "page_key": "39-2-gas-exchange-across-respiratory-surfaces",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/39-3-breathing/fig-000",
-   "page_key": "39-3-breathing",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/39-3-breathing/fig-003",
-   "page_key": "39-3-breathing",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/39-4-transport-of-gases-in-human-bodily-fluids/fig-002",
-   "page_key": "39-4-transport-of-gases-in-human-bodily-fluids",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -7137,21 +5471,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/4-3-eukaryotic-cells/fig-004",
-   "page_key": "4-3-eukaryotic-cells",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/4-3-eukaryotic-cells/fig-007",
-   "page_key": "4-3-eukaryotic-cells",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/4-3-eukaryotic-cells/fig-010",
    "page_key": "4-3-eukaryotic-cells",
    "source": "openstax",
    "source_key": "biology",
@@ -7172,20 +5492,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/4-4-the-endomembrane-system-and-proteins/fig-001",
-   "page_key": "4-4-the-endomembrane-system-and-proteins",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/4-4-the-endomembrane-system-and-proteins/fig-002",
-   "page_key": "4-4-the-endomembrane-system-and-proteins",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/4-4-the-endomembrane-system-and-proteins/fig-003",
    "page_key": "4-4-the-endomembrane-system-and-proteins",
    "source": "openstax",
@@ -7200,13 +5506,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/4-5-the-cytoskeleton/fig-004",
-   "page_key": "4-5-the-cytoskeleton",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/4-6-connections-between-cells-and-cellular-activities/fig-000",
    "page_key": "4-6-connections-between-cells-and-cellular-activities",
    "source": "openstax",
@@ -7215,20 +5514,6 @@
   },
   {
    "id": "openstax/biology/4-6-connections-between-cells-and-cellular-activities/fig-001",
-   "page_key": "4-6-connections-between-cells-and-cellular-activities",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/4-6-connections-between-cells-and-cellular-activities/fig-003",
-   "page_key": "4-6-connections-between-cells-and-cellular-activities",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/4-6-connections-between-cells-and-cellular-activities/fig-004",
    "page_key": "4-6-connections-between-cells-and-cellular-activities",
    "source": "openstax",
    "source_key": "biology",
@@ -7298,20 +5583,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/40-3-mammalian-heart-and-blood-vessels/fig-005",
-   "page_key": "40-3-mammalian-heart-and-blood-vessels",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/40-4-blood-flow-and-blood-pressure-regulation/fig-000",
-   "page_key": "40-4-blood-flow-and-blood-pressure-regulation",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/40-4-blood-flow-and-blood-pressure-regulation/fig-001",
    "page_key": "40-4-blood-flow-and-blood-pressure-regulation",
    "source": "openstax",
@@ -7319,36 +5590,8 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/41-1-osmoregulation-and-osmotic-balance/fig-000",
-   "page_key": "41-1-osmoregulation-and-osmotic-balance",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/41-1-osmoregulation-and-osmotic-balance/fig-001",
    "page_key": "41-1-osmoregulation-and-osmotic-balance",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/41-2-the-kidneys-and-osmoregulatory-organs/fig-000",
-   "page_key": "41-2-the-kidneys-and-osmoregulatory-organs",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/41-2-the-kidneys-and-osmoregulatory-organs/fig-002",
-   "page_key": "41-2-the-kidneys-and-osmoregulatory-organs",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/41-2-the-kidneys-and-osmoregulatory-organs/fig-003",
-   "page_key": "41-2-the-kidneys-and-osmoregulatory-organs",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -7387,20 +5630,6 @@
    "source": "openstax",
    "source_key": "biology",
    "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/biology/41-5-hormonal-control-of-osmoregulatory-functions/fig-000",
-   "page_key": "41-5-hormonal-control-of-osmoregulatory-functions",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/42-1-innate-immune-response/fig-001",
-   "page_key": "42-1-innate-immune-response",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/biology/42-1-innate-immune-response/fig-002",
@@ -7466,21 +5695,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/42-2-adaptive-immune-response/fig-013",
-   "page_key": "42-2-adaptive-immune-response",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/42-4-disruptions-in-the-immune-system/fig-000",
-   "page_key": "42-4-disruptions-in-the-immune-system",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/42-4-disruptions-in-the-immune-system/fig-001",
    "page_key": "42-4-disruptions-in-the-immune-system",
    "source": "openstax",
    "source_key": "biology",
@@ -7501,53 +5716,11 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/43-3-human-reproductive-anatomy-and-gametogenesis/fig-001",
-   "page_key": "43-3-human-reproductive-anatomy-and-gametogenesis",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/43-3-human-reproductive-anatomy-and-gametogenesis/fig-003",
-   "page_key": "43-3-human-reproductive-anatomy-and-gametogenesis",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/43-3-human-reproductive-anatomy-and-gametogenesis/fig-005",
    "page_key": "43-3-human-reproductive-anatomy-and-gametogenesis",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/43-4-hormonal-control-of-human-reproduction/fig-003",
-   "page_key": "43-4-hormonal-control-of-human-reproduction",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/43-5-human-pregnancy-and-birth/fig-001",
-   "page_key": "43-5-human-pregnancy-and-birth",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/43-5-human-pregnancy-and-birth/fig-003",
-   "page_key": "43-5-human-pregnancy-and-birth",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/43-6-fertilization-and-early-embryonic-development/fig-000",
-   "page_key": "43-6-fertilization-and-early-embryonic-development",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/biology/43-6-fertilization-and-early-embryonic-development/fig-002",
@@ -7592,13 +5765,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/44-1-the-scope-of-ecology/fig-000",
-   "page_key": "44-1-the-scope-of-ecology",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/biology/44-1-the-scope-of-ecology/fig-002",
    "page_key": "44-1-the-scope-of-ecology",
    "source": "openstax",
@@ -7608,27 +5774,6 @@
   {
    "id": "openstax/biology/44-1-the-scope-of-ecology/fig-003",
    "page_key": "44-1-the-scope-of-ecology",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/44-2-biogeography/fig-000",
-   "page_key": "44-2-biogeography",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/44-2-biogeography/fig-001",
-   "page_key": "44-2-biogeography",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/44-2-biogeography/fig-002",
-   "page_key": "44-2-biogeography",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -7669,35 +5814,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/44-3-terrestrial-biomes/fig-006",
-   "page_key": "44-3-terrestrial-biomes",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/44-3-terrestrial-biomes/fig-007",
-   "page_key": "44-3-terrestrial-biomes",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/44-4-aquatic-biomes/fig-000",
-   "page_key": "44-4-aquatic-biomes",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/44-4-aquatic-biomes/fig-002",
-   "page_key": "44-4-aquatic-biomes",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/44-4-aquatic-biomes/fig-004",
    "page_key": "44-4-aquatic-biomes",
    "source": "openstax",
    "source_key": "biology",
@@ -7711,28 +5828,7 @@
    "stratum": "chart"
   },
   {
-   "id": "openstax/biology/45-1-population-demography/fig-002",
-   "page_key": "45-1-population-demography",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/45-1-population-demography/fig-003",
-   "page_key": "45-1-population-demography",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/45-5-human-population-growth/fig-000",
-   "page_key": "45-5-human-population-growth",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "chart"
-  },
-  {
-   "id": "openstax/biology/45-5-human-population-growth/fig-001",
    "page_key": "45-5-human-population-growth",
    "source": "openstax",
    "source_key": "biology",
@@ -7753,13 +5849,6 @@
    "stratum": "chart"
   },
   {
-   "id": "openstax/biology/45-6-community-ecology/fig-001",
-   "page_key": "45-6-community-ecology",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/45-6-community-ecology/fig-015",
    "page_key": "45-6-community-ecology",
    "source": "openstax",
@@ -7768,13 +5857,6 @@
   },
   {
    "id": "openstax/biology/45-6-community-ecology/fig-017",
-   "page_key": "45-6-community-ecology",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/45-6-community-ecology/fig-019",
    "page_key": "45-6-community-ecology",
    "source": "openstax",
    "source_key": "biology",
@@ -7793,13 +5875,6 @@
    "source": "openstax",
    "source_key": "biology",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/46-1-ecology-of-ecosystems/fig-001",
-   "page_key": "46-1-ecology-of-ecosystems",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/biology/46-1-ecology-of-ecosystems/fig-002",
@@ -7928,25 +6003,11 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/47-2-the-importance-of-biodiversity-to-human-life/fig-000",
-   "page_key": "47-2-the-importance-of-biodiversity-to-human-life",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/47-3-threats-to-biodiversity/fig-000",
    "page_key": "47-3-threats-to-biodiversity",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "chart"
-  },
-  {
-   "id": "openstax/biology/47-3-threats-to-biodiversity/fig-001",
-   "page_key": "47-3-threats-to-biodiversity",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/biology/47-3-threats-to-biodiversity/fig-005",
@@ -7963,21 +6024,7 @@
    "stratum": "chart"
   },
   {
-   "id": "openstax/biology/47-4-preserving-biodiversity/fig-001",
-   "page_key": "47-4-preserving-biodiversity",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/5-1-components-and-structure/fig-000",
-   "page_key": "5-1-components-and-structure",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-1-components-and-structure/fig-003",
    "page_key": "5-1-components-and-structure",
    "source": "openstax",
    "source_key": "biology",
@@ -7991,99 +6038,8 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/5-2-passive-transport/fig-001",
-   "page_key": "5-2-passive-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-2-passive-transport/fig-002",
-   "page_key": "5-2-passive-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-2-passive-transport/fig-003",
-   "page_key": "5-2-passive-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/5-2-passive-transport/fig-004",
    "page_key": "5-2-passive-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-2-passive-transport/fig-005",
-   "page_key": "5-2-passive-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-2-passive-transport/fig-008",
-   "page_key": "5-2-passive-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-3-active-transport/fig-000",
-   "page_key": "5-3-active-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-3-active-transport/fig-001",
-   "page_key": "5-3-active-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-3-active-transport/fig-002",
-   "page_key": "5-3-active-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-3-active-transport/fig-003",
-   "page_key": "5-3-active-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-4-bulk-transport/fig-000",
-   "page_key": "5-4-bulk-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-4-bulk-transport/fig-001",
-   "page_key": "5-4-bulk-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-4-bulk-transport/fig-002",
-   "page_key": "5-4-bulk-transport",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/5-4-bulk-transport/fig-003",
-   "page_key": "5-4-bulk-transport",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -8098,13 +6054,6 @@
   {
    "id": "openstax/biology/6-1-energy-and-metabolism/fig-003",
    "page_key": "6-1-energy-and-metabolism",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/6-3-the-laws-of-thermodynamics/fig-000",
-   "page_key": "6-3-the-laws-of-thermodynamics",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "diagram"
@@ -8180,13 +6129,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/7-1-energy-in-living-systems/fig-003",
-   "page_key": "7-1-energy-in-living-systems",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/7-2-glycolysis/fig-000",
    "page_key": "7-2-glycolysis",
    "source": "openstax",
@@ -8208,21 +6150,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/7-3-oxidation-of-pyruvate-and-the-citric-acid-cycle/fig-001",
-   "page_key": "7-3-oxidation-of-pyruvate-and-the-citric-acid-cycle",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/7-4-oxidative-phosphorylation/fig-000",
-   "page_key": "7-4-oxidative-phosphorylation",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/7-4-oxidative-phosphorylation/fig-001",
    "page_key": "7-4-oxidative-phosphorylation",
    "source": "openstax",
    "source_key": "biology",
@@ -8243,13 +6171,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/7-6-connections-of-carbohydrate-protein-and-lipid-metabolic-pathways/fig-000",
-   "page_key": "7-6-connections-of-carbohydrate-protein-and-lipid-metabolic-pathways",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/7-6-connections-of-carbohydrate-protein-and-lipid-metabolic-pathways/fig-001",
    "page_key": "7-6-connections-of-carbohydrate-protein-and-lipid-metabolic-pathways",
    "source": "openstax",
@@ -8259,13 +6180,6 @@
   {
    "id": "openstax/biology/7-7-regulation-of-cellular-respiration/fig-001",
    "page_key": "7-7-regulation-of-cellular-respiration",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/biology/8-1-overview-of-photosynthesis/fig-000",
-   "page_key": "8-1-overview-of-photosynthesis",
    "source": "openstax",
    "source_key": "biology",
    "stratum": "photo"
@@ -8318,13 +6232,6 @@
    "source": "openstax",
    "source_key": "biology",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/biology/8-3-using-light-energy-to-make-organic-molecules/fig-003",
-   "page_key": "8-3-using-light-energy-to-make-organic-molecules",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
   },
   {
    "id": "openstax/biology/9-1-signaling-molecules-and-cellular-receptors/fig-000",
@@ -8411,24 +6318,10 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/biology/9-3-response-to-the-signal/fig-001",
-   "page_key": "9-3-response-to-the-signal",
-   "source": "openstax",
-   "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/biology/9-4-signaling-in-single-celled-organisms/fig-001",
    "page_key": "9-4-signaling-in-single-celled-organisms",
    "source": "openstax",
    "source_key": "biology",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/1-1-chemistry-in-context/fig-000",
-   "page_key": "1-1-chemistry-in-context",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
    "stratum": "photo"
   },
   {
@@ -8444,13 +6337,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/1-1-chemistry-in-context/fig-003",
-   "page_key": "1-1-chemistry-in-context",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/1-2-phases-and-classification-of-matter/fig-000",
@@ -8474,53 +6360,11 @@
    "stratum": "chemistry"
   },
   {
-   "id": "openstax/chemistry-atoms-first/1-2-phases-and-classification-of-matter/fig-006",
-   "page_key": "1-2-phases-and-classification-of-matter",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/1-2-phases-and-classification-of-matter/fig-007",
-   "page_key": "1-2-phases-and-classification-of-matter",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/1-2-phases-and-classification-of-matter/fig-008",
    "page_key": "1-2-phases-and-classification-of-matter",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/1-2-phases-and-classification-of-matter/fig-011",
-   "page_key": "1-2-phases-and-classification-of-matter",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/1-3-physical-and-chemical-properties/fig-000",
-   "page_key": "1-3-physical-and-chemical-properties",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/1-3-physical-and-chemical-properties/fig-001",
-   "page_key": "1-3-physical-and-chemical-properties",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/1-3-physical-and-chemical-properties/fig-002",
-   "page_key": "1-3-physical-and-chemical-properties",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/1-5-measurement-uncertainty-accuracy-and-precision/fig-000",
@@ -8551,13 +6395,6 @@
    "stratum": "chemistry"
   },
   {
-   "id": "openstax/chemistry-atoms-first/10-1-intermolecular-forces/fig-006",
-   "page_key": "10-1-intermolecular-forces",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/10-1-intermolecular-forces/fig-007",
    "page_key": "10-1-intermolecular-forces",
    "source": "openstax",
@@ -8586,32 +6423,11 @@
    "stratum": "chart"
   },
   {
-   "id": "openstax/chemistry-atoms-first/10-1-intermolecular-forces/fig-011",
-   "page_key": "10-1-intermolecular-forces",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/10-1-intermolecular-forces/fig-012",
    "page_key": "10-1-intermolecular-forces",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/10-2-properties-of-liquids/fig-000",
-   "page_key": "10-2-properties-of-liquids",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/10-2-properties-of-liquids/fig-001",
-   "page_key": "10-2-properties-of-liquids",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/10-2-properties-of-liquids/fig-002",
@@ -8621,21 +6437,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/chemistry-atoms-first/10-2-properties-of-liquids/fig-004",
-   "page_key": "10-2-properties-of-liquids",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/10-2-properties-of-liquids/fig-005",
-   "page_key": "10-2-properties-of-liquids",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/10-2-properties-of-liquids/fig-006",
    "page_key": "10-2-properties-of-liquids",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
@@ -8654,13 +6456,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "chart"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/10-3-phase-transitions/fig-004",
-   "page_key": "10-3-phase-transitions",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/10-3-phase-transitions/fig-006",
@@ -8684,13 +6479,6 @@
    "stratum": "chart"
   },
   {
-   "id": "openstax/chemistry-atoms-first/10-4-phase-diagrams/fig-002",
-   "page_key": "10-4-phase-diagrams",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/10-4-phase-diagrams/fig-003",
    "page_key": "10-4-phase-diagrams",
    "source": "openstax",
@@ -8703,13 +6491,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "chart"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/10-4-phase-diagrams/fig-005",
-   "page_key": "10-4-phase-diagrams",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "diagram"
   },
   {
    "id": "openstax/chemistry-atoms-first/10-4-phase-diagrams/fig-006",
@@ -8738,13 +6519,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/10-5-the-solid-state-of-matter/fig-006",
-   "page_key": "10-5-the-solid-state-of-matter",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/10-5-the-solid-state-of-matter/fig-007",
@@ -8838,13 +6612,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/11-1-the-dissolution-process/fig-000",
-   "page_key": "11-1-the-dissolution-process",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/11-1-the-dissolution-process/fig-001",
    "page_key": "11-1-the-dissolution-process",
    "source": "openstax",
@@ -8880,13 +6647,6 @@
    "stratum": "chart"
   },
   {
-   "id": "openstax/chemistry-atoms-first/11-3-solubility/fig-006",
-   "page_key": "11-3-solubility",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/11-3-solubility/fig-008",
    "page_key": "11-3-solubility",
    "source": "openstax",
@@ -8899,13 +6659,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/11-4-colligative-properties/fig-001",
-   "page_key": "11-4-colligative-properties",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/11-4-colligative-properties/fig-002",
@@ -8936,13 +6689,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/11-5-colloids/fig-000",
-   "page_key": "11-5-colloids",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/11-5-colloids/fig-002",
    "page_key": "11-5-colloids",
    "source": "openstax",
@@ -8957,32 +6703,11 @@
    "stratum": "chemistry"
   },
   {
-   "id": "openstax/chemistry-atoms-first/11-5-colloids/fig-005",
-   "page_key": "11-5-colloids",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/11-5-colloids/fig-007",
    "page_key": "11-5-colloids",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/11-5-colloids/fig-008",
-   "page_key": "11-5-colloids",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/12-1-spontaneity/fig-001",
-   "page_key": "12-1-spontaneity",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
   },
   {
    "id": "openstax/chemistry-atoms-first/12-1-spontaneity/fig-002",
@@ -8997,13 +6722,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/12-1-spontaneity/fig-004",
-   "page_key": "12-1-spontaneity",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/12-2-entropy/fig-001",
@@ -9055,13 +6773,6 @@
    "stratum": "chemistry"
   },
   {
-   "id": "openstax/chemistry-atoms-first/13-3-shifting-equilibria-le-chateliers-principle/fig-000",
-   "page_key": "13-3-shifting-equilibria-le-chateliers-principle",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/13-4-equilibrium-calculations/fig-002",
    "page_key": "13-4-equilibrium-calculations",
    "source": "openstax",
@@ -9070,20 +6781,6 @@
   },
   {
    "id": "openstax/chemistry-atoms-first/14-2-ph-and-poh/fig-000",
-   "page_key": "14-2-ph-and-poh",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/14-2-ph-and-poh/fig-001",
-   "page_key": "14-2-ph-and-poh",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/14-2-ph-and-poh/fig-003",
    "page_key": "14-2-ph-and-poh",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
@@ -9102,13 +6799,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/14-3-relative-strengths-of-acids-and-bases/fig-004",
-   "page_key": "14-3-relative-strengths-of-acids-and-bases",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/14-3-relative-strengths-of-acids-and-bases/fig-007",
@@ -9130,13 +6820,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/14-6-buffers/fig-000",
-   "page_key": "14-6-buffers",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "diagram"
   },
   {
    "id": "openstax/chemistry-atoms-first/14-6-buffers/fig-001",
@@ -9272,13 +6955,6 @@
    "stratum": "chart"
   },
   {
-   "id": "openstax/chemistry-atoms-first/17-1-chemical-reaction-rates/fig-002",
-   "page_key": "17-1-chemical-reaction-rates",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/17-1-chemical-reaction-rates/fig-003",
    "page_key": "17-1-chemical-reaction-rates",
    "source": "openstax",
@@ -9287,13 +6963,6 @@
   },
   {
    "id": "openstax/chemistry-atoms-first/17-2-factors-affecting-reaction-rates/fig-000",
-   "page_key": "17-2-factors-affecting-reaction-rates",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/17-2-factors-affecting-reaction-rates/fig-001",
    "page_key": "17-2-factors-affecting-reaction-rates",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
@@ -9356,25 +7025,11 @@
    "stratum": "chemistry"
   },
   {
-   "id": "openstax/chemistry-atoms-first/17-6-reaction-mechanisms/fig-001",
-   "page_key": "17-6-reaction-mechanisms",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/17-7-catalysis/fig-002",
    "page_key": "17-7-catalysis",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/17-7-catalysis/fig-004",
-   "page_key": "17-7-catalysis",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/17-7-catalysis/fig-005",
@@ -9417,20 +7072,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/18-1-periodicity/fig-004",
-   "page_key": "18-1-periodicity",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/18-1-periodicity/fig-006",
-   "page_key": "18-1-periodicity",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/18-1-periodicity/fig-007",
@@ -9489,20 +7130,6 @@
    "stratum": "chemistry"
   },
   {
-   "id": "openstax/chemistry-atoms-first/18-3-structure-and-general-properties-of-the-metalloids/fig-006",
-   "page_key": "18-3-structure-and-general-properties-of-the-metalloids",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/18-4-structure-and-general-properties-of-the-nonmetals/fig-001",
-   "page_key": "18-4-structure-and-general-properties-of-the-nonmetals",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/18-4-structure-and-general-properties-of-the-nonmetals/fig-002",
    "page_key": "18-4-structure-and-general-properties-of-the-nonmetals",
    "source": "openstax",
@@ -9524,13 +7151,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/18-4-structure-and-general-properties-of-the-nonmetals/fig-005",
-   "page_key": "18-4-structure-and-general-properties-of-the-nonmetals",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/18-4-structure-and-general-properties-of-the-nonmetals/fig-006",
    "page_key": "18-4-structure-and-general-properties-of-the-nonmetals",
    "source": "openstax",
@@ -9545,39 +7165,11 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/18-5-occurrence-preparation-and-compounds-of-hydrogen/fig-001",
-   "page_key": "18-5-occurrence-preparation-and-compounds-of-hydrogen",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/18-5-occurrence-preparation-and-compounds-of-hydrogen/fig-003",
    "page_key": "18-5-occurrence-preparation-and-compounds-of-hydrogen",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/18-6-occurrence-preparation-and-properties-of-carbonates/fig-000",
-   "page_key": "18-6-occurrence-preparation-and-properties-of-carbonates",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/18-6-occurrence-preparation-and-properties-of-carbonates/fig-001",
-   "page_key": "18-6-occurrence-preparation-and-properties-of-carbonates",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/18-7-occurrence-preparation-and-properties-of-nitrogen/fig-000",
-   "page_key": "18-7-occurrence-preparation-and-properties-of-nitrogen",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "diagram"
   },
   {
    "id": "openstax/chemistry-atoms-first/18-7-occurrence-preparation-and-properties-of-nitrogen/fig-001",
@@ -9648,20 +7240,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/18-9-occurrence-preparation-and-compounds-of-oxygen/fig-003",
-   "page_key": "18-9-occurrence-preparation-and-compounds-of-oxygen",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/18-9-occurrence-preparation-and-compounds-of-oxygen/fig-004",
-   "page_key": "18-9-occurrence-preparation-and-compounds-of-oxygen",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/18-9-occurrence-preparation-and-compounds-of-oxygen/fig-005",
@@ -9755,13 +7333,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/19-1-occurrence-preparation-and-properties-of-transition-metals-and-their-compounds/fig-005",
-   "page_key": "19-1-occurrence-preparation-and-properties-of-transition-metals-and-their-compounds",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/19-1-occurrence-preparation-and-properties-of-transition-metals-and-their-compounds/fig-008",
    "page_key": "19-1-occurrence-preparation-and-properties-of-transition-metals-and-their-compounds",
    "source": "openstax",
@@ -9846,13 +7417,6 @@
    "stratum": "chemistry"
   },
   {
-   "id": "openstax/chemistry-atoms-first/19-2-coordination-chemistry-of-transition-metals/fig-014",
-   "page_key": "19-2-coordination-chemistry-of-transition-metals",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/19-2-coordination-chemistry-of-transition-metals/fig-017",
    "page_key": "19-2-coordination-chemistry-of-transition-metals",
    "source": "openstax",
@@ -9881,39 +7445,11 @@
    "stratum": "chemistry"
   },
   {
-   "id": "openstax/chemistry-atoms-first/2-1-early-ideas-in-atomic-theory/fig-000",
-   "page_key": "2-1-early-ideas-in-atomic-theory",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/2-1-early-ideas-in-atomic-theory/fig-001",
-   "page_key": "2-1-early-ideas-in-atomic-theory",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/2-2-evolution-of-atomic-theory/fig-000",
-   "page_key": "2-2-evolution-of-atomic-theory",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/2-2-evolution-of-atomic-theory/fig-001",
    "page_key": "2-2-evolution-of-atomic-theory",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/2-2-evolution-of-atomic-theory/fig-002",
-   "page_key": "2-2-evolution-of-atomic-theory",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/2-2-evolution-of-atomic-theory/fig-003",
@@ -9944,46 +7480,11 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/2-4-chemical-formulas/fig-003",
-   "page_key": "2-4-chemical-formulas",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/2-4-chemical-formulas/fig-004",
-   "page_key": "2-4-chemical-formulas",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/2-4-chemical-formulas/fig-005",
-   "page_key": "2-4-chemical-formulas",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/2-4-chemical-formulas/fig-007",
    "page_key": "2-4-chemical-formulas",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/2-4-chemical-formulas/fig-008",
-   "page_key": "2-4-chemical-formulas",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/2-4-chemical-formulas/fig-010",
-   "page_key": "2-4-chemical-formulas",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/2-4-chemical-formulas/fig-013",
@@ -10028,13 +7529,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/20-3-radioactive-decay/fig-003",
-   "page_key": "20-3-radioactive-decay",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/20-3-radioactive-decay/fig-004",
    "page_key": "20-3-radioactive-decay",
    "source": "openstax",
@@ -10054,13 +7548,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/20-4-transmutation-and-nuclear-energy/fig-000",
-   "page_key": "20-4-transmutation-and-nuclear-energy",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/20-4-transmutation-and-nuclear-energy/fig-001",
@@ -10098,50 +7585,8 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/chemistry-atoms-first/20-4-transmutation-and-nuclear-energy/fig-006",
-   "page_key": "20-4-transmutation-and-nuclear-energy",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/20-4-transmutation-and-nuclear-energy/fig-007",
-   "page_key": "20-4-transmutation-and-nuclear-energy",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/20-4-transmutation-and-nuclear-energy/fig-008",
    "page_key": "20-4-transmutation-and-nuclear-energy",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/20-4-transmutation-and-nuclear-energy/fig-009",
-   "page_key": "20-4-transmutation-and-nuclear-energy",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/20-4-transmutation-and-nuclear-energy/fig-010",
-   "page_key": "20-4-transmutation-and-nuclear-energy",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/20-5-uses-of-radioisotopes/fig-000",
-   "page_key": "20-5-uses-of-radioisotopes",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/20-5-uses-of-radioisotopes/fig-001",
-   "page_key": "20-5-uses-of-radioisotopes",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "photo"
@@ -10159,20 +7604,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "chart"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/20-5-uses-of-radioisotopes/fig-004",
-   "page_key": "20-5-uses-of-radioisotopes",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/20-5-uses-of-radioisotopes/fig-005",
-   "page_key": "20-5-uses-of-radioisotopes",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/20-6-biological-effects-of-radiation/fig-000",
@@ -10204,13 +7635,6 @@
   },
   {
    "id": "openstax/chemistry-atoms-first/20-6-biological-effects-of-radiation/fig-004",
-   "page_key": "20-6-biological-effects-of-radiation",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/20-6-biological-effects-of-radiation/fig-005",
    "page_key": "20-6-biological-effects-of-radiation",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
@@ -10250,13 +7674,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/21-1-hydrocarbons/fig-004",
-   "page_key": "21-1-hydrocarbons",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/21-1-hydrocarbons/fig-005",
@@ -10299,13 +7716,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/21-2-alcohols-and-ethers/fig-001",
-   "page_key": "21-2-alcohols-and-ethers",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "diagram"
   },
   {
    "id": "openstax/chemistry-atoms-first/21-3-aldehydes-ketones-carboxylic-acids-and-esters/fig-000",
@@ -10357,25 +7767,11 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/3-1-electromagnetic-energy/fig-002",
-   "page_key": "3-1-electromagnetic-energy",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/3-1-electromagnetic-energy/fig-003",
    "page_key": "3-1-electromagnetic-energy",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/3-1-electromagnetic-energy/fig-007",
-   "page_key": "3-1-electromagnetic-energy",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chart"
   },
   {
    "id": "openstax/chemistry-atoms-first/3-1-electromagnetic-energy/fig-008",
@@ -10490,13 +7886,6 @@
    "stratum": "chart"
   },
   {
-   "id": "openstax/chemistry-atoms-first/3-6-the-periodic-table/fig-000",
-   "page_key": "3-6-the-periodic-table",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/3-6-the-periodic-table/fig-001",
    "page_key": "3-6-the-periodic-table",
    "source": "openstax",
@@ -10506,13 +7895,6 @@
   {
    "id": "openstax/chemistry-atoms-first/3-6-the-periodic-table/fig-002",
    "page_key": "3-6-the-periodic-table",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/4-1-ionic-bonding/fig-000",
-   "page_key": "4-1-ionic-bonding",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
@@ -10938,20 +8320,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/chemistry-atoms-first/6-4-other-units-for-solution-concentrations/fig-001",
-   "page_key": "6-4-other-units-for-solution-concentrations",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/6-4-other-units-for-solution-concentrations/fig-002",
-   "page_key": "6-4-other-units-for-solution-concentrations",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/7-1-writing-and-balancing-chemical-equations/fig-000",
    "page_key": "7-1-writing-and-balancing-chemical-equations",
    "source": "openstax",
@@ -10973,27 +8341,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/7-2-classifying-chemical-reactions/fig-002",
-   "page_key": "7-2-classifying-chemical-reactions",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/7-2-classifying-chemical-reactions/fig-003",
-   "page_key": "7-2-classifying-chemical-reactions",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/7-3-reaction-stoichiometry/fig-000",
-   "page_key": "7-3-reaction-stoichiometry",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/7-3-reaction-stoichiometry/fig-001",
    "page_key": "7-3-reaction-stoichiometry",
    "source": "openstax",
@@ -11001,21 +8348,7 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/7-3-reaction-stoichiometry/fig-002",
-   "page_key": "7-3-reaction-stoichiometry",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/7-4-reaction-yields/fig-001",
-   "page_key": "7-4-reaction-yields",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "chemistry"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/7-4-reaction-yields/fig-002",
    "page_key": "7-4-reaction-yields",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
@@ -11034,27 +8367,6 @@
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/8-1-gas-pressure/fig-001",
-   "page_key": "8-1-gas-pressure",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/8-1-gas-pressure/fig-004",
-   "page_key": "8-1-gas-pressure",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/8-1-gas-pressure/fig-005",
-   "page_key": "8-1-gas-pressure",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/8-1-gas-pressure/fig-006",
@@ -11106,27 +8418,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/8-2-relating-pressure-volume-amount-and-temperature-the-ideal-gas-law/fig-007",
-   "page_key": "8-2-relating-pressure-volume-amount-and-temperature-the-ideal-gas-law",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/8-2-relating-pressure-volume-amount-and-temperature-the-ideal-gas-law/fig-008",
-   "page_key": "8-2-relating-pressure-volume-amount-and-temperature-the-ideal-gas-law",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/8-3-stoichiometry-of-gaseous-substances-mixtures-and-reactions/fig-000",
-   "page_key": "8-3-stoichiometry-of-gaseous-substances-mixtures-and-reactions",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/8-3-stoichiometry-of-gaseous-substances-mixtures-and-reactions/fig-002",
    "page_key": "8-3-stoichiometry-of-gaseous-substances-mixtures-and-reactions",
    "source": "openstax",
@@ -11176,13 +8467,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/8-4-effusion-and-diffusion-of-gases/fig-002",
-   "page_key": "8-4-effusion-and-diffusion-of-gases",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/8-4-effusion-and-diffusion-of-gases/fig-003",
    "page_key": "8-4-effusion-and-diffusion-of-gases",
    "source": "openstax",
@@ -11225,20 +8509,6 @@
    "stratum": "chart"
   },
   {
-   "id": "openstax/chemistry-atoms-first/9-1-energy-basics/fig-000",
-   "page_key": "9-1-energy-basics",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/9-1-energy-basics/fig-001",
-   "page_key": "9-1-energy-basics",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/9-1-energy-basics/fig-002",
    "page_key": "9-1-energy-basics",
    "source": "openstax",
@@ -11246,42 +8516,7 @@
    "stratum": "chemistry"
   },
   {
-   "id": "openstax/chemistry-atoms-first/9-1-energy-basics/fig-003",
-   "page_key": "9-1-energy-basics",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/9-1-energy-basics/fig-004",
-   "page_key": "9-1-energy-basics",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/9-1-energy-basics/fig-005",
-   "page_key": "9-1-energy-basics",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/9-1-energy-basics/fig-006",
-   "page_key": "9-1-energy-basics",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/9-1-energy-basics/fig-007",
-   "page_key": "9-1-energy-basics",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/9-1-energy-basics/fig-008",
    "page_key": "9-1-energy-basics",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
@@ -11309,13 +8544,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/9-2-calorimetry/fig-004",
-   "page_key": "9-2-calorimetry",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/9-2-calorimetry/fig-005",
    "page_key": "9-2-calorimetry",
    "source": "openstax",
@@ -11323,39 +8551,11 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/chemistry-atoms-first/9-2-calorimetry/fig-006",
-   "page_key": "9-2-calorimetry",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/9-2-calorimetry/fig-007",
-   "page_key": "9-2-calorimetry",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/chemistry-atoms-first/9-3-enthalpy/fig-000",
    "page_key": "9-3-enthalpy",
    "source": "openstax",
    "source_key": "chemistry-atoms-first",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/9-3-enthalpy/fig-001",
-   "page_key": "9-3-enthalpy",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/chemistry-atoms-first/9-3-enthalpy/fig-003",
-   "page_key": "9-3-enthalpy",
-   "source": "openstax",
-   "source_key": "chemistry-atoms-first",
-   "stratum": "photo"
   },
   {
    "id": "openstax/chemistry-atoms-first/9-3-enthalpy/fig-004",
@@ -11414,20 +8614,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/1-1-physics-an-introduction/fig-001",
-   "page_key": "1-1-physics-an-introduction",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/college-physics/1-1-physics-an-introduction/fig-005",
-   "page_key": "1-1-physics-an-introduction",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/college-physics/10-7-gyroscopic-effects-vector-aspects-of-angular-momentum/fig-000",
    "page_key": "10-7-gyroscopic-effects-vector-aspects-of-angular-momentum",
    "source": "openstax",
@@ -11454,20 +8640,6 @@
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "photo"
-  },
-  {
-   "id": "openstax/college-physics/12-3-the-most-general-applications-of-bernoullis-equation/fig-000",
-   "page_key": "12-3-the-most-general-applications-of-bernoullis-equation",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/college-physics/12-4-viscosity-and-laminar-flow-poiseuilles-law/fig-003",
-   "page_key": "12-4-viscosity-and-laminar-flow-poiseuilles-law",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "diagram"
   },
   {
    "id": "openstax/college-physics/12-4-viscosity-and-laminar-flow-poiseuilles-law/fig-006",
@@ -11540,13 +8712,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/college-physics/15-1-the-first-law-of-thermodynamics/fig-000",
-   "page_key": "15-1-the-first-law-of-thermodynamics",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/15-1-the-first-law-of-thermodynamics/fig-001",
    "page_key": "15-1-the-first-law-of-thermodynamics",
    "source": "openstax",
@@ -11575,25 +8740,11 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/15-4-carnots-perfect-heat-engine-the-second-law-of-thermodynamics-restated/fig-000",
-   "page_key": "15-4-carnots-perfect-heat-engine-the-second-law-of-thermodynamics-restated",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/15-4-carnots-perfect-heat-engine-the-second-law-of-thermodynamics-restated/fig-002",
    "page_key": "15-4-carnots-perfect-heat-engine-the-second-law-of-thermodynamics-restated",
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/15-4-carnots-perfect-heat-engine-the-second-law-of-thermodynamics-restated/fig-003",
-   "page_key": "15-4-carnots-perfect-heat-engine-the-second-law-of-thermodynamics-restated",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
   },
   {
    "id": "openstax/college-physics/15-4-carnots-perfect-heat-engine-the-second-law-of-thermodynamics-restated/fig-004",
@@ -11624,13 +8775,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/15-6-entropy-and-the-second-law-of-thermodynamics-disorder-and-the-unavailability-of-energy/fig-000",
-   "page_key": "15-6-entropy-and-the-second-law-of-thermodynamics-disorder-and-the-unavailability-of-energy",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/15-6-entropy-and-the-second-law-of-thermodynamics-disorder-and-the-unavailability-of-energy/fig-001",
    "page_key": "15-6-entropy-and-the-second-law-of-thermodynamics-disorder-and-the-unavailability-of-energy",
    "source": "openstax",
@@ -11657,20 +8801,6 @@
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/16-8-forced-oscillations-and-resonance/fig-003",
-   "page_key": "16-8-forced-oscillations-and-resonance",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/college-physics/17-1-sound/fig-000",
-   "page_key": "17-1-sound",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
   },
   {
    "id": "openstax/college-physics/17-1-sound/fig-001",
@@ -11764,13 +8894,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/17-7-ultrasound/fig-003",
-   "page_key": "17-7-ultrasound",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/college-physics/18-6-electric-forces-in-biology/fig-001",
    "page_key": "18-6-electric-forces-in-biology",
    "source": "openstax",
@@ -11779,13 +8902,6 @@
   },
   {
    "id": "openstax/college-physics/18-8-applications-of-electrostatics/fig-000",
-   "page_key": "18-8-applications-of-electrostatics",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/18-8-applications-of-electrostatics/fig-004",
    "page_key": "18-8-applications-of-electrostatics",
    "source": "openstax",
    "source_key": "college-physics",
@@ -11808,13 +8924,6 @@
   {
    "id": "openstax/college-physics/19-5-capacitors-and-dielectrics/fig-006",
    "page_key": "19-5-capacitors-and-dielectrics",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/19-7-energy-stored-in-capacitors/fig-000",
-   "page_key": "19-7-energy-stored-in-capacitors",
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "diagram"
@@ -11946,13 +9055,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/20-4-electric-power-and-energy/fig-000",
-   "page_key": "20-4-electric-power-and-energy",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/20-6-electric-hazards-and-the-human-body/fig-001",
    "page_key": "20-6-electric-hazards-and-the-human-body",
    "source": "openstax",
@@ -12002,13 +9104,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/21-1-resistors-in-series-and-parallel/fig-002",
-   "page_key": "21-1-resistors-in-series-and-parallel",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "diagram"
-  },
-  {
    "id": "openstax/college-physics/21-1-resistors-in-series-and-parallel/fig-003",
    "page_key": "21-1-resistors-in-series-and-parallel",
    "source": "openstax",
@@ -12051,13 +9146,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/college-physics/21-2-electromotive-force-terminal-voltage/fig-005",
-   "page_key": "21-2-electromotive-force-terminal-voltage",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/21-2-electromotive-force-terminal-voltage/fig-006",
    "page_key": "21-2-electromotive-force-terminal-voltage",
    "source": "openstax",
@@ -12093,13 +9181,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/21-2-electromotive-force-terminal-voltage/fig-012",
-   "page_key": "21-2-electromotive-force-terminal-voltage",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/21-3-kirchhoffs-rules/fig-000",
    "page_key": "21-3-kirchhoffs-rules",
    "source": "openstax",
@@ -12126,20 +9207,6 @@
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/21-4-dc-voltmeters-and-ammeters/fig-000",
-   "page_key": "21-4-dc-voltmeters-and-ammeters",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/college-physics/21-4-dc-voltmeters-and-ammeters/fig-001",
-   "page_key": "21-4-dc-voltmeters-and-ammeters",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
   },
   {
    "id": "openstax/college-physics/21-4-dc-voltmeters-and-ammeters/fig-002",
@@ -12198,13 +9265,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/21-6-dc-circuits-containing-resistors-and-capacitors/fig-002",
-   "page_key": "21-6-dc-circuits-containing-resistors-and-capacitors",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/21-6-dc-circuits-containing-resistors-and-capacitors/fig-003",
    "page_key": "21-6-dc-circuits-containing-resistors-and-capacitors",
    "source": "openstax",
@@ -12255,13 +9315,6 @@
   },
   {
    "id": "openstax/college-physics/22-5-force-on-a-moving-charge-in-a-magnetic-field-examples-and-applications/fig-005",
-   "page_key": "22-5-force-on-a-moving-charge-in-a-magnetic-field-examples-and-applications",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/22-5-force-on-a-moving-charge-in-a-magnetic-field-examples-and-applications/fig-007",
    "page_key": "22-5-force-on-a-moving-charge-in-a-magnetic-field-examples-and-applications",
    "source": "openstax",
    "source_key": "college-physics",
@@ -12415,13 +9468,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/college-physics/23-4-eddy-currents-and-magnetic-damping/fig-006",
-   "page_key": "23-4-eddy-currents-and-magnetic-damping",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/23-5-electric-generators/fig-000",
    "page_key": "23-5-electric-generators",
    "source": "openstax",
@@ -12541,13 +9587,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/24-3-the-electromagnetic-spectrum/fig-005",
-   "page_key": "24-3-the-electromagnetic-spectrum",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/24-3-the-electromagnetic-spectrum/fig-006",
    "page_key": "24-3-the-electromagnetic-spectrum",
    "source": "openstax",
@@ -12576,43 +9615,8 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/college-physics/24-3-the-electromagnetic-spectrum/fig-011",
-   "page_key": "24-3-the-electromagnetic-spectrum",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/college-physics/24-3-the-electromagnetic-spectrum/fig-012",
-   "page_key": "24-3-the-electromagnetic-spectrum",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/college-physics/25-4-total-internal-reflection/fig-002",
-   "page_key": "25-4-total-internal-reflection",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/college-physics/25-4-total-internal-reflection/fig-004",
-   "page_key": "25-4-total-internal-reflection",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/25-4-total-internal-reflection/fig-005",
    "page_key": "25-4-total-internal-reflection",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/college-physics/25-6-image-formation-by-lenses/fig-009",
-   "page_key": "25-6-image-formation-by-lenses",
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "photo"
@@ -12688,13 +9692,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/26-5-telescopes/fig-003",
-   "page_key": "26-5-telescopes",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/27-2-huygenss-principle-diffraction/fig-000",
    "page_key": "27-2-huygenss-principle-diffraction",
    "source": "openstax",
@@ -12735,13 +9732,6 @@
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/27-3-youngs-double-slit-experiment/fig-002",
-   "page_key": "27-3-youngs-double-slit-experiment",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
   },
   {
    "id": "openstax/college-physics/27-3-youngs-double-slit-experiment/fig-003",
@@ -12793,25 +9783,11 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/27-6-limits-of-resolution-the-rayleigh-criterion/fig-003",
-   "page_key": "27-6-limits-of-resolution-the-rayleigh-criterion",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/27-6-limits-of-resolution-the-rayleigh-criterion/fig-004",
    "page_key": "27-6-limits-of-resolution-the-rayleigh-criterion",
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "photo"
-  },
-  {
-   "id": "openstax/college-physics/27-6-limits-of-resolution-the-rayleigh-criterion/fig-005",
-   "page_key": "27-6-limits-of-resolution-the-rayleigh-criterion",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "diagram"
   },
   {
    "id": "openstax/college-physics/27-6-limits-of-resolution-the-rayleigh-criterion/fig-006",
@@ -12826,13 +9802,6 @@
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/27-8-polarization/fig-000",
-   "page_key": "27-8-polarization",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
   },
   {
    "id": "openstax/college-physics/27-8-polarization/fig-001",
@@ -12850,13 +9819,6 @@
   },
   {
    "id": "openstax/college-physics/27-8-polarization/fig-004",
-   "page_key": "27-8-polarization",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/27-8-polarization/fig-005",
    "page_key": "27-8-polarization",
    "source": "openstax",
    "source_key": "college-physics",
@@ -12891,25 +9853,11 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/27-8-polarization/fig-011",
-   "page_key": "27-8-polarization",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/27-8-polarization/fig-012",
    "page_key": "27-8-polarization",
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/27-8-polarization/fig-013",
-   "page_key": "27-8-polarization",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
   },
   {
    "id": "openstax/college-physics/27-8-polarization/fig-014",
@@ -12947,13 +9895,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/28-6-relativistic-energy/fig-000",
-   "page_key": "28-6-relativistic-energy",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/29-2-the-photoelectric-effect/fig-001",
    "page_key": "29-2-the-photoelectric-effect",
    "source": "openstax",
@@ -12984,13 +9925,6 @@
   {
    "id": "openstax/college-physics/30-1-discovery-of-the-atom/fig-000",
    "page_key": "30-1-discovery-of-the-atom",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/college-physics/30-2-discovery-of-the-parts-of-the-atom-electrons-and-nuclei/fig-000",
-   "page_key": "30-2-discovery-of-the-parts-of-the-atom-electrons-and-nuclei",
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "photo"
@@ -13031,13 +9965,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/30-5-applications-of-atomic-excitations-and-de-excitations/fig-004",
-   "page_key": "30-5-applications-of-atomic-excitations-and-de-excitations",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/30-5-applications-of-atomic-excitations-and-de-excitations/fig-008",
    "page_key": "30-5-applications-of-atomic-excitations-and-de-excitations",
    "source": "openstax",
@@ -13064,13 +9991,6 @@
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/31-2-radiation-detection-and-detectors/fig-001",
-   "page_key": "31-2-radiation-detection-and-detectors",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
   },
   {
    "id": "openstax/college-physics/31-2-radiation-detection-and-detectors/fig-002",
@@ -13129,13 +10049,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/college-physics/33-5-quarks-is-that-all-there-is/fig-001",
-   "page_key": "33-5-quarks-is-that-all-there-is",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/college-physics/33-5-quarks-is-that-all-there-is/fig-002",
    "page_key": "33-5-quarks-is-that-all-there-is",
    "source": "openstax",
@@ -13162,13 +10075,6 @@
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/33-6-guts-the-unification-of-forces/fig-004",
-   "page_key": "33-6-guts-the-unification-of-forces",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
   },
   {
    "id": "openstax/college-physics/34-1-cosmology-and-particle-physics/fig-000",
@@ -13302,13 +10208,6 @@
    "source": "openstax",
    "source_key": "college-physics",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/college-physics/7-3-gravitational-potential-energy/fig-002",
-   "page_key": "7-3-gravitational-potential-energy",
-   "source": "openstax",
-   "source_key": "college-physics",
-   "stratum": "photo"
   },
   {
    "id": "openstax/college-physics/7-5-nonconservative-forces/fig-000",
@@ -13528,13 +10427,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/physics/17-1-understanding-diffraction-and-interference/fig-000",
-   "page_key": "17-1-understanding-diffraction-and-interference",
-   "source": "openstax",
-   "source_key": "physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/physics/17-1-understanding-diffraction-and-interference/fig-001",
    "page_key": "17-1-understanding-diffraction-and-interference",
    "source": "openstax",
@@ -13605,21 +10497,7 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/physics/17-2-applications-of-diffraction-interference-and-coherence/fig-001",
-   "page_key": "17-2-applications-of-diffraction-interference-and-coherence",
-   "source": "openstax",
-   "source_key": "physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/physics/17-2-applications-of-diffraction-interference-and-coherence/fig-003",
-   "page_key": "17-2-applications-of-diffraction-interference-and-coherence",
-   "source": "openstax",
-   "source_key": "physics",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/physics/17-2-applications-of-diffraction-interference-and-coherence/fig-004",
    "page_key": "17-2-applications-of-diffraction-interference-and-coherence",
    "source": "openstax",
    "source_key": "physics",
@@ -13668,22 +10546,8 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/physics/18-1-electrical-charges-conservation-of-charge-and-transfer-of-charge/fig-011",
-   "page_key": "18-1-electrical-charges-conservation-of-charge-and-transfer-of-charge",
-   "source": "openstax",
-   "source_key": "physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/physics/18-1-electrical-charges-conservation-of-charge-and-transfer-of-charge/fig-012",
    "page_key": "18-1-electrical-charges-conservation-of-charge-and-transfer-of-charge",
-   "source": "openstax",
-   "source_key": "physics",
-   "stratum": "diagram"
-  },
-  {
-   "id": "openstax/physics/18-2-coulombs-law/fig-000",
-   "page_key": "18-2-coulombs-law",
    "source": "openstax",
    "source_key": "physics",
    "stratum": "diagram"
@@ -13724,13 +10588,6 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/physics/18-4-electric-potential/fig-004",
-   "page_key": "18-4-electric-potential",
-   "source": "openstax",
-   "source_key": "physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/physics/18-4-electric-potential/fig-005",
    "page_key": "18-4-electric-potential",
    "source": "openstax",
@@ -13750,13 +10607,6 @@
    "source": "openstax",
    "source_key": "physics",
    "stratum": "diagram"
-  },
-  {
-   "id": "openstax/physics/18-5-capacitors-and-dielectrics/fig-002",
-   "page_key": "18-5-capacitors-and-dielectrics",
-   "source": "openstax",
-   "source_key": "physics",
-   "stratum": "photo"
   },
   {
    "id": "openstax/physics/18-5-capacitors-and-dielectrics/fig-003",
@@ -13850,20 +10700,6 @@
    "stratum": "photo"
   },
   {
-   "id": "openstax/physics/21-1-planck-and-quantum-nature-of-light/fig-002",
-   "page_key": "21-1-planck-and-quantum-nature-of-light",
-   "source": "openstax",
-   "source_key": "physics",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/physics/21-2-einstein-and-the-photoelectric-effect/fig-000",
-   "page_key": "21-2-einstein-and-the-photoelectric-effect",
-   "source": "openstax",
-   "source_key": "physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/physics/21-2-einstein-and-the-photoelectric-effect/fig-001",
    "page_key": "21-2-einstein-and-the-photoelectric-effect",
    "source": "openstax",
@@ -13878,21 +10714,7 @@
    "stratum": "diagram"
   },
   {
-   "id": "openstax/physics/21-3-the-dual-nature-of-light/fig-000",
-   "page_key": "21-3-the-dual-nature-of-light",
-   "source": "openstax",
-   "source_key": "physics",
-   "stratum": "photo"
-  },
-  {
    "id": "openstax/physics/21-3-the-dual-nature-of-light/fig-002",
-   "page_key": "21-3-the-dual-nature-of-light",
-   "source": "openstax",
-   "source_key": "physics",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/physics/21-3-the-dual-nature-of-light/fig-003",
    "page_key": "21-3-the-dual-nature-of-light",
    "source": "openstax",
    "source_key": "physics",
@@ -14377,13 +11199,6 @@
   {
    "id": "openstax/principles-macroeconomics-2e/15-1-the-federal-reserve-banking-system-and-central-banks/fig-001",
    "page_key": "15-1-the-federal-reserve-banking-system-and-central-banks",
-   "source": "openstax",
-   "source_key": "principles-macroeconomics-2e",
-   "stratum": "photo"
-  },
-  {
-   "id": "openstax/principles-macroeconomics-2e/15-2-bank-regulation/fig-000",
-   "page_key": "15-2-bank-regulation",
    "source": "openstax",
    "source_key": "principles-macroeconomics-2e",
    "stratum": "photo"
@@ -14903,9 +11718,9 @@
  "excluded_page_slugs": 54,
  "gates": {
   "page excluded (held-out or already in another set)": 47,
-  "same image already in the pool (other edition of a book)": 409
+  "same image already in the pool (other edition of a book)": 312
  },
- "pool_sha256": "c5731fa65933b77bb287db3d1125f8dd89485acdddf4b390b8ef67dd8bcdec42",
+ "pool_sha256": "3e99c66b3157be3e747fa38f1378aac69692ee5be29dd5c0cf053e4a17f8c2fa",
  "seed": "figures-v2-2026-11-02",
  "set": "figures-v2",
  "source": "openstax"
