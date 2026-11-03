@@ -29,9 +29,12 @@ as a cross product. That is meaning-level too, and asked only when the
 letters and digits mostly agree with the text layer (so it can be trusted). When the
 letters and digits agree exactly, two more checks run (`text_layer_number_case_checks`):
 the digits must make the same numbers (36 is not 63, 9.81 is not 98.1) and the capitals
-must be the same capitals (W/g is not w/g); either is meaning-level too. Any failed
-text-layer check on a cheap-model answer, a cosmetic one included, escalates to the main
-model.
+must be the same capitals (W/g is not w/g); either is meaning-level too. A chemistry
+reading's species and arrows are compared as well (`chem_check`, check
+`equation.text_layer_species`): a subscript read as a coefficient, a flipped charge sign,
+a changed state or arrow, a neighbour word in a formula, a reaction cut short; meaning-level
+too. Any failed text-layer check on a cheap-model answer, a cosmetic one included,
+escalates to the main model.
 
 Course notation (`pipeline.notation_memory`, with `FEATURE_NOTATION_MEMORY` on and the
 job's course list in the run's options): the list goes to the model as a fenced block
