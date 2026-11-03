@@ -76,7 +76,7 @@ _HEADING = re.compile(r"h[1-6]\Z")
 _KEPT_LINK = re.compile(r"(#|https?:|mailto:)", re.IGNORECASE)
 _ATTR_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_.:-]*\Z")
 # Characters XML 1.0 does not allow at all.
-_XML_BAD = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
+_XML_BAD = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
 _MEDIA_TYPES = {"png": "image/png", "jpg": "image/jpeg", "gif": "image/gif", "webp": "image/webp"}
 _EPUB_TYPES = {
     "doc-pagebreak": "pagebreak",
