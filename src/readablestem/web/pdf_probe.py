@@ -61,9 +61,17 @@ exits after one answer.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import unicodedata
 from typing import TYPE_CHECKING
+
+# This child runs under an address-space cap (`limit_memory`). numpy (imported through
+# `page_type` and `ink_strokes`) starts a BLAS thread pool whose stacks and arenas are reserved
+# per core, which on a many-core machine exceeds the cap and fails the import. The probe does
+# no linear algebra, so one thread is enough. Set before numpy is first imported.
+for _threads in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_threads, "1")
 
 if TYPE_CHECKING:
     import pymupdf

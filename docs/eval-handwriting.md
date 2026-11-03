@@ -836,7 +836,17 @@ the share of real model errors that these checks name is not known (the kinds of
 for the sizes and slopes of these pages. The case check cannot tell a capital from a small
 letter written large, and none of the checks can tell Greek from Latin. The sharp pictures are not
 measured at all: a live run of the page reader on them is a paid step, and the earlier result says
-not to expect a gain, so `IMAGE_PAGES_VECTOR_CROPS` can be turned off alone.
+not to expect a gain (0.595 against 0.662 exact, n=74). The picture changes what the model and the
+student file see, so `IMAGE_PAGES_VECTOR_CROPS` is **off by default** (`IMAGE_PAGES_VECTOR_CHECKS`,
+which only adds reasons, is on).
+
+**How to measure the crops before turning them on.** On the vector dev set and on real exports
+(the D-copy pages, own notes), run the image page pass twice over the same pages, once with
+`IMAGE_PAGES_VECTOR_CROPS=false` and once with `true`, recorded together as `handwriting_own.py`
+does for its arms (one record per arm). Compare exact and lenient match, the number of required
+decisions per page and silent wrong equations, with intervals; the pass costs about $0.05 a page, so
+24 pages are about $1.2 an arm. Turn it on only if the drawn pictures are not worse and the review
+screen is clearer for a person comparing; check the student file's equation images too.
 
 ## A set of real iPad ink with answer keys nobody typed
 

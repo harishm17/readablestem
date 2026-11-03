@@ -1739,7 +1739,7 @@ exactly as before. Measured on the vector dev set, a clean re-render of the ink 
 reader read better than a scan (docs/eval-handwriting.md), so the strokes serve pictures a person
 compares against and checks, not re-reading. Four uses, none calling a model:
 
-- **Sharp pictures** (`IMAGE_PAGES_VECTOR_CROPS`, default on). The picture of a display equation,
+- **Sharp pictures** (`IMAGE_PAGES_VECTOR_CROPS`, default off). The picture of a display equation,
   of a prose block or list item that needs a decision, and of a stretch of ink the reading left
   out is drawn from the strokes that sit in its box (centre within the box grown by a fifth of its
   height and 4 pt): black on white at 300 dpi (long side at most 2,048 px), cut to the ink with

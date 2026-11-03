@@ -1258,8 +1258,7 @@ def rerender_demo(report_path: Path, pdf_path: Path, html_path: Path, *, note: b
     result = DocumentResult.model_validate({**report["result"], "html": ""})
     pdf = pdf_path.read_bytes()
     refreshed = refresh_heading_fixes(result)  # the heading step needs no model
-    kinds = {p.page: p.kind for p in result.page_types}
-    html = rerender_html(result, recrop(pdf, result.elements, kinds))
+    html = rerender_html(result, recrop(pdf, result.elements))
     if note:
         page = render.PageSource(
             book_slug=meta.get("book_slug") or "",

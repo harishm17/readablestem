@@ -12,8 +12,8 @@
   (`image_page.case_check`, `image_page.script_check`; sentences in `web/messages.py`) to the
   equation's fix and never change its required decision. Pages with no strokes, and every scan,
   are read as before.
-- Settings `IMAGE_PAGES_VECTOR_CROPS` and `IMAGE_PAGES_VECTOR_CHECKS`, both on. `layout.page_ink`
-  reads a page's strokes under the document lock; `run.recrop` takes the pages' kinds so a stored
+- Settings `IMAGE_PAGES_VECTOR_CROPS` and `IMAGE_PAGES_VECTOR_CHECKS`, `VECTOR_CROPS` off until measured, `VECTOR_CHECKS` on. `layout.page_ink`
+  reads a page's strokes under the document lock; `run.recrop` can take the pages' kinds so a stored
   vector page is drawn the way it was converted.
 - `scripts/handwriting_vector_checks.py` measures the checks on built vector sets at no cost
   (put-in errors in the gold readings). Held-out (318 expressions): raised scripts taken out are

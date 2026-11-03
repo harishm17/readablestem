@@ -580,10 +580,10 @@ def equation_picture(fake: FakeVisionClient) -> Image.Image:
 
 
 def test_the_model_is_sent_the_picture_drawn_from_the_strokes():
-    _, fake = convert(blocks=[EXPRESSION])
+    _, fake = convert(blocks=[EXPRESSION], image_pages_vector_crops=True)
     with equation_picture(fake) as image:
         assert image.mode == "L"
-    _, fake = convert(blocks=[EXPRESSION], image_pages_vector_crops=False)
+    _, fake = convert(blocks=[EXPRESSION])  # off by default: the ordinary crop
     with equation_picture(fake) as image:
         assert image.mode == "RGB"
 
@@ -599,7 +599,7 @@ def test_the_review_screen_gets_the_same_sharp_picture():
         },
         budget=budget,
     )
-    out = convert_pdf(ink_pdf(), settings=settings(), client=fake)
+    out = convert_pdf(ink_pdf(), settings=settings(image_pages_vector_crops=True), client=fake)
     eq = next(e for e in out.result.elements if e.kind is Kind.EQUATION)
     with Image.open(io.BytesIO(out.crops[eq.id])) as image:
         assert image.mode == "L"

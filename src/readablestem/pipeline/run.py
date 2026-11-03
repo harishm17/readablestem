@@ -732,7 +732,9 @@ def recrop(
     scale = equation_scale.scaler(elements)
     crops: dict[str, bytes] = {}
     vector: dict[int, image_page_vector.VectorPage] = {}
-    if kinds:  # (`kinds`: each page's `page_type` kind; a handwritten vector page is drawn)
+    # `kinds` (each page's `page_type` kind) is given only by a caller whose conversion drew
+    # the pictures from strokes (`IMAGE_PAGES_VECTOR_CROPS`, off by default).
+    if kinds:
         wanted = {e.page for e in elements if image_page_vector.wants_picture(e)}
         vector = image_page_vector.analyse(pdf, wanted, kinds)
     try:
