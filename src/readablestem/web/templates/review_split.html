@@ -48,6 +48,31 @@
 {% for s in segments %}{% if not loop.first %} {% endif %}{% if s.differs %}<mark class="said-diff">{{ s.text }}</mark>{% else %}{{ s.text }}{% endif %}{% endfor %}
 {%- endmacro %}
 
+{# One form of choices, for a second reader's chips and for the page witness's reading: each
+   button posts the whole LaTeX its choice gives as an ordinary edit, and `origin` says which
+   kind of choice it was (web.review.CHOICE_ORIGINS). #}
+{% macro chips_form(p, chips, origin, who, prefix) %}
+{% set item = p.item %}{% set eid = item.element_id %}
+<form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="chips-form">
+  {{ hidden_fields() }}<input type="hidden" name="action" value="edit"><input type="hidden" name="origin" value="{{ origin }}">
+  {% for group in chips.groups %}
+  {% set gid = prefix ~ "-" ~ eid ~ "-" ~ loop.index %}
+  <div class="chip-group" role="group" aria-labelledby="{{ gid }}">
+    <p class="chip-lead" id="{{ gid }}">Where the proposal above has {{ group.which }}<code class="latex">{{ group.symbol }}</code> (said “{{ group.said }}”), {{ who }} had:</p>
+    <ul class="chip-list">
+      {% for chip in group.chips %}
+      {% set cid = gid ~ "-" ~ loop.index %}
+      <li>
+        <button type="submit" name="latex" value="{{ chip.latex }}" class="button-secondary chip" data-role="chip"{% if chip.speech %} aria-describedby="{{ cid }}-said"{% endif %}>Use {{ chip.phrase }}<span class="visually-hidden"> in {{ item.label|lower }}</span></button>
+        {% if chip.speech %}<span class="chip-said" id="{{ cid }}-said">Then read aloud roughly as: “{{ chip.speech }}”</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+</form>
+{% endmacro %}
+
 {# Roughly how the proposal is read aloud, and what a screen reader gets from the PDF
    itself (its text layer: shown to the document's owner only, here). #}
 {% macro speech_lines(p, item) %}
@@ -142,24 +167,28 @@
 <section class="chips" aria-labelledby="chips-title-{{ eid }}">
   <h3 id="chips-title-{{ eid }}" class="part-label">A second reading differs</h3>
   <p class="hint" id="chips-hint-{{ eid }}">Another reader read this picture differently. Look at the picture, then choose a reading, or leave this and edit the LaTeX below. Nothing is chosen for you.</p>
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="chips-form">
-    {{ hidden_fields() }}<input type="hidden" name="action" value="edit"><input type="hidden" name="origin" value="second_reader_choice">
-    {% for group in p.chips.groups %}
-    {% set gid = "chip-group-" ~ eid ~ "-" ~ loop.index %}
-    <div class="chip-group" role="group" aria-labelledby="{{ gid }}">
-      <p class="chip-lead" id="{{ gid }}">Where the proposal above has {{ group.which }}<code class="latex">{{ group.symbol }}</code> (said “{{ group.said }}”), the other reader had:</p>
-      <ul class="chip-list">
-        {% for chip in group.chips %}
-        {% set cid = gid ~ "-" ~ loop.index %}
-        <li>
-          <button type="submit" name="latex" value="{{ chip.latex }}" class="button-secondary chip" data-role="chip"{% if chip.speech %} aria-describedby="{{ cid }}-said"{% endif %}>Use {{ chip.phrase }}<span class="visually-hidden"> in {{ item.label|lower }}</span></button>
-          {% if chip.speech %}<span class="chip-said" id="{{ cid }}-said">Then read aloud roughly as: “{{ chip.speech }}”</span>{% endif %}
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endfor %}
+  {{ chips_form(p, p.chips, "second_reader_choice", "the other reader", "chip-group") }}
+</section>
+{% endif %}
+{% if p.other %}
+{# A typed equation the page witness read differently (web.reading_chips.other_reading_for):
+   the other reading beside the proposal, why the item is asked, one button for the whole of
+   it and the symbols in which it differs. Nothing is chosen until a button is pressed. #}
+{% set o = p.other %}
+<section class="chips other-reading" aria-labelledby="other-title-{{ eid }}">
+  <h3 id="other-title-{{ eid }}" class="part-label">The other reading</h3>
+  <p class="hint" id="other-why-{{ eid }}">{{ o.why }} Nothing is chosen for you.</p>
+  <p class="cmp-label">Other reading, {{ "read from the picture of the formula" if o.source == "crop" else "read from the whole page" }}</p>
+  <div class="cmp-row" tabindex="0" role="group" aria-label="Other reading of {{ item.label|lower }}"><div class="cmp-math cmp-math-plain">{{ o.mathml }}</div></div>
+  {% if o.speech %}<p class="speech" id="other-said-{{ eid }}"><span class="speech-label">Read aloud roughly as:</span> “{{ o.speech }}”</p>{% endif %}
+  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="suggest other-form">
+    {{ hidden_fields() }}<input type="hidden" name="action" value="edit"><input type="hidden" name="origin" value="page_witness_choice">
+    <button type="submit" name="latex" value="{{ o.latex }}" class="button-secondary" data-role="other"{% if o.speech %} aria-describedby="other-said-{{ eid }}"{% endif %}>Use the other reading<span class="visually-hidden"> for {{ item.label|lower }}</span></button>
   </form>
+  {% if o.chips %}
+  <p class="hint">Or take only the symbols that differ:</p>
+  {{ chips_form(p, o.chips, "page_witness_choice", "the other reading", "other-group") }}
+  {% endif %}
 </section>
 {% endif %}
 <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form{% if item.edited %} is-edited{% endif %}">

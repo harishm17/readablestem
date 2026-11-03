@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: both readings on the review card (branch eq/review-both-readings)
+
+- Review card: a typed equation the page witness read differently (`witness_mismatch`,
+  `witness_extent_differs`) shows "The other reading" under the proposal: its formula, how it is read
+  aloud, why the item is asked, **Use the other reading**, and the symbols that differ as the same
+  chips handwritten cards have (`web/reading_chips.py`, built on `reading_alternatives.from_reading`).
+  Ordinary edits (checks, Undo), none preselected, audited as `page_witness_choice`. Nothing shows with
+  `FEATURE_PAGE_WITNESS` off. Documented in docs/web.md and docs/steps.md.
 ## Unreleased: glyph checks for equations (branch eq/bag-extended-extent)
 
 - `EQUATION_GLYPH_CHECKS` (off): the glyphs under an equation's box, and for an inline equation read with
@@ -30,8 +38,7 @@
   decision with the reading nearer the extent's glyphs first and the other in `EquationFix.other_latex`;
   a formula only the witness read, with maths-glyph evidence and clear of other elements, is a new
   element and a required decision. New fields: `Element.witness_latex`, `witness_status`,
-  `EquationFix.other_latex`, `other_source`, `DocumentResult.page_witness`. The review card does not
-  show the other reading yet. Documented in docs/steps.md. Not measured (E1 is a later step).
+  `EquationFix.other_latex`, `other_source`, `DocumentResult.page_witness`. Documented in docs/steps.md. Not measured (E1 is a later step).
 ## Unreleased: pen strokes check handwritten vector pages (branch hw/stroke-checks)
 
 - `pipeline/image_page_vector.py` (new): on a page `page_type` calls handwritten and `ink_strokes`

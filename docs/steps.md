@@ -646,7 +646,9 @@ out. The equation step then compares its crop reading with the witness's:
   witness's reading as the other reading.
 - **witness-only**: a new element is always a required decision (`witness_added`).
 
-The review card does not show `other_latex` yet. Without the flag nothing here runs and the output is as before.
+The review card shows `other_latex` beside the proposal (rendered, read aloud, why it is asked, a button for the
+whole reading and chips for the symbols that differ: docs/web.md, "The other reading"). Without the flag nothing
+here runs, nothing is shown and the output is as before.
 The prompt is not used by default; the first measurement is the registered dev run (E1), a later, separately
 approved step.
 
