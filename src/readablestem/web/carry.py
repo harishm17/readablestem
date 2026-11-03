@@ -204,9 +204,17 @@ def _decided(fix: Fix) -> bool:
 
 
 def _proposal(fix: Fix) -> dict[str, Any]:
-    return fix.model_dump(
+    """What the tool proposes for the item, for the "same proposal" test. An equation's MathML
+    and speech are made from its LaTeX by code that changes between pipeline versions (the
+    MathML shape for screen readers, the speech rules), so only the LaTeX and the display mode
+    are the proposal: the same reading with another shape is not a new suggestion."""
+    proposal = fix.model_dump(
         mode="json", include={"equation", "figure", "heading", "table"}, exclude_none=True
     )
+    equation = proposal.get("equation")
+    if equation is not None:
+        proposal["equation"] = {k: equation.get(k) for k in ("latex", "display")}
+    return proposal
 
 
 def _same_proposal(old: Fix, new: Fix) -> bool:

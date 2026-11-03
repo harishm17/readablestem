@@ -122,6 +122,25 @@ def test_a_changed_picture_never_inherits_a_decision():
     assert report.removed == 0
 
 
+def test_an_accept_is_carried_when_only_the_mathml_and_speech_were_made_another_way():
+    """The MathML shape for screen readers and the speech rules change between pipeline
+    versions; the same LaTeX is the same proposal."""
+    before_e, before_f = equation("p1-e0", latex=r"\text{H}_2\text{O}")
+    decide(before_f, Status.ACCEPTED)
+    new_e, new_f = equation("p1-e0", latex=r"\text{H}_2\text{O}")
+    assert new_f.equation is not None
+    new_f.equation = EquationFix(
+        latex=new_f.equation.latex,
+        mathml="<math><msub><mi mathvariant='normal'>H</mi><mn>2</mn></msub></math>",
+        speech="H 2 O",
+        display="block",
+    )
+    old, new = result_of((before_e, before_f)), result_of((new_e, new_f))
+    report, changes = carry.carry_decisions(old, {"p1-e0": png(1)}, new, {"p1-e0": png(1)})
+    assert report.carried == ["p1-e0"] and report.suggestion_changed == []
+    assert new_f.status is Status.ACCEPTED and [c.element_id for c in changes] == ["p1-e0"]
+
+
 def test_an_accept_is_not_carried_when_the_tool_now_proposes_something_else():
     before_e, before_f = equation("p1-e0", latex="x")
     decide(before_f, Status.ACCEPTED)
