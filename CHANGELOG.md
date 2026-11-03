@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: redirects built from owned rows (branch sec/redirects-from-owned-job)
+
+- Every redirect in the review, edit, bulk, course, job-settings, feedback and job routes takes its job or course id
+  from the row the ownership check returned, never from the request's path or form. `write_review` and
+  `write_structure` return that id, and the `ReviewStale` and `ReviewInvalid` they raise carry it. The item a form
+  names is looked up in the stored result before it is put in an address. No change for a visitor; it removes the
+  CodeQL `py/url-redirection` alerts at the root. Test: `tests/test_web_redirects_owned.py`.
+
 ## Unreleased: Word and EPUB downloads (branch export/word-and-buttons)
 
 - Word export (`pipeline/export_docx.py`, `readablestem export docx FILE.html OUT.docx`): the finished HTML through
