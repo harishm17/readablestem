@@ -250,6 +250,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("heading.sentence", "heading.sentence_like"): "It reads like a sentence or a lead-in "
     "(it ends in a full stop, a question mark or a colon), not a title: decide whether it is "
     "a heading or just bold text.",
+    ("heading.numbered", "heading.numbered_unconfirmed"): "It is a numbered line that may be a "
+    "section title, but the numbers do not look like a run of sections (they do not start at "
+    "1 or 2, or the line is long): decide whether it is a heading or just text.",
     ("heading.list_like", "heading.list_like"): 'It starts like a numbered list item ("1.", '
     '"A)"), so it may be part of a list rather than a heading.',
     # Whole-document checks of the output HTML (pipeline.html_checks)

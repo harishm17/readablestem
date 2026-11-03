@@ -1,0 +1,36 @@
+% Layout fixture: Beamer theme with a header bar (section and subsection navigation)
+% and a footer bar (author, title, date, slide number). Written for ReadableSTEM's
+% tests (MIT); no third-party text.
+\documentclass{beamer}
+\usepackage{amsmath}
+\usetheme{Warsaw}
+\setbeamertemplate{navigation symbols}{}
+\title{Waves and Oscillations}
+\author{R. Example}
+\date{Spring 2027}
+
+\begin{document}
+
+\section{Waves}
+\subsection{Basics}
+\begin{frame}{Wave Speed}
+  A wave of wavelength $\lambda$ and frequency $f$ travels at
+  \begin{equation*}
+    v = \lambda f .
+  \end{equation*}
+  The wave number is $k = 2\pi/\lambda$.
+\end{frame}
+
+\section{Superposition}
+\subsection{Beats}
+\begin{frame}{Beat Frequency}
+  \begin{itemize}
+    \item Two tones with frequencies $f_1$ and $f_2$ are added.
+    \item The beat frequency is $f_b = |f_1 - f_2|$.
+  \end{itemize}
+  \begin{align*}
+    \cos a + \cos b &= 2 \cos\frac{a+b}{2} \cos\frac{a-b}{2}.
+  \end{align*}
+\end{frame}
+
+\end{document}

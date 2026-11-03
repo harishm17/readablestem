@@ -51,6 +51,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `ENV` | `dev`, `test` or `prod`. Production refuses to start without its limits and secrets (`Settings.check_production`, plus `web.app.check_web_secrets`, which also refuses empty secrets) |
 | `DATABASE_URL` | SQLite locally, Postgres (`postgresql+psycopg://...`) in production |
 | `SESSION_SECRET` | Signs the session cookie. Required in production, at least 32 characters (e.g. `python -c 'import secrets; print(secrets.token_urlsafe(48))'`) |
+| `SESSION_SECRET_PREVIOUS` | Optional, comma-separated earlier secrets, accepted when checking a session cookie and never used to sign (`web.app.RotatingSessionMiddleware`). Each entry at least 32 characters in production. Steps: [security.md](security.md), "Rotating the session secret" |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in. Without them the "Sign in with Google" button is hidden |
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft (Entra ID) sign-in, on only with all three set; tenants are directory ids, comma-separated. Half of them set refuses to start (`check_production`, any environment). See "Sign-in, sessions and CSRF" |
 | `EMAIL_LOGIN_ENABLED`, `EMAIL_SENDER`, `EMAIL_LINK_MINUTES` | Sign in by an emailed one-time link (T3-10). **Off, and no email provider is wired in.** `EMAIL_SENDER` names a registered sender (`web/email_senders.py`); the settings check refuses `EMAIL_LOGIN_ENABLED=true` without one in any environment, and in production refuses a sender that is for development only, which today means always. See "Sign-in, sessions and CSRF" |
@@ -58,7 +59,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default |
 | `FEATURE_PAGE_MATH`, `PAGE_MATH_MODEL`, `ANTHROPIC_EFFORT_PAGE_MATH`, `PAGE_MATH_UNCONFIRMED_FACTOR` | The page math pass (ADR 0006, docs/eval-page-math.md): one cheap-model call per page places the equations; off by default |
 | `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table; see "Usage events"). Both on by default; the questions are stored as events, so they need both |
-| `ANALYTICS_ENABLED` | Product analytics (see "Product analytics"): PostHog loaded and sent through this app's own `/m/` proxy, page views plus a few named funnel events. **Off by default**: the privacy notice's "Cookies" section says there are no analytics, so it needs rewording before this is turned on |
+| `ANALYTICS_ENABLED` | Product analytics (see "Product analytics"): PostHog loaded and sent through this app's own `/m/` proxy, page views plus a few named funnel events. **Off by default**: the privacy notice's "Cookies" section says there are no analytics. Production refuses to start with it on until the notice (`web/templates/privacy.html`) names PostHog and no longer says "no analytics" (`ops.launch.analytics_notice_problem`; `launch-check` lists the same). The notice has no version number, so the check reads its text |
 | `FEEDBACK_URL` | Where the footer's "Send feedback" link goes (http or https only). Unset: an email to `CONTACT_EMAIL`. A form service here is a new data processor: name it in the privacy notice first |
 | `BASE_URL` | Builds the OAuth redirect URIs, `${BASE_URL}/auth/callback` (Google) and `${BASE_URL}/auth/microsoft/callback` (Microsoft). Production: `https://readablestem.com`, so Google's redirect URI is `https://readablestem.com/auth/callback` |
 | `SIGNUP_MODE` | `allowlist` (the default: only people an admin added may sign in) or `open` (anyone with a verified Google identity, or an allowed Microsoft one, gets an account at the first sign-in). See "Sign-up modes and access tiers" |
@@ -79,7 +80,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (`claude-opus-5-5`, `claude-haiku-5-5`), the workspace id an organisation-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let the developer look (`web/retention.py`) |
-| `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`. Required (non-empty) in production, or the purge would never run |
+| `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`, compared in constant time. Required in production, at least 32 characters, or the purge would never run; the route also guards the daily paid canaries. Every call counts against the cron rate limit, wrong tokens included |
 | `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval |
 | `SOURCE_URL`, `CONTACT_EMAIL` | Footer source link (AGPL notice); contact on the 403, privacy and terms pages |
 
@@ -87,8 +88,9 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 
 | Method and path | Who | What |
 |---|---|---|
-| GET `/` | anyone | What the tool does, why now, how long, how accurate (numbers from docs/eval.md, linked), what to do with the file, sign-in, link to the demo |
-| GET `/demo` | anyone | `web/static/demo/index.html` if present (served with the sandbox CSP), else a "being prepared" page |
+| GET `/` | anyone | What the tool does, why now, how long (with the review load: about 1.8 decisions per page as on `/limits`, a full job, a new account's daily pages read from `OPEN_TIER_DAILY_PAGE_QUOTA`, and the deletion time), how accurate (numbers from docs/eval.md, linked), what to do with the file, sign-in, link to the demo |
+| GET `/demo` | anyone | `web/static/demo/index.html` if present (served with the sandbox CSP, an `ETag` and `Cache-Control: public, max-age=3600`, and a 304 for a matching `If-None-Match`: "Security headers"), else a "being prepared" page |
+| GET `/guides` | anyone | The list of the guides below it, each with its summary and date (`seo.GUIDES`); in the sitemap, `llms.txt` and the footer |
 | GET `/privacy`, `/terms` | anyone | The beta wording, describing the real behaviour (hourly purge, Railway's daily backups kept about 6 days, Langfuse only when tracing is on). `readablestem ops launch-check` lists any unfinished wording left on the public pages |
 | GET `/limits` | anyone | Known limits: the facts that hold today (including tables, links, colour, language and file types, as this server is set up) and the measured accuracy |
 | GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make the HTML the main version and keep the PDF only as a labelled print copy (28 CFR 35.202, the DOJ fact sheet); check with your accessibility office; guidance, not legal advice |
@@ -103,7 +105,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET `/account` | signed in | The address and name held, the access tier, today's limits, and the "Delete my account" link ("Sign-up modes and access tiers") |
 | GET, POST `/account/delete` | signed in | "Delete your account?" confirmation; only a POST with `confirm=yes` (and the CSRF token) erases the account and everything of theirs, signs them out and goes to `/` |
 | POST `/logout` | signed in | Clears the session |
-| GET `/app?revises=` | signed in | My documents as a to-do list (below), then the upload form; with `revises=<job id>` of the person's own finished document, the form for a revised version of it ("Revised versions" below) |
+| GET `/app?revises=` | signed in | My documents as a to-do list (below; each finished row has "Upload a revised version"), then the upload form; with `revises=<job id>` of the person's own finished document, the form for a revised version of it ("Revised versions" below) |
 | GET `/app/documents?v=&course=` | signed in | The documents list alone, polled by htmx while a document is waiting or converting (204 while unchanged); with `course=` only that course's documents (the course page polls it) |
 | POST `/jobs` | signed in | Upload of one file or up to 10: checks, quota, queue, one job each; 303 to `/jobs/{id}` for one file, to `/uploads/{id}` when it is kept for choosing its pages, 303 to `/app/upload/{id}` (the results page) for several ("Uploads and limits") |
 | GET `/app/download` | signed in | One zip of the person's ready documents ("Several files, courses and download all") |
@@ -118,12 +120,15 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | POST `/jobs/{id}/language` | owner | Confirm or change the document language (`lang`, one the control offers); lang_source becomes "user" and the HTML is made again |
 | POST `/jobs/{id}/retry` | owner | "Try again" / "Convert the missing parts" on a stopped or partly converted document (below): the same job goes back in the queue; 409 when it is not stopped or has had its 3 tries, 429 with 10 documents already waiting or converting; rate limited per address and per person |
 | GET `/jobs/{id}/download` | owner | The HTML as an attachment |
+| GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back); 409 with fewer than two such parts, 404 for another person's or an expired document |
 | GET `/jobs/{id}/download/canvas` | owner | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
 | GET `/jobs/{id}/download/cartridge` | owner | The same page as an IMS Common Cartridge 1.3 package, `.imscc` (`pipeline/export_cartridge.py`, docs/output.md "The Common Cartridge export"). Same errors and recording as the Canvas zip; a plain link on the job page |
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation, figure or table |
 | GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | owner | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
-| GET `/jobs/{id}/review/list` | owner | "All items as a list": every fix, grouped by kind (no bulk accept) |
+| GET `/jobs/{id}/review/list?kind=&page=` | owner | "All items as a list": every fix, grouped by kind; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below) |
+| GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept all remaining equations whose checks passed" or "Accept all figures that have generated alt text" would accept, its count, and the form that does it (404 for another kind) |
+| POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item that list shows, as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
 | GET `/jobs/{id}/review/marks.css` | owner | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
 | GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond four renders in progress for one person (a review page asks for the page and up to three crops of a repeated-heading group at once), 503 when the instance's two render slots stay busy |
 | GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
@@ -133,7 +138,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | POST `/jobs/{id}/edit/{element_id}` | owner | Change what the tool did not propose (T3-5): `action=text` changes the words of a paragraph, list item or heading (`text`), `action=heading` makes a paragraph a heading (`level`). Review `version` checked; 422 with the error beside the field |
 | GET `/jobs/{id}/pages/{n}/region.png?left=&top=&right=&bottom=` | owner | The region of page `n` the four edges (percent of the page) describe, cut as it would be added; rendered now in the render child, never stored; 404 for a region that is not one |
 | POST `/jobs/{id}/pages/{n}/add` | owner | Add a picture the tool did not find (`kind=picture`, `alt`) or mark a region as an equation (`kind=equation`: the equation step reads it, the answer is a required decision), the region as `left`, `top`, `right`, `bottom`. Rate limited (`edit_region`, and `reread` for an equation), one read at a time per person, under the job's and the day's spend caps |
-| POST `/jobs/{id}/pages/{n}/omit`, `/restore` | owner | Leave page `n` out of review and of the student file (T3-16), and put it back |
+| POST `/jobs/{id}/pages/{n}/omit`, `/restore` | owner | Leave page `n` out of review and of the student file (T3-16), and put it back. From a kept-image card the form also sends `after=review` (and `view`): the reviewer then goes on to the next decision instead of the page tools |
 | POST `/jobs/{id}/tables/accept-clean` | owner | Accept every table that waits with nothing wrong found in it (T3-11), one write |
 | POST `/jobs/{id}/tables/{element_id}/read-cell` | owner | Read a table's maths cell with the equation step and check it like a typed edit (T3-11); rate limited (`reread`), one read at a time, spend capped |
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <title>? This cannot be undone" confirmation page (the file, its upload time, the decisions made on it); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list |
@@ -411,7 +416,7 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    with a short title and no hidden layer, which may be a slide; ink not analysed within
    the 10 s budget) never refuses the upload: the conversion keeps it as an image with
    a decision (docs/layout.md "Hidden text and page types"). The child caps its own address space at 768 MB. The conversion
-   itself is not isolated this way; see "Limits of the worker" below;
+   runs in a child process of its own too; see "Limits of the worker" below;
 6. the page quota: one conditional `UPDATE quota_days SET pages = pages + n WHERE ... AND
    pages + n <= quota`, in the same transaction as the job insert (if over: 429 and the
    upload page again, naming the file, its pages and the pages left today). The quota is
@@ -594,8 +599,10 @@ with it), nothing is converted or counted, and the person is sent to `/uploads/{
   page names what was started and why it stopped.
 - **Each part is a document** named "chapter2 (pages 31-59).pdf", with `jobs.part_group` (the
   pending upload's id) and `jobs.part_label`; its page says which pages it holds and links
-  its sibling parts in page order. Parts are separate documents, not merged into one HTML
-  file.
+  its sibling parts in page order. Parts are separate documents; the "Combine parts" link on
+  the results page of a part (when two or more finished parts are kept) joins the ones the
+  person still keeps into one HTML file (`web/combine.py`, docs/output.md "Combining the parts
+  of a long source").
 - **Retention.** The pending upload is deleted `RETENTION_HOURS` after it was made, by the
   hourly purge (`ops.retention.purge_pending`), "Discard this file" (asks first), when its last
   page has been sent, and with the person (`erase_user`). Past its time it answers 404 at
@@ -713,8 +720,12 @@ script.
 - **Proxy.** `/m/static/*` goes to PostHog's assets host (cacheable for an hour);
   `/m/array/<token>/config(.js)` goes there too, with the browser's `Origin`, never cached;
   everything else goes to the API host with cookies and the referrer removed, only a
-  `Bearer phc_...` authorization kept, and the caller's address in `X-Forwarded-For`
-  (the address as the rate limits see it). The same rules as the personal site's edge Worker.
+  `Bearer phc_...` authorization kept. The visitor's address is not sent on: there is no
+  `X-Forwarded-For`, so PostHog records the relay's address (PostHog uses the capture
+  request's address unless an `$ip` property is given). The "Discard client IP data" setting in
+  the PostHog project drops even that; it is a setting there, not in this repo. The relay is
+  rate limited per address (`analytics`: 300 calls per 10 minutes). Otherwise the same rules
+  as the personal site's edge Worker.
   An upstream error is a 502; nothing waits on analytics.
 - **Loader.** `static/analytics.js`, included by `base.html` (app pages only). Converted
   documents, the demo, downloads and exports are built from other code and served under
@@ -736,7 +747,8 @@ script.
 - **From the personal site.** `?hm_id=<id>` becomes the PostHog `distinctID` (it must look
   like an id) and `ref: harishmanoharan.com` is registered once; `?ref=<tag>` registers `ref`
   and `first_ref`. Both, `notrack` and `utm_*` are then removed from the address bar.
-- **Before turning it on.** The privacy page's "Cookies" section says "There are no
+- **Before turning it on.** Production refuses `ANALYTICS_ENABLED=true` while the notice
+  still says there are no analytics or does not name PostHog. The privacy page's "Cookies" section says "There are no
   analytics, advertising or third-party tracking cookies" and the usage-events paragraph
   says "No cookies or scripts are used for this". Both need rewording first (the notice is
   Harish's to write); a one-line disclosure belongs in the "Cookies" section, beside the
@@ -1113,7 +1125,10 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   | `no_content` | The result had no elements at all |
   | `model_not_configured` | The model client is misconfigured (no key for the selected provider): every job would fail the same way |
   | `access_removed` | The owner was removed from the allowlist |
-  | `timeout` | The conversion ran past its time limit |
+  | `timeout` | The conversion ran past its time limit (or, in its child, its CPU limit) |
+  | `conversion_crashed` | The conversion's child process died of a signal or exited without an answer (MuPDF aborting, a segfault). Failed at once, not retried; not offered "Try again" |
+  | `conversion_unavailable` | The conversion's child could not start (an import failed, a library or the table model file is missing; exit status 1 or 72, or a "startup" error from it). The service's fault, not the PDF's: logged at ERROR (`conversion_child_unavailable`, type only); offered "Try again"; a self-check at worker start (`conversion_child_check_ok` or `_failed`) says so early |
+  | `conversion_oom` | The conversion's child ran out of memory (`MemoryError` under its address-space cap), or killed by SIGKILL that this process did not send (the kernel's OOM killer, with other work on the host using the memory): that is run once more before the job fails, so a job is not blamed on its PDF for another request's memory. Failed at once; not offered "Try again" |
   | `store_failed` | The result could not be written to the database |
   | `lease_expired` | The job was interrupted 3 times (since it was last tried again) |
   | `upload_missing` | The upload blob was gone |
@@ -1189,14 +1204,65 @@ waiting or converting says so on its page and in its status box; one answered re
 it. It is a hint from this server's own traffic (per process, forgotten on restart), never a
 gate: nothing is refused because of it.
 
-**Limits of the worker.** The conversion (`layout.analyze`, crops) runs MuPDF inside the
-web process, not in a child process like the upload probe. A conversion stuck in native
-code cannot be stopped from Python: after its time limit the job is failed and the queue
-moves on, but the stuck thread stays (logged as `conversion_abandoned`) until the
-process restarts. A PDF that crashes MuPDF during conversion takes the whole process
-down; the job is retried after its lease expires, behind fresh jobs, and failed with
-`lease_expired` after 3 attempts. Running the conversion in a killable child process is
-the fix; it is not built yet.
+**The conversion runs in a child process.** MuPDF reads the untrusted PDF on every page (layout
+analysis, page types, the table detector, the text pass, tagged structure, source facts, every
+crop), so the whole `convert_pdf` runs in a child (`web/isolated_convert.py` starts
+`python -m readablestem.web.conversion_child`) that the worker can kill. `default_converter()`
+is `convert_isolated`, which has `convert_pdf`'s signature.
+
+- *The boundary.* Not "only the MuPDF calls": those are interleaved with the model steps (a
+  crop is cut, its step is submitted, the next crop is cut) and pass page objects, which cannot
+  cross a process. The child has no key, no database URL and no token (`core/childenv.py`,
+  plus `TABLE_MODEL_DIR`) and asks the parent, over a socket, for everything outside: model
+  requests and the job's verifier (`VisionClient.run`), progress and stage progress, the step
+  cache, the call observer. The parent answers with the job's real client, so spend
+  accounting is unchanged: every reservation is still one conditional UPDATE on the job's row
+  in the parent, against the job caps and the daily cap, and every database write is the
+  parent's. Child to parent messages are JSON plus raw bytes, validated (a model request
+  is bounded in images, tokens and size; its schema must be a pydantic model of this package);
+  the parent never unpickles what the child sends. A model request is sent only for a model the deployment is configured with (every `*_model` setting and the fallbacks) and a schema one of the steps defines; progress must satisfy 0 <= done <= total <= `MAX_PAGES_PER_JOB`; at most `max(4, 2 x concurrency)` requests are open at once. The parent holds at most 128 MB of the child's output at once (a frame over that is refused and the job fails `conversion_crashed`, `conversion_child_frame_refused`; later frames wait on the socket), read in place without a second copy. The result comes back as JSON
+  (`DocumentResult`) and PNG crops, and is the same as an in-process run's apart from the
+  timings (`tests/test_web_isolated_convert.py`). A model call still running when the child is
+  killed finishes and settles in the parent; its spend counts, as an abandoned thread's did.
+- *Limits.* Address space `CONVERSION_MEMORY_MB` (default 3072; measured peak of a conversion is
+  1.6-1.8 GB of address space, 330-460 MB resident, on 4 documents of 2, 7, 7 and 11 pages with
+  `glibc` arenas capped at 2 (`MALLOC_ARENA_MAX`; without it the same runs peaked at 4.7-6 GB of
+  address space); below about 1.5 GB the ONNX runtime of the table
+  detector hangs instead of failing, which ends as `timeout`), plus twice the PDF; CPU time
+  4 times the job's wall-clock limit (a backstop; the table model's thread pools are capped at 4 threads, `conversion_child.MAX_THREADS`, whatever the host's core count, so address space does not grow with cores and 4 busy threads cannot reach the CPU limit before the wall clock); `oom_score_adj` 1000, so the kernel prefers the child to the web process; no core file (it would hold the PDF); the
+  child dies with the web process (`PR_SET_PDEATHSIG` on Linux, and the end of its socket).
+  Its own process group is killed with it, which takes the render probes (`layout._probe_pages`)
+  too.
+- *Wall clock.* The worker's own limit (`job_time_limit_s`) is unchanged. At its end the worker
+  cancels the attempt, the converter sees that within 0.2 s, kills the child and the job fails
+  `timeout`: no thread is left behind, so `conversion_abandoned` no longer happens for a hung
+  MuPDF. Deleting the job, losing the lease and shutdown cancel the same way.
+- *Outcomes.* A crash, signal or exit without an answer fails the job at once as
+  `conversion_crashed`, running out of memory as `conversion_oom`, CPU or wall clock as
+  `timeout`. None is retried: the same PDF would do the same again, so one poison file costs
+  one conversion attempt and not three lease expiries (and not three crashes of the whole
+  site). "Try again" is not offered for the first two; `MAX_RETRIES_PER_JOB` still bounds any
+  manual try. Errors the pipeline raises (`LayoutError`, budget, configuration) come out as the
+  same errors and the same codes as before.
+- *Shutdown.* SIGTERM stops the worker: the attempt is cancelled, the converter kills the child
+  at its next poll (at most 0.2 s) and the lease ends now, so another instance requeues the
+  job as before. The child holds no files and no connections, so killing it needs no clean-up.
+  Within `GRACEFUL_SHUTDOWN_S`, `WORKER_STOP_S` and the 10 s `drainingSeconds`.
+- *Cost.* A fresh process per job, so its start and imports are paid by every job (a fresh
+  process also means one document is never in memory another was in). Measured on the
+  development box (16 cores, other work running; fake models; a warm web process for the
+  in-process figure): the 2-page `lecture_notes.pdf`, median of 7 runs, 0.43 s in process and
+  2.46 s in the child (+2.0 s; with `FEATURE_TABLES` 0.36 s and 2.49 s); a 7-page paper, median of
+  3 runs, 12.3 s and 13.6 s (+1.4 s; with tables 12.8 s and 14.5 s, +1.7 s). The overhead is
+  about 1.4-2 s a job here, from starting Python and importing the pipeline; with
+  `FEATURE_TABLES` the child also loads the table models, which `PRELOAD_TABLE_MODELS` no
+  longer does in the web process (the models would only sit in memory there). On one vCPU the
+  imports and the model load take longer (deploy.md, "Sizing": 4-5 s for the models alone).
+- *Not carried over.* Tracing (`TRACING_ENABLED`, off in production) records the worker's
+  spans only; the pipeline's inner spans are not sent from the child.
+- *Still in the web process.* Not conversions: the sample document's crops (`web/sample.py`,
+  once per process, from a file shipped in the repository) and what the review screen cuts
+  through `web/page_images.py`, which already uses the probe's child.
 
 `Worker.run_once()` and `process_next_job(...)` process one job synchronously, for tests
 and scripts.
@@ -1360,7 +1426,13 @@ order, a cell changed from the keyboard, no JavaScript; `browser` marker),
 with accepted items shown, 320 px reflow, target sizes, the selected mark inside the page
 region on narrow and short screens, no JavaScript, Accept after typing, focus, shortcuts,
 forced colours, an image retried; `browser` marker), and for the list view `tests/test_web_review.py` (one fix),
-`tests/test_web_review_bulk.py` (order, landing, no bulk accept),
+`tests/test_web_review_bulk.py` (order, landing, no unconditional bulk accept),
+`tests/test_web_review_bulk_accept.py` (accept many at once: state filtering, CSRF, ownership,
+stale page, Undo as one step; the decision filter; "Report this item"; "Leave this page out"),
+`tests/test_web_scale_pages.py` (guides list, sitemap canonicals, landing numbers, "Upload a
+revised version", the finish notice's markup, link targets) and
+`tests/test_web_scale_browser.py` (the new controls from the keyboard, axe at 1280 and 320 px,
+forced colours, reduced motion, target sizes, the finish notice; `browser` marker),
 `tests/test_web_review_messages.py` (every code has a sentence),
 `tests/test_web_review_triage.py` (decisions, optional checks, heading groups),
 `tests/test_web_review_browser.py` and `tests/test_web_review_triage_browser.py`.
@@ -1494,8 +1566,16 @@ the results".
   "On pages 2 and 3" links each page number. Each page of a waiting group counts the
   decision in the page strip. "Hidden text in the PDF" (folded) gives only a count of the
   hidden characters that were not used, never the text. There is nothing to accept and
-  no promise of a later conversion. The wording is the beta wording;
-  its second button ("Leave this page out of the HTML") is not built.
+  no promise of a later conversion. The wording is the beta wording.
+  Under the first button, for whole pages kept as images (not handwriting on a typed page,
+  whose typed text was converted), **Leave this page out of the HTML** ("Leave page 3 out of
+  the HTML" for each page when there are several; `templates/_leave_out.html`). It posts to
+  the page tools' omit route (`POST /jobs/{id}/pages/{n}/omit`, T3-16) with `after=review`: the
+  page, its fixes and its notices move into `result.omitted`, the file says the page is not
+  there, and the reviewer goes on to the next decision. The hint says that decisions still waiting on the
+  page go with it, and each button says how many. It is recorded like any structural
+  edit, so the notice after it has Undo, and "Put it back" in the page tools works as before.
+  The last page of a document cannot be left out.
 
 **"Reject" is named for what it does** (UX review MF14), per kind
 (`routes/review.py reject_words`): "Keep as image" for an equation, "Keep without a
@@ -1525,6 +1605,11 @@ fragment, which would cancel autofocus) and is described by a status line above 
 "Equation 1: Accepted. 2 decisions left." The page title starts with the position
 ("Decision 2 of 3: Review …"). A refused edit comes back on the same decision (422) with
 the error summary and the field open.
+
+**Target sizes.** Undo is 44 CSS px high and wide. The marks on the page image are at least 24
+px (WCAG 2.5.8, overlapping no other mark) and are grown to 44 px wherever the page has room
+around them (`web.marks._grow`): a mark in a quiet part of the page is a 44 px target, one
+between neighbours keeps 24 px with space around it. The drawn frames do not change.
 
 **Undo** (MF14). The status line after a decision has an **Undo** button (one Shift+Tab
 from the heading that took focus). It puts back every fix the job's last review write
@@ -1944,8 +2029,9 @@ whose write was then refused as stale is spent.
 ### The list view (`/jobs/{id}/review/list`)
 
 Every fix of the document, grouped by kind, as the review screen was before the split
-view, without bulk accept. Its forms send `view=list`, so a decision there comes back to
-the list's next card.
+view. Its forms send `view=list`, so a decision there comes back to the list's next card.
+Accept-many links and the kind and page filter are at the top of "Needs your decision"
+("Review at scale" below).
 
 **Order.** Only meaning-level problems ask for a decision, so the page has three sections:
 
@@ -2081,18 +2167,79 @@ order and wrapping round to the first, or to `#review-progress` when none are le
 that changed ("Equation 1 on page 1: Accepted."), which is unfolded so the link works.
 The landing item has `tabindex="-1"`, so the next Tab reaches that link.
 
-**No bulk accept** (removed 2026-10-09). The list view used to offer "Accept every
-equation proposal at or above X%" and "Accept all N remaining headings". Both took
+**No unconditional bulk accept** (removed 2026-10-09). The list view used to offer "Accept
+every equation proposal at or above X%" and "Accept all N remaining headings". Both took
 proposals that need a decision without anyone opening them, and under the review tiers
-("meaning-level only") every decision asked for could
-change what a student reads: each is now opened and decided on its own (repeated
-headings are already one decision). Optional notes are accepted already and need no
-bulk action. A POST with a kind (`equations`, `figures`, `tables`, `headings`) in place
-of the element id is a 404 and changes nothing; Undo still puts back a bulk write made
-before the change. The one exception, asked for in T3-11, is **Accept all clean tables**
-(`POST /jobs/{id}/tables/accept-clean`, "Rough edges" under the table card): only tables
-where nothing at all was found wrong, only when there are two or more, named in the
-button, and one Undo takes them all back.
+("meaning-level only") every decision asked for could change what a student reads. A POST with
+a kind (`equations`, `figures`, `tables`, `headings`) in place of the element id is still a 404
+and changes nothing. Two bulk actions exist, each limited to items no check found fault with
+and each shown before it is done: **Accept all clean tables** (T3-11, `POST
+/jobs/{id}/tables/accept-clean`, "Rough edges" under the table card) and the two below.
+
+#### Review at scale (`web/bulk_accept.py`, `routes/bulk.py`)
+
+The measured load is about 1.8 decisions per page (the 15 held-out sections; `/limits`), so a
+300-page document would ask for about 540 single decisions. Two kinds of decision wait only
+because the model was not sure enough to accept them itself:
+
+- **Accept all remaining equations whose checks passed**: equations still undecided
+  (`needs_review`) with a usable proposal, no failed check of any kind, no reason code, no
+  second-check answer other than "ran and found nothing" (a possible mismatch, or an answer that
+  failed open or was not judged, `flagged` not false, keeps it for a person; a fix the check never
+  looked at has nothing to doubt), and on their own (not in a group);
+- **Accept all figures that have generated alt text**: figures in the same state with a
+  non-empty alt text that are not marked decorative.
+
+Nothing else is touched: a fix with a failed check (even a warning), a flagged one, an item
+already decided, a repeated-heading group, a page kept as an image, a table or a heading is left
+for the reviewer.
+
+*Where.* Links (with the count) at the top of "Needs your decision" in the list view and under
+"All items as a list" on the review screen, only while there is something to accept. A link
+opens `GET /jobs/{id}/accept/{equations|figures}`: the count, a sentence saying what is and is
+not included, the whole list (each item's label, page, the original crop beside the proposal as the card shows
+it, and a link to decide it on its own), the **Accept all N equations** button and **Cancel**. Nothing is
+written by looking.
+
+*The decision.* `POST /jobs/{id}/accept/{kind}` is CSRF-checked and owner-only like every review
+route, and goes through the same path as a clean-tables accept (`routes/edits.write_review`):
+lock the job, apply an ordinary Accept to each item (`web.review.apply_review`, so every rule of
+a single accept holds), one `ReviewEdit` per item with the kind under `bulk` in its record (the review record says "Accepted, together with the other equations whose checks passed, in one action"), one write
+(`result_version` + 1), one re-render, the usage event `decision_made` with `kind=group`. The
+form must carry the review version the list was drawn at (a blank one is refused like a stale
+one): a document changed since (another tab, an
+Undo) is refused with a 409 and nothing is accepted, so exactly what was listed is what is
+accepted. With nothing left to accept the answer is a notice and no write. The notice names the
+count ("Accepted 12 equations whose checks passed. Undo takes them all back in one step.").
+
+*Undo.* All the fixes are one write, so the notice's Undo ("Undo the last decision" in the list
+view, **Undo** on the review screen) puts every one back to undecided in one step, from the
+`before` snapshots the write stored (`web.review.undo_last`), as it does for a heading group.
+
+*Filter.* A plain GET form ("Show only some decisions", shown when more than one decision is
+waiting): **Kind** (a select of the kinds that still have decisions, with their counts) and
+**Page** (a number from 1 to the page count). `?kind=figures&page=2` keeps the decisions of
+that kind on that page; a repeated-heading group and a group of pages kept as images match
+every page they are on. The form returns to `#filter-result`, a `role="status"` line that takes
+focus ("Showing 4 of 11 decisions: figures on page 2." or "No decision matches: ..."), with a
+"Show all decisions" link. A decision made in the filtered list comes back to the same filtered
+list (hidden `flt` field; `routes/review.keep_filter`). "Accept all N clean tables" is not
+filtered: with a filter on, its note says it covers all N. A kind that is not one of the list's groups and a page outside the
+document are ignored (the list is shown whole). Filtering only hides cards; it decides nothing,
+and the accept-many actions always list everything that qualifies.
+
+*Report this item.* Each card, on both screens, ends with "Report this item"
+(`templates/_report_item.html`, `web/report_item.py`). It opens the footer's feedback path
+(`FEEDBACK_URL` with `job` and `item` added to its query, else a `mailto:` to `CONTACT_EMAIL`
+with the subject, "Job: <id>" and "Item: <id>" and a line asking not to paste text from the
+document). Only the two ids are put in the address: no LaTeX, alt text, heading text or page
+content. With neither setting there is no link. There is no mail provider in production, so
+nothing is sent by the app.
+
+*Accessibility.* Every control is a native link, button, select or number field with a visible
+label; the preview list is an ordered list whose equations scroll in a focusable named group; the
+filter result and the notice after an accept are `role="status"`; borders and fills use the
+existing colours with real borders, so forced-colours mode shows them; nothing animates.
 
 **Job page.** "Need your decision" counts the decisions still waiting (a heading group
 once; failed and not-converted items too, since each needs a decision) and is broken down
@@ -2141,7 +2288,9 @@ Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 Cache-Control: no-store            (everything except /static/; page images and
                                     marks.css: private, no-store)
                                    (/static/: public, max-age=31536000, immutable for
-                                    hashed names and vendor/ files, no-cache otherwise)
+                                    hashed names and vendor/ files, public, max-age=3600
+                                    with an ETag otherwise; /demo and /showcase/ pages:
+                                    public, max-age=3600 with an ETag and 304s)
 Strict-Transport-Security: max-age=31536000; includeSubDomains   (production only)
 ```
 
@@ -2157,7 +2306,7 @@ its own `MAX_UPLOAD_MB` limit the same way.
 Sign-in starts and callbacks, uploads and the cron route are rate limited per address (and
 uploads per person) in memory (`web/abuse.py`; the numbers are in [security.md](security.md)).
 The address is read from `X-Forwarded-For` counting `TRUSTED_PROXY_HOPS` entries from the
-right. A person may have 10 documents waiting or running and 40 kept at once.
+right; more entries than `TRUSTED_PROXY_HOPS + 1` logs `proxy_hops_unexpected` once (counts only). A person may have 10 documents waiting or running and 40 kept at once.
 
 The converted document (`/view`, `/download`, `/demo`) gets its own policy instead:
 `sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'`. It may carry
@@ -2170,7 +2319,11 @@ README) and configured to need no `eval`, inject no `<style>` and keep no histor
 Static files are cached for a year under names that change with their content: pages ask
 for `/static/app.<12 hex>.css` and `.js` (`web/assets.py`, `static_url`; the hash is the
 file's SHA-256, read again only when the file changes), `vendor/` files carry their version
-in the name, and anything else is revalidated (`no-cache`, ETag). The math font is sent as
+in the name, and anything else is kept for an hour and then checked with its ETag (304, no
+body, when nothing changed). The demo (688 KB) and the showcase pages are the same for
+everyone, so they carry an ETag (a hash of the body) and `max-age=3600` too (`assets.cached_html`; a visit the server counts, `/demo?hm_id=`, is
+revalidated every time with `no-cache`, still a 304, so cached hits are not lost);
+only pages of a signed-in person stay `no-store`. The math font is sent as
 WOFF2 (392 KB, against 733 KB for the OpenType file kept beside it). Our own script, `web/static/app.js`, places error summary links (below), shows times in
 the reader's time zone ("Times"), checks a chosen upload before it is sent ("Uploads and
 limits"), shows the questions after a download, and adds the review screen's
@@ -2187,7 +2340,13 @@ box is a polite live region that changes per step, not per element; the counts a
 the list of steps outside it. When the job finishes the status box says so and links to
 the first decision and to the results ("Start the review or show the results", "Show
 the results", or "Show why it stopped"); the page is not reloaded under the reader, which
-would send a screen reader back to the top. Without
+would send a screen reader back to the top. The fragment of a finished job carries `data-finished`, `data-state`, `data-title` and `data-summary`. `app.js` ("When a job
+finishes") sets the tab title from `data-title` and, if the person chose "Notify me when it
+finishes" (a button shown only where the `Notification` API exists and is not blocked; the
+browser's permission question is asked only when it is used, by Enter or a click), shows one browser
+notice with `data-summary` when the tab is in the background. Nothing is sent to the server. A
+page opened after the job finished says nothing more. There is no email: the app has no mail
+provider in production. Without
 JavaScript the status page does not reload by itself, because a reload the user did not
 choose sends a screen reader back to the top each time (WCAG 2.2.1, failure F41; axe
 rule `meta-refresh`, critical). It has a "refresh the status" link and, inside
@@ -2319,6 +2478,8 @@ test fails when a table with a user id is added without it.
 | `uv run pytest -m browser tests/test_web_browser.py` | Chromium: axe-core on every page, CSP, htmx polling, no-JS flow |
 | `uv run pytest -m browser tests/test_web_auth_browser.py` | Chromium: the sign-in pages with Microsoft set up (axe, 320 px reflow) and the whole Microsoft round trip under the real CSP |
 | `uv run pytest -m browser tests/test_web_open_signup_browser.py` | Chromium, open sign-up: the account, delete-confirmation, blocked, sign-ups-full, sign-in, privacy, terms and limits pages and the admin page with blocked accounts pass axe (WCAG 2.2 AA and best practice), reflow at 320 px, and deleting an account works without JavaScript |
+| `uv run pytest tests/test_web_review_bulk_accept.py tests/test_web_scale_pages.py` | Review at scale: bulk accepts (states, CSRF, ownership, stale, Undo), the filter, report links, leave-a-page-out, guides list, sitemap canonicals, landing numbers, revised-version links, finish-notice markup, mark sizes |
+| `uv run pytest -m browser tests/test_web_scale_browser.py` | Chromium: the new controls by keyboard, axe at 1280 and 320 px, forced colours and reduced motion, target sizes, the finish notice with a stubbed Notification |
 | `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |
 | `uv run pytest -m browser tests/test_web_review_figures_browser.py` | Chromium: the figure card with a long description and a data table (axe at 1440 and 390 px, as shown, after a refused edit and with the table added; no sideways scrolling at 320 px, and every number in a six-column table on one line; "Add the data table" then "Remove the data table" without JavaScript) |
 | `uv run pytest tests/test_carry_edits.py tests/test_web_carry_edits.py` | Edits carried to a revised file or a document tried again: words, headings, pictures and equations added, pages left out, descriptions; carried only onto an unchanged item (rules on small results, then the whole path with real PDFs and renders) |

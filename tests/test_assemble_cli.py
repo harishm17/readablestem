@@ -370,7 +370,8 @@ def test_client_setup_error_on_the_first_request_is_an_error(
     monkeypatch.setattr(
         models, "make_vision_client", lambda s, b, *, fake: SetupFails(), raising=False
     )
-    assert run(pdf, "--out", tmp_path / "o.html", "--max-usd", "1") == 2
+    # One step at a time: with several in flight a second one may start before the first fails.
+    assert run(pdf, "--out", tmp_path / "o.html", "--max-usd", "1", "--concurrency", "1") == 2
     captured = capsys.readouterr()
     assert f"error: {message}\n" in captured.err and "Fixes:" not in captured.out
     assert not (tmp_path / "o.html").exists()  # no file with every item flagged

@@ -87,7 +87,7 @@ def degrade_image(source: Image.Image, seed: int) -> tuple[bytes, Degradation]:
     pixels = pixels * shade
     pixels[..., 2] -= tint
     pixels += rng.normal(0.0, sigma, size=pixels.shape).astype(np.float32)
-    out = Image.fromarray(np.clip(pixels, 0, 255).astype(np.uint8), "RGB")
+    out = Image.fromarray(np.clip(pixels, 0, 255).astype(np.uint8))
     buffer = io.BytesIO()
     out.save(buffer, format="JPEG", quality=quality, subsampling=2, optimize=False)
     return buffer.getvalue(), Degradation(

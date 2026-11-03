@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from readablestem.core import triage
 from readablestem.core.types import DocumentResult, Fix, Kind, Status
 from readablestem.web import carry as carry_rules
+from readablestem.web import combine as combine_rules
 from readablestem.web import job_page, titles
 from readablestem.web import retry as retry_rules
 from readablestem.web.database import as_utc
@@ -78,6 +79,12 @@ JOB_ERROR_MESSAGES = {
     "timeout": "The conversion took longer than a document of this size is allowed and was "
     "stopped. You can use “Try again”: what was already converted is kept. If it stops "
     "again, try splitting the PDF into smaller parts.",
+    "conversion_crashed": "The converter stopped while reading this PDF. Try saving the PDF "
+    "again from the program that made it, or splitting it into smaller parts.",
+    "conversion_unavailable": "The converter could not start. This is on our side, not a "
+    "problem with your file. Use “Try again” in a little while.",
+    "conversion_oom": "This PDF needed more memory than a conversion may use. Try splitting "
+    "it into smaller parts.",
     "store_failed": "The conversion finished but its results could not be saved. Use "
     "“Try again”: what was already converted is kept.",
     "upload_missing": "The uploaded file was no longer available.",
@@ -180,6 +187,9 @@ class JobView:
     # parts of the same file still kept (this one included), in page order.
     part_label: str = ""
     parts: list[PartLink] = field(default_factory=list)
+    # How many parts "Combine parts" would join (`web.combine.kept_parts`: finished, kept,
+    # no decision open, none overlapping); the link is offered from two.
+    combinable: int = 0
     # The recorded sample document (T3-9, `web.sample`) and, for its page, where it comes from.
     is_sample: bool = False
     sample: SampleView | None = None
@@ -486,6 +496,7 @@ def job_view(
         is_sample=bool(job.is_sample),
         sample=sample_view() if job.is_sample and with_page else None,
         parts=part_links(session, job) if with_page and job.part_group else [],
+        combinable=len(combine_rules.kept_parts(session, job)) if with_page else 0,
     )
 
 

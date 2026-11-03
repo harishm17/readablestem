@@ -21,7 +21,6 @@ Run with: uv run pytest -m browser tests/test_web_review_ux_browser.py
 from __future__ import annotations
 
 import re
-import time
 
 import pytest
 
@@ -36,7 +35,8 @@ from test_web_review_split_browser import _wait_focus, open_page, strict_axe, wa
 from test_web_review_split_browser import job as job  # fixture, re-exported for pytest
 from test_web_review_split_browser import site as site  # fixture, re-exported for pytest
 
-pytestmark = pytest.mark.browser
+# A hung browser fails this test after 120 s instead of holding the job to its timeout.
+pytestmark = [pytest.mark.browser, pytest.mark.timeout(120)]
 sync_api = pytest.importorskip("playwright.sync_api")
 expect = sync_api.expect
 
@@ -154,15 +154,13 @@ def test_no_new_state_scrolls_sideways_at_320_css_px(site, browser, job, spacing
     assert widths == dict.fromkeys(widths, 0), widths
 
 
-def _wait_active(page, class_name: str, timeout_s: float = 5.0) -> None:
-    """Wait for focus on the element with this class (polled from Python, as
-    `_wait_focus`, so it works without JavaScript too)."""
-    deadline = time.monotonic() + timeout_s
-    script = f"document.activeElement.classList.contains({class_name!r})"
-    while not page.evaluate(script):
-        if time.monotonic() > deadline:
-            raise AssertionError(f"focus is not on .{class_name}: {focused(page)!r}")
-        time.sleep(0.05)
+def _wait_active(page, class_name: str, timeout_ms: int = 5000) -> None:
+    """Wait for focus on the element with this class. Playwright's auto-waiting reads the
+    page over the debugging protocol, so it works without JavaScript too."""
+    try:
+        expect(page.locator(f".{class_name}")).to_be_focused(timeout=timeout_ms)
+    except AssertionError as exc:
+        raise AssertionError(f"focus is not on .{class_name}: {focused(page)!r}") from exc
 
 
 def focused(page) -> str:
@@ -252,7 +250,10 @@ def test_stale_undo_and_anyway_work_without_javascript(site, browser, job):
     page.get_by_role("link", name="Reload this page").click()
     assert page.locator("#decision-title").inner_text().startswith("Decision 1 of 3")
     # Undo the other tab's decision from that tab, then use a plain omega anyway here.
-    other.get_by_role("button", name="Undo this decision").click()
+    # Wait for the Undo's form post to land before closing the tab: closing it mid-request
+    # (JavaScript off, so the click is a real navigation) can hang the close.
+    with other.expect_navigation():
+        other.get_by_role("button", name="Undo this decision").click()
     other.close()
     page.goto(url)
     page.get_by_label("LaTeX for equation 1").fill(r"{\omega}")
@@ -315,8 +316,6 @@ def test_a_draft_comes_back_in_the_list_view_too(site, browser, job):
     page.goto(f"{site.base}/jobs/{job}/review/list")
     page.get_by_label("Alt text for figure 1").fill(ALT)
     page.reload()
-    started = time.monotonic()
-    page.locator(".kept-draft").wait_for()
-    assert time.monotonic() - started < 5
+    page.locator(".kept-draft").wait_for(timeout=5000)
     assert page.get_by_label("Alt text for figure 1").input_value() == ALT
     context.close()

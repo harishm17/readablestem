@@ -1546,6 +1546,13 @@ def is_clean_table(fix: Fix, element: Element | None = None) -> bool:
     )
 
 
+def reading_order(result: DocumentResult, fixes: list[Fix]) -> list[Fix]:
+    """`fixes` in the review's order: page, then reading order within the page."""
+    position = _positions(result)
+    far = (1 << 30, 1 << 30, 1 << 30)
+    return sorted(fixes, key=lambda f: position.get(f.element_id, far))
+
+
 def clean_tables(result: DocumentResult) -> list[Fix]:
     """The clean tables still waiting, in page and reading order."""
     position = _positions(result)
@@ -1657,6 +1664,11 @@ def rerender_html(
         source_note=None,
         checked_on=checked_on or datetime.now(UTC).date(),
         math_alttext=math_alttext,
+        page_labels=result.page_labels,
+        pdf_pages=dict(enumerate(result.source_pages)),
+        footnote_ids=[
+            n.element_id for n in result.notices if n.code == "footnote" and n.element_id
+        ],
         **({"omitted_pages": result.omitted_pages} if result.omitted else {}),
     )
     result.html_checks = html_checks.static_checks(html)
