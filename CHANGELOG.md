@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: handwriting error classifier (branch hw/error-analysis)
+
+- `scripts/handwriting_errors.py` classifies every handwriting error in the recorded answers: kind
+  (case, Greek against Latin, other letter, digit against letter, `z` against `2`, `x` against `×`,
+  minus against dash, lost or added script, fraction, root, structure, left out), edit distance in
+  symbols, and whether the product's speech code reads the answer and the label alike. Text table
+  plus JSON with examples per arm; tests in `tests/test_handwriting_errors.py`; usage in
+  docs/eval-handwriting.md. It calls no model and changes no product behaviour.
 ## Unreleased: vector ink to strokes (branch hw/ink-strokes)
 
 - New `pipeline/ink_strokes.py`: reads a PDF page's vector ink into ordered strokes (stroked
