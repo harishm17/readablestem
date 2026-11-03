@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: chemistry species check against the text layer (branch chem/species-check)
+
+- New check `equation.text_layer_species` (code `species_mismatch`, `pipeline/chem_check.py`): a
+  chemistry reading's species (coefficient, formula with counts, charge, state) and arrows are
+  compared, in order, with the PDF's text layer. It finds a subscript read as a coefficient, a
+  flipped or dropped charge sign, a changed state or arrow, another element or count, a
+  neighbour word taken into a formula and a reaction cut mid-way. A failure is a required
+  decision like the other meaning-level checks (confidence x 0.6, a cheap answer escalates).
+  It runs only on a text layer with chemistry-only evidence, so mathematics is unchanged. A
+  reviewer's edit gets it too, and the compare table has "Species" rows. Numbers and the
+  replay: [docs/steps.md](docs/steps.md), "Chemistry species check";
+  `scripts/chem_check_replay.py`; tests in `tests/test_chem_check.py`.
 ## Unreleased: chemistry spans in the layout (branch chem/layout-spans)
 
 - Chemistry lists are cut into their items: `CO3 2−, F−` is two inline equations and

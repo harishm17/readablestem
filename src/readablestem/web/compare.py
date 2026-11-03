@@ -25,6 +25,7 @@ from defusedxml import ElementTree as SafeET
 
 from readablestem.core.mathchars import base_char, char_variant, styled_char
 from readablestem.core.types import Element, Fix, Kind
+from readablestem.pipeline.chem_check import compare_species
 
 # The step's own comparison rules, imported rather than copied so the screen and the
 # step always agree (and pipeline/equation_step.py needs no change for the screen).
@@ -60,7 +61,7 @@ class DiffRow:
     """One line of the "What differs" table. Text only: the table is the way to get this
     information without seeing the outline on the image."""
 
-    what: str  # "Style", "Symbol", "Sign", "Number" or "Case"
+    what: str  # "Style", "Symbol", "Sign", "Number", "Case" or "Species"
     symbol: str  # as the PDF shows it (or the proposal, when only it has it)
     pdf: str  # "bold", "2 times", "not there"
     proposal: str
@@ -80,7 +81,8 @@ class EquationCompare:
     proposal_marks: set[str] = field(default_factory=set)  # ... in the proposed MathML
     summary: str | None = None  # the one sentence that says what to look at
     # Every sentence, by what it is about: "style" (a style that changes the meaning),
-    # "symbol", "sign", "number", "case", "cosmetic" (a style that does not) and "unseen".
+    # "symbol", "sign", "number", "case", "species", "cosmetic" (a style that does not) and
+    # "unseen".
     said: dict[str, list[str]] = field(default_factory=dict)
 
     @property
@@ -243,11 +245,37 @@ def compare_equation(
         # The letters and digits agree as multisets: the step then asks whether the
         # numbers are the same numbers and the capitals the same capitals.
         _numbers_and_case(out, sentences, text, fix.equation.mathml, other)
+    _species(out, sentences, text, fix.equation.mathml, other)
     if sentences:
         out.summary = min(sentences, key=lambda s: s[0])[2]
     for _, about, sentence in sorted(sentences, key=lambda s: s[0]):
         out.said.setdefault(about, []).append(sentence)
     return out
+
+
+MAX_SPECIES_ROWS = 6  # rows of the table, and the first three get a sentence
+
+
+def _species(
+    out: EquationCompare, sentences: list[tuple[int, str, str]], text: str, mathml: str, other: str
+) -> None:
+    """The rows and sentences for `species_mismatch` (the step's `chem_check`): a formula,
+    charge, state or arrow of a chemistry reading that the PDF's text does not have."""
+    diff = compare_species(text, mathml)
+    if diff is None or not diff.differ:
+        return
+    for _, pdf, got in diff.rows[:MAX_SPECIES_ROWS]:
+        out.rows.append(
+            DiffRow("Species", pdf or got, pdf or "not there", got or "not there", True)
+        )
+    for _, pdf, got in diff.rows[:3]:
+        if pdf and got:
+            said = f"The PDF has {pdf} where {other} has {got}."
+        elif pdf:
+            said = f"The PDF has {pdf}, which {other} does not."
+        else:
+            said = f"{_capital(other)} has {got}, which the PDF does not."
+        sentences.append((1, "species", said))
 
 
 def _numbers_and_case(
