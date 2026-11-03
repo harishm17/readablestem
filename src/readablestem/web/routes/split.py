@@ -636,7 +636,7 @@ class SplitBuilder:
         change = None
         if element is not None and element.kind in TEXT_KINDS:
             change = review_url(
-                self.job_id, page=page, anchor="page-tools", tools=True, change=element.id
+                self.job_id, page=page, anchor="page-tools-summary", tools=True, change=element.id
             )
         card = NoticeCard(
             sentence=explain_notice(place.notice).text,
@@ -821,7 +821,11 @@ class SplitBuilder:
             panel.region_alt = f"{item.label} in the PDF, as it is on the page."
             if page:
                 panel.change_href = review_url(
-                    self.job_id, page=page, anchor="page-tools", tools=True, change=element.id
+                    self.job_id,
+                    page=page,
+                    anchor="page-tools-summary",
+                    tools=True,
+                    change=element.id,
                 )
         elif fix.kind is Kind.TABLE:
             if element is not None:

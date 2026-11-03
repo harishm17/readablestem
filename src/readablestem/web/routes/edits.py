@@ -144,7 +144,7 @@ def back_to_page(owned_id: str, number: int) -> RedirectResponse:
     `owned_id` is the id of the row the ownership check found, never the request's."""
     from readablestem.web.routes.split import review_url
 
-    where = review_url(owned_id, page=number, anchor="page-tools", tools=True)
+    where = review_url(owned_id, page=number, anchor="page-tools-summary", tools=True)
     return RedirectResponse(where, status_code=303)
 
 

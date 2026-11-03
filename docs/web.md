@@ -1117,9 +1117,13 @@ conservative. A model call now costs one more INSERT to hold and a SELECT and a 
 
 A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
 
-- **Claiming.** Fewest attempts first, then oldest (then id), so a retried job goes
-  behind fresh ones. The queue position on the job page ("2 documents ahead of yours",
-  `views.queue_ahead`) counts in the same order, also skipping the jobs of people no
+- **Claiming.** Fewest attempts first, so a retried job goes behind fresh ones; within
+  that, people take turns (`web/fair_queue.py`): the owner whose latest job started
+  longest ago goes first (someone never served, first of all), then oldest, then id. One
+  person's ten documents never keep another person's one waiting behind all ten, and a
+  person alone is served oldest first as before. The caps, retries and attempt limits are
+  untouched. The queue position on the job page ("2 documents ahead of yours",
+  `views.queue_ahead`) replays the same claims, also skipping the jobs of people no
   longer allowed. Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` then an UPDATE in the same
   transaction. SQLite: a conditional UPDATE (`WHERE status = 'queued'`) whose rowcount
   says who won. Jobs of people no longer on the allowlist are not claimed; removing
@@ -2536,6 +2540,18 @@ control without scrolling again; when the field is taller than the window (320 x
 which is 400% zoom, where a heading-level error alone wraps to 170 px) the focused
 control stays in view with as much of the field as fits above it. Without JavaScript,
 `scroll-margin-top: 8rem` on form controls keeps the label in view on wider screens.
+
+`tests/test_web_keyboard_browser.py` is the keyboard-only walk (helpers in
+`tests/fixtures/web/keyboard.py`): it presses Tab and Shift+Tab through every page of the app
+at 1280, 390 and 320 CSS px and checks the skip link, that every stop is in the window, shows a
+focus ring, is not covered and has a name, that Tab reaches every control with no trap and does
+not change the page, and that the header, main and footer are visited in that order; then it
+does the main flows with keys alone (sign in, upload, downloads, the review with Undo, an edit
+and a refused one, the page tools, the Symbols screen, deleting a document and an account) and
+checks where focus lands after each redirect. A redirect that names a fragment must name a
+focusable element: the browser skips `autofocus` when the address has a fragment, which is why
+the page tools redirect to `#page-tools-summary`. `tests/test_web_focus_style.py` checks the
+ring's colours from the stylesheet. What they cover and do not is in `docs/acr/`.
 
 `tests/test_web_browser.py` runs axe-core on every page (zero serious or critical
 violations), including an unfinished job page with JavaScript on and as a no-JS browser
