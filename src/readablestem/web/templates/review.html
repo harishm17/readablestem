@@ -380,6 +380,8 @@
   screen reader user hears; the check is new and can be wrong, so it does not hold up the
   document.{% endif %}</p>
 <p><a href="/jobs/{{ job.id }}/review">Back to the review screen</a> ·
+  {% if symbols_offer %}<a href="/jobs/{{ job.id }}/symbols?view=list">Symbols in the handwritten equations</a> ·
+  {% endif %}
   <a href="/jobs/{{ job.id }}">Back to the results</a> ·
   <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Open the accessible HTML</a></p>
 
