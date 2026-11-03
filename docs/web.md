@@ -416,7 +416,7 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    with a short title and no hidden layer, which may be a slide; ink not analysed within
    the 10 s budget) never refuses the upload: the conversion keeps it as an image with
    a decision (docs/layout.md "Hidden text and page types"). The child caps its own address space at 768 MB. The conversion
-   itself is not isolated this way; see "Limits of the worker" below;
+   runs in a child process of its own too; see "Limits of the worker" below;
 6. the page quota: one conditional `UPDATE quota_days SET pages = pages + n WHERE ... AND
    pages + n <= quota`, in the same transaction as the job insert (if over: 429 and the
    upload page again, naming the file, its pages and the pages left today). The quota is
@@ -1125,7 +1125,10 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   | `no_content` | The result had no elements at all |
   | `model_not_configured` | The model client is misconfigured (no key for the selected provider): every job would fail the same way |
   | `access_removed` | The owner was removed from the allowlist |
-  | `timeout` | The conversion ran past its time limit |
+  | `timeout` | The conversion ran past its time limit (or, in its child, its CPU limit) |
+  | `conversion_crashed` | The conversion's child process died of a signal or exited without an answer (MuPDF aborting, a segfault). Failed at once, not retried; not offered "Try again" |
+  | `conversion_unavailable` | The conversion's child could not start (an import failed, a library or the table model file is missing; exit status 1 or 72, or a "startup" error from it). The service's fault, not the PDF's: logged at ERROR (`conversion_child_unavailable`, type only); offered "Try again"; a self-check at worker start (`conversion_child_check_ok` or `_failed`) says so early |
+  | `conversion_oom` | The conversion's child ran out of memory (`MemoryError` under its address-space cap), or killed by SIGKILL that this process did not send (the kernel's OOM killer, with other work on the host using the memory): that is run once more before the job fails, so a job is not blamed on its PDF for another request's memory. Failed at once; not offered "Try again" |
   | `store_failed` | The result could not be written to the database |
   | `lease_expired` | The job was interrupted 3 times (since it was last tried again) |
   | `upload_missing` | The upload blob was gone |
@@ -1201,14 +1204,65 @@ waiting or converting says so on its page and in its status box; one answered re
 it. It is a hint from this server's own traffic (per process, forgotten on restart), never a
 gate: nothing is refused because of it.
 
-**Limits of the worker.** The conversion (`layout.analyze`, crops) runs MuPDF inside the
-web process, not in a child process like the upload probe. A conversion stuck in native
-code cannot be stopped from Python: after its time limit the job is failed and the queue
-moves on, but the stuck thread stays (logged as `conversion_abandoned`) until the
-process restarts. A PDF that crashes MuPDF during conversion takes the whole process
-down; the job is retried after its lease expires, behind fresh jobs, and failed with
-`lease_expired` after 3 attempts. Running the conversion in a killable child process is
-the fix; it is not built yet.
+**The conversion runs in a child process.** MuPDF reads the untrusted PDF on every page (layout
+analysis, page types, the table detector, the text pass, tagged structure, source facts, every
+crop), so the whole `convert_pdf` runs in a child (`web/isolated_convert.py` starts
+`python -m readablestem.web.conversion_child`) that the worker can kill. `default_converter()`
+is `convert_isolated`, which has `convert_pdf`'s signature.
+
+- *The boundary.* Not "only the MuPDF calls": those are interleaved with the model steps (a
+  crop is cut, its step is submitted, the next crop is cut) and pass page objects, which cannot
+  cross a process. The child has no key, no database URL and no token (`core/childenv.py`,
+  plus `TABLE_MODEL_DIR`) and asks the parent, over a socket, for everything outside: model
+  requests and the job's verifier (`VisionClient.run`), progress and stage progress, the step
+  cache, the call observer. The parent answers with the job's real client, so spend
+  accounting is unchanged: every reservation is still one conditional UPDATE on the job's row
+  in the parent, against the job caps and the daily cap, and every database write is the
+  parent's. Child to parent messages are JSON plus raw bytes, validated (a model request
+  is bounded in images, tokens and size; its schema must be a pydantic model of this package);
+  the parent never unpickles what the child sends. A model request is sent only for a model the deployment is configured with (every `*_model` setting and the fallbacks) and a schema one of the steps defines; progress must satisfy 0 <= done <= total <= `MAX_PAGES_PER_JOB`; at most `max(4, 2 x concurrency)` requests are open at once. The parent holds at most 128 MB of the child's output at once (a frame over that is refused and the job fails `conversion_crashed`, `conversion_child_frame_refused`; later frames wait on the socket), read in place without a second copy. The result comes back as JSON
+  (`DocumentResult`) and PNG crops, and is the same as an in-process run's apart from the
+  timings (`tests/test_web_isolated_convert.py`). A model call still running when the child is
+  killed finishes and settles in the parent; its spend counts, as an abandoned thread's did.
+- *Limits.* Address space `CONVERSION_MEMORY_MB` (default 3072; measured peak of a conversion is
+  1.6-1.8 GB of address space, 330-460 MB resident, on 4 documents of 2, 7, 7 and 11 pages with
+  `glibc` arenas capped at 2 (`MALLOC_ARENA_MAX`; without it the same runs peaked at 4.7-6 GB of
+  address space); below about 1.5 GB the ONNX runtime of the table
+  detector hangs instead of failing, which ends as `timeout`), plus twice the PDF; CPU time
+  4 times the job's wall-clock limit (a backstop; the table model's thread pools are capped at 4 threads, `conversion_child.MAX_THREADS`, whatever the host's core count, so address space does not grow with cores and 4 busy threads cannot reach the CPU limit before the wall clock); `oom_score_adj` 1000, so the kernel prefers the child to the web process; no core file (it would hold the PDF); the
+  child dies with the web process (`PR_SET_PDEATHSIG` on Linux, and the end of its socket).
+  Its own process group is killed with it, which takes the render probes (`layout._probe_pages`)
+  too.
+- *Wall clock.* The worker's own limit (`job_time_limit_s`) is unchanged. At its end the worker
+  cancels the attempt, the converter sees that within 0.2 s, kills the child and the job fails
+  `timeout`: no thread is left behind, so `conversion_abandoned` no longer happens for a hung
+  MuPDF. Deleting the job, losing the lease and shutdown cancel the same way.
+- *Outcomes.* A crash, signal or exit without an answer fails the job at once as
+  `conversion_crashed`, running out of memory as `conversion_oom`, CPU or wall clock as
+  `timeout`. None is retried: the same PDF would do the same again, so one poison file costs
+  one conversion attempt and not three lease expiries (and not three crashes of the whole
+  site). "Try again" is not offered for the first two; `MAX_RETRIES_PER_JOB` still bounds any
+  manual try. Errors the pipeline raises (`LayoutError`, budget, configuration) come out as the
+  same errors and the same codes as before.
+- *Shutdown.* SIGTERM stops the worker: the attempt is cancelled, the converter kills the child
+  at its next poll (at most 0.2 s) and the lease ends now, so another instance requeues the
+  job as before. The child holds no files and no connections, so killing it needs no clean-up.
+  Within `GRACEFUL_SHUTDOWN_S`, `WORKER_STOP_S` and the 10 s `drainingSeconds`.
+- *Cost.* A fresh process per job, so its start and imports are paid by every job (a fresh
+  process also means one document is never in memory another was in). Measured on the
+  development box (16 cores, other work running; fake models; a warm web process for the
+  in-process figure): the 2-page `lecture_notes.pdf`, median of 7 runs, 0.43 s in process and
+  2.46 s in the child (+2.0 s; with `FEATURE_TABLES` 0.36 s and 2.49 s); a 7-page paper, median of
+  3 runs, 12.3 s and 13.6 s (+1.4 s; with tables 12.8 s and 14.5 s, +1.7 s). The overhead is
+  about 1.4-2 s a job here, from starting Python and importing the pipeline; with
+  `FEATURE_TABLES` the child also loads the table models, which `PRELOAD_TABLE_MODELS` no
+  longer does in the web process (the models would only sit in memory there). On one vCPU the
+  imports and the model load take longer (deploy.md, "Sizing": 4-5 s for the models alone).
+- *Not carried over.* Tracing (`TRACING_ENABLED`, off in production) records the worker's
+  spans only; the pipeline's inner spans are not sent from the child.
+- *Still in the web process.* Not conversions: the sample document's crops (`web/sample.py`,
+  once per process, from a file shipped in the repository) and what the review screen cuts
+  through `web/page_images.py`, which already uses the probe's child.
 
 `Worker.run_once()` and `process_next_job(...)` process one job synchronously, for tests
 and scripts.

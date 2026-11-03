@@ -916,7 +916,10 @@ class _Run:
             )
             if not done:
                 return
-            for future in done:
+            # (A failed step last: the others that finished with it are recorded first.)
+            for future in sorted(
+                done, key=lambda f: not f.cancelled() and f.exception() is not None
+            ):
                 self.record(future, self.futures.pop(future))
             self.raise_if_fatal()
             if self.stop.scope is not None:
@@ -926,7 +929,28 @@ class _Run:
     def raise_if_fatal(self) -> None:
         """Re-raise a worker's configuration error here (the pool is then shut down)."""
         if self.stop.fatal is not None:
+            self.keep_finished()
             raise self.stop.fatal
+
+    def keep_finished(self) -> None:
+        """Before a configuration error ends the run: store the steps that did finish (the
+        ones running at that moment included; the pool waits for them anyway). They were paid
+        for, and "Try again" must not ask the model for them a second time."""
+        if self.cache is None:
+            return
+        for future in list(self.futures):
+            future.cancel()
+        for future, element in list(self.futures.items()):
+            if future.cancelled():
+                continue
+            try:
+                done = future.result()
+            except BaseException:  # the failed step itself, or a worker that died
+                continue
+            key = self.keys.get(element.id)
+            if key and reusable(done.fix):
+                self.cache.store(element, key, done.fix)
+            self.futures.pop(future, None)
 
     def record(self, future: Future[_Done], element: Element) -> None:
         if future.cancelled():
