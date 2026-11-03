@@ -39,14 +39,23 @@ from typing import Any
 import numpy as np
 import pymupdf
 
+from readablestem.pipeline.page_type import (
+    INK_MAX_ITEMS,
+    PAGE_MAX_PATHS,
+    InkBudget,
+)
+
 BBox = tuple[float, float, float, float]
 Point = tuple[float, float]
 
 # ---------------------------------------------------------------------------- limits
 
-# Same caps as the page-type analysis: a page with more drawings is not read.
-MAX_PATHS = 50_000
-MAX_ITEMS = 500_000
+# The caps and the time budget are the page-type analysis's (one definition): a page with
+# more drawings or path items, or an analysis that outruns the budget, is not read.
+MAX_STROKES = 20_000  # strokes before grouping; more is not handwriting (or is hostile)
+GRID_MAX_CELLS = 256  # a box over more grid cells than this is compared with every other
+GRID_MAX_BIG = 2000  # ... and a page with more such boxes than this is not grouped
+GRID_MAX_CELL = 1000  # boxes in one grid cell: real ink never piles this deep
 
 FLATTEN_STEP = 1.5  # pt: a Bezier is cut into pieces about this long
 POINT_EPS = 0.05  # pt: points closer than this are one point
@@ -183,30 +192,65 @@ class _Prim:
     outline_ok: bool = False  # short: can be read as a thin outline
 
 
+class InkOverrun(Exception):
+    """The time budget or a cap ran out: the page is not read (`extract_ink` says so with
+    `analysed` False; `group_regions` called alone raises this)."""
+
+
+def _tick(budget: InkBudget | None) -> None:
+    if budget is not None and not budget.left():
+        raise InkOverrun
+
+
 def extract_ink(
     page: pymupdf.Page,
     drawings: Sequence[dict[str, Any]] | None = None,
     *,
-    max_paths: int = MAX_PATHS,
-    max_items: int = MAX_ITEMS,
+    budget: InkBudget | None = None,
+    max_paths: int = PAGE_MAX_PATHS,
+    max_items: int = INK_MAX_ITEMS,
+    max_strokes: int = MAX_STROKES,
 ) -> PageInk:
     """Strokes, regions and what was dropped for one page. `drawings` is
-    `page.get_cdrawings()` when the caller has it already."""
+    `page.get_cdrawings()` when the caller has it already. `budget` is the document's
+    ink-analysis budget (a fresh `InkBudget` when not given), checked in every phase and
+    loop; over a cap or the budget the result is empty with `analysed` False."""
+    if budget is None:
+        budget = InkBudget()
     if drawings is None:
         drawings = page.get_cdrawings()
     result = PageInk()
     if len(drawings) > max_paths or sum(len(d.get("items") or ()) for d in drawings) > max_items:
         result.analysed = False
         return result
-    dropped: Counter[str] = Counter()
-    prims = _primitives(page, drawings, dropped)
-    prims = _drop_furniture(prims, page.rect, dropped)
-    strokes = _strokes(prims, dropped)
-    result.dropped = dict(dropped)
-    result.strokes = [s for s in strokes if not s.highlight]
-    result.highlights = [s for s in strokes if s.highlight]
-    result.regions = group_regions(result.strokes)
+    try:
+        dropped: Counter[str] = Counter()
+        prims = _primitives(page, drawings, dropped, budget)
+        prims = _drop_furniture(prims, page.rect, dropped, budget)
+        strokes = _strokes(prims, dropped, budget)
+        strokes = _on_page(strokes, page.rect, dropped)
+        if len(strokes) > max_strokes:
+            raise InkOverrun
+        result.dropped = dict(dropped)
+        result.strokes = [s for s in strokes if not s.highlight]
+        result.highlights = [s for s in strokes if s.highlight]
+        result.regions = group_regions(result.strokes, budget=budget, frame=tuple(page.rect))
+    except InkOverrun:
+        return PageInk(analysed=False)
     return result
+
+
+def _on_page(strokes: list[Stroke], page: pymupdf.Rect, dropped: Counter) -> list[Stroke]:
+    """Strokes with any part on the page. (A path object that holds many strokes can reach
+    off the page; the strokes that lie wholly outside it are not writing on it.)"""
+    out = []
+    for st in strokes:
+        x0, y0, x1, y1 = st.bbox
+        if x1 < page.x0 or x0 > page.x1 or y1 < page.y0 or y0 > page.y1:
+            dropped["off_page"] += 1
+        else:
+            out.append(st)
+    return out
 
 
 def _colour(value: Sequence[float] | None) -> str:
@@ -328,7 +372,10 @@ def _exact_rect(pts: Sequence[Point]) -> bool:
 
 
 def _primitives(
-    page: pymupdf.Page, drawings: Sequence[dict[str, Any]], dropped: Counter
+    page: pymupdf.Page,
+    drawings: Sequence[dict[str, Any]],
+    dropped: Counter,
+    budget: InkBudget | None = None,
 ) -> list[_Prim]:
     """Every subpath that might be ink, in paint order, in display space."""
     rotated = page.rotation % 360 != 0
@@ -337,6 +384,8 @@ def _primitives(
     out: list[_Prim] = []
     order = 0
     for di, d in enumerate(drawings):
+        if not di & 255:
+            _tick(budget)
         kind = d.get("type")
         if kind not in ("f", "s", "fs"):
             continue
@@ -418,7 +467,10 @@ def _lattice(points: Sequence[Point]) -> bool:
     return ux >= 3 and uy >= 3 and n >= LATTICE_FILL * ux * uy
 
 
-def _drop_furniture(prims: list[_Prim], page: pymupdf.Rect, dropped: Counter) -> list[_Prim]:
+def _drop_furniture(
+    prims: list[_Prim], page: pymupdf.Rect, dropped: Counter, budget: InkBudget | None = None
+) -> list[_Prim]:
+    _tick(budget)
     gone: set[int] = set()
     lines: dict[tuple[str, str, float], list[tuple[float, float, int]]] = {}
     rects: dict[tuple[float, float], list[int]] = {}
@@ -467,6 +519,7 @@ def _drop_furniture(prims: list[_Prim], page: pymupdf.Rect, dropped: Counter) ->
             _mark_run([i for c in run for i in by_coord[c]], len(run), gone, dropped)
             run = [cur]
         _mark_run([i for c in run for i in by_coord[c]], len(run), gone, dropped)
+    _tick(budget)
     # dot grids: short shapes on a lattice, by drawing and by colour and size
     by_key: dict[tuple, list[int]] = {}
     for i, p in enumerate(prims):
@@ -502,11 +555,12 @@ def _touch(a: _Prim, b: _Prim) -> bool:
     return ax0 - gap <= bx1 and bx0 - gap <= ax1 and ay0 - gap <= by1 and by0 - gap <= ay1
 
 
-def _strokes(prims: list[_Prim], dropped: Counter) -> list[Stroke]:
+def _strokes(prims: list[_Prim], dropped: Counter, budget: InkBudget | None = None) -> list[Stroke]:
     out: list[Stroke] = []
     i = 0
     n = len(prims)
     while i < n:
+        _tick(budget)  # an outline costs about 3 ms
         p = prims[i]
         if p.kind == "stroked":
             # Xournal++ style: one segment per path object; chain the ones that continue.
@@ -649,11 +703,74 @@ class _Sets:
         self.parent[self.find(a)] = self.find(b)
 
 
-def group_regions(strokes: Sequence[Stroke]) -> list[InkRegion]:
+def _union_near(
+    boxes: Sequence[BBox],
+    pad_x: float,
+    pad_y: float,
+    cell: float,
+    sets: _Sets,
+    budget: InkBudget | None,
+    test: Any = None,
+) -> None:
+    """Union every pair of boxes that intersect once either is grown by (pad_x, pad_y) and
+    pass `test`. A grid hash: each box sits in the cells it covers, and looks only in the
+    cells its grown box covers. A box over GRID_MAX_CELLS cells is compared with all boxes
+    (more than GRID_MAX_BIG of them is an overrun). Pairs are taken once, j after i.."""
+    cx, cy = max(cell, pad_x, 1e-6), max(cell, pad_y, 1e-6)
+    grid: dict[tuple[int, int], list[int]] = {}
+    big: list[int] = []
+
+    for i, (x0, y0, x1, y1) in enumerate(boxes):
+        nx = int(x1 // cx - x0 // cx) + 1
+        ny = int(y1 // cy - y0 // cy) + 1
+        if nx * ny > GRID_MAX_CELLS:
+            big.append(i)
+            continue
+        for gx in range(int(x0 // cx), int(x1 // cx) + 1):
+            for gy in range(int(y0 // cy), int(y1 // cy) + 1):
+                grid.setdefault((gx, gy), []).append(i)
+        if not i & 1023:
+            _tick(budget)
+    if any(len(v) > GRID_MAX_CELL for v in grid.values()) or len(big) > GRID_MAX_BIG:
+        raise InkOverrun
+    big_set = set(big)
+    work = 0
+    for i, (x0, y0, x1, y1) in enumerate(boxes):
+        ex0, ey0, ex1, ey1 = x0 - pad_x, y0 - pad_y, x1 + pad_x, y1 + pad_y
+        nx = int(ex1 // cx - ex0 // cx) + 1
+        ny = int(ey1 // cy - ey0 // cy) + 1
+        if i in big_set or nx * ny > GRID_MAX_CELLS:
+            candidates: Any = range(len(boxes))  # a wide box: compare with all
+        else:
+            found: set[int] = set(big_set)
+            for gx in range(int(ex0 // cx), int(ex1 // cx) + 1):
+                for gy in range(int(ey0 // cy), int(ey1 // cy) + 1):
+                    found.update(grid.get((gx, gy), ()))
+            candidates = found
+        for j in candidates:
+            work += 1
+            if not work & 4095:
+                _tick(budget)
+            if j <= i:
+                continue
+            b = boxes[j]
+            near = ex0 <= b[2] and b[0] <= ex1 and ey0 <= b[3] and b[1] <= ey1
+            if near and sets.find(i) != sets.find(j) and (test is None or test(i, j)):
+                sets.union(i, j)
+
+
+def group_regions(
+    strokes: Sequence[Stroke],
+    *,
+    budget: InkBudget | None = None,
+    frame: BBox | None = None,
+) -> list[InkRegion]:
     """Lines by proximity (strokes that overlap vertically and sit within a few stroke sizes
     of each other horizontally), then regions (lines that stack closely and overlap
     horizontally: a fraction, a matrix, a multi-line equation). Sizes are relative to the
-    median stroke, so small and large writing group alike. Regions come in reading order."""
+    median stroke, so small and large writing group alike. Regions come in reading order.
+    Neighbours are found with a grid hash, so the cost is near linear in the strokes.
+    A region's box is clipped to `frame` (the page) when given."""
     if not strokes:
         return []
     boxes = [s.bbox for s in strokes]
@@ -665,17 +782,15 @@ def group_regions(strokes: Sequence[Stroke]) -> list[InkRegion]:
         mid = (b[1] + b[3]) / 2
         half = max(h, flat) / 2
         spans.append((mid - half, mid + half))
-    by_x = sorted(range(len(boxes)), key=lambda i: boxes[i][0])
     lines = _Sets(len(boxes))
-    window: list[int] = []
-    for i in by_x:
-        window = [j for j in window if boxes[j][2] + LINE_GAP * size >= boxes[i][0]]
-        for j in window:
-            overlap = min(spans[i][1], spans[j][1]) - max(spans[i][0], spans[j][0])
-            shorter = min(spans[i][1] - spans[i][0], spans[j][1] - spans[j][0])
-            if overlap >= LINE_OVERLAP * shorter:
-                lines.union(i, j)
-        window.append(i)
+
+    def same_line(i: int, j: int) -> bool:
+        overlap = min(spans[i][1], spans[j][1]) - max(spans[i][0], spans[j][0])
+        shorter = min(spans[i][1] - spans[i][0], spans[j][1] - spans[j][0])
+        return overlap >= LINE_OVERLAP * shorter
+
+    line_boxes = [(b[0], sp[0], b[2], sp[1]) for b, sp in zip(boxes, spans, strict=True)]
+    _union_near(line_boxes, LINE_GAP * size, 0.0, size, lines, budget, same_line)
     rows: dict[int, list[int]] = {}
     for i in range(len(boxes)):
         rows.setdefault(lines.find(i), []).append(i)
@@ -683,19 +798,7 @@ def group_regions(strokes: Sequence[Stroke]) -> list[InkRegion]:
     row_boxes = [_union([boxes[i] for i in r]) for r in row_list]
     stacks = _Sets(len(row_list))
     gap = REGION_GAP * size
-    order = sorted(range(len(row_list)), key=lambda r: row_boxes[r][1])
-    for ai, a in enumerate(order):
-        for b in order[ai + 1 :]:
-            ba, bb = row_boxes[a], row_boxes[b]
-            if bb[1] > ba[3] + gap:
-                break  # sorted by top: every later row starts lower still
-            if (
-                ba[0] - size <= bb[2]
-                and bb[0] - size <= ba[2]
-                and ba[1] - gap <= bb[3]
-                and bb[1] - gap <= ba[3]
-            ):
-                stacks.union(a, b)
+    _union_near(row_boxes, size, gap, size, stacks, budget)
     groups: dict[int, list[int]] = {}
     for r in range(len(row_list)):
         groups.setdefault(stacks.find(r), []).append(r)
@@ -711,7 +814,15 @@ def group_regions(strokes: Sequence[Stroke]) -> list[InkRegion]:
             tuple(position[i] for i in sorted(row_list[r], key=lambda i: boxes[i][0]))
             for r in row_order
         )
-        regions.append(InkRegion(_union([boxes[i] for i in idx]), member_strokes, region_lines))
+        box = _union([boxes[i] for i in idx])
+        if frame is not None:
+            box = (
+                max(box[0], frame[0]),
+                max(box[1], frame[1]),
+                min(box[2], frame[2]),
+                min(box[3], frame[3]),
+            )
+        regions.append(InkRegion(box, member_strokes, region_lines))
     regions.sort(key=lambda r: (r.bbox[1], r.bbox[0]))
     return regions
 

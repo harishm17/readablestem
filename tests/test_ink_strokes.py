@@ -533,3 +533,139 @@ def test_ios_notes_centre_lines_follow_the_strokes_the_fixture_was_written_from(
         for s, t in zip(ink.strokes, truth, strict=True)
     )
     assert forward >= 0.9 * len(truth)  # the misses are closed loops, whose start is a guess
+
+
+# ----------------------------------------------------------------------------- limits
+
+
+def _marks(points: list[tuple[float, float]]) -> list[Stroke]:
+    return [
+        Stroke(((x, y), (x + 3, y + 5), (x + 6, y + 2)), "#000000", 1.0, 1.0, i, "path")
+        for i, (x, y) in enumerate(points)
+    ]
+
+
+@pytest.mark.parametrize("shape", ["column", "row", "random"])
+def test_grouping_50000_strokes_is_fast_whatever_their_layout(shape):
+    import random
+    import time
+
+    n = 50_000
+    rng = random.Random(7)
+    if shape == "column":
+        pts = [(100.0, 4.0 * i) for i in range(n)]
+    elif shape == "row":
+        pts = [(8.0 * i, 100.0) for i in range(n)]
+    else:
+        pts = [(rng.uniform(0, 5000), rng.uniform(0, 5000)) for _ in range(n)]
+    start = time.monotonic()
+    regions = group_regions(_marks(pts), budget=ink_strokes.InkBudget(60.0))
+    elapsed = time.monotonic() - start
+    assert elapsed < 8.0, (shape, elapsed)
+    assert sum(len(r.strokes) for r in regions) == n
+
+
+def test_a_pile_of_strokes_is_an_overrun_not_a_stall():
+    import random
+    import time
+
+    rng = random.Random(7)
+    pts = [(100.0 + rng.uniform(0, 1), 100.0 + rng.uniform(0, 1)) for _ in range(50_000)]
+    start = time.monotonic()
+    with pytest.raises(ink_strokes.InkOverrun):
+        group_regions(_marks(pts), budget=ink_strokes.InkBudget(60.0))
+    assert time.monotonic() - start < 5.0
+
+
+def test_grouping_equals_the_brute_force_partition_on_random_ink():
+    import random
+
+    rng = random.Random(3)
+    strokes = _marks([(rng.uniform(0, 300), rng.uniform(0, 120)) for _ in range(400)])
+    boxes = [s.bbox for s in strokes]
+    size = max(
+        ink_strokes.MIN_SIZE, float(np.median([max(b[2] - b[0], b[3] - b[1]) for b in boxes]))
+    )
+    flat = ink_strokes.MIN_HEIGHT * size
+    spans = [
+        (
+            (b[1] + b[3]) / 2 - max(b[3] - b[1], flat) / 2,
+            (b[1] + b[3]) / 2 + max(b[3] - b[1], flat) / 2,
+        )
+        for b in boxes
+    ]
+    sets = ink_strokes._Sets(len(boxes))
+    for i in range(len(boxes)):
+        for j in range(i + 1, len(boxes)):
+            overlap = min(spans[i][1], spans[j][1]) - max(spans[i][0], spans[j][0])
+            shorter = min(spans[i][1] - spans[i][0], spans[j][1] - spans[j][0])
+            gap_ok = (
+                boxes[i][0] - ink_strokes.LINE_GAP * size <= boxes[j][2]
+                and boxes[j][0] - ink_strokes.LINE_GAP * size <= boxes[i][2]
+            )
+            if gap_ok and overlap >= ink_strokes.LINE_OVERLAP * shorter:
+                sets.union(i, j)
+    rows: dict[int, list[int]] = {}
+    for i in range(len(boxes)):
+        rows.setdefault(sets.find(i), []).append(i)
+    row_list = list(rows.values())
+    rb = [ink_strokes._union([boxes[i] for i in r]) for r in row_list]
+    stacks = ink_strokes._Sets(len(row_list))
+    gap = ink_strokes.REGION_GAP * size
+    for a in range(len(rb)):
+        for b in range(a + 1, len(rb)):
+            if (
+                rb[a][0] - size <= rb[b][2]
+                and rb[b][0] - size <= rb[a][2]
+                and rb[a][1] - gap <= rb[b][3]
+                and rb[b][1] - gap <= rb[a][3]
+            ):
+                stacks.union(a, b)
+    want: dict[int, set[int]] = {}
+    for r, members in enumerate(row_list):
+        want.setdefault(stacks.find(r), set()).update(strokes[i].order for i in members)
+    got = [{s.order for s in r.strokes} for r in group_regions(strokes)]
+    assert sorted(map(sorted, got)) == sorted(map(sorted, want.values()))
+
+
+def test_an_exhausted_budget_returns_an_unanalysed_empty_page():
+    ink = extract_ink(make_page("outline"), budget=ink_strokes.InkBudget(0))
+    assert not ink.analysed and not ink.strokes and not ink.regions
+
+
+def test_more_strokes_than_the_cap_are_not_grouped():
+    ink = extract_ink(make_page("polyline"), max_strokes=3)
+    assert not ink.analysed and not ink.regions
+
+
+def test_the_caps_are_the_page_type_ones():
+    from readablestem.pipeline import page_type
+
+    assert ink_strokes.INK_MAX_ITEMS is page_type.INK_MAX_ITEMS
+    assert ink_strokes.PAGE_MAX_PATHS is page_type.PAGE_MAX_PATHS
+    assert ink_strokes.InkBudget is page_type.InkBudget
+
+
+def test_strokes_wholly_off_the_page_are_dropped_and_do_not_stretch_regions():
+    doc = pymupdf.open()
+    page = doc.new_page(width=300, height=300)
+    shape = page.new_shape()
+    shape.draw_polyline(TRUTH[2])
+    shape.draw_polyline([(x + 1000.0, y) for x, y in TRUTH[2]])  # same path object, off the page
+    shape.finish(color=(0, 0, 0), width=1)
+    shape.commit()
+    ink = extract_ink(page)
+    assert len(ink.strokes) == 1 and ink.dropped == {"off_page": 1}
+    (region,) = ink.regions
+    assert region.bbox[2] <= page.rect.x1
+
+
+def test_a_stroke_leaving_the_page_clips_its_region_box_to_the_page():
+    doc = pymupdf.open()
+    page = doc.new_page(width=300, height=300)
+    shape = page.new_shape()
+    shape.draw_polyline([(250.0 + 2 * i, 100.0 + (i % 5)) for i in range(60)])
+    shape.finish(color=(0, 0, 0), width=1)
+    shape.commit()
+    (region,) = extract_ink(page).regions
+    assert region.bbox[2] == pytest.approx(300.0)

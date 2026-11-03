@@ -1648,9 +1648,15 @@ GoodNotes, Notability, OneNote or Xournal++ export has been read yet.
   A stroke whose outline crosses itself can pair its edges wrongly.
 - Regions are a proximity guess: tightly spaced lines become one region (use `lines`), and a far
   superscript or answer can be a region of its own.
-- A page with more than 50,000 drawings or 500,000 path items is not read (`analysed` is false).
-  There is no time budget yet: reading outlines costs about 3 ms a stroke (0.5 s for the 150
-  strokes of `ios_notes.pdf`, 0.03 s for the 270 polylines of `ink_no_layer.pdf`, on this machine).
+- Limits and time: the caps and the budget are `page_type`'s (`PAGE_MAX_PATHS`, `INK_MAX_ITEMS`,
+  `InkBudget`, `INK_BUDGET_S`); `extract_ink` takes the document's `InkBudget`, checks it in
+  every phase and inside the loops, and over a cap, more than 20,000 strokes (`MAX_STROKES`) or
+  the budget returns an empty result with `analysed` false. Grouping finds neighbours with a
+  grid hash, so it is near linear: 50,000 strokes in a column, a row or at random group in
+  1 to 3 s on this machine; strokes piled on one spot (over 1,000 in one grid cell) are an
+  overrun, not a stall. Reading outlines costs about 3 ms a stroke (0.5 s for the 150 strokes
+  of `ios_notes.pdf`; 0.03 s for the 270 polylines of `ink_no_layer.pdf`).
+- Strokes wholly off the page are dropped (`off_page`), and a region's box is clipped to the page.
 - On the seeded outline writer (150 strokes, 7 pt writing), the centre-line lies a median 0.4 pt
   (at most 1.4 pt) from the pen path; its ends can fall up to 2 pt short.
 
