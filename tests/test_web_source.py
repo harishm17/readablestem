@@ -215,6 +215,19 @@ def zip_with_attr(name: str, data: bytes, attr: int) -> bytes:
         (make_zip({f"f{i}.tex": "x" for i in range(501)}), "too many files"),
         (make_zip({"main.tex": ARTICLE, "big.txt": "\0" * (30 * 1024 * 1024)}), "too big"),
     ],
+    # ids by name: the zips carry the time they were made, and every worker must see the same ids
+    ids=[
+        "traversal",
+        "absolute",
+        "symlink",
+        "eps",
+        "nested-zip",
+        "shell-script",
+        "not-a-zip",
+        "no-main",
+        "too-many-entries",
+        "unpacked-too-big",
+    ],  # fmt: skip
 )
 def test_a_bad_zip_is_refused_with_a_plain_message(web, data, words):
     text = refused(web, data, "project.zip")
