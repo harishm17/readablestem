@@ -199,3 +199,34 @@ def test_the_reading_whose_symbols_are_closer_to_the_glyphs_wins_and_a_near_tie_
     assert witness_reconcile.adjudicate("a b", mathml("a", "c"), mathml("a", "d")) == "tie"
     assert witness_reconcile.adjudicate(None, mathml("a"), mathml("b")) == "tie"
     assert witness_reconcile.adjudicate("  ", mathml("a"), mathml("b")) == "tie"
+
+
+def test_a_tie_on_the_letters_is_broken_by_a_slash_the_glyphs_show():
+    # "-2/3" written on the page: the text layer has the slash, a fraction bar would not
+    fraction = "<math><mo>-</mo><mfrac><mn>2</mn><mn>3</mn></mfrac></math>"
+    written = "<math><mo>-</mo><mn>2</mn><mo>/</mo><mn>3</mn></math>"
+    assert witness_reconcile.adjudicate("−2/3", fraction, written) == "witness"
+    assert witness_reconcile.adjudicate("−2/3", written, fraction) == "crop"
+    # a drawn fraction (no slash in the text layer) and a reading that wrote a slash
+    assert witness_reconcile.adjudicate("−2 3", written, fraction) == "witness"
+    assert witness_reconcile.adjudicate("−2 3", fraction, written) == "crop"
+    # no slash anywhere: still a tie, and the crop stays
+    assert witness_reconcile.adjudicate("a b", mathml("a", "b"), mathml("a", "b")) == "tie"
+
+
+def test_the_slash_never_overrules_the_letters_and_brackets_are_not_marks():
+    # the letters decide first, whatever the slashes say
+    assert (
+        witness_reconcile.adjudicate(
+            "a b c/d",
+            "<math><mi>a</mi><mi>b</mi><mi>c</mi><mi>x</mi></math>",
+            "<math><mi>a</mi><mi>b</mi><mi>c</mi><mo>/</mo><mi>d</mi></math>",
+        )
+        == "witness"
+    )
+    # an element's text often holds a neighbour's bracket: it does not pick a reading
+    bare = "<math><mi>R</mi></math>"
+    bracketed = "<math><mo>(</mo><mi>R</mi><mo>)</mo></math>"
+    assert witness_reconcile.adjudicate("(R)", bare, bracketed) == "tie"
+    assert witness_reconcile.marks_dice("a/b", "<math><mi>a</mi><mi>b</mi></math>") == 0.0
+    assert witness_reconcile.marks_dice("a b", "<math><mi>a</mi><mi>b</mi></math>") == 1.0

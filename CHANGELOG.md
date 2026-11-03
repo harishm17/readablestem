@@ -22,6 +22,15 @@
   says a download does; they do now. The two questions after a download also open for the Common Cartridge link.
 - Docker image: pandoc from the distribution (about 200 MB on disk), always installed; `python-docx` joins the dev
   group for the tests; THIRD_PARTY_NOTICES.md lists both.
+## Unreleased: page witness, why it changed nothing (branch eq/witness-diagnosis)
+
+- Page witness (off: `FEATURE_PAGE_WITNESS`): when the crop's reading and the witness's tie on the letters, digits
+  and Greek letters of the glyphs (23 of the 24 disagreements of the E1 dev run did, so the crop's reading always
+  stayed), the slashes in the glyphs now break the tie (`witness_reconcile.marks_dice`): a written `-2/3` beats a
+  drawn fraction, and the other way round. Both readings are still shown and the formula is still a required
+  decision. Re-scored on the recorded E1 answers (12 dev papers, 1,096 gold, $0): exact 0.753 to 0.755, silent
+  wrong 8.58 per 100 gold and decisions a page 4.35 unchanged. `scripts/eq_dev_run.py` has an offline arm
+  `witness-sonnet-r2` for it and passes the two flags `realworld_run` gained. docs/eval-equation-round5.md.
 
 ## Unreleased: page witness dev run (branch eq/e1-witness-dev)
 

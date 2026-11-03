@@ -135,6 +135,17 @@ def test_a_glyph_tie_keeps_the_crop_and_is_still_a_required_decision_with_both_r
     assert (fix.equation.other_latex, fix.equation.other_source) == ("a d", "page_witness")
 
 
+def test_a_slash_in_the_glyphs_breaks_a_tie_on_the_letters_for_the_witness():
+    """The page writes "-2/3". The crop read a fraction, the witness the slash: the letters
+    tie, the slash decides for the witness, and the crop's reading is the other one (still a
+    required decision). E1 dev: 2 equations of 914."""
+    client = by_model(cheap=out(r"-\frac{2}{3}", 0.97), main=out(r"-\frac{2}{3}", 0.97))
+    fix = run(client, element(text="\u22122/3", witness="-2/3"))
+    assert fix.status == Status.NEEDS_REVIEW and fix.review == "required"
+    assert fix.equation is not None and fix.equation.latex == "-2/3"
+    assert (fix.equation.other_latex, fix.equation.other_source) == (r"-\frac{2}{3}", "crop")
+
+
 def test_a_witness_reading_that_does_not_convert_is_the_other_reading_never_the_proposal():
     client = by_model(cheap=out("x = 5", 0.97))
     fix = run(client, element(text="x = 5", witness=r"\frac{x"))
