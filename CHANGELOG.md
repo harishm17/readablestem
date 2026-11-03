@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: figures spot check
+
+- `eval figures-spotcheck` (`eval/figures_spotcheck.py`, docs/eval.md "Figure spot check"): offline,
+  no model call. From a figures run with long descriptions on, writes a blind sheet of every
+  long-judge fail plus a seeded sample of 10 passes for a person to label, and scores the labels
+  against a key (judge fails confirmed, sampled passes the person would fail, each with n and a
+  Wilson interval). Tests: `tests/test_eval_figures_spotcheck.py`.
+
 ## Unreleased: slide decks (branch layout/beamer-slides)
 
 - Slide decks (`pipeline/slides.py`, docs/layout.md "Slide decks"): a Beamer file, or a slide-shaped
