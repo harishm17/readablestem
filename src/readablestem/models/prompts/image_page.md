@@ -48,44 +48,18 @@ Each block has these fields. Fields that do not apply to a block's kind are left
   else as you can: for an equation, the equation itself with its printed number outside the
   box; for a paragraph, all of its lines. Boxes do not overlap, except a figure's box may
   contain its own labels.
-- `confidence`: how sure you are that you copied the block exactly. It counts specific
-  doubts, each a place where you can name the other reading:
-  - `high`: every word and symbol is clear. `alternatives` is empty and there is no word you
-    chose between two readings of;
-  - `medium`: one or two doubts you can name: a word with two plausible readings, or one or
-    two symbols listed in `alternatives` (`x` or `X`, `l` or `1`, a minus or a dash, a
-    subscript that may or may not be there). Everything else in the block is clear;
-  - `low`: three or more doubts, or a part you cannot give a second reading for: smudged,
-    cut off, crossed out or `[illegible]`.
-  Needing the subject or the line around a symbol to read it does not make a block `medium`
-  when the symbol is clear once you do; a doubt does. Never say `high` for a block with a
-  doubt, and never say `medium` for one without: a person reads every block you call `medium`
-  or `low`, and `alternatives` gives them the choices to click.
-- `alternatives` (a block with an equation `latex` or a `math` run; `[]` when every symbol is
-  clear): the symbols of a formula that you read one way and that the writer may have drawn
-  another way. The `latex` or run keeps your best reading; `alternatives` never changes it.
-  An entry has:
-  - `run`: the position in `runs`, counting from 0, of the `math` run the symbol is in; for an
-    equation's `latex`, 0;
-  - `symbol`: the symbol as it stands in your LaTeX (`x`, `\rho`, `f_i`, `\times`);
-  - `occurrence`: 1 if it is the first time that symbol stands in that formula, 2 for the
-    second, and so on;
-  - `kind`: `case` (`x` or `X`, `k` or `K`), `greek_latin` (`p` or `\rho`, `w` or `\omega`,
-    `v` or `\nu`, `d` or `\partial`), `digit_letter` (`1`, `l` or `|`; `z` or `2`; `0` or
-    `o`), `operator` (`\times` or `x`, a minus or a dash, a dot or a full stop, a bracket),
-    `script` (a subscript, superscript or prime you may have lost or added: `f(y)` that may
-    be `f^{-1}(y)`) or `other`;
-  - `options`: one to three other LaTeX spellings of that same stretch, the likeliest first,
-    never your own reading. Each replaces `symbol` as it stands and leaves a whole formula
-    (`x` becomes `X`; `f` becomes `f^{-1}`; `f_i` becomes `f`).
-  List a symbol only when the other reading has a real chance, about one in four or better,
-  of being what was drawn. A letter that is clearly one thing is not doubtful because it
-  could have been another. At most three entries a formula: the ones most likely to be wrong.
+- `confidence`: how sure you are that you copied the block exactly.
+  - `high`: every word and symbol is clear and you are sure of each one;
+  - `medium`: you needed context to settle one or more words or symbols, or a symbol is
+    ambiguous (`l` or `1`, a minus or a dash, bold or plain, a subscript);
+  - `low`: part of it is hard to read, smudged, cut off or crossed out.
+  Be honest: a person reads every block you call `medium` or `low`, so they cost attention
+  only where it is needed. Never say `high` for text you had to guess at.
 - `runs` (heading, paragraph, list_item): the block's content as a list of runs in reading
   order. A `text` run holds plain words exactly as written. A `math` run holds a formula that
   sits inside the sentence, as LaTeX; every symbol, variable, number with units and fraction
   that is set as mathematics belongs in a `math` run, not in a `text` run ("the speed `v`",
-  "`5.0\ \text{m/s}`", "`\ce{H2O}`"). Put the spaces between words and a math run inside the
+  "`5.0\ \text{m/s}`", "`H_2O`"). Put the spaces between words and a math run inside the
   neighbouring `text` runs. Do not put the sentence's full stop or comma inside a `math` run.
 - `latex` (equation): see the rules below. `rows` (table): see below.
 
@@ -119,47 +93,18 @@ Each block has these fields. Fields that do not apply to a block's kind are left
 6. Standard commands only: Greek letters, `\times`, `\cdot`, `\pm`, `\leq`, `\neq`, `\approx`,
    `\rightarrow`, `\sin`, `\log`, `\sum`, `\int`, `\lim`, `\hat`, `\bar`, `\dot`,
    `\left( ... \right)`, and the `array`, `pmatrix`, `bmatrix` and `cases` environments. Never
-   `\def`, `\newcommand`, `\href`, `\url`, `\color`, `\label`, `\tag` or a package's commands
-   (`\ce` for chemical species is the one exception, see Chemistry below).
-7. Handwriting: write the letter the strokes show. A letter is Greek when it has the Greek
-   shape (the tail of a `\rho`, the loops of an `\omega`, the point of a `\nu`) and Latin when
-   it has the Latin shape; the subject does not decide, since mathematics and physics are
-   written with both. What the writer does elsewhere on the page is the evidence for a
-   doubtful letter: one variable is written the same way each time. If the strokes and the
-   page still leave two readings, write the likelier and list the other in `alternatives`.
+   `\def`, `\newcommand`, `\href`, `\url`, `\color`, `\label`, `\tag`.
+7. Handwriting: read the maths as the author meant it; a letter written like a Greek letter is
+   that Greek letter when the context is physical or mathematical. If a symbol is truly
+   ambiguous, write your best reading and call the block `medium` or `low`.
 8. Write the letters as drawn. A letter drawn as a plain letter stays plain: `R`, not
    `\mathbb{R}`, unless the strokes are double-struck; `\mathrm`, `\mathcal` and `\mathbb`
    are for letters that are drawn upright, in script or double-struck. Take the case of a
    letter from its height against its neighbours and from the formula around it; one variable
-   keeps one case through a formula. When height cannot settle the case, list the other
-   case in `alternatives`.
+   keeps one case through a formula.
 9. Copy every mark that is drawn: superscripts and subscripts (and a script on a script),
    accents (`\hat`, `\tilde`, `\vec`), primes, brackets, bars and dots. A bar over one or
    more symbols is `\overline{...}`.
-
-## Chemistry
-
-Write each chemical species and reaction with `\ce{...}`, and everything else (numbers, units,
-words, fractions, and quantities such as `K_\text{sp}`) as ordinary LaTeX around it. A generic
-letter that is not an element (`A`, `X`) is not chemistry: `[A]_0`.
-
-- Formulas: `\ce{H2O}`, `\ce{Al2(SO4)3}`, `\ce{CH3CO2-}`, `\ce{[Cu(NH3)4]^2+}`.
-- Ions: `\ce{Na+}`, `\ce{OH-}`, `\ce{H3O+}`; a charge of two or more goes after a `^`:
-  `\ce{SO4^2-}`, `\ce{Fe^3+}`, `\ce{Hg2^2+}`. The electron is `\ce{e-}`.
-- State symbols stay with their species: `\ce{NaCl(aq)}`, `\ce{H2O(l)}`, `\ce{CO2(g)}`,
-  `\ce{AgCl(s)}`.
-- A reaction is one `\ce` for the whole line, coefficients in front of their species:
-  `\ce{2 H2 + O2 -> 2 H2O}`. Arrows are `->`, `<-`, `<->`, and `<=>` for an equilibrium; a
-  condition on an arrow goes in brackets: `\ce{CaCO3(s) ->[\Delta] CaO(s) + CO2(g)}`.
-- Nuclides: `\ce{^{14}_{6}C}`, `\ce{^{0}_{-1}e}`.
-- A concentration keeps its brackets outside the `\ce`: `[\ce{H3O+}]`, and a script after the
-  bracket goes outside too: `[\ce{NH3}]^2`.
-- Whatever `\ce` cannot hold goes in ordinary LaTeX, with `\ce` only for the species inside
-  it: `K = \frac{[\ce{NH3}]^2}{[\ce{N2}][\ce{H2}]^3}`, `\text{rate} = k[\ce{NO}]^2`. Never put
-  `\text`, `$` or other LaTeX commands inside `\ce`.
-- Write only what is drawn: do not balance, complete or correct a reaction. A doubtful
-  element letter (`Co` or `CO`) or count goes in `alternatives` like any other symbol, as a
-  single character inside the `\ce`.
 
 ## Tables
 

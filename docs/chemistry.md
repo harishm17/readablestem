@@ -34,7 +34,6 @@ that are about what the output says and not about the answer key:
 | Detection of formulas, ions, state symbols, reactions in running text and on display lines | `pipeline/chem.py` (pure string rules), `layout._chem_words`, `_chem_runs`, `_with_chemistry`, `_reaction_row` |
 | `\ce{...}` to plain LaTeX, a tested subset, the rest refused | `chem.ce_to_latex`, `chem.convert_ce_commands`, `chem.expand_ce`, `equation_step.read_latex` |
 | The equation prompt asks for `\ce` | `models/prompts/equation.md` and `equation_notation.md`, section "Chemistry" |
-| The page reader of scanned and handwritten pages asks for `\ce` with the same subset | `models/prompts/image_page.md` and `image_page_crops.md`; both readings go through `equation_step.read_latex` |
 | Subscripts and superscripts after `(...)` and `[...]` belong to the group | `core/latex_groups.group_delimited_scripts`, called by `validate.safe_latex_to_mathml` |
 | A charge or a count hangs on the whole element symbol; a long arrow is an operator | `chem.group_element_symbols`, `chem.arrows_as_operators`, called by `safe_latex_to_mathml` |
 | Speech | `pipeline/speech_chem.py`, hooks in `pipeline/speech.py` |

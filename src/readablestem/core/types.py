@@ -584,7 +584,7 @@ class Element(BaseModel):
     image_confidence: Literal["high", "medium", "low"] | None = Field(
         default=None, exclude_if=lambda v: v is None
     )
-    # Equations read from an image of a handwritten page: the symbols the page reader named as
+    # Equations: the symbols another reading or a reader named as
     # doubtful, with what else each may be (`ReadingAlternatives`, which says which string its
     # offsets belong to). None when the reader listed none, and for everything else.
     alternatives: ReadingAlternatives | None = Field(default=None, exclude_if=lambda v: v is None)
