@@ -29,6 +29,7 @@ from readablestem.web.routes.review import (
     SYMBOLS_FLASH,
     _load_versioned,
     list_url,
+    symbols_url,
     undo_offer,
 )
 
@@ -133,4 +134,4 @@ def relabel(
         left_out=len(left_out),
     )
     flash(request, inventory.done_message(done), element_id=SYMBOLS_FLASH)
-    return RedirectResponse(f"/jobs/{job_id}/symbols?view={view}", status_code=303)
+    return RedirectResponse(symbols_url(job_id, view), status_code=303)

@@ -79,6 +79,7 @@ from readablestem.web import (
 from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
 from readablestem.web.deps import (
     ELEMENT_ID,
+    JOB_ID,
     CurrentUser,
     PageError,
     UserDep,
@@ -1307,6 +1308,20 @@ def list_url(job_id: str, anchor: str) -> str:
     return f"/jobs/{job_id}/review/list#{anchor}"
 
 
+# The Symbols screen's address for each view it can come back to; nothing typed goes in.
+_SYMBOLS_QUERY = {LIST_VIEW: "?view=list", "split": "?view=split"}
+
+
+def symbols_url(job_id: str, view: str) -> str:
+    """Where to send the browser after a write on (or an Undo from) the Symbols screen. Built
+    only from a well-formed job id and a fixed query, so a crafted `job_id` or `view` cannot
+    make it point anywhere else (the redirect is always this site's own `/jobs/.../symbols`)."""
+    match = JOB_ID.fullmatch(job_id)
+    if match is None:
+        raise PageError(404, "Not found", "There is no such document.")
+    return f"/jobs/{match.group(0)}/symbols{_SYMBOLS_QUERY.get(view, '?view=split')}"
+
+
 @router.get("/jobs/{job_id}/review/list")
 def review_list(
     request: Request, job_id: str, user: UserDep, kind: str = "", page: str = ""
@@ -1877,7 +1892,7 @@ def undo(
     message = (UNDO_PENDING if any(f.pending for f in fixes) else UNDO_BACK).format(**words)
     if view == SYMBOLS_VIEW:  # the Symbols screen: back on it, no Undo under an Undo
         flash(request, message, element_id=SYMBOLS_FLASH, undo=False)
-        return RedirectResponse(f"/jobs/{job_id}/symbols?view=split", status_code=303)
+        return RedirectResponse(symbols_url(job_id, "split"), status_code=303)
     keys = {f.group_key for f in fixes}
     if len(fixes) == 1:
         target, flashed = fixes[0].element_id, fixes[0].element_id
@@ -1897,7 +1912,7 @@ def undo(
 
 def _back(job_id: str, view: str) -> Response:
     if view == SYMBOLS_VIEW:
-        return RedirectResponse(f"/jobs/{job_id}/symbols?view=split", status_code=303)
+        return RedirectResponse(symbols_url(job_id, "split"), status_code=303)
     if view == LIST_VIEW:
         return RedirectResponse(list_url(job_id, "review-progress"), status_code=303)
     from readablestem.web.routes.split import review_url

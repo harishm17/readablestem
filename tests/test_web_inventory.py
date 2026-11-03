@@ -426,3 +426,21 @@ def test_malformed_exclusions_are_ignored():
     assert inventory.excluded_places(["p1-e2:1", "junk", ":3", "p1-e2:x", "p1-e5:99999"]) == {
         ("p1-e2", 1)
     }
+
+
+@pytest.mark.parametrize("view", ["list", "split", "//evil.example", "https://evil.example", ""])
+def test_symbols_url_stays_on_site(view: str) -> None:
+    from readablestem.web.routes.review import symbols_url
+
+    url = symbols_url("a" * 32, view)
+    assert url.startswith(f"/jobs/{'a' * 32}/symbols?view=")
+    assert url.endswith(("?view=list", "?view=split"))
+
+
+@pytest.mark.parametrize("job_id", ["//evil.example", "x/../../evil", "A" * 32, ""])
+def test_symbols_url_refuses_a_bad_job_id(job_id: str) -> None:
+    from readablestem.web.deps import PageError
+    from readablestem.web.routes.review import symbols_url
+
+    with pytest.raises(PageError):
+        symbols_url(job_id, "split")
