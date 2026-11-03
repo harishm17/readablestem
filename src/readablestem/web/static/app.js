@@ -243,7 +243,8 @@
   if (!questions) return;
   document.addEventListener("click", function (event) {
     if (!(event.target instanceof Element)) return;
-    if (event.target.closest('a[href$="/download"]')) questions.hidden = false;
+    // The HTML file and the other file types (Common Cartridge, Word, EPUB).
+    if (event.target.closest('a[href$="/download"], a[href$="/download/cartridge"], a[href$="/download.docx"], a[href$="/download.epub"]')) questions.hidden = false;
   });
   // The Canvas download is a form (a course number can go with it).
   document.addEventListener("submit", function (event) {

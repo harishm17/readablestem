@@ -12,7 +12,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 
 from readablestem.core.types import DocumentResult
-from readablestem.web import documents, record
+from readablestem.web import documents, events, record
 from readablestem.web.database import as_utc
 from readablestem.web.db import ReviewEdit, User, session_scope, utcnow
 from readablestem.web.deps import CurrentUser, UserDep, get_ctx, render
@@ -56,6 +56,9 @@ def _record(request: Request, job_id: str, user: CurrentUser) -> tuple[record.Re
             made_at=utcnow(),
             title_chosen=bool(job.title_override),
             contact_set=bool(job.contact_line),
+            downloaded_formats=(
+                events.downloaded_formats(session, job.id) if ctx.settings.events_enabled else None
+            ),
         )
         return made, f"review-record-{slug(title) or 'document'}-{job.id[:6]}"
 

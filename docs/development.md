@@ -15,6 +15,7 @@ printed pages read differently.
 |---|---|
 | `uv sync` | Create `.venv` and install locked dependencies |
 | `make test` | `uv run pytest` (offline) |
+| Word export | `tests/test_export_docx.py` and `tests/test_web_exports.py` need pandoc (`apt install pandoc`; the tests pass with 3.1.3, 3.1.11 and 3.7) and skip, saying so, without it. They open the file with python-docx (dev group); LibreOffice, when installed, must open it too. CI installs pandoc |
 | EPUB validators | `tests/test_export_epub_validators.py` skips unless EPUBCheck and DAISY Ace are installed: set `EPUBCHECK_JAR` (needs Java; `JAVA` if not on PATH) and `ACE` (for example `npx -y @daisy/ace`). CI runs them in `epub.yml` |
 | `make test-fast` | Unit tests in parallel (`pytest -n auto`, pytest-xdist), without the Postgres, browser, network, live-model and slow markers |
 | `make test-network` | Live OpenStax API test (`pytest -m network`) |

@@ -140,6 +140,13 @@ jobs:
           enable-cache: true
       - name: Install (locked)
         run: uv sync --locked --all-extras --group browser
+      # The Word export (tests/test_export_docx.py, test_web_exports.py) runs pandoc; the
+      # tests skip without it, so the step checks it is there.
+      - name: Install pandoc (Word export tests)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pandoc
+          pandoc --version | head -n 1
       # Includes tests/test_gold_sample.py: known-correct LaTeX must match the gold sample.
       # On 3.12 the Postgres tests also run, against the embedded pgserver. The suite is
       # split by `--shard` (tests/_sharding.py): files are dealt to the shards by recorded
@@ -393,8 +400,8 @@ jobs:
       # The fonts the eval renderer and the browser tests name (eval/render.py: Noto Sans
       # Math, Liberation Serif). Without them Chromium falls back to other fonts and the
       # printed PDFs differ from the ones the tests were written against.
-      - name: Install the fonts the printed test pages use
-        run: sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-liberation
+      - name: Install the fonts the printed test pages use, and pandoc (the Word button)
+        run: sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-liberation pandoc
       # Two shards (`--shard`, by recorded duration), each with -n 3 on the 4-core runner:
       # each worker runs its own Chromium, and `--dist loadfile` keeps a file's tests on one
       # worker so its module-scoped server and browser start once. Every server binds its
