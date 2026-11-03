@@ -61,6 +61,9 @@
   `max-age` instead of `no-store` or `no-cache`.
 ## Unreleased
 
+### Documentation
+
+- `docs/screen-reader-test.md`: a 15-minute VoiceOver (Safari) protocol for the demo, a converted file and the review screen, with a results table that maps to WCAG 2.2 criteria.
 ### Microsoft sign-in configuration
 
 - `.railway/railway.ts` declares `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and `MS_ALLOWED_TENANTS` on the web service as `preserve()`, so values set with `railway variable set` survive `railway config apply`. `docs/deploy-railway.md` has a "Microsoft sign-in on Railway" section with the app registration, the secret's expiry, the allowed directory ids and the exact commands.
