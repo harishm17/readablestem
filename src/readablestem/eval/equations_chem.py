@@ -1,3 +1,4 @@
+# ruff: noqa: RUF001, RUF002, RUF003
 # (look-alike bars, arrows and deltas are what this module unifies)
 r"""Scorer "chem": is it the same chemistry, however the markup writes it? (secondary)
 
@@ -204,4 +205,145 @@ def summarize(scores: Sequence[ChemScore]) -> dict:
         "exact": sum(s.exact for s in scores) / n,
         "mean_similarity": sum(s.similarity for s in scores) / n,
         "errors": sum(s.error is not None for s in scores),
+    }
+
+
+# ------------------------------------------------------------------------ report fields
+#
+# Two numbers a chemistry report carries beside `exact_chem`, never in its place (the
+# primary scorer, the gate and the committed reports do not move; a report with no
+# chemistry gold has neither field).
+#
+# * `chem_right_excl_times`: the gold marks a lone multiplication sign (`×` between two
+#   numbers in a sentence) as an equation of its own, and the sentence around it already
+#   says "times", so finding it or not changes nothing for a listener. It is left out of
+#   the count of gold and of the right ones, and reported with how many were left out.
+# * `silent_harm`: an aligned equation that is wrong on `exact_chem`, was not put to the
+#   reviewer (`review` is not "required"), and is spoken differently from the gold. A
+#   reading that only lacks what the printed page does not show (the atomic number of a
+#   prefix nuclide symbol) is not harm. Counted per 100 chemistry gold equations.
+
+LONE_TIMES = ["×"]
+_PREFIX_SUB = re.compile(r"_ (?:<g> )?[−+]?\d+(?: </g>)? \^")
+
+
+def is_chemistry_id(gold_id: str) -> bool:
+    """The chemistry book's equations and the authored chemistry document's (the id says it)."""
+    return "chemistry" in gold_id
+
+
+def is_lone_times(gold: str | ET.Element) -> bool:
+    """The gold equation is a multiplication sign and nothing else."""
+    return chem_of(gold) == LONE_TIMES
+
+
+def without_prefix_subscripts(stream: list[str]) -> list[str]:
+    """A chemistry stream with the atomic number of every prefix nuclide symbol taken out."""
+    return _PREFIX_SUB.sub("^", " ".join(stream)).split()
+
+
+def lacks_only_what_the_page_lacks(pred: list[str], gold: list[str]) -> bool:
+    """The reading is the gold less a prefix nuclide's atomic number: the printed page does
+    not show it, so the reading is not wrong about anything the page says."""
+    return pred == without_prefix_subscripts(gold) != gold
+
+
+def _heard(text: str) -> str:
+    """Speech compared as a listener would: case, commas and full stops do not count."""
+    return re.sub(r"\s+", " ", text.lower().replace(",", " ").replace(".", " ")).strip()
+
+
+def spoken_alike(pred: str, gold: str) -> bool:
+    """The two read the same aloud (`pipeline.speech`). A reading that cannot be spoken
+    counts as different."""
+    from readablestem.pipeline.speech import mathml_to_speech
+
+    try:
+        return _heard(mathml_to_speech(pred)) == _heard(mathml_to_speech(gold))
+    except Exception:  # speech is a heuristic over untrusted markup: no reading is "different"
+        return False
+
+
+def silent_harm(pred: str | None, gold: str, review: str | None) -> bool:
+    """Wrong, not asked, and it changes what a listener hears (comment above).
+
+    `pred` None is a reading nobody kept (a failed fix): a different kind of miss, not counted.
+    """
+    if pred is None or review == "required":
+        return False
+    try:
+        pred_stream = chem_of(pred)
+    except MathMLError:
+        return False
+    gold_stream = chem_of(gold)
+    if pred_stream == gold_stream or lacks_only_what_the_page_lacks(pred_stream, gold_stream):
+        return False
+    return not spoken_alike(pred, gold)
+
+
+def _rate(n: int, d: int) -> float | None:
+    return None if d == 0 else n / d
+
+
+def chem_gold_ids(items: Sequence[dict]) -> set[str]:
+    """Every chemistry gold equation of the document items (aligned, missed or split)."""
+    ids: set[str] = set()
+    for item in items:
+        found = [p["gold_id"] for p in item["pairs"]]
+        found += item["missed_gold_ids"] + item.get("split_gold_ids", [])
+        ids.update(g for g in found if is_chemistry_id(g))
+    return ids
+
+
+def chem_right_excl_times(items: Sequence[dict]) -> dict:
+    """Chemically right on the chemistry gold, with the lone `×` left out of both sides.
+
+    `n` and `right` are what `rate` is over; `lone_times` is how many were left out, and
+    `chem_right` beside them keeps them in, so neither number replaces the other.
+    """
+    chem = chem_gold_ids(items)
+    lone = {g for item in items for g in item.get("chem_lone_times_gold_ids", []) if g in chem}
+    right = {
+        p["gold_id"]
+        for item in items
+        for p in item["pairs"]
+        if p["gold_id"] in chem and p.get("exact_chem")
+    }
+    kept = chem - lone
+    return {
+        "n": len(kept),
+        "right": len(right & kept),
+        "rate": _rate(len(right & kept), len(kept)),
+        "lone_times": len(lone),
+        "chem_right_n": len(chem),
+        "chem_right": len(right),
+        "chem_right_rate": _rate(len(right), len(chem)),
+    }
+
+
+def silent_harm_summary(items: Sequence[dict]) -> dict:
+    """How many chemistry gold equations were silently harmed, and per 100 gold. Counts only:
+    a report of a held-out run must not name items (the ids are `silent_harm` on the pairs of
+    the kept `items.jsonl`)."""
+    chem = chem_gold_ids(items)
+    harmed = sorted(
+        p["gold_id"]
+        for item in items
+        for p in item["pairs"]
+        if p["gold_id"] in chem and p.get("silent_harm")
+    )
+    return {
+        "n_gold": len(chem),
+        "n": len(harmed),
+        "per_100_gold": None if not chem else 100 * len(harmed) / len(chem),
+    }
+
+
+def document_metrics(items: Sequence[dict]) -> dict:
+    """The report's `chemistry` block; empty when the items hold no chemistry gold."""
+    if not chem_gold_ids(items):
+        return {}
+    return {
+        "chem_right_excl_times": chem_right_excl_times(items),
+        "silent_harm": silent_harm_summary(items),
     }

@@ -58,6 +58,19 @@ def test_a_short_cron_token_is_fine_outside_production(tmp_path):
     make_settings(tmp_path, cron_token="short").check_production()
 
 
+# ------------------------------------------------------------------ maths on image pages
+
+
+@pytest.mark.parametrize("flag", ["feature_image_pages", "image_pages_accept_agreed"])
+def test_production_refuses_image_pages_without_the_maths_rule(tmp_path, flag):
+    off = {flag: True, "image_pages_maths_always_required": False}
+    with pytest.raises(ConfigError, match="IMAGE_PAGES_MATHS_ALWAYS_REQUIRED must be true"):
+        prod(tmp_path, **off).check_production()
+    prod(tmp_path, **{flag: True}).check_production()  # the rule on (the default): fine
+    prod(tmp_path, image_pages_maths_always_required=False).check_production()  # feature off
+    make_settings(tmp_path, **off).check_production()  # outside production, the A/B replay
+
+
 # ------------------------------------------------------------------ analytics and the notice
 
 

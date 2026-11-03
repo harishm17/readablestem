@@ -234,12 +234,16 @@ a different job; [docs/eval-image-pages.md](docs/eval-image-pages.md), [ADR 0007
   end (0.83 on the symbols score), the same as the same pages as typed PDFs; words of the prose
   wrong 3 to 5 % of the time; $0.106 a page. Handwriting was looked at on four public-domain pages
   by eye only: the main model read them well, and a cheaper model misread two section numbers with
-  full confidence.
+  full confidence. Five photographed notebook pages were looked at by eye later (2026-11-03): the
+  pass read the two physics pages well and the three linear-algebra pages mostly right; so nine
+  handwritten pages in all, none with an answer key.
 - **Real papers as scans, never used to build the feature** (the real-world held-out set, 9 of 15
   papers because the $9 spending cap for the run was reached; 42 pages, 1,147 equations, registered
   before the run): 0.66 exactly right (0.69 on the symbols score) against 0.62 (0.66) for the typed
   PDFs of the same papers, a difference inside the noise, with 5 wrong equations in every 100 not
-  asked about (10 for the typed PDFs); $0.136 a page.
+  asked about when it was measured (10 for the typed PDFs); since 2026-10-22 every converted block
+  with maths is a decision, and a replay of the same recorded answers left none unasked
+  (docs/eval-image-pages.md, "Update: maths always required"); $0.136 a page.
 - It is slower (about 20 to 30 seconds a page), it costs four to six times a typed page, and a
   model can misread handwriting and small symbols; the measurement is on synthetic scans, nine
   papers and eight real pages, with no measurement of how long checking takes.
@@ -388,7 +392,7 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
   you can choose which pages to convert, in parts.
 - **A model is in the loop.** Document images and the text around them are sent to Anthropic's
   Claude API (the beta's provider, `MODEL_PROVIDER=anthropic`), or to OpenAI's API (with
-  `store=False`) if you set `MODEL_PROVIDER=openai`. Models are not deterministic, so two runs on the same file can differ.
+  `store=False`) if you set `MODEL_PROVIDER=openai`; the handwriting readers (off, unused) would send crops to their own company. Models are not deterministic, so two runs on the same file can differ.
 - **Equations are the hard part.** On the development sample 23 of 30 equations match the
   answer key under the lenient scorer, and 5 of the 7 misses are gaps in the scorer, not in
   the transcription. On the held-out sections 1,379 of 2,738 (two runs, 0.504, version 0.4.0) match through

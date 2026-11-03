@@ -303,7 +303,10 @@ def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
     assert "\\SECRETLATEX{x}</textarea>" in equation
     assert '<label for="latex-p1-e3">LaTeX for equation 2</label>' in equation
     # No confidence percentage and no internal code on the list view (T1-11).
-    assert ">Needs review</span>" in equation and "55%" not in equation
+    # The report link's mailto body carries the random job id, which can end in "55" before
+    # its "%0A": check the visible markup, not attribute values.
+    visible = re.sub(r'="[^"]*"', '=""', equation)
+    assert ">Needs review</span>" in equation and "55%" not in visible
     assert "<strong>Worth checking:</strong> The LaTeX uses a command that is not on" in equation
     assert "Code:" not in equation and "unknown_command" not in equation
     for action in ("edit", "accept", "reject"):

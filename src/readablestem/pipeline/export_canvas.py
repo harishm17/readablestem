@@ -30,6 +30,7 @@ content.
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import re
 import textwrap
@@ -453,11 +454,18 @@ def _extract_images(root: _Node, notes: Notes, src_for) -> dict[str, bytes]:
     for img in (n for n in root.walk() if n.tag == "img"):
         match = _DATA_URI.match(img.attrs.get("src", ""))
         if not match:
+            if img.attrs.get("src", "").lstrip().lower().startswith("data:"):
+                raise CanvasExportError("an image is not a base64 data address")
             continue  # an http(s) or relative source stays as it is
         extension = _IMAGE_TYPES.get(match.group("type").lower())
         if extension is None:
             raise CanvasExportError(f"an image of type {match.group('type')} cannot be exported")
-        data = base64.b64decode(re.sub(r"\s+", "", match.group("data")))
+        try:
+            data = base64.b64decode(re.sub(r"\s+", "", match.group("data")), validate=True)
+        except binascii.Error as exc:
+            raise CanvasExportError("an image is not valid base64") from exc
+        if not data:
+            raise CanvasExportError("an image is empty")
         digest = hashlib.sha256(data).hexdigest()
         if digest not in by_digest:
             by_digest[digest] = f"images/image-{len(by_digest) + 1:02d}.{extension}"

@@ -34,6 +34,7 @@ from readablestem.web.db import Job, User, session_scope, utcnow
 from readablestem.web.deps import CurrentUser, UserDep, flash, get_ctx, render, require_csrf
 from readablestem.web.logsafe import log_event
 from readablestem.web.quota import next_day_start, pages_left, rereads_used
+from readablestem.web.recipients import recipients
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -69,7 +70,7 @@ def _context(request: Request, user: CurrentUser) -> dict[str, Any]:
         "rereads_left": rereads_left,
         "documents": documents,
         "is_admin": user.is_admin,
-        "provider": s.model_provider,
+        "recipients": recipients(s),
         "signup_open": s.signup_open,
         "next_reset": next_day_start(now),
     }

@@ -72,8 +72,10 @@ from readablestem.core.types import PageType
 # hidden layer over a few strokes under a title, or over marks with no evidence of machine
 # drawing, is handwriting; v5.4 after the silent-loss sweep: near-white paint on something
 # darker is seen (a dark slide's white ink), and a hidden layer over a page with no picture
-# is never a scan.
-CLASSIFIER_VERSION = "page-type-v5.4"
+# is never a scan; v5.5 after the handwriting experiment: a text layer that does not cover
+# a page-sized picture or a page of writing (a watermark, a stamp, a page number) does not
+# make the page typed (`TEXT_NOT_COVERING`).
+CLASSIFIER_VERSION = "page-type-v5.5"
 
 BBox = tuple[float, float, float, float]
 
@@ -117,6 +119,27 @@ THICK_STROKE = 3.0  # pt: a stroked line this wide can cover the middle of a gly
 SCAN_COVERAGE = 0.5
 PICTURE_COVERAGE = 0.85
 GRID = 64
+SHARE_GRID = 128  # finer, for the shares below: a line of type is under one 64-grid cell tall
+# A visible text layer is the page's content only when it covers the page's content. A
+# page-sized picture (a photo of a notebook page) or a page of handwriting (vector ink)
+# that no visible text lies over, with little text on the page as a whole, is content the
+# text layer does not hold: a watermark, a stamp, a header, a page number or a stray
+# recognition layer sits over it (`TEXT_NOT_COVERING`). Shares are of the page area on a
+# SHARE_GRID (boxes of text lines, images, pen strokes). Measured: three photographed
+# notebook pages under a watermark text layer (145 characters) have a 0.88-0.91 picture, 0.78-0.81
+# of the page picture with no text over it and 0.08 of it covered by text; typed pages of
+# arXiv papers (153 pages) have pictures of at most 0.47 of the page (figure-heavy ones).
+UNCOVERED_PICTURE = 0.6  # share of the page that is picture with no visible text over it
+PAGE_PICTURE = 0.75  # and the pictures cover this much of the page
+THIN_TEXT = 0.12  # and the visible text covers less than this share of it
+PAGE_NUMBER_CHARS = 15  # a header or footer span this short is furniture over writing
+BODY_MAX = 20  # characters of body text (not furniture) a text layer may have and still not cover
+FURNITURE_BAND = 0.08  # header and footer bands, as a share of the page height
+FURNITURE_ALPHA = 200  # spans fainter than this (of 255) are a watermark's
+PICTURE_INK_MIN = 0.02  # share of the page: less is a blank or see-through picture (0.007)
+INK_RENDER_DPI = 72  # the render that is measured
+INK_TONE_DELTA = 45  # grey levels (of 255) from the page's usual tone that count as ink
+TEXT_NOT_COVERING = "text_not_covering_content"  # reason code (page record, notices)
 
 # Text amounts, in non-space characters.
 TEXT_MIN = 40  # visible chars for a page to "have a text layer" (about one line of type)
@@ -270,6 +293,15 @@ class TextStats:
     # looks visible: covered ones, and clip text nothing was painted through (counted as
     # invisible).
     covered: set[tuple[int, int]] = field(default_factory=set)
+    text_share: float = 0.0  # share of the page the visible text's boxes cover
+    uncovered_picture: float = 0.0  # share of the page that is picture with no visible text
+    # Measured only when the picture rule might apply: the share of the page, outside the
+    # text, with ink on it (`_ink_outside_text`); 1.0 when it was not measured.
+    picture_ink: float = 1.0
+    body_chars: int = 0  # visible characters that are not furniture (`_furniture`)
+    # ... and, for a page of writing, a header or footer line longer than a page number is
+    # not furniture either (a typed header over notes is a typed header).
+    typed_chars: int = 0
 
     @property
     def untrusted(self) -> int:
@@ -293,6 +325,7 @@ class InkStats:
     size_twins: float = 0.0  # share of strokes with a same-size twin
     stroke_boxes: list[BBox] = field(default_factory=list)  # display space
     ink_drawings: set[int] = field(default_factory=set)  # indices into the drawings list
+    ink_share: float = 0.0  # share of the page the pen strokes' boxes cover
 
     @property
     def repeat_share(self) -> float:
@@ -459,6 +492,7 @@ def text_stats(
     filled shape (`_maybe_covered`), so a page with neither costs nothing more."""
     stats = TextStats()
     spans: list[BBox] = []
+    glyphs: list[BBox] = []  # what the visible text covers, for the shares
     clips: list[tuple[BBox, list[tuple[int, int]], int]] = []
     for block in raw_blocks:
         if block.get("type") != 0:
@@ -479,8 +513,21 @@ def text_stats(
                 stats.visible_chars += n
                 b = span["bbox"]
                 spans.append((b[0], b[1], b[2], b[3]))
+                if not _furniture(span, line.get("dir"), b, page.cropbox.height):
+                    stats.body_chars += n
+                if not _furniture(span, line.get("dir"), b, page.cropbox.height, short=n):
+                    stats.typed_chars += n
+                if _axis_aligned(line.get("dir")):
+                    glyphs.append((b[0], b[1], b[2], b[3]))
+                else:  # a slanted line's box is mostly empty page: its characters' boxes
+                    glyphs.extend(
+                        (g[0], g[1], g[2], g[3])
+                        for ch in span.get("chars", ())
+                        if _ink(ch.get("c", "")) and (g := ch.get("bbox"))
+                    )
                 if (run := _clip_run(span)) is not None:
                     clips.append(run)
+    _text_shares(page, stats, glyphs, images)
     if spans and _maybe_covered(spans, images, drawings):
         covered = _covered(page, _thick_strokes(drawings))
         if covered:
@@ -497,6 +544,82 @@ def text_stats(
                 stats.invisible_chars += n
                 stats.visible_chars -= n
     return stats
+
+
+def _furniture(
+    span: dict[str, Any],
+    direction: Sequence[float] | None,
+    box: Sequence[float],
+    height: float,
+    short: int | None = None,
+) -> bool:
+    """Text that is a page's furniture, not its body: translucent (a watermark), slanted, or in
+    the header or footer band (a running header, a page number, a stamp). A text layer made only
+    of furniture does not cover a picture it lies over (`TEXT_NOT_COVERING`)."""
+    if int(span.get("alpha", 255)) < FURNITURE_ALPHA or not _axis_aligned(direction):
+        return True
+    middle = (box[1] + box[3]) / 2
+    if short is not None and short > PAGE_NUMBER_CHARS:  # (strict: a typed header is text)
+        return False
+    return middle < FURNITURE_BAND * height or middle > (1 - FURNITURE_BAND) * height
+
+
+def _axis_aligned(direction: Sequence[float] | None) -> bool:
+    if not direction:
+        return True
+    return min(abs(direction[0]), abs(direction[1])) < 0.02
+
+
+def _text_shares(
+    page: pymupdf.Page, stats: TextStats, spans: Sequence[BBox], images: Sequence[BBox]
+) -> None:
+    """How much of the page the visible text covers (`spans`: the boxes of its lines, or of
+    its characters on a slanted line), and how much of it is picture that no visible text
+    lies over (`UNCOVERED_PICTURE`)."""
+    frame = page.cropbox
+    text = _Grid(frame.width, frame.height, SHARE_GRID)
+    for box in spans:
+        text.add(box)
+    stats.text_share = text.fraction
+    if images:
+        pictures = _Grid(frame.width, frame.height, SHARE_GRID)
+        for box in images:
+            pictures.add(box)
+        stats.uncovered_picture = len(pictures.cells - text.cells) / (pictures.n * pictures.n)
+        if (
+            spans
+            and pictures.fraction >= PAGE_PICTURE
+            and stats.uncovered_picture >= UNCOVERED_PICTURE
+            and stats.text_share < THIN_TEXT
+            and stats.body_chars < BODY_MAX
+        ):
+            stats.picture_ink = _ink_outside_text(page, spans)
+
+
+def _ink_outside_text(page: pymupdf.Page, spans: Sequence[BBox]) -> float:
+    """The share of the page, outside the boxes of the visible text, whose tone differs
+    from the page's usual one (a low-resolution render): writing, a drawing or a photo's
+    detail on a picture the text layer does not cover. A blank or see-through picture over
+    typed text has none. Measured only for a page the picture rule might apply to."""
+    pix = page.get_pixmap(dpi=INK_RENDER_DPI, colorspace=pymupdf.csGRAY, alpha=False)
+    width, height = pix.width, pix.height
+    samples = pix.samples
+    if width < 8 or height < 8:
+        return 0.0
+    step = max(1, len(samples) // 4096)
+    usual = sorted(samples[::step])[len(samples[::step]) // 2]
+    display, frame = _Display(page), page.rect
+    sx, sy = width / frame.width, height / frame.height
+    text = bytearray(width * height)
+    for span in spans:
+        x0, y0, x1, y1 = display.box(span)
+        for y in range(max(0, int(y0 * sy) - 1), min(height, int(y1 * sy) + 2)):
+            for x in range(max(0, int(x0 * sx) - 1), min(width, int(x1 * sx) + 2)):
+                text[y * width + x] = 1
+    ink = sum(
+        1 for i, value in enumerate(samples) if not text[i] and abs(value - usual) >= INK_TONE_DELTA
+    )
+    return ink / (width * height)
 
 
 def _clip_run(span: dict[str, Any]) -> tuple[BBox, list[tuple[int, int]], int] | None:
@@ -1202,6 +1325,11 @@ def _summarise(page: pymupdf.Page, stats: InkStats, cands: list[_Candidate]) -> 
     ]
     stats.rows = _rows(shapes)
     stats.stroke_boxes = boxes
+    frame = page.cropbox
+    grid = _Grid(frame.width, frame.height, SHARE_GRID)
+    for box in boxes:
+        grid.add(box)
+    stats.ink_share = grid.fraction
     # A drawing is ink when most of the shapes taken from it are pen strokes (an iOS path
     # object holds about 120 strokes; a ruled template's lines are never candidates).
     votes: Counter[int] = Counter()
@@ -1265,8 +1393,16 @@ def _machine_drawn(ink: InkStats) -> bool:
 
 
 def decide(
-    text: TextStats, ink: InkStats, image_coverage: float, producer: str = "other"
+    text: TextStats,
+    ink: InkStats,
+    image_coverage: float,
+    producer: str = "other",
+    *,
+    picture_counts: bool = True,
 ) -> PageTypeResult:
+    """The page's kind. `picture_counts` False: a picture over the page is not content
+    here (layout found it to be the template's background or one plain colour), so a thin
+    text layer over it is the page's text."""
     untrusted = text.untrusted
     has_text = text.visible_chars >= TEXT_MIN
     clean = ink.clean
@@ -1327,7 +1463,15 @@ def decide(
     )
     if hidden_page:
         reasons.append("hidden_ratio")
-    if has_text and not hidden_page:
+    # A text layer that does not cover the content (module constants: a watermark over a
+    # photographed page, a stamp, a page number, a typed title over a page of handwriting)
+    # does not make the page typed: the picture or the ink is the content.
+    uncovered_picture = picture_counts and _text_misses_picture(text, image_coverage)
+    # The same for a page of writing (vector ink): text that is only furniture over it.
+    uncovered_ink = has_text and writing and text.typed_chars < BODY_MAX
+    if text.visible_chars and not hidden_page and (uncovered_picture or uncovered_ink):
+        reasons.append(TEXT_NOT_COVERING)
+    if has_text and not hidden_page and TEXT_NOT_COVERING not in reasons:
         # A page with a real visible text layer is never a picture of a page as a whole.
         # At most it is mixed_ink, which keeps the text layer.
         if some_ink:
@@ -1339,7 +1483,11 @@ def decide(
         if "ink_writing" not in reasons and "ink_some" not in reasons:
             reasons.append("ink_few")
         return result("handwritten_ocr" if ocr else "handwritten")
-    picture = image_coverage >= PICTURE_COVERAGE or text.visible_chars == 0
+    picture = (
+        image_coverage >= PICTURE_COVERAGE
+        or text.visible_chars == 0
+        or (TEXT_NOT_COVERING in reasons and uncovered_picture)
+    )
     if image_coverage >= SCAN_COVERAGE and picture:
         return result("scan_ocr" if ocr else "scan_no_text")
     if untrusted >= OCR_MIN:
@@ -1428,8 +1576,41 @@ def kept_reason(page: PageTypeResult | PageType) -> str | None:
     return None
 
 
+def reads_image(page: PageTypeResult | PageType) -> bool:
+    """Is this page one the image page pass reads (ADR 0007)? A scanned or handwritten kept
+    page, and a picture of a page under a text layer that does not cover it
+    (`TEXT_NOT_COVERING`): kept as an unread page, its visible text read, but it is a scan
+    as far as the pass is concerned. Works on a classifier result and on the stored record."""
+    reason = kept_reason(page)
+    if reason in (SCANNED_PAGE, HANDWRITTEN_PAGE):
+        return True
+    return (
+        reason == UNREAD_PAGE and page.kind == "scan_no_text" and TEXT_NOT_COVERING in page.reasons
+    )
+
+
+def keeps_text(page: PageTypeResult | PageType) -> bool:
+    """A kept page whose visible typed text is still read (layout): a little text and a
+    picture or ink of something unread (`unread_page`), or a text layer that does not cover
+    the page's content (`TEXT_NOT_COVERING`: a watermark over handwriting, a stamp on a
+    scan). If the image page pass reads the page, what it reads replaces that text
+    (`pipeline.run`)."""
+    reason = kept_reason(page)
+    if not _visible_chars(page):
+        return False
+    return reason == UNREAD_PAGE or (reason is not None and TEXT_NOT_COVERING in page.reasons)
+
+
 def _visible_chars(page: PageTypeResult | PageType) -> int:
     return page.text.visible_chars if isinstance(page, PageTypeResult) else page.visible_chars
+
+
+def without_picture(result: PageTypeResult) -> PageTypeResult:
+    """`result` decided again with the picture over the page not counted as content (a
+    background layout recognised: `decide` `picture_counts`)."""
+    return decide(
+        result.text, result.ink, result.image_coverage, result.producer, picture_counts=False
+    )
 
 
 def ink_regions(result: PageTypeResult) -> list[BBox]:
@@ -1542,7 +1723,21 @@ def clearly_convertible(text: TextStats, coverage: float) -> bool:
     hidden_page = untrusted >= max(OCR_MIN, text.visible_chars) or (
         coverage >= SCAN_COVERAGE and untrusted >= OCR_MIN
     )
-    return text.visible_chars >= TEXT_MIN and not hidden_page
+    return (
+        text.visible_chars >= TEXT_MIN
+        and not hidden_page
+        and not _text_misses_picture(text, coverage)
+    )
+
+
+def _text_misses_picture(text: TextStats, coverage: float) -> bool:
+    return (
+        coverage >= PAGE_PICTURE
+        and text.uncovered_picture >= UNCOVERED_PICTURE
+        and text.text_share < THIN_TEXT
+        and text.picture_ink >= PICTURE_INK_MIN
+        and text.body_chars < BODY_MAX
+    )
 
 
 def document_refusal(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -> str | None:
@@ -1596,5 +1791,5 @@ def image_page_count(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -
             continue
         ink = ink_stats(page, drawings, budget)
         record = decide(stats, ink, coverage, hint).to_record(number)
-        found += kept_reason(record) in {SCANNED_PAGE, HANDWRITTEN_PAGE}
+        found += reads_image(record)
     return found
