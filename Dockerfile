@@ -84,6 +84,17 @@ RUN if [ "$INSTALL_LIBREOFFICE" = "true" ]; then \
         && rm -rf /var/lib/apt/lists/*; \
     fi
 
+# Word downloads (docs/output.md, "The Word export") are made by pandoc, run as a child process
+# (src/readablestem/pipeline/export_docx.py). Installed from the distribution, always: it is a
+# statically linked program of about 200 MB on disk (the installed size of the Ubuntu pandoc
+# 3.7 package is 201,810 kB; the trixie package is of the same order, read the real figure
+# from the first build's `docker history`). pandoc is GPL-2.0-or-later and is only ever run,
+# never linked (THIRD_PARTY_NOTICES.md). Without it the job page shows no Word button.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pandoc \
+    && rm -rf /var/lib/apt/lists/* \
+    && pandoc --version | head -n 1
+
 WORKDIR /app
 # Owned by root and read-only to the app user: the process cannot rewrite its own code.
 COPY --from=build /app /app

@@ -29,7 +29,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult
-from readablestem.pipeline import export_canvas, export_cartridge, text_pass
+from readablestem.pipeline import export_canvas, export_cartridge, export_docx, text_pass
 from readablestem.pipeline import language as languages
 from readablestem.web import (
     access,
@@ -1054,6 +1054,7 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
     context["course"] = _job_course(request, job_id, user)  # notation memory
     context |= _job_suggestions(request, job_id, user)  # notation found in the document
     context["after_download"] = after_download_state(request, job_id, user)  # ux-a
+    context["word_export"] = export_docx.available()  # the Word button needs pandoc
     # No `active` nav item: this page is not "My documents" itself (aria-current="page"
     # would announce it as such).
     return render(request, "job.html", context | {"auto_reload_s": AUTO_RELOAD_S})
@@ -1323,7 +1324,12 @@ def download_canvas(request: Request, job_id: str, user: UserDep, course: str = 
     ctx = get_ctx(request)
     export, title, job_ref, still_open = _canvas_export(ctx, user, job_id, number)
     events.record_download(
-        ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, open_decisions=still_open
+        ctx.factory,
+        ctx.settings,
+        user_id=user.id,
+        job_id=job_id,
+        open_decisions=still_open,
+        file_type="canvas",
     )
     return Response(
         export_canvas.build_zip(export),
@@ -1348,7 +1354,12 @@ def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response
     ctx = get_ctx(request)
     export, title, job_ref, still_open = _canvas_export(ctx, user, job_id, None)
     events.record_download(
-        ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, open_decisions=still_open
+        ctx.factory,
+        ctx.settings,
+        user_id=user.id,
+        job_id=job_id,
+        open_decisions=still_open,
+        file_type="cartridge",
     )
     return Response(
         export_cartridge.build_cartridge(export),
@@ -1426,6 +1437,7 @@ def _canvas_export(
         title = documents.display_title(result.get("title"), job.filename)
         html, job_ref = job.html or "", job.id
         still_open = documents.open_decisions(result.get("fixes"))
+        retention.restart_clock(job, ctx.settings)  # a download is activity, as for the HTML
     try:
         export = export_canvas.export_canvas(
             html,

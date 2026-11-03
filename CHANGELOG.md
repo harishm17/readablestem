@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: Word and EPUB downloads (branch export/word-and-buttons)
+
+- Word export (`pipeline/export_docx.py`, `readablestem export docx FILE.html OUT.docx`): the finished HTML through
+  pandoc in a child process (60 s, minimal environment, CPU, size and heap limits), then checked and fixed in
+  `word/document.xml`. Equations are native Word equations (OMML; the file must hold as many as the HTML has
+  `<math>`, else the export fails), headings are Heading 1 to 6, each picture's alt text is written where Word reads it
+  (pandoc wrote the picture's address there), a table's header row repeats and is marked `w:tblHeader`, lists and links
+  are Word's, the language and title are set, a long description follows its figure, page markers are left out and a
+  figure without a picture is paragraphs, not a layout table. Remote pictures, scripts and forms are not carried
+  (the same sanitiser as the EPUB). docs/output.md, "The Word export".
+- `GET /jobs/{id}/download.docx` and `/download.epub` (`web/routes/exports.py`) and an "Other file types" block on the
+  job page's finish line (plain links; the Word one only when pandoc is installed). Both follow the HTML download:
+  owner only, clock restarts, recorded as a download (with the decisions that were open), and offered only when no
+  decision is open. At most two Word files are made at once; a third request waits up to 20 s, then gets a 503 asking
+  to try again. "Download all" stays HTML only.
+- Usage events: a `download_format` event (`html`, `canvas`, `cartridge`, `docx`, `epub`) beside each `downloaded`; the
+  review record and its CSV list the file types downloaded, and its "what was not checked" says nobody has checked the
+  Word and EPUB files in Word or a reading app.
+- Fix: the Canvas zip and the Common Cartridge downloads did not restart the deletion clock, though docs/security.md
+  says a download does; they do now. The two questions after a download also open for the Common Cartridge link.
+- Docker image: pandoc from the distribution (about 200 MB on disk), always installed; `python-docx` joins the dev
+  group for the tests; THIRD_PARTY_NOTICES.md lists both.
 ## Unreleased: wording and a page for accessibility offices (branch trust/wording-and-offices)
 
 - Copy: the "individual developer" and "not a company or a university" framing is gone from the landing, privacy,

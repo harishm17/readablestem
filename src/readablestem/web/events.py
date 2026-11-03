@@ -15,6 +15,7 @@ records that on the server, with no cookies and no script in the browser:
 | `review_completed` | no decision is left open (once) | | seconds since finished |
 | `html_viewed` | the HTML opens in the browser | | |
 | `downloaded` | the HTML is downloaded | `open` (decisions open) or `done` | decisions open |
+| `download_format` | each download, beside `downloaded` | `html`, `canvas`, `docx`, ... | |
 | `will_post` | "Will you post this for students?" | `yes`, `no` or `not_sure` | |
 | `minutes_saved` | "About how many minutes did this save?" | | minutes |
 
@@ -73,6 +74,10 @@ DECISION_MADE = "decision_made"
 REVIEW_COMPLETED = "review_completed"
 HTML_VIEWED = "html_viewed"
 DOWNLOADED = "downloaded"
+DOWNLOAD_FORMAT = "download_format"
+# The file types a download can be, as the `download_format` event's code: the review record
+# says which of them were downloaded (`web.record`).
+FORMATS = ("html", "canvas", "cartridge", "docx", "epub")
 WILL_POST = "will_post"
 MINUTES_SAVED = "minutes_saved"
 NAMES = (
@@ -85,6 +90,7 @@ NAMES = (
     REVIEW_COMPLETED,
     HTML_VIEWED,
     DOWNLOADED,
+    DOWNLOAD_FORMAT,
     WILL_POST,
     MINUTES_SAVED,
 )
@@ -316,9 +322,13 @@ def record_download(
     user_id: str,
     job_id: str,
     open_decisions: int,
+    file_type: str = "html",
 ) -> None:
     """`downloaded`, saying whether decisions were still open (the measure "downloads
-    made while decisions are open", target under 1 in 10)."""
+    made while decisions are open", target under 1 in 10), and `download_format`, saying
+    which file type it was (`FORMATS`; the review record lists them)."""
+    if file_type not in FORMATS:
+        raise ValueError(f"unknown file type {file_type!r}")
     record(
         factory,
         settings,
@@ -328,6 +338,17 @@ def record_download(
         code="open" if open_decisions else "done",
         value=open_decisions,
     )
+    record(factory, settings, user_id, DOWNLOAD_FORMAT, job_ref=job_id, code=file_type)
+
+
+def downloaded_formats(session: Session, job_id: str) -> list[str]:
+    """The file types of this job that were downloaded, in the order of `FORMATS`."""
+    codes = set(
+        session.scalars(
+            select(Event.code).where(Event.name == DOWNLOAD_FORMAT, Event.job_ref == job_id)
+        )
+    )
+    return [f for f in FORMATS if f in codes]
 
 
 def downloaded(session: Session, user_id: str, job_id: str) -> bool:

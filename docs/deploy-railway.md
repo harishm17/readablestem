@@ -450,6 +450,14 @@ LibreOffice Writer and Impress. Check the build log for the `apt-get install` st
 upload form then offers Word and PowerPoint. Unset it to go back. (On Cloud Run this needed a code
 change because `gcloud builds submit --tag` cannot pass build arguments.)
 
+**pandoc.** The Dockerfile installs pandoc from the distribution in every build (no build argument):
+it makes the Word download (docs/output.md, "The Word export"). It adds about 200 MB to the image (the
+installed size of the Ubuntu pandoc 3.7 package is 201,810 kB; the Debian trixie package should be of the
+same order, so **read the real before and after sizes from the first Railway build**). One run on the
+7-picture demo page (700 KB of HTML) took 0.7 s and 248 MB resident, measured on the development box with
+pandoc 3.7; the web service lets two run at once and caps each at 2 GB of heap, so allow for about 0.5 GB
+more while two Word files are made. Check the build log for the pandoc version line.
+
 ## Ship a new version
 
 Production is deployed from a checkout; none of its services is connected to GitHub (`source` is empty
