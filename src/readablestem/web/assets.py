@@ -12,8 +12,9 @@ Other rules, for every file under `/static/`:
   `fonts/latinmodern-math-1.959.woff2`; `vendor/README.md` says to rename on update), so
   they are immutable too.
 - Anything else (the demo's files, an unhashed `app.css` that an old page or the error
-  pages ask for) is revalidated every time with `Cache-Control: no-cache` and the ETag
-  Starlette already sends: a 304 with no body when nothing changed.
+  pages ask for) is kept for an hour (`Cache-Control: public, max-age=3600`); after that the
+  ETag Starlette already sends makes the check a 304 with no body when nothing changed. An
+  hour is how long an old page can be handed an outdated stylesheet after a deploy.
 - A hashed name whose hash is not the file's today is a 404, not the new file under an
   old name: an immutable URL never changes what it serves.
 """
@@ -24,14 +25,16 @@ import hashlib
 import re
 from pathlib import Path
 
-from starlette.responses import Response
+from starlette.background import BackgroundTask
+from starlette.requests import Request
+from starlette.responses import HTMLResponse, Response
 from starlette.staticfiles import StaticFiles
 from starlette.types import Scope
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 HASH_LENGTH = 12
 IMMUTABLE = "public, max-age=31536000, immutable"
-REVALIDATE = "no-cache"
+UNHASHED = "public, max-age=3600"
 _HASHED = re.compile(rf"^(?P<stem>.+)\.(?P<hash>[0-9a-f]{{{HASH_LENGTH}}})(?P<ext>\.[A-Za-z0-9]+)$")
 
 # path -> ((mtime_ns, size), hash): a file is read again only when it changed.
@@ -81,8 +84,29 @@ class CachedStaticFiles(StaticFiles):
         response = await super().get_response(real or path, scope)
         if response.status_code in (200, 304):
             immutable = real is not None or path.startswith("vendor/")
-            response.headers["Cache-Control"] = IMMUTABLE if immutable else REVALIDATE
+            response.headers["Cache-Control"] = IMMUTABLE if immutable else UNHASHED
         return response
+
+
+def cached_html(
+    request: Request,
+    body: str,
+    *,
+    max_age: int,
+    headers: dict[str, str] | None = None,
+    background: BackgroundTask | None = None,
+) -> Response:
+    """A public page that is the same for everyone (the demo, the showcase): an `ETag` (a
+    hash of the body), `Cache-Control: public, max-age=<max_age>`, and a 304 with no body
+    when the visitor's `If-None-Match` names the ETag. Pages of a signed-in person never
+    come through here: they stay `no-store` (`web.security`)."""
+    etag = '"' + hashlib.sha256(body.encode("utf-8")).hexdigest()[:32] + '"'
+    sent = {**(headers or {}), "ETag": etag, "Cache-Control": f"public, max-age={max_age}"}
+    sent_tags = request.headers.get("if-none-match", "").split(",")
+    wanted = [tag.strip().removeprefix("W/") for tag in sent_tags]
+    if etag in wanted or "*" in wanted:
+        return Response(status_code=304, headers=sent, background=background)
+    return HTMLResponse(body, headers=sent, background=background)
 
 
 def clear_hashes() -> None:

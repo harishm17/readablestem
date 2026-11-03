@@ -17,6 +17,11 @@ the axis where the overlap is smaller, but never so far that a link stops coveri
 middle of its own element (`_slack`). The frames stay where the elements are. Only what
 cannot be separated that way (elements that overlap each other) is left overlapping.
 
+That 24 px layout is the floor. Afterwards each link grows toward 44 CSS px (`COMFORT_PX`,
+`_grow`) as far as it can without touching another link: a link on a quiet part of the page
+is a 44 px target, one between neighbours stays 24 px with space around it, which is what
+2.5.8 asks for.
+
 The layout covers every fix on the page, shown or not (accepted ones are only shown on
 request), so whatever subset a view shows, no two of its links overlap.
 
@@ -35,6 +40,7 @@ FRAME_PAD_PT = 3.0  # the frame is this much bigger than the element on every si
 # is drawn inside, so this is the room between the border and the item)
 MIN_TARGET_PX = 24  # WCAG 2.5.8
 MIN_PAGE_PX = 576  # the page frame's min-width (36rem at the default 16 px), app.css
+COMFORT_PX = 44  # the size a link is grown to where the page has room (WCAG 2.5.5)
 TARGET_MARGIN = 1.05  # a little over 24 px, so rounding never leaves 23.9
 GAP_PT = 0.4  # space left between two links pushed apart
 ROUNDS = 60
@@ -181,7 +187,46 @@ def place(
             break
         for a, b in stuck:
             _separate(a, b, side, other_axis=True)
+    _grow(marks, page_size, comfortable_pt(page_size[0]))
     return {m.element_id: m for m in marks}
+
+
+def comfortable_pt(page_width: float) -> float:
+    """44 CSS px in points, on a page drawn `MIN_PAGE_PX` wide: the size a target is grown
+    to where the page has room (WCAG 2.5.5)."""
+    return COMFORT_PX * TARGET_MARGIN * page_width / MIN_PAGE_PX
+
+
+def _grow(marks: list[Mark], page_size: tuple[float, float], goal: float) -> None:
+    """Grow each link toward `goal` on both axes, around its centre, as far as it can without
+    overlapping another link. The 24 px layout above is the floor: a link with no room keeps
+    its size (so 2.5.8 holds everywhere), one with room becomes a 44 px target. Frames do
+    not change. Earlier marks claim their room first."""
+    for mark in marks:
+        x0, y0, x1, y1 = mark.link
+        grow_x, grow_y = max(0.0, goal - (x1 - x0)) / 2, max(0.0, goal - (y1 - y0)) / 2
+        if grow_x <= 0 and grow_y <= 0:
+            continue
+        others = [o.link for o in marks if o is not mark]
+
+        def grown(t: float, x0=x0, y0=y0, x1=x1, y1=y1, gx=grow_x, gy=grow_y) -> BBox:
+            return _clamp((x0 - gx * t, y0 - gy * t, x1 + gx * t, y1 + gy * t), page_size)
+
+        def free(box: BBox, others=others) -> bool:
+            return all(
+                not (_overlap(box, o)[0] > 1e-6 and _overlap(box, o)[1] > 1e-6) for o in others
+            )
+
+        if not free(grown(0.0)):
+            continue  # already overlapping (elements that overlap each other): leave it
+        if free(grown(1.0)):
+            mark.link = grown(1.0)
+            continue
+        low, high = 0.0, 1.0
+        for _ in range(14):
+            middle = (low + high) / 2
+            low, high = (middle, high) if free(grown(middle)) else (low, middle)
+        mark.link = grown(low)
 
 
 def _overlaps(a: Mark, b: Mark) -> bool:

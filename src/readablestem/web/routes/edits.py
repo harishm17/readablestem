@@ -150,8 +150,23 @@ def _page_action(
     user: CurrentUser,
     version: str,
     action: str,
+    after: str = "",
+    view: str = "",
 ) -> Response:
-    from readablestem.web.routes.split import _owned_page_count
+    """`after` "review": the form is on a decision's card (the pages kept as images), so
+    the reviewer goes on to the next decision, in the view the form was on, instead of to
+    the page tools."""
+    from readablestem.web.routes.review import LIST_VIEW, list_url
+    from readablestem.web.routes.split import _owned_page_count, review_url
+
+    def back(page_number_: int, result: DocumentResult | None = None) -> Response:
+        if after != "review":
+            return back_to_page(job_id, page_number_)
+        if view == LIST_VIEW:
+            return RedirectResponse(list_url(job_id, "needs-decision"), status_code=303)
+        if result is None:
+            return RedirectResponse(review_url(job_id), status_code=303)
+        return _split_redirect(job_id, result, None)
 
     count = _owned_page_count(request, job_id, user)
     page = page_number(number, count)
@@ -163,18 +178,18 @@ def _page_action(
         return page_edits.restore_page(result, page)
 
     try:
-        change, _ = write_structure(request, job_id, user, version, make)
+        change, result = write_structure(request, job_id, user, version, make)
     except ReviewStale:
         log_event(logger, "review_stale", job_id=job_id)
         flash(request, STALE_FLASH, undo=False)
-        return back_to_page(job_id, page + 1)
+        return back(page + 1)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action=f"{action}_page")
         flash(request, " ".join(e.message for e in exc.errors), undo=False)
-        return back_to_page(job_id, page + 1)
+        return back(page + 1)
     log_event(logger, f"page_{action}", job_id=job_id)
     flash(request, change.message)
-    return back_to_page(job_id, page + 1)
+    return back(page + 1, result)
 
 
 @router.post("/jobs/{job_id}/pages/{number}/omit", dependencies=[Depends(require_csrf)])
@@ -184,9 +199,12 @@ def omit_page(
     number: str,
     user: UserDep,
     version: Annotated[str, Form()] = "",
+    after: Annotated[str, Form()] = "",
+    view: Annotated[str, Form()] = "",
 ) -> Response:
-    """Leave a page out of review and of the student file (a blank page, a cover)."""
-    return _page_action(request, job_id, number, user, version, "omit")
+    """Leave a page out of review and of the student file (a blank page, a cover). From a
+    kept-image card (`after=review`) the reviewer goes on to the next decision."""
+    return _page_action(request, job_id, number, user, version, "omit", after, view)
 
 
 @router.post("/jobs/{job_id}/pages/{number}/restore", dependencies=[Depends(require_csrf)])

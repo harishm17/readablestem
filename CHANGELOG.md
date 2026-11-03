@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: review at scale, finish notice, guides, caching
+
+- Review: "Accept all remaining equations whose checks passed" and "Accept all figures that have
+  generated alt text", each after a list of what would be accepted; one write, one Undo
+  (`web/bulk_accept.py`). The list view's decisions can be filtered by kind and by page. Every card
+  has "Report this item" (job and item ids only). Pages kept as images have the documented "Leave
+  this page out of the HTML" button. Undo is 44 px, and the marks on the page image grow to 44 px
+  where there is room ([docs/web.md](docs/web.md), "Review at scale").
+- Job page: the tab title changes and an opt-in browser notice shows when a conversion finishes.
+  "Upload a revised version" is on the results page and on each finished row of My documents.
+- The landing page says what review costs (decisions per page, a full job, a new account's day,
+  deletion after 24 hours). `/guides` lists the guides; the sitemap names the showcase pages by their
+  canonical address.
+- `/demo`, the showcase pages and unhashed static files are served with an ETag and a one hour
+  `max-age` instead of `no-store` or `no-cache`.
+
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 
 - `ANALYTICS_ENABLED` (default false): PostHog loaded from and reporting to the app's own `/m/` proxy
