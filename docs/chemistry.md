@@ -778,9 +778,11 @@ scorers as the existing secondary ones.
   on gold made by the older converter. `eval/equations_chem.py` is the score for chemistry that
   does not ("Accuracy"); the primary stays as registered.
 - **The prompt's one `\mathrm` example** (a state symbol with a concentration) is older than the
-  `\text` shape the converter now writes; changing it changes the prompt's version and with it
-  every recorded answer, so it waits for the next re-recording. The table prompt
-  (`models/prompts/table.md`) does not teach `\ce` either, though `table_step` expands it.
+  `\text` shape the converter now writes, and the table prompt (`models/prompts/table.md`) does
+  not teach `\ce`, though `table_step` expands it. A candidate that fixed both (and added states
+  with conditions, marks, the excited nuclide, half-reactions, couples and cell notation) was
+  re-recorded on the dev sets and did not move chemically right (-0.5 points on 385 gold
+  equations), so it is not in the prompts: `docs/eval-chemistry-round2.md`.
 - **Real screen readers were not run.** MathCAT and Speech Rule Engine were, built from source
   ("MathML shape"); what NVDA, JAWS and VoiceOver say with their own settings and what VoiceOver
   does with `intent` and `mmultiscripts` is the manual test of docs/mathml-alttext.md and was not

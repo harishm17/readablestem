@@ -671,11 +671,32 @@ and little at the places that need them. The alternatives are to come from disag
 independent readings instead. What stays in the code is the part that does not depend on the prompt:
 `Element.alternatives` (`core/types.py`, optional), and `pipeline/reading_alternatives.py`, which turns
 another reading of the same expression (`from_reading`) or named doubts (`resolve_doubts`) into
-spans of the stored LaTeX, keeping only options that convert. Nothing reads `Element.alternatives`
-yet. The eval guard now asks for `data/eval/latest-image-pages.json` when an image page prompt or
+spans of the stored LaTeX, keeping only options that convert. `Element.alternatives` is now filled from the
+disagreement of a second reader (`pipeline/image_page_reconcile.py`, below) and read by the review
+card. The eval guard now asks for `data/eval/latest-image-pages.json` when an image page prompt or
 `IMAGE_PAGES_MODEL` or `ANTHROPIC_EFFORT_IMAGE_PAGES` changes (docs/eval.md); that report is created
 by the first such change, and the table above is the shape of its probe. The rule 7 rewrite, the
 `medium` definition and the chemistry section can be tried again alone, each with its own run.
+
+## Second reader and choices (2026-11-03; code only, not measured)
+
+`IMAGE_PAGES_SECOND_READER` (off by default) makes the pipeline read each handwritten display
+equation's crop with a second reader and compare it with the page's reading
+(docs/math-readers.md, "Using a reader in the pipeline"). A difference in a few symbols becomes
+one-click choices on the review card (docs/web.md); agreement is recorded and the item is still a
+required decision. This replaces the self-reported doubts above: the options come from two
+independent readings, not from one reader's report of its own doubt.
+
+What is measured and what is not. The earlier numbers about the local reader as a flag (18 of 21
+wrong readings caught, 15 right ones flagged, 74 expressions, one body of ink, a model that has
+probably seen it) are the only evidence, and they are in docs/math-readers.md. **No run of the
+integrated step has been made**: nothing here says how often a wrong reading's choices contain the
+right one when the options come from a second reader, how many decisions per page the choices
+save, or whether a reviewer clicks them. The gates stay the gates: the choices are kept when the
+right reading is among the page reading and the choices for at least 60% of the ambiguous errors
+and decisions per page do not go up. The two reader prompts, now under `models/prompts/`
+(`math_reader.md`, `math_reader_claude.md`), are mapped to `data/eval/latest-image-pages.json` by
+the eval guard.
 
 ## Reproduce
 

@@ -4,8 +4,8 @@
 the reader reported. Adapters: Claude (another model, its own prompt, one high-resolution
 crop: as decorrelated from the page read as a model reading can be made), OpenAI, and a
 local one (TexTeller on CPU: no key, no network, nothing leaves the process).
-`build_readers` makes the ones the settings turn on; all are off by default and nothing
-in the pipeline calls them yet. See `docs/math-readers.md`.
+`build_readers` makes the ones the settings turn on; all are off by default, and the pipeline
+uses one only through `pipeline.image_page_reconcile`. See `docs/math-readers.md`.
 """
 
 from __future__ import annotations

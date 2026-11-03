@@ -174,7 +174,10 @@ def test_unlisted_prompt_needs_the_document_report() -> None:
     assert guard.check([path, "data/eval/latest-document.json"], "", "")[0] == 0
 
 
-@pytest.mark.parametrize("name", ["image_page", "image_page_crops", "image_page_notation"])
+@pytest.mark.parametrize(
+    "name",
+    ["image_page", "image_page_crops", "image_page_notation", "math_reader", "math_reader_claude"],
+)
 def test_an_image_page_prompt_needs_the_image_pages_report(name: str) -> None:
     path = f"src/readablestem/models/prompts/{name}.md"
     code, lines = guard.check([path], "", "")
