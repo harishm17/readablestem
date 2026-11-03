@@ -361,9 +361,37 @@ drains open connections for at most 5 seconds (`GRACEFUL_SHUTDOWN_S`) and the ap
 makes sure the worker is stopped (3 seconds). If the process is killed before the lease is
 ended, the lease runs out and the job is requeued by the next worker. The requeued job restarts
 from the beginning on another attempt (three attempts end in `lease_expired`). Look for
-`sigterm_received`, `job_cancelled reason=shutdown` and `worker_stopped` in the logs.
+`sigterm_received`, `job_cancelled reason=shutdown` and `worker_stopped` in the logs. A conversion
+runs in a child process (below): cancelling it kills the child within 0.2 seconds, so shutdown
+leaves nothing running.
 `tests/test_web_health.py` starts a real server, sends SIGTERM, and checks it exits well inside
 10 seconds.
+
+**The conversion child.** Each conversion runs in a child process (`python -m
+readablestem.web.conversion_child`, started by `web/isolated_convert.py`), so a PDF that crashes,
+exhausts memory or hangs MuPDF fails that one job and the web process, its sessions and the
+worker go on. The child is limited to `CONVERSION_MEMORY_MB` of address space (default 3072, plus
+twice the PDF; resident memory is far lower, 330-460 MB measured) and 4 times the job's time limit
+in CPU seconds, and is killed at the job's time limit, when the job is deleted or taken over, and
+at shutdown. Web service and child share the service's RAM: while a job converts, expect the web
+process plus one child; a service limit below about 1 GB would not hold both (docs/deploy-railway.md,
+"Memory"). Do not set `CONVERSION_MEMORY_MB` below 1536: the table detector's ONNX runtime then
+hangs instead of failing, and the job ends as `timeout`. What to look for:
+
+| Log line or job code | Meaning |
+|---|---|
+| `job_failed error_code=conversion_crashed`, preceded by `conversion_child_died signal=6` (abort), `11` (segfault) or `exit_code=N` | MuPDF or another native library killed the child. That file will do it again: nothing to retry (the job page does not offer "Try again"). Keep the document id; reproduce with `readablestem convert` on a copy only if the owner agrees |
+| `error_code=conversion_oom`, `conversion_child_died signal=9` | The child ran out of memory (its cap, or the kernel's OOM killer). Raise `CONVERSION_MEMORY_MB` only if documents that should fit are failing; a single large file is better split |
+| `conversion_child_timeout` | The converter's own backstop fired (the worker's limit normally does first: `job_timeout`, `error_code=timeout`). `conversion_child_died signal=24` is the CPU limit |
+| `conversion_child_protocol` | The child sent something that is not the protocol (a bug, or a compromised child): the job is failed `conversion_crashed`. Treat repeated ones on one account as an incident |
+| `conversion_child_unreaped` | A child did not die within 5 s of SIGKILL (a process stuck in the kernel); check the host |
+| `conversion_abandoned` | No longer expected for a hung MuPDF; it would mean a callback in the web process (the database) hung |
+
+A crashed or out-of-memory child fails the job at once; it is not requeued, so one poison PDF
+costs one attempt and not three lease expiries. `PRELOAD_TABLE_MODELS` has no effect while
+conversions run in a child: each child loads what it needs (with `FEATURE_TABLES` on, the table
+models load in about 4-5 s on 1 vCPU, which every conversion now pays). Tracing records the web
+process's spans only.
 
 **Error pages.** Every page that fails answers in the app's plain style with a way home:
 404 "Page not found", 500 "Something went wrong" (the same page whether the error was
@@ -511,7 +539,7 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 |---|---|---|
 | The weekly GitHub uptime run failed, or a Railway deploy or crash notification | `@severity:WARNING` logs; the web service's deployments list | Roll back to the last good deployment (deploy-railway.md, "Ship a new version") |
 | `/healthz` answers 503, or `/readyz` shows `database: unreachable` | The database: the Postgres service's state and connections. Users meanwhile see a calm "Not available right now" page (503 with `Retry-After`) | See "Too many connections" below |
-| `/readyz` shows `worker: stalled` or `stopped`, or documents wait for ever | `worker_loop_error`, `lease_refresh_failed` and `conversion_abandoned` in the logs | The worker thread is stuck or dead; documents are queued but nothing converts. Redeploy the web service (`railway up --service web`, or Redeploy on its latest deployment) to replace the process; the running job's lease expires and it is requeued |
+| `/readyz` shows `worker: stalled` or `stopped`, or documents wait for ever | `worker_loop_error`, `lease_refresh_failed` and `conversion_abandoned` in the logs (a hung MuPDF no longer stalls the worker: its child is killed at the time limit) | The worker thread is stuck or dead; documents are queued but nothing converts. Redeploy the web service (`railway up --service web`, or Redeploy on its latest deployment) to replace the process; the running job's lease expires and it is requeued |
 | `/readyz` shows `model_provider: no_key` or `unpriced_model` | `ANTHROPIC_API_KEY` is set on the web service; `ANTHROPIC_MAIN_MODEL` names a model in `models/pricing.py` | Set the variable and redeploy, or fix the model name |
 | Conversions fail with `reason:budget_daily`, jobs end `error:budget_daily`, or `claims_paused` in the logs | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed: users see "Stopped early" or "Waiting", and queued jobs start after 00:00 UTC. Raise the cap only on purpose |
 | Conversions fail with provider errors | `call:<model>:outcome:api_error` counts; OpenAI or Anthropic dashboard | The OpenAI project limit may be reached (HTTP 429 `project_spend_limit_exceeded`); with Claude, the workspace limit or rate limit (HTTP 429 `rate_limit_error`), or a key not scoped to a workspace (HTTP 400, set `ANTHROPIC_WORKSPACE_ID`) |

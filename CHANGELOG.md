@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: conversions run in a child process (branch fix/worker-child-process)
+
+- The whole conversion (`convert_pdf`) now runs in a child process the worker can kill
+  (`web/isolated_convert.py`, `web/conversion_child.py`), with an address-space cap
+  (`CONVERSION_MEMORY_MB`, default 3072), a CPU limit and the job's wall-clock limit. A PDF that
+  passes the upload probe and still crashes, exhausts memory or hangs MuPDF now fails that one job
+  (`conversion_crashed`, `conversion_oom`, `timeout`) instead of taking the web process, every
+  session and the worker down, three times over. The child has no keys or database URL: model
+  requests, spend reservations, progress and the step cache stay in the web process, so spend
+  accounting and the database writes are as before. Results are unchanged
+  (`tests/test_web_isolated_convert.py`). `PRELOAD_TABLE_MODELS` no longer loads models in the web
+  process. Details and measurements: [docs/web.md](docs/web.md), "The conversion runs in a child process".
+
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 
 - `ANALYTICS_ENABLED` (default false): PostHog loaded from and reporting to the app's own `/m/` proxy

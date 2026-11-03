@@ -78,6 +78,10 @@ JOB_ERROR_MESSAGES = {
     "timeout": "The conversion took longer than a document of this size is allowed and was "
     "stopped. You can use “Try again”: what was already converted is kept. If it stops "
     "again, try splitting the PDF into smaller parts.",
+    "conversion_crashed": "The converter stopped while reading this PDF. Try saving the PDF "
+    "again from the program that made it, or splitting it into smaller parts.",
+    "conversion_oom": "This PDF needed more memory than a conversion may use. Try splitting "
+    "it into smaller parts.",
     "store_failed": "The conversion finished but its results could not be saved. Use "
     "“Try again”: what was already converted is kept.",
     "upload_missing": "The uploaded file was no longer available.",

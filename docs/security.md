@@ -18,7 +18,7 @@ cookie; the model provider's API key and the daily spend it can create; the data
 | Anyone on the internet | Reach public pages, the sign-in routes and the cron route; send anything | Sign-in (the allowlist, or with `SIGNUP_MODE=open` a verified Google or allowed Microsoft identity), CSRF, rate limits, body-size caps, security headers |
 | Someone who makes many accounts (open sign-up) | Use the free quota again and again, run up model spend, fill the database | A verified identity, 5 new accounts an hour per address, `MAX_NEW_ACCOUNTS_PER_DAY` for the service, lower daily pages and model reads for a new account, a separate spend pool inside the daily cap, block on `/admin` |
 | A signed-in instructor (curious or malicious) | Call every route with other people's ids, send hostile files, send floods | Owner check on every job and course route, 404 for strangers, per-person quotas and queue caps |
-| A crafted PDF | Crash or stall the parser, balloon memory, smuggle text that becomes HTML or a prompt | Isolated probe process with time and memory limits, page and size limits, escaping and allowlists on everything that reaches HTML |
+| A crafted PDF | Crash or stall the parser, balloon memory, smuggle text that becomes HTML or a prompt | Isolated probe process with time and memory limits, the conversion itself in a killable child with memory, CPU and time limits, page and size limits, escaping and allowlists on everything that reaches HTML |
 | The model's output | Contain markup, script, unsafe URLs, wrong content | Validation before use; HTML built by escaping and by rebuilding MathML from an allowlisted tree |
 | A person with read access to logs, traces or the aggregate tables | Read document content if it were there | Content-free logging by construction; no document text in events, aggregates or traces |
 | A compromised dependency or a leaked key | Run code, spend money | Locked and audited dependencies, pinned CI actions, spend caps, secrets only in Railway's service variables (never in the repository; `.railway/railway.ts` lists names only) |
@@ -170,6 +170,7 @@ script injected into an app page is refused by the policy.
 | Word and PowerPoint files of one upload | their conversions share 180 s (`OFFICE_BUDGET_S`); the rest are refused with a reason | `routes/jobs.py` (`_place_files`) |
 | Sample document | one per person, outside the quota, the spend and the caps; `sample` rate rule 10 per 10 minutes per address | `web/sample.py` |
 | Probe child | 30 s timeout, 768 MiB address space, minimal environment | `inspect_pdf_isolated`, `pdf_probe` |
+| Conversion child | The whole conversion, in its own process and process group: `CONVERSION_MEMORY_MB` (3072) plus twice the PDF of address space, CPU time 4 times the job's time limit, no core file, killed at the job's time limit, on cancel or shutdown, dies with the web process; minimal environment (no keys, no database URL), model requests and every database write made by the parent; a crash fails that job at once (`conversion_crashed`, `conversion_oom`) | `convert_isolated`, `conversion_child` |
 | Word and PowerPoint (T3-30) | File checks in a child with a minimal environment and a 768 MiB cap; LibreOffice in its own session and process group with 2 GiB address space, CPU, output-size and open-file limits and `OFFICE_TIMEOUT_S` (90 s) then killed; one conversion at a time per instance; the PDF it makes is probed like any upload | `convert_office_isolated`, `office_convert` |
 | Daily pages per person | `PER_USER_DAILY_PAGE_QUOTA` (invited), `OPEN_TIER_DAILY_PAGE_QUOTA` (open tier) | `web/quota.py`, `web/access.py` |
 | Model reads from review per person per day (open tier) | `OPEN_TIER_DAILY_REREADS`, counted before the read and not given back | `web/quota.py` (`try_consume_reread`), `web/reread.py` |
@@ -214,7 +215,17 @@ that comes out is probed like any upload, and only it is stored.
 
 The PDF is opened first in a child process (`python -m readablestem.web.pdf_probe`) that has no
 secrets in its environment, caps its own memory and is killed at its timeout; MuPDF is C code
-reading bytes from the internet and is never run in the web process on first contact.
+reading bytes from the internet and is never run in the web process on first contact. The
+conversion that follows is run the same way (`web/isolated_convert.py`, `web/conversion_child.py`): a
+file that passes the probe and still crashes, exhausts memory or hangs MuPDF in a later step
+fails that one job and nothing else, where it used to take the whole web process (every session,
+the worker, and again on each retry) down. The child has no API key, no database URL and no
+token; it asks the parent for model requests and progress over a socket, and what it sends is
+JSON and bytes that the parent validates and never unpickles, so a compromised child can
+only do what a conversion of that document could: ask for requests under the job's spend caps
+(a model that has no price is refused), and return a result. The parent kills it at the job's
+time limit, when the job is deleted or taken over, and at shutdown. The exposure that remains is
+the model request itself: a compromised child could choose its text and images.
 `test_audit_uploads.py` feeds it a decompression bomb, a page tree that points at itself, a
 page count that lies, a page a million points wide, a stream length past the end of the file,
 truncated and garbage files, and files that are not PDFs; each ends in a category, never an
