@@ -45,12 +45,16 @@ ARMS = {
     # see docs/eval-equation-round5.md); it is kept for its answers and is not an arm
     "witness-opus": ("e1-opus", True, "claude-opus-5-5", "e1-witness-opus"),
     "witness-sonnet": ("e1-sonnet", True, "claude-sonnet-5-5", "e1-witness-opus"),
+    # the Sonnet witness's recorded answers re-settled with today's adjudication rule: run with
+    # `--offline` (nothing is asked; a miss is refused)
+    "witness-sonnet-r2": ("e1-sonnet-r2", True, "claude-sonnet-5-5", "e1-sonnet"),
 }
 KEEP_ENV = {"ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"}
 LABELS = {
     "e1-control": "Control (witness off)",
     "e1-opus": "Witness, Opus",
     "e1-sonnet": "Witness, Sonnet",
+    "e1-sonnet-r2": "Witness, Sonnet, marks tie-break",
 }
 
 
@@ -113,7 +117,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     ns = argparse.Namespace(
         part=PART, max_usd=args.max_usd, tag=tag, offline=args.offline,
         page_math=False, tables=True, notation_memory=True, line_context=True,
-        no_agreement_lift=False, page_math_tokens=None,
+        no_agreement_lift=False, page_math_tokens=None, glyph_checks=False, flag_policy=False,
         seed_answers_from=args.seed_from or seed,
         papers=",".join(args.papers.split(",") if args.papers else paper_ids()),
         section_workers=args.workers, concurrency=args.concurrency,
