@@ -40,17 +40,97 @@ def test_value_change_comment_change_and_other_lines() -> None:
     assert guard.changed_model_names(CONFIG, field) == ["claude_check_model"]
 
 
-def test_added_and_removed_model_settings_count() -> None:
-    added = CONFIG + '    extra_model: str = "x"\n'
-    assert guard.changed_model_names(CONFIG, added) == ["extra_model"]
-    assert guard.changed_model_names(added, CONFIG) == ["extra_model"]
+def test_added_and_removed_answer_settings_count() -> None:
+    added = CONFIG + '    anthropic_effort_figure: str = "high"\n'
+    assert guard.changed_model_names(CONFIG, added) == ["anthropic_effort_figure"]
+    assert guard.changed_model_names(added, CONFIG) == ["anthropic_effort_figure"]
+
+
+RUNTIME_KNOBS = """
+class Settings:
+    model_timeout_s: float = Field(default=60.0, gt=0)
+    model_max_retries: int = Field(default=2, ge=0, le=5)
+    model_concurrency: int = Field(default=8, ge=1, le=16)
+    max_model_calls_per_job: int = Field(default=400, gt=0)
+    fake_models: bool = False
+    preload_table_models: bool = True
+    model_config = SettingsConfigDict(env_file=".env")
+"""
+
+
+def test_runtime_knobs_are_not_answer_settings() -> None:
+    changed = (
+        RUNTIME_KNOBS.replace("60.0", "90.0")
+        .replace("= 8", "= 4")
+        .replace("400", "800")
+        .replace("False", "True")
+        .replace('".env"', '".env.local"')
+    )
+    assert guard.model_assignments(RUNTIME_KNOBS) == {}
+    assert guard.changed_model_names(RUNTIME_KNOBS, changed) == []
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "MAIN_MODEL",
+        "claude_check_model",
+        "claude_check_effort",
+        "anthropic_effort_main",
+        "anthropic_effort_image_pages",
+        "page_math_max_output_tokens",
+        "figure_thinking_budget",
+        "openai_reasoning_effort",
+    ],
+)
+def test_answer_settings_are_recognised(name: str) -> None:
+    assert guard.is_answer_setting(name)
+
+
+def test_multi_line_values_compare_by_parsed_value() -> None:
+    wrapped = (
+        "class S:\n"
+        "    page_math_max_output_tokens: int = Field(\n"
+        "        default=4096,\n"
+        "        ge=1024,\n"
+        "    )\n"
+    )
+    same = (
+        "class S:\n    page_math_max_output_tokens: int = Field(default=4096, ge=1024, le=32000)\n"
+    )
+    assert guard.changed_model_names(wrapped, same) == []  # a bound is not the value
+    other = wrapped.replace("default=4096", "default=8192")
+    assert guard.changed_model_names(wrapped, other) == ["page_math_max_output_tokens"]
+    multi = 'class S:\n    anthropic_effort_main = (\n        "medium"\n    )\n'
+    assert guard.changed_model_names(multi, multi.replace("medium", "high")) == [
+        "anthropic_effort_main"
+    ]
+    reflowed = 'class S:\n    anthropic_effort_main = "medium"\n'
+    assert guard.changed_model_names(multi, reflowed) == []
+
+
+def test_prompt_in_a_subfolder_counts() -> None:
+    path = "src/readablestem/models/prompts/extra/equation.md"
+    assert guard.prompt_name(path) == "equation"
+    code, lines = guard.check([path], "", "")
+    assert code == 1 and "latest-equations.json" in "\n".join(lines)
+
+
+def test_trailer_must_be_a_real_trailer() -> None:
+    body = "Explain\n\nWe use Eval-Unchanged: reason in the body text.\n\nMore."
+    assert guard.opt_out([], [body]) is None
+    assert guard.opt_out([], ["Eval-Unchanged: in the subject line only"]) is None
+    mid = "Subject\n\nEval-Unchanged: not last\n\nSigned-off-by: someone"
+    assert guard.opt_out([], [mid]) is None
+    last = "Subject\n\nbody\n\nSigned-off-by: someone\nEval-Unchanged: comment only\n"
+    assert guard.opt_out([], [last]) == "commit trailer Eval-Unchanged: comment only"
 
 
 def test_prompt_name_only_for_prompt_markdown() -> None:
     assert guard.prompt_name(PROMPT) == "equation"
     assert guard.prompt_name("src/readablestem/models/prompts/__init__.py") is None
     assert guard.prompt_name("docs/equation.md") is None
-    assert guard.prompt_name("src/readablestem/models/prompts/sub/x.md") is None
+    assert guard.prompt_name("src/readablestem/models/prompts/sub/x.md") == "x"
 
 
 def test_nothing_relevant_passes() -> None:
@@ -114,10 +194,10 @@ def test_label_waives_with_a_visible_note() -> None:
 
 
 def test_trailer_waives_only_with_a_reason() -> None:
-    ok = "Fix typo\n\nEval-Unchanged: whitespace in a comment line of the prompt\n"
+    ok = "Fix typo\n\nbody\n\nEval-Unchanged: whitespace in a comment line of the prompt\n"
     code, lines = guard.check([PROMPT], "", "", commit_messages=["other", ok])
     assert code == 0 and "whitespace in a comment" in lines[0]
-    assert guard.check([PROMPT], "", "", commit_messages=["Eval-Unchanged:\n"])[0] == 1
+    assert guard.check([PROMPT], "", "", commit_messages=["x\n\nEval-Unchanged:\n"])[0] == 1
     assert guard.check([PROMPT], "", "", labels=["eval"], commit_messages=["no trailer"])[0] == 1
 
 
@@ -178,3 +258,23 @@ def test_main_model_constant_change_in_a_real_repository(repo: Path) -> None:
     (repo / CFG).write_text(CONFIG.replace("gpt-6.1-sol", "gpt-6.2-sol"))
     _git(repo, "commit", "-qam", "bump the OpenAI model")
     assert guard.main(["--base", "main"]) == 1
+
+
+def test_history_replay_package_rename_is_not_flagged() -> None:
+    """27eab47 renamed the package folder (config.py R099, prompts R100) and changed no
+    setting and no prompt text: the guard must pass it."""
+    sha = "27eab47"
+    probe = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "--verify", "-q", f"{sha}^{{commit}}"],
+        capture_output=True,
+    )
+    if probe.returncode != 0:
+        pytest.skip("history before the package rename is not in this checkout")
+    files, config_path = guard.changed_files(f"{sha}^", sha, cwd=ROOT)
+    assert config_path == "src/a11y_stem/config.py"
+    assert not any(f.endswith(".md") and "/prompts/" in f for f in files)  # R100 moves
+    base = _git(ROOT, "show", f"{sha}^:{config_path}")
+    head = _git(ROOT, "show", f"{sha}:{guard.CONFIG}")
+    assert guard.changed_model_names(base, head) == []
+    code, lines = guard.check(files, base, head)
+    assert code == 0, lines

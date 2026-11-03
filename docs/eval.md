@@ -754,9 +754,13 @@ installed as in `ci.yml`, and the OpenStax pages are fetched on the run.
 
 ### Eval guard (`eval-guard.yml`)
 
-A pull request that changes a model constant in `src/readablestem/config.py` (any assignment
-to a name containing `model`, such as `ANTHROPIC_MAIN_MODEL` or `claude_check_model`) or a
-prompt (`src/readablestem/models/prompts/*.md`) fails unless it also changes the matching
+A pull request that changes a setting in `src/readablestem/config.py` that decides what a
+model answers (the model ids such as `ANTHROPIC_MAIN_MODEL` or `claude_check_model`, the
+`*_effort*` settings, `*max_output_tokens`, thinking and reasoning settings; an explicit list
+in `scripts/eval_guard.py`, compared by parsed value, so reformatting is not a change;
+timeouts, retries, concurrency and call limits are not on it) or a prompt (a `.md` file under
+`src/readablestem/models/prompts/`, subfolders included; a file moved with its content
+unchanged is not a change) fails unless it also changes the matching
 `data/eval/latest-*.json` report(s). The message points to "How to rerun". The mapping is in
 `scripts/eval_guard.py` (tests: `tests/test_eval_guard.py`): a prompt needs the reports of
 the tasks that use it (`equation*.md`: equations and document; `figure*.md`: figures and
@@ -768,7 +772,7 @@ report.
 
 Opt-out, for a change that does not alter what a model is asked or which model answers (a
 renamed constant, a comment): add the label `eval-unchanged` to the pull request, or put a
-trailer `Eval-Unchanged: <reason>` in any of its commits (the reason is required). The guard
+trailer `Eval-Unchanged: <reason>` in the last paragraph of any of its commit messages (the reason is required). The guard
 prints the waiver and the reports it did not need, so a reviewer sees it. Prompt text a
 model reads is never a refactor: change it and re-run.
 

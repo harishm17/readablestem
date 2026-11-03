@@ -5,9 +5,12 @@
 Run by `.github/workflows/eval-guard.yml`. The CI eval gate compares the committed
 `data/eval/latest-<task>.json` with its baseline, so a change to a model constant or a
 prompt cannot fail it by itself: nothing re-measures. This guard closes that hole. A change
-is "a model constant" when an assignment to a name containing `model` in
-`src/readablestem/config.py` has another value than on the base; it is "a prompt" when a
-`.md` file under `src/readablestem/models/prompts/` is added, changed or removed. Either
+is "a model constant" when a setting in `src/readablestem/config.py` that changes what a
+model answers (the model ids, and the effort and output-token settings of each step: see
+`is_answer_setting`) has another parsed value than on the base; runtime knobs (timeouts,
+concurrency, call limits) are not. It is "a prompt" when a `.md` file under
+`src/readablestem/models/prompts/` (or a folder in it) is added, changed or removed; a
+file only moved without a change of content is not. Either
 needs the matching `latest-*.json` reports in the same pull request (`docs/eval.md`, "How
 to rerun").
 
@@ -23,22 +26,41 @@ Standard library only. Exit 0: fine or opted out. Exit 1: reports missing.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import subprocess
 import sys
 from collections.abc import Iterable, Sequence
+from pathlib import Path
 
 CONFIG = "src/readablestem/config.py"
 PROMPTS_DIR = "src/readablestem/models/prompts/"
 EVAL_DIR = "data/eval/"
 OPT_OUT_LABEL = "eval-unchanged"
-TRAILER = re.compile(r"^Eval-Unchanged:[ \t]*(\S.*)$", re.IGNORECASE | re.MULTILINE)
+TRAILER = re.compile(r"^Eval-Unchanged:[ \t]*(\S.*)$", re.IGNORECASE)
 
-# An assignment whose name has "model" in it, with its right-hand side up to a comment.
-_MODEL_ASSIGNMENT = re.compile(
-    r"^[ \t]*(?P<name>\w*model\w*)[ \t]*(?::[^=\n]+)?=[ \t]*(?P<value>[^#\n]+?)[ \t]*(?:#.*)?$",
-    re.IGNORECASE | re.MULTILINE,
+# Settings of config.py that change what a model is asked or answers. Everything else with
+# "model" in its name (timeouts, retries, concurrency, call limits, fake_models,
+# preload_table_models, model_config) is a runtime knob and needs no new report.
+ANSWER_SETTINGS = frozenset(
+    {
+        "main_model",
+        "cheap_model",
+        "anthropic_main_model",
+        "anthropic_cheap_model",
+        "decisions_model",
+        "claude_check_model",
+        "claude_check_effort",
+        "page_math_model",
+        "image_pages_model",
+        "figure_model_max_edge_px",
+    }
+)
+_ANSWER_PATTERNS = (
+    re.compile(r"anthropic_effort_\w+"),
+    re.compile(r"\w*max_output_tokens\w*"),
+    re.compile(r"\w*(thinking|reasoning)\w*"),
 )
 
 ANTHROPIC_REPORTS = (
@@ -75,17 +97,49 @@ MODEL_REPORTS: dict[str, tuple[str, ...]] = {
 DEFAULT_MODEL_REPORTS = ("latest-document.json",)
 
 
+def is_answer_setting(name: str) -> bool:
+    """Whether the config name (any case) is a model id or an effort, output-token, thinking
+    or reasoning setting."""
+    lowered = name.lower()
+    return lowered in ANSWER_SETTINGS or any(p.fullmatch(lowered) for p in _ANSWER_PATTERNS)
+
+
+def _value(node: ast.expr) -> str:
+    """The parsed value of a right-hand side: `Field(default=x, ...)` is x, so a change of
+    a bound or a description is not a change of the value."""
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "Field":
+        for keyword in node.keywords:
+            if keyword.arg == "default":
+                node = keyword.value
+                break
+    return ast.dump(node)
+
+
 def model_assignments(source: str) -> dict[str, set[str]]:
-    """Name (lower case) -> every value it is assigned in `source`."""
+    """Answer setting (lower case) -> every parsed value it is assigned in `source`, in the
+    module and in class bodies. Comments, spacing and line breaks do not matter (`ast`)."""
     found: dict[str, set[str]] = {}
-    for match in _MODEL_ASSIGNMENT.finditer(source):
-        value = re.sub(r"\s+", " ", match.group("value")).strip()
-        found.setdefault(match.group("name").lower(), set()).add(value)
+    scopes: list[Sequence[ast.stmt]] = []
+    tree = ast.parse(source)
+    scopes.append(tree.body)
+    scopes += [n.body for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]
+    for body in scopes:
+        for node in body:
+            if isinstance(node, ast.AnnAssign) and node.value is not None:
+                targets = [node.target]
+            elif isinstance(node, ast.Assign):
+                targets = node.targets
+            else:
+                continue
+            for target in targets:
+                if isinstance(target, ast.Name) and is_answer_setting(target.id):
+                    value = _value(node.value)  # type: ignore[arg-type]
+                    found.setdefault(target.id.lower(), set()).add(value)
     return found
 
 
 def changed_model_names(base_source: str, head_source: str) -> list[str]:
-    """Names of model assignments added, removed or given another value."""
+    """Names of answer settings added, removed or given another value."""
     before, after = model_assignments(base_source), model_assignments(head_source)
     return sorted(
         name for name in before.keys() | after.keys() if before.get(name) != after.get(name)
@@ -93,11 +147,12 @@ def changed_model_names(base_source: str, head_source: str) -> list[str]:
 
 
 def prompt_name(path: str) -> str | None:
-    """`equation` for `src/readablestem/models/prompts/equation.md`, else None."""
+    """`equation` for `src/readablestem/models/prompts/equation.md` (also in a subfolder),
+    else None."""
     if not path.startswith(PROMPTS_DIR) or not path.endswith(".md"):
         return None
     rest = path[len(PROMPTS_DIR) : -len(".md")]
-    return rest if rest and "/" not in rest else None
+    return rest.rsplit("/", 1)[-1] or None  # a file in a subfolder counts by its own name
 
 
 def required_reports(
@@ -122,9 +177,14 @@ def opt_out(labels: Iterable[str], commit_messages: Iterable[str]) -> str | None
     if any(label.strip().lower() == OPT_OUT_LABEL for label in labels):
         return f"label {OPT_OUT_LABEL}"
     for message in commit_messages:
-        found = TRAILER.search(message)
-        if found:
-            return f"commit trailer Eval-Unchanged: {found.group(1).strip()}"
+        # A trailer sits in the last paragraph, after the subject and a body or blank line.
+        paragraphs = [p for p in re.split(r"\n\s*\n", message.strip()) if p.strip()]
+        if len(paragraphs) < 2:
+            continue
+        for line in paragraphs[-1].splitlines():
+            found = TRAILER.match(line.strip())
+            if found:
+                return f"commit trailer Eval-Unchanged: {found.group(1).strip()}"
     return None
 
 
@@ -164,8 +224,8 @@ def check(
     return 1, lines
 
 
-def _git(*args: str) -> str:
-    done = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
+def _git(*args: str, cwd: Path | None = None) -> str:
+    done = subprocess.run(["git", *args], capture_output=True, text=True, check=False, cwd=cwd)
     if done.returncode != 0:
         raise SystemExit(f"error: git {' '.join(args)}: {done.stderr.strip()}")
     return done.stdout
@@ -178,6 +238,25 @@ def _show(ref: str, path: str) -> str:
     return done.stdout if done.returncode == 0 else ""
 
 
+def changed_files(base: str, head: str, cwd: Path | None = None) -> tuple[list[str], str]:
+    """(the paths the pull request changes since it branched from `base`, the path the base
+    had `config.py` under). A file moved with its content unchanged (a rename of the package
+    folder) is not a change of that file; `git diff -M` tells."""
+    files: list[str] = []
+    config_path = CONFIG
+    for line in _git("diff", "--name-status", "-M", f"{base}...{head}", cwd=cwd).splitlines():
+        status, *paths = line.split("\t")
+        if status.startswith("R"):
+            if paths[1] == CONFIG:
+                config_path = paths[0]
+            if status == "R100":
+                continue
+            files.append(paths[1])
+        else:
+            files.append(paths[-1])
+    return files, config_path
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--base", required=True, help="the base ref, e.g. origin/main")
@@ -188,11 +267,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         labels = [str(x) for x in json.loads(args.labels_json)]
     except ValueError:
         parser.error("--labels-json must be a JSON list of strings")
-    # Three dots: what the pull request changes since it branched from the base.
-    changed = _git("diff", "--name-only", f"{args.base}...{args.head}").splitlines()
+    changed, config_path = changed_files(args.base, args.head)
     base = _git("merge-base", args.base, args.head).strip()
     messages = _git("log", "--format=%B%x00", f"{args.base}..{args.head}").split("\x00")
-    code, lines = check(changed, _show(base, CONFIG), _show(args.head, CONFIG), labels, messages)
+    code, lines = check(
+        changed, _show(base, config_path), _show(args.head, CONFIG), labels, messages
+    )
     print("\n".join(lines))
     if code:
         print(
