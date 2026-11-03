@@ -11,6 +11,42 @@
   its whole reservation; `PAGE_WITNESS_TIMEOUT_S` (default 240) is set on the request.
 - Fix: `eval pipeline` left the witness's cost out of an item's `cost_usd`; items now carry `page_witness`
   and `page_witness_cost_usd`, and the cost block `page_witness_usd` and `page_witness_per_pdf_page_usd`.
+## Unreleased: calibrated flag policy (branch eq/flag-policy)
+
+- Flag policy (off: `FLAG_POLICY`): `pipeline/flag_policy.py` turns an accepted equation that nobody is asked
+  about into a required decision when a small logistic model over content-free features (second reading, notes,
+  extension past the span, size, notation classes) puts it with the readings that turned out wrong. It only adds
+  decisions, makes no model call, and its weights and threshold are constants fitted on the development splits
+  (`flag-policy-1`; `eval/flag_features.py` dumps the features of recorded runs and fits them at $0). New check
+  `equation.flag_policy`, code `flag_policy`, with a review sentence. `scripts/realworld_run.py rs` takes
+  `--flag-policy`. Replayed on the recorded runs: on fresh2 to fresh4 (validation, 45 papers, 5,018 gold) silent wrong
+  8.83 to 7.77 per 100 gold, flag recall 0.29 to 0.38, decisions a page 3.55 to 3.92; the goal (silent 4 per 100 at
+  4 decisions a page) is not reachable with these features. docs/eval-flag-policy.md, docs/steps.md.
+## Unreleased: both readings on the review card (branch eq/review-both-readings)
+
+- Review card: a typed equation the page witness read differently (`witness_mismatch`,
+  `witness_extent_differs`) shows "The other reading" under the proposal: its formula, how it is read
+  aloud, why the item is asked, **Use the other reading**, and the symbols that differ as the same
+  chips handwritten cards have (`web/reading_chips.py`, built on `reading_alternatives.from_reading`).
+  Ordinary edits (checks, Undo), none preselected, audited as `page_witness_choice`. Nothing shows with
+  `FEATURE_PAGE_WITNESS` off. Documented in docs/web.md and docs/steps.md.
+## Unreleased: glyph checks for equations (branch eq/bag-extended-extent)
+
+- `EQUATION_GLYPH_CHECKS` (off): the glyphs under an equation's box, and for an inline equation read with
+  its line the glyphs beside it, are kept with the element (`Element.glyphs`, `core.types.GlyphContext`; read
+  by `layout.line_glyphs`, which shares the line crop's region with `crop_line` through `_line_clip`).
+- A reading that goes past the box (`EQUATION_LINE_CONTEXT`) is compared with the glyphs it covers, not the
+  box's text (`text_layer_compare.extend_text_layer`, `equation_step.reading_layer`): symbols, numbers, case,
+  style, signs and chemistry checks, a reviewer's edit (`web.edit_check`), the review screen's compare table
+  (`web.compare`) and the eval's "supported" test all use that one layer. A wrong letter in the extended part
+  is still a decision.
+- New check `equation.glyph_style`, code `glyph_style_mismatch` (meaning-level, a required decision): a letter's
+  style in the reading's LaTeX against its glyph's font (italic against upright, bold against bold italic, script,
+  double-struck; `text_layer_compare.compare_letter_styles`). New review message and compare-table row.
+- `\mathbf` is written `\boldsymbol` for a letter the glyphs say is bold italic (`restyle_bold_italic`, the
+  bold-letter fix of running text), including Latin Modern's `LMMathItalic10-Bold`, whose text-layer code point
+  says only "bold". Measured by replay of the recorded fresh4 run in docs/eval-equation-glyph-checks.md.
+- `scripts/realworld_run.py rs --glyph-checks` turns the setting on for a replay.
 
 ## Unreleased: page witness (branch eq/page-witness)
 
@@ -24,8 +60,7 @@
   decision with the reading nearer the extent's glyphs first and the other in `EquationFix.other_latex`;
   a formula only the witness read, with maths-glyph evidence and clear of other elements, is a new
   element and a required decision. New fields: `Element.witness_latex`, `witness_status`,
-  `EquationFix.other_latex`, `other_source`, `DocumentResult.page_witness`. The review card does not
-  show the other reading yet. Documented in docs/steps.md. Not measured (E1 is a later step).
+  `EquationFix.other_latex`, `other_source`, `DocumentResult.page_witness`. Documented in docs/steps.md. Not measured (E1 is a later step).
 ## Unreleased: pen strokes check handwritten vector pages (branch hw/stroke-checks)
 
 - `pipeline/image_page_vector.py` (new): on a page `page_type` calls handwritten and `ink_strokes`

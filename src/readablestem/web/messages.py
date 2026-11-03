@@ -102,6 +102,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.text_layer_style", "style_mismatch"): "A style that carries meaning differs "
     "from the PDF (a bold letter, a vector, is plain here, a plain one became bold, or a "
     "double-struck letter such as the R of the reals became plain), so check those letters.",
+    ("equation.glyph_style", "glyph_style_mismatch"): "A letter's style differs from the PDF's "
+    "font (upright in the PDF but italic here, bold against bold italic, plain against "
+    "script or double-struck), so check those letters against the image.",
     ("equation.text_layer_style", "style_cosmetic"): "A letter's style differs from the PDF "
     "only where it does not change the meaning (a bold subscript or digit, or a style such "
     "as double-struck that the PDF's text cannot show), so this was accepted as it is.",
@@ -115,6 +118,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "marks this formula's boundaries differently, so check where the formula starts and ends.",
     ("equation.witness_reading", "witness_mismatch"): "A second reading of the page reads "
     "this formula differently, so compare both readings with the image.",
+    ("equation.flag_policy", "flag_policy"): "Readings of this kind are wrong more often than "
+    "others, though no check found a problem here, so compare it with the image symbol by "
+    "symbol.",
     ("equation.no_text_layer", "no_text_layer"): "This equation is a picture, so the PDF holds "
     "no text to check the transcription against: compare it with the picture symbol by "
     "symbol.",

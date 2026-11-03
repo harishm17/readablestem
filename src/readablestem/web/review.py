@@ -87,6 +87,7 @@ from readablestem.core.types import (
     TableGrid,
     grid_problems,
 )
+from readablestem.web import reading_chips
 from readablestem.web.edit_check import MEANING_CODES
 from readablestem.web.messages import explain_check
 
@@ -433,8 +434,13 @@ MODEL_READ_KEY = "model_read"
 # offered, so the mark is a fact about the edit and not a label a form can put on any text.
 CHOICE_KEY = "second_reader_choice"
 CHOICE_ORIGIN = "second_reader_choice"
+# The same for the other reading of a typed equation (`EquationFix.other_latex`, the page
+# witness): the whole reading or one of its symbols, offered by `reading_chips.other_reading_for`.
+WITNESS_KEY = "page_witness_choice"
+WITNESS_ORIGIN = "page_witness_choice"
 # A `before` that holds a structural snapshot instead of a fix's (`web.page_edits.capture`).
 STRUCTURE_KEY = "structure"
+CHOICE_ORIGINS = {CHOICE_ORIGIN: CHOICE_KEY, WITNESS_ORIGIN: WITNESS_KEY}
 
 
 def snapshot(fix: Fix) -> dict[str, Any]:
@@ -455,9 +461,15 @@ def describe_failed(checks: list[Check]) -> str:
     return f"{sentences} ({'; '.join(e.code for e in explained)})"
 
 
-def offered_latex(element: Element | None, fix: Fix) -> set[str]:
-    """The whole LaTeX each of a second reader's choices on the card would give (none unless
-    the choices are for the fix's current reading: `ReadingAlternatives.latex`)."""
+def offered_latex(
+    element: Element | None, fix: Fix, origin: str = CHOICE_ORIGIN, *, witness: bool = True
+) -> set[str]:
+    """The whole LaTeX each choice on the card would give for the form's `origin`: a second
+    reader's (none unless the choices are for the fix's current reading:
+    `ReadingAlternatives.latex`) or the page witness's other reading (`witness`: the page
+    witness is on)."""
+    if origin == WITNESS_ORIGIN:
+        return reading_chips.offered_witness_latex(fix, enabled=witness)
     reading = element.alternatives if element is not None else None
     if reading is None or fix.equation is None or fix.equation.latex != reading.latex:
         return set()
@@ -475,8 +487,12 @@ def apply_review(
     form: Mapping[str, str],
     *,
     anyway: bool = False,
+    witness: bool = False,
 ) -> ReviewChange:
     """Apply one decision to `result` in place. Raises LookupError or ReviewInvalid.
+
+    `witness`: the page witness is on (`FEATURE_PAGE_WITNESS`), so an edit that is its other
+    reading can be recorded as a choice of it.
 
     `anyway`: the reviewer chose "Use my edit anyway" for LaTeX that differs from the
     PDF's text where it changes the meaning (`web.edit_check`); the failed checks stay
@@ -496,7 +512,12 @@ def apply_review(
         raise ReviewInvalid([FieldError(field_id("actions", element_id), "Choose an action.")])
     element = next((e for e in result.elements if e.id == element_id), None)
     before = snapshot(fix)
-    offered = offered_latex(element, fix) if action == "edit" else set()
+    origin = form.get("origin", "")
+    offered = (
+        offered_latex(element, fix, origin, witness=witness)
+        if action == "edit" and origin in CHOICE_ORIGINS
+        else set()
+    )
     warnings: list[Check] = []
     note = ""
     if action == "accept" and not has_proposal(fix):
@@ -537,13 +558,8 @@ def apply_review(
     after = snapshot(fix)
     if overridden:
         after[ANYWAY_KEY] = True  # the ReviewEdit records the explicit choice
-    if (
-        offered
-        and form.get("origin") == CHOICE_ORIGIN
-        and fix.equation is not None
-        and fix.equation.latex in offered
-    ):
-        after[CHOICE_KEY] = True
+    if offered and fix.equation is not None and fix.equation.latex in offered:
+        after[CHOICE_ORIGINS[origin]] = True
     return ReviewChange(
         fix=fix,
         action=action,

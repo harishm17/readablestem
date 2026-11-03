@@ -36,6 +36,14 @@ a changed state or arrow, a neighbour word in a formula, a reaction cut short; m
 too. Any failed text-layer check on a cheap-model answer, a cosmetic one included,
 escalates to the main model.
 
+With `EQUATION_GLYPH_CHECKS` the glyphs under the box and beside it are kept with the element
+(`Element.glyphs`) and two things are added. A reading that goes on past the box (the line
+context's) is compared with the glyphs it covers, not the box's text (`reading_layer`,
+`text_layer_compare.extend_text_layer`): every check below uses that layer. And the style of each
+letter in the reading's LaTeX is compared with its glyph's font (`glyph_style_check`: italic
+against upright, bold against bold italic, script, double-struck): the meaning-level
+`glyph_style_mismatch`. Without the setting nothing here changes.
+
 Course notation (`pipeline.notation_memory`, with `FEATURE_NOTATION_MEMORY` on and the
 job's course list in the run's options): the list goes to the model as a fenced block
 of the untrusted context, under a prompt version of its own (`NOTATION_PROMPT_NAME`;
@@ -71,6 +79,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -85,6 +94,7 @@ from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.models.prompts import load_prompt
 from readablestem.pipeline import (
     equation_images,
+    flag_policy,
     layout,
     notation_memory,
     page_math,
@@ -94,7 +104,13 @@ from readablestem.pipeline.chem import expand_ce as chem_expand_ce
 from readablestem.pipeline.chem_check import compare_species
 from readablestem.pipeline.signs import compare_signs
 from readablestem.pipeline.speech import SpeechError, mathml_to_speech
-from readablestem.pipeline.text_layer_compare import compare_case, numbers_differ
+from readablestem.pipeline.text_layer_compare import (
+    Glyph,
+    compare_case,
+    compare_letter_styles,
+    extend_text_layer,
+    numbers_differ,
+)
 from readablestem.pipeline.validate import (
     LatexConversionError,
     check_latex,
@@ -380,17 +396,23 @@ def drop_neighbour_marks(latex: str, text_layer: str | None) -> str:
 _MATHBF_LETTER = re.compile(r"\\mathbf\s*\{\s*([A-Za-z])\s*\}")
 
 
-def restyle_bold_italic(latex: str, text_layer: str | None) -> str:
+def restyle_bold_italic(latex: str, text_layer: str | None, glyphs: Sequence[Glyph] = ()) -> str:
     r"""`\mathbf{x}` written `\boldsymbol{x}` for a letter the PDF draws in a bold italic font.
 
     A crop shows a bold vector as bold; whether it is upright (`\mathbf`, CMBX) or italic
     (`\boldsymbol`, `\bm`, CMMIB) is small, and every reading says `\mathbf`. The layout
     step writes the text layer's bold-italic letters as bold-italic code points, so the
-    letter's face is known. A letter drawn in both faces is left as the model wrote it."""
+    letter's face is known. A letter drawn in both faces is left as the model wrote it.
+    `glyphs` (`Element.glyphs`, with `EQUATION_GLYPH_CHECKS`) say the face of every letter,
+    including those of a font whose name the text layer does not call bold italic
+    (`LMMathItalic10-Bold`: bold and italic flags), and are used instead of the text."""
     if not text_layer or "\\mathbf" not in latex:
         return latex
     faces: dict[str, set[str]] = {}
-    for ch in text_layer:
+    for ch, style in glyphs:
+        if style in ("bold", "bold-italic"):
+            faces.setdefault(base_char(ch), set()).add(style)
+    for ch in text_layer if not faces else "":
         variant = char_variant(ch)
         if variant in ("bold", "bold-italic"):
             faces.setdefault(base_char(ch), set()).add(variant)
@@ -830,6 +852,51 @@ def _speech(mathml: str, spoken: dict[str, str] | None = None) -> tuple[str, Che
     )
 
 
+# A letter's style in the reading differs from the glyphs it covers (italic against upright,
+# bold against bold italic, plain against script or double-struck): meaning-level.
+GLYPH_STYLE_CODE = "glyph_style_mismatch"
+GLYPH_STYLE_CHECK = "equation.glyph_style"
+
+
+@dataclass(frozen=True)
+class TextLayer:
+    """The text layer a reading is compared with: the span's text, or the text of the glyphs the
+    reading covers when it reaches past the span (`extended`), and the style of each glyph."""
+
+    text: str | None
+    glyphs: tuple[Glyph, ...] = ()
+    extended: bool = False
+
+
+def reading_layer(element: Element, mathml: str) -> TextLayer:
+    """The text layer to compare `mathml` with: the element's own text, except that an inline
+    reading that goes on past the span, as a reading of the line does (`equation_line.md`:
+    `T = 2\\pi` boxed, `\\sqrt{m/k}` after it), is compared with the glyphs it covers
+    (`extend_text_layer`). Every text-layer check of one reading goes through this, the
+    step's, a reviewer's edit (`web.edit_check`) and the review screen's table (`web.compare`),
+    so they never disagree about what the PDF says."""
+    context = element.glyphs
+    if context is None:
+        return TextLayer(element.text)
+    span = context.span_glyphs
+    if context.before or context.after:
+        extent = extend_text_layer(
+            element.text, mathml, span, context.before_glyphs, context.after_glyphs
+        )
+        if extent is not None:
+            return TextLayer(extent.text, extent.glyphs, True)
+    return TextLayer(element.text, span)
+
+
+def glyph_style_check(layer: TextLayer, latex: str) -> Check | None:
+    """The failed check when a letter's style in `latex` differs from the glyphs of `layer`
+    (`text_layer_compare.compare_letter_styles`), else None. Not made for the equation that
+    says nothing about styles."""
+    if not layer.glyphs or not compare_letter_styles(layer.glyphs, latex):
+        return None
+    return Check(name=GLYPH_STYLE_CHECK, passed=False, severity="warning", code=GLYPH_STYLE_CODE)
+
+
 def _evaluate(
     output: EquationOutput | None,
     calls: list[ModelCall],
@@ -844,7 +911,8 @@ def _evaluate(
     candidate = _Candidate(output, calls, confidence=output.confidence)
     if not output.is_equation:
         return candidate
-    candidate.latex = restyle_bold_italic(read_latex(output.latex), element.text)
+    span = element.glyphs.span_glyphs if element.glyphs is not None else ()
+    candidate.latex = restyle_bold_italic(read_latex(output.latex), element.text, span)
     if display == "inline":
         candidate.latex = strip_trailing_punctuation(candidate.latex)
         candidate.latex = drop_neighbour_brackets(candidate.latex, element.text)
@@ -856,9 +924,10 @@ def _evaluate(
     candidate.checks.append(speech_check)
     meaning = False  # a meaning-level difference from the text layer
     mismatch = False  # the strong symbol mismatch: the text layer is no use for signs
-    differ = text_layer_symbols_differ(element.text, candidate.mathml)
+    layer = reading_layer(element, candidate.mathml)
+    differ = text_layer_symbols_differ(layer.text, candidate.mathml)
     if differ is not None:
-        similarity = text_layer_similarity(element.text, candidate.mathml)
+        similarity = text_layer_similarity(layer.text, candidate.mathml)
         mismatch = similarity is not None and similarity < TEXT_LAYER_MISMATCH_BELOW
         # A strong mismatch (likely a hallucination) also lowers the confidence; any
         # other difference in the symbols (a wrong digit, a misread Greek letter) keeps
@@ -878,11 +947,11 @@ def _evaluate(
     if differ is False:
         # The letters and digits agree as multisets: are the numbers the same numbers,
         # and the capitals the same capitals?
-        extra = text_layer_number_case_checks(element.text, candidate.mathml)
+        extra = text_layer_number_case_checks(layer.text, candidate.mathml)
         candidate.checks.extend(extra)
         meaning = any(not c.passed for c in extra)
     style = text_layer_style(
-        element.text,
+        layer.text,
         candidate.mathml,
         regular_letters=element.regular_letters,
         course_bold=course_bold,
@@ -902,13 +971,19 @@ def _evaluate(
             )
         )
         meaning = meaning or style == "meaning"
+    # Letter styles the text of the layer cannot show (italic against upright, bold against
+    # bold italic): from the glyphs' fonts. Only when the symbols agree and the text-based
+    # style check has not asked already.
+    if differ is False and style != "meaning":
+        glyph_style = glyph_style_check(layer, candidate.latex)
+        if glyph_style is not None:
+            candidate.checks.append(glyph_style)
+            meaning = True
     # Signs and relations: only against a text layer whose letters and digits mostly
     # agree with the transcription (it has some, and no strong mismatch), so a garbled
     # layer or a different equation never adds a sign flag on top.
     signs = (
-        compare_signs(element.text, candidate.mathml)
-        if differ is not None and not mismatch
-        else None
+        compare_signs(layer.text, candidate.mathml) if differ is not None and not mismatch else None
     )
     if signs is not None:
         candidate.checks.append(
@@ -923,7 +998,7 @@ def _evaluate(
     # Chemistry: the species (formulas with their counts, charges and states) and arrows of
     # the text layer against the reading's, in order. Only a text layer with chemistry
     # evidence is asked, and not one the symbol check already found to be another equation.
-    species = None if mismatch else compare_species(element.text, candidate.mathml)
+    species = None if mismatch else compare_species(layer.text, candidate.mathml)
     if species is not None:
         candidate.checks.append(
             Check(
@@ -1345,6 +1420,8 @@ def transcribe(
     outcome = _escalation_outcome(first, reread, skipped)
     if outcome is not None:
         fix = fix.model_copy(update={"escalation": outcome})
+    if settings.flag_policy:
+        fix = flag_policy.apply(fix, text=element.text)
     if other is not None and fix.equation is not None:
         fix = fix.model_copy(
             update={

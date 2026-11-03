@@ -1443,7 +1443,7 @@ def review_action(
         "long_description": long_description,
         "remove_data_table": remove_data_table,
         "description": description,
-        "origin": origin,  # a second reader's choice pressed on the card (`CHOICE_ORIGIN`)
+        "origin": origin,  # a choice pressed on the card (`review.CHOICE_ORIGINS`)
     }
     form = {name: value for name, value in sent.items() if value is not None}
     # "Use my edit anyway": an edit the reviewer chose to use although it differs from
@@ -1460,7 +1460,14 @@ def review_action(
             require_done(job)
             _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
-            change_made = apply_review(result, element_id, action, form, anyway=anyway)
+            change_made = apply_review(
+                result,
+                element_id,
+                action,
+                form,
+                anyway=anyway,
+                witness=ctx.settings.feature_page_witness,
+            )
             job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)

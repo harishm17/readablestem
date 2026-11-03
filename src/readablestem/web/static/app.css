@@ -430,8 +430,14 @@ code.latex { overflow-wrap: anywhere; }
 .chip-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; }
 .chip { min-height: 44px; min-width: 44px; font-weight: 600; max-width: 100%; white-space: normal; text-align: left; }
 .chip-said { color: var(--muted); overflow-wrap: anywhere; }
+/* The other reading of a typed equation (the page witness's): its formula sits in the same
+   framed row as the proposal, its button is a target of 44 px and wraps like the chips. */
+.other-reading .cmp-row { margin: 0.25rem 0 0; }
+.other-reading .speech { margin: 0.35rem 0 0.5rem; }
+.other-form { margin: 0.5rem 0 0.75rem; }
+.other-form .button-secondary { min-height: 44px; min-width: 44px; font-weight: 600; max-width: 100%; white-space: normal; text-align: left; }
 @media (forced-colors: active) {
-  .chip { border: 2px solid ButtonText; }
+  .chip, .other-form .button-secondary { border: 2px solid ButtonText; }
 }
 .unseen-line { color: var(--muted); margin: 0 0 0.75rem; font-size: 0.95rem; }
 .group-state { font-weight: 600; margin: 0.25rem 0 0; }

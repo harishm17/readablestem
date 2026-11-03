@@ -1534,6 +1534,25 @@ the results".
   outlined on the picture. A chosen reading is recorded as such in the review record
   (`ReviewEdit.after["second_reader_choice"]`, "Edited: chose the reading a second reader gave for
   one symbol"), only when the form says it was a choice and the LaTeX is one the card offered.
+  **The other reading** (a typed equation whose page witness read it differently,
+  `FEATURE_PAGE_WITNESS`; `EquationFix.other_latex`, `web/reading_chips.py` `other_reading_for`, docs/steps.md "Page
+  witness"): under the proposal, "The other reading" says why the item is asked (a second reading of the whole
+  page read the formula differently; which one is the proposal; when the check is `witness_extent_differs`, that
+  its boundaries differ too), shows the other reading's formula in the same framed row as the proposal ("Other
+  reading of equation 3", focusable, scrolls sideways), how it is read aloud, and **Use the other reading**. Where
+  it differs from the proposal in a few symbols (`reading_alternatives.from_reading`) the same chips as above
+  follow, "Where the proposal above has `x` (said "x"), the other reading had:", the same
+  `_chips` code, so typed and handwritten cards behave alike (one differing symbol is the whole reading: no
+  chip repeats the button). Same rules as the chips: submit buttons of small forms (`action=edit`, the whole LaTeX
+  the choice gives, form `origin=page_witness_choice`), nothing selected, before the edit box in tab order, 44 CSS px
+  targets, forced-colors border, ordinary checks. A choice the PDF's own text contradicts is refused like a typed
+  edit, with the usual "Use my edit anyway". Shown only while the decision is open, only when the other reading
+  converts and differs from the proposal, and never with the flag off. The reading belongs to the proposal it
+  was made against: an edit replaces the equation (it is gone), an Undo brings both back. Recorded as
+  `ReviewEdit.after["page_witness_choice"]` ("Edited: chose the other reading of this equation") only when
+  the form says so and the LaTeX is one the card offered (`review.offered_latex`). A formula only the page witness
+  read (`witness_added`) has no other reading, so it shows its check's sentence and nothing more. Tests:
+  `tests/test_web_review_other_reading.py`, `tests/test_web_review_other_reading_browser.py`.
   Items read from an image of a page (`IMAGE_PAGE_REASON`) are never part of a bulk accept
   ("Accept all equations ...", "Accept all clean tables"): `bulk_accept.is_bulk_candidate` and
   `review.is_clean_table` leave them out whatever their checks say (ADR 0007, point 12). Tests: `tests/test_web_review_chips.py`,
@@ -1672,7 +1691,7 @@ plain ω where the PDF has a bold one, was saved without a word and the warning 
 for the decision went away. Now an edit gets what the equation step runs on a proposal:
 the same cleaning, the LaTeX validators, the conversion, the MathML checks, the spoken
 version, and the cross-checks against the PDF's own text (letters, digits and Greek
-letters; letter styles, such as a vector's bold; signs and relations), with the step's
+letters; letter styles, such as a vector's bold, and with `EQUATION_GLYPH_CHECKS` the style of each letter against its glyph's font; signs and relations; a reading that goes on past the box is compared with the glyphs it covers, `docs/steps.md`), with the step's
 check names and codes. With FEATURE_NOTATION_MEMORY and a job read for a course, the
 check runs with that course's notation in force (`web.notation.in_force`, the options
 the run had): a letter the course writes bold is evidence for the style check where the
@@ -1684,7 +1703,7 @@ as for the proposal. What fails is said in plain words, in three kinds:
   ("Your LaTeX was not saved. It has one more { than }: add the missing }.", "\omegaa is
   not a command this tool supports");
 - *differs from the PDF where that changes the meaning* (the codes that make a proposal a
-  required decision: `symbol_mismatch`, `text_layer_mismatch`, `style_mismatch`,
+  required decision: `symbol_mismatch`, `text_layer_mismatch`, `style_mismatch`, `glyph_style_mismatch`,
   `sign_mismatch`, `number_mismatch`, `case_mismatch`, `species_mismatch`): not used. The card says what differs, in the compare table's words
   ("The ω is bold in the PDF (a vector) but plain in your edit."), and offers **Use my
   edit anyway** (the PDF's text is sometimes wrong). Choosing it saves the edit with the
