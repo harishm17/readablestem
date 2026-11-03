@@ -31,14 +31,20 @@ from readablestem.pipeline.chem_check import compare_species
 # step always agree (and pipeline/equation_step.py needs no change for the screen).
 from readablestem.pipeline.equation_step import (
     LETTER_STYLES,
+    TextLayer,
     _layer_letters,
     _letter_verdict,
     _LetterStyles,
     _MathLetters,
     _mathml_letters,
     _symbol_bag,
+    reading_layer,
 )
-from readablestem.pipeline.text_layer_compare import compare_case, numbers_differ
+from readablestem.pipeline.text_layer_compare import (
+    compare_case,
+    compare_letter_styles,
+    numbers_differ,
+)
 
 BBox = tuple[float, float, float, float]
 
@@ -167,7 +173,9 @@ def compare_equation(
     out = EquationCompare()
     if element is None or fix.kind is not Kind.EQUATION or fix.equation is None:
         return out
-    text = element.text or ""
+    # The glyphs the reading covers when it goes on past the span, as the step reads them.
+    layer = reading_layer(element, fix.equation.mathml)
+    text = layer.text or ""
     if not any(ch.isalnum() for ch in text):
         return out
     try:
@@ -245,12 +253,43 @@ def compare_equation(
         # The letters and digits agree as multisets: the step then asks whether the
         # numbers are the same numbers and the capitals the same capitals.
         _numbers_and_case(out, sentences, text, fix.equation.mathml, other)
+        _glyph_styles(out, sentences, layer, fix.equation.latex, other)
     _species(out, sentences, text, fix.equation.mathml, other)
     if sentences:
         out.summary = min(sentences, key=lambda s: s[0])[2]
     for _, about, sentence in sorted(sentences, key=lambda s: s[0]):
         out.said.setdefault(about, []).append(sentence)
     return out
+
+
+_STYLE_WORDS = {"bold-italic": "bold italic"}
+
+
+def _glyph_words(counts: tuple[tuple[str, int], ...]) -> str:
+    return _join([_STYLE_WORDS.get(style, style) for style, _ in counts])
+
+
+def _glyph_styles(
+    out: EquationCompare,
+    sentences: list[tuple[int, str, str]],
+    layer: TextLayer,
+    latex: str,
+    other: str,
+) -> None:
+    """The rows and sentences for `glyph_style_mismatch` (the step's `compare_letter_styles`):
+    a letter upright in the PDF and italic in the reading, bold against bold italic, plain
+    against script or double-struck. A letter the text-based style rows already name is left."""
+    named = {row.letter for row in out.rows if row.what == "Style"}
+    for row in compare_letter_styles(layer.glyphs, latex):
+        if row.letter in named:
+            continue
+        pdf, got = _glyph_words(row.pdf), _glyph_words(row.reading)
+        out.rows.append(DiffRow("Style", _shown(row.letter, pdf), pdf, got, True, row.letter))
+        out.pdf_marks.add(row.letter)
+        out.proposal_marks.add(row.letter)
+        sentences.append(
+            (0, "style", f"The {row.letter} is {pdf} in the PDF but {got} in {other}.")
+        )
 
 
 MAX_SPECIES_ROWS = 6  # rows of the table, and the first three get a sentence

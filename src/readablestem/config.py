@@ -110,6 +110,12 @@ class Settings(BaseSettings):
     # of a relation on a line object of its own), the author's formula is not. Off until a
     # registered real-world test says otherwise (docs/eval-equation-round3.md).
     equation_line_context: bool = False
+    # The glyphs of an equation are read with it (`layout.line_glyphs`, `Element.glyphs`): a
+    # reading that reaches past the box (the line context's) is checked against the glyphs it
+    # covers, not the box's text, and each letter's style in the reading (italic, upright, bold,
+    # bold italic, script, double-struck) against the glyph's font. Off until the review load it
+    # adds has been looked at (docs/steps.md, "Letter styles from the glyphs").
+    equation_glyph_checks: bool = False
     # A figure crop is scaled down to this many pixels on its long side before it goes to the
     # model (T3-24); review and the HTML keep the full crop. None: sent as it is.
     figure_model_max_edge_px: int | None = Field(default=None, ge=256)

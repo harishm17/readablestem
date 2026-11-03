@@ -902,6 +902,24 @@ class _Run:
             log.warning("line crop failed: %s", type(exc).__name__)
             return None
 
+    def read_glyphs(self, element: Element) -> None:
+        """Keep the glyphs under an equation and beside it with the element, when the setting
+        is on (`Element.glyphs`): the evidence of every check of a reading against the PDF.
+        The neighbours are only read for an inline equation read with its line."""
+        if not (self.settings.equation_glyph_checks and element.kind is Kind.EQUATION):
+            return
+        if element.glyphs is not None or not element.text:
+            return
+        reach = self.settings.equation_line_context and element.display == "inline"
+        parent = self.parents.get(element.parent_id or "")
+        across = (parent.bbox[0], parent.bbox[2]) if parent is not None else None
+        try:
+            glyphs = layout.line_glyphs(self.pdf_bytes, element, across, reach=reach)
+        except Exception as exc:
+            log.warning("glyph read failed: %s", type(exc).__name__)
+            return
+        element.glyphs = glyphs
+
     def crop_and_submit(self, element: Element) -> None:
         self.raise_if_fatal()
         try:
@@ -929,6 +947,7 @@ class _Run:
             return
         self.raise_if_fatal()  # a step may have failed while this element was being cut
         line_png = self.line_crop(element)
+        self.read_glyphs(element)
         if self.cache is not None:
             key = step_key(
                 element,
