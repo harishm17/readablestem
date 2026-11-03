@@ -19,11 +19,11 @@ The site is at readablestem.com.
 handwriting are converted only when you ask, by reading each page's picture with a model, so
 every converted equation and table is for a person to check and the original page stays in the
 file; without that request those pages are kept as images and flagged. It is not a general PDF-to-Markdown
-converter, and it does not work from Word, LaTeX or PowerPoint sources: it starts from the
-PDF.
+converter, and it does not work from LaTeX sources: it starts from the PDF (a Word or
+PowerPoint file is first turned into a PDF, on a server set up for that).
 
-**Status.** Beta. The service is live at https://readablestem.com as a free beta run by Harish
-Manoharan. Anyone with a Google account can sign in and try it (the beta runs `SIGNUP_MODE=open`;
+**Status.** Beta. The service is live at https://readablestem.com as a free beta built and maintained by
+Harish Manoharan. Anyone with a Google account can sign in and try it (the beta runs `SIGNUP_MODE=open`;
 the code's default is `allowlist`, invitation only), with daily limits for new accounts; the demo
 needs no sign-in. The code, the evaluation harness and the documentation
 are here. `uv run readablestem ops launch-check` lists the checks a deploy has to pass.
@@ -431,8 +431,8 @@ order of events can be checked.
 ## Licence
 
 The code is MIT ([LICENSE](LICENSE)). The hosted service links PyMuPDF, which is AGPL-3.0, so
-the service is offered under AGPL-3.0 terms and links this repository's complete source in
-every page footer. OpenStax material used as answer keys, in the demo and in test fixtures is
+the service is offered under AGPL-3.0 terms and links this repository's complete source from
+the "Source code" link in every page footer; the licence is also on the Terms page. OpenStax material used as answer keys, in the demo and in test fixtures is
 CC BY 4.0 with attribution; documents under `data/authored/` are MIT. The full list of which
 files are under which licence, and the third-party packages, is in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). ReadableSTEM is not affiliated with or

@@ -49,6 +49,7 @@ from readablestem.pipeline.validate import ALT_WARN_CHARS
 from readablestem.web import (
     bulk_accept,
     events,
+    inventory,
     marks,
     notation,
     notice_places,
@@ -1369,6 +1370,7 @@ def split_page(
         "list_url": f"/jobs/{builder.job_id}/review/list",
         # Accept many at once (web.bulk_accept): links to the page that lists them.
         "bulk_offers": bulk_accept.offers(builder.result),
+        "symbols_offer": inventory.handwritten_count(builder.result),
         "max_steps": MAX_STEPS,
         "result_version": builder.version,
         "stale": stale_notice(

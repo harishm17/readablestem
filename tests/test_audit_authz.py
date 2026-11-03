@@ -34,6 +34,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/privacy"): PUBLIC,
     ("GET", "/terms"): PUBLIC,
     ("GET", "/limits"): PUBLIC,
+    ("GET", "/for-accessibility-offices"): PUBLIC,
+    ("GET", "/for-accessibility-offices/summary"): PUBLIC,
     ("GET", "/help/posting"): PUBLIC,
     ("GET", "/guides"): PUBLIC,
     ("GET", "/guides/ada-title-ii-stem-course-materials"): PUBLIC,
@@ -100,6 +102,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/download"): USER,
     ("GET", "/jobs/{job_id}/download/canvas"): USER,  # the same file, packaged for Canvas
     ("GET", "/jobs/{job_id}/download/cartridge"): USER,  # T3-8: the same file as a cartridge
+    ("GET", "/jobs/{job_id}/download.docx"): USER,  # W3: the same file as Word
+    ("GET", "/jobs/{job_id}/download.epub"): USER,  # W3: the same file as an EPUB
     ("GET", "/jobs/{job_id}/combine"): USER,  # T3-3: the finished parts of a source, joined
     ("GET", "/jobs/{job_id}/draft"): USER,
     ("GET", "/jobs/{job_id}/feedback"): USER,
@@ -137,7 +141,10 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/review/{element_id}/check"): USER,
     ("GET", "/jobs/{job_id}/status"): USER,
     ("POST", "/jobs/{job_id}/retry"): USER,  # T3-1: CSRF, owner only, rate limited, tries capped
-    ("POST", "/jobs/{job_id}/title"): USER,  # T1-7: CSRF, owner only, not rate limited
+    ("POST", "/jobs/{job_id}/title"): USER,
+    # H11: the Symbols screen; the POST is a review write (CSRF, owner only, version-checked)
+    ("GET", "/jobs/{job_id}/symbols"): USER,
+    ("POST", "/jobs/{job_id}/symbols"): USER,  # T1-7: CSRF, owner only, not rate limited
     ("POST", "/jobs/{job_id}/undo"): USER,
     ("GET", "/jobs/{job_id}/view"): USER,
     # T3-3: a large file kept while its owner chooses the pages; owner only like a job

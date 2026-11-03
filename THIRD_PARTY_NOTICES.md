@@ -36,8 +36,8 @@ the repository (LaTeX, HTML, python-docx or a script) with invented text; the on
 OpenStax PDF is the demo's `source.pdf`.
 
 The hosted service links PyMuPDF (AGPL-3.0), so the combined work, when run as a network
-service, is offered under the AGPL-3.0 terms through the source link in every page
-footer. The code in this repository stays MIT. See
+service, is offered under the AGPL-3.0 terms through the "Source code" link in every page
+footer, and the Terms page says so (`/terms#open-source`). The code in this repository stays MIT. See
 `docs/decisions/0003-pdf-library-agpl.md`.
 
 ## Third-party packages
@@ -59,6 +59,8 @@ add-on (AGPL-3.0), and psycopg (LGPL-3.0, used unmodified as a dependency):
 | TexTeller model (OleehyO, github.com/OleehyO/TexTeller; ONNX export in huggingface.co/OleehyO/TexTeller) | Apache-2.0 (code and weights, per the repository and the model card) | Optional local handwriting reader. Fetched at image build only when `INSTALL_MATH_READER=true`, at a pinned revision, each file checked against its SHA-256, the ONNX files rewritten with int8 weights (`src/readablestem/models/math_readers/local_weights.py`); not in this repository. Its handwritten training data comes from public sets, some non-commercial: `docs/math-readers.md`, "The local reader". |
 | RapidTable 3.0.2 (RapidAI; code from PaddleOCR's PP-Structure) | Apache-2.0 | The pre- and post-processing around SLANet-plus, vendored with changes as `src/readablestem/pipeline/vendor/rapid_table.py`, with its licence (`rapid_table-LICENSE.txt`) and notice (`rapid_table-NOTICE.txt`). Source: https://github.com/RapidAI/RapidTable. |
 | NumPy, Pillow, networkx, flatbuffers | BSD-3-Clause (NumPy, networkx), MIT-CMU (Pillow), Apache-2.0 (flatbuffers) | NumPy and Pillow prepare the image for SLANet-plus; networkx (used by the layout add-on) and flatbuffers (by onnxruntime) come in with them. |
+| pandoc (John MacFarlane and contributors) | GPL-2.0-or-later | Writes the Word download (`src/readablestem/pipeline/export_docx.py`): it reads the finished HTML and its MathML and writes a `.docx` with Office Math equations. Installed in the Docker image from the Debian package, and only ever run as a separate program (not linked, not modified, not shipped with this repository), so the project's own licences are not affected. Source: https://github.com/jgm/pandoc. Without it the app offers no Word download. |
+| python-docx 1.2 (Steve Canny) and lxml | MIT (python-docx), BSD-3-Clause (lxml) | A development dependency only (`dev` group): the tests open the Word file with it. Not installed in the Docker image. |
 | Docling, MinerU, PyMuPDF4LLM (the parsers compared in `proof/parsers`) | MIT (Docling), the MinerU Open Source License (Apache-2.0 plus extra terms: credit MinerU), AGPL-3.0 (PyMuPDF4LLM) | Used only by `proof/parsers`, a separate uv project with one environment per tool outside this repository. They are not dependencies of the app or of its Docker image. Versions and licences: `proof/parsers/README.md`. |
 | axe-core 4.14.0 (Deque Systems) | MPL-2.0 (bundles MIT-licensed code) | Vendored, unmodified, as `src/readablestem/pipeline/vendor/axe.min.js` with its licence files; runs in headless Chromium to check generated HTML. Source: https://github.com/dequelabs/axe-core. Version and checksums: `src/readablestem/pipeline/vendor/README.md`. |
 | htmx 2.0.11 (Big Sky Software) | 0BSD | Vendored, unmodified, as `src/readablestem/web/static/vendor/htmx-2.0.11.min.js`; progressive enhancement only (pages work without JavaScript). Version and checksum: `src/readablestem/web/static/vendor/README.md`. |

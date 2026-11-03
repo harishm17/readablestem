@@ -19,6 +19,59 @@
 - Tests: `tests/test_layout_slides.py` and `tests/fixtures/layout/latex/slides_steps.tex` with its
   PDF; six of the strict xfails of `tests/test_layout_beamer_math.py` now pass (one test was reworded: a frame's title is a heading once). The pipeline
   version is not bumped here.
+## Unreleased: symbol inventory (branch hw/symbol-inventory)
+
+- Symbols screen (`GET/POST /jobs/{id}/symbols`, `web/inventory.py`, `routes/inventory.py`): for a document
+  with handwritten equations, every symbol read in them grouped with the ones that look alike, with counts,
+  small pictures and places; one symbol can be changed to another of its family everywhere at once, with
+  checkboxes to leave places out. Applied as one write through the edit checks per equation, never an accept
+  (each equation stays a required decision), one `relabel` review record per equation shown as one row in the
+  review record, one Undo. Linked from the review screen and the list view. docs/web.md, docs/eval-handwriting.md.
+## Unreleased: Word and EPUB downloads (branch export/word-and-buttons)
+
+- Word export (`pipeline/export_docx.py`, `readablestem export docx FILE.html OUT.docx`): the finished HTML through
+  pandoc in a child process (60 s, minimal environment, CPU, size and heap limits), then checked and fixed in
+  `word/document.xml`. Equations are native Word equations (OMML; the file must hold as many as the HTML has
+  `<math>`, else the export fails), headings are Heading 1 to 6, each picture's alt text is written where Word reads it
+  (pandoc wrote the picture's address there), a table's header row repeats and is marked `w:tblHeader`, lists and links
+  are Word's, the language and title are set, a long description follows its figure, page markers are left out and a
+  figure without a picture is paragraphs, not a layout table. Remote pictures, scripts and forms are not carried
+  (the same sanitiser as the EPUB). docs/output.md, "The Word export".
+- `GET /jobs/{id}/download.docx` and `/download.epub` (`web/routes/exports.py`) and an "Other file types" block on the
+  job page's finish line (plain links; the Word one only when pandoc is installed). Both follow the HTML download:
+  owner only, clock restarts, recorded as a download (with the decisions that were open), and offered only when no
+  decision is open. At most two Word files are made at once; a third request waits up to 20 s, then gets a 503 asking
+  to try again. "Download all" stays HTML only.
+- Usage events: a `download_format` event (`html`, `canvas`, `cartridge`, `docx`, `epub`) beside each `downloaded`; the
+  review record and its CSV list the file types downloaded, and its "what was not checked" says nobody has checked the
+  Word and EPUB files in Word or a reading app.
+- Fix: the Canvas zip and the Common Cartridge downloads did not restart the deletion clock, though docs/security.md
+  says a download does; they do now. The two questions after a download also open for the Common Cartridge link.
+- Docker image: pandoc from the distribution (about 200 MB on disk), always installed; `python-docx` joins the dev
+  group for the tests; THIRD_PARTY_NOTICES.md lists both.
+## Unreleased: wording and a page for accessibility offices (branch trust/wording-and-offices)
+
+- Copy: the "individual developer" and "not a company or a university" framing is gone from the landing, privacy,
+  terms and login pages, `llms.txt` and the README; the landing page has an About block ("Built and maintained by
+  Harish Manoharan. The code is open source."). The listed strings are in the pull request.
+- Licence wording (ADR 0003 addendum): the PyMuPDF/AGPL sentence moved from every footer to the Terms
+  ("Open source", `/terms#open-source`); the footer keeps the "Source code" link and gains an "Open source" link.
+  The demo and showcase notes link the source without the sentence.
+- New public page `/for-accessibility-offices` (`web/offices.py`): data flow with a text equivalent, the
+  companies that receive data (from `web/recipients.py`, as `/privacy`), retention from the settings, no training
+  and `store`, student records (FERPA), what the tool does not do, a pilot checklist, and a one-page summary to
+  download (`/for-accessibility-offices/summary`). Footer link, sitemap, `llms.txt`.
+- `docs/vendor-information.md` refreshed: current accuracy numbers with sample size, scanned and handwritten
+  pages, files, no conformance report, no claim of conformance (kept under 900 words).
+## Unreleased: page witness, why it changed nothing (branch eq/witness-diagnosis)
+
+- Page witness (off: `FEATURE_PAGE_WITNESS`): when the crop's reading and the witness's tie on the letters, digits
+  and Greek letters of the glyphs (23 of the 24 disagreements of the E1 dev run did, so the crop's reading always
+  stayed), the slashes in the glyphs now break the tie (`witness_reconcile.marks_dice`): a written `-2/3` beats a
+  drawn fraction, and the other way round. Both readings are still shown and the formula is still a required
+  decision. Re-scored on the recorded E1 answers (12 dev papers, 1,096 gold, $0): exact 0.753 to 0.755, silent
+  wrong 8.58 per 100 gold and decisions a page 4.35 unchanged. `scripts/eq_dev_run.py` has an offline arm
+  `witness-sonnet-r2` for it and passes the two flags `realworld_run` gained. docs/eval-equation-round5.md.
 
 ## Unreleased: page witness dev run (branch eq/e1-witness-dev)
 

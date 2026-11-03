@@ -273,3 +273,27 @@ def test_the_finish_line_downloads_in_one_click(site, browser, jobs):
     # The title's slug and the start of the job id (ux-a, MF24).
     assert download.value.suggested_filename.endswith(f"-{jobs['ready'][:6]}.html")
     context.close()
+
+
+def test_the_word_and_epub_buttons_download_in_one_click(site, browser, jobs):
+    """Plain links: they work without JavaScript, and the page does not move or ask first."""
+    from readablestem.pipeline import export_docx
+
+    context = browser.new_context(java_script_enabled=False)
+    page = context.new_page()
+    sign_in(page, site.base, ALICE)
+    page.goto(f"{site.base}/jobs/{jobs['ready']}")
+    ready = page.locator("#ready")
+    assert ready.get_by_role("heading", name="Other file types").is_visible()
+    expected = [("Download as EPUB", ".epub")]
+    if export_docx.available():
+        expected.insert(0, ("Download as Word (.docx)", ".docx"))
+    else:
+        assert ready.get_by_role("link", name="Download as Word (.docx)").count() == 0
+    for name, ending in expected:
+        link = ready.get_by_role("link", name=name)
+        assert link.get_attribute("href") == f"/jobs/{jobs['ready']}/download{ending}"
+        with page.expect_download() as download:
+            link.click()
+        assert download.value.suggested_filename.endswith(f"-{jobs['ready'][:6]}{ending}")
+    context.close()

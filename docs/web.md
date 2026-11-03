@@ -83,7 +83,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let the developer look (`web/retention.py`) |
 | `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`, compared in constant time. Required in production, at least 32 characters, or the purge would never run; the route also guards the daily paid canaries. Every call counts against the cron rate limit, wrong tokens included |
 | `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval |
-| `SOURCE_URL`, `CONTACT_EMAIL` | Footer source link (AGPL notice); contact on the 403, privacy and terms pages |
+| `SOURCE_URL`, `CONTACT_EMAIL` | Footer "Source code" link (the AGPL source offer; the licence sentence is on /terms, ADR 0003 addendum); contact on the 403, privacy and terms pages |
 
 ## Routes
 
@@ -93,6 +93,8 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET `/demo` | anyone | `web/static/demo/index.html` if present (served with the sandbox CSP, an `ETag` and `Cache-Control: public, max-age=3600`, and a 304 for a matching `If-None-Match`: "Security headers"), else a "being prepared" page |
 | GET `/guides` | anyone | The list of the guides below it, each with its summary and date (`seo.GUIDES`); in the sitemap, `llms.txt` and the footer |
 | GET `/privacy`, `/terms` | anyone | The beta wording, describing the real behaviour (hourly purge, Railway's daily backups kept about 6 days, Langfuse only when tracing is on). `readablestem ops launch-check` lists any unfinished wording left on the public pages |
+| GET `/for-accessibility-offices` | anyone | The page for an accessibility or procurement office (`web/offices.py`, `offices.html`): data flow (an SVG with a described list as its text equivalent), the companies that receive data (one row per entry of `web/recipients.py`, the list `/privacy` uses, so tracing and analytics appear only when on), retention from the settings, no training and the `store` setting (OpenAI path only), student records (FERPA), what the tool does not do, an eight-step pilot checklist. It makes no conformance claim (`tests/test_web_offices.py`). Linked from every footer, in the sitemap and `llms.txt` |
+| GET `/for-accessibility-offices/summary` | anyone | The same facts on one printable page, a self-contained HTML file sent as a download (`offices_summary.html`, inline style, no script, `VIEW_CSP`); not indexed |
 | GET `/limits` | anyone | Known limits: the facts that hold today (including tables, links, colour, language and file types, as this server is set up) and the measured accuracy |
 | GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make the HTML the main version and keep the PDF only as a labelled print copy (28 CFR 35.202, the DOJ fact sheet); check with your accessibility office; guidance, not legal advice |
 | GET `/status` | anyone | Service status: up, conversions open or paused for today, whether the AI service is answering (from this server's own last requests), documents waiting and converting (numbers only; 503 when the database does not answer) |
@@ -124,12 +126,16 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back); 409 with fewer than two such parts, 404 for another person's or an expired document |
 | GET `/jobs/{id}/download/canvas` | owner | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
 | GET `/jobs/{id}/download/cartridge` | owner | The same page as an IMS Common Cartridge 1.3 package, `.imscc` (`pipeline/export_cartridge.py`, docs/output.md "The Common Cartridge export"). Same errors and recording as the Canvas zip; a plain link on the job page |
+| GET `/jobs/{id}/download.docx` | owner | The document as a Word file with native equations (`pipeline/export_docx.py`, docs/output.md "The Word export"). The same rules as `/download`: another user's or an expired job is 404, one that is not done 409, the file is made again first when a review write left it out of date, the deletion clock restarts, and it is recorded as a download (code `open` when decisions were still open) with the file type `docx`. 503 when pandoc is not installed or two Word files are already being made; 409 with a plain page when the file cannot be made (the HTML stays available). A plain link under "Other file types" on the finish line, shown only when pandoc is installed |
+| GET `/jobs/{id}/download.epub` | owner | The document as an EPUB 3 publication (`pipeline/export_epub.py`). Same rules, errors and recording as the Word file (file type `epub`); a plain link under "Other file types" |
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation, figure or table |
 | GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | owner | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
 | GET `/jobs/{id}/review/list?kind=&page=` | owner | "All items as a list": every fix, grouped by kind; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below) |
 | GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept all remaining equations whose checks passed" or "Accept all figures that have generated alt text" would accept, its count, and the form that does it (404 for another kind) |
 | POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item that list shows, as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
+| GET `/jobs/{id}/symbols?view=` | owner | The Symbols screen of a document with handwritten equations: every symbol read in them, grouped with the ones that look alike, with counts and places ("Symbols in handwritten equations" below) |
+| POST `/jobs/{id}/symbols` | owner | Write one symbol as another of its family in every handwritten equation still waiting, except the places the form ticked; one write (CSRF, review `version` checked: 409 and nothing changed when the document changed since the page was drawn; 422 when no symbol, or one outside the family, is chosen); one Undo takes it back |
 | GET `/jobs/{id}/review/marks.css` | owner | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
 | GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond four renders in progress for one person (a review page asks for the page and up to three crops of a repeated-heading group at once), 503 when the instance's two render slots stay busy |
 | GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
@@ -697,7 +703,7 @@ file as an earlier upload of the same person; value: hours since), `finished` (c
 visit of 30 minutes), `decision_made` (code: `single`, `group` or `structure` for an edit to the words, a heading, an added region or a page left out, `bulk` in older rows; value: fixes
 changed), `review_completed` (the first time no decision is left open; value: seconds
 since it finished), `html_viewed` (once per visit), `downloaded` (code `open` or `done`:
-whether decisions were still open), and the two answers after a download, `will_post`
+whether decisions were still open), `download_format` (written with each `downloaded`; code `html`, `canvas`, `cartridge`, `docx` or `epub`, which the review record lists), and the two answers after a download, `will_post`
 and `minutes_saved`. Each row is a user id, a name, a job id, a code and a number
 (`events.make` refuses anything else; the column set is fixed by
 `tests/test_web_content_schema.py`). The fingerprint is an HMAC of the file's SHA-256
@@ -974,7 +980,8 @@ starts with a byte order mark so Excel reads non-English letters right. Its colu
 `section, item, page, tool_had, decision, by, when_utc, detail`, with the sections `document`,
 `summary`, `decision`, `open`, `not_converted`, `check` and `not_checked`.
 `docs/vendor-information.md` is the matching one-page sheet for a procurement office: what the
-tool does, what happens to a document, and where it falls short.
+tool does, what happens to a document, and where it falls short. The site's own page for such an
+office is `/for-accessibility-offices`; change the sheet and that page together.
 
 ## Spend cap (`web/spend.py`)
 
@@ -1321,7 +1328,8 @@ From top to bottom:
    decision as soon as the job finishes ("Start the review"), so it is one click from
    finished to deciding. With none open, **Ready to share** (BW1, MF9): "You made 3
    decisions on 9 October." (or "Nothing in this file needed your decision."), the
-   download as the main button, the student version, "Before you share" (read it
+   download as the main button, the student version, "Other file types" (plain links: "Download as Word (.docx)",
+   only when pandoc is installed, and "Download as EPUB"), "Before you share" (read it
    through; the notes, optional; what is not handled) and "Put it in your course"
    ("How to post it in your course" links the Canvas steps on `/help/posting`; upload it
    as a file and link it where the PDF was, as the main version, the PDF kept only as a
@@ -2323,6 +2331,52 @@ unknown code still gets a neutral sentence plus the code.
 and the review cards; `break-word` everywhere else), so no page scrolls sideways at 320
 CSS px. A table wider than the screen scrolls inside its own `.table-scroll` box, which
 is `position: relative` so the visually hidden button text in it cannot widen the page.
+
+#### Symbols in handwritten equations (`web/inventory.py`, `routes/inventory.py`, H11)
+
+A writer's notation is consistent, so a letter misread once is usually misread everywhere: an `x`
+read as `X`, a `p` read as `\rho`. The Symbols screen shows that pattern and fixes it at once. It is
+linked as "Symbols in the handwritten equations" under "All items as a list" on the review screen
+and in the list view, only while the document has handwritten equations.
+
+*What it lists.* Every equation item read from an image page (`IMAGE_PAGE_REASON`) that has a
+proposal, except on a page measured as a scan (`PageType.kind` `scan_*`: printed, not handwritten).
+Typed documents are not listed: their letters come from the PDF's text layer, not from a reading, so
+there is nothing to re-letter. Maths inside a paragraph read from a page image is part of that
+paragraph's text and is not listed. A symbol is found in the proposal's LaTeX by token: a letter, a
+Greek or similar command, and the digits and bars that can be taken for a letter (`1`, `0`, `2`, `5`,
+`6`, `9`, `|`). Words inside `\text{}` and similar commands are not symbols. Families
+(`inventory.FAMILIES`) are the look-alikes: x X × χ, p P ρ, l 1 I | ℓ, z Z 2 ζ, u U μ, v V ν, w W ω,
+o O 0, s S 5 σ, and so on; families with more than one symbol read come first, then the rest, then
+"Other symbols". Each symbol has its name in words ("small x", "capital X", "Greek rho"), how often
+it was read and in how many equations, and a list of every place under a fold: the equation's small
+picture, a link to its card, the LaTeX with the symbol marked, and "the 2nd one in it" when it
+stands more than once. Places in equations already decided are listed as "Already decided: not
+changed."
+
+*The change.* One form per symbol: a select with the other symbols of its family (nothing chosen
+beforehand; the server refuses anything else), a checkbox "Leave this one as it is" on each place,
+and "Change all ...". `POST /jobs/{id}/symbols` goes through `routes/edits.write_review`: the job
+is locked, the review version must be the one the page was drawn at, and each equation still waiting
+is edited the way an ordinary edit is checked (`web.edit_check`: the LaTeX must convert and must not
+differ from the PDF's text where that changes the meaning). An equation that fails is left as it was
+and counted in the notice; the others change. It is one write, one re-render, one `ReviewEdit` per
+changed equation with action `relabel` and the mark `symbol_inventory` (from, to, how many), and one
+Undo (the screen's own notice has the button; Undo from it returns to the screen).
+
+*It never accepts.* A handwritten equation is a required decision (ADR 0007, point 12). The change
+edits the proposal only: the status, `review` and `reviewed` stay, and the checks that made the item a
+decision (`image_page.*`) are kept next to the new checks of the changed LaTeX. Each equation is still
+looked at on its card. The record shows the write as one row ("Changed small x to capital X in 7
+equations at once ... Each equation stayed waiting for a decision."), not one per equation.
+
+*What it does not do.* It does not look at the pictures: the small picture is the whole equation, not
+the symbol. It lists inline maths in prose no more than the review does. Typed (text-layer)
+equations are not part of it. Interface: the form is plain HTML (no script); the screen has
+44 px targets for the select, the fold, the button, each link and each "Leave this one as it is"
+label, a visible border in forced-colors mode, and the marked symbol is underlined, not only
+coloured. `tests/test_web_inventory.py` and `tests/test_web_inventory_browser.py` (keyboard only,
+axe at 1440 and 390 px, 44 px at 320 px, forced-colors) cover it.
 
 ## Security headers
 

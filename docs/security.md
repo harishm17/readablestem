@@ -87,7 +87,7 @@ cannot skip these checks unnoticed.
 
 | Class | Routes |
 |---|---|
-| Public | `/`, `/demo`, `/privacy`, `/terms`, `/limits`, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (names of late scheduled tasks only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
+| Public | `/`, `/demo`, `/privacy`, `/terms`, `/limits`, `/for-accessibility-offices` and its `/summary` download, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (names of late scheduled tasks only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
 | Signed-in user, owner only | `/account`, `/account/delete` (GET, POST), `/app`, `/app/documents`, `/app/download`, `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages), everything under `/courses/...` (including `/courses/{id}/download`) |
 | Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
 | Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), rate limited per address (`analytics`, 300 per 10 minutes), the visitor's address is not forwarded (PostHog sees the relay's own), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
@@ -99,7 +99,7 @@ The job page's three settings, `POST /jobs/{id}/title`, `/contact` and `/keep`, 
 and CSRF-checked like every other write on a job. They are not rate limited: each costs one
 re-render of the person's own document (the same as a review decision or a language change,
 which are not limited either), the body limit applies, and the number of documents a person
-can hold is capped. `/jobs/{id}/download/canvas` and `/jobs/{id}/download/cartridge` (the same page as an IMS Common Cartridge) are GETs for the owner, like `/download`. So is `/jobs/{id}/combine` (one file from the person's own finished, still-kept parts of one source; another person's part in the same group is never included, a part with a decision open is held back, and it restarts the clock of the parts it took and records the downloads, as "Download all" does). A
+can hold is capped. `/jobs/{id}/download/canvas`, `/jobs/{id}/download/cartridge` (the same page as an IMS Common Cartridge), `/jobs/{id}/download.docx` and `/jobs/{id}/download.epub` are GETs for the owner, like `/download`. The Word file is made by pandoc in a child process (minimal environment, CPU, size and heap limits, 60 s, two at a time) from HTML that went through the EPUB's sanitiser, so it cannot fetch a picture or read a file (docs/output.md, "The Word export"). So is `/jobs/{id}/combine` (one file from the person's own finished, still-kept parts of one source; another person's part in the same group is never included, a part with a decision open is held back, and it restarts the clock of the parts it took and records the downloads, as "Download all" does). A
 download restarts the deletion clock of the person's own document (`retention.restart_clock`),
 which is the one thing a GET changes; `test_get_requests_change_nothing` allows that and no
 other change.
@@ -110,7 +110,9 @@ refused, nothing applied): `POST /jobs/{id}/edit/{element}` (the words of a para
 heading; a paragraph made a heading), `POST /jobs/{id}/pages/{n}/add` (a picture or an equation
 the tool missed), `GET /jobs/{id}/pages/{n}/region.png` (the region about to be added),
 `POST /jobs/{id}/pages/{n}/omit` and `/restore` (a page left out), `POST
-/jobs/{id}/tables/accept-clean` and `POST /jobs/{id}/tables/{element}/read-cell`. Like a
+/jobs/{id}/tables/accept-clean` and `POST /jobs/{id}/tables/{element}/read-cell`, and `POST /jobs/{id}/symbols` (one symbol written as another in the
+handwritten equations, a single write that one Undo takes back; its redirect is built only from
+the checked job id and a fixed view, `routes/review.symbols_url`). Like a
 decision, a text edit, an omission or accepting the clean tables is not rate limited (it
 changes the person's own document, the body limit applies, the document is capped). Two of them
 cost something and are limited: adding a region cuts a crop in the render child (60 in 10
