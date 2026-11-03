@@ -250,7 +250,10 @@ def test_stale_undo_and_anyway_work_without_javascript(site, browser, job):
     page.get_by_role("link", name="Reload this page").click()
     assert page.locator("#decision-title").inner_text().startswith("Decision 1 of 3")
     # Undo the other tab's decision from that tab, then use a plain omega anyway here.
-    other.get_by_role("button", name="Undo this decision").click()
+    # Wait for the Undo's form post to land before closing the tab: closing it mid-request
+    # (JavaScript off, so the click is a real navigation) can hang the close.
+    with other.expect_navigation():
+        other.get_by_role("button", name="Undo this decision").click()
     other.close()
     page.goto(url)
     page.get_by_label("LaTeX for equation 1").fill(r"{\omega}")
