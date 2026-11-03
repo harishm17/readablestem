@@ -322,7 +322,9 @@ def chem_right_excl_times(items: Sequence[dict]) -> dict:
 
 
 def silent_harm_summary(items: Sequence[dict]) -> dict:
-    """How many chemistry gold equations were silently harmed, and per 100 gold."""
+    """How many chemistry gold equations were silently harmed, and per 100 gold. Counts only:
+    a report of a held-out run must not name items (the ids are `silent_harm` on the pairs of
+    the kept `items.jsonl`)."""
     chem = chem_gold_ids(items)
     harmed = sorted(
         p["gold_id"]
@@ -334,7 +336,6 @@ def silent_harm_summary(items: Sequence[dict]) -> dict:
         "n_gold": len(chem),
         "n": len(harmed),
         "per_100_gold": None if not chem else 100 * len(harmed) / len(chem),
-        "gold_ids": harmed,
     }
 
 

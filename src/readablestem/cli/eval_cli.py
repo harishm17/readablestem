@@ -302,9 +302,8 @@ def _recording(
     try:
         yield rec
     finally:
-        if not [p for p in rec.directory.iterdir() if p.name != "run.json"]:
-            (rec.directory / "run.json").unlink(missing_ok=True)
-            rec.directory.rmdir()
+        if run_record.holds_nothing(rec.directory):
+            run_record.discard(rec.directory)
 
 
 def _finish_recording(rec: Any, args: argparse.Namespace, report: dict) -> None:
@@ -772,6 +771,42 @@ def _cmd_classes(args: argparse.Namespace) -> int:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0
+
+
+# =========================================================================== prune
+
+
+def _cmd_prune(args: argparse.Namespace) -> int:
+    """`eval prune --older-than DAYS`: delete kept runs (eval/run_record.py) older than the age,
+    except a run a committed report names under `recording.run`."""
+    from readablestem.cli.main import project_root
+    from readablestem.core.paths import cache_dir
+    from readablestem.eval import run_record
+
+    base = cache_dir()
+    names = (
+        args.set or sorted(p.name for p in base.iterdir() if (p / run_record.RUNS).is_dir())
+        if base.is_dir()
+        else []
+    )
+    referenced = run_record.referenced_runs(project_root())
+    total = 0
+    for name in names:
+        deleted, kept = run_record.prune(
+            run_record.set_root(name),
+            name,
+            older_than_days=args.older_than,
+            keep=referenced,
+            dry_run=args.dry_run,
+        )
+        total += len(deleted)
+        verb = "would delete" if args.dry_run else "deleted"
+        for path in deleted:
+            print(f"{verb} {path}")
+        for path in kept:
+            print(f"kept (a committed report names it) {path}")
+    print(f"{'would delete' if args.dry_run else 'deleted'} {total} run(s)")
     return 0
 
 
@@ -1434,6 +1469,21 @@ def register(
     )
     classes.add_argument("--report", type=Path, help="also write the summary as JSON")
     classes.set_defaults(func=_cmd_classes)
+
+    prune = group.add_parser(
+        "prune",
+        help="delete kept run recordings older than an age (not those a committed report names)",
+    )
+    prune.add_argument("--older-than", type=_positive_float, required=True, metavar="DAYS")
+    prune.add_argument(
+        "--set",
+        action="append",
+        metavar="NAME",
+        help="a set's cache folder under ~/.cache/readablestem (repeatable; default: every one "
+        "that has runs)",
+    )
+    prune.add_argument("--dry-run", action="store_true", help="list, delete nothing")
+    prune.set_defaults(func=_cmd_prune)
 
     gate = group.add_parser(
         "gate", help="fail when a tracked metric regressed vs a baseline, or is below a floor"

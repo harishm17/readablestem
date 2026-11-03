@@ -345,7 +345,7 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `secondary_stream_v2` | the labelled secondary scorer (see "equations"): `matched_exact`, `matched_mean_similarity`, `end_to_end_exact`, `end_to_end_exact_with_credit` (split and merged gold credited) and `credited_split`, `credited_merged` |
 | `prose_classes` | only with dev-v2 gold: the scripts, code, glossary and hyphen scorers (see "Extended development set") |
 | `split_gold_equations` | gold equations the pipeline found as several pieces |
-| `chemistry` | only when the gold has chemistry equations (ids with `chemistry`); report fields beside the scorers, never in their place. `chem_right_excl_times`: `n`, `right`, `rate` of chemically right (`exact_chem`) with the lone multiplication sign gold left out of both (the sentence around it says "times"), `lone_times` (how many were left out) and `chem_right_n`, `chem_right`, `chem_right_rate` with them kept. `silent_harm`: `n`, `n_gold`, `per_100_gold` and `gold_ids` of aligned equations that are wrong on `exact_chem`, not a required decision, and spoken differently from the gold (a reading that lacks only a prefix nuclide's atomic number the page does not show is not harm). Per pair: `silent_harm`; per page: `chem_lone_times_gold_ids` (`eval/equations_chem.py`) |
+| `chemistry` | only when the gold has chemistry equations (ids with `chemistry`); report fields beside the scorers, never in their place. `chem_right_excl_times`: `n`, `right`, `rate` of chemically right (`exact_chem`) with the lone multiplication sign gold left out of both (the sentence around it says "times"), `lone_times` (how many were left out) and `chem_right_n`, `chem_right`, `chem_right_rate` with them kept. `silent_harm`: `n`, `n_gold` and `per_100_gold` (counts only: no item ids, so a held-out report names no items) of aligned equations that are wrong on `exact_chem`, not a required decision, and spoken differently from the gold (a reading that lacks only a prefix nuclide's atomic number the page does not show is not harm). Neither number is read by `eval gate`, a floor or a tolerance: they are for reading, not for passing or failing a change. Per pair: `silent_harm`; per page: `chem_lone_times_gold_ids` (`eval/equations_chem.py`) |
 | `static_violations` | failed error-level checks from `html_checks.static_checks` on the output HTML, summed over pages (warnings excluded) |
 | `axe_violations` | same for `html_checks.axe_checks`, over the pages where axe ran |
 | `axe_checked_pages` | pages where axe-core really ran (`axe_violations` is over these) |
@@ -756,13 +756,32 @@ answers file and items per run (`scripts/realworld_run.py`, `handwriting_eval.py
 Read a kept run with the chemistry classes script, which accepts the run folder:
 
 ```
-uv run python scripts/dev_chem_classes.py --gold ~/.cache/readablestem/chem-heldout/gold --speech \
-  run=~/.cache/readablestem/chem-heldout/runs/20261103T120000Z
+uv run python scripts/dev_chem_classes.py --gold data/dev-v2/dev --speech \
+  run=~/.cache/readablestem/dev-v2/runs/20261103T120000Z
 ```
 
 `--speech` adds what a listener hears (`pipeline/speech.py`): whether each reading is spoken as the
 gold is, the spoken defects it adds, and the silent harm per 100 gold. Without it the script prints
-the outcome classes and how many of them harm a listener.
+the outcome classes and how many of them harm a listener. The script lists equations one by one,
+so it is for development sets only: it refuses a run folder of a held-out or sealed set (the
+`set` in its `run.json`, or a held-out/sealed word in the path) and a held-out gold folder. A
+held-out run's report holds counts only (the chemistry block names no item ids); read its
+numbers there.
+
+**Privacy and pruning.** A recording holds the text layers of the evaluated PDFs and the model's
+answers: `runs/` and each run folder are mode 0700 and every file in them 0600. Delete old runs
+with
+
+```
+uv run readablestem eval prune --older-than 90 --dry-run
+uv run readablestem eval prune --older-than 90 [--set dev-v2 ...]
+```
+
+which removes the runs of `~/.cache/readablestem/<set>/runs/` older than that many days (by the
+timestamp in the folder name; any other folder is left alone) and keeps every run a committed
+report names under `recording.run` (it reads the tracked `*.json` files of the repository).
+`--dry-run` lists what would go. The chemistry block's `chem_right_excl_times` and `silent_harm`
+are report fields to read; no gate, floor or tolerance uses them.
 
 ### Weekly live run (`eval-live.yml`)
 

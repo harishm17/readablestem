@@ -267,6 +267,19 @@ def main() -> int:
         help="a run's items file, or its folder under ~/.cache/readablestem/<set>/runs/",
     )
     args = parser.parse_args()
+    from readablestem.eval.run_record import sealed_reason
+
+    checked = [("--gold", args.gold)] + [
+        (spec.partition("=")[0], Path(spec.partition("=")[2] or spec)) for spec in args.runs
+    ]
+    for what, path in checked:
+        if reason := sealed_reason(path):
+            print(
+                f"refused: {what} is for a held-out or sealed set ({reason}); this script lists "
+                "equations one by one and is for development sets only",
+                file=sys.stderr,
+            )
+            return 2
     gold = dev_chem.load_gold(args.gold)
     pools = table_pools(args.gold)
     results = {}

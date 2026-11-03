@@ -19,12 +19,19 @@ still choose other files; a file given by hand is not copied. A fake run, a repl
 (`--answers-offline`) and a run with no model (tables, local mode) keep nothing: they spend
 nothing and can be made again. The sealed check part keeps nothing either (its items are not
 listed, by design).
+
+A recording holds the text layers of the evaluated PDFs and the model's answers, so the folders
+are private to the user: `runs/` and each run folder are mode 0700 and every file in them 0600.
+`prune` deletes the runs older than an age and keeps any run a committed report names.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import json
+import os
+import re
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,6 +40,13 @@ from typing import Any
 from readablestem.core.paths import cache_dir
 
 RUNS = "runs"
+DIR_MODE = 0o700
+FILE_MODE = 0o600
+# A run folder of a held-out or sealed set: its rows list items one by one, so the analysis
+# scripts refuse it (`sealed_reason`).
+SEALED_WORDS = ("heldout", "held-out", "sealed", "check")
+# A whole word of a folder or set name (`chem-heldout`, `check`), not `checkout`.
+_SEALED = re.compile(r"(?:^|[-_.])(" + "|".join(SEALED_WORDS) + r")(?:$|[-_.])")
 
 
 @dataclass(frozen=True)
@@ -111,10 +125,12 @@ def start(
     moment = (now or dt.datetime.now(dt.UTC)).strftime("%Y%m%dT%H%M%SZ")
     runs = root / RUNS
     runs.mkdir(parents=True, exist_ok=True)
+    runs.chmod(DIR_MODE)
     for attempt in range(1, 100):
         directory = runs / (moment if attempt == 1 else f"{moment}-{attempt}")
         try:
-            directory.mkdir()
+            directory.mkdir(mode=DIR_MODE)
+            directory.chmod(DIR_MODE)
             break
         except FileExistsError:
             continue
@@ -122,6 +138,8 @@ def start(
         raise RuntimeError(f"no free run folder under {runs}")
     sha, dirty = source_state(repo)
     recording = Recording(set_name, directory, sha, dirty)
+    for name in ("answers.jsonl", "items.jsonl", "report.json"):
+        _private_file(directory / name)  # made now, so every writer inherits mode 0600
     (directory / "run.json").write_text(
         json.dumps(
             {"set": set_name, "task": task, "started": moment, "sha": sha, "dirty": dirty},
@@ -130,4 +148,101 @@ def start(
         + "\n",
         encoding="utf-8",
     )
+    (directory / "run.json").chmod(FILE_MODE)
     return recording
+
+
+def _private_file(path: Path) -> None:
+    os.close(os.open(path, os.O_WRONLY | os.O_CREAT, FILE_MODE))
+    path.chmod(FILE_MODE)
+
+
+def holds_nothing(directory: Path) -> bool:
+    """The run stopped before it kept anything (only `run.json` and empty files)."""
+    return all(p.name == "run.json" or p.stat().st_size == 0 for p in directory.iterdir())
+
+
+def discard(directory: Path) -> None:
+    shutil.rmtree(directory)
+
+
+def sealed_reason(path: Path) -> str | None:
+    """Why a run folder, an items file in one, or a gold folder must not be analysed item by
+    item: it belongs to a held-out or sealed set. None when it does not."""
+    resolved = path.resolve()
+    folder = resolved if resolved.is_dir() else resolved.parent
+    info = folder / "run.json"
+    if info.is_file():
+        try:
+            name = str(json.loads(info.read_text(encoding="utf-8")).get("set", ""))
+        except (OSError, ValueError):
+            name = ""
+        if _SEALED.search(name.lower()):
+            return f"a run of the {name!r} set"
+    for part in resolved.parts:
+        if found := _SEALED.search(part.lower()):
+            return f"the path names a {found.group(1)} set"
+    return None
+
+
+def referenced_runs(repo: Path) -> set[str]:
+    """Every `recording.run` a committed report (any tracked JSON file) names: those runs are
+    the evidence behind a published number."""
+    try:
+        listed = subprocess.run(
+            ["git", "-C", str(repo), "ls-files", "*.json"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=60,
+        ).stdout.split("\n")
+    except (OSError, subprocess.SubprocessError):
+        listed = [str(p.relative_to(repo)) for p in repo.rglob("*.json") if ".git" not in p.parts]
+    found: set[str] = set()
+    for name in filter(None, listed):
+        try:
+            data = json.loads((repo / name).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        run = data.get("recording", {}).get("run") if isinstance(data, dict) else None
+        if isinstance(run, str):
+            found.add(run)
+    return found
+
+
+def _started(directory: Path) -> dt.datetime | None:
+    stamp = directory.name.split("-", 1)[0]
+    try:
+        return dt.datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=dt.UTC)
+    except ValueError:
+        return None
+
+
+def prune(
+    root: Path,
+    set_name: str,
+    *,
+    older_than_days: float,
+    keep: set[str],
+    now: dt.datetime | None = None,
+    dry_run: bool = False,
+) -> tuple[list[Path], list[Path]]:
+    """Delete the runs of `<root>/runs/` older than the age; return (deleted, kept because a
+    committed report names them). A folder whose name is not a timestamp is never touched."""
+    cutoff = (now or dt.datetime.now(dt.UTC)) - dt.timedelta(days=older_than_days)
+    deleted: list[Path] = []
+    kept: list[Path] = []
+    runs = root / RUNS
+    if not runs.is_dir():
+        return deleted, kept
+    for directory in sorted(p for p in runs.iterdir() if p.is_dir()):
+        started = _started(directory)
+        if started is None or started >= cutoff:
+            continue
+        if f"{set_name}/{RUNS}/{directory.name}" in keep:
+            kept.append(directory)
+            continue
+        if not dry_run:
+            discard(directory)
+        deleted.append(directory)
+    return deleted, kept

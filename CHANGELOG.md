@@ -11,7 +11,11 @@
   and with `--speech` the spoken comparison and the silent harm per 100 gold.
 - Document reports with chemistry gold gain a `chemistry` block: `chem_right_excl_times` (lone `×`
   left out, reported beside the count that keeps it) and `silent_harm` (wrong, not asked, heard
-  differently). Report fields only; the primary scorer, the gate and committed reports are unchanged.
+  differently), counts only. Report fields only; the primary scorer, the gate and committed reports
+  are unchanged, and no gate reads them.
+- Recordings are private (folders 0700, files 0600). `eval prune --older-than DAYS [--set NAME] [--dry-run]`
+  deletes old runs and keeps any a committed report names. `scripts/dev_chem_classes.py` refuses
+  held-out and sealed run folders.
 
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)
 
