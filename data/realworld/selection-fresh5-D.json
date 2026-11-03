@@ -1,0 +1,300 @@
+{
+ "seed": "fresh5-D",
+ "date": "2026-11-02",
+ "rule": {
+  "licence": "CC BY in both the archive book JSON and the CMS, read live for every book whose slug has 'chemistry' (the first editions pass; 2e and Organic Chemistry are NC-SA and are refused)",
+  "retired_editions": "allowed (proof/DECISION-retired-editions-2026-10-13.md)",
+  "unused": "section not named by any earlier set; sibling editions folded; a section whose title (slug without numbers) an earlier set has is out; so is any section of dev-v2's books that could be in its sealed check part, and any with a title one of those has",
+  "topics_out": [
+   "balanc",
+   "precipitat",
+   "galvanic",
+   "decay",
+   "nernst",
+   "rate-law",
+   "bronsted",
+   "nuclear-equation",
+   "measurement",
+   "thermodynamic",
+   "noble-gas",
+   "representative-metal",
+   "lewis",
+   "titration",
+   "coordination"
+  ],
+  "min_equations": 25,
+  "min_chemistry_share": 0.4,
+  "max_overlap_8gram": 0.2,
+  "max_pdf_pages": 15,
+  "overlap_reference": "word 8-grams outside maths of every used or sealed section of the pool's books and of the sections already taken",
+  "order": "SHA-256 of 'fresh5-D|book|section', smallest first; the first 4 that pass"
+ },
+ "books_refused": [
+  {
+   "book": "chemistry-2e",
+   "licence": "Creative Commons Attribution-NonCommercial-ShareAlike License",
+   "reason": "LicenseError"
+  },
+  {
+   "book": "chemistry-atoms-first-2e",
+   "licence": "Creative Commons Attribution-NonCommercial-ShareAlike License",
+   "reason": "LicenseError"
+  },
+  {
+   "book": "organic-chemistry",
+   "licence": "Creative Commons Attribution-NonCommercial-ShareAlike License",
+   "reason": "LicenseError"
+  }
+ ],
+ "n_used_sections": 717,
+ "n_sealed_possible": 18,
+ "n_reference_sections": 114,
+ "skipped_before_gates": {
+  "topic": 4,
+  "used": 209
+ },
+ "n_ranked": 15,
+ "visits": [
+  {
+   "book": "chemistry-atoms-first",
+   "section": "4-5-formal-charges-and-resonance",
+   "gate": "equations",
+   "equations": 8,
+   "chemistry": 7,
+   "lone_times": 0,
+   "overlap_8gram": 0.0044,
+   "records_by_kind": {
+    "equation": 8,
+    "heading": 21
+   }
+  },
+  {
+   "book": "chemistry",
+   "section": "3-1-formula-mass-and-the-mole-concept",
+   "gate": "equations",
+   "equations": 8,
+   "chemistry": 2,
+   "lone_times": 15,
+   "overlap_8gram": 0.9136,
+   "records_by_kind": {
+    "equation": 23,
+    "figure": 9,
+    "table": 1,
+    "heading": 49
+   }
+  },
+  {
+   "book": "chemistry",
+   "section": "3-4-other-units-for-solution-concentrations",
+   "gate": "equations",
+   "equations": 9,
+   "chemistry": 0,
+   "lone_times": 1,
+   "overlap_8gram": 0.0054,
+   "records_by_kind": {
+    "equation": 10,
+    "figure": 3,
+    "heading": 26
+   }
+  },
+  {
+   "book": "chemistry",
+   "section": "2-6-molecular-and-ionic-compounds",
+   "gate": "pass",
+   "equations": 35,
+   "chemistry": 33,
+   "lone_times": 0,
+   "overlap_8gram": 0.0048,
+   "records_by_kind": {
+    "equation": 35,
+    "figure": 4,
+    "table": 1,
+    "heading": 30
+   },
+   "pdf_pages": 11
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "section": "2-1-early-ideas-in-atomic-theory",
+   "gate": "equations",
+   "equations": 10,
+   "chemistry": 0,
+   "lone_times": 1,
+   "overlap_8gram": 0.0086,
+   "records_by_kind": {
+    "equation": 11,
+    "figure": 4,
+    "table": 1,
+    "heading": 13
+   }
+  },
+  {
+   "book": "chemistry",
+   "section": "2-1-early-ideas-in-atomic-theory",
+   "gate": "equations",
+   "equations": 10,
+   "chemistry": 0,
+   "lone_times": 1,
+   "overlap_8gram": 0.0082,
+   "records_by_kind": {
+    "equation": 11,
+    "figure": 4,
+    "table": 1,
+    "heading": 13
+   }
+  },
+  {
+   "book": "chemistry",
+   "section": "1-3-physical-and-chemical-properties",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.01,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 4
+   }
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "section": "12-4-free-energy",
+   "gate": "chemistry_share",
+   "equations": 43,
+   "chemistry": 10,
+   "lone_times": 0,
+   "overlap_8gram": 0.0141,
+   "records_by_kind": {
+    "equation": 43,
+    "table": 3,
+    "heading": 13
+   }
+  },
+  {
+   "book": "chemistry",
+   "section": "7-4-formal-charges-and-resonance",
+   "gate": "equations",
+   "equations": 8,
+   "chemistry": 7,
+   "lone_times": 0,
+   "overlap_8gram": 0.0044,
+   "records_by_kind": {
+    "equation": 8,
+    "heading": 21
+   }
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "section": "13-3-shifting-equilibria-le-chateliers-principle",
+   "gate": "equations",
+   "equations": 10,
+   "chemistry": 10,
+   "lone_times": 0,
+   "overlap_8gram": 0.0119,
+   "records_by_kind": {
+    "equation": 10,
+    "figure": 1,
+    "heading": 8
+   }
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "section": "6-4-other-units-for-solution-concentrations",
+   "gate": "equations",
+   "equations": 9,
+   "chemistry": 0,
+   "lone_times": 1,
+   "overlap_8gram": 0.0054,
+   "records_by_kind": {
+    "equation": 10,
+    "figure": 3,
+    "heading": 26
+   }
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "section": "3-7-molecular-and-ionic-compounds",
+   "gate": "overlap",
+   "equations": 35,
+   "chemistry": 33,
+   "lone_times": 0,
+   "overlap_8gram": 0.9482,
+   "records_by_kind": {
+    "equation": 35,
+    "figure": 4,
+    "table": 1,
+    "heading": 30
+   }
+  },
+  {
+   "book": "chemistry",
+   "section": "16-4-free-energy",
+   "gate": "chemistry_share",
+   "equations": 67,
+   "chemistry": 22,
+   "lone_times": 0,
+   "overlap_8gram": 0.529,
+   "records_by_kind": {
+    "equation": 67,
+    "figure": 3,
+    "table": 4,
+    "heading": 35
+   }
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "section": "1-3-physical-and-chemical-properties",
+   "gate": "equations",
+   "equations": 0,
+   "chemistry": 0,
+   "lone_times": 0,
+   "overlap_8gram": 0.01,
+   "records_by_kind": {
+    "figure": 5,
+    "heading": 4
+   }
+  },
+  {
+   "book": "chemistry",
+   "section": "13-3-shifting-equilibria-le-chateliers-principle",
+   "gate": "equations",
+   "equations": 14,
+   "chemistry": 14,
+   "lone_times": 0,
+   "overlap_8gram": 0.3837,
+   "records_by_kind": {
+    "equation": 14,
+    "figure": 3,
+    "heading": 11
+   }
+  }
+ ],
+ "sections": [
+  {
+   "book": "chemistry",
+   "book_title": "Chemistry",
+   "book_state": "retired",
+   "section": "2-6-molecular-and-ionic-compounds",
+   "title": "2.6 Molecular and Ionic Compounds",
+   "licence": "Creative Commons Attribution License",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "archive_version": "20260604.144757",
+   "book_version": "741a7af",
+   "equations": 35,
+   "chemistry": 33,
+   "lone_times": 0,
+   "overlap_8gram": 0.0048,
+   "records_by_kind": {
+    "equation": 35,
+    "figure": 4,
+    "table": 1,
+    "heading": 30
+   },
+   "pdf_pages": 11,
+   "pdf_paper": "Letter",
+   "pdf_sha256": "b868e135bbe56fbce750bc046748133d9139384f6812b5ff02f928d96d973e46",
+   "gold_sha256": "e3e23332289dfd4a74531ab58e0d9b5d2bb7d6ffe1c7c2bbda55c459c1ead5b5"
+  }
+ ],
+ "n_pdf_pages": 11
+}

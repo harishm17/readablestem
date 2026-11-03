@@ -5,8 +5,9 @@
     uv run python scripts/fresh5_select.py openstax         [--date 2026-11-02]
     uv run python scripts/fresh5_select.py course-harvest
     uv run python scripts/fresh5_select.py course-draw
+    uv run python scripts/fresh5_select.py chemistry          [--date 2026-11-02]
 
-Three strata, each a rule and a seed, never a choice (`PREREGISTRATION-FRESH5.md`):
+Four strata, each a rule and a seed, never a choice (`PREREGISTRATION-FRESH5.md`):
 
 - A, arXiv LaTeX: the seeded order of the fresh4 split continued from the first candidate fresh4 did
   not visit, with the same gates (`realworld_build.process`), 12 papers.
@@ -15,6 +16,10 @@ Three strata, each a rule and a seed, never a choice (`PREREGISTRATION-FRESH5.md
 - C, course-style LaTeX (`gold/course_corpus.py`): a pool of GitHub repositories found by a fixed
   query set and a licence gate, drawn in the seeded order, 8 documents of which at least 3 are
   Beamer decks.
+- D, OpenStax chemistry (reported apart, never pooled): sections of the CC BY first editions only
+  (Chemistry, Chemistry: Atoms First; the live licence is read for every book), never used before,
+  off the topics earlier chemistry sets cover, with enough chemistry equations, a measured 8-gram
+  overlap with every used section of at most 20%, and at most 15 printed pages, ranked by SHA-256.
 
 Gold, downloads and compiled PDFs stay under ROOT (default ~/.cache/readablestem/realworld; outside
 the repository). The repository gets manifests, candidate logs, the pool and the selection: ids,
@@ -32,7 +37,7 @@ import re
 import subprocess
 import sys
 from collections import Counter
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
@@ -43,6 +48,7 @@ from readablestem.gold import arxiv_corpus as ac
 from readablestem.gold import arxiv_gold as ag
 from readablestem.gold import arxiv_tex as tex
 from readablestem.gold import course_corpus as cc
+from readablestem.gold import devset
 from readablestem.gold import openstax as ox
 
 REPO = Path(__file__).resolve().parent.parent
@@ -53,6 +59,9 @@ DATE = "2026-11-02"
 
 FRESH4_ORDER = "order-realworld-fresh4-2026-10-26.json"
 FRESH4_CANDIDATES = "candidates-fresh4.json"
+# The selection files of the strata that name OpenStax sections: a rerun of one stratum must not
+# see its own picks (or a later stratum's) as "used", or it would draw something else.
+SELECTION_FILES = frozenset({"selection-fresh5-B.json", "selection-fresh5-D.json"})
 ARXIV_TARGET = 12
 OPENSTAX_TARGET = 6
 OPENSTAX_PER_BOOK = 2
@@ -169,16 +178,18 @@ def used_from_text(text: str) -> set[tuple[str, str]]:
     return found
 
 
-def iter_scanned(root: Path) -> Iterator[Path]:
+def iter_scanned(root: Path, skip: frozenset[str] = frozenset()) -> Iterator[Path]:
     for folder in ("proof", "data"):
         for path in sorted((root / folder).rglob("*")):
-            if not path.is_file() or path.stat().st_size > 30_000_000:
+            if not path.is_file() or path.stat().st_size > 30_000_000 or path.name in skip:
                 continue
             if path.suffix in _SCANNED_SUFFIXES or path.name in _SCANNED_NAMES:
                 yield path
 
 
-def used_openstax(root: Path) -> tuple[set[tuple[str, str]], set[str]]:
+def used_openstax(
+    root: Path, skip: frozenset[str] = frozenset()
+) -> tuple[set[tuple[str, str]], set[str]]:
     """Sections any earlier set used and the book families whose unseen part is sealed.
 
     Sections: the held-out registration (`gold/heldout.REGISTERED`), and every
@@ -189,7 +200,7 @@ def used_openstax(root: Path) -> tuple[set[tuple[str, str]], set[str]]:
     from readablestem.gold.heldout import REGISTERED
 
     sections = {(s.book, s.slug) for s in REGISTERED.sections}
-    for path in iter_scanned(root):
+    for path in iter_scanned(root, skip):
         sections |= used_from_text(path.read_text(encoding="utf-8", errors="ignore"))
     families: set[str] = set()
     selection = root / "data" / "dev-v2" / "selection.json"
@@ -273,7 +284,7 @@ def pick_sections(
 
 def cmd_openstax(args: argparse.Namespace) -> int:
     fetcher = ox.HttpFetcher(cache_dir=args.root / "archive")
-    used, families = used_openstax(REPO)
+    used, families = used_openstax(REPO, SELECTION_FILES)
     rows = [r for r in ox.license_table(fetcher) if r["cc_by"] and r["in_archive_release"]]
     books: dict[str, ox.Book] = {}
     ranked: dict[str, list[str]] = {}
@@ -560,6 +571,351 @@ def cmd_course_draw(args: argparse.Namespace) -> int:
     return 0
 
 
+# ============================================================================== stratum D
+
+SEED_D = "fresh5-D"
+D_TARGET = 4
+D_MIN_EQUATIONS = 25  # gold equations in the key, the lone multiplication sign not counted
+D_MIN_CHEM_SHARE = 0.40  # of those, the share that is chemistry (`chemistry_equation`)
+D_MAX_OVERLAP = 0.20  # 8-gram overlap with the text of every used section
+D_MAX_PAGES = 15  # printed Letter pages
+D_POOL_WORD = "chemistry"  # every book whose slug has it is looked at; the licence gate decides
+
+# Sections on the topics the development and held-out chemistry sets cover (a stem of the title).
+D_TOPIC_STEMS = (
+    "balanc",
+    "precipitat",
+    "galvanic",
+    "decay",
+    "nernst",
+    "rate-law",
+    "bronsted",
+    "nuclear-equation",
+    "measurement",
+    "thermodynamic",
+    "noble-gas",
+    "representative-metal",
+    "lewis",
+    "titration",
+    "coordination",
+)
+
+_ELEMENTS = (  # noqa: SIM905
+    "H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As "
+    "Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu "
+    "Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np "
+    "Pu Am Cm Bk Cf Es Fm Md No Lr"
+).split()
+_EL = "|".join(sorted(_ELEMENTS, key=lambda e: (-len(e), e)))
+_FORMULA = re.compile(rf"(?<![A-Za-z])(?:(?:{_EL})\d*){{2,}}(?![a-z])")
+_ION = re.compile(rf"(?<![A-Za-z])(?:{_EL})\d*\^[−+]|(?<![A-Za-z])(?:{_EL})\^\d[−+]")
+_STATE = re.compile(r"\((?:aq|s|l|g)\)")
+
+
+def chemistry_equation(mathml: str) -> bool:
+    """A gold equation that writes chemistry: a reaction arrow, a state symbol, a formula of two
+    or more element symbols (H2O, NaCl) or an ion (Cu^2+). A symbol alone (a variable) is not."""
+    from readablestem.eval import equations_chem as ec
+
+    stream = ec.chem_of(mathml)
+    if stream == ec.LONE_TIMES:
+        return False
+    text = "".join(stream).replace("<g>", "").replace("</g>", "")
+    if "→" in text or "⇌" in text or _STATE.search(text):
+        return True
+    flat = text.replace("_", "")
+    return bool(_FORMULA.search(flat) or _ION.search(flat))
+
+
+def chemistry_counts(mathmls: Iterable[str]) -> dict[str, int]:
+    """Equations that count (the lone multiplication sign is left out, as the metric leaves it
+    out) and how many of them are chemistry."""
+    from readablestem.eval import equations_chem as ec
+
+    counted = [m for m in mathmls if not ec.is_lone_times(m)]
+    return {
+        "equations": len(counted),
+        "chemistry": sum(1 for m in counted if chemistry_equation(m)),
+        "lone_times": sum(1 for m in mathmls if ec.is_lone_times(m)),
+    }
+
+
+def topic_hit(slug: str) -> str | None:
+    """The topic stem a section's title has, or None."""
+    title = title_key(slug)
+    return next((stem for stem in D_TOPIC_STEMS if stem in title), None)
+
+
+def rank_key_d(book: str, slug: str) -> str:
+    """SHA-256 of "fresh5-D|book|slug"; the draw takes the smallest first."""
+    return ac.stable_key(SEED_D, book, slug)
+
+
+def order_d(sections: Iterable[tuple[str, str]]) -> list[tuple[str, str]]:
+    return sorted(sections, key=lambda bs: rank_key_d(*bs))
+
+
+def overlap_share(words: Sequence[str], reference: set[tuple[str, ...]]) -> float:
+    """Share of the section's word 8-grams that occur in the reference text."""
+    return devset.containment(words, reference)
+
+
+def chemistry_gate(counts: dict[str, int], overlap: float, pages: int | None = None) -> str | None:
+    """None when a section is eligible, else the name of the first gate it fails."""
+    if counts["equations"] < D_MIN_EQUATIONS:
+        return "equations"
+    if counts["chemistry"] < D_MIN_CHEM_SHARE * counts["equations"]:
+        return "chemistry_share"
+    if overlap > D_MAX_OVERLAP:
+        return "overlap"
+    if pages is not None and pages > D_MAX_PAGES:
+        return "pages"
+    return None
+
+
+def pick_chemistry(
+    order: Sequence[tuple[str, str]],
+    judge: Callable[[str, str], str | None],
+    *,
+    target: int = D_TARGET,
+    log: list[dict] | None = None,
+) -> list[tuple[str, str]]:
+    """Walk the seeded order and take what `judge` passes (None) until `target`. A failing section
+    is logged with its gate and skipped, never swapped by choice."""
+    taken: list[tuple[str, str]] = []
+    for book, slug in order:
+        if len(taken) >= target:
+            break
+        gate = judge(book, slug)
+        if log is not None:
+            log.append({"book": book, "section": slug, "gate": gate or "pass"})
+        if gate is None:
+            taken.append((book, slug))
+    return taken
+
+
+def sealed_check_sections(books: dict[str, ox.Book], salt: str) -> set[tuple[str, str]]:
+    """The sections of dev-v2's sealed check part. Their names are not recorded (the registry says
+    only that a section whose SHA-256 of "salt:book/slug" is below the share can be one), so every
+    section of the dev-v2 books that falls below it is treated as sealed: a superset."""
+    return {
+        (b, p.slug)
+        for b, book in books.items()
+        for p in ox.iter_pages(book.tree)
+        if p.section is not None and devset.part_of(salt, b, p.slug) == "check"
+    }
+
+
+def cmd_chemistry(args: argparse.Namespace) -> int:
+    import pymupdf
+
+    from readablestem.eval import render
+    from readablestem.eval.pipeline_eval import load_gold
+
+    fetcher = ox.HttpFetcher(cache_dir=args.root / "archive")
+    used, _families = used_openstax(REPO, SELECTION_FILES)
+    config = json.loads((REPO / "data" / "dev-v2" / "selection.json").read_text(encoding="utf-8"))[
+        "config"
+    ]
+    refused: list[dict] = []
+    books: dict[str, ox.Book] = {}
+    for row in ox.license_table(fetcher):
+        if D_POOL_WORD not in row["slug"]:
+            continue
+        try:
+            book = ox.resolve_book(row["slug"], fetcher)
+            ox.check_public_license(book)  # CC BY in the archive and in the CMS, read now
+        except ox.GoldError as exc:
+            refused.append(
+                {
+                    "book": row["slug"],
+                    "licence": row["license_name"],
+                    "reason": type(exc).__name__,
+                }
+            )
+            continue
+        books[row["slug"]] = book
+    dev_books = {b: bk for b, bk in books.items() if b in config["books"]}
+    sealed = sealed_check_sections(dev_books, config["salt"])
+    sealed_titles = {title_key(s) for _, s in sealed}
+    used_titles = {title_key(s) for _, s in used} | sealed_titles
+    pages: dict[tuple[str, str], ox.PageRef] = {}
+    ranked: list[tuple[str, str]] = []
+    skipped: Counter[str] = Counter()
+    for slug, book in sorted(books.items()):
+        for page in ox.iter_pages(book.tree):
+            if page.section is None:
+                continue
+            pages[(slug, page.slug)] = page
+            reason = (
+                "used"
+                if blocked(slug, page.slug, used, set(), used_titles)
+                else "sealed_check"
+                if (slug, page.slug) in sealed
+                else "topic"
+                if topic_hit(page.slug)
+                else None
+            )
+            if reason:
+                skipped[reason] += 1
+            else:
+                ranked.append((slug, page.slug))
+    order = order_d(ranked)
+
+    def words_of(book_slug: str, page_slug: str) -> list[str]:
+        book = books[book_slug]
+        payload = fetcher.get_json(book.content_url(pages[(book_slug, page_slug)].uuid))
+        return devset.words_outside_math(payload["content"])
+
+    reference: set[tuple[str, ...]] = set()
+    n_reference = 0
+    for book_slug, page_slug in sorted(used | sealed):
+        if book_slug in books and (book_slug, page_slug) in pages:
+            reference |= devset.ngrams(words_of(book_slug, page_slug))
+            n_reference += 1
+    out_dir = args.root / "gold" / "fresh5d"
+    for old in sorted(out_dir.rglob("*")) if out_dir.is_dir() else []:
+        if old.is_file():
+            old.unlink()  # a rerun writes the gold of this selection only
+    pdf_dir = out_dir / "pdfs"
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    images = render.ImageCache(args.root / "render" / "images")
+    measured: dict[tuple[str, str], dict] = {}
+    printed: dict[tuple[str, str], tuple[int, str]] = {}
+    taken_grams: set[tuple[str, ...]] = set()
+
+    with render.ChromiumRenderer() as browser:
+
+        def judge(book_slug: str, page_slug: str) -> str | None:
+            book = books[book_slug]
+            page = pages[(book_slug, page_slug)]
+            payload = fetcher.get_json(book.content_url(page.uuid))
+            records = ox.build_page_records(book, page, payload["content"], args.date)
+            counts = chemistry_counts([r["mathml"] for r in records if r["kind"] == "equation"])
+            grams = devset.ngrams(devset.words_outside_math(payload["content"]))
+            overlap = overlap_share(
+                devset.words_outside_math(payload["content"]), reference | taken_grams
+            )
+            measured[(book_slug, page_slug)] = counts | {
+                "overlap_8gram": round(overlap, 4),
+                "records_by_kind": dict(Counter(r["kind"] for r in records)),
+            }
+            gate = chemistry_gate(counts, overlap)
+            if gate:
+                return gate
+            ox.fetch_gold(
+                book_slug,
+                1,
+                out_dir,
+                fetcher,
+                page_slugs=[page_slug],
+                retrieved_at=args.date,
+                allow_retired=True,
+                pin=ox.BookPin(book.archive_version, book.version),
+            )
+            gold = out_dir / "openstax" / book_slug / f"{page_slug}.jsonl"
+            mine = [
+                r
+                for r in load_gold(out_dir)
+                if r["book_slug"] == book_slug and r["page_slug"] == page_slug
+            ]
+            source = render.page_source_from_records(
+                mine, fetcher, authors=render.book_authors(out_dir, book_slug)
+            )
+            pdf_path = pdf_dir / f"{book_slug}-{page_slug}.pdf"
+            pdf = render.render_page_pdf(
+                source,
+                pdf_path,
+                images=images,
+                renderer=browser,
+                paper="Letter",
+                cache_dir=args.root / "render" / "pages",
+            )
+            with pymupdf.open(stream=pdf, filetype="pdf") as doc:
+                n_pages = doc.page_count
+            measured[(book_slug, page_slug)]["pdf_pages"] = n_pages
+            if chemistry_gate(counts, overlap, n_pages):
+                gold.unlink()
+                pdf_path.unlink(missing_ok=True)
+                return "pages"
+            printed[(book_slug, page_slug)] = (n_pages, hashlib.sha256(pdf).hexdigest())
+            taken_grams.update(grams)
+            return None
+
+        visits: list[dict] = []
+        taken = pick_chemistry(order, judge, log=visits)
+    for visit in visits:
+        visit.update(measured.get((visit["book"], visit["section"]), {}))
+    ox.write_manifest(out_dir)
+    selected = []
+    for book_slug, page_slug in taken:
+        book = books[book_slug]
+        gold = out_dir / "openstax" / book_slug / f"{page_slug}.jsonl"
+        n_pages, pdf_hash = printed[(book_slug, page_slug)]
+        selected.append(
+            {
+                "book": book_slug,
+                "book_title": book.title,
+                "book_state": book.state,
+                "section": page_slug,
+                "title": pages[(book_slug, page_slug)].title,
+                "licence": book.license_name,
+                "licence_url": book.license_url,
+                "archive_version": book.archive_version,
+                "book_version": book.version,
+                **measured[(book_slug, page_slug)],
+                "pdf_pages": n_pages,
+                "pdf_paper": "Letter",
+                "pdf_sha256": pdf_hash,
+                "gold_sha256": file_sha256(gold),
+            }
+        )
+    selection = {
+        "seed": SEED_D,
+        "date": args.date,
+        "rule": {
+            "licence": (
+                "CC BY in both the archive book JSON and the CMS, read live for every book whose "
+                "slug has 'chemistry' (the first editions pass; 2e and Organic Chemistry are "
+                "NC-SA and are refused)"
+            ),
+            "retired_editions": "allowed (proof/DECISION-retired-editions-2026-10-13.md)",
+            "unused": (
+                "section not named by any earlier set; sibling editions folded; a section whose "
+                "title (slug without numbers) an earlier set has is out; so is any section of "
+                "dev-v2's books that could be in its sealed check part, and any with a title one "
+                "of those has"
+            ),
+            "topics_out": list(D_TOPIC_STEMS),
+            "min_equations": D_MIN_EQUATIONS,
+            "min_chemistry_share": D_MIN_CHEM_SHARE,
+            "max_overlap_8gram": D_MAX_OVERLAP,
+            "max_pdf_pages": D_MAX_PAGES,
+            "overlap_reference": (
+                "word 8-grams outside maths of every used or sealed section of the pool's "
+                "books and "
+                "of the sections already taken"
+            ),
+            "order": "SHA-256 of 'fresh5-D|book|section', smallest first; the first 4 that pass",
+        },
+        "books_refused": refused,
+        "n_used_sections": len(used),
+        "n_sealed_possible": len(sealed),
+        "n_reference_sections": n_reference,
+        "skipped_before_gates": dict(sorted(skipped.items())),
+        "n_ranked": len(order),
+        "visits": visits,
+        "sections": selected,
+        "n_pdf_pages": sum(s["pdf_pages"] for s in selected),
+    }
+    path = REPO_DATA / "selection-fresh5-D.json"
+    dump(path, selection)
+    print(path, len(selected), "sections,", selection["n_pdf_pages"], "pages")
+    for s in selected:
+        print(s["book"], s["section"], s["licence"], s["equations"], s["chemistry"], s["pdf_pages"])
+    return 0
+
+
 # =================================================================================== main
 
 
@@ -578,6 +934,7 @@ def main() -> int:
     h.add_argument("--pause", type=float, default=7.0)
     h.set_defaults(func=cmd_course_harvest)
     sub.add_parser("course-draw").set_defaults(func=cmd_course_draw)
+    sub.add_parser("chemistry").set_defaults(func=cmd_chemistry)
     args = parser.parse_args()
     return args.func(args)
 

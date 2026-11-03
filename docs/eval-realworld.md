@@ -445,7 +445,7 @@ Spend: fresh `off` $2.458, `on` $1.063: **$3.52** of the $8 (86 pages, so $0.028
 
 ## The fifth fresh split: how its units are selected
 
-`scripts/fresh5_select.py` builds the units of the fifth fresh split (26 units in three strata) by rule and seed, and
+`scripts/fresh5_select.py` builds the units of the fifth fresh split (26 units in three strata, plus the chemistry stratum D) by rule and seed, and
 writes only manifests, candidate logs and hashes to `data/realworld/`; gold, downloads and compiled PDFs stay in the cache.
 No command reads a gold file's content. The registration is `data/realworld/PREREGISTRATION-FRESH5.md`.
 
@@ -454,6 +454,16 @@ No command reads a gold file's content. The registration is `data/realworld/PRER
 | A, arXiv LaTeX | 12 papers | the fresh4 order continued after its last visited candidate, same gates as above | `arxiv-order`, `arxiv-build` |
 | B, OpenStax | 6 sections | CC BY books (archive and CMS), sections no earlier set used, a title no earlier set used, sibling editions folded, at most 2 per book family, seeded by SHA-256 | `openstax`, `openstax-render` |
 | C, course-style LaTeX | 8 documents, at least 3 Beamer decks | GitHub repositories from a fixed query set, licence gate (CC BY, CC BY-SA, MIT), seeded order, compiled with TeX Live (Tectonic as fallback), gold by the arXiv path | `course-harvest`, `course-draw` |
+| D, OpenStax chemistry (not pooled) | about 4 sections; the rule filled 1 | the CC BY first editions only (licence read live for every book with "chemistry" in its slug; 2e and Organic Chemistry are NC-SA and refused), sections no earlier set used and no title an earlier set or dev-v2's possible sealed part has, off the topics earlier chemistry sets cover, at least 25 gold equations of which 40% chemistry, 8-gram overlap with every used section at most 20%, at most 15 printed pages, ranked by SHA-256 of `fresh5-D\|book\|section` | `chemistry` |
+
+Stratum D (`chemistry` command, `selection-fresh5-D.json`). It is read apart from the others: chemistry gold is scored by what the
+chemistry says (`eval/equations_chem.py`), the primary number is "chemically right" with the lone `×` left out and the number with
+it kept beside it, and the success rule is in the registration. Every candidate section is fetched, its equations counted (a
+reaction arrow, state symbol, formula of two or more element symbols or ion is chemistry), its word 8-grams compared with every
+used or possibly sealed section, and it is printed to Letter with the renderer of stratum B for the page gate; a section that
+fails is logged with the gate and skipped. The two CC BY editions are close to one text and earlier sets used most of it, so the
+rule filled 1 of its 4 places. The scan for used sections skips the selection files of B and D so that a rerun of either gives
+the same draw; the command writes byte-identical output when run again.
 
 Stratum C (`src/readablestem/gold/course_corpus.py`). The licence is GitHub's SPDX id for the repository and is read again
 when the repository is fetched; forks, archived repositories and anything else (NC, ND, GPL, no licence) are refused. Documents
@@ -505,7 +515,7 @@ No run was repeated. The offline replays (ReadableSTEM's HTML for the invented-c
 | Reports | `scripts/realworld_report.py`, `scripts/realworld_invented.py`; results `data/realworld/results-*.json`, `invented-*.json` |
 | Registration | `data/realworld/PREREGISTRATION.md`, `-ADDENDUM-1.md`, `-ADDENDUM-2.md`, `REGISTRATION.sha256`, `scripts/realworld_register.py` |
 | Manifests and the candidate log | `data/realworld/manifest-dev.json`, `manifest-heldout.json`, `pool.json`, `order-*.json`, `candidates.json`, `spend-log.jsonl` |
-| Fifth fresh split | `scripts/fresh5_select.py`, `src/readablestem/gold/course_corpus.py`, `data/realworld/PREREGISTRATION-FRESH5.md` (draft), `selection-fresh5-B.json`, `pool-fresh5-course.json`, `manifest-fresh5a.json`, `manifest-fresh5c.json` |
+| Fifth fresh split | `scripts/fresh5_select.py`, `src/readablestem/gold/course_corpus.py`, `data/realworld/PREREGISTRATION-FRESH5.md` (draft), `selection-fresh5-B.json`, `selection-fresh5-D.json`, `pool-fresh5-course.json`, `manifest-fresh5a.json`, `manifest-fresh5c.json` |
 | Tests | `tests/test_arxiv_tex.py` (fixtures in `tests/fixtures/arxiv_tex/`), `tests/test_fresh5_select.py` |
 | Corpus, gold, PDFs, recorded answers (not in the repository) | `~/.cache/readablestem/realworld/{papers,gold,runs}` |
 
