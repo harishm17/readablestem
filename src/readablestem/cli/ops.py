@@ -1,5 +1,5 @@
 """CLI commands: readablestem ops aggregate|purge|cron|launch-check|backup-check|restore-drill|
-report|export-opted-in|decisions-canary|claude-canary.
+report|export-opted-in|decisions-canary|claude-canary|replay-erasures.
 
 The same tasks the web app runs on its hourly cron call, for running by hand or as the
 Railway `cron` service (`readablestem ops cron`). Output is counts only, as `key=value` pairs on
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -41,6 +42,17 @@ def register(
     sub.add_parser(
         "cron", help="aggregate, then purge (purge runs even if aggregation fails)"
     ).set_defaults(func=_cmd_cron)
+    replay = sub.add_parser(
+        "replay-erasures",
+        help="after restoring a backup: erase again every account in the erasure ledger "
+        "(first merging --ledger-csv, the ledger exported from the database before the restore)",
+    )
+    replay.add_argument(
+        "--ledger-csv",
+        type=Path,
+        help="CSV of user_hash,erased_at exported from the current database before the restore",
+    )
+    replay.set_defaults(func=_cmd_replay_erasures)
     sub.add_parser(
         "launch-check",
         help="list what is unfinished before real users: draft pages, demo, eval baseline, "
@@ -162,12 +174,67 @@ def _cmd_cron(args: argparse.Namespace) -> int:
     from readablestem.ops.retention import aggregate_and_purge
 
     try:
-        aggregated, stats = aggregate_and_purge(_factory())
+        factory = _factory()
+        aggregated, stats = aggregate_and_purge(factory)
     except SQLAlchemyError as exc:
         return _db_error(exc)
     shown = "failed" if aggregated is None else str(aggregated)
     print(f"aggregated_jobs={shown} {_purge_line(stats)}")
-    return 1 if aggregated is None else 0
+    if aggregated is None:
+        return 1
+    # Both halves worked: tell /healthz/ops. A failure to write it is a failed run.
+    from readablestem.ops import heartbeat
+    from readablestem.web.db import session_scope
+
+    try:
+        with session_scope(factory) as session:
+            heartbeat.beat(
+                session,
+                heartbeat.CRON,
+                f"aggregated={aggregated} jobs_deleted={stats.jobs_deleted}",
+            )
+    except SQLAlchemyError as exc:
+        return _db_error(exc)
+    return 0
+
+
+def _read_ledger_csv(path: Path) -> list[tuple[str, datetime]]:
+    """Rows of `user_hash,erased_at` (no header needed; a header line is skipped)."""
+    import csv
+    from datetime import UTC
+
+    rows: list[tuple[str, datetime]] = []
+    with path.open(newline="", encoding="utf-8") as handle:
+        for record in csv.reader(handle):
+            if len(record) < 2 or record[0] == "user_hash":
+                continue
+            digest = record[0].strip()
+            if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+                raise ValueError("a ledger row does not start with a SHA-256 hash")
+            moment = datetime.fromisoformat(record[1].strip())
+            rows.append((digest, moment if moment.tzinfo else moment.replace(tzinfo=UTC)))
+    return rows
+
+
+def _cmd_replay_erasures(args: argparse.Namespace) -> int:
+    """Erase again the accounts the ledger names that exist in this database (a restored
+    backup brings back accounts erased after it was made). Counts only."""
+    from readablestem.ops.retention import import_ledger, replay_erasures
+    from readablestem.web.db import session_scope
+
+    try:
+        imported_rows = _read_ledger_csv(args.ledger_csv) if args.ledger_csv else []
+    except (OSError, ValueError) as exc:
+        print(f"error: cannot read the ledger file ({type(exc).__name__})", file=sys.stderr)
+        return 2
+    try:
+        with session_scope(_factory()) as session:
+            imported = import_ledger(session, imported_rows)
+            erased = replay_erasures(session)
+    except SQLAlchemyError as exc:
+        return _db_error(exc)
+    print(f"ledger_imported={imported} accounts_erased={erased}")
+    return 0
 
 
 def _cmd_launch_check(args: argparse.Namespace) -> int:

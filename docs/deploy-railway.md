@@ -17,7 +17,7 @@ Instructors ── https://readablestem.com ──> Railway edge ──> web ser
                                                               Postgres service
 Cron service "cron" (same repo and Dockerfile, hourly) ── `readablestem ops cron` ──> Postgres
 Backup service "backup" (postgres:18 image, daily) ── pg_dump ──> Postgres, dumps on its volume
-GitHub uptime.yml (weekly) ── GET /readyz and /demo ──> readablestem.com
+GitHub uptime.yml (every 5 min: GET /readyz; every 3 h: GET /healthz/ops and /demo) ──> readablestem.com
 ```
 
 ## As deployed (2026-10-14)
@@ -36,7 +36,7 @@ What the first deploy found, and how production is actually configured:
   |---|---|
   | `web` | Dockerfile; pre-deploy `readablestem db upgrade`; health check `/healthz` (300 s); restart policy not set in `railway.ts`, so Railway's default applies (on failure, 10 retries); one replica; domains readablestem.com and www.readablestem.com |
   | `cron` | Same image; start `readablestem ops cron`; schedule `7 * * * *`; restart policy `NEVER`; every variable a reference to `web` (`${{web.NAME}}`) |
-  | `backup` | Image `postgres:18`; daily at 08:17 UTC `pg_dump` of the database (`PGURL=${{Postgres.DATABASE_URL}}`), gzipped onto the private volume `/backups`, then restored into a scratch database to prove it works; dumps older than 5 days are deleted (`find -mtime +5`), so the last 6 are kept; restart policy `NEVER` |
+  | `backup` | Image `postgres:18`; daily at 08:17 UTC `pg_dump` of the database (`PGURL=${{Postgres.DATABASE_URL}}`), written to a `.part` file on the private volume `/backups`, restored into a scratch database and compared with the live one (gzip reads back, completion line, every table, same `alembic_version`), and only then moved into place; on any failure it prints `backup_failed reason=...`, removes the file and exits 1; after a good run it records the `backup` heartbeat (`ops_heartbeat`); dumps older than 5 days are deleted, so the last 6 are kept; restart policy `NEVER`. The command is the bash script `backupScript` in `.railway/railway.ts` |
 
   A redeploy reuses the old deployment's settings; after changing a setting, deploy afresh with
   `railway up --service <name>`.
@@ -47,9 +47,11 @@ What the first deploy found, and how production is actually configured:
   above does the daily copy inside the same project. The privacy page's "kept for about 6 days"
   matches it. To restore: `railway ssh --service backup`, then
   `gunzip -c /backups/readablestem-<date>.sql.gz | psql "$PGURL"` into an empty database.
-  Every run also restores the new dump into a scratch database `restore_check`, counts its
-  tables, reads `alembic_version`, drops it and logs `backup_ok file=... tables=... alembic=...`;
-  a dump that does not restore fails the run. First verified run: 2026-10-14, 17 tables.
+  Every run also restores the new dump into a scratch database `restore_check`, checks it against
+  the live database (every table, the same `alembic_version`), drops it and logs
+  `backup_ok file=... tables=... alembic=...`; a dump that is cut short, does not restore or lacks a
+  table fails the run and is not kept (`backup_failed reason=...`, docs/operations.md). First
+  verified run: 2026-10-14, 17 tables.
 - **Google sign-in** is published (In production): any Google account can reach the sign-in.
   With `SIGNUP_MODE=allowlist` the app's own allowlist decides who gets in (`/admin`); with
   `SIGNUP_MODE=open` anyone with a verified Google account gets an account at the first
@@ -154,7 +156,7 @@ production if a required one is missing, and logs the reason):
 | `SOURCE_URL` | The footer's link to the source (AGPL). The default is the public repository, `https://github.com/harishm17/readablestem`, which has to exist before the first sign-in. | Leave unset, or set it to the deployed commit's URL. |
 | `MAX_USD_PER_JOB`, `MAX_USD_PER_PAGE` | Per-conversion dollar caps. | Leave unset: the defaults for Claude are $3.00 and $1.00, and the start-up check refuses numbers that cannot work. |
 | `FEEDBACK_URL` | The footer's Feedback link. | Leave unset: it becomes an email to `CONTACT_EMAIL`. A form service is a new data processor to name on the privacy page. |
-| `ALERT_EMAIL` | Read only by `deploy/deploy.sh` (Google Cloud alert policies). The app ignores it, so setting it on Railway does nothing. | Skip. Use Railway's project notifications and the weekly GitHub uptime check (below). |
+| `ALERT_EMAIL` | Read only by `deploy/deploy.sh` (Google Cloud alert policies). The app ignores it, so setting it on Railway does nothing. | Skip. Use Railway's project notifications and the GitHub uptime checks (below). |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | Defaults 24 hours and 30 days. | Leave unset. If you set them, the cron service needs the same values (reference the web service's). |
 | `CLAUDE_CANARY` | Daily drift check of the Claude second check. Only the HTTP cron route runs it, so with the cron service it never runs and this variable does nothing. | Leave unset. |
 | `INSTALL_LIBREOFFICE` | Build argument, see decision 4. | Unset. |
@@ -212,7 +214,8 @@ only flags `TRUSTED_PROXY_HOPS=0`.
    deployment may take traffic. `/healthz` needs the database and nothing else. `/readyz` also needs
    the worker thread and the model provider to be set up, so a provider problem would block a deploy
    that is otherwise fine and a worker starting late would be read as a failed deploy. `/readyz` is
-   what the weekly GitHub uptime check and your own monitoring should read. Railway's health check
+   what the GitHub uptime check (every 5 minutes) and your own monitoring should read. `/healthz/ops`
+   says the backup and the cron ran lately (below). Railway's health check
    sends its requests from the host name `healthcheck.railway.app`; the app does not restrict host
    names, so nothing needs adding.
 6. **Deploy,** watch the build and deploy logs. The first deploy creates the schema.
@@ -226,8 +229,12 @@ only flags `TRUSTED_PROXY_HOPS=0`.
 10. **Check it:** `curl https://readablestem.com/healthz`, `/readyz` (each worker, database, provider
     word should read ok), sign in at the domain, convert one small PDF, download, delete.
 11. **Run the launch check** against production settings (below) and clear its list.
-12. **GitHub:** repository variable `LIVE_URL=https://readablestem.com` turns on the weekly
-    `uptime.yml` check of `/readyz` and `/demo`.
+12. **GitHub:** repository variable `LIVE_URL=https://readablestem.com` turns on the
+    `uptime.yml` checks: `/readyz` every 5 minutes, `/healthz/ops` and `/demo` every 3 hours. Set it
+    after the first `cron` run and the first `backup` run on a release that has `ops_heartbeat`
+    (`/healthz/ops` is 503 until both have reported). GitHub emails a failed run to the repository
+    owner, and turns scheduled workflows off after 60 days without a commit to a public
+    repository (docs/operations.md, "Health, readiness and shutdown").
 
 ## Cron
 
@@ -289,17 +296,22 @@ without repository activity, which is why option A is the recommendation.
 The Postgres service stores its data on a Railway volume. The `backup` service in
 `.railway/railway.ts` is the backup: daily at 08:17 UTC it dumps the database with `pg_dump`
 to `/backups/readablestem-<date>.sql.gz` on its own volume (`backup-volume`), restores the dump
-into a scratch database, and logs `backup_ok file=... tables=... alembic=...`. It keeps the
-last 6 dumps. The privacy page's "about 6 days" matches that (decision 1). Railway's own
+into a scratch database, checks it against the live database and logs
+`backup_ok file=... tables=... alembic=...` (or `backup_failed reason=...` and a failed run), and
+records the heartbeat that `/healthz/ops` reads. It keeps the last 6 dumps. The privacy page's "about 6 days" matches that (decision 1). Railway's own
 volume backups (docs.railway.com/volumes/backups) are not switched on.
 
 Restore into an empty database with `railway ssh --service backup`, then
 `gunzip -c /backups/readablestem-<date>.sql.gz | psql "$PGURL"`. A restore also brings back
 documents that retention had already deleted: run the cron right after (redeploy the `cron`
-service). Check the restored copy with `readablestem ops backup-check`.
+service). Then `readablestem ops replay-erasures` erases again the accounts that were erased
+after the dump was made (export the current `erasure_ledger` first if the old database can still
+be reached; docs/operations.md, "Backups and restore"). Check the restored copy with
+`readablestem ops backup-check`.
 
-Check that it runs: the `backup` service's latest deployment log should show today's
-`backup_ok` line. A run that fails shows in the deployments list.
+Check that it runs: `/healthz/ops` (and the GitHub uptime job that calls it), or the `backup`
+service's latest deployment log, which should show today's `backup_ok` line. A run that fails
+shows in the deployments list and as `backup_failed reason=...`.
 
 Prove a restore before real users. With a scratch database: `readablestem ops restore-drill`
 (pg_dump into a scratch database and back, counts only) and `readablestem ops backup-check` on a
@@ -388,8 +400,9 @@ Then fix on a branch and ship forward.
   `sigterm_received`, `schema_ahead`.
 - Railway keeps logs for a limited time (**confirm** for Hobby), so they are not a record of anything.
 - Alerts: the Cloud Monitoring policies in `deploy.sh` have no Railway equivalent. Use Railway's project
-  notifications (Settings > Notifications, for failed deploys and crashes; **confirm**), the weekly GitHub
-  uptime workflow, and the model provider's own spend alert (the hard stops are the provider's workspace limit
+  notifications (Settings > Notifications, for failed deploys and crashes; **confirm**), the GitHub
+  uptime workflow (`/readyz` every 5 minutes; `/healthz/ops`, which goes 503 when the daily backup or the
+  hourly cron did not finish, every 3 hours), and the model provider's own spend alert (the hard stops are the provider's workspace limit
   and `DAILY_SPEND_CAP_USD`).
 
 ## Running the launch check against production

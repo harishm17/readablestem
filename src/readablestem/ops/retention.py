@@ -29,6 +29,7 @@ the same purge deletes every event older than `EVENT_RETENTION_DAYS` (400 days).
 
 from __future__ import annotations
 
+import hashlib
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -49,12 +50,14 @@ from readablestem.ops.aggregate import (
     upsert_counts,
     utc_day,
 )
+from readablestem.web.database import insert_ignore
 from readablestem.web.db import (
     AuthIdentity,
     Blob,
     Course,
     CourseNotation,
     DeletedAccount,
+    ErasureLedger,
     Event,
     Job,
     LinkedEmail,
@@ -241,6 +244,8 @@ def erase_user(
     daily page counts, and the user row.
     With `tombstone_key`, what the account used today is first recorded under a hash of its
     address (`web.tombstones`), so that signing up again today does not reset the day's limits.
+    The erasure is also written to the ledger (`erasure_ledger`: a hash of the user id and the
+    time), so that restoring an older backup can have it done again (`replay_erasures`).
     Returns the job deletion's stats.
     """
     if tombstone_key is not None:
@@ -265,7 +270,54 @@ def erase_user(
     session.execute(delete(LoginLink).where(LoginLink.user_id == user_id))
     session.execute(delete(QuotaDay).where(QuotaDay.user_id == user_id))
     session.execute(delete(User).where(User.id == user_id))
+    record_erasure(session, user_id, now)
     return stats
+
+
+def user_hash(user_id: str) -> str:
+    """What the erasure ledger keeps of a user id: its SHA-256. User ids are random 128-bit
+    values, so the hash cannot be turned back into one by guessing."""
+    return hashlib.sha256(user_id.encode()).hexdigest()
+
+
+def record_erasure(session: Session, user_id: str, now: datetime | None = None) -> None:
+    """Add the user to the erasure ledger, in the caller's transaction (an earlier entry for
+    the same user is kept as it is)."""
+    insert_ignore(
+        session,
+        ErasureLedger,
+        {"user_hash": user_hash(user_id), "erased_at": _as_utc(now or datetime.now(UTC))},
+    )
+
+
+def replay_erasures(session: Session, now: datetime | None = None) -> int:
+    """Erase again every user whose hash is in the ledger, in the caller's transaction.
+    Returns how many were erased. For a database restored from a backup made before the
+    erasure: its own ledger holds the older entries, and `import_ledger` adds the current
+    database's. Users the ledger does not name are never touched."""
+    ledger = set(session.scalars(select(ErasureLedger.user_hash)))
+    if not ledger:
+        return 0
+    erased = 0
+    for user_id in list(session.scalars(select(User.id))):
+        if user_hash(user_id) in ledger:
+            erase_user(session, user_id, now)
+            erased += 1
+    return erased
+
+
+def import_ledger(session: Session, rows: Iterable[tuple[str, datetime]]) -> int:
+    """Add ledger entries exported from another copy of the database, in the caller's
+    transaction; existing entries stay. Returns how many were new."""
+    known = set(session.scalars(select(ErasureLedger.user_hash)))
+    added = 0
+    for digest, erased_at in rows:
+        if digest in known:
+            continue
+        session.add(ErasureLedger(user_hash=digest, erased_at=_as_utc(erased_at)))
+        known.add(digest)
+        added += 1
+    return added
 
 
 def _aggregate_before_delete(session: Session, job_ids: list[str], now: datetime) -> bool:
