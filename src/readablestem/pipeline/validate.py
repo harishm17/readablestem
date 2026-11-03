@@ -750,11 +750,43 @@ def _has_file_name(text: str) -> bool:
 
 
 # Single-token camera, scan and export names: IMG_2041, DSC0042, figure_3_2, scan-0001.
-_FILE_STEM = re.compile(
-    r"^(img|dsc|dscn|dcim|pxl|image|fig|figure|scan|screenshot|pic|photo)[\W_]*\d[\w\-]*$"
-    r"|^\w+_\w+$",
-    re.I,
+_CAMERA_PREFIXES = tuple(
+    re.compile(p, re.I)
+    for p in (
+        *("img", "dsc", "dscn", "dcim", "pxl", "image", "fig", "figure"),
+        *("scan", "screenshot", "pic", "photo"),
+    )
 )
+
+
+def _word(c: str) -> bool:
+    return c.isalnum() or c == "_"  # what `\w` matches
+
+
+def _is_file_stem(text: str) -> bool:
+    """A camera, scan or export name (a prefix, separators, a digit, then name characters:
+    "IMG_2041", "scan-0001") or two words joined by "_" ("figure_3"). Plain string tests,
+    the same answers as the pattern `^(prefix)[\\W_]*\\d[\\w\\-]*$|^\\w+_\\w+$` they replace,
+    in linear time (that pattern was quadratic on "a_a_a_..." , CodeQL py/polynomial-redos)."""
+    body = text[:-1] if text.endswith("\n") else text  # `$` also matched before a final newline
+    if body and all(_word(c) for c in body) and "_" in body[1:-1]:
+        return True
+    for prefix in _CAMERA_PREFIXES:
+        found = prefix.match(text)
+        if found is None:
+            continue
+        if found.end() > len(body):
+            continue
+        rest, i = body[found.end() :], 0
+        while i < len(rest) and not rest[i].isalnum():  # `[\W_]*`
+            i += 1
+        # `\d`, then `[\w\-]*` to the end
+        digit = i < len(rest) and rest[i].isdecimal()
+        if digit and all(_word(c) or c == "-" for c in rest[i + 1 :]):
+            return True
+    return False
+
+
 # URLs, script URLs, data URIs, HTML tags or entities, Markdown links, LaTeX commands. A tag's
 # body is `[^<>]*`: a failed match stops at the next "<", so many "<a" with no ">" stay linear.
 _URL_OR_MARKUP = re.compile(
@@ -844,7 +876,7 @@ def check_alt(alt: str, *, decorative: bool, caption: str | None = None) -> list
         length = _check("alt.length", "too_long", "warning")
     else:
         length = _check("alt.length", None)
-    is_filename = _has_file_name(text) or (" " not in text and bool(_FILE_STEM.match(text)))
+    is_filename = _has_file_name(text) or (" " not in text and _is_file_stem(text))
     is_placeholder = _is_placeholder(text, plain)
     is_caption_copy = bool(caption and caption.strip()) and _plain(
         _without_figure_label(text)

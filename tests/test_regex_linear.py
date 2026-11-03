@@ -72,3 +72,24 @@ def test_file_name_scan_agrees_with_the_old_pattern() -> None:
     for _ in range(200_000):
         text = "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 12)))
         assert validate._has_file_name(text) is bool(_OLD_FILE_EXTENSION.search(text)), text
+
+
+# The pattern `_is_file_stem` replaced.
+_OLD_FILE_STEM = re.compile(
+    r"^(img|dsc|dscn|dcim|pxl|image|fig|figure|scan|screenshot|pic|photo)[\W_]*\d[\w\-]*$"
+    r"|^\w+_\w+$",
+    re.I,
+)
+
+
+def test_file_stem_check_agrees_with_the_old_pattern() -> None:
+    rng = random.Random(1102)
+    alphabet = ["IMG", "dsc", "n", "Figure", "scan", "pic", "_", "-", ".", "\n", "7", "a", "é", "!"]
+    for _ in range(200_000):
+        text = "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 8)))
+        assert validate._is_file_stem(text) is bool(_OLD_FILE_STEM.match(text)), repr(text)
+
+
+@pytest.mark.parametrize("text", ["a_" * N + "!", "dsc0" + "0" * N + "!", "IMG" + "_" * N])
+def test_file_stem_check_is_linear(text: str) -> None:
+    _fast(lambda: validate._is_file_stem(text))
