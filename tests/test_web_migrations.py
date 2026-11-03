@@ -237,7 +237,8 @@ SIGN_IN_REVISION = "5e2b8d70a3c1"
 RESULTS_REVISION = "d3f8a1c5b920"  # the answer to an upload of several files
 OPEN_SIGNUP_REVISION = "a6c2e9f4b713"  # open sign-up (tests/test_web_open_signup.py)
 IMAGE_PAGES_REVISION = "c4e7a2b9d150"  # the image pages choice (tests/test_web_image_pages.py)
-OPS_MONITORING_REVISION = "e1a7c3b95d24"  # the head (tests/test_ops_monitoring.py)
+OPS_MONITORING_REVISION = "e1a7c3b95d24"  # (tests/test_ops_monitoring.py)
+JOB_SHARES_REVISION = "b7112167eb0d"  # the head (tests/test_job_shares.py)
 SIGN_IN_TABLES = {"linked_emails", "login_links"}
 
 
@@ -264,7 +265,9 @@ def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
     assert image_pages is not None and image_pages.down_revision == OPEN_SIGNUP_REVISION
     monitoring = script.get_revision(OPS_MONITORING_REVISION)
     assert monitoring is not None and monitoring.down_revision == IMAGE_PAGES_REVISION
-    assert migration_heads() == {OPS_MONITORING_REVISION}  # one head, the newest
+    shares = script.get_revision(JOB_SHARES_REVISION)
+    assert shares is not None and shares.down_revision == OPS_MONITORING_REVISION
+    assert migration_heads() == {JOB_SHARES_REVISION}  # one head, the newest
 
 
 def test_the_job_page_migration_keeps_jobs_and_maps_the_old_opt_in(tmp_path):

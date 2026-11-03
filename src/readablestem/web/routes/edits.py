@@ -2,12 +2,12 @@
 paragraph's words, making a line a heading, adding a picture or an equation the tool did
 not find, accepting the clean tables in one action.
 
-Every route here is a POST that is CSRF-checked and owner-only (`owned_job` answers 404 for
-someone else's job), carries the review version its page was drawn at (a form from an
-out-of-date tab is refused, not applied), and writes the way a review decision does
-(`routes/review.py`): lock the job row, apply the edit to the stored result, store a
-`ReviewEdit`, mark the HTML file out of date (it is made again when somebody asks for it,
-`jobs.current_html`), count the write. Nothing renders on the click. All of them work
+Every route here is a POST that is CSRF-checked and needs the Review right (`job_access`: a 404
+for a stranger, a 403 for someone who may only view), carries the review version its page was
+drawn at (a form from an out-of-date tab is refused, not applied), and writes the way a
+review decision does (`routes/review.py`): lock the job row, apply the edit to the stored
+result, store a `ReviewEdit`, mark the HTML file out of date (it is made again when somebody
+asks for it, `jobs.current_html`), count the write. Nothing renders on the click. All of them work
 without JavaScript: a redirect to the Split View with a notice, or the page again (422) with
 the error beside the field and what was typed kept.
 
@@ -54,7 +54,7 @@ from readablestem.web.review import (
     is_stale,
 )
 from readablestem.web.review import accept_clean_tables as accept_clean_tables_rule
-from readablestem.web.routes.jobs import NOT_FOUND, owned_job, require_done
+from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done
 from readablestem.web.routes.review import (
     _landing,
     _review_edit,
@@ -62,6 +62,7 @@ from readablestem.web.routes.review import (
     _stale_page,
     done_message,
 )
+from readablestem.web.shares import REVIEW
 from readablestem.web.worker import db_safe
 
 logger = logging.getLogger(__name__)
@@ -90,7 +91,7 @@ def write_structure(
     carry that id as `job_id`) or a PageError (404)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user, lock=True)
+        job = job_access(session, job_id, user, REVIEW, lock=True)
         require_done(job)
         if is_stale(job.result_version, version):
             raise ReviewStale(job.id)
@@ -271,7 +272,7 @@ def _invalid_screen(
 def _page_of(request: Request, job_id: str, user: CurrentUser, element_id: str) -> int:
     """The 1-based page of an element of the user's job (404 otherwise)."""
     with session_scope(get_ctx(request).factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, REVIEW)
         require_done(job)
         result = DocumentResult.model_validate(job.result_json or {})
     element = next((e for e in result.elements if e.id == element_id), None)
@@ -438,7 +439,7 @@ def add_region(
     try:
         # Check before anything is rendered or spent that this form is not out of date.
         with session_scope(ctx.factory) as session:
-            job = owned_job(session, job_id, user)
+            job = job_access(session, job_id, user, REVIEW)
             require_done(job)
             if is_stale(job.result_version, version):
                 raise ReviewStale(job.id)
@@ -541,7 +542,7 @@ def write_review(
         session_scope(ctx.factory) as session,
         notation.in_force(ctx.factory, ctx.settings, job_id),
     ):
-        job = owned_job(session, job_id, user, lock=True)
+        job = job_access(session, job_id, user, REVIEW, lock=True)
         require_done(job)
         if is_stale(job.result_version, version):
             raise ReviewStale(job.id)
@@ -640,7 +641,7 @@ def read_cell(
     enforce(request, "reread", user.id)
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, REVIEW)
         require_done(job)
         stale = is_stale(job.result_version, version)
         result = DocumentResult.model_validate(job.result_json or {})

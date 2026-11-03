@@ -22,6 +22,18 @@
 </section>
 {% endif %}
 
+{# Documents other people shared with this address (web/shares.py): a plain list of links. #}
+{% if shared_documents|default([]) %}
+<section aria-labelledby="shared-heading">
+  <h2 id="shared-heading">Shared with you</h2>
+  <ul>
+    {% for item in shared_documents %}
+    <li><a href="/jobs/{{ item.id }}">{{ item.title }}</a>: shared by {{ item.owner }}, you can {{ "review" if item.role == "Review" else "view" }} it.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 {% if pending|default([]) %}
 {# T3-3: large files kept while their pages are chosen (web/pending.py). #}
 <section aria-labelledby="pending-heading" id="pending">

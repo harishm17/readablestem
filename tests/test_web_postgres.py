@@ -516,13 +516,13 @@ def test_erasure_and_course_deletion_on_postgres(factory):
 
 
 def test_only_one_of_20_tabs_writing_from_the_same_version_gets_through(factory):
-    """The review routes lock the job row (`owned_job(..., lock=True)`), then check the
+    """The review routes lock the job row (`job_access(..., lock=True)`), then check the
     form's version (`web.review.is_stale`) and count the write (`bump_result_version`) in
     one transaction: of 20 tabs made from version 0 and writing at once, exactly one write
     is applied."""
     from readablestem.web.deps import CurrentUser
     from readablestem.web.review import ReviewStale, bump_result_version, is_stale
-    from readablestem.web.routes.jobs import owned_job
+    from readablestem.web.routes.jobs import job_access
 
     [job_id] = queue_jobs(factory, 1)
     with db.session_scope(factory) as session:
@@ -535,7 +535,7 @@ def test_only_one_of_20_tabs_writing_from_the_same_version_gets_through(factory)
     def write() -> None:
         try:
             with db.session_scope(factory) as session:
-                job = owned_job(session, job_id, user, lock=True)
+                job = job_access(session, job_id, user, "review", lock=True)
                 if is_stale(job.result_version, "0"):
                     raise ReviewStale(job.id)
                 bump_result_version(job)

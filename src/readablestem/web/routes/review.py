@@ -75,6 +75,7 @@ from readablestem.web import (
     notice_places,
     page_edits,
     retention,
+    shares,
 )
 from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
 from readablestem.web.deps import (
@@ -145,7 +146,8 @@ from readablestem.web.review import (
     review_anchor,
     undo_last,
 )
-from readablestem.web.routes.jobs import NOT_FOUND, owned_job, require_done
+from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done
+from readablestem.web.shares import REVIEW
 from readablestem.web.table_card import TableCard, table_card
 from readablestem.web.views import (
     KIND_LABELS,
@@ -1045,9 +1047,10 @@ def _load_versioned(
 ) -> tuple[JobView, DocumentResult, set[str], int]:
     """`_load`, and the job's review version: what the page's forms carry (stale guard)."""
     with session_scope(get_ctx(request).factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, REVIEW)
         require_done(job)
-        view = job_view(session, job, with_summary=True)
+        role = shares.role_of(session, job, user.id, user.email) or REVIEW
+        view = job_view(session, job, with_summary=True, role=role)
         result = DocumentResult.model_validate(job.result_json or {})
         crop_ids = set(
             session.scalars(
@@ -1478,7 +1481,7 @@ def review_action(
             session_scope(ctx.factory) as session,
             notation.in_force(ctx.factory, ctx.settings, job_id),
         ):
-            job = owned_job(session, job_id, user, lock=True)
+            job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
             _refuse_stale(job, version)
@@ -1585,7 +1588,7 @@ def _group_action(
 ) -> Response:
     try:
         with session_scope(get_ctx(request).factory) as session:
-            job = owned_job(session, job_id, user, lock=True)
+            job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
             _refuse_stale(job, version)
@@ -1656,7 +1659,7 @@ def _page_group_action(
             message = "Choose “Keep”: these images have nothing else to accept."
             raise ReviewInvalid([FieldError(f"group-actions-{group_key}", message)])
         with session_scope(get_ctx(request).factory) as session:
-            job = owned_job(session, job_id, user, lock=True)
+            job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
             _refuse_stale(job, version)
@@ -1831,7 +1834,7 @@ def can_undo(edits: list[ReviewEdit]) -> bool:
 def undo_offer(request: Request, job_id: str, user: CurrentUser, version: int) -> bool:
     """Whether the notice after a decision offers Undo (one small query)."""
     with session_scope(get_ctx(request).factory) as session:
-        owned_job(session, job_id, user)
+        job_access(session, job_id, user, REVIEW)
         return can_undo(last_write(session, job_id, version))
 
 
@@ -1856,7 +1859,7 @@ def undo(
     view = view if view == SYMBOLS_VIEW else (LIST_VIEW if view == LIST_VIEW else "split")
     try:
         with session_scope(get_ctx(request).factory) as session:
-            job = owned_job(session, job_id, user, lock=True)
+            job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
             if not version.strip():
