@@ -558,7 +558,7 @@ layout's. Measurements: [eval-page-math.md](eval-page-math.md).
 ## Page witness and the glyph-checked second reading (equations; `FEATURE_PAGE_WITNESS`, off)
 
 With the flag on, one call per maths page (`pipeline/page_witness.py`, prompt `page_witness`, model
-`PAGE_WITNESS_MODEL`, default `claude-opus-5-5`, output limit `PAGE_WITNESS_MAX_OUTPUT_TOKENS` 12,288, effort
+`PAGE_WITNESS_MODEL`, default `claude-opus-5-5`, output limit `PAGE_WITNESS_MAX_OUTPUT_TOKENS` 12,288, timeout `PAGE_WITNESS_TIMEOUT_S` 240 s (a timeout is charged its whole worst-case reservation), effort
 `ANTHROPIC_EFFORT_PAGE_WITNESS`, default medium) reads every formula on the page from the page image and the
 numbered text-layer rows, table cells, captions and figure labels included. Each formula is anchored by a quote
 of its text-layer row(s); `page_math.locate` and `page_math.verify` decide whether the quote holds, so a formula
@@ -596,8 +596,10 @@ out. The equation step then compares its crop reading with the witness's:
 - **witness-only**: a new element is always a required decision (`witness_added`).
 
 The review card does not show `other_latex` yet. Without the flag nothing here runs and the output is as before.
-The prompt is not used by default; the first measurement is the registered dev run (E1), a later, separately
-approved step.
+The flag is off. The first measurement, on 12 development papers with Sonnet as the witness
+(docs/eval-equation-round5.md), found no change in any reading and no detection addition, silent errors
+2.1 per 100 gold lower (more required decisions: flag recall 0.26 to 0.41, one more decision a page, 2.4 cents
+a page), and stopped under the registered rule; Opus as the witness was not measured.
 
 ## Course notation (equations)
 

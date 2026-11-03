@@ -407,13 +407,18 @@ class Settings(BaseSettings):
     # formula on the page (table cells, captions and figure labels included) as LaTeX anchored
     # in the text layer. Its readings are a second witness beside the crop's: agreement is a
     # note only (errors are correlated: D2), a formula only the witness found becomes a new
-    # element, a disagreement is a decision showing both readings. Off until the registered dev
-    # run (E1) says it helps; nothing reads these settings while the flag is off.
+    # element, a disagreement is a decision showing both readings. Off: the dev run (E1,
+    # docs/eval-equation-round5.md) found no accuracy gain; nothing reads these settings while
+    # the flag is off.
     feature_page_witness: bool = False
     page_witness_model: str = "claude-opus-5-5"
     # Output limit of one witness call (thinking is allowed on top of it): a dense page lists
     # a hundred formulas or more, and a call that ends at the limit is split in two.
     page_witness_max_output_tokens: int = Field(default=12288, ge=1024, le=32000)
+    # Seconds one witness call may take. A dense page with thinking takes a minute or more (the
+    # E1 dev run saw 58 s answers and timeouts at `model_timeout_s`), and a timeout is charged
+    # its whole worst-case reservation.
+    page_witness_timeout_s: float = Field(default=240.0, gt=0, le=600)
     # Scanned and handwritten pages (`page_type`) can be read from an image of the page by one
     # vision call each and put into the document as elements that are all review items (ADR 0007,
     # pipeline/image_page.py). In the web app this flag only OFFERS the option: the upload form

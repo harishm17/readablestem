@@ -181,7 +181,8 @@ def cmd_rs(args: argparse.Namespace) -> int:
     argv = [
         "eval", "pipeline", "--task", "document", "--provider", "anthropic",
         "--answers", str(answers), "--items", str(items), "--out", str(report),
-        "--section-workers", "3", "--cache", str(out_dir / "cache"),
+        "--section-workers", str(args.section_workers),
+        "--concurrency", str(args.concurrency), "--cache", str(out_dir / "cache"),
         "--max-usd", str(args.max_usd),
     ]  # fmt: skip
     if args.offline:
@@ -402,6 +403,12 @@ def main() -> int:
                 "--seed-answers-from", help="tag whose answers file this run starts from"
             )
             p.add_argument("--papers", help="comma-separated arXiv ids (default: all of the part)")
+            p.add_argument(
+                "--section-workers", type=int, default=3, help="papers converted at once"
+            )
+            p.add_argument(
+                "--concurrency", type=int, default=4, help="worker threads inside one paper"
+            )
             p.add_argument("--note", default="")
         if name in ("chat", "chat-items"):
             p.add_argument("--arm", choices=sorted(chatbot.ARM_BY_ID), required=True)
