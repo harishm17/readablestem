@@ -1,0 +1,78 @@
+name: EPUB validators
+
+# Runs EPUBCheck and DAISY Ace on the EPUB export (tests/test_export_epub_validators.py).
+# Both need a runtime ci.yml does not install (Java, Node), so they have their own small
+# workflow; locally those tests skip when the tools are missing. REQUIRE_EPUB_VALIDATORS
+# turns a skip into a failure here. A pass is not a claim of conformance.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/readablestem/pipeline/export_epub.py"
+      - "src/readablestem/cli/export.py"
+      - ".github/ace/**"
+      - "src/readablestem/pipeline/export_canvas.py"
+      - "src/readablestem/pipeline/assemble.py"
+      - "tests/test_export_epub*.py"
+      - ".github/workflows/epub.yml"
+  pull_request:
+    paths:
+      - "src/readablestem/pipeline/export_epub.py"
+      - "src/readablestem/cli/export.py"
+      - ".github/ace/**"
+      - "src/readablestem/pipeline/export_canvas.py"
+      - "src/readablestem/pipeline/assemble.py"
+      - "tests/test_export_epub*.py"
+      - ".github/workflows/epub.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: epub-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EPUBCHECK_VERSION: "5.4.0"
+  # sha256 of epubcheck-5.4.0.zip from the w3c/epubcheck release, checked 2026-11-02.
+  EPUBCHECK_SHA256: "33350c61038e71dfb3d45a76aed04bf5481e6d5500cb780f6e98db8bbd15a28c"
+
+jobs:
+  validate:
+    name: EPUBCheck and DAISY Ace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Install EPUBCheck (official release, hash checked)
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/epubcheck.zip" \
+            "https://github.com/w3c/epubcheck/releases/download/v${EPUBCHECK_VERSION}/epubcheck-${EPUBCHECK_VERSION}.zip"
+          echo "${EPUBCHECK_SHA256}  $RUNNER_TEMP/epubcheck.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/epubcheck.zip" -d "$RUNNER_TEMP/epubcheck"
+          echo "EPUBCHECK_JAR=$RUNNER_TEMP/epubcheck/epubcheck-${EPUBCHECK_VERSION}/epubcheck.jar" >> "$GITHUB_ENV"
+      # Ace and everything it pulls in come from the committed lockfile (.github/ace).
+      - name: Install DAISY Ace (npm ci)
+        run: npm ci --prefix .github/ace
+      - name: Install (locked)
+        run: uv sync --locked --all-extras --group browser
+      - name: EPUBCheck and Ace on the golden documents
+        env:
+          REQUIRE_EPUB_VALIDATORS: "1"
+          ACE: xvfb-run -a ${{ github.workspace }}/.github/ace/node_modules/.bin/ace  # Ace drives Electron, which needs a display
+        run: uv run pytest tests/test_export_epub.py tests/test_export_epub_validators.py

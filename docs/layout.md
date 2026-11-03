@@ -1199,7 +1199,8 @@ decision. On request, per upload (the box "Convert scanned or handwritten pages"
 `FEATURE_IMAGE_PAGES`, default off; [ADR 0007](decisions/0007-image-pages.md), measured in
 [eval-image-pages.md](eval-image-pages.md)) a page the types below call
 `scan_no_text`, `scan_ocr`, `handwritten` or `handwritten_ocr` (kept reasons `scanned_page` and
-`handwritten_page`, nothing else) is read from an image of the page instead, every block of it
+`handwritten_page`, and a picture under a text layer that does not cover it, `unread_page`
+with the reason `text_not_covering_content`; nothing else) is read from an image of the page instead, every block of it
 is a review item, and the page keeps its original: see "Pages read from an image" below. A page
 the pass cannot read stays a kept image exactly as described here.
 
@@ -1232,15 +1233,15 @@ The text pass's glyphs (`page_glyphs`) skip the same invisible spans.
 extracts (`_read_page`; image boxes come from MuPDF's image blocks, which decode no
 image) and returns a kind, the characters it may trust, where its content would have to
 come from, and content-free reason codes. It is detect v4 from the research, ported with
-the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.4"):
+the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.5"):
 
 | Kind | What it is | What the app does |
 |---|---|---|
-| `born_digital` | visible text, nothing hidden | reads it as before |
+| `born_digital` | visible text that covers the page's content, nothing hidden | reads it as before |
 | `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count |
 | `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and ticked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple for the stroke test (a tick, a cross, a one-stroke signature) are cut out too ("Small drawings on a typed page") |
 | `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer | the page is kept as its image (`handwritten_page`): no elements |
-| `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements. With a little visible typed text and nothing hidden (a typed header on a scan, a title slide on a photo) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`) |
+| `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements. With a little visible typed text and nothing hidden (a typed header on a scan, a title slide on a photo, a watermark or page number over a photographed page) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`). If the text does not cover the picture (reason `text_not_covering_content`, below) the image page pass reads it as a scan (`page_type.reads_image`) |
 | `vector_no_text` | drawings, little or no text | read as before (figures); kept as an image (`unread_page`) when it has less than a line (40 characters) of visible text and its ink could not be analysed in time; its visible text is read, its drawings are not sent to the figure model |
 | `blank` | nothing painted, or paper rules alone | nothing |
 
@@ -1270,6 +1271,39 @@ The decisions in the rules, with the measured values next to each threshold in t
   when its hidden characters are at least max(20, its visible characters), or when a page
   image covers half of it and 20 or more characters are hidden (a scan with a visible
   "Downloaded from" stamp; notes under a typed template header).
+- **A text layer makes a page typed only when it covers the page's content**
+  (page-type-v5.5, 2026-11-03; `TEXT_NOT_COVERING`). Three of five real photographed notebook
+  pages carried a watermark text layer (a diagonal channel name, a header, a page number), so
+  they were called typed, skipped the image page pass and came out "Not converted" with only the
+  watermark as text (a decision was asked, as for any kept page, but the page was never read).
+  Now a visible text layer does not make a page typed when all of these hold: pictures cover 75 %
+  of the page or more; 60 % of the page is picture with no visible text over it (boxes of text
+  lines, or of characters on a slanted line); the text covers under 12 % of the page; the text
+  has under 20 characters of *body* (furniture is translucent text, slanted text, or text whose
+  line is in the top or bottom 8 % of the page: a watermark, a running header, a page number, a
+  stamp); and a 72 dpi render shows ink (tone 45 grey levels from the page's usual one) on at
+  least 2 % of the page outside the text. The kind stays `scan_no_text` and the page stays
+  `unread_page` (its text read, so the words of a title slide are not lost when the pass is off),
+  but `page_type.reads_image` is true and the image page pass reads it as a scan. The render is
+  made only for a page the rule might apply to. A picture that is the template's background
+  repeated on the pages or one plain colour is not content: layout asks (`_page_picture`) and
+  decides such a page again without the rule (`page_type.without_picture`).
+  Calibration: on the 846-page labelled corpus (the author's machine, not in the repository;
+  `scripts/page_type_corpus_compare.py`) the rules change no page's kind or action; a first version
+  without the body-text gate changed 10 pages, all against their labels (designed covers and
+  background-image pages with real text over a picture; typed slides and boxes with ink
+  annotations, which a rule for vector writing under thin text had turned into `handwritten`; that
+  rule was dropped). The rule for vector writing is back with the same gate (below). The three real pages: picture 0.88 to 0.91, no text over it 0.78 to 0.81, text
+  0.08, ink outside the text 0.13 to 0.17. **Vector writing** (a page of writing, 40 clean strokes in 3
+  rows, as iPad notes) under furniture-only text goes the same way: `handwritten`, read by the pass
+  (`reads_image`), its text still read when the pass is off. For writing a header or footer line
+  counts as furniture only when it is a page number (15 characters or fewer); a typed header line
+  over notes is text (the corpus labels such pages `mixed_ink`, and a looser rule turned 2 of them
+  into `handwritten`). Ink-annotated typed slides have body text and stay `mixed_ink`. Not caught:
+  a watermarked page whose body text is real; a typed page
+  with a photograph of handwriting covering less than 75 % of it (a figure; its writing is not
+  read). A scan whose OCR layer is hidden (render mode 3, covered) is read from its image as it
+  always was; a visible text layer that covers the picture is the page's text.
 - **A scan is a picture of a page** (C1.5): images cover 85 % of the page, or half of it
   with no visible text at all. A slide title over a photo is a typed page with a figure.
   Hidden text with no picture of a page over vector ink (clean, or rows of writing the
@@ -1593,6 +1627,72 @@ which keeps some `vector_no_text` pages of dense ink as images, is not counted.
   given by the people who built the pages.
 - Time: median 6 ms a page, 95th percentile 0.14 s, at most about 1 s on the densest
   synthetic ink (this machine); the real iPad notes (4 pages) are refused at upload in 0.5 s.
+
+### Vector ink and strokes (`pipeline/ink_strokes.py`)
+
+A handwritten page that a notes app exported as vector paths still holds the pen's trace.
+`ink_strokes.extract_ink(page)` reads it into ordered strokes (pure PyMuPDF and numpy, no model
+call, no network). Nothing in the pipeline calls it yet: such pages are still kept as their
+image, or read from it on request, as above. It exists so a later step can give a recogniser
+strokes, or a sharp re-render of only the ink, instead of a pixel crop.
+
+**What is extracted**, from `page.get_cdrawings()` in paint order and in display space (the page
+rotation applied):
+
+| Drawn as | Stroke |
+|---|---|
+| stroked polylines and Bezier paths with a pen width, one per stroke, or one short segment per path object (as Xournal++ writes them) | `source="path"`: the path itself; consecutive two-point segments that continue each other, in one colour and width, are chained |
+| one small filled shape per pen sample (as GoodNotes writes them) | `source="samples"`: three or more touching shapes of one colour in a row of paint order are one stroke through the shape centres |
+| a filled outline of the whole stroke, several to a path object (as the committed `ios_notes.pdf` fixture imitates PencilKit) | `source="outline"`: the two edges are paired and averaged; the centre-line is the stroke, and the mean gap is the pen width |
+
+A `Stroke` has `points` (page points, y down), `colour` (`#rrggbb`), `opacity`, `width` and
+`order` (paint order, which is the pen order). A short filled mark on its own is a one-point
+stroke (a dot) or, when thin, a short tick. Wide see-through strokes (width at least 5 pt,
+opacity at most 0.85: a highlighter) are returned apart, in `PageInk.highlights`. Fully
+transparent paint is not read.
+
+**What is dropped as page furniture**, counted by reason in `PageInk.dropped`, never by colour
+(pastel ink on a pastel template stays): `rule` (an exactly axis-aligned line at least half the
+page across), `grid` (four or more evenly spaced parallel axis-aligned lines, or four or more
+equal exact rectangles, whatever their length), `dashed` (a dashed straight line), `frame` (an
+exact rectangle at least 30% of the page across), `background` (an exact filled rectangle at
+least a quarter of the page across), `dot_grid` (filled shapes on a lattice), `blob` (a filled
+shape that is neither a pen sample nor a pen outline), `hidden` and `off_page`.
+
+**Grouping.** `PageInk.regions` (reading order) holds `InkRegion`s. Strokes join into a line when
+they overlap vertically and sit within four median-stroke sizes of each other horizontally;
+lines that stack within half a stroke size and overlap horizontally join into one region (a
+fraction, a matrix, a multi-line equation). Sizes are relative, so large and small writing
+group alike. `InkRegion.strokes` is in pen order and `lines` indexes them row by row.
+`InkRegion.normalised(size)` gives each stroke's points with the region's top left at the origin,
+scaled evenly so the longer side is `size` (default 1000), and `to_inkml(size)` writes the same
+as InkML (one trace per stroke, one brush per colour and opacity, no time channel).
+
+**Limits.** Checked on synthetic ink in each style and on the two committed fixtures only; no real
+GoodNotes, Notability, OneNote or Xournal++ export has been read yet.
+
+- The direction of an outline's centre-line is a guess (the outline's first point is taken as the
+  stroke's start). A closed loop such as a handwritten o can come out either way: on the seeded
+  writer behind `ios_notes.pdf`, 139 of 150 strokes ran the right way and the 11 misses were
+  closed loops.
+- Fast pen samples whose shapes do not touch split into single dots. Three or more thin ticks
+  that touch in a row join into one stroke. There is no pressure or time.
+- A filled shape over 12 pt across that is not a long thin outline is dropped as a blob.
+- A rule drawn by hand, exactly level, across more than half the page is taken for paper.
+  A stroke whose outline crosses itself can pair its edges wrongly.
+- Regions are a proximity guess: tightly spaced lines become one region (use `lines`), and a far
+  superscript or answer can be a region of its own.
+- Limits and time: the caps and the budget are `page_type`'s (`PAGE_MAX_PATHS`, `INK_MAX_ITEMS`,
+  `InkBudget`, `INK_BUDGET_S`); `extract_ink` takes the document's `InkBudget`, checks it in
+  every phase and inside the loops, and over a cap, more than 20,000 strokes (`MAX_STROKES`) or
+  the budget returns an empty result with `analysed` false. Grouping finds neighbours with a
+  grid hash, so it is near linear: 50,000 strokes in a column, a row or at random group in
+  1 to 3 s on this machine; strokes piled on one spot (over 1,000 in one grid cell) are an
+  overrun, not a stall. Reading outlines costs about 3 ms a stroke (0.5 s for the 150 strokes
+  of `ios_notes.pdf`; 0.03 s for the 270 polylines of `ink_no_layer.pdf`).
+- Strokes wholly off the page are dropped (`off_page`), and a region's box is clipped to the page.
+- On the seeded outline writer (150 strokes, 7 pt writing), the centre-line lies a median 0.4 pt
+  (at most 1.4 pt) from the pen path; its ends can fall up to 2 pt short.
 
 ## The text pass (`pipeline/text_pass.py`, pipeline 0.4.0)
 
@@ -1969,6 +2069,10 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   in sequence, run-in labels, math-italic in a heading, paragraphs over a page break (a
   footnote and a running header between, a hyphen at the break, each reason not to join),
   the document's spelling of compounds and inline maths that wraps.
+- `tests/test_ink_strokes.py` draws ink in each export style (stroked paths, filled shapes per
+  pen sample, filled outlines) on ruled, squared and dotted paper and in pastel ink, and
+  checks the recovered strokes against the drawn paths, in pen order; it also reads the two
+  ink fixtures (`ios_notes.pdf`, `ink_no_layer.pdf`) and the seeded writer that made them.
 - `tests/test_layout_lists.py` (bullets, ordered markers, siblings, nesting, false lists),
   `tests/test_layout_equations.py` (display-equation regions and equation numbers) and
   `tests/test_layout_fragments.py` (inline fragments and the punctuation after inline

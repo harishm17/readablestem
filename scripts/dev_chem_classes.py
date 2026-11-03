@@ -2,7 +2,12 @@
 """Every chemistry gold equation of a development run, put in one outcome class.
 
     uv run python scripts/dev_chem_classes.py --gold data/dev-v2/dev LABEL=items.jsonl [...]
-        [--sections A,B] [--list CLASS,CLASS]
+        [--sections A,B] [--list CLASS,CLASS] [--speech]
+
+`items.jsonl` may be a run folder (`~/.cache/readablestem/<set>/runs/<time>/`, docs/eval.md,
+"Runs keep their recordings"): its `items.jsonl` is read. `--speech` adds what a listener hears
+(`pipeline/speech.py`): per aligned equation whether our reading is spoken as the gold is, the
+spoken defects it adds, and the silent harm per 100 gold (`eval.equations_chem.silent_harm`).
 
 Reads per-page items (`eval pipeline --task document --items FILE`, or `scripts/dev_chatbot.py
 score --out FILE`; development sets only) and the set's gold. The gold equations counted are
@@ -61,7 +66,30 @@ ORDER = [
     "undetected: x sign",
     "undetected: other",
 ]
-_PREFIX_SUB = re.compile(r"_ (?:<g> )?[−+]?\d+(?: </g>)? \^")
+
+# Does a gold equation in this class harm a listener? What the system wrote or found decides it,
+# not the scorer: the first four classes say the reading is the gold's.
+HARM = {
+    "right": "no",
+    "artefact: tokens": "no",
+    "artefact: scripts": "no",
+    "artefact: chem": "no",
+    "input: page lacks it": "no",
+    "not read": "asked",
+    "span: extra": "partly",
+    "span: partial": "partly",
+    "span: split": "partly",
+    "wrong reading": "yes",
+    "undetected: table": "yes",
+    "undetected: x sign": "no",  # the sentence around a lone sign still says "times"
+    "undetected: other": "partly",  # often a neighbour swallowed it
+}
+CHEM_RIGHT = {"right", "artefact: tokens", "artefact: scripts", "artefact: chem"}
+# Spoken forms that are defects in a reading (markup said aloud, not the chemistry).
+SPEECH_DEFECTS = re.compile(
+    r"to the power|superscript|subscript| sub |end sub|open parenthesis a q|a q close|capital"
+    r"|italic|box drawings|bold"
+)
 
 
 def pred_mathml(pair: dict) -> str | None:
@@ -78,10 +106,6 @@ def pred_mathml(pair: dict) -> str | None:
 def _contains(big: list[str], small: list[str]) -> bool:
     n = len(small)
     return n > 0 and any(big[i : i + n] == small for i in range(len(big) - n + 1))
-
-
-def _without_prefix_subscripts(stream: list[str]) -> list[str]:
-    return _PREFIX_SUB.sub("^", " ".join(stream)).split()
 
 
 def how_wrong(pred: list[str], gold: list[str]) -> str:
@@ -163,7 +187,7 @@ def classify(
             p_stream = chem.chem_of(mml)
             if p_stream == g_stream:
                 out[gold_id] = ("artefact: chem", "")
-            elif p_stream == _without_prefix_subscripts(g_stream) != g_stream:
+            elif chem.lacks_only_what_the_page_lacks(p_stream, g_stream):
                 out[gold_id] = ("input: page lacks it", "")
             elif _contains(p_stream, g_stream):
                 out[gold_id] = ("span: extra", "")
@@ -174,20 +198,98 @@ def classify(
     return out
 
 
+def harm_counts(classes: dict[str, tuple[str, str]]) -> Counter:
+    """How many gold equations harm a listener: `HARM` of each one's class."""
+    return Counter(HARM[c] for c, _ in classes.values())
+
+
+def speech_report(rows: list[dict], gold: dict[str, dict], classes: dict[str, tuple[str, str]]):
+    """What a listener hears, for the gold equations `classes` holds (`--speech`).
+
+    Per aligned gold equation: is our reading spoken as the gold is (`chem.spoken_alike`), and
+    which spoken defects (`SPEECH_DEFECTS`) it holds that the gold's speech does not. And the
+    silent harm of the report (`chem.silent_harm`): wrong, not asked, heard differently.
+    """
+    from readablestem.pipeline.speech import mathml_to_speech
+
+    def spoken(mathml: str) -> str | None:
+        try:
+            return mathml_to_speech(mathml)
+        except Exception:
+            return None
+
+    pairs = {p["gold_id"]: p for row in rows for p in row["pairs"]}
+    same: Counter = Counter()
+    defects: Counter = Counter()
+    harmed: list[str] = []
+    for gold_id, (cls, _) in classes.items():
+        pair = pairs.get(gold_id)
+        mathml = pred_mathml(pair) if pair else None
+        if mathml is None:
+            continue
+        gold_mathml = gold[gold_id]["mathml"]
+        right = cls in CHEM_RIGHT
+        alike = chem.spoken_alike(mathml, gold_mathml)
+        same[(right, alike)] += 1
+        heard, gold_heard = spoken(mathml) or "", spoken(gold_mathml) or ""
+        for found in set(SPEECH_DEFECTS.findall(heard)) - set(SPEECH_DEFECTS.findall(gold_heard)):
+            defects[(right, found)] += 1
+        if chem.silent_harm(mathml, gold_mathml, pair.get("review")):
+            harmed.append(gold_id)
+    return {
+        "spoken_alike": {
+            "right": {"same": same[(True, True)], "different": same[(True, False)]},
+            "not right": {"same": same[(False, True)], "different": same[(False, False)]},
+        },
+        "defects": {
+            f"{'right' if r else 'not right'}: {d}": n for (r, d), n in sorted(defects.items())
+        },
+        "silent_harm": sorted(harmed),
+        "per_100_gold": 100 * len(harmed) / len(classes) if classes else None,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--gold", type=Path, required=True)
     parser.add_argument("--sections", default="", help="comma list: only rows whose id has one")
     parser.add_argument("--list", default="", metavar="CLASS,...", help="print these classes")
-    parser.add_argument("runs", nargs="+", metavar="LABEL=items.jsonl")
+    parser.add_argument(
+        "--speech",
+        action="store_true",
+        help="also: is our reading spoken as the gold is, which spoken defects it holds, and "
+        "the silent harm (wrong, not asked, heard differently) per 100 gold",
+    )
+    parser.add_argument(
+        "runs",
+        nargs="+",
+        metavar="LABEL=items.jsonl",
+        help="a run's items file, or its folder under ~/.cache/readablestem/<set>/runs/",
+    )
     args = parser.parse_args()
+    from readablestem.eval.run_record import sealed_reason
+
+    checked = [("--gold", args.gold)] + [
+        (spec.partition("=")[0], Path(spec.partition("=")[2] or spec)) for spec in args.runs
+    ]
+    for what, path in checked:
+        if reason := sealed_reason(path):
+            print(
+                f"refused: {what} is for a held-out or sealed set ({reason}); this script lists "
+                "equations one by one and is for development sets only",
+                file=sys.stderr,
+            )
+            return 2
     gold = dev_chem.load_gold(args.gold)
     pools = table_pools(args.gold)
     results = {}
+    run_rows: dict[str, list[dict]] = {}
     for spec in args.runs:
         label, _, path = spec.partition("=")
+        file = Path(path)
+        run_rows[label] = dev_chem.rows_of(file / "items.jsonl" if file.is_dir() else file)
         results[label] = classify(
-            dev_chem.rows_of(Path(path)),
+            run_rows[label],
             gold,
             pools,
             args.sections.split(",") if args.sections else [],
@@ -217,6 +319,11 @@ def main() -> int:
     for label in labels:
         details = Counter(d for c, d in results[label].values() if c == "wrong reading")
         print(f"wrong reading by change, {label}:", dict(details))
+    for label in labels:
+        print(f"harms a listener, {label}:", dict(harm_counts(results[label])))
+        if args.speech:
+            report = speech_report(run_rows[label], gold, results[label])
+            print(f"speech, {label}:", json.dumps(report, ensure_ascii=False))
     for cls in [c for c in args.list.split(",") if c]:
         for label in labels:
             for g, (c, d) in sorted(results[label].items()):
