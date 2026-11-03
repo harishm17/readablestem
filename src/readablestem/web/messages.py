@@ -43,6 +43,8 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "read files or change settings, so it is never allowed.",
     ("latex.allowed_commands", "unknown_command"): "The LaTeX uses a command that is not on "
     "the list of supported maths commands, so check for a typo or rewrite it.",
+    ("latex.allowed_commands", "unsupported_ce"): "The chemistry in \\ce{...} is outside what "
+    "this tool can read, so write the formula with ordinary LaTeX.",
     ("latex.allowed_environments", "unknown_environment"): "The LaTeX uses an environment "
     "(\\begin{...}) that is not supported.",
     ("latex.command_arguments", "bad_argument"): "A command has an argument in a form that is "

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased: `\ce` subset and `\ce` on every LaTeX path (branch chem/ce-subset)
+
+- The `\ce{...}` subset (`pipeline/chem.py`) now reads a condition in a state symbol
+  (`(aq, 0.10 M)`), the excited state of a nuclide (`^{60}_{28}Ni^*`) and gas and precipitate marks (`CO2 ^`, `AgCl v`);
+  every other construct is still refused.
+- `\ce` is accepted on every path that takes LaTeX: the review screen's edit box (equation and
+  table cell), scanned pages and their second reading, table cells' HTML and page-math spans, all
+  through `equation_step.read_latex`. A `\ce` outside the subset fails the LaTeX check with the new
+  code `unsupported_ce` (was `unknown_command`) and the edit box says so in words. See
+  [docs/chemistry.md](docs/chemistry.md).
 ## Unreleased: chemistry speech fixes
 
 - The review screen's "read aloud roughly as" text (and the checks that compare readings) now
