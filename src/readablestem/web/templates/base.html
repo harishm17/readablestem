@@ -99,6 +99,7 @@
           <li><a href="/terms"{% if active == "terms" %} aria-current="page"{% endif %}>Terms</a></li>
           <li><a href="/limits"{% if active == "limits" %} aria-current="page"{% endif %}>Known limits</a></li>
           <li><a href="/help/posting"{% if active == "posting" %} aria-current="page"{% endif %}>Posting in your course</a></li>
+          <li><a href="/guides"{% if active == "guides" %} aria-current="page"{% endif %}>All guides</a></li>
           <li><a href="/guides/ada-title-ii-stem-course-materials"{% if active == "guide-ada" %} aria-current="page"{% endif %}>ADA Title II guide</a></li>
           <li><a href="/guides/readablestem-mathpix-latexml"{% if active == "guide-compare" %} aria-current="page"{% endif %}>Compared with Mathpix and LaTeXML</a></li>
           <li><a href="/status"{% if active == "status" %} aria-current="page"{% endif %}>Service status</a></li>
@@ -109,8 +110,8 @@
           {% endif %}
           <li><a href="{{ source_url }}">Source code</a></li>
           {% if showcase_on %}
-          <li><a href="/showcase/examples/index.html">Worked examples</a></li>
-          <li><a href="/showcase/method/index.html">Method and limits</a></li>
+          <li><a href="/showcase/examples/">Worked examples</a></li>
+          <li><a href="/showcase/method/">Method and limits</a></li>
           {% endif %}
           <li>Built by <a href="https://harishmanoharan.com/?ref=readablestem">Harish Manoharan</a></li>
         </ul>

@@ -52,13 +52,14 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import case, delete, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded, Reservation, SpendGuard
 from readablestem.web.access import POOL_OPEN
 from readablestem.web.database import insert_ignore, rowcount, utc_today
-from readablestem.web.db import SpendDay, SpendHold, session_scope, utcnow
+from readablestem.web.db import QuotaDay, SpendDay, SpendHold, session_scope, utcnow
 
 # Float sums of many small costs drift by ~1e-16; this keeps an exact fit under the cap.
 _EPSILON = 1e-9
@@ -133,7 +134,7 @@ class DbSpendGuard:
         # Reservation id -> (day, in the open pool): what this process made. The books are
         # `spend_holds`; this only tells a settlement whose row was already released (a hold
         # given back after a lease ran out) which columns the spend belongs in.
-        self._holds: dict[str, tuple[date, bool]] = {}
+        self._holds: dict[str, tuple[date, bool, str | None]] = {}
         self._lock = threading.Lock()
 
     def _today(self) -> date:
@@ -158,13 +159,23 @@ class DbSpendGuard:
         `core.budget.JobBudget` is given, so the budget code needs to know nothing of pools."""
         return self if pool is None else _PooledGuard(self, pool)
 
-    def scoped(self, pool: str | None, job_id: str | None) -> SpendGuard:
+    def scoped(
+        self, pool: str | None, job_id: str | None, user_id: str | None = None
+    ) -> SpendGuard:
         """`pooled`, and every hold made through it is recorded against `job_id`, so
-        `release_holds(job_ids=...)` can give back what that job's dead attempt held."""
-        return self if pool is None and job_id is None else _PooledGuard(self, pool, job_id)
+        `release_holds(job_ids=...)` can give back what that job's dead attempt held, and
+        against `user_id`, the job's owner, whose `quota_days.spent_usd` its settlements add to."""
+        if pool is None and job_id is None and user_id is None:
+            return self
+        return _PooledGuard(self, pool, job_id, user_id)
 
     def reserve(
-        self, amount_usd: float, *, pool: str | None = None, job_id: str | None = None
+        self,
+        amount_usd: float,
+        *,
+        pool: str | None = None,
+        job_id: str | None = None,
+        user_id: str | None = None,
     ) -> Reservation:
         """One conditional UPDATE. A refusal by the cap and a missing row look the same to
         it, so when it changes nothing the day's row is made if missing (an insert that does
@@ -220,11 +231,12 @@ class DbSpendGuard:
                     amount_usd=amount_usd,
                     in_pool=in_pool,
                     job_id=job_id,
+                    user_id=user_id,
                     created_at=self._clock(),
                 )
             )
         with self._lock:
-            self._holds[reservation.id] = (day, in_pool)
+            self._holds[reservation.id] = (day, in_pool, user_id)
         return reservation
 
     def _pool_is_the_limit(self, session: Session, day: date, amount_usd: float) -> bool:
@@ -247,9 +259,9 @@ class DbSpendGuard:
             hint = self._holds.pop(reservation.id, None)
         with session_scope(self.factory) as session:
             row = session.execute(
-                select(SpendHold.day, SpendHold.in_pool, SpendHold.amount_usd).where(
-                    SpendHold.id == reservation.id
-                )
+                select(
+                    SpendHold.day, SpendHold.in_pool, SpendHold.amount_usd, SpendHold.user_id
+                ).where(SpendHold.id == reservation.id)
             ).first()
             won = row is not None and (
                 rowcount(
@@ -263,8 +275,9 @@ class DbSpendGuard:
             )
             if won and row is not None:
                 day, in_pool, release = row.day, bool(row.in_pool), float(row.amount_usd)
+                user_id = row.user_id
             else:  # released already, or not ours: the spend still counts, nothing is released
-                day, in_pool = hint if hint is not None else (self._today(), False)
+                day, in_pool, user_id = hint if hint is not None else (self._today(), False, None)
                 release = 0.0
             held_after = SpendDay.held_usd - release
             values: dict[str, Any] = {
@@ -286,6 +299,25 @@ class DbSpendGuard:
             if rowcount(session.execute(stmt)) != 1:
                 self._ensure_day(session, day)
                 session.execute(stmt)
+            if user_id is not None and spent > 0:
+                self._add_to_user(session, user_id, day, spent)
+
+    @staticmethod
+    def _add_to_user(session: Session, user_id: str, day: date, spent: float) -> None:
+        """Add `spent` to the owner's `quota_days.spent_usd` for `day`: what that person's jobs
+        cost, kept as long as the row. An owner erased while the call ran has no user row for
+        the row to point at: the spend then counts in the day's total only."""
+        try:
+            with session.begin_nested():
+                insert_ignore(session, QuotaDay, {"user_id": user_id, "day": day, "pages": 0})
+                session.execute(
+                    update(QuotaDay)
+                    .where(QuotaDay.user_id == user_id, QuotaDay.day == day)
+                    .values(spent_usd=QuotaDay.spent_usd + spent)
+                    .execution_options(synchronize_session=False)
+                )
+        except IntegrityError:
+            return
 
     def release_holds(
         self, *, job_ids: Collection[str] | None = None, older_than_s: float | None = None
@@ -381,13 +413,22 @@ class _PooledGuard:
     """A `DbSpendGuard` seen by the jobs of one pool and/or one job: `reserve` holds in that
     pool too and records the hold against that job."""
 
-    def __init__(self, guard: DbSpendGuard, pool: str | None, job_id: str | None = None) -> None:
+    def __init__(
+        self,
+        guard: DbSpendGuard,
+        pool: str | None,
+        job_id: str | None = None,
+        user_id: str | None = None,
+    ) -> None:
         self._guard = guard
         self.pool = pool
         self.job_id = job_id
+        self.user_id = user_id
 
     def reserve(self, amount_usd: float) -> Reservation:
-        return self._guard.reserve(amount_usd, pool=self.pool, job_id=self.job_id)
+        return self._guard.reserve(
+            amount_usd, pool=self.pool, job_id=self.job_id, user_id=self.user_id
+        )
 
     def settle(self, reservation: Reservation, actual_usd: float) -> None:
         self._guard.settle(reservation, actual_usd)

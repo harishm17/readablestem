@@ -38,6 +38,13 @@ def setting(block: str, key: str) -> str | None:
     return value[1:-1] if value[:1] == '"' and value[-1:] == '"' else value
 
 
+def backup_script() -> str:
+    """The backup service's start command: the `String.raw` template `backupScript`."""
+    match = re.search(r"const backupScript = String\.raw`(.*?)`;", IAC.read_text(), re.DOTALL)
+    assert match, "no backupScript template in railway.ts"
+    return match.group(1)
+
+
 def parses_as_cli(command: str) -> bool:
     """`readablestem <args>` is a command the argument parser accepts."""
     words = shlex.split(command)
@@ -118,8 +125,10 @@ def test_backup_service_dumps_daily_and_proves_the_restore():
     block = service_block("backup")
     assert 'image("postgres:18")' in block
     assert re.search(r'cronSchedule: "\d+ \d+ \* \* \*"', block)  # once a day
-    for needed in ("pg_dump", "restore_check", "alembic_version", "backup_ok"):
-        assert needed in block
+    script = backup_script()
+    for needed in ("pg_dump", "restore_check", "alembic_version", "backup_ok", "ops_heartbeat"):
+        assert needed in script
+    assert setting(block, "start") == '"bash -c " + shellQuote(backupScript)'
     assert '"/backups": backupVolume' in block
 
 

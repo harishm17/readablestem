@@ -6,6 +6,147 @@
   table cells is missed), `scripts/eq_diag_glyphs.py` (glyph evidence of undetected and span-wrong equations),
   `scripts/eq_diag_unflagged.py` (why wrong equations with other symbols were not flagged). Counts and sample sizes in
   [docs/eval-equation-diagnostics.md](docs/eval-equation-diagnostics.md). No product behaviour changes.
+## Unreleased: conversions run in a child process (branch fix/worker-child-process)
+
+- The whole conversion (`convert_pdf`) now runs in a child process the worker can kill
+  (`web/isolated_convert.py`, `web/conversion_child.py`), with an address-space cap
+  (`CONVERSION_MEMORY_MB`, default 3072), a CPU limit and the job's wall-clock limit. A PDF that
+  passes the upload probe and still crashes, exhausts memory or hangs MuPDF now fails that one job
+  (`conversion_crashed`, `conversion_oom`, `timeout`) instead of taking the web process, every
+  session and the worker down, three times over. The child has no keys or database URL: model
+  requests, spend reservations, progress and the step cache stay in the web process, so spend
+  accounting and the database writes are as before. Results are unchanged
+  (`tests/test_web_isolated_convert.py`). `PRELOAD_TABLE_MODELS` no longer loads models in the web
+  process. Details and measurements: [docs/web.md](docs/web.md), "The conversion runs in a child process".
+## Unreleased: dependency and CI hardening
+
+- Locked dependencies upgraded for known advisories: pillow 12.3.0 to 13.0.0 (floor now `>=13.0`),
+  certifi to 2026.10.23, joserfc to 1.7.7.
+- CI: a `dependency-audit` job (`pip-audit` over the exported lock), a CodeQL workflow (Python and
+  GitHub Actions; push to main, pull requests, weekly), `alembic upgrade head` plus `alembic check` in
+  the `postgres` job, which now runs Postgres 18 (the backup image's major). Zero collected tests in the
+  `postgres` and `browser` jobs now fails them. The main `pytest` step runs in parallel (`-n auto`).
+- `make test-fast`; pytest-xdist and pytest-timeout in the dev group. The review-UX browser tests wait
+  with Playwright's `expect` and have a 120 s per-test timeout.
+## The interim held-out report is replayed at the tag, and CI runs it (2026-11-02, branch fix/proof-interim-repro)
+
+- `tests/test_proof_interim.py` used to rebuild the registered report with the current scorer, and
+  skipped without the held-out key, which CI never fetches. With the key it failed on main: the
+  chemistry converter change moved one parser's exact equations (238 to 241 of 1,369) and the rename
+  of Addendum 8 moved coverage by 210 6-grams. It now replays `report.py` at the tag
+  `proof-heldout-2026-10` with the key the tag's code fetches (`make heldout-gold-at-tag`) and
+  requires the registered bytes. No registered number or file changed.
+- `make proof-interim` writes `proof/interim/rebuilt-here.md` instead of the registered file.
+- `.github/workflows/proof-interim.yml` fetches the key and runs the test (a missing key fails) on
+  pull requests touching `proof/`, the scorer modules, the dependencies or the test, and weekly.
+## Unreleased: security hardening
+
+- The `/m/` analytics relay is rate limited per address (`analytics`, 300 per 10 minutes) and no
+  longer forwards the visitor's address to PostHog.
+- Production refuses `ANALYTICS_ENABLED=true` until the privacy notice names PostHog and no
+  longer says there are no analytics. The notice text is unchanged.
+- Production requires a `CRON_TOKEN` of at least 32 characters.
+- A one-time `proxy_hops_unexpected` log line when `X-Forwarded-For` has more entries than
+  `TRUSTED_PROXY_HOPS + 1`; `launch-check` flags `TRUSTED_PROXY_HOPS=0` in production.
+- `SESSION_SECRET_PREVIOUS`: earlier session secrets accepted for verification only, so the
+  secret can be rotated without signing everyone out ([docs/security.md](docs/security.md)).
+## Unreleased: review at scale, finish notice, guides, caching
+
+- Review: "Accept all remaining equations whose checks passed" and "Accept all figures that have
+  generated alt text", each after a list of what would be accepted; one write, one Undo
+  (`web/bulk_accept.py`). The list view's decisions can be filtered by kind and by page. Every card
+  has "Report this item" (job and item ids only). Pages kept as images have the documented "Leave
+  this page out of the HTML" button. Undo is 44 px, and the marks on the page image grow to 44 px
+  where there is room ([docs/web.md](docs/web.md), "Review at scale").
+- Job page: the tab title changes and an opt-in browser notice shows when a conversion finishes.
+  "Upload a revised version" is on the results page and on each finished row of My documents.
+- The landing page says what review costs (decisions per page, a full job, a new account's day,
+  deletion after 24 hours). `/guides` lists the guides; the sitemap names the showcase pages by their
+  canonical address.
+- `/demo`, the showcase pages and unhashed static files are served with an ETag and a one hour
+  `max-age` instead of `no-store` or `no-cache`.
+## Unreleased
+
+### Layout structure: bookmarks, numbered and run-in headings, joins (2026-11-02, branch fix/layout-structure)
+
+- The PDF's outline (bookmarks) is the first signal for headings when it matches the page text
+  (`pipeline/outline.py`): a line that is a bookmark's title becomes a heading at the bookmark's level
+  (a tag still wins), the heading takes the bookmark's text, and an outline that does not match, or is
+  flat where the type is not, is ignored. dev-v2 heading level accuracy 0.898 to 0.914 (28 documents,
+  683 gold headings).
+- Plain body-size numbered lines in sequence (`3 Forces`, `4 Energy`, with a paragraph between) are
+  headings, as weak evidence; one alone stays a paragraph. Repeated bold run-in labels (`Solution`,
+  `Answer`, `Discussion`, `Procedure`, `Proof`, `Hint`) set in from their column's edge are bold text,
+  not headings: original gold set heading precision 0.850 to 0.914 at the same recall.
+  A paragraph that is a bookmark's title becomes a heading only if it is short, has no sentence end and is
+  bold, larger or set off by space; the plain ones are weak evidence (an optional note), and an outline
+  that bookmarks most of a document's paragraphs promotes none. Numbered exercises (`1 Find the final
+  speed`) are never headings; a numbered sequence that does not start at 1 or 2, or has a long title, is
+  a decision (new check text in `web/messages.py`).
+- Math-italic and bold variable letters in a heading or a caption's plain text are plain letters; the
+  number sets and letterlike symbols stay.
+- A paragraph (not a list item) that goes on over a page break is one element (`Element.last_page` is its
+  last page, and the page markers of the pages it runs over are written after it); inline maths that wraps at a relation
+  sign is one equation; at a line break a hyphenated compound follows the document's own spelling
+  (`eigen-vector` written elsewhere keeps its hyphen, `antiderivative` written whole elsewhere loses
+  it). Details and what stays open: [docs/layout.md](docs/layout.md), "Known failure modes".
+- Pipeline version 0.5.0 to 0.5.1 (ids shift after a join; review carry matches by content, so revised
+  uploads still carry what is unchanged).
+- Offline heading, document and structure evals before and after: [docs/eval.md](docs/eval.md),
+  "Structure fixes, 2026-11-02".
+
+- Tables, structure (`pipeline/tables.py`; [docs/tables.md](docs/tables.md), "Known misses"): the rest of an unruled
+  table that a page break carried over is found by its repeated header and joined (a split row is merged, the
+  repeated header dropped); a booktabs table with text in only one column is kept; an unruled box that holds two
+  tables is split at a caption or a clear gap; a booktabs table read without the model file (a fallback: production has it, so production
+  grids are unchanged) no longer gets a column for a cell with a gap in it. A new "Table N" caption over a repeated
+  header is a new table, not a continuation. Maths in cells is unchanged: it needs the equation step's model calls.
+- Local table eval, gold (45 documents, 197 gold tables): with the model file TEDS 0.941 and detection recall and
+  precision 0.985 and 0.985, unchanged; without it TEDS 0.912 to 0.928. The continued-table, sparse-table and split-box fixes change nothing on any PDF
+  of the repository's fixtures, the three real-document sets and the eval's prints (128 PDFs, 245 tables); the
+  fixes are pinned by generated pages. Real-document sets unchanged (25, 39 and 58 labelled tables, precision 1.000).
+  `make fuzz-tables`: 300 of 300 mutants ok, as before.
+### Navigation in the output, and combining the parts of a long source (branch feat/output-navigation)
+
+- The converted file now has a skip link, a contents list (`<nav aria-label="Contents">`, nested links to the
+  headings, from 3 headings, and not when the PDF has a contents page of its own), page markers at each source
+  page boundary (`role="doc-pagebreak"`, "Page N": the PDF's page label, else the number printed in the margin;
+  a page with neither says "PDF page N" when other pages have a label, "Page N" when none does) and footnote links both ways (`doc-noteref`, `doc-footnote`, `doc-backlink`)
+  (`pipeline/navigation.py`, `pipeline/page_labels.py`; docs/output.md "Navigation"). Every heading has an id.
+  Every converted file changes by the skip link; golden files regenerated.
+- Canvas page to paste: the skip link is left out (its target, `<main>`, is removed by Canvas); the contents list,
+  markers and note links are kept. The README in the zip says so. The Common Cartridge page is the zip's
+  `index.html`, unchanged.
+- axe in `html_checks.axe_checks` also runs the `wcag22aa` tag; no output fixture failed it.
+- "Combine parts": one HTML file from a person's own finished, still-kept parts of the same long source, in page
+  order, with one contents list, continuous page markers and ids that cannot clash; parts with a decision open are held
+  back, overlapping parts keep the newest, and the download restarts the parts' clocks like "Download all"
+  (`GET /jobs/{id}/combine`,
+  `pipeline/combine.py`, `web/combine.py`; docs/output.md "Combining the parts of a long source"). A part cut from a
+  long PDF keeps its pages' labels.
+- The committed demo (`web/static/demo/index.html`) was not regenerated: that needs a paid conversion run. Its
+  golden test renders the stored result and was regenerated.
+- `eval-live.yml` runs weekly (Monday 06:17 UTC) and by hand, for the production provider (Claude):
+  equations, headings, figures, document and tables, each with its own hard `--max-usd` (total at most
+  $2.95 a week, about $0.70 expected), each report gated with `eval gate --require-current` against its
+  committed baseline (tables: floors), reports uploaded as artifacts and never committed. It needs the
+  secret `ANTHROPIC_API_KEY` (was `OPENAI_API_KEY`, equations only); a scheduled run without it skips
+  with a notice. Chromium fonts are installed as in `ci.yml`.
+- `eval-guard.yml` and `scripts/eval_guard.py`: a pull request that changes a model constant in
+  `config.py` or a prompt under `models/prompts/` fails without the matching `data/eval/latest-*.json`.
+  Opt-out: label `eval-unchanged` or commit trailer `Eval-Unchanged: <reason>`.
+- Docs: `docs/eval.md` says which pipeline version and date made each committed report (0.5.0, Claude,
+  2026-10-14 and 2026-10-21; it said 0.4.0) and tells `PIPELINE_VERSION` (`pipeline/run.py`, what reports
+  record) from the package `__version__` (0.1.0); `tests/test_eval_docs.py` keeps the table true. The 0.4.0
+  results sections are labelled as historical and are not rewritten.
+### Monitoring and recovery
+
+- The daily backup keeps a dump only after it has been proved: gzip reads it back, it ends with pg_dump's completion line, it restores with errors fatal, every live table is in the restore and `alembic_version` matches. A failure prints `backup_failed reason=...`, removes the file and fails the run. The command is a readable bash script (`set -euo pipefail`) with tests (`tests/test_railway_backup_script.py`). `railway config apply` is needed to put it live.
+- Alerts without a new vendor: `ops_heartbeat` (migration `e1a7c3b95d24`), written by the backup and by `readablestem ops cron`; public content-free `GET /healthz/ops` (503 naming the late task); `uptime.yml` now checks `/readyz` every 5 minutes and `/healthz/ops` every 3 hours. GitHub disables scheduled workflows after 60 days with no commit to a public repository.
+- Erasing an account writes a content-free line to `erasure_ledger` (hash of the user id, time); `readablestem ops replay-erasures [--ledger-csv FILE]` erases again whatever a restored backup brought back.
+- Per-person daily spend: `quota_days.spent_usd`, shown by pseudonym on `/admin`.
+- The day's cap on new accounts logs `signup_cap_reached` once a day and shows a notice on `/admin`.
+- Database pool: 5 plus 5 connections per process (was 3 plus 2).
 
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 

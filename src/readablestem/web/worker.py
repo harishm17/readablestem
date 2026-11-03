@@ -23,10 +23,17 @@ queue is safe with several workers or instances:
   with "lease_expired" instead of retried forever. `Worker.stop` (process shutdown)
   cancels the running attempt and ends its lease at once, so another instance can
   requeue the job without waiting for the lease to run out.
+- The converter is `web.isolated_convert.convert_isolated`: the conversion runs in a child
+  process that this thread's converter call kills when the attempt is cancelled (so a crash,
+  an out of memory or a hang in MuPDF fails the job, never the web process; a crash fails it
+  at once as "conversion_crashed" or "conversion_oom", with no retry). The conversion thread
+  below is that call; model requests, spend reservations, progress and every database write
+  stay in this process.
 - Every job has a time limit (`job_time_limit_s`). Past it the worker stops extending
-  the lease, cancels the conversion, fails the job with "timeout" and moves on to the
-  next job, so one hung document cannot hold the only worker thread for ever. Python
-  cannot kill a thread: a conversion stuck inside native code (MuPDF) is abandoned. It
+  the lease, cancels the conversion (which kills the child within a fraction of a second),
+  fails the job with "timeout" and moves on to the next job, so one hung document cannot
+  hold the only worker thread for ever. A converter that runs in this process (tests, a
+  fake) cannot be killed from Python: one stuck inside native code (MuPDF) is abandoned. It
   can no longer spend or store anything, but it keeps its thread until the process
   restarts.
 - A conversion is cancelled as soon as this worker no longer owns the job: the user
@@ -61,7 +68,8 @@ queue is safe with several workers or instances:
   again from none.
 
 Failures become `Job.error_code` categories: `LayoutError.code`, "budget_<scope>",
-"timeout", "store_failed", "model_not_configured" or "internal_error". A finished job
+"timeout", "conversion_crashed", "conversion_oom", "store_failed", "model_not_configured" or
+"internal_error". A finished job
 can carry a code too (`result_outcome`): "budget_<scope>" when a spend cap stopped model
 work part way (the result is partial), "pages_not_converted" when pages (or handwriting
 on typed pages) were kept as images. A result with nothing in it fails as "no_content",
@@ -90,9 +98,11 @@ from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation, Spe
 from readablestem.core.types import ConversionOutput, DocumentResult, ProgressEvent
 from readablestem.ops import limits
 from readablestem.web import access, carry_edits, events
+from readablestem.web import combine as combine_rules
 from readablestem.web import retry as retry_rules
 from readablestem.web.database import as_utc, rowcount
 from readablestem.web.db import Blob, Job, JobStatus, ReviewEdit, User, session_scope, utcnow
+from readablestem.web.isolated_convert import ConversionFailed, convert_isolated, self_check
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.provider_health import HEALTH
 from readablestem.web.spend import DbSpendGuard, largest_reservation_usd
@@ -181,9 +191,8 @@ ClientFactory = Callable[[Settings, JobBudget], "VisionClient"]
 
 
 def default_converter() -> Converter:
-    from readablestem.pipeline.run import convert_pdf
-
-    return convert_pdf
+    """`convert_pdf` run in a child process the worker can kill (`web.isolated_convert`)."""
+    return convert_isolated
 
 
 def default_client_factory(settings: Settings, budget: JobBudget) -> VisionClient:
@@ -211,6 +220,8 @@ def error_code_for(exc: BaseException) -> str:
         return f"budget_{scope}" if _CODE.match(scope) else "budget_exceeded"
     if isinstance(exc, ConfigError):  # e.g. no OpenAI key: every job would fail the same way
         return "model_not_configured"
+    if isinstance(exc, ConversionFailed):  # the child crashed, ran out of memory or of time
+        return exc.code
     return "internal_error"
 
 
@@ -653,12 +664,15 @@ class Worker:
 
     # ------------------------------------------------------------------ one attempt
 
-    def _guard_for(self, pool: str | None, job_id: str | None = None) -> SpendGuard:
+    def _guard_for(
+        self, pool: str | None, job_id: str | None = None, user_id: str | None = None
+    ) -> SpendGuard:
         """The spend guard as the job `job_id` of `pool` sees it (`DbSpendGuard.scoped`:
-        its holds are in the pool and recorded against the job); a guard with no pools
-        (tests, CLI) is the same for everyone."""
+        its holds are in the pool and recorded against the job and its owner `user_id`, whose
+        day's spend the settlements add to); a guard with no pools (tests, CLI) is the same
+        for everyone."""
         scoped = getattr(self.guard, "scoped", None)
-        return scoped(pool, job_id) if callable(scoped) else self.guard
+        return scoped(pool, job_id, user_id) if callable(scoped) else self.guard
 
     def release_holds(
         self, *, job_ids: list[str] | None = None, older_than_s: float | None = None
@@ -694,6 +708,7 @@ class Worker:
         page_count: int,
         pool: str | None = None,
         image_pages: bool = False,
+        user_id: str | None = None,
     ) -> _Attempt:
         max_usd, max_calls = job_caps(self.settings, page_count, image_pages)
         attempt = _Attempt(
@@ -705,7 +720,7 @@ class Worker:
             pool=pool,
         )
         attempt.budget = _AttemptBudget(
-            guard=self._guard_for(pool, claim.job_id),
+            guard=self._guard_for(pool, claim.job_id, user_id),
             max_usd=max(0.0, max_usd - prior_usd),
             max_calls=max(0, max_calls - prior_calls),
             hold_on_job=lambda amount, calls: self._hold_on_job(attempt, amount, calls),
@@ -741,7 +756,7 @@ class Worker:
 
         return progress
 
-    def _converter_kwargs(self, attempt: _Attempt) -> dict[str, Any]:
+    def _converter_kwargs(self, attempt: _Attempt, limit_s: float | None = None) -> dict[str, Any]:
         """The converter's optional arguments, each passed only when set (`Converter`).
 
         Content features add theirs here, each in its
@@ -780,6 +795,14 @@ class Worker:
         # job's cap or of today's cap could not hold that many reservations.
         if _accepts(self.converter, "concurrency"):
             kwargs["concurrency"] = self._concurrency(attempt)
+
+        # cancelled, limit_s: a converter that runs in a child process (`web.isolated_convert`)
+        # kills it as soon as the attempt is cancelled (deleted, taken over, shutdown or past
+        # its time limit) and sizes the child's CPU limit from the job's time limit.
+        if _accepts(self.converter, "cancelled"):
+            kwargs["cancelled"] = attempt.cancelled.is_set
+        if limit_s is not None and _accepts(self.converter, "limit_s"):
+            kwargs["limit_s"] = limit_s
 
         return kwargs
 
@@ -854,7 +877,9 @@ class Worker:
                 == 1
             )
 
-    def _start_conversion(self, attempt: _Attempt, pdf: bytes) -> tuple[threading.Thread, _Run]:
+    def _start_conversion(
+        self, attempt: _Attempt, pdf: bytes, limit_s: float | None = None
+    ) -> tuple[threading.Thread, _Run]:
         run = _Run()
 
         def target() -> None:
@@ -866,7 +891,7 @@ class Worker:
                     settings=self.settings,
                     client=client,
                     progress=progress,
-                    **self._converter_kwargs(attempt),
+                    **self._converter_kwargs(attempt, limit_s),
                 )
             except Exception as exc:  # handed to the worker thread
                 run.error = exc
@@ -937,6 +962,7 @@ class Worker:
             page_count,
             pool,
             bool(job.image_pages),
+            job.user_id,
         )
         if pdf is None:
             return self._finish_failed(attempt, "upload_missing")
@@ -954,7 +980,7 @@ class Worker:
     ) -> str:
         claim = attempt.claim
         limit_s = self.time_limit_s(page_count)
-        thread, run = self._start_conversion(attempt, pdf)
+        thread, run = self._start_conversion(attempt, pdf, limit_s)
         finished = self._wait(attempt, thread, limit_s)
         if not finished and not attempt.cancelled.is_set():
             return self._time_out(attempt, thread, limit_s)
@@ -1057,9 +1083,12 @@ class Worker:
                 )
             if earlier is not None:
                 self._carry_decisions(session, job, result, output.crops, earlier)
+            # A part of a longer file: its pages are numbered as in that file, and the file
+            # is made again from the result (lazily, `current_html`) to say so.
+            numbered = combine_rules.number_part_pages(job, result)
             job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
             job.html = db_safe(result.html)
-            job.html_stale = False  # the file is made from this result
+            job.html_stale = numbered  # False: the file is made from this result
             # The row already counts every reservation (`_hold_on_job`). A converter that
             # reports more than went through the budget (a test fake) is counted as well.
             # The steps given back by the cache cost this much when they were first run: it
@@ -1340,7 +1369,19 @@ class Worker:
         # Holds left by a process that died (a restart, a crash) are given back now, not at
         # midnight. Those of a job still marked running are released when its lease runs out.
         self.release_holds(older_than_s=self.stale_hold_s())
-        if self.settings.env == "prod" and self.settings.preload_table_models:
+        # A conversion child that cannot start (a missing library, an unreadable model
+        # file) would fail every job as "conversion_unavailable": say so once, now.
+        if self.settings.env == "prod" and self.converter is convert_isolated:
+            threading.Thread(
+                target=self_check, name="readablestem-child-check", daemon=True
+            ).start()
+        # (Not when conversions run in a child process: it loads its own models, and a copy
+        # here would only take memory.)
+        if (
+            self.settings.env == "prod"
+            and self.settings.preload_table_models
+            and self.converter is not convert_isolated
+        ):
             from readablestem.pipeline import tables
 
             threading.Thread(

@@ -23,6 +23,25 @@
     <div><dt>Pool</dt><dd>{% if spend.open_cap_usd is not none %}{{ spend.open_cap_usd|usd }}{% else %}None set{% endif %}</dd></div>
     <div><dt>Left today</dt><dd>{% if spend.open_remaining_usd is not none %}{{ spend.open_remaining_usd|usd }}{% else %}No limit{% endif %}</dd></div>
   </dl>
+  <h3 id="spend-people-heading">Spend by person</h3>
+  <p>What each person's documents cost, by pseudonym like the usage tables: the {{ spend_people_rows }}
+    biggest today, then over all days kept.</p>
+  {% if spend_people %}
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="spend-people-heading">
+  <table>
+    <thead>
+      <tr><th scope="col">Person</th><th scope="col" class="num">Today</th><th scope="col" class="num">All days</th></tr>
+    </thead>
+    <tbody>
+      {% for row in spend_people %}
+      <tr><th scope="row">{{ row.person }}</th><td class="num">{{ row.today|usd }}</td><td class="num">{{ row.total|usd }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>No spend recorded yet.</p>
+  {% endif %}
 </section>
 
 <section aria-labelledby="signup-heading">
@@ -33,6 +52,13 @@
     {% else %}By invitation: only the people listed below can sign in. (Accounts made while
     sign-up was open keep working until you block them.){% endif %}
     Set with <code>SIGNUP_MODE</code>.</p>
+  {% if signup.full %}
+  <div class="notice notice-warning" role="status">
+    <p>Today's limit on new accounts is reached ({{ signup.today }} of {{ signup.limit }}). New
+      people are told to come back tomorrow. Raise <code>MAX_NEW_ACCOUNTS_PER_DAY</code> if that
+      is not what you want.</p>
+  </div>
+  {% endif %}
   <dl class="summary-list">
     <div><dt>New accounts today (UTC)</dt><dd>{{ signup.today }} of {{ signup.limit }}</dd></div>
     <div><dt>Invited accounts</dt><dd>{{ signup.invited }}</dd></div>

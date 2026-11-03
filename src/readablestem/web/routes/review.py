@@ -15,10 +15,12 @@ Layout (see `web.review` for the rules), in three sections:
    listing the fixes still waiting (page and reading order). Repeated headings that share a
    `Fix.group_key` are one card with one decision for all of them ("Apply to all 11",
    "Make all 11 bold text", or one level for all); their own cards are folded inside it.
-   N counts decisions, so such a group counts once. There is no bulk accept: every
-   decision asked for is meaning-level, so each is opened (`web.review`). The one
-   exception is "Accept all N clean tables" (T3-11, `routes/edits.py`): tables where
-   nothing at all was found wrong, two or more, named in the button.
+   N counts decisions, so such a group counts once. There is no unconditional bulk accept:
+   every decision asked for is meaning-level, so each is opened (`web.review`). The
+   exceptions are explicit and shown before they are done: "Accept all N clean tables"
+   (T3-11, `routes/edits.py`) and, with a page that lists them first, equations whose
+   checks passed and figures with generated alt text (`web.bulk_accept`, `routes/bulk.py`).
+   "Needs your decision" can be narrowed by kind and page (`filter_decisions`).
 2. "Optional checks (M)": fixes accepted automatically with a note (a cosmetic style
    difference, a heading with weak evidence, a long alt text), folded away in a
    <details>, each note in plain English. Nothing there blocks "done"; each can still be
@@ -42,8 +44,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Annotated, Any
+from urllib.parse import parse_qsl, urlencode
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
@@ -63,7 +66,15 @@ from readablestem.core.types import (
 )
 from readablestem.pipeline.layout import REASON_LARGER_FONT
 from readablestem.pipeline.validate import ALT_WARN_CHARS
-from readablestem.web import events, heading_groups, notation, notice_places, page_edits, retention
+from readablestem.web import (
+    bulk_accept,
+    events,
+    heading_groups,
+    notation,
+    notice_places,
+    page_edits,
+    retention,
+)
 from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
 from readablestem.web.deps import (
     ELEMENT_ID,
@@ -92,6 +103,7 @@ from readablestem.web.review import (
     ADD_DATA_TABLE,
     DESCRIBE,
     GROUP_SLUGS,
+    KEPT_IMAGES_SLUG,
     NOT_CONVERTED,
     STATUS_FOR_ACTION,
     TABLE_CHANGES,
@@ -544,6 +556,12 @@ class PageGroupView:
     members_open: bool = False
     # Every page or piece of handwriting of the group, to describe in words (T3-16).
     describe: list[ReviewItem] = field(default_factory=list)
+    # The pages (1-based) of the ones still waiting that can be left out of the HTML with
+    # one button each (`web.page_edits.omit_page`): whole pages kept as images, not
+    # handwriting on a typed page, whose text was converted.
+    leave_out: list[int] = field(default_factory=list)
+    # Decisions still waiting on each of those pages (this one included): they go with it.
+    leave_drops: dict[int, int] = field(default_factory=dict)
 
     @property
     def waiting(self) -> int:
@@ -673,6 +691,11 @@ def page_group_view(
             if many or len(members) > 1
             else "Kept as an image, marked “Not converted”."
         )
+    leave_out = [] if region else sorted({m.page for m in waiting if m.page})
+    waiting_on: dict[int, int] = {}
+    for fix in result.fixes:
+        if fix.pending and fix.element_id in page_of:
+            waiting_on[page_of[fix.element_id]] = waiting_on.get(page_of[fix.element_id], 0) + 1
     return PageGroupView(
         key=key,
         anchor=group_anchor(key),
@@ -688,6 +711,8 @@ def page_group_view(
         size=len(members),
         state=state,
         describe=[items[f.element_id] for f in members if f.element_id in items],
+        leave_out=leave_out,
+        leave_drops={p: waiting_on.get(p, 0) for p in leave_out},
     )
 
 
@@ -1066,6 +1091,76 @@ def _apply_invalid(
             item.errors[error.field_id.split("-", 1)[0]] = error.message
 
 
+@dataclass
+class DecisionFilter:
+    """The "Needs your decision" list narrowed by kind and by page (query `kind` and
+    `page` of the list view). `groups` are what is shown; nothing is changed by filtering."""
+
+    groups: list[GroupView]
+    kind: str = ""  # a group slug, "" for all
+    kind_title: str = ""
+    page: int = 0  # 1-based, 0 for all
+    shown: int = 0
+    total: int = 0
+
+    @property
+    def active(self) -> bool:
+        return bool(self.kind or self.page)
+
+    @property
+    def query(self) -> str:
+        """The filter as a query string (the hidden `flt` field of every decision form)."""
+        found = {"kind": self.kind, "page": str(self.page) if self.page else ""}
+        return urlencode({k: v for k, v in found.items() if v})
+
+    @property
+    def summary(self) -> str:
+        """ "Showing 3 of 41 decisions: equations on page 5."""
+        n = "decision" if self.total == 1 else "decisions"
+        what = []
+        if self.kind:
+            what.append(self.kind_title.lower())
+        if self.page:
+            what.append(f"on page {self.page}")
+        tail = f": {' '.join(what)}" if what else ""
+        if not self.shown:
+            return f"No decision matches{tail}. {self.total} {n} in all."
+        return f"Showing {self.shown} of {self.total} {n}{tail}."
+
+
+def _unit_pages(unit: UnitView) -> set[int]:
+    if unit.item is not None:
+        return {unit.item.page}
+    if unit.group is not None:
+        return set(unit.group.pages)
+    return set(unit.pages.pages) if unit.pages is not None else set()
+
+
+def filter_decisions(deciding: list[GroupView], kind: str, page: str, pages: int) -> DecisionFilter:
+    """Keep the decisions of one kind and/or on one page. A kind that is not a group of
+    this list, or a page outside the document, is ignored (the list is shown whole)."""
+    total = sum(len(g.units) for g in deciding)
+    chosen = next((g for g in deciding if g.slug == kind and g.units), None)
+    number = int(page) if page.isascii() and page.isdigit() and 1 <= int(page) <= pages else 0
+    if chosen is None and not number:
+        return DecisionFilter(deciding, total=total, shown=total)
+    groups = []
+    for g in deciding:
+        if chosen is not None and g is not chosen:
+            continue
+        units = [u for u in g.units if not number or number in _unit_pages(u)]
+        if units or g.error or g.notices:
+            groups.append(replace(g, units=units))
+    return DecisionFilter(
+        groups,
+        kind=chosen.slug if chosen else "",
+        kind_title=chosen.title if chosen else "",
+        page=number,
+        shown=sum(len(g.units) for g in groups),
+        total=total,
+    )
+
+
 def _page(
     request: Request,
     job_id: str,
@@ -1074,6 +1169,8 @@ def _page(
     invalid: tuple[str, ReviewInvalid] | None = None,
     stale: str | None = None,
     status_code: int = 200,
+    kind: str = "",
+    page: str = "",
 ) -> Response:
     view, result, crop_ids, version = _load_versioned(request, job_id, user)
     elements = {e.id: e for e in result.elements}
@@ -1126,13 +1223,20 @@ def _page(
         f"/jobs/{view.id}/review",
     )
     count = page_edits.page_count(result, view.page_count)
+    deciding = [g for g in groups.values() if g.units or g.error or g.notices]
+    filtered = filter_decisions(deciding, kind, page, count)
     context: dict[str, Any] = {
         "note_rows": note_rows,
+        # Accept many at once (web.bulk_accept), and the filter of the decision list.
+        "bulk_offers": bulk_accept.offers(result),
+        "decision_filter": filtered,
+        "filter_kinds": [(g.slug, g.title, len(g.units)) for g in deciding if g.units],
+        "page_count": count,
         # T3-5, T3-16: the page tools are on the review screen; one link to each page's.
         "tool_pages": [(n, n - 1 in result.omitted_pages) for n in range(1, count + 1)],
         "job": view,
         "groups": list(groups.values()),
-        "deciding": [g for g in groups.values() if g.units or g.error or g.notices],
+        "deciding": filtered.groups,
         "optional": optional,
         "optional_open": any(item.open for item in optional),
         "second_checks": sum(item.second_check for item in optional),
@@ -1165,8 +1269,10 @@ def list_url(job_id: str, anchor: str) -> str:
 
 
 @router.get("/jobs/{job_id}/review/list")
-def review_list(request: Request, job_id: str, user: UserDep) -> Response:
-    response = _page(request, job_id, user)
+def review_list(
+    request: Request, job_id: str, user: UserDep, kind: str = "", page: str = ""
+) -> Response:
+    response = _page(request, job_id, user, kind=kind, page=page)
     ctx = get_ctx(request)  # usage event (web/events.py)
     events.record_review_opened(ctx.factory, ctx.settings, user.id, job_id, "list")
     return response
@@ -1253,11 +1359,13 @@ def review_action(
     remove_data_table: Annotated[str | None, Form()] = None,
     description: Annotated[str | None, Form()] = None,
     version: Annotated[str, Form()] = "",
+    flt: Annotated[str, Form()] = "",
 ) -> Response:
     """One decision on one fix; when it is a heading group's key ("hg-p1-e7"), one
     decision for every heading of that group still waiting (with `scope=all`, for every
     heading of the group: a decided group decided again). A kind in place of the id
-    ("equations"), the bulk accept removed on 2026-10-09, is not found.
+    ("equations"), the unconditional bulk accept removed on 2026-10-09, is not found;
+    the previewed bulk actions are `POST /jobs/{id}/accept/{kind}` (`routes/bulk.py`).
 
     Element ids look like "p3-e12", so neither a kind nor a group key can be one.
     Sharing the route keeps a single CSRF-checked, ownership-checked way to change a
@@ -1277,11 +1385,16 @@ def review_action(
         raise PageError(404, *NOT_FOUND)
     if is_group_key(element_id):
         every = scope == "all"
-        return _group_action(
-            request, job_id, element_id, user, action, level or "", view, every, version
+        return keep_filter(
+            _group_action(
+                request, job_id, element_id, user, action, level or "", view, every, version
+            ),
+            flt,
         )
     if is_page_group_key(element_id):
-        return _page_group_action(request, job_id, element_id, user, action, view, version)
+        return keep_filter(
+            _page_group_action(request, job_id, element_id, user, action, view, version), flt
+        )
     sent = {
         "latex": latex,
         "alt": alt,
@@ -1353,7 +1466,31 @@ def review_action(
 
             return RedirectResponse(review_url(job_id, item=element_id), status_code=303)
         return _split_redirect(job_id, result, element_id)
-    return RedirectResponse(_landing(job_id, result, element_id), status_code=303)
+    response = RedirectResponse(_landing(job_id, result, element_id), status_code=303)
+    return keep_filter(response, flt)
+
+
+def list_query(raw: str) -> str:
+    """The `kind` and `page` of a filter, as a query string, from the hidden `flt` field of
+    a list-view form: only a kind of this list and a page number are kept."""
+    found = dict(parse_qsl(raw))
+    slugs = {*GROUP_SLUGS.values(), KEPT_IMAGES_SLUG}
+    query = {}
+    if found.get("kind") in slugs:
+        query["kind"] = found["kind"]
+    if found.get("page", "").isascii() and found.get("page", "").isdigit():
+        query["page"] = found["page"]
+    return urlencode(query)
+
+
+def keep_filter(response: Response, flt: str) -> Response:
+    """A redirect back to the list view keeps the decision filter the form was drawn with."""
+    query = list_query(flt) if flt else ""
+    location = response.headers.get("location", "")
+    marker = "/review/list#"
+    if query and response.status_code == 303 and marker in location:
+        response.headers["location"] = location.replace(marker, f"/review/list?{query}#", 1)
+    return response
 
 
 def _landing(job_id: str, result: DocumentResult, element_id: str) -> str:
@@ -1637,6 +1774,7 @@ def undo(
     user: UserDep,
     version: Annotated[str, Form()] = "",
     view: Annotated[str, Form()] = "",
+    flt: Annotated[str, Form()] = "",
 ) -> Response:
     """Undo the job's last review write: every fix it changed goes back to what its
     ReviewEdit's `before` recorded, the HTML is rendered again, and the undo is a write
@@ -1700,7 +1838,8 @@ def undo(
         target, flashed = slug, GROUP_FLASH + slug
     flash(request, message, element_id=flashed)
     if view == LIST_VIEW:
-        return RedirectResponse(list_url(job_id, _stale_anchor(result, target)), status_code=303)
+        where = RedirectResponse(list_url(job_id, _stale_anchor(result, target)), status_code=303)
+        return keep_filter(where, flt)
     item = target if target and kind_for_slug(target) is None else None
     return RedirectResponse(review_url(job_id, item=item), status_code=303)
 

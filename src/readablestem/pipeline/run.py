@@ -138,6 +138,7 @@ from readablestem.pipeline import (
     image_page,
     image_page_check,
     layout,
+    page_labels,
     page_math,
     page_math_reconcile,
     page_type,
@@ -163,7 +164,12 @@ log = logging.getLogger(__name__)
 # layout and structure rules, the Claude second check, speech readings, review rules for
 # equations as pictures and half fractions, and the model-cost settings. Results from 0.4.0
 # load unchanged; their numbers were made under the old rules.
-PIPELINE_VERSION = "0.5.0"
+# 0.5.1 (2026-11-02): layout structure fixes (docs/layout.md, "Known failure modes"):
+# bookmarks as heading evidence, numbered and run-in headings, paragraphs joined over page
+# breaks (element ids after the first join shift), inline maths joined over a line break.
+# Heading fingerprints of the review carry change where a heading had math-italic letters.
+# Results from 0.5.0 load unchanged; their numbers were made under the old rules.
+PIPELINE_VERSION = "0.5.1"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -915,7 +921,10 @@ class _Run:
             )
             if not done:
                 return
-            for future in done:
+            # (A failed step last: the others that finished with it are recorded first.)
+            for future in sorted(
+                done, key=lambda f: not f.cancelled() and f.exception() is not None
+            ):
                 self.record(future, self.futures.pop(future))
             self.raise_if_fatal()
             if self.stop.scope is not None:
@@ -925,7 +934,28 @@ class _Run:
     def raise_if_fatal(self) -> None:
         """Re-raise a worker's configuration error here (the pool is then shut down)."""
         if self.stop.fatal is not None:
+            self.keep_finished()
             raise self.stop.fatal
+
+    def keep_finished(self) -> None:
+        """Before a configuration error ends the run: store the steps that did finish (the
+        ones running at that moment included; the pool waits for them anyway). They were paid
+        for, and "Try again" must not ask the model for them a second time."""
+        if self.cache is None:
+            return
+        for future in list(self.futures):
+            future.cancel()
+        for future, element in list(self.futures.items()):
+            if future.cancelled():
+                continue
+            try:
+                done = future.result()
+            except BaseException:  # the failed step itself, or a worker that died
+                continue
+            key = self.keys.get(element.id)
+            if key and reusable(done.fix):
+                self.cache.store(element, key, done.fix)
+            self.futures.pop(future, None)
 
     def record(self, future: Future[_Done], element: Element) -> None:
         if future.cancelled():
@@ -1118,6 +1148,18 @@ def _source_facts(
     except Exception as exc:
         log.warning("source facts failed: %s", type(exc).__name__)
         return None
+
+
+def _page_labels(pdf_bytes: bytes, pages: list[int]) -> dict[int, str]:
+    """`page_labels.read`, which never raises; none if it did anyway (page markers are a
+    convenience: a bug there must not cost the user a finished conversion)."""
+    lock = getattr(layout, "_LOCK", None)
+    try:
+        with lock if lock is not None else contextlib.nullcontext():
+            return page_labels.read(pdf_bytes, pages)
+    except Exception as exc:
+        log.warning("page labels failed: %s", type(exc).__name__)
+        return {}
 
 
 # --------------------------------------------------------------------------- entry point
@@ -1493,6 +1535,8 @@ def _convert(
             cached.release()  # also when analysis, a step or `progress` failed
 
         ordered = _ordered_fixes(elements, run.fixes)
+        labels = _page_labels(pdf_bytes, page_list)
+        footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]
         source_facts = _source_facts(pdf_bytes, page_list, elements, ordered)
         with _span(tracer, "assemble", elements=len(elements), fixes=len(ordered)):
             _send(stage_progress, "assemble")
@@ -1505,6 +1549,8 @@ def _convert(
                 source_note=source_note,
                 notice=notice,
                 math_alttext=settings.mathml_alttext,
+                page_labels=labels,
+                footnote_ids=footnotes,
             )
             _send(stage_progress, "checks")
             checks = html_checks.static_checks(html)
@@ -1574,6 +1620,7 @@ def _convert(
         image_only_pages=sorted(kept),
         html_checks=checks,
         page_sizes=dict(zip(doc.pages, doc.page_sizes, strict=False)),
+        page_labels=labels,
         notices=notices,
         source_facts=source_facts,
         lang_source=text.lang_source,

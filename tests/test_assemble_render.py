@@ -128,7 +128,7 @@ def test_document_skeleton(sample_html):
         assert needle in sample_html
     assert sample_html.count("<main>") == 1
     assert "<script" not in sample_html.lower()
-    assert not re.search(r"(src|href)=\"(?!data:)", sample_html)  # nothing external
+    assert not re.search(r"(src|href)=\"(?!data:|#)", sample_html)  # nothing external
     assert "compli" + "ant" not in sample_html.lower()  # rule 7, anywhere in the output
 
 
@@ -373,7 +373,7 @@ def test_hostile_text_is_escaped_everywhere():
     assert "<script" not in html.lower()
     assert not [a for a in parsed.attrs if a[1].startswith("on")]
     assert {tag for tag, _, _ in parsed.attrs} <= {
-        "html", "meta", "img", "h1", "p", "figure", "footer", "h2", "span", "div",
+        "html", "meta", "img", "h1", "p", "figure", "footer", "h2", "span", "div", "a",
     }  # fmt: skip
     assert "&lt;script&gt;alert(&#x27;p&#x27;)&lt;/script&gt;" in html
     assert 'alt="&quot;&gt;&lt;img src=x onerror=alert(4)&gt;"' in html

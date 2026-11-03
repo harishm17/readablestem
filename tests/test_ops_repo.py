@@ -18,7 +18,7 @@ yaml = pytest.importorskip("yaml")  # PyYAML arrives with uvicorn[standard]
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
-PINNED = re.compile(r"^[\w.-]+/[\w.-]+@[0-9a-f]{40} # v\d+(\.\d+)*$")
+PINNED = re.compile(r"^[\w.-]+/[\w.-]+(/[\w.-]+)*@[0-9a-f]{40} # v\d+(\.\d+)*$")
 
 
 def workflow(path: Path) -> dict:
@@ -46,7 +46,10 @@ def test_workflows_are_least_privilege_on_a_fixed_runner(path):
     assert data["permissions"] == {"contents": "read"}
     for name, job in data["jobs"].items():
         assert job["runs-on"] == "ubuntu-24.04", name
-        assert "permissions" not in job or job["permissions"] == {"contents": "read"}, name
+        allowed = {"contents": "read"}
+        if path.name == "codeql.yml":  # code scanning results are uploaded with this scope
+            allowed = {"contents": "read", "security-events": "write", "actions": "read"}
+        assert "permissions" not in job or job["permissions"] == allowed, name
 
 
 def test_ci_runs_type_checks_and_the_marked_suites():
@@ -82,13 +85,41 @@ def test_no_expressions_inside_run_scripts(path):
             assert "${{" not in step.get("run", ""), step.get("name")
 
 
-def test_live_eval_is_manual_and_capped():
+def test_live_eval_is_weekly_or_manual_capped_and_skips_without_a_key():
+    import json
+
     data = workflow(ROOT / ".github" / "workflows" / "eval-live.yml")
     triggers = data[True] if True in data else data["on"]  # YAML 1.1 reads `on` as True
-    assert set(triggers) == {"workflow_dispatch"}
-    runs = [s.get("run", "") for s in data["jobs"]["equations"]["steps"]]
-    assert any('--task equations --max-usd "$MAX_USD"' in r for r in runs)
-    assert any("v <= 10" in r for r in runs)
+    assert set(triggers) == {"schedule", "workflow_dispatch"}  # never on a pull request
+    assert len(triggers["schedule"]) == 1
+    tasks = json.loads(data["env"]["TASKS"])
+    assert {t["task"] for t in tasks} == {"equations", "headings", "figures", "document", "tables"}
+    assert all(0 < t["max_usd"] <= 1.0 for t in tasks)  # each task has its own small hard cap
+    assert sum(t["max_usd"] for t in tasks) <= float(data["env"]["MAX_WEEKLY_USD"]) <= 3.0
+    # Production provider; every task has a baseline except tables (floors alone).
+    assert data["env"]["PROVIDER"] == "anthropic"
+    assert {t["task"] for t in tasks if not t["baseline"]} == {"tables"}
+    plan = "\n".join(s.get("run", "") for s in data["jobs"]["plan"]["steps"])
+    assert "ANTHROPIC_API_KEY" in str(data["jobs"]["plan"]["steps"])
+    assert "skipped" in plan and "::notice::" in plan  # a scheduled run without the key
+    assert data["jobs"]["live"]["if"] == "needs.plan.outputs.run == 'true'"
+    runs = "\n".join(s.get("run", "") for s in data["jobs"]["live"]["steps"])
+    assert '--max-usd "$MAX_USD"' in runs and "eval gate" in runs and "--require-current" in runs
+    uploads = [s for s in data["jobs"]["live"]["steps"] if "upload-artifact" in s.get("uses", "")]
+    assert uploads and uploads[0]["if"] == "always()"
+    assert "git commit" not in runs and "git push" not in runs  # reports are never committed
+    assert data["permissions"] == {"contents": "read"}
+
+
+def test_eval_guard_runs_on_pull_requests_and_reads_labels_through_env():
+    data = workflow(ROOT / ".github" / "workflows" / "eval-guard.yml")
+    triggers = data[True] if True in data else data["on"]
+    assert {"labeled", "unlabeled", "synchronize"} <= set(triggers["pull_request"]["types"])
+    steps = data["jobs"]["guard"]["steps"]
+    assert steps[0]["with"]["fetch-depth"] == 0
+    guard = steps[-1]
+    assert "scripts/eval_guard.py" in guard["run"] and "${{" not in guard["run"]
+    assert "labels" in guard["env"]["LABELS_JSON"]
 
 
 def test_dependabot_covers_dependencies_actions_and_images():
@@ -167,3 +198,15 @@ def test_ops_files_never_claim_compliance(path):
     text = (ROOT / path).read_text().lower()
     assert "compliant" not in text
     assert "ensures compliance" not in text
+
+
+def test_ci_does_not_turn_no_tests_collected_into_a_pass_and_audits_the_lock():
+    jobs = workflow(ROOT / ".github" / "workflows" / "ci.yml")["jobs"]
+    for name in ("postgres", "browser"):
+        runs = "\n".join(s.get("run", "") for s in jobs[name]["steps"])
+        assert "-eq 5" not in runs and "exit 0" not in runs, name
+    pg = "\n".join(s.get("run", "") for s in jobs["postgres"]["steps"])
+    assert "alembic upgrade head" in pg and "alembic check" in pg
+    assert jobs["postgres"]["services"]["postgres"]["image"] == "postgres:18"
+    audit = "\n".join(s.get("run", "") for s in jobs["dependency-audit"]["steps"])
+    assert "uv export" in audit and "pip-audit" in audit

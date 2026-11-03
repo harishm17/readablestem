@@ -9,17 +9,17 @@ from datetime import date
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
 from readablestem.web import analytics, office_convert, seo
-from readablestem.web.assets import static_url
+from readablestem.web.assets import cached_html, static_url
 from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import get_ctx, render
 from readablestem.web.events import EVENT_RETENTION_DAYS
-from readablestem.web.health import readiness
+from readablestem.web.health import ops_freshness, readiness
 from readablestem.web.provider_health import HEALTH
 from readablestem.web.quota import next_day_start
 from readablestem.web.security import VIEW_CSP
@@ -52,12 +52,20 @@ def demo(request: Request) -> Response:
             if visitor and analytics.enabled(request)
             else None
         )
-        return HTMLResponse(
+        return cached_html(
+            request,
             _with_preview_tags(DEMO_PAGE.read_text(encoding="utf-8"), site),
+            max_age=DEMO_MAX_AGE,
+            revalidate=noted is not None,  # a counted visit (hm_id) must reach the server
             headers={"Content-Security-Policy": VIEW_CSP},
             background=noted,
         )
     return render(request, "demo_pending.html", {"active": "demo"})
+
+
+# The demo is the same bytes for everyone until a deploy (688 KB): kept an hour, then the
+# ETag turns a repeat visit into a 304. Only per-user pages are `no-store` (web.security).
+DEMO_MAX_AGE = 3600
 
 
 DEMO_TITLE = "Demo: a physics textbook section converted | ReadableSTEM"
@@ -182,6 +190,18 @@ def _long_date(iso: str) -> str:
     return f"{day.day} {day.strftime('%B %Y')}"
 
 
+@router.get(seo.GUIDES_INDEX)
+def guides_index(request: Request) -> Response:
+    """The guides, listed (public, like each of them)."""
+    guides = []
+    for guide in seo.GUIDES:
+        page = next(p for p in seo.PUBLIC_PAGES if p.path == guide.path)
+        guides.append(
+            {"guide": guide, "updated": page.updated, "updated_text": _long_date(page.updated)}
+        )
+    return render(request, "guides.html", {"active": "guides", "guides": guides})
+
+
 @router.get(seo.ADA_GUIDE)
 def guide_ada_title_ii(request: Request) -> Response:
     """What the Justice Department's web rule asks of STEM course materials, with sources
@@ -247,4 +267,14 @@ def readyz(request: Request) -> Response:
     return JSONResponse(
         {"status": "ready" if ready else "not_ready", "checks": checks},
         status_code=200 if ready else 503,
+    )
+
+
+@router.get("/healthz/ops")
+def healthz_ops(request: Request) -> Response:
+    """Did the daily backup and the hourly cron finish well lately (ops.heartbeat)? 200, or
+    503 listing only the names that are stale. Content-free, like /readyz."""
+    ok, stale = ops_freshness(get_ctx(request))
+    return JSONResponse(
+        {"status": "ok" if ok else "stale", "stale": stale}, status_code=200 if ok else 503
     )
