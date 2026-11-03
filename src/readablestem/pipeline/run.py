@@ -922,10 +922,16 @@ class _Run:
             if not done:
                 return
             # (A failed step last: the others that finished with it are recorded first.)
-            for future in sorted(
-                done, key=lambda f: not f.cancelled() and f.exception() is not None
-            ):
-                self.record(future, self.futures.pop(future))
+            try:
+                for future in sorted(
+                    done, key=lambda f: not f.cancelled() and f.exception() is not None
+                ):
+                    self.record(future, self.futures.pop(future))
+            except FATAL_ERRORS:
+                # The failed step's own error surfaces here, usually before the steps that
+                # were still running beside it were collected: keep those first.
+                self.keep_finished()
+                raise
             self.raise_if_fatal()
             if self.stop.scope is not None:
                 for future in self.futures:
