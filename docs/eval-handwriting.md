@@ -698,6 +698,21 @@ and decisions per page do not go up. The two reader prompts, now under `models/p
 (`math_reader.md`, `math_reader_claude.md`), are mapped to `data/eval/latest-image-pages.json` by
 the eval guard.
 
+## Symbol inventory (2026-11-03; code only, not measured)
+
+Most wrong handwritten equations are one symbol off, and a writer's notation is consistent, so the
+same misreading tends to repeat in a document. The Symbols screen (docs/web.md, "Symbols in
+handwritten equations") lists every symbol read in the handwritten equations of one document,
+grouped with the symbols that look alike, with counts and the place of each; the instructor changes
+one symbol to another of its family everywhere in one step and ticks the places where it was right.
+It edits the proposal of each equation still waiting and never accepts, so every handwritten
+equation stays a required decision; one Undo takes the change back.
+
+Not measured: no run says how often a document's misreadings repeat in a way this fixes, how many
+clicks it saves, or whether instructors use it. The plan's measure (clicks per page, "right after one
+click") needs the integrated run. The families are a fixed list of look-alikes taken from the
+error kinds above (case, Greek against Latin, digit against letter), not fitted to a set.
+
 ## Reproduce
 
 ```

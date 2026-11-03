@@ -70,6 +70,7 @@ from readablestem.web import (
     bulk_accept,
     events,
     heading_groups,
+    inventory,
     notation,
     notice_places,
     page_edits,
@@ -297,6 +298,10 @@ def done_message(change: ReviewChange, element: Element | None) -> str:
 GROUP_FLASH = "group:"
 # ... and this one to a heading group's card (a group decision).
 HEADING_GROUP_FLASH = "heading-group:"
+# ... and this one to the Symbols screen (`routes/inventory.py`): a symbol changed in many
+# equations at once. `SYMBOLS_VIEW` is the `view` its Undo form sends, to come back to it.
+SYMBOLS_FLASH = "symbols"
+SYMBOLS_VIEW = "symbols"
 NOUNS = {
     Kind.EQUATION: ("equation", "equations"),
     Kind.FIGURE: ("figure", "figures"),
@@ -1262,6 +1267,7 @@ def _page(
         "note_rows": note_rows,
         # Accept many at once (web.bulk_accept), and the filter of the decision list.
         "bulk_offers": bulk_accept.offers(result),
+        "symbols_offer": inventory.handwritten_count(result),
         "decision_filter": filtered,
         "filter_kinds": [(g.slug, g.title, len(g.units)) for g in deciding if g.units],
         "page_count": count,
@@ -1823,7 +1829,7 @@ def undo(
     of its own (counted, and recorded as "undo" ReviewEdits). Only from a page drawn
     after that write (`version` must be the job's): Undo means "what I just did", never
     something another tab did since."""
-    view = LIST_VIEW if view == LIST_VIEW else "split"
+    view = view if view == SYMBOLS_VIEW else (LIST_VIEW if view == LIST_VIEW else "split")
     try:
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
@@ -1869,6 +1875,9 @@ def undo(
     many = len(fixes) > 1
     words = {"it": "They are" if many else "It is", "was": "they were" if many else "it was"}
     message = (UNDO_PENDING if any(f.pending for f in fixes) else UNDO_BACK).format(**words)
+    if view == SYMBOLS_VIEW:  # the Symbols screen: back on it, no Undo under an Undo
+        flash(request, message, element_id=SYMBOLS_FLASH, undo=False)
+        return RedirectResponse(f"/jobs/{job_id}/symbols?view=split", status_code=303)
     keys = {f.group_key for f in fixes}
     if len(fixes) == 1:
         target, flashed = fixes[0].element_id, fixes[0].element_id
@@ -1887,6 +1896,8 @@ def undo(
 
 
 def _back(job_id: str, view: str) -> Response:
+    if view == SYMBOLS_VIEW:
+        return RedirectResponse(f"/jobs/{job_id}/symbols?view=split", status_code=303)
     if view == LIST_VIEW:
         return RedirectResponse(list_url(job_id, "review-progress"), status_code=303)
     from readablestem.web.routes.split import review_url

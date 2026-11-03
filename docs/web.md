@@ -130,6 +130,8 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/review/list?kind=&page=` | owner | "All items as a list": every fix, grouped by kind; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below) |
 | GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept all remaining equations whose checks passed" or "Accept all figures that have generated alt text" would accept, its count, and the form that does it (404 for another kind) |
 | POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item that list shows, as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
+| GET `/jobs/{id}/symbols?view=` | owner | The Symbols screen of a document with handwritten equations: every symbol read in them, grouped with the ones that look alike, with counts and places ("Symbols in handwritten equations" below) |
+| POST `/jobs/{id}/symbols` | owner | Write one symbol as another of its family in every handwritten equation still waiting, except the places the form ticked; one write (CSRF, review `version` checked: 409 and nothing changed when the document changed since the page was drawn; 422 when no symbol, or one outside the family, is chosen); one Undo takes it back |
 | GET `/jobs/{id}/review/marks.css` | owner | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
 | GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond four renders in progress for one person (a review page asks for the page and up to three crops of a repeated-heading group at once), 503 when the instance's two render slots stay busy |
 | GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
@@ -2323,6 +2325,52 @@ unknown code still gets a neutral sentence plus the code.
 and the review cards; `break-word` everywhere else), so no page scrolls sideways at 320
 CSS px. A table wider than the screen scrolls inside its own `.table-scroll` box, which
 is `position: relative` so the visually hidden button text in it cannot widen the page.
+
+#### Symbols in handwritten equations (`web/inventory.py`, `routes/inventory.py`, H11)
+
+A writer's notation is consistent, so a letter misread once is usually misread everywhere: an `x`
+read as `X`, a `p` read as `\rho`. The Symbols screen shows that pattern and fixes it at once. It is
+linked as "Symbols in the handwritten equations" under "All items as a list" on the review screen
+and in the list view, only while the document has handwritten equations.
+
+*What it lists.* Every equation item read from an image page (`IMAGE_PAGE_REASON`) that has a
+proposal, except on a page measured as a scan (`PageType.kind` `scan_*`: printed, not handwritten).
+Typed documents are not listed: their letters come from the PDF's text layer, not from a reading, so
+there is nothing to re-letter. Maths inside a paragraph read from a page image is part of that
+paragraph's text and is not listed. A symbol is found in the proposal's LaTeX by token: a letter, a
+Greek or similar command, and the digits and bars that can be taken for a letter (`1`, `0`, `2`, `5`,
+`6`, `9`, `|`). Words inside `\text{}` and similar commands are not symbols. Families
+(`inventory.FAMILIES`) are the look-alikes: x X × χ, p P ρ, l 1 I | ℓ, z Z 2 ζ, u U μ, v V ν, w W ω,
+o O 0, s S 5 σ, and so on; families with more than one symbol read come first, then the rest, then
+"Other symbols". Each symbol has its name in words ("small x", "capital X", "Greek rho"), how often
+it was read and in how many equations, and a list of every place under a fold: the equation's small
+picture, a link to its card, the LaTeX with the symbol marked, and "the 2nd one in it" when it
+stands more than once. Places in equations already decided are listed as "Already decided: not
+changed."
+
+*The change.* One form per symbol: a select with the other symbols of its family (nothing chosen
+beforehand; the server refuses anything else), a checkbox "Leave this one as it is" on each place,
+and "Change all ...". `POST /jobs/{id}/symbols` goes through `routes/edits.write_review`: the job
+is locked, the review version must be the one the page was drawn at, and each equation still waiting
+is edited the way an ordinary edit is checked (`web.edit_check`: the LaTeX must convert and must not
+differ from the PDF's text where that changes the meaning). An equation that fails is left as it was
+and counted in the notice; the others change. It is one write, one re-render, one `ReviewEdit` per
+changed equation with action `relabel` and the mark `symbol_inventory` (from, to, how many), and one
+Undo (the screen's own notice has the button; Undo from it returns to the screen).
+
+*It never accepts.* A handwritten equation is a required decision (ADR 0007, point 12). The change
+edits the proposal only: the status, `review` and `reviewed` stay, and the checks that made the item a
+decision (`image_page.*`) are kept next to the new checks of the changed LaTeX. Each equation is still
+looked at on its card. The record shows the write as one row ("Changed small x to capital X in 7
+equations at once ... Each equation stayed waiting for a decision."), not one per equation.
+
+*What it does not do.* It does not look at the pictures: the small picture is the whole equation, not
+the symbol. It lists inline maths in prose no more than the review does. Typed (text-layer)
+equations are not part of it. Interface: the form is plain HTML (no script); the screen has
+44 px targets for the select, the fold, the button, each link and each "Leave this one as it is"
+label, a visible border in forced-colors mode, and the marked symbol is underlined, not only
+coloured. `tests/test_web_inventory.py` and `tests/test_web_inventory_browser.py` (keyboard only,
+axe at 1440 and 390 px, 44 px at 320 px, forced-colors) cover it.
 
 ## Security headers
 

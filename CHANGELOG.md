@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased: symbol inventory (branch hw/symbol-inventory)
+
+- Symbols screen (`GET/POST /jobs/{id}/symbols`, `web/inventory.py`, `routes/inventory.py`): for a document
+  with handwritten equations, every symbol read in them grouped with the ones that look alike, with counts,
+  small pictures and places; one symbol can be changed to another of its family everywhere at once, with
+  checkboxes to leave places out. Applied as one write through the edit checks per equation, never an accept
+  (each equation stays a required decision), one `relabel` review record per equation shown as one row in the
+  review record, one Undo. Linked from the review screen and the list view. docs/web.md, docs/eval-handwriting.md.
+
 ## Unreleased: page witness dev run (branch eq/e1-witness-dev)
 
 - `scripts/eq_dev_run.py` (new): the page witness on or off over twelve development papers, crop answers
