@@ -10,6 +10,92 @@
   hostile page cannot stall a worker. Nothing in the pipeline calls it yet, so conversions are
   unchanged. What is read and the limits:
   [docs/layout.md](docs/layout.md), "Vector ink and strokes" (`tests/test_ink_strokes.py`).
+## Unreleased: text layers that do not cover the page, and the maths rule as a guard (branch fix/handwriting-skip-and-flags)
+
+- A visible text layer no longer makes a page "typed" when it does not cover the page's content
+  (`page_type.TEXT_NOT_COVERING`, classifier page-type-v5.5). A watermark, a header, a stamp or a page
+  number over a page-sized picture (a photographed notebook page) made the page typed: it skipped the image page pass and came out "Not converted"
+  with only that text. Three of five real photographed pages hit it. Such a page is now scanned or
+  handwritten and read by the pass when asked; its visible text is still read when the pass is off, and
+  the pass's reading replaces it when on (`page_type.keeps_text`, `layout._analyze_document`,
+  `run.convert_pdf`). A background picture repeated on the pages, a plain one, or one with nothing on
+  it is not content. Details, thresholds and what was measured: docs/layout.md, "Hidden text and page
+  types"; ADR 0007 point 13. `tests/test_page_type_text_coverage.py`.
+- `scripts/page_type_corpus_compare.py` compares the classifier with and without these rules on a
+  labelled corpus (0 pages worse of 846 on the author's corpus; a test runs it when the corpus is there).
+- Production refuses `FEATURE_IMAGE_PAGES` or `IMAGE_PAGES_ACCEPT_AGREED` with
+  `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED=false` (`Settings.check_production`).
+- The review card of a page that was tried from an image and stayed an image says why (`reading_note`).
+- `image_page.enforce_maths_required` runs after every step: any equation or table read from an image
+  whose governing decision is not a required one is lifted to one (a no-op when every path kept
+  ADR 0007 point 12). A practice-set run that seemed to show 14 of 25 and 16 of 30 wrong readings not
+  flagged counted an inline formula's own `review`; counted by its paragraph's decision, as the eval
+  does, all were asked about (replayed at $0: docs/eval-handwriting.md, "Note, 2026-11-03").
+  `tests/test_image_page_maths_required.py`.
+- Copy: `limits.html`, README, docs/vendor-information.md (list in the pull request).
+## Unreleased: eval runs keep their recordings; chemistry report fields (branch chem/eval-metric)
+
+- Every eval run that calls a real model (`eval pipeline` on any set and task, `eval sample`,
+  `eval calibrate --probes`) now writes `answers.jsonl`, `items.jsonl`, `report.json` and `run.json`
+  (the commit) under `~/.cache/readablestem/<set>/runs/<timestamp>/`, and the report names the folder
+  and the commit under `recording`. `--answers` and `--items` still override. Fake runs, replays and
+  the sealed check part keep nothing. `scripts/dev_chatbot.py score` always writes its items.
+- `scripts/dev_chem_classes.py`: reads a run folder, prints how many gold equations harm a listener,
+  and with `--speech` the spoken comparison and the silent harm per 100 gold.
+- Document reports with chemistry gold gain a `chemistry` block: `chem_right_excl_times` (lone `×`
+  left out, reported beside the count that keeps it) and `silent_harm` (wrong, not asked, heard
+  differently), counts only. Report fields only; the primary scorer, the gate and committed reports
+  are unchanged, and no gate reads them.
+- Recordings are private (folders 0700, files 0600). `eval prune --older-than DAYS [--set NAME] [--dry-run]`
+  deletes old runs and keeps any a committed report names. `scripts/dev_chem_classes.py` refuses
+  held-out and sealed run folders.
+## Unreleased: a kit for collecting hand-copied OpenStax examples (branch hw/copy-set-kit)
+
+- `scripts/handwriting_copy_set.py` and `data/handwriting-copy/README.md`: a kit for a small set of
+  real iPad handwriting whose answer key nobody types. It draws OpenStax worked examples with a
+  written, seeded rule behind a CC BY licence gate (the committed table, then the live archive and CMS
+  records), writes each volunteer a brief, matches the PDFs they return to passages (counts only in
+  reports; a folder inside the repository is refused), builds the gold from the passage's published
+  MathML, and writes a manifest in which a page is published only if its writer's yes is recorded; the
+  other pages are counts. A person must look at every page (`review`) before it can be published; published PDFs are rebuilt with page content only and checked, failing closed; unpublished pages can be purged. Tests in
+  `tests/test_handwriting_copy_set.py`; no page has been collected yet, so there is no result.
+## Unreleased: reader B adapters for handwritten expressions (branch hw/math-readers)
+
+- `models/math_readers/`: one small `MathReader` protocol (a PNG crop in, LaTeX candidates with
+  reported confidences out) and two adapters, a Claude reader built to differ from the page pass
+  (another model, its own instructions, one high-resolution crop, no page text) and an OpenAI
+  vision reader (`store: false`). Worst-case reservation before every send, timeout, retries,
+  refusal and error mapping as in the step clients, no content in logs. Settings
+  `MATH_READER_CLAUDE_*` and `MATH_READER_OPENAI_*`, all off; nothing in the pipeline calls them
+  yet (`docs/math-readers.md`).
+- One list of who receives what (`web/recipients.py`) now writes the privacy page (its provider
+  items, "Where it is processed" and the account deletion notes), so a reader's company is named as
+  soon as the reader is on, whichever `MODEL_PROVIDER` is set. A production start is refused while a
+  reader is on and the rendered page does not name every company that receives pictures; the
+  launch checks (model provider, analytics, tables, notation, Microsoft, sign-up) now read the
+  rendered page, not the template source. `MATH_READER_MAX_USD_PER_JOB` caps all readers of a job
+  together. The vendor sheet and `docs/security.md` are updated to match.
+## Unreleased: handwriting harness for private handwritten notes
+
+- `scripts/handwriting_own.py`: intake of PDFs from a folder outside the repo, a hash-based dev and
+  held-out split registered privately, a blank answer-key form served on 127.0.0.1
+  (`scripts/handwriting_gold_form.html`, no model draft) and a `run` command capped by `--max-usd`
+  (at most 2.00 in total across restarts). `run` sends the PDFs to the model provider. Every command
+  refuses a path inside a git repository; `.gitignore` guards the usual private folder names.
+  Use: [docs/eval-handwriting.md](docs/eval-handwriting.md), "Your own handwritten notes".
+## Unreleased: canonical comparator for two readings (branch eq/math-canonical)
+
+- `pipeline/math_canonical.py`: one comparator for "is this the same formula" (tree, notation-neutral,
+  spoken-equal, symbols) with a reason when it is not. The registered scorer scripts are untouched;
+  tests check the library agrees with them. `tests/test_realworld_registration.py` runs
+  `realworld_register.py --check` for every registered set. No product behaviour changes yet
+  ([docs/steps.md](docs/steps.md), "Comparing two readings").
+## Unreleased
+
+- Equation diagnostics on the recorded real-world runs, no model and no cost: `scripts/eq_diag_tables.py` (why maths in
+  table cells is missed), `scripts/eq_diag_glyphs.py` (glyph evidence of undetected and span-wrong equations),
+  `scripts/eq_diag_unflagged.py` (why wrong equations with other symbols were not flagged). Counts and sample sizes in
+  [docs/eval-equation-diagnostics.md](docs/eval-equation-diagnostics.md). No product behaviour changes.
 ## Unreleased: finished steps are kept when a configuration error ends the run
 
 - When a configuration error (a model that is not set up) ended a conversion while other
@@ -80,6 +166,20 @@
   `max-age` instead of `no-store` or `no-cache`.
 ## Unreleased
 
+### Figure gold v2 and a draft pre-registration for long descriptions
+
+- `data/gold-figures-v2/`: 50 figures (14 data charts, 14 diagrams, 10 photos and illustrations, 12 chemistry
+  structures) from CC BY OpenStax books, drawn by a seeded rule with licence and exclusion gates
+  (`gold/figures_v2.py`, `scripts/figures_v2_pool.py`, `scripts/figures_v2_build.py`); each has its source,
+  licence and a reference long description, and 4 of the charts a reference data table. 45 figures come from
+  retired editions ([decisions/0001-scope.md](docs/decisions/0001-scope.md), question 2). No model was run.
+- `gold/figures_v2_arxiv.py` reads plotted data from pgfplots TeX; 100 seeded CC BY papers held no usable
+  chart. `gold/figures_v2_table.py` scores table cells against a reference table.
+- [docs/eval-figures-long.md](docs/eval-figures-long.md): the set, and a draft pre-registration (arms, bars,
+  budget cap, judge calibration with human labels) awaiting sign-off.
+### EPUB export
+
+- `readablestem export epub FILE.html OUT.epub`: an EPUB 3 from the finished HTML (`pipeline/export_epub.py`): XHTML with native MathML, images as files with their alt text, a contents list from the headings, a page list from page markers when present, language, title and accessibility metadata. No `conformsTo`; the summary makes no conformance claim; a feature is claimed only when every item has it. Scripts, frames, forms, remote pictures and `url()` styles are not carried. EPUBCheck and DAISY Ace run on it in `.github/workflows/epub.yml` and locally when installed ([docs/output.md](docs/output.md), "The EPUB export"). No route or button yet.
 ### Documentation
 
 - `docs/screen-reader-test.md`: a 15-minute VoiceOver (Safari) protocol for the demo, a converted file and the review screen, with a results table that maps to WCAG 2.2 criteria.
