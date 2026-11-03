@@ -61,9 +61,29 @@ OPEN_SIGNUP_NOTICE = (
     ("first time you sign in, we make an account", "that the first sign-in makes an account"),
     ("Delete my account", "how to delete the account"),
 )
+# What the privacy notice must say while analytics is on (settings.analytics_enabled): that
+# PostHog gets page views, and not the sentence that there are no analytics. The same check
+# stops a production start (`Settings.check_production`).
+ANALYTICS_NOTICE_WORD = "PostHog"
+NO_ANALYTICS_CLAIM = "no analytics"
 # Written into a demo built with the offline client (`readablestem demo build --fake`);
 # the same string as eval.render.PLACEHOLDER_ATTR (kept here so this module stays light).
 FAKE_DEMO_MARKER = 'data-readablestem-demo="placeholder"'
+
+
+def analytics_notice_problem() -> str | None:
+    """Why the privacy notice cannot stand with analytics on, or None when it describes it.
+    The notice is read from the template as written (matched as text, like the other
+    checks here)."""
+    privacy = TEMPLATES_DIR / "privacy.html"
+    if not privacy.is_file():
+        return "web/templates/privacy.html is missing"
+    text = privacy.read_text(encoding="utf-8")
+    if NO_ANALYTICS_CLAIM in text.lower():
+        return 'the privacy notice still says there are "no analytics"'
+    if ANALYTICS_NOTICE_WORD not in text:
+        return f"the privacy notice does not name {ANALYTICS_NOTICE_WORD}"
+    return None
 
 
 def launch_blockers(
@@ -83,6 +103,11 @@ def launch_blockers(
                 settings.model_provider == "anthropic",
                 "Anthropic",
                 "MODEL_PROVIDER=anthropic sends document images to Anthropic",
+            ),
+            (
+                settings.analytics_enabled,
+                ANALYTICS_NOTICE_WORD,
+                "ANALYTICS_ENABLED sends page views to PostHog",
             ),
             (
                 settings.feature_tables,
@@ -137,6 +162,12 @@ def _settings_items(settings: Settings) -> list[str]:
     from readablestem.ops.limits import spend_findings
 
     items: list[str] = []
+    if settings.env == "prod" and settings.trusted_proxy_hops == 0:
+        items.append(
+            "settings: TRUSTED_PROXY_HOPS=0 ignores X-Forwarded-For, so behind the host's "
+            "proxy every visitor shares one rate-limit bucket (1 on Railway alone, 2 with "
+            "Cloudflare's proxy in front)"
+        )
     refused = ""
     try:
         settings.check_production()

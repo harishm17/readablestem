@@ -95,7 +95,7 @@ _DARK_BLOCK = re.compile(r"@media[^{}]*prefers-color-scheme\s*:\s*dark[^{}]*\{")
 
 AXE_VERSION = "4.14.0"
 AXE_SHA256 = "20c09fe157a8a34a30e241aaa1fcdade657734f08ab379ecfbeb7d45cc46e878"
-AXE_TAGS = ("wcag2a", "wcag2aa", "wcag21aa")
+AXE_TAGS = ("wcag2a", "wcag2aa", "wcag21aa", "wcag22aa")
 AXE_ERROR_IMPACTS = frozenset({"serious", "critical"})
 AXE_SKIPPED = Check(name="axe", passed=True, severity="warning", code="skipped")
 _AXE_RULE_ID = re.compile(r"[a-z0-9-]{1,64}")

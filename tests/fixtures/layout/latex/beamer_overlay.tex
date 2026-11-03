@@ -1,0 +1,30 @@
+% Layout fixture: Beamer overlays. \pause and \item<n-> make TeX emit one page per step,
+% each repeating the earlier content. Written for ReadableSTEM's tests (MIT).
+\documentclass{beamer}
+\usepackage{amsmath}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\begin{document}
+
+\begin{frame}{Deriving the Range}
+  A projectile leaves the ground at speed $v_0$ and angle $\theta$.
+  \pause
+  \begin{equation*}
+    t_{\text{flight}} = \frac{2 v_0 \sin\theta}{g}
+  \end{equation*}
+  \pause
+  \begin{equation*}
+    R = v_0 \cos\theta \; t_{\text{flight}} = \frac{v_0^2 \sin 2\theta}{g}
+  \end{equation*}
+\end{frame}
+
+\begin{frame}{Checking the Result}
+  \begin{itemize}
+    \item<1-> The range is largest at $\theta = 45^\circ$.
+    \item<2-> At $\theta = 0$ the range is zero.
+    \item<3-> The maximum is $R_{\max} = v_0^2 / g$.
+  \end{itemize}
+\end{frame}
+
+\end{document}

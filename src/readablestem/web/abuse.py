@@ -15,6 +15,11 @@ from the right (the platform's front end appends the address it saw, so one hop,
 Railway; another proxy in front, such as Cloudflare's, adds a second). Entries further left
 are written by the client and are never believed. With no such header the peer address is used.
 
+When the header holds more entries than `trusted_hops + 1` (one more is what a client's own
+header leaves in front of the proxies' entries), either a proxy is missing from the setting
+or a client is forging the header; `client_ip` logs `proxy_hops_unexpected` once per process,
+with the two counts and no address, so a wrong `TRUSTED_PROXY_HOPS` does not go unnoticed.
+
 Nothing here is logged with an address: a limited request logs the rule name only
 (`deps.enforce`, which turns a refusal into the 429 page).
 """
@@ -22,6 +27,7 @@ Nothing here is logged with an address: a limited request logs the rule name onl
 from __future__ import annotations
 
 import ipaddress
+import logging
 import threading
 import time
 from collections import deque
@@ -29,6 +35,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from starlette.requests import Request
+
+from readablestem.web.logsafe import log_event
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -53,7 +63,11 @@ RULES: dict[str, Rule] = {
     "upload_user": Rule(15, 600),  # uploads, per signed-in person
     "retry": Rule(20, 600),  # "Try again" on a stopped document, per address
     "retry_user": Rule(10, 600),  # ... per signed-in person
-    "cron": Rule(10, 300),  # the scheduler's endpoint, per address
+    "cron": Rule(10, 300),  # the scheduler's endpoint, per address; failed tokens count too
+    # The /m/ analytics relay (only with ANALYTICS_ENABLED), per address: PostHog's script
+    # batches its events, so a person browsing makes a few requests a minute; a shared
+    # university address still has room. It stops the relay being used as an open proxy.
+    "analytics": Rule(300, 600),
     "sample": Rule(10, 600),  # opening the sample document, per address
     # Review edits that cost something (T3-5, T3-11): a region cut from the PDF and a read
     # by the model, per signed-in person. Generous for a person fixing a document, tight
@@ -103,6 +117,25 @@ class RateLimiter:
         return not hits or hits[-1] <= now - self.rules[rule_name].window_s
 
 
+_hops_warned = False
+
+
+def _warn_hops_once(trusted_hops: int, entries: int) -> None:
+    """The one-time warning about more `X-Forwarded-For` entries than the setting explains.
+    Counts only: never an address."""
+    global _hops_warned
+    if _hops_warned:
+        return
+    _hops_warned = True
+    log_event(
+        logger,
+        "proxy_hops_unexpected",
+        logging.WARNING,
+        trusted_proxy_hops=trusted_hops,
+        forwarded_entries=entries,
+    )
+
+
 def client_ip(request: Request, trusted_hops: int) -> str:
     """The caller's address as the limiter keys it: IPv4 as is, IPv6 by its /64."""
     peer = request.client.host if request.client else "unknown"
@@ -110,6 +143,8 @@ def client_ip(request: Request, trusted_hops: int) -> str:
     chosen = peer
     if trusted_hops > 0 and forwarded:
         parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+        if len(parts) > trusted_hops + 1:
+            _warn_hops_once(trusted_hops, len(parts))
         if len(parts) >= trusted_hops:
             chosen = parts[-trusted_hops]
     try:

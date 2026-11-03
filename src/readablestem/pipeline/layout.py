@@ -76,7 +76,15 @@ from readablestem.core.childenv import child_env
 from readablestem.core.mathchars import base_char, char_variant, styled_char
 from readablestem.core.notation import canonical_from_parts
 from readablestem.core.types import BBox, Element, Kind, Link, Notice, TableGrid, inline_marker
-from readablestem.pipeline import chem, equation_images, hyphens, page_type, script_marks, tables
+from readablestem.pipeline import (
+    chem,
+    equation_images,
+    hyphens,
+    outline,
+    page_type,
+    script_marks,
+    tables,
+)
 from readablestem.pipeline import options as run_options
 from readablestem.pipeline.notation_memory import (
     BOLD_LETTER_REASON,
@@ -207,6 +215,15 @@ REASON_IMAGE_HEADING = "image heading h"
 REASON_NUMBERED = "numbered section"
 REASON_NUMBERED_LINE = "standalone numbered line"
 REASON_LIST_NUMBER = "list-style number"
+# A bold body-size label that repeats ("Solution" under every example): bold text, not a
+# heading (`_mark_run_in_labels`, `heading_step.heading_fixes`).
+REASON_RUN_IN_LABEL = "run-in label"
+# A plain numbered line found a heading only from its neighbours' numbers, in a sequence
+# that does not look like a document's sections (`_promote_numbered_lines`): a decision.
+REASON_NUMBERED_UNCONFIRMED = "numbered line, unconfirmed"
+# On a paragraph (or list item): its text goes on over a page break and the element holds
+# both parts, with the page and box of the first (`_join_page_splits`).
+REASON_JOINED_PAGES = "joined across pages"
 
 # "2.3 Speed", "Chapter 2: Motion", "IV. Results", "A) Units". Letters and roman numerals
 # need a separator or a prefix ("A ball rolls" is not numbered).
@@ -363,6 +380,11 @@ _LOCK = threading.RLock()  # PyMuPDF is not thread-safe: one PyMuPDF call at a t
 # before a unit or a parenthesis of the sentence) apply only then. Set by `_analyze_document`
 # under `_LOCK`; a Chromium print of MathML or a Word file is read as before.
 _TEX_MADE = False
+# How the document spells its own compounds (`hyphens.document_spellings`), for the hyphen at
+# the end of a line: pairs it hyphenates inside a line, words it writes whole. Set by
+# `_analyze_document` under `_LOCK` and cleared with `_TEX_MADE`.
+_COMPOUNDS: frozenset[str] = frozenset()
+_WHOLE_WORDS: frozenset[str] = frozenset()
 # Run the table detector only on pages that could hold a table (`tables.may_hold_table`).
 # The result is the same either way; switched off, only to check that.
 TABLE_PREFILTER = True
@@ -438,8 +460,9 @@ def analyze(
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
             finally:
-                global _TEX_MADE
+                global _TEX_MADE, _COMPOUNDS, _WHOLE_WORDS
                 _TEX_MADE = False
+                _COMPOUNDS = _WHOLE_WORDS = frozenset()
                 doc.close()
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store quotes PDF content
@@ -594,10 +617,11 @@ def release(pdf_bytes: bytes | None = None) -> None:
 
 
 def tagged_level(element: Element) -> int | None:
-    """The heading level the PDF's tags gave this element, or the level the page reader gave
-    a heading read from an image of a page (`REASON_IMAGE_HEADING`), or None."""
-    for reason in element.reasons:
-        for prefix in (REASON_TAGGED, REASON_IMAGE_HEADING):
+    """The heading level the PDF's tags gave this element, else the level of its bookmark
+    (`outline.REASON_OUTLINE`), else the level the page reader gave a heading read from an
+    image of a page (`REASON_IMAGE_HEADING`), or None. A tag wins over a bookmark."""
+    for prefix in (REASON_TAGGED, outline.REASON_OUTLINE, REASON_IMAGE_HEADING):
+        for reason in element.reasons:
             if reason.startswith(prefix) and reason[len(prefix) :].isdigit():
                 return int(reason[len(prefix) :])
     return None
@@ -632,7 +656,7 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
             raw = level_of[round(e.font_size or 0.0, 1)]
         else:
             raw = below + max(0, (depth[e.id] or shallowest) - shallowest)
-        levels[e.id] = max(1, min(6, tagged_level(e) or raw))
+        levels[e.id] = max(1, min(6, tagged_level(e) or outline.weak_level(e) or raw))
     return levels
 
 
@@ -2889,6 +2913,9 @@ class _Inline:
     # the run ("span") or only layout found it ("layout"); None without a pass.
     page_latex: str | None = None
     page_status: PageStatus | None = None
+    # The page it is on, only when that is not its paragraph's page (the paragraph goes on
+    # over a page break, `_join_page_splits`).
+    page: int | None = None
 
 
 def _inline_runs(
@@ -6621,6 +6648,11 @@ class _Block:
     # Display equations placed by the page math pass: its LaTeX, and "span" or "layout".
     page_latex: str | None = None
     page_status: PageStatus | None = None
+    # Paragraphs that go on over a page break: this block is the first part, `parts` the
+    # later ones with their page numbers (`_join_page_splits`); a later part is `joined`,
+    # stays in its page's blocks for the notices and the safety net, and makes no element.
+    parts: list[tuple[int, _Block]] = field(default_factory=list)
+    joined: bool = False
 
 
 def _dominant_size(rows: Sequence[_Row]) -> float:
@@ -7052,7 +7084,7 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     ):
         heading = [REASON_LARGER_FONT, f"font {ratio:.2f}x body", *evidence]
     elif CAPTION.match(text):
-        return _Block("caption", box, rows, text=text, font_size=size)
+        return _Block("caption", box, rows, text=readable_math_letters(text), font_size=size)
     elif (
         upright
         and bold
@@ -7084,12 +7116,12 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     if heading is not None:
         if bold:
             heading.append("bold")
-        marked = _join_text(rows, marked=True)
+        marked = readable_math_letters(_join_text(rows, marked=True))
         return _Block(
             Kind.HEADING,
             box,
             rows,
-            text=text,
+            text=readable_math_letters(text),
             font_size=size,
             bold=bold,
             reasons=heading,
@@ -7098,6 +7130,34 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     if rows[0].marker is not None:
         return _Block(Kind.LIST_ITEM, box, rows, font_size=size, bold=bold, marker=rows[0].marker)
     return _Block(Kind.PARAGRAPH, box, rows, font_size=size, bold=bold)
+
+
+# The style variants of a variable that a plain letter says as well: bold, italic and bold
+# italic Latin (U+1D400-1D49B), the sans-serif and monospace Latin and Greek, the digits
+# except the double-struck ones (U+1D7D8-1D7E1), and Planck's h (U+210E, the italic h).
+# Script, fraktur and double-struck letters (the number sets R C N Z Q, and the letterlike
+# symbols l and L) are names of things, not styles of a letter: they stay.
+_FLATTEN = ((0x1D400, 0x1D49B), (0x1D5A0, 0x1D7D7), (0x1D7E2, 0x1D7FF), (0x210E, 0x210E))
+
+
+def readable_math_letters(text: str) -> str:
+    """`text` with the italic and bold variable letters of the Mathematical Alphanumeric
+    Symbols block (and Planck's h) as the plain letters and digits they style; nothing else
+    changes, so the number sets and the letterlike symbols keep their meaning.
+
+    A heading or a caption's plain text keeps no inline equation (a paragraph, and a
+    figure's caption when it has maths, do), so a variable in a title such as "Free fall
+    and g" set in math italic would be read out as "mathematical italic small g". The
+    letter is what a reader and a screen reader need; the italics are lost."""
+    if text.isascii():
+        return text
+    return "".join(
+        unicodedata.normalize("NFKC", c)
+        if any(lo <= ord(c) <= hi for lo, hi in _FLATTEN)
+        and unicodedata.decomposition(c).startswith("<font>")
+        else c
+        for c in text
+    )
 
 
 def _join_text(rows: Sequence[_Row], *, marked: bool = False) -> str:
@@ -7128,7 +7188,9 @@ def _line_break(before: str, after: str) -> tuple[str, str]:
     if before.endswith("\u00ad"):
         return before[:-1], ""
     if len(before) > 1 and before[-1] in hyphens.HYPHENS and before[-2].isalpha():
-        if after[:1].islower() and not hyphens.keeps_hyphen(before, after):
+        if after[:1].islower() and not hyphens.keeps_hyphen(
+            before, after, _COMPOUNDS, _WHOLE_WORDS
+        ):
             return before[:-1], ""
         return before, ""
     return before, " "
@@ -7396,10 +7458,99 @@ def _clear_of_punctuation(box: BBox, row: _Row, end: int) -> BBox:
     return (box[0], box[1], x1, box[3])
 
 
+REASON_WRAPPED_MATHS = "wrapped across lines"
+# A line of a paragraph ends on one of these (TeX breaks inline maths after a relation or a
+# binary operator; Word may break before one) when one formula goes on at the next line.
+_WRAP_OPERATORS = frozenset("=+−×·<>≈≠≤≥∼→±∓∝*")  # noqa: RUF001
+_MAX_WRAP_CONNECTOR = 2  # operator characters between the two halves
+
+
+def _connector(strings: list[str]) -> str | None:
+    """The operator characters in `strings` (blanks aside), or None when any of them is a
+    word or other text."""
+    joined = "".join("".join(s.split()) for s in strings)
+    if all(c in _WRAP_OPERATORS for c in joined) and len(joined) <= _MAX_WRAP_CONNECTOR:
+        return joined
+    return None
+
+
+_RELATIONS = frozenset("=<>≈≠≤≥∼→∝")  # noqa: RUF001
+
+
+def _wraps_here(first: str, second: str, connector: str) -> bool:
+    """Do the two halves read as one formula broken at this place? A relation sign at the
+    break always says so. A plus or minus does only when its half is a longer expression
+    (it has a space in it): "Na+" at the end of a line and "Cl-" at the start of the next
+    are two ions, not a sum."""
+    if connector:
+        return any(c in _RELATIONS for c in connector) or " " in first
+    if first[-1] in _RELATIONS or second[0] in _RELATIONS:
+        return True
+    return (first[-1] in _WRAP_OPERATORS and " " in first) or (
+        second[0] in _WRAP_OPERATORS and " " in second
+    )
+
+
+def _wrapped_inline(pieces: list[str | _Inline], row_pieces: list[str | _Inline]) -> bool:
+    """Is the inline equation that starts the next row the rest of the one that ends this
+    row? Then they are one equation (in place) and the next row's pieces go on after it.
+
+    "x + y =" at the end of a line and "z + w" at the start of the next is one formula that
+    wrapped, not two. It needs the two to touch: only operator characters (or nothing)
+    between them, and either half next to the break is an operator ("... = " / "z") or
+    the connector is one. Two formulas with a word between them, or two variables set side
+    by side, stay two."""
+    tail: list[str] = []
+    index = len(pieces) - 1
+    while index >= 0 and isinstance(piece := pieces[index], str):
+        tail.append(piece)
+        index -= 1
+    head: list[str] = []
+    start = 0
+    while start < len(row_pieces) and isinstance(piece := row_pieces[start], str):
+        head.append(piece)
+        start += 1
+    if index < 0 or start >= len(row_pieces):
+        return False
+    first, second = pieces[index], row_pieces[start]
+    if not (isinstance(first, _Inline) and isinstance(second, _Inline)):
+        return False
+    if not (first.text and second.text) or first.page != second.page:
+        return False
+    connector = _connector([*tail, *head])
+    if connector is None:
+        return False
+    if not _wraps_here(first.text, second.text, connector):
+        return False
+    words = [first.text, connector, second.text]
+    pieces[index:] = [
+        _Inline(
+            _union([first.bbox, second.bbox]),
+            _clean(" ".join(w for w in words if w)),
+            max(first.score, second.score),
+            [
+                *first.reasons,
+                *(r for r in second.reasons if r not in first.reasons),
+                REASON_WRAPPED_MATHS,
+            ],
+            first.font_size,
+            (first.regular or "") + (second.regular or "") or None,
+            None,
+            None,
+            first.page,
+        )
+    ]
+    pieces.extend(row_pieces[start + 1 :])
+    return True
+
+
 def _append_row(pieces: list[str | _Inline], row_pieces: list[str | _Inline]) -> None:
-    """Join the next row of a paragraph, repairing end-of-line hyphenation."""
+    """Join the next row of a paragraph, repairing end-of-line hyphenation and inline maths
+    that wraps from one row to the next (`_wrapped_inline`)."""
     if not pieces:
         pieces.extend(row_pieces)
+        return
+    if _wrapped_inline(pieces, row_pieces):
         return
     last, first = pieces[-1], row_pieces[0] if row_pieces else ""
     if isinstance(last, str) and isinstance(first, str):
@@ -7493,8 +7644,16 @@ def _claim_tables(
     from its last one is marked, and the end of a row the page break split is joined to
     that row (`tables.join_split_row`)."""
     if TABLE_PREFILTER and not tables.may_hold_table(page, frags[number], paths[number]):
-        return []  # nothing the detector could find would be kept (`may_hold_table`)
-    found = tables.find(page, frags[number], paths[number], clean=_clean, budget=budget)
+        found = []  # nothing the detector could find would be kept (`may_hold_table`)
+    else:
+        found = tables.find(page, frags[number], paths[number], clean=_clean, budget=budget)
+    if previous and not (found and tables.continues(previous[-1], found[0], page.rect.width)):
+        # The rest of an unruled table has too few lines to be found on its own page.
+        rest = tables.find_continued(
+            page, frags[number], paths[number], previous[-1], found, clean=_clean, budget=budget
+        )
+        if rest is not None:
+            found = [rest, *found]
     if not found:
         return found
     lines = set().union(*(t.lines for t in found))
@@ -8244,6 +8403,316 @@ def _merge_column_continuations(blocks: list[_Block]) -> list[_Block]:
     return out
 
 
+# ============================================================================ structure passes
+# Read across the whole document, after every page has its blocks: what a page cannot tell on
+# its own (a numbered line is a heading only if its neighbours are numbered too; a label is
+# a label only if it repeats; a paragraph goes on over a page break).
+
+
+def _text_of(pieces: Sequence[str | _Inline]) -> str | None:
+    """The text of a paragraph's pieces, or None when it holds inline maths."""
+    if any(isinstance(piece, _Inline) for piece in pieces):
+        return None
+    return "".join(piece for piece in pieces if isinstance(piece, str))
+
+
+_SENTENCE_END = ".?!:…"
+_CLOSING = "\"')]’”"  # noqa: RUF001
+
+
+def _ends_sentence(pieces: Sequence[str | _Inline]) -> bool:
+    """Does the last piece of text end on a full stop, question or exclamation mark, colon or
+    ellipsis (closing quotes and brackets aside)? A paragraph that ends on maths does not."""
+    last = next((p for p in reversed(pieces) if not isinstance(p, str) or p.strip()), None)
+    if not isinstance(last, str):
+        return False
+    end = last.rstrip().rstrip(_CLOSING)[-1:]
+    return end != "" and end in _SENTENCE_END
+
+
+RUN_IN_LABELS = frozenset({"solution", "answer", "discussion", "procedure", "proof", "hint"})
+MIN_LABEL_COPIES = 2  # a label word that repeats this often is a label
+LABEL_SIZE_TOLERANCE = 0.05  # of the body size: "exactly body size"
+LABEL_INSET = 3.0  # pt a label sits in from its page's text edge: inside a box, not a section
+
+
+def _text_edges(page: _PageBlocks) -> dict[str, float]:
+    """Left edge of the body text of each column of a page: the leftmost x where at least
+    three paragraphs of two lines or more start (within 2.5 pt), else the leftmost such
+    paragraph's (a column with none has no entry)."""
+    starts: dict[str, list[float]] = {}
+    for block in page.blocks:
+        if block.kind == Kind.PARAGRAPH and len(block.rows) >= 2:
+            starts.setdefault(block.rows[0].column, []).append(block.bbox[0])
+    edges: dict[str, float] = {}
+    for column, xs in starts.items():
+        xs.sort()
+        edges[column] = next(
+            (x for i, x in enumerate(xs) if bisect.bisect_right(xs, x + 2.5) - i >= 3), xs[0]
+        )
+    return edges
+
+
+def _mark_run_in_labels(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
+    """Mark the bold run-in labels that repeat (`REASON_RUN_IN_LABEL`).
+
+    "Solution" or "Procedure" under every example is a label, not a heading: OpenStax's
+    own outline does not count them, and a screen-reader user who navigates by headings
+    would stop at each. The rule is narrow on purpose (docs/layout.md "Run-in labels"): a
+    heading found only by the bold body-size rule (no larger font, no number, no tag), one
+    line, at body size, whose text is one of `RUN_IN_LABELS` (a trailing full stop or colon
+    aside), set in from its column's text edge (`LABEL_INSET`: inside a box, where an author
+    sets labels; a section heading sits at the margin, as LaTeX's `\\subsubsection*{Solution}`
+    and a Word heading style do), and the same label at least `MIN_LABEL_COPIES` times in
+    the document."""
+    found: dict[str, list[_Block]] = {}
+    for page in pages:
+        edges = _text_edges(page)
+        for block in page.blocks:
+            edge = edges.get(block.rows[0].column) if block.rows else None
+            if (
+                edge is not None
+                and block.kind == Kind.HEADING
+                and block.reasons[:1] == [REASON_BOLD_BODY]
+                and REASON_LARGER_FONT not in block.reasons
+                and len(block.rows) == 1
+                and block.font_size is not None
+                and abs(block.font_size / ctx.body - 1) <= LABEL_SIZE_TOLERANCE
+                and block.bbox[0] - edge > LABEL_INSET
+            ):
+                label = (block.text or "").strip().rstrip(".:").strip().casefold()
+                if label in RUN_IN_LABELS:
+                    found.setdefault(label, []).append(block)
+    for blocks in found.values():
+        if len(blocks) >= MIN_LABEL_COPIES:
+            for block in blocks:
+                block.reasons.append(REASON_RUN_IN_LABEL)
+
+
+_NUMBERED_PLAIN = re.compile(r"^(?P<n>\d{1,2})\s+(?P<title>[A-Z]\S*(?:\s+\S+){0,7})$")
+_NO_TITLE_END = ".,;:!?"
+
+
+# A numbered line that starts with one of these is an exercise or a question ("1 Find the
+# final speed of the cart"), never a section title: problem sets are content.
+_EXERCISE_OPENERS = frozenset(
+    [
+        "find",
+        "calculate",
+        "determine",
+        "solve",
+        "compute",
+        "show",
+        "prove",
+        "explain",
+        "describe",
+        "write",
+        "draw",
+        "use",
+        "give",
+        "list",
+        "state",
+        "identify",
+        "estimate",
+        "evaluate",
+        "simplify",
+        "graph",
+        "plot",
+        "sketch",
+        "derive",
+        "verify",
+        "convert",
+        "express",
+        "compare",
+        "discuss",
+        "define",
+        "suppose",
+        "consider",
+        "let",
+        "choose",
+        "complete",
+        "answer",
+        "name",
+        "predict",
+        "measure",
+        "what",
+        "why",
+        "how",
+        "when",
+        "where",
+        "which",
+        "who",
+        "is",
+        "are",
+        "does",
+        "do",
+        "can",
+        "will",
+        "would",
+        "should",
+        "if",
+    ]
+)
+MAX_STRONG_TITLE_WORDS = 6  # a longer title is a decision
+MAX_FIRST_NUMBER = 2  # a sequence of section numbers starts at 1 (or 2: no section 0)
+
+
+def _numbered_candidate(block: _Block, ctx: _Context) -> tuple[int, int] | None:
+    """(integer, words in the title) of a plain body-size line that reads like "3 Forces"
+    (one regular line, a capital after the number, no closing punctuation, not a quantity,
+    not an exercise or a question), else None."""
+    if (
+        block.kind != Kind.PARAGRAPH
+        or block.code
+        or block.marker is not None
+        or block.bold
+        or len(block.rows) != 1
+        or block.font_size is None
+        or abs(block.font_size - ctx.body) > 0.5
+    ):
+        return None
+    text = _text_of(block.pieces)
+    match = _NUMBERED_PLAIN.match((text or "").strip())
+    if match is None or match["title"][-1] in _NO_TITLE_END:
+        return None
+    words = match["title"].split()
+    stem = "".join(c for c in words[0].lower() if c.isalpha())
+    unit = stem in _QUANTITY_WORDS or stem.rstrip("s") in _QUANTITY_WORDS
+    if unit and not (len(words) > 1 and words[1][:1].isupper()):
+        return None
+    if stem in _EXERCISE_OPENERS:
+        return None
+    if sum(c.isalpha() for c in match["title"]) < 3:
+        return None
+    return int(match["n"]), len(words)
+
+
+def _promote_numbered_lines(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
+    """Plain body-size numbered lines in sequence are headings ("3 Forces", "4 Energy").
+
+    At body size a bare integer before a word is too often a quantity or a list line to
+    call a heading on its own (`section_heading_number`). Here it counts when the document
+    corroborates it: the next such line, in the same type and column, carries the next
+    integer, with at least one paragraph of two lines or more between them (so a run of
+    short numbered lines is a list, not headings). A line that opens like an exercise or a
+    question is never a candidate ("1 Find the final speed", "2 What is the mass"). The
+    evidence is the weak "standalone numbered line" (an optional note), never "numbered
+    section"; and where the sequence does not look like a document's sections (it does not
+    start at 1 or 2, or the title is longer than `MAX_STRONG_TITLE_WORDS`) the heading is
+    `REASON_NUMBERED_UNCONFIRMED`: a required decision."""
+    flat = [block for page in pages for block in page.blocks]
+    found: list[tuple[int, int, int, tuple[float, str, str], _Block]] = []
+    for position, block in enumerate(flat):
+        candidate = _numbered_candidate(block, ctx)
+        if candidate is not None:
+            style = (
+                round((block.font_size or 0.0) * 2) / 2,
+                block.rows[0].family,
+                block.rows[0].column,
+            )
+            found.append((position, candidate[0], candidate[1], style, block))
+    start_of: dict[int, int] = {}  # a promoted block -> the integer its sequence starts at
+    for (first_at, first_n, _, first_style, first), (
+        next_at,
+        next_n,
+        _,
+        next_style,
+        second,
+    ) in pairwise(found):
+        if next_n != first_n + 1 or next_style != first_style:
+            continue
+        if not any(
+            b.kind == Kind.PARAGRAPH and len(b.rows) >= 2 for b in flat[first_at + 1 : next_at]
+        ):
+            continue
+        start_of.setdefault(id(first), first_n)
+        start_of[id(second)] = start_of[id(first)]
+    for _, _, words, _, block in found:
+        if id(block) not in start_of:
+            continue
+        block.text = (_text_of(block.pieces) or "").strip()
+        block.kind = Kind.HEADING
+        block.reasons = [REASON_NUMBERED_LINE]
+        if start_of[id(block)] > MAX_FIRST_NUMBER or words > MAX_STRONG_TITLE_WORDS:
+            block.reasons.append(REASON_NUMBERED_UNCONFIRMED)
+        block.pieces = []
+
+
+def _body_sized(block: _Block, ctx: _Context) -> bool:
+    return block.font_size is not None and block.font_size >= FOOTNOTE_SIZE * ctx.body
+
+
+def _last_body_block(blocks: Sequence[_Block], ctx: _Context) -> _Block | None:
+    """The lowest block of a page that is not a footnote (smaller type below the text)."""
+    return next((b for b in reversed(blocks) if _body_sized(b, ctx)), None)
+
+
+def _goes_on(last: _Block, first: _Block, limits: tuple[float, float]) -> bool:
+    """Is `first`, the top block of a page, the rest of the paragraph that `last` ends on the
+    page before? The first part must not end a sentence, the second must start in the middle
+    of one (a lower-case letter), and the two must look alike: the same size, typeface and
+    weight, the left edge of the second at the first's text edge with no first-line indent.
+    Both must sit at the text area's edges (`limits`: its bottom and its top, with slack)."""
+    if (
+        last.kind != Kind.PARAGRAPH
+        or last.code
+        or first.kind != Kind.PARAGRAPH
+        or first.code
+        or first.marker is not None
+        or first.joined
+        or not last.rows
+        or not first.rows
+        or last.font_size is None
+        or first.font_size is None
+        or abs(last.font_size - first.font_size) > 0.5
+        or last.bbox[3] < limits[0]
+        or first.bbox[1] > limits[1]
+    ):
+        return False
+    tail, head = last.rows[-1], first.rows[0]
+    if abs(tail.x0 - head.x0) > 3.0 or head.x0 - first.bbox[0] > 3.0:
+        return False
+    if tail.family != head.family or tail.bold != head.bold:
+        return False
+    start = next((p for p in first.pieces if not isinstance(p, str) or p.strip()), None)
+    if not isinstance(start, str) or not start.lstrip()[:1].islower():
+        return False
+    return not _ends_sentence(last.pieces)
+
+
+def _join_page_splits(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
+    """A paragraph that goes on over a page break is one block again.
+
+    The top block of a page continues the lowest body block of the page before (footnotes
+    below it, and the running header and footer, are not in the way: the margin filter has
+    dropped the latter and footnotes are smaller type) when `_goes_on`. The first part
+    keeps its page and box (an element has one page and one box); the later part stays in
+    its page's blocks, marked `joined`, so the notices and the safety net still see it, and
+    `_to_elements` writes both parts as one element. A paragraph that runs over a second
+    break joins again."""
+    bodies = [
+        b
+        for page in pages
+        for b in page.blocks
+        if b.kind in _TEXT_BLOCKS and _body_sized(b, ctx) and not b.code
+    ]
+    if not bodies:
+        return
+    slack = 3 * ctx.pitch
+    limits = (max(b.bbox[3] for b in bodies) - slack, min(b.bbox[1] for b in bodies) + slack)
+    owner: dict[int, _Block] = {}
+    for before, page in pairwise(pages):
+        if page.number != before.number + 1 or not page.blocks:
+            continue
+        last = _last_body_block(before.blocks, ctx)
+        if last is None or not _goes_on(last, page.blocks[0], limits):
+            continue
+        host, part = owner.get(id(last), last), page.blocks[0]
+        host.parts.append((page.number, part))
+        part.joined = True
+        owner[id(part)] = host
+
+
 REASON_HALF_FRACTION = "half a fraction"
 
 
@@ -8439,6 +8908,10 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any
         _answer_fields(paths[number], page_rows)
         _mark_plots(paths[number], page_rows)
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
+    global _COMPOUNDS, _WHOLE_WORDS
+    _COMPOUNDS, _WHOLE_WORDS = hyphens.document_spellings(
+        row.text for rows, _, _ in prepared.values() for row in rows
+    )
     _list_markers({n: rows for n, (rows, _, _) in prepared.items()}, paths, ctx)
     label_keys = _label_keys(doc, list(prepared), prepared, paths, ctx, margins)
     pages = [
@@ -8468,8 +8941,11 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any
     ]
     _glossary_entries(pages)
     _settle_bold_letters(pages)
+    _promote_numbered_lines(pages, ctx)
+    _mark_run_in_labels(pages, ctx)
+    _join_page_splits(pages, ctx)
     block_ids: dict[int, str] = {}
-    elements = _to_elements(pages, ctx, block_ids)
+    elements = outline.apply(_to_elements(pages, ctx, block_ids), outline.read(doc), selected)
     footnote_marks: dict[str, _FootnoteMark] = {}
     notices = _layout_notices(pages, ctx, block_ids, footnote_marks)
     elements = _contents_links(_footnote_links(elements, footnote_marks))
@@ -8479,6 +8955,8 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any
     boxes: dict[int, list[BBox]] = {}
     for e in elements:
         boxes.setdefault(e.page, []).append(e.bbox)
+    for page in pages:  # the later part of a paragraph joined over a page break is read
+        boxes.setdefault(page.number, []).extend(b.bbox for b in page.blocks if b.joined)
     for page in pages:
         n = page.number
         if n in kept:
@@ -8819,6 +9297,22 @@ def _footnote(
     return small and low and mark and first in raised
 
 
+def _whole_pieces(block: _Block) -> list[str | _Inline]:
+    """The pieces of a paragraph with the parts that follow it over page breaks joined on
+    (hyphenation repaired as between lines); an inline equation of a later part keeps its
+    own page."""
+    if not block.parts:
+        return block.pieces
+    pieces = list(block.pieces)
+    for number, part in block.parts:
+        later = [
+            replace(p, page=number) if isinstance(p, _Inline) and p.page is None else p
+            for p in part.pieces
+        ]
+        _append_row(pieces, later)
+    return _tidy(pieces)
+
+
 def _to_elements(
     pages: list[_PageBlocks], ctx: _Context, block_ids: dict[int, str] | None = None
 ) -> list[Element]:
@@ -8829,14 +9323,17 @@ def _to_elements(
     for page in pages:
         ids = (f"p{page.number + 1}-e{index}" for index in count())
         for block in page.blocks:
+            if block.joined:  # written with the paragraph it goes on from (`_join_page_splits`)
+                continue
             element_id = next(ids)
             if block_ids is not None:
                 block_ids[id(block)] = element_id
+                block_ids.update({id(part): element_id for _, part in block.parts})
             if block.kind in _TEXT_BLOCKS:
                 children = []
                 parts = []
                 term_length = 0
-                for number, piece in enumerate(block.pieces, start=1):
+                for number, piece in enumerate(_whole_pieces(block), start=1):
                     if isinstance(piece, _Inline):
                         child_id = next(ids)
                         children.append((child_id, piece))
@@ -8872,14 +9369,16 @@ def _to_elements(
                         list_ordered=marker.ordered if marker else None,
                         list_level=block.contents_level
                         or (levels.get(id(block)) if marker else None),
-                        reasons=[CONTENTS_ENTRY] if block.contents_level else [],
+                        reasons=[CONTENTS_ENTRY]
+                        if block.contents_level
+                        else ([REASON_JOINED_PAGES] if block.parts else []),
                         script_runs=script_runs,
+                        last_page=block.parts[-1][0] if block.parts else None,
                     )
                 )
                 for child_id, inline in children:
-                    elements.append(
-                        _inline_element(child_id, inline, page.number, element_id, elements)
-                    )
+                    where = page.number if inline.page is None else inline.page
+                    elements.append(_inline_element(child_id, inline, where, element_id, elements))
                 continue
             kind = Kind(block.kind)
             heading_text, heading_runs = (

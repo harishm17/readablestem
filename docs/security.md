@@ -18,7 +18,7 @@ cookie; the model provider's API key and the daily spend it can create; the data
 | Anyone on the internet | Reach public pages, the sign-in routes and the cron route; send anything | Sign-in (the allowlist, or with `SIGNUP_MODE=open` a verified Google or allowed Microsoft identity), CSRF, rate limits, body-size caps, security headers |
 | Someone who makes many accounts (open sign-up) | Use the free quota again and again, run up model spend, fill the database | A verified identity, 5 new accounts an hour per address, `MAX_NEW_ACCOUNTS_PER_DAY` for the service, lower daily pages and model reads for a new account, a separate spend pool inside the daily cap, block on `/admin` |
 | A signed-in instructor (curious or malicious) | Call every route with other people's ids, send hostile files, send floods | Owner check on every job and course route, 404 for strangers, per-person quotas and queue caps |
-| A crafted PDF | Crash or stall the parser, balloon memory, smuggle text that becomes HTML or a prompt | Isolated probe process with time and memory limits, page and size limits, escaping and allowlists on everything that reaches HTML |
+| A crafted PDF | Crash or stall the parser, balloon memory, smuggle text that becomes HTML or a prompt | Isolated probe process with time and memory limits, the conversion itself in a killable child with memory, CPU and time limits, page and size limits, escaping and allowlists on everything that reaches HTML |
 | The model's output | Contain markup, script, unsafe URLs, wrong content | Validation before use; HTML built by escaping and by rebuilding MathML from an allowlisted tree |
 | A person with read access to logs, traces or the aggregate tables | Read document content if it were there | Content-free logging by construction; no document text in events, aggregates or traces |
 | A compromised dependency or a leaked key | Run code, spend money | Locked and audited dependencies, pinned CI actions, spend caps, secrets only in Railway's service variables (never in the repository; `.railway/railway.ts` lists names only) |
@@ -90,8 +90,8 @@ cannot skip these checks unnoticed.
 | Public | `/`, `/demo`, `/privacy`, `/terms`, `/limits`, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (names of late scheduled tasks only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
 | Signed-in user, owner only | `/account`, `/account/delete` (GET, POST), `/app`, `/app/documents`, `/app/download`, `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages), everything under `/courses/...` (including `/courses/{id}/download`) |
 | Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
-| Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
-| Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare) |
+| Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), rate limited per address (`analytics`, 300 per 10 minutes), the visitor's address is not forwarded (PostHog sees the relay's own), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
+| Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare; production refuses a `CRON_TOKEN` shorter than 32 characters; wrong tokens count against the cron limit below) |
 
 `POST /jobs/{id}/retry` ("Try again") is owner-only and CSRF-checked like every other write on a job, and rate limited; it refuses with 409 when the document is not stopped or has had its 3 tries, and with 429 when the person already has 10 documents waiting or converting.
 
@@ -99,7 +99,7 @@ The job page's three settings, `POST /jobs/{id}/title`, `/contact` and `/keep`, 
 and CSRF-checked like every other write on a job. They are not rate limited: each costs one
 re-render of the person's own document (the same as a review decision or a language change,
 which are not limited either), the body limit applies, and the number of documents a person
-can hold is capped. `/jobs/{id}/download/canvas` and `/jobs/{id}/download/cartridge` (the same page as an IMS Common Cartridge) are GETs for the owner, like `/download`. A
+can hold is capped. `/jobs/{id}/download/canvas` and `/jobs/{id}/download/cartridge` (the same page as an IMS Common Cartridge) are GETs for the owner, like `/download`. So is `/jobs/{id}/combine` (one file from the person's own finished, still-kept parts of one source; another person's part in the same group is never included, a part with a decision open is held back, and it restarts the clock of the parts it took and records the downloads, as "Download all" does). A
 download restarts the deletion clock of the person's own document (`retention.restart_clock`),
 which is the one thing a GET changes; `test_get_requests_change_nothing` allows that and no
 other change.
@@ -141,7 +141,8 @@ with `script-src 'self'` and `style-src 'self'` and no `unsafe-inline`; `frame-a
 same-origin`; a Permissions-Policy that turns off camera, microphone, geolocation and payment;
 Cross-Origin-Opener-Policy and Cross-Origin-Resource-Policy `same-origin`; `Cache-Control:
 no-store` except for `/static/` (public files: a year for names that carry a hash or a version,
-`no-cache` for the rest, `web/assets.py`); and, in production, HSTS. That includes error pages, the 413
+an hour with an ETag for the rest, `web/assets.py`) and the demo and showcase pages (an hour with an
+ETag, the same for everyone); and, in production, HSTS. That includes error pages, the 413
 for an oversized body, the 500 page, redirects, `HEAD`, 404s from the static route and the
 sandboxed document.
 
@@ -170,6 +171,7 @@ script injected into an app page is refused by the policy.
 | Word and PowerPoint files of one upload | their conversions share 180 s (`OFFICE_BUDGET_S`); the rest are refused with a reason | `routes/jobs.py` (`_place_files`) |
 | Sample document | one per person, outside the quota, the spend and the caps; `sample` rate rule 10 per 10 minutes per address | `web/sample.py` |
 | Probe child | 30 s timeout, 768 MiB address space, minimal environment | `inspect_pdf_isolated`, `pdf_probe` |
+| Conversion child | The whole conversion, in its own process and process group: `CONVERSION_MEMORY_MB` (3072) plus twice the PDF of address space, CPU time 4 times the job's time limit, no core file, killed at the job's time limit, on cancel or shutdown, dies with the web process; minimal environment (no keys, no database URL), model requests and every database write made by the parent; a crash fails that job at once (`conversion_crashed`, `conversion_oom`) | `convert_isolated`, `conversion_child` |
 | Word and PowerPoint (T3-30) | File checks in a child with a minimal environment and a 768 MiB cap; LibreOffice in its own session and process group with 2 GiB address space, CPU, output-size and open-file limits and `OFFICE_TIMEOUT_S` (90 s) then killed; one conversion at a time per instance; the PDF it makes is probed like any upload | `convert_office_isolated`, `office_convert` |
 | Daily pages per person | `PER_USER_DAILY_PAGE_QUOTA` (invited), `OPEN_TIER_DAILY_PAGE_QUOTA` (open tier) | `web/quota.py`, `web/access.py` |
 | Model reads from review per person per day (open tier) | `OPEN_TIER_DAILY_REREADS`, counted before the read and not given back | `web/quota.py` (`try_consume_reread`), `web/reread.py` |
@@ -187,13 +189,44 @@ script injected into an app page is refused by the policy.
 | Emailed sign-in links, per target address (off) | 3 per 15 minutes, whoever asks | `web/abuse.py` (`email_link`) |
 | Sign-in callbacks, per address | 20 per 5 minutes | `web/abuse.py` |
 | Uploads, per address / per person | 30 / 15 per 10 minutes | `web/abuse.py` |
-| Cron route, per address | 10 per 5 minutes | `web/abuse.py` |
+| Cron route, per address (every call counts, so wrong tokens are limited too) | 10 per 5 minutes | `web/abuse.py` |
+| Analytics relay `/m/` (only with `ANALYTICS_ENABLED`), per address | 300 per 10 minutes | `web/abuse.py` (`analytics`) |
 
 The rate limit is on by default and production refuses to start with `RATE_LIMITS_ENABLED=false`. It is in memory, per instance: with two instances the allowance is doubled, and a
 restart forgets it. It is a seatbelt for a few people, not a flood defence. The address is the
 entry `TRUSTED_PROXY_HOPS` places from the right of `X-Forwarded-For` (1 with Railway's edge alone, which is production; 2 if another proxy such as Cloudflare's sits in
 front as well); entries further left are written by the client and never
 believed. **If this is set wrong the limits are shared by everyone or by no one**.
+Two checks help catch it. At run time, an `X-Forwarded-For` with more than
+`TRUSTED_PROXY_HOPS + 1` entries logs `proxy_hops_unexpected` once per process (the two counts,
+never an address): a proxy is missing from the setting, or a client is forging the header. And
+`readablestem ops launch-check` lists `TRUSTED_PROXY_HOPS=0` in production, which makes every
+visitor share the platform's address. Launch-check runs from the repo and the settings, so it
+cannot see the live header; the log line is the only live check.
+
+### Rotating the session secret
+
+`SESSION_SECRET` signs the session cookie. To change it without signing everyone out:
+
+1. Generate a new value (`python -c 'import secrets; print(secrets.token_urlsafe(48))'`).
+2. Set `SESSION_SECRET_PREVIOUS` to the old value (several, comma-separated, if rotating
+   again before step 4), set `SESSION_SECRET` to the new one, and redeploy. New cookies are
+   signed with the new secret; a cookie signed with a listed old one is still accepted, and is
+   re-signed the next time the session changes. Production refuses an entry shorter than 32
+   characters.
+3. Wait 7 days (the cookie's lifetime), after which no cookie signed with the old secret is
+   valid anyway.
+4. Remove `SESSION_SECRET_PREVIOUS` and redeploy.
+
+Leaked secret: skip the wait. Rotate with `SESSION_SECRET_PREVIOUS` unset, so every session
+ends. The secret is also the key of two HMACs that do not accept an old key: the upload
+fingerprints in usage events (`web/events.py`, after rotation a repeat upload no longer counts
+as the same file again) and the deleted-account tombstones (`web/tombstones.py`, a person
+deleted before the rotation who signs up again the same day is no longer matched to the
+earlier use). Both are only statistics and quota carry-over for that day.
+
+`CRON_TOKEN` and the provider keys rotate by changing the variable on the service (and on the
+scheduler that calls the route, if any); the token needs at least 32 characters in production.
 
 A Word or PowerPoint file (T3-30) is handled the same way, with more care because
 LibreOffice is far larger than MuPDF and, unlike it, reads files and not pipes. In a child
@@ -214,7 +247,17 @@ that comes out is probed like any upload, and only it is stored.
 
 The PDF is opened first in a child process (`python -m readablestem.web.pdf_probe`) that has no
 secrets in its environment, caps its own memory and is killed at its timeout; MuPDF is C code
-reading bytes from the internet and is never run in the web process on first contact.
+reading bytes from the internet and is never run in the web process on first contact. The
+conversion that follows is run the same way (`web/isolated_convert.py`, `web/conversion_child.py`): a
+file that passes the probe and still crashes, exhausts memory or hangs MuPDF in a later step
+fails that one job and nothing else, where it used to take the whole web process (every session,
+the worker, and again on each retry) down. The child has no API key, no database URL and no
+token; it asks the parent for model requests and progress over a socket, and what it sends is
+JSON and bytes that the parent validates and never unpickles, so a compromised child can
+only do what a conversion of that document could: ask for requests under the job's spend caps
+(only models the deployment is configured with, only the steps' own schemas, a bounded number of requests, bounded frames), and return a result. The parent kills it at the job's
+time limit, when the job is deleted or taken over, and at shutdown. The exposure that remains is
+the model request itself: a compromised child could choose its text and images.
 `test_audit_uploads.py` feeds it a decompression bomb, a page tree that points at itself, a
 page count that lies, a page a million points wide, a stream length past the end of the file,
 truncated and garbage files, and files that are not PDFs; each ends in a category, never an

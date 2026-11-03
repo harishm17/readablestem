@@ -45,6 +45,9 @@ PROVIDER_LIMIT_DEFAULTS: dict[str, dict[str, float]] = {
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
 
+MIN_CRON_TOKEN_CHARS = 32  # the scheduler's shared secret in production
+
+
 class ConfigError(RuntimeError):
     """A required setting is missing or inconsistent."""
 
@@ -283,13 +286,22 @@ class Settings(BaseSettings):
     # Shared secret that a scheduler sends to /internal/cron/* (header X-Cron-Token). Production
     # does not call that route: its cron service runs `readablestem ops cron` instead.
     cron_token: SecretStr | None = None
+    # Earlier SESSION_SECRET values, comma-separated, accepted for checking a session cookie
+    # only (new cookies are signed with SESSION_SECRET). For rotating the secret without
+    # signing everyone out: docs/security.md "Rotating the session secret".
+    session_secret_previous: SecretStr | None = None
     # Run the background worker thread inside the web process (one web service).
     run_worker: bool = True
     worker_poll_s: float = Field(default=2.0, gt=0)
     # Load the table detector and the structure model when the worker starts (production
     # only), while it waits for its first job, instead of inside that job: 4-5 s off the
-    # first conversion after every start.
+    # first conversion after every start. Only for a conversion run in the web process: the
+    # conversion child (`conversion_memory_mb`) loads its own.
     preload_table_models: bool = True
+    # Address-space cap, in MiB, of the child process a conversion runs in (twice the PDF's
+    # size is added); past it the job fails "conversion_oom" and the web process is not
+    # touched. The web process and its child share the host's RAM (web/isolated_convert.py).
+    conversion_memory_mb: int = Field(default=3072, ge=1536, le=16384)
     # How many proxies in front of the app write the caller's address into the right-hand end
     # of X-Forwarded-For (web/abuse.py): 1 with the platform's front end alone (Railway,
     # Cloud Run), 2 with another proxy such as Cloudflare's as well, 0 with none (the peer
@@ -490,6 +502,14 @@ class Settings(BaseSettings):
         return value
 
     @property
+    def previous_session_secrets(self) -> list[str]:
+        """`SESSION_SECRET_PREVIOUS` as a list (blank entries dropped)."""
+        raw = (
+            self.session_secret_previous.get_secret_value() if self.session_secret_previous else ""
+        )
+        return [part.strip() for part in raw.split(",") if part.strip()]
+
+    @property
     def admin_email_list(self) -> list[str]:
         return [e.strip() for e in self.admin_emails.split(",") if e.strip()]
 
@@ -589,6 +609,19 @@ class Settings(BaseSettings):
         ]
         if missing:
             raise ConfigError("production start refused; missing: " + ", ".join(missing))
+        cron = self.cron_token.get_secret_value() if self.cron_token else ""
+        if len(cron) < MIN_CRON_TOKEN_CHARS:
+            raise ConfigError(
+                f"CRON_TOKEN must be at least {MIN_CRON_TOKEN_CHARS} characters in production"
+            )
+        if self.analytics_enabled:
+            from readablestem.ops.launch import analytics_notice_problem
+
+            if (problem := analytics_notice_problem()) is not None:
+                raise ConfigError(
+                    f"ANALYTICS_ENABLED=true is refused in production: {problem}. "
+                    "Update the notice (web/templates/privacy.html) first"
+                )
         if self.dev_login_enabled:
             raise ConfigError("DEV_LOGIN_ENABLED must be false in production")
         if self.fake_models:
