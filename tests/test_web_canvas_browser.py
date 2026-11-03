@@ -57,8 +57,9 @@ def test_the_form_is_named_and_works_from_the_keyboard(site, browser):
     assert button.get_attribute("aria-describedby") == "canvas-help"
     assert "keeps each picture as its own file" in page.locator("#canvas-help").inner_text()
 
-    # Tab order: the form follows the two links of the download area, field before button.
-    page.get_by_role("link", name="Preview the student version").focus()
+    # Tab order: the form follows the links of the download area (download, preview, upload a
+    # revised version), field before button.
+    page.get_by_role("link", name="Upload a revised version").first.focus()
     page.keyboard.press("Tab")
     assert page.evaluate("document.activeElement.id") == "canvas-course"
     page.keyboard.type("48213")

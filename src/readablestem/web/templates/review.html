@@ -2,6 +2,8 @@
 {% block title %}{% if errors %}Error: {% endif %}All items as a list: {{ job.filename }}{% endblock %}
 {% from "_table_card.html" import table_list_proposal, table_list_actions, accept_clean with context %}
 {% from "_describe.html" import describe_box with context %}
+{% from "_report_item.html" import report_link with context %}
+{% from "_leave_out.html" import leave_out_forms with context %}
 
 {% macro notice_box(notice) %}
 <div class="notice" role="status"{% if notice.element_id %} data-saved="/jobs/{{ job.id }}/review/{{ notice.element_id }}"{% endif %}>
@@ -14,7 +16,7 @@
 {# Every decision form: the CSRF token, the view to come back to, and the review version
    the page was drawn at (a form from an out-of-date tab is refused, not applied). #}
 {% macro hidden_fields() -%}
-<input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="list"><input type="hidden" name="version" value="{{ result_version }}">
+<input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="list"><input type="hidden" name="version" value="{{ result_version }}">{% if decision_filter.query %}<input type="hidden" name="flt" value="{{ decision_filter.query }}">{% endif %}
 {%- endmacro %}
 
 {% macro group_counts(g) %}
@@ -194,6 +196,7 @@
 </form>
 {% endif %}
 {{ describe_box(item, "list") }}
+{{ report_link(job.id, eid, item.label) }}
 {% endif %}
 {% endmacro %}
 
@@ -221,6 +224,7 @@
   </div>
 </div>
 {{ describe_box(item, "list") }}
+{{ report_link(job.id, eid, item.label) }}
 {% endmacro %}
 
 {# One card for repeated headings: one decision for all of the ones still waiting. #}
@@ -295,6 +299,7 @@
         {% endfor %}
       </ol>
     </details>
+    {{ report_link(job.id, key, "repeated heading “" ~ hg.text ~ "”") }}
   </article>
 </li>
 {% endmacro %}
@@ -320,6 +325,7 @@
     </form>
     {% else %}<p class="group-state">{{ pg.state }}</p>{% endif %}
     <p class="hint" id="hint-{{ key }}">{{ pg.hint }}</p>
+    {{ leave_out_forms(pg, "list") }}
     {% for member in pg.describe %}{{ describe_box(member, "list") }}{% endfor %}
     {% if pg.hidden %}
     <details class="done-group">
@@ -327,6 +333,7 @@
       <p>{{ pg.hidden }}</p>
     </details>
     {% endif %}
+    {{ report_link(job.id, key, pg.title) }}
   </article>
 </li>
 {% endmacro %}
@@ -396,7 +403,47 @@
 
 <section id="needs-decision" class="review-section" aria-labelledby="needs-decision-title" tabindex="-1">
   <h2 id="needs-decision-title">Needs your decision ({{ remaining }})</h2>
-  {% if not deciding %}<p>Nothing is waiting for a decision.</p>{% endif %}
+  {# Many decisions: accept the ones no check found fault with, after seeing the list. #}
+  {% if bulk_offers %}
+  <div class="bulk-offers" id="bulk-offers">
+    <h3 id="bulk-offers-title">Accept many at once</h3>
+    <p class="hint" id="bulk-offers-hint">You see the list first and confirm. Undo takes the whole action back in one step.</p>
+    <ul class="bulk-list" aria-labelledby="bulk-offers-title">
+      {% for o in bulk_offers %}
+      <li><a class="button-secondary" href="/jobs/{{ job.id }}/accept/{{ o.slug }}?view=list" aria-describedby="bulk-offers-hint">{{ o.title }} ({{ o.count }})</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {# Narrow the list by kind and by page: a plain GET form, so it works without JavaScript. #}
+  {% if remaining > 1 %}
+  <form method="get" action="/jobs/{{ job.id }}/review/list#filter-result" class="decision-filter" aria-labelledby="filter-title">
+    <h3 id="filter-title">Show only some decisions</h3>
+    <div class="filter-fields">
+      <div class="field">
+        <label for="filter-kind">Kind</label>
+        <select id="filter-kind" name="kind">
+          <option value="">All kinds</option>
+          {% for slug, title, n in filter_kinds %}
+          <option value="{{ slug }}"{% if decision_filter.kind == slug %} selected{% endif %}>{{ title }} ({{ n }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="filter-page">Page</label>
+        <input type="number" id="filter-page" name="page" class="input-short" min="1" max="{{ page_count }}" inputmode="numeric" autocomplete="off" aria-describedby="filter-page-hint"{% if decision_filter.page %} value="{{ decision_filter.page }}"{% endif %}>
+        <p class="hint" id="filter-page-hint">1 to {{ page_count }}. Leave it empty for every page.</p>
+      </div>
+    </div>
+    <div class="button-row">
+      <button type="submit" class="button-secondary">Show these decisions</button>
+      {% if decision_filter.active %}<a class="button-secondary" href="/jobs/{{ job.id }}/review/list#needs-decision">Show all decisions</a>{% endif %}
+    </div>
+  </form>
+  {% endif %}
+  {% if decision_filter.active %}
+  <p id="filter-result" class="filter-result" role="status" tabindex="-1">{{ decision_filter.summary }}</p>
+  {% elif not deciding %}<p>Nothing is waiting for a decision.</p>{% endif %}
   {% for g in deciding %}
   <section id="group-{{ g.slug }}" class="review-group" aria-labelledby="group-{{ g.slug }}-title" tabindex="-1">
     <h3 id="group-{{ g.slug }}-title">{{ g.title }} <span class="group-count">({{ counted(g.units|length, "decision", "decisions") }})</span></h3>

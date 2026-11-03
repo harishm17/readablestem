@@ -82,13 +82,41 @@ def test_no_expressions_inside_run_scripts(path):
             assert "${{" not in step.get("run", ""), step.get("name")
 
 
-def test_live_eval_is_manual_and_capped():
+def test_live_eval_is_weekly_or_manual_capped_and_skips_without_a_key():
+    import json
+
     data = workflow(ROOT / ".github" / "workflows" / "eval-live.yml")
     triggers = data[True] if True in data else data["on"]  # YAML 1.1 reads `on` as True
-    assert set(triggers) == {"workflow_dispatch"}
-    runs = [s.get("run", "") for s in data["jobs"]["equations"]["steps"]]
-    assert any('--task equations --max-usd "$MAX_USD"' in r for r in runs)
-    assert any("v <= 10" in r for r in runs)
+    assert set(triggers) == {"schedule", "workflow_dispatch"}  # never on a pull request
+    assert len(triggers["schedule"]) == 1
+    tasks = json.loads(data["env"]["TASKS"])
+    assert {t["task"] for t in tasks} == {"equations", "headings", "figures", "document", "tables"}
+    assert all(0 < t["max_usd"] <= 1.0 for t in tasks)  # each task has its own small hard cap
+    assert sum(t["max_usd"] for t in tasks) <= float(data["env"]["MAX_WEEKLY_USD"]) <= 3.0
+    # Production provider; every task has a baseline except tables (floors alone).
+    assert data["env"]["PROVIDER"] == "anthropic"
+    assert {t["task"] for t in tasks if not t["baseline"]} == {"tables"}
+    plan = "\n".join(s.get("run", "") for s in data["jobs"]["plan"]["steps"])
+    assert "ANTHROPIC_API_KEY" in str(data["jobs"]["plan"]["steps"])
+    assert "skipped" in plan and "::notice::" in plan  # a scheduled run without the key
+    assert data["jobs"]["live"]["if"] == "needs.plan.outputs.run == 'true'"
+    runs = "\n".join(s.get("run", "") for s in data["jobs"]["live"]["steps"])
+    assert '--max-usd "$MAX_USD"' in runs and "eval gate" in runs and "--require-current" in runs
+    uploads = [s for s in data["jobs"]["live"]["steps"] if "upload-artifact" in s.get("uses", "")]
+    assert uploads and uploads[0]["if"] == "always()"
+    assert "git commit" not in runs and "git push" not in runs  # reports are never committed
+    assert data["permissions"] == {"contents": "read"}
+
+
+def test_eval_guard_runs_on_pull_requests_and_reads_labels_through_env():
+    data = workflow(ROOT / ".github" / "workflows" / "eval-guard.yml")
+    triggers = data[True] if True in data else data["on"]
+    assert {"labeled", "unlabeled", "synchronize"} <= set(triggers["pull_request"]["types"])
+    steps = data["jobs"]["guard"]["steps"]
+    assert steps[0]["with"]["fetch-depth"] == 0
+    guard = steps[-1]
+    assert "scripts/eval_guard.py" in guard["run"] and "${{" not in guard["run"]
+    assert "labels" in guard["env"]["LABELS_JSON"]
 
 
 def test_dependabot_covers_dependencies_actions_and_images():
