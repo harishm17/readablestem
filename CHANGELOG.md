@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased: development baseline (branch eval/dev-baseline-2026-11-03)
+
+- Measurement report `docs/eval-dev-baseline-2026-11-03.md`: ReadableSTEM at pipeline 0.5.3 with production flags on the 25
+  real-world development papers, against the recorded Opus (6 papers) and Haiku (25) chatbot answers. One
+  run, $0.1186 of model spend; no code, prompt or setting changed.
+
 ## Unreleased: slide decks (branch layout/beamer-slides)
 
 - Slide decks (`pipeline/slides.py`, docs/layout.md "Slide decks"): a Beamer file, or a slide-shaped
