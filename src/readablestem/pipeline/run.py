@@ -139,6 +139,7 @@ from readablestem.pipeline import (
     image_page,
     image_page_check,
     image_page_reconcile,
+    image_page_vector,
     layout,
     page_labels,
     page_math,
@@ -722,7 +723,9 @@ def _unit_scale(_element: Element) -> float:
     return 1.0
 
 
-def recrop(pdf: bytes, elements: list[Element]) -> dict[str, bytes]:
+def recrop(
+    pdf: bytes, elements: list[Element], kinds: dict[int, str] | None = None
+) -> dict[str, bytes]:
     """The pictures a conversion of `pdf` cuts for these elements, without converting
     anything: the crop of every equation, figure and table, an equation's cut sharp for the
     size it is shown at (T3-15), exactly as `_Run.crop_and_submit` does. For showing a
@@ -730,6 +733,12 @@ def recrop(pdf: bytes, elements: list[Element]) -> dict[str, bytes]:
     paid. An element whose crop fails has none."""
     scale = equation_scale.scaler(elements)
     crops: dict[str, bytes] = {}
+    vector: dict[int, image_page_vector.VectorPage] = {}
+    # `kinds` (each page's `page_type` kind) is given only by a caller whose conversion drew
+    # the pictures from strokes (`IMAGE_PAGES_VECTOR_CROPS`, off by default).
+    if kinds:
+        wanted = {e.page for e in elements if image_page_vector.wants_picture(e)}
+        vector = image_page_vector.analyse(pdf, wanted, kinds)
     try:
         for element in elements:
             if element.kind not in _MODEL_KINDS:
@@ -740,6 +749,17 @@ def recrop(pdf: bytes, elements: list[Element]) -> dict[str, bytes]:
                     png = layout.crop(
                         pdf, element, dpi=equation_scale.crop_dpi(scale(element)), tag_dpi=True
                     )
+                    png = (
+                        image_page_vector.element_picture(
+                            vector,
+                            element,
+                            dpi=equation_scale.crop_dpi(scale(element)),
+                            tag_dpi=True,
+                        )
+                        or png
+                    )
+                elif (drawn := image_page_vector.element_picture(vector, element)) is not None:
+                    png = drawn
             except Exception as exc:
                 log.warning("crop failed: %s", type(exc).__name__)
                 continue
@@ -795,6 +815,9 @@ class _Run:
     observer: Callable[[ModelCall], None] | None = None
     # The scale an equation's picture is shown at in the student file (T3-15).
     eq_scale: Callable[[Element], float] = field(default_factory=lambda: _unit_scale)
+    # Pen strokes of the handwritten vector pages read as images: the pictures of their lines
+    # are drawn from these (`image_page_vector`), by 0-based page.
+    vector: dict[int, image_page_vector.VectorPage] = field(default_factory=dict)
     # The paragraph (or list item, figure) each inline equation sits in, by id.
     parents: dict[str, Element] = field(default_factory=dict)
 
@@ -842,6 +865,13 @@ class _Run:
         failed: the ordinary crop is used then)."""
         if element.kind is not Kind.EQUATION:
             return None
+        if element.page in self.vector:
+            return image_page_vector.element_picture(
+                self.vector,
+                element,
+                dpi=equation_scale.crop_dpi(self.eq_scale(element)),
+                tag_dpi=True,
+            )
         try:
             return layout.crop(
                 self.pdf_bytes,
@@ -882,7 +912,11 @@ class _Run:
             return
         # The student file shows an unconverted equation at the size of its text, cut
         # sharp for that size (T3-15); the model is sent the same crop as ever, and the
-        # review screen shows this one. Any other crop is as it was.
+        # review screen shows this one. Any other crop is as it was. On a vector page of
+        # handwriting the picture is drawn from the strokes, for the model and the person alike.
+        drawn = image_page_vector.element_picture(self.vector, element)
+        if drawn is not None:
+            png = drawn
         self.crops[element.id] = self.sharp_equation(element) or png
         if element.id in self.fixes or image_page.is_original(element):
             return  # decided before any model work: a scanned page, a converted page's picture
@@ -1402,6 +1436,7 @@ def _image_pages_pass(
     pdf_bytes: bytes,
     kept: dict[int, str],
     boxes: dict[int, BBox],
+    vector: dict[int, image_page_vector.VectorPage],
     *,
     client: VisionClient,
     settings: Settings,
@@ -1432,6 +1467,8 @@ def _image_pages_pass(
     }
     with _span(tracer, "image_pages", pages=len(pages)) as span:
         result = image_page.run(recording, settings, renders, concurrency=concurrency)
+        for number, read in result.reads.items():
+            read.vector = vector.get(number)  # (empty when both vector settings are off)
         if (
             settings.image_pages_omission_check
             and settings.image_pages_recover_omissions
@@ -1454,6 +1491,7 @@ def _image_pages_pass(
                     verdicts=read.verdicts,
                     accept_agreed=settings.image_pages_accept_agreed,
                     maths_required=settings.image_pages_maths_always_required,
+                    page_ink=read.vector if settings.image_pages_vector_checks else None,
                 )
             except Exception as exc:  # the page stays an image: a bad answer is not worth more
                 log.warning("image page build failed: %s", type(exc).__name__)
@@ -1522,6 +1560,7 @@ def _convert(
             boxes = _page_boxes(pdf_bytes, kept, sizes)
             image_built: dict[int, image_page.Built] = {}
             image_summary: ImagePagesSummary | None = None
+            vector_pages: dict[int, image_page_vector.VectorPage] = {}
             if options.image_pages:
                 # (a picture under a text layer that does not cover it is kept as an
                 # unread page and read as a scan: `page_type.reads_image`)
@@ -1533,10 +1572,17 @@ def _convert(
                     else reason
                     for n, reason in kept.items()
                 }
+                if settings.image_pages_vector_crops or settings.image_pages_vector_checks:
+                    vector_pages = image_page_vector.analyse(
+                        pdf_bytes,
+                        to_read,
+                        {n: r.kind for n, r in (getattr(doc, "page_types", None) or {}).items()},
+                    )
                 image_built, image_summary = _image_pages_pass(
                     pdf_bytes,
                     to_read,
                     boxes,
+                    vector_pages,
                     client=client,
                     settings=settings,
                     concurrency=concurrency,
@@ -1583,6 +1629,7 @@ def _convert(
                 futures={},
                 cache=step_cache,
                 observer=call_observer,
+                vector=vector_pages if settings.image_pages_vector_crops else {},
             )
             # The text pass adds links, colour runs and passage languages to the elements
             # without touching their text or anything a step reads, and the heading
@@ -1601,6 +1648,8 @@ def _convert(
         finally:
             cached.release()  # also when analysis, a step or `progress` failed
 
+        if settings.image_pages_vector_checks and vector_pages and image_built:
+            image_page_vector.add_checks(elements, run.fixes, vector_pages)
         reading_cost = 0.0
         reading_notices: list[Notice] = []
         if image_built and settings.image_pages_second_reader != "off":

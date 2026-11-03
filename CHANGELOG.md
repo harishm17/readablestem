@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: pen strokes check handwritten vector pages (branch hw/stroke-checks)
+
+- `pipeline/image_page_vector.py` (new): on a page `page_type` calls handwritten and `ink_strokes`
+  analysed, the image page pass now (1) draws the picture of each display equation, prose block
+  and left-out stretch from the strokes alone (300 dpi, black on white, cut to the ink) for the
+  model, the review screen and the student file; (2) checks each equation's reading against the
+  strokes: a letter in the other case (c o s u v w x z), a script lost, added or moved; (3)
+  compares the page's stroke groups with the blocks' boxes, so ink the reading left out becomes
+  the existing omission decision, including pale ink. Checks add failed warnings
+  (`image_page.case_check`, `image_page.script_check`; sentences in `web/messages.py`) to the
+  equation's fix and never change its required decision. Pages with no strokes, and every scan,
+  are read as before.
+- Settings `IMAGE_PAGES_VECTOR_CROPS` and `IMAGE_PAGES_VECTOR_CHECKS`, `VECTOR_CROPS` off until measured, `VECTOR_CHECKS` on. `layout.page_ink`
+  reads a page's strokes under the document lock; `run.recrop` can take the pages' kinds so a stored
+  vector page is drawn the way it was converted.
+- `scripts/handwriting_vector_checks.py` measures the checks on built vector sets at no cost
+  (put-in errors in the gold readings). Held-out (318 expressions): raised scripts taken out are
+  named 27 of 65 times at 12 of 172 false alarms, a case flip 21 of 37 at 6 of 25, a dropped
+  block 314 of 318 at 0 of 54 pages (the raster check: 290 of 318 at 11 of 54, and 0 on pale ink).
+  Not measured: real iPad ink, or the reader on the drawn pictures (docs/eval-handwriting.md,
+  "Checks from strokes").
+
 ## Unreleased: agreement oracle on the recorded chatbot answers (branch eq/agreement-oracle)
 
 - `scripts/eq_oracle_agreement.py` and a D2 section of docs/eval-equation-diagnostics.md: how often
