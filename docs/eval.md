@@ -411,6 +411,64 @@ or `DECISIONS_EQUATION_SHADOW=false` turn it off for a run). Code:
 Agreement with the judge is agreement between two models, not validity: only Harish's
 labels (`eval calibrate`) can say which one is right.
 
+### Speech under screen-reader engines (`--speech`, `scripts/screenreader_speech.py`)
+
+A student hears our MathML through their own screen reader, not through our speech strings
+(`pipeline/speech.py`). NVDA 2026.1 and JAWS speak MathML with MathCAT; MathJax and ChromeVox
+use Speech Rule Engine (SRE). `eval/speech_oracle.py` runs any pair of MathML (ours and the
+gold's) through both and reports where they sound different. Offline, no key, $0.
+
+Engines read: MathCAT 0.7.7 (ClearSpeak and SimpleSpeak, English, Medium verbosity, NVDA's
+defaults) and SRE 4.1.5 (`clearspeak` and `mathspeak` domains). Build them once; nothing is
+installed system-wide:
+
+```
+scripts/speech_oracles/build.sh      # MathCAT at tag v0.7.7 (commit checked), a small batch tool
+                                     # built with the toolchain pinned in rust-toolchain.toml,
+                                     # SRE from the committed package-lock.json (npm ci
+                                     # --ignore-scripts); all under .local/speech-oracles/
+                                     # (SPEECH_ORACLES_DIR moves it); versions: versions.env
+```
+
+It needs git, node and npm, and about a minute of compile time. Rust comes from an existing
+rustup or cargo; if there is none, `build.sh` downloads a pinned `rustup-init`, checks its
+SHA-256 against `versions.env`, and installs into `~/.cargo` (no sudo). Without the build, the script
+and `--speech` say so (`speech oracles skipped: ... run scripts/speech_oracles/build.sh`) and
+produce nothing; the tests that speak MathML skip.
+
+```
+# any set whose rows came from `eval pipeline --items` (equations or document task) and gold dir
+uv run python scripts/screenreader_speech.py --items items.jsonl --gold data/dev-v2/dev \
+  --sections chemistry-atoms-first latex-chemistry --out rows.jsonl --report speech.json
+# any other set: JSON lines {id, gold|gold_latex, ours|ours_latex|null, source?, class?}
+uv run python scripts/screenreader_speech.py --pairs pairs.jsonl
+# one expression
+uv run python scripts/screenreader_speech.py --mathml '<math>...</math>'
+# in an eval report (equations and document tasks): adds a `speech` block
+uv run readablestem eval pipeline --task document --set dev-v2 ... --speech
+```
+
+Per equation (`--out`): the spoken strings under each engine for ours and the gold, whether
+MathCAT recognised chemistry (`data-chem-formula` or `data-chem-equation` in its canonical
+MathML) on each side, a word diff, and a class (`chemistry`, `table or matrix`, `prescripts`,
+`limits, accents, arrows`, `fraction`, `root`, `scripts`, `text in math`, `plain`; or the
+`class` the input gave). Per set: the share of ours whose speech equals the gold's under each
+engine (case, pauses and spacing ignored) with a 95% Wilson interval and n, once counting an
+equation with no proposal as different and once over proposals only, the worst classes over
+proposals (at least 3 equations), and the most common word-level differences. The report's
+`speech` block holds aggregates only: no ids, no speech strings and no per-book numbers. The
+script refuses held-out and sealed gold (and rows kept under the cache home), as
+`eval pipeline --set heldout` does. An engine that fails reports only its exit code, and each
+engine process is killed after 15 minutes.
+
+What it does not show. Equal speech means two markups read the same under that engine; it is
+not a listening test and not a statement that the reading is right. The gold's own markup can
+read badly (OpenStax sets the minus of `x - 3` inside the number, which MathCAT says as
+"negative"), so a difference from the gold can be ours reading better. MathCAT and SRE are the
+engines behind NVDA, JAWS, MathJax and ChromeVox; VoiceOver is not covered, and a screen
+reader's own settings change what is said. The chemistry flag is MathCAT's own decision and
+says only that it treats the input as chemistry.
+
 ### Judge calibration (`eval calibrate`)
 
 Agreement with Harish's labels, on figures the judge graded:

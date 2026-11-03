@@ -291,6 +291,32 @@ Twenty of the 24, as read (the rest are in the tests):
 | [Cu(NH₃)₄]²⁺ | open bracket C u open parenthesis N H 3 close parenthesis 4 close bracket 2 plus |
 | Na⁺ + Cl⁻ → NaCl | N a plus, plus C l minus reacts to form N a C l |
 
+## What a screen reader says (MathCAT and SRE)
+
+The speech above is ours. A student's screen reader reads the MathML in the page: NVDA 2026.1
+and JAWS with MathCAT, MathJax and ChromeVox with Speech Rule Engine. `scripts/screenreader_speech.py`
+runs our MathML and the gold's through both and reports where they differ, with a flag for
+whether MathCAT recognised the input as chemistry (it marks `data-chem-formula` or
+`data-chem-equation`; `docs/eval.md`, "Speech under screen-reader engines", has the commands and
+what the numbers do not show). Build the engines once:
+
+```
+scripts/speech_oracles/build.sh     # MathCAT v0.7.7 from source (rustup into ~/.cargo, no sudo),
+                                    # SRE 4.1.5 from npm; into .local/speech-oracles/
+uv run python scripts/screenreader_speech.py --items after.jsonl --gold data/dev-v2/dev \
+  --sections chemistry-atoms-first latex-chemistry
+```
+
+What it found on the development chemistry rows of the recorded run of 2026-10-26 (443 gold
+equations, 318 with a proposal; `--items` of that run, no model call): MathCAT recognises 114
+of the 443 gold equations as chemistry (the authored document's one-`mi`-per-letter shape, not
+OpenStax's `mtext`), and 90 of our 94 proposals for those. A formula MathCAT recognises is still
+spelled letter by letter ("cap h, sub 2 cap o") unless the MathML carries `intent`
+(`:chemical-formula`), which the validator does not allow yet. A state written `<mtext>(aq)</mtext>`
+is spoken "(aq)", not "aqueous": 63 of our 318 proposals have it, and none of the 16 gold readings
+that say "aqueous" is matched by ours. That is the shape, not the symbols, and the scorers do not
+see it.
+
 ## Side effect on maths that is not chemistry
 
 The conversion repair that hangs a script on the group before it (`(a+b)^2`, `[A]_0`) is for
