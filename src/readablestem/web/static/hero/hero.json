@@ -1,7 +1,7 @@
 {
   "source": "OpenStax Physics 2.3 Position vs. Time Graphs, page 3 of 13, CC BY 4.0",
   "pdf_tagged": "no",
-  "crop_sha256": "8a8faad5d02bd80f4ebf4d06972b64dc643f32efeaf23b013327b9c77fae0bd2",
+  "crop_sha256": "85040458e32f9907067e41782ad43340861f4b91dcdfa6de3bb157363151115a",
   "text_layer": "Δ𝐝 Δ𝑡. 2.4",
   "paragraph": "What is the slope? The rise is the change in position, (i.e., displacement) and the run is the change in time. This relationship can also be written",
   "mathml": "<math display=\"block\"><mrow><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac><mo>.</mo></mrow></math>",
