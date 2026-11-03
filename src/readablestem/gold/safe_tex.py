@@ -9,13 +9,19 @@ through this module:
 1. `extract_tar` unpacks into a temporary folder and renames it into place only when the whole
    archive was read: no absolute paths, no `..`, no links or devices, a cap on the unpacked bytes
    (also on the decompressed stream, so a gzip bomb stops early) and on the number of files.
-2. `compile_tex` runs the engine inside bubblewrap with a minimal root (the system libraries, the
-   TeX Live tree read-only, the source as a throw-away overlay, an output folder), no network, a
-   temporary home, a clean environment and its own process group, which a timeout kills whole.
-   The engine is also told, by environment, to refuse reads and writes outside the working tree
-   (`openin_any=p`, `openout_any=p`, `shell_escape=f`); latexmk is started with `-norc`, so no
-   rc file from the source tree or the home directory is read; Tectonic gets `--untrusted`.
-   When bubblewrap is missing the compile is refused: there is no unsandboxed fallback.
+2. `compile_tex` runs the engine inside bubblewrap. What stops a document reading a local file
+   is the mount namespace: the engine sees a minimal root (the system libraries, the TeX Live
+   tree read-only, the source as a throw-away overlay on disk, an output folder), a tmpfs home,
+   no network, a fresh pid namespace, and an environment that holds nothing but what
+   `tex_env` sets (the parent's environment is not passed on, not even to bubblewrap itself,
+   which is pid 1 of the sandbox and whose `/proc/1/environ` a document can read). The
+   texmf.cnf switches `openin_any=p`, `openout_any=p` and `shell_escape=f` are set as well, but
+   they are defence in depth: TeX Live's paranoid mode does not refuse absolute reads, so they
+   are not what the guarantee rests on. latexmk is started with `-norc`, so no rc file from the
+   source tree or the home directory is read; Tectonic gets `--untrusted`. Disk use of a compile
+   (output folder plus overlay) is polled and the process group killed over `MAX_TOTAL_BYTES`;
+   the tmpfs mounts have fixed sizes. When bubblewrap is missing the compile is refused: there
+   is no unsandboxed fallback.
 """
 
 from __future__ import annotations
@@ -30,12 +36,16 @@ import signal
 import subprocess
 import tarfile
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
 MAX_UNPACKED_BYTES = 400_000_000
 MAX_FILES = 20_000
-MAX_OUTPUT_BYTES = 500_000_000  # the largest file a compile may write
+MAX_OUTPUT_BYTES = 200_000_000  # the largest single file a compile may write
+MAX_TOTAL_BYTES = 400_000_000  # all it may write: the output folder plus the overlay
+TMPFS_BYTES = 256_000_000  # size of each tmpfs mount (/tmp and the home directory)
+POLL_SECONDS = 0.25
 
 
 class UnsafeArchive(ValueError):
@@ -88,11 +98,13 @@ def extract_tar(
     max_bytes: int = MAX_UNPACKED_BYTES,
     max_files: int = MAX_FILES,
     strip_top: bool = False,
+    suffixes: tuple[str, ...] | None = None,
 ) -> None:
     """Unpack the tar (plain or gzip) `data` into `folder`, which must not exist yet.
 
     Written to a sibling temporary folder and renamed, so a refused or broken archive leaves no
-    folder behind. `strip_top` drops a single top-level directory (a repository tarball's)."""
+    folder behind. `strip_top` drops a single top-level directory (a repository tarball's);
+    `suffixes` keeps only the files whose names end so (all entries count against the caps)."""
     if folder.exists():
         raise FileExistsError(str(folder))
     folder.parent.mkdir(parents=True, exist_ok=True)
@@ -103,7 +115,7 @@ def extract_tar(
             gzip.GzipFile(fileobj=io.BytesIO(data)) if data[:2] == b"\x1f\x8b" else io.BytesIO(data)
         )
         stream = io.BufferedReader(_CappedReader(raw, max_bytes))
-        files = 0
+        entries = 0
         total = 0
         tops: set[str] = set()
         with tarfile.open(fileobj=stream, mode="r|") as archive:
@@ -111,19 +123,21 @@ def extract_tar(
                 rel = _check_name(member.name)
                 if not rel.parts:
                     continue
+                entries += 1  # directories count too: a small archive can hold millions
+                if entries > max_files:
+                    raise UnsafeArchive("too_many_files", str(max_files))
                 if member.isdir():
                     tops.add(rel.parts[0])
                     (tmp / rel).mkdir(parents=True, exist_ok=True)
                     continue
                 if not member.isfile():  # symlink, hard link, device, fifo
                     raise UnsafeArchive("unsafe_member", "link or special file")
-                files += 1
                 total += member.size
-                if files > max_files:
-                    raise UnsafeArchive("too_many_files", str(max_files))
                 if total > max_bytes:
                     raise UnsafeArchive("unpacked_too_large", str(max_bytes))
                 tops.add(rel.parts[0])
+                if suffixes is not None and not member.name.endswith(suffixes):
+                    continue
                 target = tmp / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 source = archive.extractfile(member)
@@ -157,14 +171,19 @@ def extract_single_file(
     folder.parent.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(prefix=folder.name + ".part-", dir=folder.parent))
     try:
+        written = 0
         try:
-            with gzip.GzipFile(fileobj=io.BytesIO(data)) as handle:
-                raw = handle.read(max_bytes + 1)
+            with (
+                gzip.GzipFile(fileobj=io.BytesIO(data)) as handle,
+                (tmp / name).open("wb") as target,
+            ):
+                while chunk := handle.read(1 << 20):
+                    written += len(chunk)
+                    if written > max_bytes:
+                        raise UnsafeArchive("unpacked_too_large", str(max_bytes))
+                    target.write(chunk)
         except (OSError, EOFError) as exc:
             raise UnsafeArchive("bad_archive", type(exc).__name__) from None
-        if len(raw) > max_bytes:
-            raise UnsafeArchive("unpacked_too_large", str(max_bytes))
-        (tmp / name).write_bytes(raw)
         tmp.rename(folder)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -185,9 +204,22 @@ def texlive_bin() -> Path | None:
     return None
 
 
+_BROAD_ROOTS = {"/", "/usr", "/usr/local", "/opt", "/etc", "/var", "/home", "/root", "/lib", "/bin"}
+
+
 def texlive_root(bin_dir: Path) -> Path:
-    """`.../texlive` for `.../texlive/2026/bin/x86_64-linux`: what has to be visible read-only."""
-    return bin_dir.parents[2] if bin_dir.parents[1].name.isdigit() else bin_dir.parents[1]
+    """`.../texlive` for `.../texlive/2026/bin/x86_64-linux`: what has to be visible read-only.
+    A distribution's latexmk (`/usr/bin`) would make this `/`, `/usr` or `/usr/local`: refused,
+    the TeX Live must be a dedicated tree (docs/development.md)."""
+    resolved = bin_dir.resolve()
+    parents = resolved.parents
+    root = parents[2] if len(parents) > 2 and parents[1].name.isdigit() else parents[1]
+    if str(root) in _BROAD_ROOTS or len(root.parts) < 3:
+        raise SandboxUnavailable(
+            f"TeX Live at {resolved} is not a dedicated tree (its root would be {root}); "
+            "install a user-level TeX Live (docs/development.md)"
+        )
+    return root
 
 
 def tectonic_path() -> str | None:
@@ -267,6 +299,7 @@ def _limits() -> None:  # runs in the child before exec
 class Result:
     returncode: int
     timed_out: bool
+    over_quota: bool = False
 
 
 def tex_env(home: str, docdir: str, root: str) -> dict[str, str]:
@@ -296,6 +329,25 @@ def latexmk_command(engine: str, main: str) -> list[str]:
     ]  # fmt: skip
 
 
+def _remove_tree(path: Path) -> None:
+    """Delete `path`; overlayfs leaves a work directory with mode 000 that rmtree cannot enter."""
+    for folder, dirs, _files in os.walk(path):
+        for name in dirs:
+            with contextlib.suppress(OSError):
+                os.chmod(os.path.join(folder, name), 0o700)
+    shutil.rmtree(path, ignore_errors=True)
+
+
+def _tree_bytes(*roots: Path) -> int:
+    total = 0
+    for root in roots:
+        for folder, _dirs, files in os.walk(root):
+            for name in files:
+                with contextlib.suppress(OSError):
+                    total += os.lstat(os.path.join(folder, name)).st_size
+    return total
+
+
 def run_in_sandbox(
     command: list[str],
     *,
@@ -307,41 +359,68 @@ def run_in_sandbox(
     timeout: int,
     ro_extra: tuple[tuple[Path, str], ...] = (),
     rw_extra: tuple[tuple[Path, str], ...] = (),
+    max_total_bytes: int = MAX_TOTAL_BYTES,
 ) -> Result:
-    """Run `command` with the source at /work (a throw-away overlay: writes are discarded) and
-    `out` at /out, no network, the TeX Live tree read-only. A timeout kills the whole group."""
+    """Run `command` with the source at /work (a throw-away overlay kept on disk, so that it can be
+    measured), `out` at /out, no network, the TeX Live tree read-only. A timeout, or more than
+    `max_total_bytes` written to the output folder and the overlay, kills the whole group."""
     out.mkdir(parents=True, exist_ok=True)
-    args = [
-        _bwrap(), "--die-with-parent", "--new-session", "--unshare-all", "--clearenv",
-        *_system_mounts(), "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
-        "--overlay-src", str(src), "--tmp-overlay", "/work", "--bind", str(out), "/out",
-    ]  # fmt: skip
-    path = "/usr/bin:/bin"
-    if bin_dir is not None:
-        root = texlive_root(bin_dir)
-        args += ["--ro-bind", str(root), str(root)]
-        path = f"{bin_dir}:{path}"
-    home = env["HOME"]
-    args += ["--tmpfs", home]  # before the extra mounts: one of them sits below it
-    for host, inside in ro_extra:
-        args += ["--ro-bind", str(host), inside]
-    for host, inside in rw_extra:
-        args += ["--bind", str(host), inside]
-    for key, value in {**env, "PATH": path}.items():
-        args += ["--setenv", key, value]
-    args += ["--chdir", f"/work/{cwd_rel}".rstrip("/"), *command]
-    proc = subprocess.Popen(
-        args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        start_new_session=True, preexec_fn=_limits,
-    )  # fmt: skip
+    scratch = Path(tempfile.mkdtemp(prefix="sandbox-"))
     try:
-        proc.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(proc.pid, signal.SIGKILL)
-        proc.communicate()
-        return Result(-9, True)
-    return Result(proc.returncode, False)
+        (scratch / "upper").mkdir()
+        (scratch / "wk").mkdir()
+        args = [
+            _bwrap(), "--die-with-parent", "--new-session", "--unshare-all", "--clearenv",
+            *_system_mounts(), "--proc", "/proc", "--dev", "/dev",
+            "--size", str(TMPFS_BYTES), "--tmpfs", "/tmp",
+            "--overlay-src", str(src), "--overlay", str(scratch / "upper"), str(scratch / "wk"),
+            "/work", "--bind", str(out), "/out",
+        ]  # fmt: skip
+        path = "/usr/bin:/bin"
+        if bin_dir is not None:
+            root = texlive_root(bin_dir)
+            args += ["--ro-bind", str(root), str(root)]
+            path = f"{bin_dir}:{path}"
+        home = env["HOME"]
+        args += ["--size", str(TMPFS_BYTES), "--tmpfs", home]  # before the mounts below it
+        for host, inside in ro_extra:
+            args += ["--ro-bind", str(host), inside]
+        for host, inside in rw_extra:
+            args += ["--bind", str(host), inside]
+        # bubblewrap is pid 1 of the sandbox: hide what it was started with
+        args += [
+            "--ro-bind",
+            "/dev/null",
+            "/proc/1/environ",
+            "--ro-bind",
+            "/dev/null",
+            "/proc/1/cmdline",
+        ]
+        for key, value in {**env, "PATH": path}.items():
+            args += ["--setenv", key, value]
+        args += ["--chdir", f"/work/{cwd_rel}".rstrip("/"), *command]
+        # the parent's environment is not passed on: only a PATH for bwrap itself
+        proc = subprocess.Popen(
+            args, env={"PATH": "/usr/bin:/bin"}, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True, preexec_fn=_limits,
+        )  # fmt: skip
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                proc.wait(timeout=POLL_SECONDS)
+                return Result(proc.returncode, False)
+            except subprocess.TimeoutExpired:
+                pass
+            timed_out = time.monotonic() > deadline
+            over = _tree_bytes(out, scratch / "upper") > max_total_bytes
+            if timed_out or over:
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(proc.pid, signal.SIGKILL)
+                proc.wait()
+                return Result(-9, timed_out, over_quota=over)
+    finally:
+        _remove_tree(scratch)
 
 
 def compile_tex(src: Path, main: str, out: Path, engine: str, *, timeout: int) -> Result:

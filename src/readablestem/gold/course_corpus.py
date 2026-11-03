@@ -17,9 +17,10 @@ Steps, each a function here and a subcommand of `scripts/fresh5_select.py`:
 4. `discover`: the files with `\\documentclass` and `\\begin{document}`; Beamer is `beamer` as the
    class (or a `\\usepackage{beamer}`).
 5. `compile_document`: pdflatex or xelatex from a user-level TeX Live (latexmk), then Tectonic if
-   neither compiles it, all through `safe_tex.compile_tex` (sandboxed, no network, no rc file, no
-   shell escape, reads and writes only below the working tree); the engine and its version are
-   recorded.
+   neither compiles it, all through `safe_tex.compile_tex` (bubblewrap: no network, no rc file, no
+   shell escape, a clean environment; the mount namespace, which shows the engine only the TeX Live
+   tree, the source and an output folder, is what keeps a document from reading local files); the
+   engine and its version are recorded.
 6. `draw`: walk repositories in the seeded order and their documents in the seeded order, accept a
    document that passes the gates, at most `PER_REPO` per repository and `VISITS_PER_REPO` tried
    in one, stop at `TARGET` documents;
@@ -324,9 +325,9 @@ def compile_document(
     src: Path, main: str, out: Path, *, timeout: int = COMPILE_TIMEOUT
 ) -> tuple[Path, str]:
     """(the PDF of `src/main`, "engine: version") from the first engine that compiles it, run by
-    `safe_tex.compile_tex` (sandboxed, no network, no rc file, no shell escape, reads and writes
-    only below the working tree). The engine is written beside the PDF so that a cached build
-    reports it too."""
+    `safe_tex.compile_tex` (bubblewrap sandbox: the mount namespace, not the texmf switches, is what
+    keeps a document from reading local files). The engine is written beside the PDF so that a
+    cached build reports it too."""
     out.mkdir(parents=True, exist_ok=True)
     target = out / (Path(main).stem + ".pdf")
     record = out / (Path(main).stem + ".engine")

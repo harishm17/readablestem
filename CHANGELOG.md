@@ -188,7 +188,8 @@
   or MIT, compiled with a user-level TeX Live and Tectonic as fallback inside a bubblewrap sandbox), `gold/course_corpus.py`, and the registration as an unsigned draft
   (`data/realworld/PREREGISTRATION-FRESH5.md`). `arxiv_gold.analyse` takes `min_equations` (default unchanged, 5). New `gold/safe_tex.py`: the one place that unpacks
   (no links or unsafe paths, size and file caps, atomic) and compiles downloaded TeX (sandbox, `-norc`, no network or shell
-  escape); `realworld_build.py` unpacks through it too.
+  escape, no environment from the parent, a cap on what a compile writes); `realworld_build.py` and
+  `figures_v2_arxiv.py` unpack and compile through it too.
   [docs/eval-realworld.md](docs/eval-realworld.md).
 ### Figure gold v2 and a draft pre-registration for long descriptions
 

@@ -74,7 +74,8 @@ repository, non-Beamer documents capped at 5 so that 3 Beamer slots stay open. E
 source and the gold is made by the arXiv path (`arxiv_gold`) from the same source, so the PDF and the answer key
 agree. Engines, in order: pdflatex and xelatex from a user-level TeX Live 2026 (latexmk), then
 Tectonic 0.17.0 (`--untrusted`, cached packages only); every compile runs in a bubblewrap sandbox (no network, a minimal read-only root, the source as a discarded overlay,
-no rc file, shell escape off, reads and writes only below the working tree: `safe_tex.py`), and the first engine that
+no rc file, shell escape off, no environment from the parent, a mount namespace that shows it only the source, the TeX
+Live tree and an output folder: `safe_tex.py`), and the first engine that
 compiles the document wins; each document's engine and
 version are in the manifest (`tex_engine`). Gates are those of the arXiv path (at most 10% unconvertible
 equations, at least 4 usable pages, 4 to 6 pages drawn by hash) with a text floor of 300 characters per page (100
@@ -100,7 +101,7 @@ recorded so the signed text can be read against them:
 4. A review found that compiling downloaded TeX unsandboxed could run code (an rc file) or read local files (an absolute
    `\input`), so every unpacking and compile now goes through `safe_tex.py` (archives with links, unsafe paths or
    more than 20,000 files or 400 MB are refused, which skipped 1 repository; engines run in a bubblewrap sandbox
-   with no network, `latexmk -norc`, shell escape off, `openin_any=p`, `openout_any=p`; lualatex was dropped from the
+   with no network, `latexmk -norc`, shell escape off, a clean environment; lualatex was dropped from the
    engine list). The whole draw was repeated from fresh downloads under it; it gave the same 8 documents.
 
 Accepted (`manifest-fresh5c.json`, with the commit each was read from and the engine):

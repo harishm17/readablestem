@@ -251,6 +251,145 @@ def test_a_timeout_kills_the_whole_process_group(tmp_path):
     assert left.stdout.strip() == ""
 
 
+needs_bwrap = pytest.mark.skipif(not BWRAP, reason="needs bubblewrap")
+TECTONIC = safe_tex.tectonic_path() is not None and safe_tex.tectonic_cache().is_dir()
+needs_tectonic = pytest.mark.skipif(
+    not (BWRAP and TECTONIC), reason="needs bubblewrap and a warm Tectonic cache"
+)
+
+
+def sh(tmp_path: Path, script: str, **kwargs):
+    """Run a shell script in the sandbox, with the source folder empty and `out` at /out."""
+    (tmp_path / "src").mkdir(exist_ok=True)
+    kwargs.setdefault("timeout", 30)
+    result = safe_tex.run_in_sandbox(
+        ["/bin/sh", "-c", script], src=tmp_path / "src", out=tmp_path / "out", cwd_rel="",
+        env={"HOME": "/tmp/home"}, bin_dir=None, **kwargs,
+    )  # fmt: skip
+    return result, tmp_path / "out"
+
+
+@needs_bwrap
+def test_the_parents_environment_is_not_visible_in_the_sandbox(tmp_path, monkeypatch):
+    monkeypatch.setenv("FAKE_API_KEY_FOR_TEST", "S3CR3T-VALUE-xyz")
+    _, out = sh(
+        tmp_path,
+        "cat /proc/1/environ /proc/self/environ /proc/1/cmdline > /out/leak.bin;"
+        " env > /out/env.txt",
+    )
+    assert b"S3CR3T-VALUE" not in (out / "leak.bin").read_bytes()
+    assert "S3CR3T-VALUE" not in (out / "env.txt").read_text()
+
+
+@needs_tex
+def test_a_document_cannot_read_proc_environ_of_the_sandbox_or_itself(tmp_path, monkeypatch):
+    monkeypatch.setenv("FAKE_API_KEY_FOR_TEST", "S3CR3T-VALUE-xyz")
+    src = tmp_path / "src"
+    src.mkdir()
+    body = ""
+    for i, path in enumerate(("/proc/1/environ", "/proc/self/environ")):
+        body += (
+            f"\\newread\\r{'a' * (i + 1)}\\openin\\r{'a' * (i + 1)}={path}\\relax "
+            f"\\ifeof\\r{'a' * (i + 1)}\\else\\read\\r{'a' * (i + 1)} to\\x\\x\\fi "
+        )
+    (src / "env.tex").write_text(
+        "\\documentclass{article}\\catcode`\\^^@=12 \\endlinechar=-1 \\begin{document}"
+        + body
+        + "END\\end{document}\n"
+    )
+    _, out = compile_pdf(tmp_path, "env.tex")
+    texts = [p.read_bytes() for p in out.glob("*.log")]
+    if (out / "env.pdf").exists():
+        texts.append(pdf_text(out / "env.pdf").encode())
+    assert texts and all(b"S3CR3T-VALUE" not in t for t in texts)
+
+
+@needs_bwrap
+def test_output_written_past_the_quota_kills_the_run(tmp_path):
+    result, out = sh(
+        tmp_path,
+        "while :; do head -c 1000000 /dev/zero >> /out/big; done",
+        max_total_bytes=5_000_000,
+    )
+    assert result.over_quota and not result.timed_out
+    assert (out / "big").stat().st_size < 100_000_000
+
+
+@needs_bwrap
+def test_writes_into_the_overlay_count_toward_the_quota_too(tmp_path):
+    result, _ = sh(
+        tmp_path,
+        "while :; do head -c 1000000 /dev/zero >> /work/big; done",
+        max_total_bytes=5_000_000,
+    )
+    assert result.over_quota
+
+
+@needs_bwrap
+def test_the_sandbox_leaves_no_scratch_folder_behind(tmp_path):
+    import tempfile
+
+    before = set(Path(tempfile.gettempdir()).glob("sandbox-*"))
+    sh(tmp_path, "echo hi > /work/x")
+    assert set(Path(tempfile.gettempdir()).glob("sandbox-*")) == before
+
+
+@pytest.mark.parametrize("root", ["/usr/bin", "/usr/local/bin", "/bin", "/opt/bin"])
+def test_a_distribution_texlive_is_refused_as_a_sandbox_root(root):
+    with pytest.raises(safe_tex.SandboxUnavailable):
+        safe_tex.texlive_root(Path(root))
+
+
+def test_a_dedicated_texlive_tree_is_accepted():
+    bin_dir = Path("/home/someone/.local/texlive/2026/bin/x86_64-linux")
+    assert safe_tex.texlive_root(bin_dir) == Path("/home/someone/.local/texlive")
+
+
+def test_directories_count_toward_the_entry_cap(tmp_path):
+    many_dirs = make_tar([(f"d{i}/", None, "dir") for i in range(50)])
+    with pytest.raises(safe_tex.UnsafeArchive) as info:
+        safe_tex.extract_tar(many_dirs, tmp_path / "src", max_files=10)
+    assert info.value.code == "too_many_files"
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_extract_can_keep_only_some_suffixes(tmp_path):
+    data = make_tar([("a.tex", b"x", "file"), ("b.png", b"y", "file"), ("s/c.tex", b"z", "file")])
+    safe_tex.extract_tar(data, tmp_path / "src", suffixes=(".tex",))
+    assert sorted(
+        p.relative_to(tmp_path / "src").as_posix() for p in (tmp_path / "src").rglob("*.*")
+    ) == [
+        "a.tex",
+        "s/c.tex",
+    ]
+
+
+def test_a_single_file_is_streamed_with_a_cap_and_leaves_nothing(tmp_path):
+    bomb = gzip.compress(b"\0" * 20_000_000, compresslevel=9)
+    with pytest.raises(safe_tex.UnsafeArchive) as info:
+        safe_tex.extract_single_file(bomb, tmp_path / "x", "main.tex", max_bytes=1_000_000)
+    assert info.value.code == "unpacked_too_large"
+    assert list(tmp_path.iterdir()) == []
+
+
+@needs_tectonic
+def test_tectonic_also_cannot_read_a_local_file_by_absolute_path(tmp_path):
+    secret = tmp_path / "outside" / "secret.tex"
+    secret.parent.mkdir()
+    secret.write_text("TOPSECRETVALUE\n")
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "t.tex").write_text(
+        "\\documentclass{article}\\begin{document}BEFORE "
+        f"\\input{{{secret}}} AFTER\\end{{document}}\n"
+    )
+    out = tmp_path / "out"
+    result = safe_tex.compile_tex(src, "t.tex", out, "tectonic", timeout=120)
+    pdf = out / "t.pdf"
+    assert result.returncode != 0 or not pdf.exists() or "TOPSECRETVALUE" not in pdf_text(pdf)
+    assert not pdf.exists() or "TOPSECRETVALUE" not in pdf_text(pdf)
+
+
 def test_the_environment_switches_and_command_are_set():
     env = safe_tex.tex_env("/tmp/home", "/work/d", "/work")
     assert (env["openin_any"], env["openout_any"], env["shell_escape"]) == ("p", "p", "f")
