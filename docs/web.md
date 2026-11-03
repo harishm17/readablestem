@@ -124,6 +124,8 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back); 409 with fewer than two such parts, 404 for another person's or an expired document |
 | GET `/jobs/{id}/download/canvas` | owner | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
 | GET `/jobs/{id}/download/cartridge` | owner | The same page as an IMS Common Cartridge 1.3 package, `.imscc` (`pipeline/export_cartridge.py`, docs/output.md "The Common Cartridge export"). Same errors and recording as the Canvas zip; a plain link on the job page |
+| GET `/jobs/{id}/download.docx` | owner | The document as a Word file with native equations (`pipeline/export_docx.py`, docs/output.md "The Word export"). The same rules as `/download`: another user's or an expired job is 404, one that is not done 409, the file is made again first when a review write left it out of date, the deletion clock restarts, and it is recorded as a download (code `open` when decisions were still open) with the file type `docx`. 503 when pandoc is not installed or two Word files are already being made; 409 with a plain page when the file cannot be made (the HTML stays available). A plain link under "Other file types" on the finish line, shown only when pandoc is installed |
+| GET `/jobs/{id}/download.epub` | owner | The document as an EPUB 3 publication (`pipeline/export_epub.py`). Same rules, errors and recording as the Word file (file type `epub`); a plain link under "Other file types" |
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation, figure or table |
 | GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | owner | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
@@ -697,7 +699,7 @@ file as an earlier upload of the same person; value: hours since), `finished` (c
 visit of 30 minutes), `decision_made` (code: `single`, `group` or `structure` for an edit to the words, a heading, an added region or a page left out, `bulk` in older rows; value: fixes
 changed), `review_completed` (the first time no decision is left open; value: seconds
 since it finished), `html_viewed` (once per visit), `downloaded` (code `open` or `done`:
-whether decisions were still open), and the two answers after a download, `will_post`
+whether decisions were still open), `download_format` (written with each `downloaded`; code `html`, `canvas`, `cartridge`, `docx` or `epub`, which the review record lists), and the two answers after a download, `will_post`
 and `minutes_saved`. Each row is a user id, a name, a job id, a code and a number
 (`events.make` refuses anything else; the column set is fixed by
 `tests/test_web_content_schema.py`). The fingerprint is an HMAC of the file's SHA-256
@@ -1321,7 +1323,8 @@ From top to bottom:
    decision as soon as the job finishes ("Start the review"), so it is one click from
    finished to deciding. With none open, **Ready to share** (BW1, MF9): "You made 3
    decisions on 9 October." (or "Nothing in this file needed your decision."), the
-   download as the main button, the student version, "Before you share" (read it
+   download as the main button, the student version, "Other file types" (plain links: "Download as Word (.docx)",
+   only when pandoc is installed, and "Download as EPUB"), "Before you share" (read it
    through; the notes, optional; what is not handled) and "Put it in your course"
    ("How to post it in your course" links the Canvas steps on `/help/posting`; upload it
    as a file and link it where the PDF was, as the main version, the PDF kept only as a

@@ -25,6 +25,7 @@
     <div><dt>Language</dt><dd>{{ record.language }}</dd></div>
     <div><dt>Record made on</dt><dd>{{ long_when(record.made_at) }}</dd></div>
     <div><dt>Reference</dt><dd>{{ record.job_ref }}</dd></div>
+    {% if record.downloaded is not none %}<div><dt>File types downloaded</dt><dd>{{ record.downloaded|join(", ") or "None yet" }}</dd></div>{% endif %}
   </dl>
 </section>
 

@@ -105,6 +105,14 @@ STRUCTURE_TOOL_HAD = {
     "omit_page": "A page of the file",
     "restore_page": "A page left out",
 }
+# The file types a download can be (`web.events.FORMATS`), in words for the record.
+FORMAT_WORDS = {
+    "html": "HTML file",
+    "canvas": "Canvas zip",
+    "cartridge": "Common Cartridge",
+    "docx": "Word",
+    "epub": "EPUB",
+}
 TOOL_STATUS_WORDS = {
     "needs_review": "Asked for a decision",
     "accepted": "Accepted by the tool",
@@ -123,6 +131,8 @@ ALWAYS_NOT_CHECKED = (
     "the meaning.",
     "How the file looks in your course site (for example Canvas). It has not been tried "
     "in a live course.",
+    "The Word and EPUB files. They are made from the HTML file, and the checks above are "
+    "of the HTML file. Nobody has checked how they open in Word or a reading app.",
     "The PDF itself. This record is about the HTML file made from it.",
 )
 
@@ -175,6 +185,9 @@ class Record:
     # What the instructor did by hand that the tool did not propose, as it stands now.
     by_hand: dict[str, int] = field(default_factory=dict)
     left_out_pages: list[int] = field(default_factory=list)  # 1-based
+    # The file types downloaded so far, in words; None when the app is not recording
+    # downloads (EVENTS_ENABLED off), so the record does not say "none" when it cannot know.
+    downloaded: list[str] | None = None
 
 
 def long_when(value: datetime | None) -> str:
@@ -303,6 +316,7 @@ def build(
     made_at: datetime,
     title_chosen: bool,
     contact_set: bool,
+    downloaded_formats: list[str] | None = None,
 ) -> Record:
     """The record from a finished job's parts. `edits` are its `ReviewEdit` rows (any
     order); `who` maps a user id to the name shown for them."""
@@ -378,6 +392,11 @@ def build(
         not_checked=not_checked_list(result, counts),
         by_hand=by_hand_counts(result),
         left_out_pages=sorted(o.page + 1 for o in result.omitted),
+        downloaded=(
+            None
+            if downloaded_formats is None
+            else [FORMAT_WORDS.get(f, f) for f in downloaded_formats]
+        ),
     )
 
 
@@ -425,6 +444,8 @@ def to_csv(record: Record) -> str:
     row("document", "Language", detail=record.language)
     row("document", "Record made on", when=iso_when(record.made_at))
     row("document", "Reference", detail=record.job_ref)
+    if record.downloaded is not None:
+        row("document", "File types downloaded", detail=", ".join(record.downloaded) or "None")
     c = record.counts
     row("summary", "Parts found", detail=c.items)
     for kind, n in record.by_kind.items():

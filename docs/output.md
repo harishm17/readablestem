@@ -168,11 +168,69 @@ What Canvas still removes, and why that is accepted:
   that happens in the browser and is not tested here.
 - Not tested against a live Canvas, UT Dallas's included; the README says so.
 
+### The Word export (`pipeline/export_docx.py`)
+
+A fourth form of the same document, made from the finished HTML alone (no pipeline step
+changes): a `.docx` with native equations. `readablestem export docx FILE.html OUT.docx
+[--title T]` writes it, and the job page's "Download as Word (.docx)" (`GET
+/jobs/{id}/download.docx`) serves it. Nothing is read but the file: no model, no network.
+
+[pandoc](https://pandoc.org) does the conversion (`-f html -t docx`): it reads the MathML and
+writes Office Math (OMML), so an equation is an editable Word equation that Word's own
+navigation and a screen reader with Word can read, not a picture. It is GPL-2.0-or-later and
+is run as a separate program, never linked (THIRD_PARTY_NOTICES.md). The Docker image installs
+it from the distribution (about 200 MB on disk; the Ubuntu 3.7 package's installed size is
+201,810 kB, so read the real figure from the first Railway build). The tests pass with pandoc
+3.1.3 (Ubuntu 24.04, as CI installs), 3.1.11 (Debian trixie, the image) and 3.7. Without pandoc on `PATH` there is no Word download: the route is a 503 and the
+job page shows no button. The pure-Python alternative was not taken: the Office MathML-to-OMML
+stylesheet (`MML2OMML.XSL`) ships with Office and is not redistributable, and a converter of
+our own would be a second MathML reader to keep right.
+
+- **Before pandoc.** The same sanitiser as the EPUB (`export_epub._sanitise`): scripts, frames,
+  forms, remote pictures (they become their alt text), `javascript:` links and event handlers
+  go, so pandoc is given only a document that names nothing outside itself. (Pandoc's own
+  `--sandbox` cannot be used: the distribution build reads its default styles from disk.) Page
+  markers (`role="doc-pagebreak"` and their visible label) are left out; a Word document has
+  its own pages. A figure's long description (`<details class="figure-description">`) becomes
+  its summary line in bold and its paragraphs, after the figure. A figure with no picture is
+  written as paragraphs: pandoc would make it a one-cell table. A WebP picture is written as a
+  PNG. The page's language and title are passed on.
+- **The child.** Its own process group, an environment of `PATH`, `LANG` and the like only
+  (`core.childenv`: no keys, no database URL), a private temporary directory removed
+  afterwards, 90 s of CPU, a file-size cap, 256 open files, a 2 GB heap (`+RTS -M2g`), and 60 s
+  on the clock, after which the group is killed. A failure is an error with a category code
+  (`unavailable`, `failed`, `timeout`, `equations`, `invalid`) and no document text. The web
+  route lets two run at once.
+- **After pandoc**, in `word/document.xml`, whatever the pandoc version:
+  - every picture's alt text is also written on the picture itself (pandoc writes the
+    picture's address there, which a screen reader would read out);
+  - a table whose first row is a header gets `w:tblHeader`, so it repeats on each page and is
+    read as a header;
+  - pandoc's title paragraph is dropped when the first heading says the same thing (the
+    title stays in the document properties).
+- **What the file has.** Headings as Heading 1 to 6; lists as Word lists; links as hyperlinks
+  (inside the document by bookmark); tables with their caption; alt text on each picture; the
+  document language and title; equations as `m:oMath`. The export fails
+  (`equations`) rather than hand over a file with fewer equations than the HTML has `<math>`.
+- **What it does not have.** The page's stylesheet (the styles are pandoc's own), the colours
+  of the flagged boxes (their words and each image's alt text stay), inline SVG, remote
+  pictures, and any conformance claim: the tool assists, and nobody has checked how the file
+  reads in Word with a screen reader. The review record says so.
+- **Not in "Download all".** That zip stays the HTML files: up to 25 documents through pandoc
+  would hold a request for a minute or more, and the HTML is the file to post. Word and EPUB
+  are one document at a time.
+- **Tests** (`tests/test_export_docx.py`): the demo, the golden documents and the LaTeX
+  conversions opened with python-docx (as many `m:oMath` as `<math>`, heading styles in the
+  HTML's order, alt text on every picture and never an address, the language, the title);
+  a page with every feature; a remote address never opened; a fake `pandoc` for the timeout,
+  failure, missing-equation and secret-free environment cases; and LibreOffice opening the
+  file when it is installed. They skip, saying why, without pandoc (CI installs it).
+
 ### The EPUB export (`pipeline/export_epub.py`)
 
 A third form of the same document, made from the finished HTML alone like the two above
 (no pipeline step changes). `readablestem export epub FILE.html OUT.epub [--title T]` writes an
-EPUB 3 (no route or button yet). Nothing is read but the file: no network, no model.
+EPUB 3; the job page's "Download as EPUB" (`GET /jobs/{id}/download.epub`) serves the same file. Nothing is read but the file: no network, no model.
 
 | File | What it is |
 |---|---|
@@ -1110,9 +1168,10 @@ generation (with tokens and cost), so per-request cost shows in Langfuse's cost 
 
 ## CLI
 
-`readablestem export epub FILE.html OUT.epub` is described under "The EPUB export" above;
-it exits 0 when the file is written and 2 when the input cannot be read or turned into an
-EPUB or the output cannot be written (a message on stderr, no traceback).
+`readablestem export epub FILE.html OUT.epub` is described under "The EPUB export" above, and
+`readablestem export docx FILE.html OUT.docx` under "The Word export"; each exits 0 when the
+file is written and 2 when the input cannot be read or turned into that file type or the
+output cannot be written (a message on stderr, no traceback).
 
 ```
 readablestem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [--concurrency 4]
