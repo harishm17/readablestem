@@ -15,6 +15,32 @@
   `EquationFix.other_latex`, `other_source`, `DocumentResult.page_witness`. The review card does not
   show the other reading yet. Documented in docs/steps.md. Not measured (E1 is a later step).
 
+## Unreleased: agreement oracle on the recorded chatbot answers (branch eq/agreement-oracle)
+
+- `scripts/eq_oracle_agreement.py` and a D2 section of docs/eval-equation-diagnostics.md: how often
+  a second whole-page reading (the recorded Opus chatbot answers) is right where ours is wrong, how
+  often our reading is right when the two agree under `math_canonical`, how well disagreement
+  flags our wrong readings, and how many of our undetected equations it found. Measurement only,
+  offline, no change to the product.
+
+## Unreleased: a second reader's reading and choices on the review card (branch hw/reconcile-and-chips)
+
+- `pipeline/image_page_reconcile.py`: with `IMAGE_PAGES_SECOND_READER` set (`local`, `claude` or
+  `openai`; default `off`, and the reader must also be enabled), the crop of each handwritten display
+  equation is read by that reader and compared with the page's reading. Agreement is a note and the
+  item stays a required decision; a difference is a note and, where it is a few symbols, fills
+  `Element.alternatives`; an unavailable reader, a spent time share (`IMAGE_PAGES_SECOND_READER_TIME_S`)
+  or a spent reader budget is a note only. The reader's own spend limit is never a failed fix, so it
+  cannot stop the job. In the hosted conversion child only the local reader can run.
+- Review card: a handwritten equation whose second reading differed shows one-click choices
+  ("Use capital X") under the proposal; each posts an ordinary edit (checks, record, Undo), none is
+  chosen for the person, and nothing changes while there are no alternatives. Keyboard, 44 px targets,
+  forced-colors and axe are tested.
+- The two reader prompts moved under `models/prompts/` (`math_reader.md`, `math_reader_claude.md`),
+  text unchanged, so the eval guard sees them (mapped to `latest-image-pages.json`).
+- New check messages for the four notes (`image_page.second_reader`).
+- Not measured: how often the choices contain the right reading, or whether decisions per page fall
+  (docs/eval-handwriting.md).
 ## Unreleased: a local handwriting reader (branch hw/local-reader)
 
 - New reader B, `local` (`models/math_readers/local_reader.py`): TexTeller on CPU with ONNX

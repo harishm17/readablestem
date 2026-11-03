@@ -92,7 +92,7 @@ import threading
 import time
 from bisect import bisect_left
 from collections import Counter, defaultdict
-from collections.abc import Callable, Generator, Iterable
+from collections.abc import Callable, Generator, Iterable, Mapping
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -127,6 +127,7 @@ from readablestem.core.types import (
     inline_marker,
 )
 from readablestem.models.base import T, VisionClient, VisionRequest
+from readablestem.models.math_readers.base import MathReader
 from readablestem.models.pricing import UnknownModelError
 from readablestem.observability.tracing import NoopTracer, Tracer
 from readablestem.pipeline import (
@@ -138,6 +139,7 @@ from readablestem.pipeline import (
     html_checks,
     image_page,
     image_page_check,
+    image_page_reconcile,
     layout,
     page_labels,
     page_math,
@@ -965,11 +967,9 @@ class _Run:
                 continue
             try:
                 done = future.result()
-            except BaseException as e:  # the failed step itself, or a worker that died
-                print("DBG exc", repr(e))
+            except BaseException:  # the failed step itself, or a worker that died
                 continue
             key = self.keys.get(element.id)
-            print("DBG", element.kind, key is not None, done.fix.status, done.fix.reason)
             if key and reusable(done.fix):
                 self.cache.store(element, key, done.fix)
             self.futures.pop(future, None)
@@ -1250,6 +1250,7 @@ def convert_pdf(
     stage_progress: StageProgressFn | None = None,
     step_cache: StepCache | None = None,
     call_observer: Callable[[ModelCall], None] | None = None,
+    readers: Mapping[str, MathReader] | None = None,
 ) -> ConversionOutput:
     """Convert one PDF (0-based `pages`, all by default) into a `PipelineOutput`.
 
@@ -1275,6 +1276,11 @@ def convert_pdf(
     `step_cache` keeps the answers of finished model steps and gives them back to a later
     run of the same document (module docstring); without one every step is asked.
     `call_observer` is told each model request's `ModelCall` when it ends (any thread).
+
+    `readers` are the second readers of handwriting (`models.math_readers.build_readers`) for
+    `Settings.image_pages_second_reader`; without them the local reader is built when it is
+    the chosen one (`image_page_reconcile.default_readers`), which is all the conversion child
+    can do (it has no keys and no network).
     """
     if options is None:
         options = ConversionOptions.from_settings(settings)
@@ -1293,7 +1299,27 @@ def convert_pdf(
             stage_progress=stage_progress,
             step_cache=step_cache,
             call_observer=call_observer,
+            readers=readers,
         )
+
+
+def _second_readings(
+    elements: list[Element],
+    run: _Run,
+    settings: Settings,
+    readers: Mapping[str, MathReader] | None,
+) -> image_page_reconcile.Summary | None:
+    """Compare each handwritten equation's reading with the second reader's, when one is
+    chosen and can be built. Optional: whatever goes wrong here leaves every item as it was."""
+    try:
+        pool = readers if readers is not None else image_page_reconcile.default_readers(settings)
+        reader = image_page_reconcile.chosen(settings, pool)
+        if reader is None:
+            return None
+        return image_page_reconcile.reconcile(elements, run.fixes, run.crops, reader, settings)
+    except Exception as exc:
+        log.warning("second readings failed: %s", type(exc).__name__)
+        return None
 
 
 def _page_math_pass(
@@ -1530,6 +1556,7 @@ def _convert(
     stage_progress: StageProgressFn | None,
     step_cache: StepCache | None = None,
     call_observer: Callable[[ModelCall], None] | None = None,
+    readers: Mapping[str, MathReader] | None = None,
 ) -> ConversionOutput:
     """`convert_pdf`'s body, with its options already in force."""
     tracer = tracer or NoopTracer()
@@ -1661,6 +1688,19 @@ def _convert(
         finally:
             cached.release()  # also when analysis, a step or `progress` failed
 
+        reading_cost = 0.0
+        if image_built and settings.image_pages_second_reader != "off":
+            with _span(tracer, "second_readings") as reading_span:
+                reconciled = _second_readings(elements, run, settings, readers)
+                if reconciled is not None:
+                    reading_cost = reconciled.cost_usd
+                    _annotate(
+                        reading_span,
+                        considered=reconciled.considered,
+                        agreed=reconciled.agreed,
+                        differed=reconciled.differed,
+                        cost_usd=reconciled.cost_usd,
+                    )
         if settings.image_pages_maths_always_required and image_built:
             image_page.enforce_maths_required(elements, run.fixes)
         ordered = _ordered_fixes(elements, run.fixes)
@@ -1699,6 +1739,8 @@ def _convert(
                     "model_calls": stats.model_calls + witness_summary.calls,
                 }
             )
+        if reading_cost:
+            stats = stats.model_copy(update={"cost_usd": round(stats.cost_usd + reading_cost, 8)})
         if image_summary is not None:
             costs = {r.page: r.cost_usd for r in image_summary.per_page}
             stats = stats.model_copy(

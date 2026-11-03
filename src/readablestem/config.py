@@ -334,7 +334,8 @@ class Settings(BaseSettings):
 
     # --- handwriting: reader B (models/math_readers, docs/math-readers.md). A second reading
     # of one handwritten expression, made to differ from the page pass's. Both readers are OFF
-    # and nothing in the pipeline calls one yet. Each sends the crop to a model provider, so a
+    # and the pipeline calls one only when `image_pages_second_reader` names it. Each sends the
+    # crop to a model provider, so a
     # production start is refused while one is on and the privacy notice does not name that
     # provider (`ops.launch.recipients_notice_problem`). Timeout and retries are
     # `model_timeout_s` and `model_max_retries`.
@@ -360,6 +361,16 @@ class Settings(BaseSettings):
     # second readings cannot starve the conversion (`BudgetExceeded("reader_usd")`: no second
     # reading, not a failed job).
     math_reader_max_usd_per_job: float = Field(default=0.5, gt=0, le=100)
+    # Which reader reads each handwritten expression's crop a second time, to compare with the
+    # page reading (`pipeline.image_page_reconcile`): "off", or the name of a reader that is
+    # also enabled above. Where the two differ the review card offers the other reading as a
+    # choice; where they agree the item is still a decision. Only "local" runs in the hosted
+    # conversion child (it has no keys and no network); the others run where a caller passes
+    # readers in (`convert_pdf(readers=...)`).
+    image_pages_second_reader: Literal["off", "local", "claude", "openai"] = "off"
+    # The most wall time all second readings of one job may take together; expressions past it
+    # are left with a note and no second reading (a read has its own time budget besides).
+    image_pages_second_reader_time_s: float = Field(default=120.0, gt=0, le=1800)
 
     # --- content features. Each is off until its eval
     # says it helps; ConversionOptions.from_settings reads them for every conversion.
@@ -511,6 +522,16 @@ class Settings(BaseSettings):
             )
         self.main_model = self.anthropic_main_model
         self.cheap_model = self.anthropic_cheap_model
+        return self
+
+    @model_validator(mode="after")
+    def _second_reader_enabled(self) -> Settings:
+        """A second reader that is not enabled has no model files or key to read with."""
+        name = self.image_pages_second_reader
+        if name != "off" and not getattr(self, f"math_reader_{name}_enabled"):
+            raise ValueError(
+                f"IMAGE_PAGES_SECOND_READER={name} needs MATH_READER_{name.upper()}_ENABLED=true"
+            )
         return self
 
     @model_validator(mode="after")

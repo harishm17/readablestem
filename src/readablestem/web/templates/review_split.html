@@ -135,6 +135,33 @@
   <p class="hint" id="suggest-hint-{{ eid }}">Saves <code class="latex">{{ p.suggestion.latex }}</code> and runs the checks again.</p>
 </form>
 {% endif %}
+{% if p.chips %}
+{# A second reader read the picture differently in a few symbols (web.reading_chips). Each
+   choice is a button that posts the whole LaTeX it gives as an ordinary edit; none is
+   selected, and nothing happens until one is pressed. #}
+<section class="chips" aria-labelledby="chips-title-{{ eid }}">
+  <h3 id="chips-title-{{ eid }}" class="part-label">A second reading differs</h3>
+  <p class="hint" id="chips-hint-{{ eid }}">Another reader read this picture differently. Look at the picture, then choose a reading, or leave this and edit the LaTeX below. Nothing is chosen for you.</p>
+  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="chips-form">
+    {{ hidden_fields() }}<input type="hidden" name="action" value="edit">
+    {% for group in p.chips.groups %}
+    {% set gid = "chip-group-" ~ eid ~ "-" ~ loop.index %}
+    <div class="chip-group" role="group" aria-labelledby="{{ gid }}">
+      <p class="chip-lead" id="{{ gid }}">Where the page reading has <code class="latex">{{ group.symbol }}</code> (said “{{ group.said }}”), the other reader had:</p>
+      <ul class="chip-list">
+        {% for chip in group.chips %}
+        {% set cid = gid ~ "-" ~ loop.index %}
+        <li>
+          <button type="submit" name="latex" value="{{ chip.latex }}" class="button-secondary chip" data-role="chip"{% if chip.speech %} aria-describedby="{{ cid }}-said"{% endif %}>Use {{ chip.phrase }}<span class="visually-hidden"> in {{ item.label|lower }}</span></button>
+          {% if chip.speech %}<span class="chip-said" id="{{ cid }}-said">Then read aloud roughly as: “{{ chip.speech }}”</span>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+  </form>
+</section>
+{% endif %}
 <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form{% if item.edited %} is-edited{% endif %}">
   {{ hidden_fields() }}
   {% set err = item.errors.get("latex") %}

@@ -89,6 +89,7 @@ from readablestem.web.page_edits import (
     MAX_HEADING_CHARS,
     friendly_text,
 )
+from readablestem.web.reading_chips import Chips, chips_for
 from readablestem.web.review import (
     GROUP_KINDS,
     MAX_LATEX_CHARS,
@@ -344,6 +345,9 @@ class Panel:
     # one-click fix, else the edit box, open), and Accept is the secondary "Accept anyway".
     changes_meaning: bool = False
     suggestion: Suggestion | None = None
+    # A second reader's other readings of a doubtful symbol, as one-click choices
+    # (`web.reading_chips`); None when there are none, so nothing changes without them.
+    chips: Chips | None = None
     region_url: str | None = None  # the item with the page around it
     region_alt: str = ""
     # Text read from an image of a page: the page tools with this paragraph open to change.
@@ -784,6 +788,7 @@ class SplitBuilder:
         if fix.kind is Kind.EQUATION and element is not None:
             compare = compare_equation(element, fix)
             panel.compare = compare
+            panel.chips = chips_for(element, fix)
             if fix.pending and compare.meaning:
                 panel.changes_meaning = True
                 panel.suggestion = suggest_fix(element, fix, compare)
