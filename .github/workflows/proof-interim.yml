@@ -33,7 +33,7 @@ permissions:
 
 concurrency:
   group: proof-interim-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Actions are pinned to full commit SHAs, the same ones as ci.yml (tag in the comment).
 

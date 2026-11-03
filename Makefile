@@ -56,7 +56,7 @@ fmt:
 
 check: lint test
 
-# What CI's lint-test job runs, on both of its Python versions, before you push. The 3.14
+# What CI's static and pytest jobs run, on both of its Python versions, before you push. The 3.14
 # environment lives in .local/venv-3.14 (ignored); a fault only newer interpreters
 # reject (e.g. a docstring that 3.13+ cannot compile) shows up here instead of in CI.
 CI_314 = UV_PROJECT_ENVIRONMENT=.local/venv-3.14
