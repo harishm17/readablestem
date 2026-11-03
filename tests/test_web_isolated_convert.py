@@ -417,7 +417,7 @@ def test_a_progress_callback_that_raises_kills_the_child_and_the_error_is_raised
 
 def test_the_child_cannot_use_more_than_its_memory_cap(spawned):
     """A real allocation past the cap, not a stand-in: `conversion_memory_mb` is enforced."""
-    settings = offline_settings(conversion_memory_mb=1024)
+    settings = offline_settings(conversion_memory_mb=1536)
     client, _ = offline_client(settings)
     with pytest.raises(ConversionOom):
         convert_isolated(b"%PDF-1.4", settings=settings, client=client, fault="oom")

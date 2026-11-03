@@ -108,6 +108,7 @@ MAX_IMAGES_PER_REQUEST = 32
 # Requests the child may have open at once (its steps run `MODEL_CONCURRENCY` at a time, a few
 # pools at most); more is not the pipeline, and each costs a thread here.
 MAX_IN_FLIGHT = 64
+QUEUED_FRAMES = 4
 MAX_OUTPUT_TOKENS = 64_000
 _STEPS = frozenset(get_args(Step))
 _DETAILS = frozenset({"low", "high", "auto"})
@@ -241,7 +242,10 @@ class _Conversion:
         self.limit_s = limit_s
         self.fault = fault
         self.fault_at = fault_at
-        self.frames: queue.Queue[Any] = queue.Queue()
+        # Bounded: a child that sends faster than the parent handles waits on its socket
+        # instead of filling this process's memory.
+        self.frames: queue.Queue[Any] = queue.Queue(maxsize=QUEUED_FRAMES)
+        self.closed = threading.Event()
         self.send_lock = threading.Lock()
         self.proc: subprocess.Popen[bytes] | None = None
         self.sock: socket.socket | None = None
@@ -307,10 +311,21 @@ class _Conversion:
         assert sock is not None
         try:
             while (parts := protocol.read_frame(sock)) is not None:
-                self.frames.put(parts)
+                if not self._queue(parts):
+                    return
         except (OSError, ValueError):
             pass
-        self.frames.put(_EOF)
+        self._queue(_EOF)
+
+    def _queue(self, item: Any) -> bool:
+        """Hand a frame to the loop, waiting while it is busy; False once the run is over."""
+        while not self.closed.is_set():
+            try:
+                self.frames.put(item, timeout=0.5)
+                return True
+            except queue.Full:
+                continue
+        return False
 
     def _send(self, parts: list[bytes]) -> None:
         sock = self.sock
@@ -336,6 +351,7 @@ class _Conversion:
         """Kill the child's process group, wait for the child, close the socket. Returns
         its exit status (negative: the signal)."""
         proc, sock = self.proc, self.sock
+        self.closed.set()
         if proc is not None and not self.reaped:
             with suppress(ProcessLookupError, PermissionError):
                 os.killpg(proc.pid, signal.SIGKILL)

@@ -389,8 +389,9 @@ hangs instead of failing, and the job ends as `timeout`. What to look for:
 
 A crashed or out-of-memory child fails the job at once; it is not requeued, so one poison PDF
 costs one attempt and not three lease expiries. `PRELOAD_TABLE_MODELS` has no effect while
-conversions run in a child: each child loads what it needs (with `FEATURE_TABLES` on, the table
-models load in about 4-5 s on 1 vCPU, which every conversion now pays). Tracing records the web
+conversions run in a child: each child loads what it needs (a job pays about 1.4-2 s for the child's start and
+imports on the development box, more on 1 vCPU, and with `FEATURE_TABLES` on the table models
+load in about 4-5 s on 1 vCPU; docs/web.md, "The conversion runs in a child process"). Tracing records the web
 process's spans only.
 
 **Error pages.** Every page that fails answers in the app's plain style with a way home:

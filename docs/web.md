@@ -1190,8 +1190,9 @@ is `convert_isolated`, which has `convert_pdf`'s signature.
   timings (`tests/test_web_isolated_convert.py`). A model call still running when the child is
   killed finishes and settles in the parent; its spend counts, as an abandoned thread's did.
 - *Limits.* Address space `CONVERSION_MEMORY_MB` (default 3072; measured peak of a conversion is
-  1.6-1.8 GB of address space, 330-460 MB resident, on 4 documents of 1-40 pages with `glibc`
-  arenas capped at 2, `MALLOC_ARENA_MAX`; below about 1.5 GB the ONNX runtime of the table
+  1.6-1.8 GB of address space, 330-460 MB resident, on 4 documents of 2, 7, 7 and 11 pages with
+  `glibc` arenas capped at 2 (`MALLOC_ARENA_MAX`; without it the same runs peaked at 4.7-6 GB of
+  address space); below about 1.5 GB the ONNX runtime of the table
   detector hangs instead of failing, which ends as `timeout`), plus twice the PDF; CPU time
   4 times the job's wall-clock limit (a backstop); no core file (it would hold the PDF); the
   child dies with the web process (`PR_SET_PDEATHSIG` on Linux, and the end of its socket).
@@ -1212,10 +1213,16 @@ is `convert_isolated`, which has `convert_pdf`'s signature.
   at its next poll (at most 0.2 s) and the lease ends now, so another instance requeues the
   job as before. The child holds no files and no connections, so killing it needs no clean-up.
   Within `GRACEFUL_SHUTDOWN_S`, `WORKER_STOP_S` and the 10 s `drainingSeconds`.
-- *Cost.* A fresh process per job: its start and imports (and, with `FEATURE_TABLES`, loading
-  the table models, which `PRELOAD_TABLE_MODELS` no longer does in the web process, since
-  the models would only sit in memory there) are paid by every job; measured below. A fresh
-  process per job also means one document is never in the memory another was in.
+- *Cost.* A fresh process per job, so its start and imports are paid by every job (a fresh
+  process also means one document is never in memory another was in). Measured on the
+  development box (16 cores, other work running; fake models; a warm web process for the
+  in-process figure): the 2-page `lecture_notes.pdf`, median of 7 runs, 0.43 s in process and
+  2.46 s in the child (+2.0 s; with `FEATURE_TABLES` 0.36 s and 2.49 s); a 7-page paper, median of
+  3 runs, 12.3 s and 13.6 s (+1.4 s; with tables 12.8 s and 14.5 s, +1.7 s). The overhead is
+  about 1.4-2 s a job here, from starting Python and importing the pipeline; with
+  `FEATURE_TABLES` the child also loads the table models, which `PRELOAD_TABLE_MODELS` no
+  longer does in the web process (the models would only sit in memory there). On one vCPU the
+  imports and the model load take longer (deploy.md, "Sizing": 4-5 s for the models alone).
 - *Not carried over.* Tracing (`TRACING_ENABLED`, off in production) records the worker's
   spans only; the pipeline's inner spans are not sent from the child.
 - *Still in the web process.* Not conversions: the sample document's crops (`web/sample.py`,
