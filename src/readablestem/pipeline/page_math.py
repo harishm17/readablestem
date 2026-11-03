@@ -36,7 +36,6 @@ from readablestem.core.types import ModelCall
 from readablestem.models.base import VisionClient, VisionRequest
 from readablestem.models.pricing import UnknownModelError
 from readablestem.models.prompts import load_prompt
-from readablestem.pipeline import chem
 
 log = logging.getLogger(__name__)
 
@@ -319,8 +318,11 @@ def verify(output: PageMathOutput | None, rows: Sequence[PageRow]) -> tuple[list
 
 def _latex_of(expression: Expression) -> str:
     r"""The expression's LaTeX as the other readings are stored: a mathematics `\ce{...}`
-    written out (`chem.expand_ce`; one outside the subset stays and does not convert)."""
-    return chem.expand_ce(expression.latex) if expression.role == "math" else expression.latex
+    written out and cleaned (`equation_step.read_latex`, as on every other path; one outside
+    the subset stays and does not convert)."""
+    from readablestem.pipeline.equation_step import read_latex  # equation_step imports this
+
+    return read_latex(expression.latex) if expression.role == "math" else expression.latex
 
 
 def _retrimmed(span: Span, rows: dict[str, PageRow]) -> Span:

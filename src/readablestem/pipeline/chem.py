@@ -27,8 +27,9 @@ parentheses with counts (`Ca(OH)2`, `[Cu(NH3)4]^2+`), charges (`Na+`, `OH-`, `SO
 between species, the electron and particles (`e-`, `n`, `p`), hydrates (`CuSO4.5H2O`), bonds
 (`-`, `=`, `#`), nuclide prefixes (`^{14}_{6}C`, `^{0}_{-1}e`), and the arrows `->` `-->` `<-`
 `<->` `<=>`, with a label (`->[\Delta]`, `->[heat]`, or two). A state symbol may carry a condition
-(`(aq, 0.10 M)`: a number and a unit from `_STATE`'s short list), a species the excited state
-(`Ni^*`) and a mark for gas or precipitate (`CO2 ^`, `AgCl v`, after a species and a space).
+(`(aq, 0.10 M)`: a number and a unit from `_STATE`'s short list), a nuclide the excited state
+(`^{60}_{28}Ni^*`) and a mark for gas or precipitate (`CO2 ^`, `AgCl v`, after a species and a
+space, not before a number).
 Not supported (`CeError`): `<=>>`, `<<=>`, a mark anywhere else, `$...$`, other conditions,
 three-part arrow labels, and any text that is not a species. The module stays an allowlist:
 every construct is matched by name, and what is not matched is refused.
@@ -547,6 +548,10 @@ def _species_latex(s: str, i: int) -> tuple[str, int]:
             if not base:
                 raise CeError("superscript with nothing before it")
             latex, i = _caret(s, i)
+            if "*" in latex and not prefix:
+                # speech reads a star only on a nuclide (`^{60}_{28}Ni^*`, "excited state"); on a
+                # bare species it would say "to the power times", so a person decides
+                raise CeError("excited-state star outside a nuclide")
             put(latex)
         elif c == "_":
             if not base:
@@ -707,6 +712,8 @@ def ce_to_latex(source: str) -> str:
             continue
         mark = _MARK.match(s, i)
         if mark and out and s[i - 1].isspace() and _ends_species(out[-1]):
+            if s[mark.end() :].lstrip()[:1].isdigit():
+                raise CeError("mark followed by a number")  # `H2 ^ 2` is not H2 given off
             out[-1] += _MARKS[mark.group(1)]
             i = mark.end()
             continue

@@ -55,8 +55,7 @@ NS = "{http://www.w3.org/1998/Math/MathML}"
         ("Zn^2+(aq,0.10M)", r"\text{Zn}^{2+}\text{(aq, 0.10 M)}"),
         ("NaCl(aq, 1.5)", r"\text{NaCl}\text{(aq, 1.5)}"),
         ("CO2(g, 1 atm)", r"\text{CO}_2\text{(g, 1 atm)}"),
-        ("Ni^*", r"\text{Ni}^*"),
-        ("Ni^{*}", r"\text{Ni}^*"),
+        ("^{60}_{28}Ni^{*}", r"{}^{60}_{28}\text{Ni}^*"),
         ("^{60}_{28}Ni^*", r"{}^{60}_{28}\text{Ni}^*"),
         ("Ag+ + Cl- -> AgCl v", r"\text{Ag}^+ + \text{Cl}^- \longrightarrow \text{AgCl}\downarrow"),
         ("AgCl(s) v", r"\text{AgCl}\text{(s)}\downarrow"),
@@ -154,6 +153,11 @@ def test_ce_subset(ce, latex):
         "Zn(aq, 0.1 M, 25 C)",  # two conditions
         "Zn(aq, \\text{x})",  # commands in a condition
         "Zn(x, 0.1 M)",  # not a state
+        "Ni^*",  # a star on a bare species: speech cannot read it, a person decides
+        "Ni^{*}",
+        "Ni^{2+*}",
+        "H2 ^ 2",  # a mark followed by a number
+        "H2 v 2 O",
         "^*Ni",  # a star with nothing before it
         "Ni^*x",  # a star that is not last
         "Ni^{a b*}",

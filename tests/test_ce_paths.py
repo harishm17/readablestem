@@ -244,6 +244,8 @@ def test_a_page_math_ce_expression_is_written_out_and_a_bad_one_is_left_to_fail(
     )
     spans, _ = page_math.verify(out, rows)
     assert [s.latex for s in spans] == [WATER, BAD]
+    cleaned = PageMathOutput(expressions=[expression([("L0", 10, "H2O")], latex=r"$\ce{H2O}$")])
+    assert [s.latex for s in page_math.verify(cleaned, rows)[0]] == [WATER]  # cleaned, too
     assert page_math.latex_stream(spans[0].latex) is not None
     other: Any = expression([("L0", 10, "H2O")], role="exercise_or_item_number", latex=r"\ce{H2O}")
     spans, _ = page_math.verify(PageMathOutput(expressions=[other]), rows)

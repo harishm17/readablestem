@@ -97,7 +97,7 @@ and nothing is saved. The proof's arms (`proof/systems.py`) and the gold side of
 | brackets and parentheses with counts | `Ca(OH)2`, `Al2(SO4)3`, `[Cu(NH3)4]^2+` |
 | charges | `Na+`, `OH-`, `SO4^2-`, `Fe^3+`, `Fe^{3+}`, `Fe+++`, `e-` |
 | state symbols | `(aq)`, `(s)`, `(l)`, `(g)`, with a condition: `(aq, 0.10 M)`, `(g, 1 atm)` (a number, then `M mM m atm bar kPa Pa mmHg torr` or no unit) |
-| the excited state | `Ni^*`, `Ni^{*}`, `^{60}_{28}Ni^*` |
+| the excited state, on a nuclide only | `^{60}_{28}Ni^*` (a bare `Ni^*` is refused: speech reads the star only on a nuclide) |
 | gas and precipitate marks | `CO2 ^`, `AgCl v` (after a species, set apart by a space; written `\uparrow`, `\downarrow`) |
 | coefficients | `2`, `0.5`, `1/2` |
 | arrows | `->`, `-->`, `<-`, `<--`, `<->`, `<=>`, with a label `->[\Delta]`, `->[heat]`, or two (`->[above][below]`; text, numbers, `\text{...}`, `^\circ`) |
@@ -108,7 +108,7 @@ and nothing is saved. The proof's arms (`proof/systems.py`) and the gold side of
 Not supported, and refused (`CeError`, then the LaTeX check says `unknown_command`, the cheap
 model's answer goes to the main model, and a reading that still has it is a failed fix with a
 required decision, the picture kept): `<=>>` and `<<=>`, a mark that does not follow a species
-(on a coefficient, an arrow, or two in a row, or glued to the formula), `$...$` in the body, a
+(on a coefficient, an arrow, or two in a row, glued to the formula, or followed by a number), a star on a bare species, `$...$` in the body, a
 condition with a unit that is not listed or a second condition, a three-part arrow label,
 anything that is not a species (words, a generic letter such as `A`). The prompt says what to do
 instead: ordinary LaTeX with `\ce` only around the species inside it.
