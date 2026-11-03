@@ -254,7 +254,7 @@ CI runs with them (`data/eval/baseline-*.json`).
 | Task | n | Result | Cost |
 |---|---|---|---|
 | Equations | 30 | `exact_lenient` 0.767 (95% CI 0.591 to 0.882); a perfect transcriber scores 0.833 here, because of known gaps in the scorer; mean TEDS 0.864 | $0.0017 per equation |
-| Headings | 121 | recall 0.793 (CI 0.713 to 0.856), level accuracy 0.740, precision 0.850 (113 predicted against 121 gold; the 16 least certain went to review). The gold counts the label and the title of an OpenStax box as two headings; the outline keeps one (docs/eval.md, "Doubled box headings") | no model call |
+| Headings | 121 | recall 0.793 (CI 0.713 to 0.856), level accuracy 0.740, precision 0.914 (105 predicted against 121 gold; the 8 least certain went to review). The gold counts the label and the title of an OpenStax box as two headings; the outline keeps one (docs/eval.md, "Doubled box headings") | no model call |
 | Figures | 13 | judge pass 1.000 (CI 0.772 to 1.000); the judge is a model and is not yet calibrated against human labels | $0.0039 per figure |
 | Whole pages | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 without prose maths); 0 static and 0 axe-core violations; 0.233 required decisions per PDF page, of which 6 of 10 pointed at a real error | $0.0034 per PDF page; median 33 s per section (n = 3) |
 | Tables (local mode, no model; off by default) | 197 tables | recall 0.909 (CI 0.857 to 0.958), precision 0.984 (CI 0.953 to 0.994), TEDS 0.866 | no model call |

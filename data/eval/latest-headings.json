@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "task": "headings",
-  "date": "2026-10-14",
+  "date": "2026-11-02",
   "pipeline_version": "0.5.0",
   "prompt_versions": {},
   "models": {
@@ -23,15 +23,15 @@
   "stopped_reason": null,
   "metrics": {
     "gold_headings": 121,
-    "predicted_headings": 113,
+    "predicted_headings": 105,
     "matched": 96,
-    "precision": 0.8495575221238938,
+    "precision": 0.9142857142857143,
     "recall": 0.7933884297520661,
     "recall_ci95": [
       0.7127678362149311,
       0.8559534895067548
     ],
-    "f1": 0.8205128205128206,
+    "f1": 0.8495575221238939,
     "level_accuracy": 0.7395833333333334,
     "precision_by_status": {
       "accepted": {
@@ -39,8 +39,8 @@
         "precision": 0.9690721649484536
       },
       "needs_review": {
-        "n": 16,
-        "precision": 0.125
+        "n": 8,
+        "precision": 0.25
       }
     },
     "recall_by_context": {
@@ -108,53 +108,53 @@
       },
       {
         "id": "physics/2-2-speed-and-velocity",
-        "precision": 0.813953488372093,
+        "precision": 0.8974358974358975,
         "recall": 0.8333333333333334,
         "n_gold": 42,
-        "n_pred": 43,
+        "n_pred": 39,
         "error": null
       },
       {
         "id": "physics/2-3-position-vs-time-graphs",
-        "precision": 0.8275862068965517,
+        "precision": 0.96,
         "recall": 0.7741935483870968,
         "n_gold": 31,
-        "n_pred": 29,
+        "n_pred": 25,
         "error": null
       }
     ],
     "page_errors": {},
     "review_load": {
-      "required_decisions": 6,
-      "required_fixes": 16,
+      "required_decisions": 4,
+      "required_fixes": 8,
       "optional": 20,
-      "none": 102,
+      "none": 110,
       "required_by_kind": {
-        "heading": 6
+        "heading": 4
       },
       "optional_by_kind": {
         "heading": 20
       },
       "required_by_reason": {
-        "heading.repeated_label": 16,
-        "heading.weak_evidence": 16
+        "heading.repeated_label": 8,
+        "heading.weak_evidence": 8
       },
       "optional_by_reason": {
         "heading.weak_evidence": 20
       },
       "sections": 3,
       "pdf_pages": 43,
-      "required_per_section": 2.0,
-      "required_per_pdf_page": 0.1395,
+      "required_per_section": 1.3333,
+      "required_per_pdf_page": 0.093,
       "optional_per_pdf_page": 0.4651,
       "flags": {
-        "units": 103,
-        "required_units": 6,
-        "required_units_wrong": 5,
-        "wrong": 42,
-        "wrong_required": 14,
-        "flag_precision": 0.8333333333333334,
-        "flag_recall": 0.3333333333333333
+        "units": 101,
+        "required_units": 4,
+        "required_units_wrong": 3,
+        "wrong": 34,
+        "wrong_required": 6,
+        "flag_precision": 0.75,
+        "flag_recall": 0.17647058823529413
       },
       "wrong_not_required": [
         {

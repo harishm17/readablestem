@@ -1934,6 +1934,63 @@ development set (`data/gold`, 3 sections of Physics) F1 is unchanged, 0.9344 (pr
 repeated-label groups should stay decisions was measured in four variants on both sets:
 docs/layout.md "Review tiers" has the table and the choice (one decision per group).
 
+### Structure fixes (2026-11-02)
+
+Six layout fixes (docs/layout.md: "The PDF's outline", plain numbered lines, run-in labels,
+maths in headings, page and line joins, the document's spelling of compounds), measured with
+the offline tasks only: `eval pipeline --task headings --fake`, `--task document --fake` (no
+model call; every call is refused, so its equation numbers are 0 and only layout, headings
+and the HTML checks mean anything) and `eval.structure_check`, before (3e2b7cd, a clean
+checkout of main) and after (this branch). Gold: the original development set (3 OpenStax
+Physics sections, 43 PDF pages, 121 gold headings) and the dev part of dev-v2 (28
+documents, 338 PDF pages, 683 gold headings; nothing from the sealed check part). No
+held-out data was used.
+
+| | Original set, before | after | dev-v2 dev, before | after |
+|---|---|---|---|---|
+| heading precision | 0.850 | 0.914 | 0.922 | 0.922 |
+| heading recall | 0.793 | 0.793 | 0.917 | 0.917 |
+| F1 | 0.821 | 0.850 | 0.919 | 0.919 |
+| level accuracy | 0.740 | 0.740 | 0.898 | 0.914 |
+| predicted headings | 113 | 105 | 679 | 679 |
+| required decisions (headings) | 6 | 4 | 59 | 59 |
+
+- Precision on the original set: the 8 fewer predicted headings are repeated "Solution",
+  "Discussion" and "Procedure" labels inside boxes on sections 2.2 and 2.3 (the gold counts
+  them as not headings); the 9 other predicted headings the gold lacks stay, among them the
+  labels on 2.1, a page set mostly in boxes. Recall does not move. 2 fewer required
+  decisions (their groups), and the document task's required decisions go 63 to 61 for the
+  same reason.
+- Level accuracy on dev-v2: the bookmarks of the authored Word and LaTeX documents
+  (`word-lecture`: 17 of its headings, `word-eq-images`: 6) give the author's own levels. The
+  OpenStax pages are printed by Chromium without an outline, so the original set cannot
+  move from this fix.
+- Document task: detection precision, detection recall, split gold equations, static and
+  axe violations are identical on both sets (0.732 / 1.000 on 3 sections; 0.672 / 0.870 on 28
+  documents). Structure check: identical (40 of 40 code blocks exact, 112 of 126 glossary
+  terms found).
+- A first version of the label rule (no inset test) lost 10 gold headings of the authored
+  documents and cost dev-v2 recall 0.9165 to 0.9019 (F1 0.9192 to 0.9112), and a second
+  (inset against the page's edge, not the column's) 2 of them (recall 0.9136). Both were
+  dropped for the inset against the column's edge, which loses none: docs/layout.md "Run-in
+  labels".
+- Not measured by these tasks: page joins, wrapped inline maths and compounds (no gold of
+  their own). A survey of the 67 PDFs in the repository (authored dev-v2 documents and test
+  fixtures, 1 to 8 pages) changed 8 of them: 2 paragraphs joined over a page break (both
+  reading right: "... Aluminium" / "sulfate has the formula ..."), no wrapped inline
+  equation (none occurs in them), and outline reasons on 35 headings in 6 PDFs. The unit
+  tests (`tests/test_layout_structure_fixes.py`) pin each fix on PDFs drawn in the test.
+- `data/eval/baseline-headings.json` and `latest-headings.json` were replaced with the new
+  run on purpose, as on 2026-10-14 (the gate compares them with each other; both only gain,
+  precision 0.850 to 0.914, recall the same); their model fields are the earlier run's
+  because the task calls no model. `make reproduce-rerun` already failed before this change
+  on a clean checkout of main when run here with no key (its headings re-run exited with
+  status 2, and its tables numbers differ from `latest-tables-local.json`); `eval pipeline
+  --task headings --fake` reproduces the numbers above.
+- Sample sizes are small and the gold is OpenStax Physics plus authored documents; none of
+  this is a rate on other documents. The outline fix needs a PDF that has bookmarks, which
+  no OpenStax page print has.
+
 ### Prose scripts, nuclides and pictures of equations (T2-3, T2-4, T2-5, 2026-10-14)
 
 Measured on the dev part of this set only (nothing from the check part was opened, and it was

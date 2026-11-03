@@ -347,14 +347,25 @@ alone they are optional notes, repeated they are one group decision.
 *The narrow rule* (2026-11-02, `_mark_run_in_labels`, `heading_step.run_in_labels`). A
 heading found only by the bold body-size rule (no larger font, no number, no tag), one
 line, at body size (within 5 %), whose text is one of `solution`, `answer`, `discussion`,
-`procedure`, `proof`, `hint` (a trailing full stop or colon aside), and which occurs at
-least twice in the document, is a label: `REASON_RUN_IN_LABEL`, no `HeadingFix`, review
-`none`, written as `<p><strong>` (the fix is the one `repeated_above` gives, reason
-`repeats_heading_above`, which the assembler writes as bold text). It stays out of the
-outline and the repeated-label groups. A bookmark or tag that calls the line a heading
-wins. Cost: a document that really uses "Solution" as a repeated section heading at body
-size loses those headings from the outline; the word list is closed and short for that
-reason, and `Example`, `Strategy`, `Teacher Support` and the like are not in it.
+`procedure`, `proof`, `hint` (a trailing full stop or colon aside), **set in more than 3 pt
+from its column's text edge** (`_text_edges`: inside a box; a section heading sits at the
+margin), and which occurs at least twice in the document, is a label:
+`REASON_RUN_IN_LABEL`, no `HeadingFix`, review `none`, written as `<p><strong>` (the fix is
+the one `repeated_above` gives, reason `repeats_heading_above`, which the assembler writes
+as bold text). It stays out of the outline and the repeated-label groups. A bookmark or tag
+that calls the line a heading wins.
+
+The inset test is there because the first version, without it, was measured and
+rejected: the authored dev-v2 documents set "Solution" and "Example" as real headings
+(LaTeX `\subsubsection*{Solution}`, a Word heading style), at the margin of their column,
+and the rule removed 10 gold headings from them (dev-v2 recall 0.9165 to 0.9019, F1 0.9192
+to 0.9112). The edge is the column's, not the page's: on a two-column page measured against
+the page, the right column's whole text looked indented and two Word headings were lost.
+With the inset against the column the authored documents are untouched. What is left: a
+label that sits at the margin of a page mostly set in boxes (the two "Procedure" labels
+of OpenStax 2.1), and a document that really indents a repeated "Solution" heading, which
+loses those headings from the outline; the word list is closed and short for that reason
+(`Example`, `Strategy`, `Teacher Support` and the like are not in it).
 
 **Known-plain letters** (`Element.regular_letters`, equations only). The letters of an
 equation's text that the PDF draws, not bold, in a font known to have a bold face

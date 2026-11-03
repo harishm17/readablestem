@@ -11,7 +11,7 @@ Evidence and confidence (also in docs/layout.md):
 |---------------------------------------------------|------|---------|
 | larger font (>= 1.15 x body text)                 | 0.90 | yes     |
 | ... plus a section number ("2.3", "Chapter 2")    | 0.95 | yes     |
-| tagged heading (the PDF's own tags: H1-H6)       | 0.90 | yes     |
+| tagged heading (the PDF's own tags: H1-H6), or a bookmark | 0.90 | yes     |
 | ... plus a section number                         | 0.95 | yes     |
 | bold body-size line, or a standalone numbered line | 0.60 | no      |
 | ... plus a section number                         | 0.88 | yes     |
