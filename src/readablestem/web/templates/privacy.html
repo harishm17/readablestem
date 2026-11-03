@@ -2,6 +2,7 @@
 {% block title %}Privacy{% endblock %}
 {% block description %}How ReadableSTEM handles the course PDFs you upload: what you may upload, who sees your documents, when they are deleted and what is logged.{% endblock %}
 {% block content %}
+{% from "_recipients.html" import retention %}
 <h1>Privacy</h1>
 <p class="hint">This page describes how the beta works today. If it changes in a way that
   matters to you, see "Changes to this notice" below.</p>
@@ -62,41 +63,32 @@
 
 <h2>Who else sees your documents</h2>
 <ul>
-  {% if provider == "anthropic" %}
-  {# What is known: the commercial API terms say inputs and outputs are not used to train
-     models by default; Anthropic's standard API retention is 30 days; content its safety
-     systems flag can be kept longer. No zero-retention agreement is in place for the beta.
-     Re-read Anthropic's policy page when you launch. #}
-  <li><strong>Anthropic.</strong> To propose LaTeX for equations and alt text for figures{% if tables_on %},
+  {% for r in recipients %}
+  {% if "model" in r.purposes %}
+  <li><strong>{{ r.name }}.</strong> To propose LaTeX for equations and alt text for figures{% if tables_on %},
     and to rebuild tables{% endif %}, images of those parts of the page, and a little of the
-    nearby text, are sent to Anthropic's API (the Claude models).{% if notation_on %} For a document you upload
+    nearby text, are sent to {{ r.name }}'s API{% if r.name == "Anthropic" %} (the Claude models){% endif %}.{% if notation_on %} For a document you upload
     for one of your courses, that course's notation (its symbols and what they mean) is
     sent with the equations.{% endif %}{% if image_pages_on %} If you tick “Convert scanned or
-    handwritten pages”, a picture of each scanned or handwritten page is sent as well.{% endif %}
-    Anthropic states that it does not use API data to train its models by
-    default. Anthropic's published policy is to delete API inputs and outputs from its systems
-    within 30 days (longer for material its safety systems flag), so a document you delete here
-    can remain with Anthropic for up to that long; see Anthropic's own API data policies.</li>
-  {% else %}
-  <li><strong>OpenAI.</strong> To propose LaTeX for equations and alt text for figures{% if tables_on %},
-    and to rebuild tables{% endif %}, images of those parts of the page, and a little of the
-    nearby text, are sent to OpenAI's API.{% if notation_on %} For a document you upload
-    for one of your courses, that course's notation (its symbols and what they mean) is
-    sent with the equations.{% endif %}{% if image_pages_on %} If you tick “Convert scanned or
-    handwritten pages”, a picture of each scanned or handwritten page is sent as well.{% endif %}
-    OpenAI states that it does not use API data to train its models by
-    default; see OpenAI's own API data policies for how long it keeps requests.</li>
-  {% endif %}
-  <li><strong>Railway</strong> hosts the app and its database (Railway Postgres), in its
+    handwritten pages”, a picture of each scanned or handwritten page is sent as well.{% endif %}{% if "handwriting" in r.purposes %}
+    A close-up picture of a handwritten expression can also be sent, to be read a second time.{% endif %}
+    {{ retention(r.name) }}</li>
+  {% elif "handwriting" in r.purposes %}
+  <li><strong>{{ r.name }}.</strong> A close-up picture of a handwritten expression can be sent
+    to {{ r.name }}'s API, to be read a second time. No other text goes with it.
+    {{ retention(r.name) }}</li>
+  {% elif "hosting" in r.purposes %}
+  <li><strong>{{ r.name }}</strong> hosts the app and its database (Railway Postgres), in its
     United States region.</li>
-  {% if tracing %}
+  {% elif "tracing" in r.purposes %}
   {# Tracing is off for the beta (TRACING_ENABLED=false). Before turning
      it on, set the Langfuse project retention (docs/operations.md, "Tracing") and state it
      in this item. #}
-  <li><strong>Langfuse</strong> receives performance records of each conversion: timings,
+  <li><strong>{{ r.name }}</strong> receives performance records of each conversion: timings,
     model names, token counts, costs and error categories, with random ids. They never
     contain document text, images, LaTeX, alt text, file names or your email address.</li>
   {% endif %}
+  {% endfor %}
   <li>No one else. We do not use your uploads to train models, sell them or share them
     beyond the services named here.</li>
 </ul>
@@ -196,7 +188,7 @@
 </ul>
 <h2>Where it is processed</h2>
 <p>The app and its database run on Railway, in its United States region. Images and nearby
-  text of equations and figures are sent to {% if provider == "anthropic" %}Anthropic{% else %}OpenAI{% endif %} in
+  text of equations and figures are sent to {{ recipients|selectattr("gets_documents")|map(attribute="name")|join(" and ") }} in
   the United States for processing, as described above. If you are outside the United
   States, your documents are therefore transferred there.</p>
 

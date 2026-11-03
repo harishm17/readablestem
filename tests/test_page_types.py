@@ -70,7 +70,9 @@ def refusal(path: Path, **kwargs) -> str | None:
         ("painted_over.pdf", ["mixed_hidden_text"] * 3, [None] * 3, None),
         # A CropBox that trims a scan's margins leaves a picture of the whole page. With a
         # short typed header and nothing hidden it is kept as an image (its header read,
-        # not called a scan) and never refused; so is a title slide on a photo.
+        # not called a scan) and never refused; so is a title slide on a photo. (A header
+        # that does not cover the picture makes it a page the image pass reads, as a scan:
+        # `page_type.reads_image`, tests/test_page_type_text_coverage.py.)
         ("cropped_scan.pdf", ["scan_no_text"], ["unread_page"], None),
         ("title_slide.pdf", ["scan_no_text"], ["unread_page"], None),
         # Square waves are drawings, not paper rules.

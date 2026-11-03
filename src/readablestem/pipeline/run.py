@@ -922,10 +922,16 @@ class _Run:
             if not done:
                 return
             # (A failed step last: the others that finished with it are recorded first.)
-            for future in sorted(
-                done, key=lambda f: not f.cancelled() and f.exception() is not None
-            ):
-                self.record(future, self.futures.pop(future))
+            try:
+                for future in sorted(
+                    done, key=lambda f: not f.cancelled() and f.exception() is not None
+                ):
+                    self.record(future, self.futures.pop(future))
+            except FATAL_ERRORS:
+                # The failed step's own error surfaces here, usually before the steps that
+                # were still running beside it were collected: keep those first.
+                self.keep_finished()
+                raise
             self.raise_if_fatal()
             if self.stop.scope is not None:
                 for future in self.futures:
@@ -1472,9 +1478,19 @@ def _convert(
             image_built: dict[int, image_page.Built] = {}
             image_summary: ImagePagesSummary | None = None
             if options.image_pages:
+                # (a picture under a text layer that does not cover it is kept as an
+                # unread page and read as a scan: `page_type.reads_image`)
+                to_read = {
+                    n: page_type.SCANNED_PAGE
+                    if reason == page_type.UNREAD_PAGE
+                    and (kind := (getattr(doc, "page_types", None) or {}).get(n)) is not None
+                    and page_type.reads_image(kind)
+                    else reason
+                    for n, reason in kept.items()
+                }
                 image_built, image_summary = _image_pages_pass(
                     pdf_bytes,
-                    kept,
+                    to_read,
                     boxes,
                     client=client,
                     settings=settings,
@@ -1484,8 +1500,14 @@ def _convert(
                 )
                 for number in image_built:
                     kept.pop(number)  # read: no longer an image kept whole
+                # What layout read from a page the pass read (the watermark, header or page
+                # number over a photographed page) is the pass's to read again: the page
+                # would hold that text twice.
                 elements = sorted(
-                    [*elements, *(e for b in image_built.values() for e in b.elements)],
+                    [
+                        *(e for e in elements if e.page not in image_built),
+                        *(e for b in image_built.values() for e in b.elements),
+                    ],
                     key=lambda e: (e.page, e.order),
                 )
             page_list = list(dict.fromkeys([*doc.pages, *(e.page for e in elements)]))
@@ -1534,6 +1556,8 @@ def _convert(
         finally:
             cached.release()  # also when analysis, a step or `progress` failed
 
+        if settings.image_pages_maths_always_required and image_built:
+            image_page.enforce_maths_required(elements, run.fixes)
         ordered = _ordered_fixes(elements, run.fixes)
         labels = _page_labels(pdf_bytes, page_list)
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]

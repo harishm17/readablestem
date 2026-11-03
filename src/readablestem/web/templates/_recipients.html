@@ -1,0 +1,17 @@
+{# Wording about the companies in `recipients` (web/recipients.py), shared by the privacy page
+   and the account deletion notes. What is known: the commercial API terms of both say inputs and
+   outputs are not used to train models by default; Anthropic's standard API retention is 30
+   days and content its safety systems flag can be kept longer (no zero-retention agreement is
+   in place for the beta; re-read its policy page when you launch); OpenAI requests are sent with
+   store=False. A new provider needs its own branch here, and a name in web/recipients.py. #}
+{% macro retention(name) %}
+{% if name == "Anthropic" %}Anthropic states that it does not use API data to train its models by
+    default. Anthropic's published policy is to delete API inputs and outputs from its systems
+    within 30 days (longer for material its safety systems flag), so a document you delete here
+    can remain with Anthropic for up to that long; see Anthropic's own API data policies.{% elif name == "OpenAI" %}OpenAI states that it does not use API data to train its models by
+    default; see OpenAI's own API data policies for how long it keeps requests.{% endif %}
+{% endmacro %}
+
+{% macro retention_short(name) %}
+{% if name == "Anthropic" %}Anthropic's published policy is to delete API inputs and outputs within 30 days, longer for material its safety systems flag.{% elif name == "OpenAI" %}For OpenAI, see its API data policies.{% endif %}
+{% endmacro %}

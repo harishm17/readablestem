@@ -19,10 +19,14 @@ arrived at; read them by question, not front to back.
 | How are formulas, ions and reactions found, written (`\ce`) and read aloud? | [chemistry.md](chemistry.md) |
 | Can scanned and handwritten pages be converted, how well, and at what cost? | [eval-image-pages.md](eval-image-pages.md); [decisions/0007-image-pages.md](decisions/0007-image-pages.md) |
 | How well does it read real human handwriting (an answer key of ink with known LaTeX), and may the app advertise it? | [eval-handwriting.md](eval-handwriting.md) |
+| How are volunteers' hand copies of OpenStax examples collected, with answer keys from the source, and published only with consent? | [data/handwriting-copy/README.md](../data/handwriting-copy/README.md) |
+| What is reader B (a second reading of a handwritten expression), what does it cost, and what must change before one is turned on? | [math-readers.md](math-readers.md) |
 | How does it do on real LaTeX PDFs from arXiv (not Chromium prints), against the chatbot recipe? | [eval-realworld.md](eval-realworld.md) |
 | Why did it lose equations to the chatbot recipe on real papers, what was fixed, and what did a fresh set of papers say? | [eval-equation-rootcause.md](eval-equation-rootcause.md) |
 | What did the second round of equation fixes do, on a third registered set of papers? | [eval-equation-round2.md](eval-equation-round2.md) |
 | Why did it trail a chatbot on equations, and what did reading each inline equation with its line do? | [eval-equation-round3.md](eval-equation-round3.md) |
+| Which 50 figures will long descriptions and chart data tables be judged on, how were they drawn, and what is pre-registered (draft)? | [eval-figures-long.md](eval-figures-long.md) |
+| Why are maths in table cells missed, do the misses carry glyph evidence the rules ignore, and why were wrong equations not flagged? (no model, recorded runs) | [eval-equation-diagnostics.md](eval-equation-diagnostics.md) |
 
 ## If you want to know how it is built
 
@@ -34,7 +38,9 @@ arrived at; read them by question, not front to back.
 | How do I run, test and extend it? | [development.md](development.md) |
 | What is the threat model, what protects it, and how do I report a problem? | [security.md](security.md) |
 | What do I give an accessibility or procurement office? | [vendor-information.md](vendor-information.md), and the review record each document has (web.md "The review record") |
+| What is in the EPUB export? | [output.md](output.md), "The EPUB export" |
 | How do I test the Canvas export in a real Canvas? | [canvas-sandbox-test.md](canvas-sandbox-test.md) |
+| How do I check what a screen reader says (VoiceOver in Safari) on the demo, a converted file and the review screen? | [screen-reader-test.md](screen-reader-test.md) |
 
 ## If you want to know why a choice was made
 

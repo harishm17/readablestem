@@ -221,7 +221,7 @@ def test_launch_check_wants_tables_and_notation_in_the_privacy_notice(tmp_path, 
     assert launch.launch_blockers(settings=make_settings(tmp_path)) == [
         item for item in launch.launch_blockers() if "privacy" in item
     ]
-    privacy.write_text("<p>... and to rebuild tables ... the course's notation ...</p>")
+    privacy.write_text("<p>OpenAI ... and to rebuild tables ... the course's notation ...</p>")
     assert not any("privacy.html" in item for item in launch.launch_blockers(settings=on))
 
 
@@ -415,3 +415,27 @@ def test_pages_do_not_offer_word_when_libreoffice_is_missing(tmp_path):
     assert "data-office" not in app and ".docx" not in app
     assert "Word or PowerPoint" not in privacy and "LibreOffice" not in privacy
     assert "Only PDF files are taken" in limits
+
+
+def test_launch_check_lists_a_half_set_microsoft_sign_in(tmp_path):
+    from fixtures.web.support import make_settings
+    from readablestem.ops import launch
+
+    tenant = "11111111-1111-4111-8111-111111111111"
+
+    def microsoft_items(**values):
+        settings = make_settings(tmp_path, **values)
+        return [i for i in launch.launch_blockers(settings=settings) if "MS_" in i]
+
+    assert microsoft_items() == []
+    assert (
+        microsoft_items(ms_client_id="app", ms_client_secret="s", ms_allowed_tenants=[tenant]) == []
+    )
+    only_tenants = microsoft_items(ms_allowed_tenants=[tenant])
+    assert len(only_tenants) == 1 and "Microsoft sign-in is off" in only_tenants[0]
+    id_only = microsoft_items(ms_client_id="app")
+    assert len(id_only) == 1 and "MS_CLIENT_ID is set but MS_CLIENT_SECRET is not" in id_only[0]
+    secret_only = microsoft_items(ms_client_secret="s", ms_allowed_tenants=[tenant])
+    assert len(secret_only) == 1 and "MS_CLIENT_ID is not set" not in secret_only[0]
+    no_tenants = microsoft_items(ms_client_id="app", ms_client_secret="s")
+    assert len(no_tenants) == 1 and "lists no tenant" in no_tenants[0]
