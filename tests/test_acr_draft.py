@@ -30,7 +30,7 @@ LEVEL_AA = re.findall(
 # The rows whose answer depends on what a screen reader says (and the others
 # the VoiceOver sheet feeds with a judgement of wording): they stay "Not yet evaluated".
 NEEDS_VOICEOVER = {
-    "1.1.1", "1.3.1", "1.3.2", "2.4.4", "4.1.2",  # level A
+    "1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.2", "2.4.4", "3.3.1", "4.1.2",  # level A
     "2.4.6", "3.1.2", "4.1.3",  # level AA
 }  # fmt: skip
 

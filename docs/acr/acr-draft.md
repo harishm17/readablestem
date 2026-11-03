@@ -72,8 +72,8 @@ of the sheet that feeds it (R1 to R17).
 | 2.2.1 Timing Adjustable | Supports | The only time limit is the sign-in session, 7 days (`SESSION_MAX_AGE_S`, `web/app.py`): longer than 20 hours. Text typed when a session ends is kept (`test_typed_text_survives_the_session_ending`, `tests/test_web_review_ux_browser.py`). |
 | 2.2.2 Pause, Stop, Hide | Partially Supports | The job page's status box (every 3 s) and My documents (every 5 s, only while a document is converting) update by themselves with no control to pause them. The updates do not move focus (`test_the_documents_list_and_the_job_status_refresh_without_taking_focus_away`; `test_the_steps_update_without_touching_the_live_region`, `tests/test_web_job_page_browser.py`), and each page says the list can be refreshed by hand. Whether the progress counts as essential has not been decided. Nothing blinks or moves otherwise. |
 | 2.3.1 Three Flashes or Below Threshold | Supports | No animation or flashing content: `app.css` declares no `@keyframes`, and under `prefers-reduced-motion` all transitions are off (`test_forced_colors_and_reduced_motion_keep_the_controls_visible_and_still`, `tests/test_web_scale_browser.py`). |
-| 2.4.1 Bypass Blocks | Supports | Every app page starts with a skip link that is the first Tab stop, is visible when focused, and puts focus in `main` (`test_every_page_can_be_walked_with_the_tab_key`, skip-link check, every page in scope); the review screen adds "Skip to the decision". Header, main and footer are landmarks. VoiceOver (R3) will confirm what it says. |
-| 2.4.2 Page Titled | Supports | Titles are unique per page (`test_page_titles_are_unique`, `tests/test_web_pages.py`) and say where the person is; the job page title changes when conversion finishes (`test_finish_notice_opt_in_title_and_announcement`). VoiceOver (R17) will confirm what is heard first. |
+| 2.4.1 Bypass Blocks | Not yet evaluated | VoiceOver (R3). Already verified by the keyboard walk: every app page starts with a skip link that is the first Tab stop, is visible when focused, and puts focus in `main` (`test_every_page_can_be_walked_with_the_tab_key`, skip-link check, every page in scope); the review screen adds "Skip to the decision". Header, main and footer are landmarks.  |
+| 2.4.2 Page Titled | Not yet evaluated | VoiceOver (R17). Already verified: titles are unique per page (`test_page_titles_are_unique`, `tests/test_web_pages.py`) and say where the person is; the job page title changes when conversion finishes (`test_finish_notice_opt_in_title_and_announcement`).  |
 | 2.4.3 Focus Order | Supports | The walk checks the page's parts are visited header, main, footer and that Shift+Tab reverses the order, on every page in scope. After a decision, focus goes to the next decision's heading (`test_the_whole_review_is_decided_and_undone_by_keyboard_with_focus_on_the_next_decision`, `test_focus_moves_to_the_next_decisions_heading_after_each_decision`). On the review screen the order is decision, optional checks, page image, by design (see 1.3.2). |
 | 2.4.4 Link Purpose (In Context) | Not yet evaluated | VoiceOver (R5). The walk finds every link has a name; row actions carry their target in visually hidden text ("Delete Vectors"). Whether each reads well out of context is a person's judgement. |
 | 2.5.1 Pointer Gestures | Supports | No path-based or multi-point gesture: `app.js` and the templates use no touch, pointer-move or drag handlers; everything is a click, a key or a form. |
@@ -84,7 +84,7 @@ of the sheet that feeds it (R1 to R17).
 | 3.2.1 On Focus | Supports | The walk fails if moving focus changes the page address, on every page in scope (`test_every_page_can_be_walked_with_the_tab_key`). |
 | 3.2.2 On Input | Supports | No `change` handler submits a form or navigates: choices (the kind filter, the language, a symbol's replacement) take effect only on their own button; `app.js` change and input handlers only mark a form edited, check a file, or save a draft, and the live check of an edit posts to a status line without moving focus or leaving the page. |
 | 3.2.6 Consistent Help | Supports | One footer on every page (`base.html`) with the feedback link in the same place, when a feedback address is configured. |
-| 3.3.1 Error Identification | Supports | After a failed form the error summary takes focus, names each problem and links to its field (`test_the_error_summary_takes_focus_after_every_failed_form`; the keyboard walk repeats it for sign-in, upload and a refused edit); a file the browser can see is wrong is said at once in a live region. VoiceOver (R15) will confirm what is heard. |
+| 3.3.1 Error Identification | Not yet evaluated | VoiceOver (R15). Already verified: after a failed form the error summary takes focus, names each problem and links to its field (`test_the_error_summary_takes_focus_after_every_failed_form`; the keyboard walk repeats it for sign-in, upload and a refused edit); a file the browser can see is wrong is said at once in a live region.  |
 | 3.3.2 Labels or Instructions | Supports | The walk finds a name on every stop (`test_every_page_can_be_walked_with_the_tab_key`); axe's `label` and `form-field-multiple-labels` rules pass on every state; hints are tied to fields with `aria-describedby`. |
 | 3.3.7 Redundant Entry | Not yet evaluated | Not reviewed. |
 | 4.1.1 Parsing | Not Applicable | Removed from WCAG 2.2. |
@@ -133,8 +133,8 @@ of the sheet that feeds it (R1 to R17).
 ## 8. What is still needed before this can be published
 
 1. A VoiceOver session in Safari ([../screen-reader-test.md](../screen-reader-test.md)), by the
-   owner. It feeds the rows marked VoiceOver: 1.1.1, 1.3.1, 1.3.2, 2.4.4, 2.4.6, 3.1.2, 4.1.2,
-   4.1.3, and confirms 2.4.1, 2.4.2, 3.3.1.
+   owner. It feeds the rows marked VoiceOver: 1.1.1, 1.3.1, 1.3.2, 2.4.1, 2.4.2, 2.4.4, 2.4.6, 3.1.2, 3.3.1, 4.1.2,
+   4.1.3.
 2. A look by a person at the rows marked "Not reviewed": 1.3.3, 1.4.13, 3.2.4, 3.3.7, and a
    decision on 2.2.2.
 3. At publication, every **Not yet evaluated** row is given a tested level (the form allows "Not
@@ -154,7 +154,7 @@ focus lands where the action happened (`test_a_page_is_left_out_and_put_back_by_
 
 ## 10. Counts
 
-Level A, 32 rows: Supports 18, Partially Supports 1, Not Applicable 6, Not yet evaluated 7 (of
-which need VoiceOver 5).
+Level A, 32 rows: Supports 15, Partially Supports 1, Not Applicable 6, Not yet evaluated 10 (of
+which need VoiceOver 8).
 Level AA, 24 rows: Supports 16, Partially Supports 1, Not Applicable 2, Not yet evaluated 5 (of
 which need VoiceOver 3).
