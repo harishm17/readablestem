@@ -1,0 +1,41 @@
+% Layout fixture: Beamer two-column frames and a table with maths. Written for
+% ReadableSTEM's tests (MIT); no third-party text.
+\documentclass{beamer}
+\usepackage{amsmath}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\begin{document}
+
+\begin{frame}{Two Views of a Spring}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      Force view
+      \begin{itemize}
+        \item Hooke's law: $F = -k x$.
+        \item The force points to the origin.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      Energy view
+      \begin{itemize}
+        \item Stored energy: $U = \tfrac{1}{2} k x^2$.
+        \item The energy is zero at $x = 0$.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Measured Quantities}
+  \centering
+  \begin{tabular}{lcc}
+    Quantity & Symbol & Value \\
+    \hline
+    Mass & $m$ & $0.50$ kg \\
+    Stiffness & $k$ & $8.0$ N/m \\
+    Frequency & $\omega = \sqrt{k/m}$ & $4.0$ rad/s \\
+    Period & $T = 2\pi/\omega$ & $1.57$ s \\
+  \end{tabular}
+\end{frame}
+
+\end{document}
