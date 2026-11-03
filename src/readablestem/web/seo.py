@@ -92,13 +92,14 @@ GUIDES = (
     ),
 )
 PUBLIC_PAGES = (
-    PublicPage("/", "2026-11-02"),
+    PublicPage("/", "2026-11-03"),
     PublicPage("/demo", "2026-10-14"),
     PublicPage("/limits", "2026-10-22"),
     PublicPage(GUIDES_INDEX, "2026-11-02"),
     PublicPage("/help/posting", "2026-10-27"),
-    PublicPage("/privacy", "2026-10-27"),
-    PublicPage("/terms", "2026-10-20"),
+    PublicPage("/privacy", "2026-11-03"),
+    PublicPage("/terms", "2026-11-03"),
+    PublicPage("/for-accessibility-offices", "2026-11-03"),
     PublicPage(ADA_GUIDE, "2026-10-28", "2026-10-28"),
     PublicPage(COMPARE_GUIDE, "2026-10-28", "2026-10-28"),
 )
@@ -202,7 +203,7 @@ def llms_txt(site: str, showcase: bool) -> str:
         "",
         "It assists; it does not certify. Nothing here establishes conformance with WCAG, the "
         "ADA or any other standard, and the output still needs a person to look at it. "
-        f"It is a free, open-source beta run by {AUTHOR}, an individual developer; anyone "
+        f"It is a free, open-source beta built and maintained by {AUTHOR}; anyone "
         "with a Google account can sign in, and the demo needs no sign-in.",
         "",
         "## The service",
@@ -213,6 +214,8 @@ def llms_txt(site: str, showcase: bool) -> str:
         f"- [Posting in your course]({site}/help/posting): sharing the HTML file with students",
         f"- [Privacy]({site}/privacy): what happens to uploaded documents",
         f"- [Terms]({site}/terms)",
+        f"- [For accessibility offices]({site}/for-accessibility-offices): where a "
+        "document goes, who receives it, how long it is kept, and what the tool does not do",
         "",
         "## Guides",
         "",
@@ -243,7 +246,7 @@ def llms_txt(site: str, showcase: bool) -> str:
         f"- [Source code]({SOURCE_URL}): the code is MIT; the hosted service is offered "
         "under AGPL-3.0 terms",
         f"- [README]({SOURCE_URL}/blob/main/README.md)",
-        f"- [{AUTHOR}]({AUTHOR_URL}): the developer",
+        f"- [{AUTHOR}]({AUTHOR_URL}): the author",
         f"- [Case study]({CASE_STUDY_URL})",
         "",
     ]

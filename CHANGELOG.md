@@ -8,6 +8,20 @@
   checkboxes to leave places out. Applied as one write through the edit checks per equation, never an accept
   (each equation stays a required decision), one `relabel` review record per equation shown as one row in the
   review record, one Undo. Linked from the review screen and the list view. docs/web.md, docs/eval-handwriting.md.
+## Unreleased: wording and a page for accessibility offices (branch trust/wording-and-offices)
+
+- Copy: the "individual developer" and "not a company or a university" framing is gone from the landing, privacy,
+  terms and login pages, `llms.txt` and the README; the landing page has an About block ("Built and maintained by
+  Harish Manoharan. The code is open source."). The listed strings are in the pull request.
+- Licence wording (ADR 0003 addendum): the PyMuPDF/AGPL sentence moved from every footer to the Terms
+  ("Open source", `/terms#open-source`); the footer keeps the "Source code" link and gains an "Open source" link.
+  The demo and showcase notes link the source without the sentence.
+- New public page `/for-accessibility-offices` (`web/offices.py`): data flow with a text equivalent, the
+  companies that receive data (from `web/recipients.py`, as `/privacy`), retention from the settings, no training
+  and `store`, student records (FERPA), what the tool does not do, a pilot checklist, and a one-page summary to
+  download (`/for-accessibility-offices/summary`). Footer link, sitemap, `llms.txt`.
+- `docs/vendor-information.md` refreshed: current accuracy numbers with sample size, scanned and handwritten
+  pages, files, no conformance report, no claim of conformance (kept under 900 words).
 ## Unreleased: page witness, why it changed nothing (branch eq/witness-diagnosis)
 
 - Page witness (off: `FEATURE_PAGE_WITNESS`): when the crop's reading and the witness's tie on the letters, digits

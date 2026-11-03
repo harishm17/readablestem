@@ -75,7 +75,7 @@
 
 <h2>Who can use it</h2>
 {% if signup_open %}
-<p>ReadableSTEM is a free beta run by Harish Manoharan, an individual developer. Anyone with
+<p>ReadableSTEM is a free beta. Anyone with
   a Google account can sign in and try it{% if microsoft_login %}, and so can people with a
   Microsoft account from a university that is set up for it{% endif %}. Signing in the first
   time makes your account. New accounts have daily limits: {{ open_page_quota }} pages a day,
@@ -95,5 +95,10 @@
   separately to let the developer look at the results for {{ opt_in_days }} days to improve
   the tool. You can delete it yourself at any time. We do not use your uploads to train models.
   ReadableSTEM assists you; it does not replace your judgement or a full accessibility review of your
-  course. <a href="/privacy">Read the privacy notice</a>.</p>
+  course. <a href="/privacy">Read the privacy notice</a>. Working for an accessibility
+  office? <a href="/for-accessibility-offices">See the page for accessibility offices</a>.</p>
+
+<h2>About</h2>
+<p>Built and maintained by Harish Manoharan. The code is open source:
+  <a href="{{ source_url }}">source code on GitHub</a>.</p>
 {% endblock %}

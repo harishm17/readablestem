@@ -477,7 +477,16 @@ def long_named_job(site, browser) -> str:
     return job_id
 
 
-PUBLIC = ("/", "/privacy", "/terms", "/limits", "/status", "/login", "/dev-login")
+PUBLIC = (
+    "/",
+    "/privacy",
+    "/terms",
+    "/limits",
+    "/for-accessibility-offices",
+    "/status",
+    "/login",
+    "/dev-login",
+)
 
 
 def _reflow_params():
