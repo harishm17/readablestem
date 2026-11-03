@@ -17,8 +17,9 @@
   (`page_labels.pdf_label`); it was refused as "<FEFF0031>" and the page markers fell back to the
   footline number.
 - Tests: `tests/test_layout_slides.py` and `tests/fixtures/layout/latex/slides_steps.tex` with its
-  PDF; six of the strict xfails of `tests/test_layout_beamer_math.py` now pass (one test was reworded: a frame's title is a heading once). The pipeline
-  version is not bumped here.
+  PDF; six of the strict xfails of `tests/test_layout_beamer_math.py` now pass (one test was reworded: a frame's title is a heading once).
+- Pipeline version 0.5.2 to 0.5.3: deck output and ligature text change; results from 0.5.2 load
+  unchanged.
 ## Unreleased: symbol inventory (branch hw/symbol-inventory)
 
 - Symbols screen (`GET/POST /jobs/{id}/symbols`, `web/inventory.py`, `routes/inventory.py`): for a document
