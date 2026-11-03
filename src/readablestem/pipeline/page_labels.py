@@ -68,6 +68,22 @@ def _to_roman(number: int, upper: bool) -> str:
     return out.upper() if upper else out
 
 
+_UTF16_HEX = re.compile(r"<FEFF((?:[0-9A-Fa-f]{4})*)>")
+
+
+def pdf_label(page: pymupdf.Page) -> str | None:
+    """The label the PDF gives `page`, cleaned (`clean_label`). PyMuPDF returns a label the
+    PDF writes as UTF-16 (xdvipdfmx, hyperref: every Beamer deck made with Tectonic) as the
+    string "<FEFF0031>", which is not a label; it is decoded here."""
+    text = page.get_label()
+    if match := _UTF16_HEX.fullmatch((text or "").strip()):
+        try:
+            text = bytes.fromhex(match[1]).decode("utf-16-be")
+        except ValueError:
+            return None
+    return clean_label(text)
+
+
 def clean_label(text: str | None) -> str | None:
     """The label if it is short and made of letters, digits and "." or "-"; else None."""
     label = (text or "").strip()
@@ -131,7 +147,7 @@ def read(pdf_bytes: bytes, pages: Iterable[int]) -> dict[int, str]:
                 continue
             with contextlib.suppress(Exception):
                 page = doc[index]
-                if label := clean_label(page.get_label()):
+                if label := pdf_label(page):
                     labels[index] = label
                 elif (number := _margin_number(page)) is not None:
                     numbers[index] = number

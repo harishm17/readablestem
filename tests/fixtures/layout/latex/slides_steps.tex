@@ -1,0 +1,53 @@
+% Layout fixture: a deck with every kind of overlay step and a header and footer bar theme.
+% \pause and \item<n-> add to the earlier steps (an earlier page is all on the last one);
+% \only<1>{..}\only<2>{..} replaces text (the earlier page has text the last one lacks);
+% \uncover shows more of the same slide. Written for ReadableSTEM's tests (MIT).
+\documentclass{beamer}
+\usepackage{amsmath}
+\usetheme{Warsaw}
+\setbeamertemplate{navigation symbols}{}
+
+\title{Waves and Oscillations}
+\author{R. Example}
+
+\begin{document}
+
+\section{Waves}
+\begin{frame}{Wave Speed}
+  A wave of wavelength $\lambda$ and frequency $f$ travels at
+  \pause
+  \begin{equation*}
+    v = \lambda f.
+  \end{equation*}
+  \pause
+  Longer waves move faster at a fixed frequency.
+\end{frame}
+
+\begin{frame}{Cases}
+  \only<1>{Light waves need no medium.}%
+  \only<2>{Sound waves need a medium.}
+\end{frame}
+
+\begin{frame}{Checks}
+  \begin{itemize}
+    \item<1-> The period is $T = 1/f$.
+    \item<2-> The angular frequency is $\omega = 2\pi f$.
+    \item<3-> The wave number is $k = 2\pi/\lambda$.
+    \item<4-> Speed is $v = \omega/k$.
+  \end{itemize}
+\end{frame}
+
+\section{Superposition}
+\begin{frame}{Uncovered}
+  \uncover<1->{Two waves add.}
+
+  \uncover<2->{Where crests meet, the sum is larger.}
+
+  \uncover<3->{Where a crest meets a trough, it cancels.}
+\end{frame}
+
+\begin{frame}{Summary}
+  Frequency, wavelength and speed are linked by $v = \lambda f$.
+\end{frame}
+
+\end{document}

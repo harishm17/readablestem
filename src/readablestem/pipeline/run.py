@@ -181,7 +181,11 @@ log = logging.getLogger(__name__)
 # The MathML of an equation with chemistry in it (and `^\circ`, `\overline`, `\xrightarrow`)
 # changes; its LaTeX does not, and review carry compares the LaTeX, so revised uploads carry what
 # is unchanged. Results from 0.5.1 load unchanged; their MathML keeps the old shape.
-PIPELINE_VERSION = "0.5.2"
+# 0.5.3 (2026-11-03): slide decks are read frame by frame (`pipeline/slides.py`): an overlay step
+# repeated on its frame's last page is not read, frame titles are headings, headline furniture is
+# dropped. Every PDF: a ligature's letters come out in order ("Stiffness", not "Stifnf ess"), and
+# UTF-16 page labels are read. Results from 0.5.2 load unchanged.
+PIPELINE_VERSION = "0.5.3"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

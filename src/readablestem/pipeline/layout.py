@@ -36,6 +36,10 @@ How a page is read (thresholds and known failure modes: docs/layout.md):
    caption within reach is attached.
 7. Text is document content: the inline-marker brackets are replaced by look-alikes
    wherever they occur in it, so only real inline equations have markers.
+8. Slide decks (`pipeline/slides.py`): a Beamer file, or slide-shaped pages that share page
+   labels, is read frame by frame: overlay steps that a frame's last page repeats are not
+   read, frame titles are headings, the headline and slide numbers are dropped, and short
+   two-column frames are read left then right (docs/layout.md "Slide decks").
 
 Untrusted input: MuPDF is C code parsing bytes from the internet, and some damaged files
 make it abort the whole process (a glibc double free while rendering). Before a page is
@@ -90,8 +94,10 @@ from readablestem.pipeline import (
     equation_images,
     hyphens,
     outline,
+    page_labels,
     page_type,
     script_marks,
+    slides,
     tables,
 )
 from readablestem.pipeline import options as run_options
@@ -389,6 +395,10 @@ _LOCK = threading.RLock()  # PyMuPDF is not thread-safe: one PyMuPDF call at a t
 # before a unit or a parenthesis of the sentence) apply only then. Set by `_analyze_document`
 # under `_LOCK`; a Chromium print of MathML or a Word file is read as before.
 _TEX_MADE = False
+# The document is a slide deck (`slides.detect`): the reading rules that suit a slide (a column
+# of two lines is a column; a line of maths that ends a wrapped bullet is part of it) apply
+# only then. Set by `_analyze_document` under `_LOCK` and cleared with `_TEX_MADE`.
+_SLIDE_DECK = False
 # How the document spells its own compounds (`hyphens.document_spellings`), for the hyphen at
 # the end of a line: pairs it hyphenates inside a line, words it writes whole. Set by
 # `_analyze_document` under `_LOCK` and cleared with `_TEX_MADE`.
@@ -469,8 +479,8 @@ def analyze(
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
             finally:
-                global _TEX_MADE, _COMPOUNDS, _WHOLE_WORDS
-                _TEX_MADE = False
+                global _TEX_MADE, _SLIDE_DECK, _COMPOUNDS, _WHOLE_WORDS
+                _TEX_MADE = _SLIDE_DECK = False
                 _COMPOUNDS = _WHOLE_WORDS = frozenset()
                 doc.close()
         finally:
@@ -696,7 +706,7 @@ def line_glyphs(
             span: list[tuple[str, str | None]] = []
             left: list[tuple[float, tuple[str, str | None]]] = []
             right: list[tuple[float, tuple[str, str | None]]] = []
-            for block in page.get_text("rawdict", flags=TEXT_FLAGS, clip=clip)["blocks"]:
+            for block in _text_blocks(page, clip=clip):
                 if block.get("type") != 0:
                     continue
                 for line in block["lines"]:
@@ -1556,7 +1566,63 @@ class _Display:
 def _raw_blocks(page: pymupdf.Page) -> list[dict]:
     """The page's raw text dictionary: the one text extraction layout makes per page,
     shared by the rows and the page type (`pipeline.page_type`)."""
-    return page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]
+    return _text_blocks(page)
+
+
+def _text_blocks(page: pymupdf.Page, **kwargs: Any) -> list[dict]:
+    """`page.get_text("rawdict", flags=TEXT_FLAGS, **kwargs)["blocks"]` with each ligature's
+    characters given their own share of the glyph's width (`_spread_ligatures`). Every
+    place layout reads characters from the PDF goes through here (rows, line glyphs, the
+    text pass's glyphs), so no path sees the zero-width boxes ligatures come out with."""
+    blocks = page.get_text("rawdict", flags=TEXT_FLAGS, **kwargs)["blocks"]
+    for block in blocks:
+        if block.get("type") == 0:
+            for line in block["lines"]:
+                for span in line["spans"]:
+                    _spread_ligatures(span["chars"], line["dir"])
+    return blocks
+
+
+def _spread_ligatures(chars: list[dict], direction: Sequence[float]) -> None:
+    """A ligature glyph ("ff", "ffi", "fl" in Latin Modern, Computer Modern, Times) is one
+    glyph for several characters, and MuPDF gives the first the whole glyph box and the rest
+    a box of no width at its end. Sorted by position, as rows, table cells and words are,
+    the zero-width characters swap with the next letter ("Stiffness" came out "Stifnf ess").
+    Each of the characters now gets an equal share of the glyph's box along the line, so
+    position order is reading order. Only letters share a box: the other characters of no
+    width (the arrow of a vector, a combining accent, a negation slash) are drawn over the
+    letter before them and stay at its end. Text running left to right or top to bottom only;
+    other directions are left as they are."""
+    dx, dy = direction[0], direction[1]
+    if dx >= 0.7:
+        lo = 0
+    elif dy >= 0.7:
+        lo = 1
+    else:
+        return
+    hi = lo + 2
+    i = 1
+    while i < len(chars):
+        run = i
+        while (
+            run < len(chars)
+            and chars[run]["bbox"][hi] - chars[run]["bbox"][lo] < 1e-3
+            and chars[run]["c"].isalpha()
+            and abs(chars[run]["bbox"][lo] - chars[i - 1]["bbox"][hi]) < 0.5
+        ):
+            run += 1
+        head = chars[i - 1]
+        width = head["bbox"][hi] - head["bbox"][lo]
+        if run == i or width < 1e-3:
+            i += 1
+            continue
+        parts = run - i + 1
+        start, step = head["bbox"][lo], width / parts
+        for k, ch in enumerate([head, *chars[i:run]]):
+            box = list(ch["bbox"])
+            box[lo], box[hi] = start + k * step, start + (k + 1) * step
+            ch["bbox"] = tuple(box)
+        i = run + 1
 
 
 def _page_rows(
@@ -2392,14 +2458,21 @@ class _MarginFilter:
         )
 
 
-def _reference_pages(page_count: int, selected: list[int]) -> list[int]:
-    """The analysed pages plus their neighbours, up to MARGIN_REFERENCE_PAGES pages."""
+def _reference_pages(page_count: int, selected: list[int], skip: Collection[int] = ()) -> list[int]:
+    """The analysed pages plus their neighbours, up to MARGIN_REFERENCE_PAGES pages. `skip`:
+    pages that are not neighbours (a slide deck's earlier overlay steps repeat the frame
+    title, which would make it a running header)."""
     chosen = set(selected[:MARGIN_REFERENCE_PAGES])
     distance = 1
-    while len(chosen) < min(page_count, MARGIN_REFERENCE_PAGES) and distance < page_count:
+    room = min(page_count - len(skip), MARGIN_REFERENCE_PAGES)
+    while len(chosen) < room and distance < page_count:
         for page in selected:
             for candidate in (page - distance, page + distance):
-                if 0 <= candidate < page_count and len(chosen) < MARGIN_REFERENCE_PAGES:
+                if (
+                    0 <= candidate < page_count
+                    and candidate not in skip
+                    and len(chosen) < MARGIN_REFERENCE_PAGES
+                ):
                     chosen.add(candidate)
         distance += 1
     return sorted(chosen)
@@ -2453,8 +2526,9 @@ def _margin_filter(
     selected: list[int],
     frags: dict[int, list[_Row]],
     paths: dict[int, list[_Path]],
+    skip: Collection[int] = (),
 ) -> _MarginFilter:
-    reference = _reference_pages(doc.page_count, selected)
+    reference = _reference_pages(doc.page_count, selected, skip)
     counts: Counter[tuple] = Counter()
     texts: dict[tuple[str, str], set[str]] = {}
     sizes: Counter[float] = Counter()
@@ -2508,7 +2582,7 @@ def _margin_filter(
 # ============================================================================ columns
 
 
-def _find_gutter(boxes: list[BBox]) -> tuple[float, float] | None:
+def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, float] | None:
     """The white vertical gap between two text columns, or None for one column.
 
     Looks for an x-interval near the middle that (almost) no narrow line touches, with at
@@ -2516,7 +2590,7 @@ def _find_gutter(boxes: list[BBox]) -> tuple[float, float] | None:
     and whose rows are long enough to be prose (two table columns are not text columns).
     A couple of lines may cross it: a centred title or caption does not undo the columns.
     """
-    if len(boxes) < 6:
+    if len(boxes) < (4 if slide else 6):
         return None
     left, right = min(b[0] for b in boxes), max(b[2] for b in boxes)
     width = right - left
@@ -2528,7 +2602,7 @@ def _find_gutter(boxes: list[BBox]) -> tuple[float, float] | None:
     # of the longest left-column lines. A gutter crossed by more than MAX_GUTTER_CROSSINGS
     # lines is no gutter (and the cap keeps a page of thousands of rows linear).
     for allowed in range(min(max(2, len(narrow) // 10), MAX_GUTTER_CROSSINGS) + 1):
-        gutter = _gutter_with(narrow, events, allowed, left, width)
+        gutter = _gutter_with(narrow, events, allowed, left, width, slide)
         if gutter is not None:
             return gutter
     return None
@@ -2540,6 +2614,7 @@ def _gutter_with(
     allowed: int,
     left: float,
     width: float,
+    slide: bool = False,
 ) -> tuple[float, float] | None:
     best: tuple[float, float] | None = None
     for gap0, gap1 in _sparse_intervals(events, allowed):
@@ -2552,15 +2627,34 @@ def _gutter_with(
         return None
     lefts = [b for b in narrow if b[2] <= best[0] + 0.5]
     rights = [b for b in narrow if b[0] >= best[1] - 0.5]
+    # A slide's column has two or three short lines (a heading and a bullet), whose left edges
+    # line up two by two (a bullet's text, its continuation); a page's has three.
+    wanted = 2 if slide else 3
     for side in (lefts, rights):
-        if len(side) < 3:
+        if len(side) < wanted:
             return None
-        edge = min(b[0] for b in side)
-        if sum(b[0] <= edge + 2.5 for b in side) < 3:
+        if slide:
+            aligned = max(sum(abs(b[0] - a[0]) <= 2.5 for b in side) for a in side)
+        else:
+            edge = min(b[0] for b in side)
+            aligned = sum(b[0] <= edge + 2.5 for b in side)
+        if aligned < wanted:
             return None
-        if statistics.median(_line_widths(side)) < 0.3 * width:
+        if statistics.median(_line_widths(side)) < (0.15 if slide else 0.3) * width:
             return None
     return best
+
+
+def _words_both_sides(rows: Sequence[_Row], gutter: tuple[float, float], height: float) -> bool:
+    """Each side of `gutter` has a row with a word of three letters or more."""
+    split = (gutter[0] + gutter[1]) / 2
+    has = {"L": False, "R": False}
+    for row in rows:
+        if row.vertical or _margin_zone(row, height) is not None:
+            continue
+        if any(w.isalpha() and len(w) >= 3 for w in row.clean.split()):
+            has["L" if (row.x0 + row.x1) / 2 < split else "R"] = True
+    return has["L"] and has["R"]
 
 
 def _sparse_intervals(events: list[tuple[float, int]], allowed: int) -> list[tuple[float, float]]:
@@ -7405,12 +7499,15 @@ def _wrapped_maths(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
 
     "... the system has exactly one solution," / "x = A^-1 b." A display equation is
     centred or indented and set off by extra space; a line of the paragraph starts at its
-    left margin at the usual line pitch. A numbered or multi-line equation is never one.
+    left margin at the usual line pitch; in a list item, where the item's text starts (after
+    its marker; slides only). A numbered or multi-line equation is never one.
     """
     region = row.region
     if region is None or region.forced or region.labels or len(region.rows) != 1:
         return False
-    return abs(row.x0 - run.box[0]) <= 0.5 and _continues(prev, row, run, ctx)
+    first = run.rows[0]
+    left = first.marker.x if first.marker is not None and _SLIDE_DECK else run.box[0]
+    return abs(row.x0 - left) <= 0.5 and _continues(prev, row, run, ctx)
 
 
 def _title_like(text: str) -> bool:
@@ -8279,6 +8376,12 @@ def _prepare_rows(
     # Margin lines (an unrepeated header, a centred footer) say nothing about columns.
     body = [f.bbox for f in kept if not f.vertical and _margin_zone(f, height) is None]
     gutter = _find_gutter(body)
+    if gutter is None and _SLIDE_DECK:
+        # A slide's columns are short (`_find_gutter`, `slide`), so they must also hold words:
+        # the brace and the cases of a piecewise function are not two columns of text.
+        gutter = _find_gutter(body, slide=True)
+        if gutter is not None and not _words_both_sides(kept, gutter, height):
+            gutter = None
     return _merge_baselines(kept, gutter, rules), gutter, _merge_baselines(dropped, gutter)
 
 
@@ -9338,7 +9441,16 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any
             # strokes must not stay in memory as objects.
             height = doc[number].rect.height
             paths[number] = [p for p in paths[number] if _box_zone(p.bbox, height) is not None]
-    margins = _margin_filter(doc, selected, frags, paths)
+    deck = _read_deck(doc, selected, frags, types, paths)
+    global _SLIDE_DECK
+    _SLIDE_DECK = deck is not None
+    if deck is not None and deck.dropped:
+        # An earlier step of a frame has nothing the frame's last page lacks: it is not read
+        # again, so it costs no crop, no model call and no line of the output.
+        for number in deck.dropped:
+            frags.pop(number), paths.pop(number), types.pop(number)
+        selected = [n for n in selected if n not in deck.dropped]
+    margins = _margin_filter(doc, selected, frags, paths, deck.dropped if deck else ())
     for number in selected:
         # A thin text layer over a page-sized picture makes the picture the page's content
         # (`page_type.TEXT_NOT_COVERING`) unless the picture is the template's background
@@ -9449,6 +9561,10 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any
         # not to be dropped as a background unless it is one.
         if unread or _page_picture(doc[n], margins):
             kept[n] = page_type.UNREAD_PAGE
+    if deck is not None:
+        elements = slides.finish(
+            elements, deck, {p.number: p.size for p in pages}, (REASON_LARGER_FONT,)
+        )
     title = _meaningful_title(doc.metadata.get("title") if doc.metadata else None)
     if title is None:
         levels = heading_levels(elements)
@@ -9464,6 +9580,107 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any
         page_types=types,
         kept_pages=dict(sorted(kept.items())),
     )
+
+
+def _read_deck(
+    doc: pymupdf.Document,
+    selected: list[int],
+    frags: dict[int, list[_Row]],
+    types: dict[int, page_type.PageTypeResult],
+    paths: dict[int, list[_Path]],
+) -> slides.Deck | None:
+    """The slide deck the selected pages make up (`slides.detect`), or None. A page kept whole
+    as its image is shown to it with no text, so it is never taken for an earlier step."""
+    views: list[slides.PageView] = []
+    for number in selected:
+        page = doc[number]
+        whole = _kept_whole(types[number])
+        rows = (
+            []
+            if whole
+            else [
+                slides.RowView(r.clean, r.bbox, r.size, r.vertical)
+                for r in frags[number]
+                if r.clean.strip()
+            ]
+        )
+        rect = page.rect
+        views.append(
+            slides.PageView(
+                number,
+                rect.width,
+                rect.height,
+                page_labels.pdf_label(page),
+                rows,
+                _slide_marks(page, paths.get(number, []), rect.height),
+            )
+        )
+    creator = doc.metadata.get("creator") if doc.metadata else None
+    return slides.detect(creator, views)
+
+
+def _slide_marks(page: pymupdf.Page, paths: list[_Path], height: float) -> list[slides.Mark]:
+    """Every raster image on the slide (by a digest of its pixels) and every vector drawing
+    on the page (by its colours and the shape of its path, `_drawing_key`), for the test that
+    a step's pictures are all on the frame's last page. Drawings near the top and bottom edges
+    count too (a figure can sit there); only a theme's thin progress bar is left out, since it
+    grows on every page and would make every step differ."""
+    marks: list[slides.Mark] = []
+    display = _Display.of(page)
+    for info in page.get_image_info(hashes=True):
+        if info["bbox"][2] - info["bbox"][0] <= 0 or info["bbox"][3] - info["bbox"][1] <= 0:
+            continue  # an image with no area shows nothing (an overlay's hidden item)
+        digest = info.get("digest")
+        key = (
+            digest.hex()
+            if isinstance(digest, bytes)
+            else f"{info.get('width')}x{info.get('height')}"
+        )
+        marks.append(slides.Mark("image", key, display.box(info["bbox"])))
+    drawings = page.get_cdrawings() if paths else []
+    width = page.rect.width
+    for path in paths:
+        centre = (path.bbox[1] + path.bbox[3]) / 2
+        in_body = 0.2 * height <= centre <= (1 - NUMBER_BODY_BAND) * height
+        thin_bar = path.bbox[3] - path.bbox[1] <= PROGRESS_BAR_PT and (
+            path.bbox[2] - path.bbox[0] >= 0.25 * width
+        )
+        if not in_body and thin_bar:
+            continue  # a theme's progress bar grows on every page, steps included
+        marks.append(slides.Mark("drawing", _drawing_key(path, drawings), path.bbox))
+    return marks
+
+
+NUMBER_BODY_BAND = 0.12  # the footline's share of a slide (bare slide numbers live there)
+PROGRESS_BAR_PT = 4.0  # a headline or footline bar at most this tall is furniture
+
+
+def _drawing_key(path: _Path, drawings: list[dict[str, Any]]) -> str:
+    """What a drawing looks like, for "is this drawing also on the last page": its stroke and
+    fill colours and the shape of its path (every point, to the point), so two different
+    drawings in the same box never pass as one. Falls back to the path's summary when the
+    raw drawing is not known (`source` -1)."""
+    summary = f"{path.kind}{int(path.curved)}{int(path.filled)}"
+    if not 0 <= path.source < len(drawings):
+        return summary + "".join(f"{round(c, 2)}" for c in path.colour)
+    raw = drawings[path.source]
+    parts = [summary, repr(raw.get("fill")), repr(raw.get("color")), repr(raw.get("width"))]
+    for item in raw.get("items", ()):
+        parts.append(str(item[0]))
+        for value in item[1:]:
+            if isinstance(value, (tuple, list)):
+                parts.append(",".join(f"{round(float(v))}" for v in _flat(value)))
+    return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
+
+
+def _flat(value: Any) -> list[float]:
+    """The numbers of a drawing item's point, rect or quad, in order."""
+    if isinstance(value, (int, float)):
+        return [float(value)]
+    out: list[float] = []
+    for part in value:
+        out.extend(_flat(part))
+    return out
 
 
 def _kept_whole(kind: page_type.PageTypeResult) -> bool:
@@ -9950,7 +10167,7 @@ def page_glyphs(page: pymupdf.Page) -> list[Glyph]:
     """
     display = _Display.of(page)
     glyphs: list[Glyph] = []
-    for block in page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]:
+    for block in _text_blocks(page):
         if block.get("type") != 0:
             continue
         for line in block["lines"]:
