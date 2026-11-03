@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import base64
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from itertools import pairwise
@@ -59,6 +59,7 @@ from readablestem.core.types import (
     Element,
     Fix,
     Kind,
+    Link,
     Status,
 )
 from readablestem.core.types import INLINE_MARKER_RE as INLINE_MARKER_RE
@@ -68,6 +69,7 @@ from readablestem.pipeline import (
     figure_details,
     figure_images,
     inline_text,
+    navigation,
     table_html,
 )
 from readablestem.pipeline.safe_html import MATHML_ATTRIBUTES as MATHML_ATTRIBUTES
@@ -193,6 +195,11 @@ KEPT_PAGE_REASONS = frozenset({"handwritten_page", "scanned_page", "unread_page"
 
 # Fix statuses whose proposal is not used: the original stays, flagged.
 NOT_CONVERTED = KEPT_ORIGINAL_STATUSES
+
+# Stands for a footnote's backlink until the body is written (`_Renderer.footnote`): a
+# control character, which escaped document text never contains.
+_BACKLINK_SLOT = "\x00"
+_BACKLINK_RE = re.compile(_BACKLINK_SLOT + "([^\x00]*)" + _BACKLINK_SLOT)
 
 ABOUT_ID = "about-conversion"
 ABOUT_TITLE_ID = "about-conversion-title"
@@ -664,6 +671,19 @@ class _Renderer:
     demote: int = 0
     # The scale an unconverted equation's picture is shown at (T3-15).
     scale_of: Callable[[Element], float] = field(default_factory=lambda: _unit_scale)
+    # Navigation (`pipeline.navigation`): the headings as written (for the contents list),
+    # the printed label of each source page and whether page markers are written (the
+    # document has two pages or more), the page the last marker or block was on, and the
+    # footnotes: their element ids, and the id of the mark that links to each.
+    toc: list[navigation.TocEntry] = field(default_factory=list)
+    page_labels: Mapping[int, str] = field(default_factory=dict)
+    # Page of the PDF each of the document's pages is, when it is not its own number (a part of
+    # a longer file: 0-based local page to 0-based page of the source).
+    pdf_pages: Mapping[int, int] = field(default_factory=dict)
+    mark_pages: bool = False
+    last_page: int | None = None
+    footnote_ids: Collection[str] = ()
+    noterefs: dict[str, str] = field(default_factory=dict)
 
     def add_style(self, name: str, css: str) -> None:
         """Add CSS to this document's stylesheet, once per name. Features add their CSS
@@ -685,6 +705,46 @@ class _Renderer:
         claimed = self.claim_id(element_id)
         return f' id="{_escape(claimed)}"' if claimed else ""
 
+    def fresh_id(self, stem: str) -> str:
+        """An id not used yet, `stem-1`, `stem-2`, ... (for what has no pipeline id)."""
+        number = 1
+        while f"{stem}-{number}" in self.used_ids:
+            number += 1
+        self.used_ids.add(f"{stem}-{number}")
+        return f"{stem}-{number}"
+
+    def page_mark(self, element: Element) -> str:
+        """The page marker to write before `element` when it is on a page after the last one
+        written; "" otherwise (and always in a one-page document). Never inside a block of
+        text: callers ask only between blocks, or at the start of a list item."""
+        if not self.mark_pages or element.page == self.last_page:
+            return ""
+        self.last_page = element.page
+        position = self.pdf_pages.get(element.page, element.page) + 1
+        printed = self.page_labels.get(element.page)
+        if printed:
+            said = f"Page {printed}"
+        elif self.page_labels:  # others have printed labels: never let this one read as one
+            said = f"PDF page {position}"
+        else:
+            said = f"Page {position}"
+        self.add_style("pagebreak", navigation.PAGEBREAK_CSS)
+        return navigation.pagebreak(said, self.claim_id(f"pagebreak-{position}"), AUTHORED_CLASS)
+
+    def link_attrs(self, link: Link) -> str:
+        """The mark of a footnote is a `doc-noteref`; the first one for a note also gets the
+        id its backlink returns to."""
+        target = link.target_id
+        if link.kind != "internal" or target is None or target not in self.footnote_ids:
+            return ""
+        attrs = ' role="doc-noteref"'
+        if target not in self.noterefs:
+            ref = self.claim_id(f"noteref-{target}")
+            if ref is not None:
+                self.noterefs[target] = ref
+                attrs = f' id="{_escape(ref)}"{attrs}'
+        return attrs
+
     def rich(self, text: str, element: Element | None = None) -> str:
         """Escaped text with inline-equation markers replaced by maths (or a flag).
 
@@ -693,7 +753,11 @@ class _Renderer:
         if element is not None and text != element.text:
             element = None
         return inline_text.render_inline_text(
-            text, element=element, equation=self.marker_html, add_style=self.add_style
+            text,
+            element=element,
+            equation=self.marker_html,
+            add_style=self.add_style,
+            link_attrs=self.link_attrs if self.footnote_ids else None,
         )
 
     def marker_html(self, element_id: str) -> str | None:
@@ -716,6 +780,7 @@ class _Renderer:
         i = 0
         while i < len(ordered):
             if is_entry(ordered[i]):
+                mark = self.page_mark(ordered[i])
                 entries: list[Element] = []
                 while i < len(ordered):
                     if is_entry(ordered[i]):
@@ -723,9 +788,10 @@ class _Renderer:
                     elif ordered[i].id not in self.placed:
                         break  # (a term's inline equations are written inside it)
                     i += 1
-                chunks.append(self.definitions(entries))
+                chunks.extend([*([mark] if mark else []), self.definitions(entries)])
                 continue
             if ordered[i].kind is Kind.LIST_ITEM:
+                mark = self.page_mark(ordered[i])
                 items: list[Element] = []
                 inside: dict[str, list[Element]] = {}
                 while i < len(ordered):
@@ -739,10 +805,12 @@ class _Renderer:
                     else:
                         break
                     i += 1
-                chunks.append(self.lists(items, inside))
+                chunks.extend([*([mark] if mark else []), self.lists(items, inside)])
                 continue
             chunk = self.render(ordered[i])
             if chunk:
+                if mark := self.page_mark(ordered[i]):
+                    chunks.append(mark)
                 chunks.append(chunk)
             i += 1
         return chunks
@@ -774,8 +842,30 @@ class _Renderer:
             return ""
         if element.preformatted:
             return self.code_block(element, text)
+        if element.id in self.footnote_ids:
+            return self.footnote(element, text)
         attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
         return f"<p{attrs}>{self.rich(text, element)}</p>"
+
+    def footnote(self, element: Element, text: str) -> str:
+        """A footnote, left where it falls in the text, as a `doc-footnote` with a
+        `doc-backlink` to its mark. The mark comes earlier in reading order in nearly every
+        document but is not known until it is written, so the link is a placeholder that
+        `fill_backlinks` replaces once the whole body is written (and drops when no mark
+        was written for this note)."""
+        self.add_style("footnote", navigation.FOOTNOTE_CSS)
+        attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
+        return (
+            f'<div role="doc-footnote"{attrs}><p>{self.rich(text, element)}'
+            f"{_BACKLINK_SLOT}{element.id}{_BACKLINK_SLOT}</p></div>"
+        )
+
+    def fill_backlinks(self, parts: list[str]) -> list[str]:
+        def link(match: re.Match[str]) -> str:
+            ref = self.noterefs.get(match.group(1))
+            return " " + navigation.backlink(ref, AUTHORED_CLASS) if ref else ""
+
+        return [_BACKLINK_RE.sub(link, part) for part in parts]
 
     def code_block(self, element: Element, text: str) -> str:
         """Program code as `<pre><code>`: its lines and indentation as printed, no
@@ -798,8 +888,10 @@ class _Renderer:
             end = entry.term_end or 0
             attrs = self.id_attr(entry.id) + inline_text.passage_attrs(entry)
             term, definition = text[:end].strip(), text[end:].strip()
+            page = self.page_mark(entry)
             out.append(
-                f"<dt{attrs}><strong>{self.rich(term)}</strong></dt><dd>{self.rich(definition)}</dd>"
+                f"<dt{attrs}>{page}<strong>{self.rich(term)}</strong></dt>"
+                f"<dd>{self.rich(definition)}</dd>"
             )
         return f"<dl>{''.join(out)}</dl>"
 
@@ -856,7 +948,8 @@ class _Renderer:
             )
             text = self.rich(item.text or "", item)
             item_attrs = self.id_attr(item.id) + inline_text.passage_attrs(item)
-            lis.append(f"<li{item_attrs}>{marker}{text}{inner}</li>")
+            page = self.page_mark(item)  # a list that runs over a page boundary
+            lis.append(f"<li{item_attrs}>{page}{marker}{text}{inner}</li>")
         return f"<{style.tag}{attrs}>{''.join(lis)}</{style.tag}>"
 
     def heading(self, element: Element) -> str:
@@ -876,7 +969,13 @@ class _Renderer:
                 return f"<p{attrs}><strong>{self.rich(text, element)}</strong></p>"
             return self.paragraph(element, text)
         level = min(6, self.outline.write(level) + self.demote)
-        attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
+        # Every heading has an id, so the contents list can link to it: the pipeline's own
+        # (`p3-e7`, the same on every render of a result), else the next free `heading-N`.
+        anchor = self.claim_id(element.id) or self.fresh_id("heading")
+        attrs = f' id="{_escape(anchor)}"' + inline_text.passage_attrs(element)
+        plain = " ".join(INLINE_MARKER_RE.sub("[equation]", text).split())
+        if plain:
+            self.toc.append(navigation.TocEntry(level, anchor, plain))
         return f"<h{level}{attrs}>{self.rich(text, element)}</h{level}>"
 
     def converted_mathml(
@@ -1276,12 +1375,17 @@ figcaption { margin-top: 0.5em; }
 @media (min-width: 44rem) { .about { margin: 0 auto; } }
 .about-title { font-size: 1.5em; font-weight: 700; line-height: 1.25; margin: 1.6em 0 0.5em; }
 :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
-@media print { .flagged { break-inside: avoid; } }
+.skip-link { display: inline-block; margin: 0.5rem; padding: 0.5em 1em; background: #ffffff;
+  color: #0b57d0; }
+.skip-link:not(:focus) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media print { .flagged { break-inside: avoid; } .skip-link { display: none; } }
 @media screen and (prefers-color-scheme: dark) {
   body { background: #121212; color: #ececec; }
   .flagged, .notice, .flagged-inline { border-color: #ffa066; }
   .about { border-top-color: #ececec; }
   :focus-visible { outline-color: #8ab4f8; }
+  .skip-link { background: #121212; color: #8ab4f8; }
   img { outline: 1px solid #8c8c8c; outline-offset: -1px; }
 }
 """
@@ -1393,6 +1497,9 @@ def render_html(
     contact: str | None = None,
     math_alttext: bool | None = None,
     omitted_pages: list[int] | None = None,
+    page_labels: Mapping[int, str] | None = None,
+    pdf_pages: Mapping[int, int] | None = None,
+    footnote_ids: Collection[str] = (),
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -1412,7 +1519,12 @@ def render_html(
     after `<main>` (T1-17). `math_alttext`: write each equation's stored speech as the
     `alttext` of its <math> (None: `Settings.mathml_alttext`, off by default).
     `omitted_pages`: 0-based pages the instructor left out (T3-16); the elements are not
-    here, and the student note says so.
+    here, and the student note says so. `page_labels`: the printed label of each 0-based page
+    that has one (`DocumentResult.page_labels`), for the page markers. A page without one says its
+    position in the PDF ("PDF page 5") when any page has a printed label, so two pages never
+    both read "Page 5", and "Page 5" when none has. `pdf_pages` maps a page of this document to
+    its page in the PDF it was cut from (a part of a longer file). `footnote_ids`: the element
+    ids of footnotes (`Notice` code "footnote"), whose marks and notes are linked both ways.
     """
     ordered = _without_dead_links(sorted(elements, key=lambda e: e.order))
     first_fix: dict[str, Fix] = {}
@@ -1431,9 +1543,13 @@ def render_html(
         math_alttext=math_alttext,
         demote=shift,
         scale_of=equation_scale.scaler(ordered),
+        page_labels=page_labels or {},
+        pdf_pages=pdf_pages or {},
+        mark_pages=len({e.page for e in ordered}) >= 2,
+        footnote_ids=set(footnote_ids),
     )
     renderer.placed = _placed_equations(ordered, renderer, set(equations))
-    body = renderer.render_all(ordered)
+    body = renderer.fill_backlinks(renderer.render_all(ordered))
     kept_pages = [
         e.page
         for e in ordered
@@ -1461,6 +1577,18 @@ def render_html(
     page_title = _clean_title(title) if title_set else suggested_title(title, heading_texts)
     if (title_set or shift) and not any("<h1" in part for part in body):
         body = [f"<h1>{_escape(page_title)}</h1>", *body]
+    # The PDF's own contents page is the contents list; a second one would be one too many.
+    printed_contents = any(navigation.PRINTED_CONTENTS_REASON in e.reasons for e in ordered)
+    contents = ""
+    if len(renderer.toc) >= navigation.MIN_TOC_HEADINGS and not printed_contents:
+        renderer.add_style("contents", navigation.TOC_CSS)
+        english = _clean_lang(lang).split("-", 1)[0].lower() == "en"
+        contents = _authored_in_english(
+            navigation.contents_nav(
+                renderer.toc, AUTHORED_CLASS, None if english else _clean_lang(lang)
+            ),
+            lang,
+        )
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
     return "\n".join(
@@ -1475,6 +1603,9 @@ def render_html(
             f"<style>\n{style}</style>",
             "</head>",
             "<body>",
+            _authored_in_english(navigation.skip_link(AUTHORED_CLASS), lang),
+            *([contents] if contents else []),
+            f'<span id="{navigation.MAIN_ID}" tabindex="-1"></span>',
             "<main>",
             *([_authored_in_english(note, lang)] if (note := _notice(notice)) else []),
             *(_authored_in_english(part, lang) for part in body),

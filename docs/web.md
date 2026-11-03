@@ -120,6 +120,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | POST `/jobs/{id}/language` | owner | Confirm or change the document language (`lang`, one the control offers); lang_source becomes "user" and the HTML is made again |
 | POST `/jobs/{id}/retry` | owner | "Try again" / "Convert the missing parts" on a stopped or partly converted document (below): the same job goes back in the queue; 409 when it is not stopped or has had its 3 tries, 429 with 10 documents already waiting or converting; rate limited per address and per person |
 | GET `/jobs/{id}/download` | owner | The HTML as an attachment |
+| GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back); 409 with fewer than two such parts, 404 for another person's or an expired document |
 | GET `/jobs/{id}/download/canvas` | owner | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
 | GET `/jobs/{id}/download/cartridge` | owner | The same page as an IMS Common Cartridge 1.3 package, `.imscc` (`pipeline/export_cartridge.py`, docs/output.md "The Common Cartridge export"). Same errors and recording as the Canvas zip; a plain link on the job page |
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
@@ -598,8 +599,10 @@ with it), nothing is converted or counted, and the person is sent to `/uploads/{
   page names what was started and why it stopped.
 - **Each part is a document** named "chapter2 (pages 31-59).pdf", with `jobs.part_group` (the
   pending upload's id) and `jobs.part_label`; its page says which pages it holds and links
-  its sibling parts in page order. Parts are separate documents, not merged into one HTML
-  file.
+  its sibling parts in page order. Parts are separate documents; the "Combine parts" link on
+  the results page of a part (when two or more finished parts are kept) joins the ones the
+  person still keeps into one HTML file (`web/combine.py`, docs/output.md "Combining the parts
+  of a long source").
 - **Retention.** The pending upload is deleted `RETENTION_HOURS` after it was made, by the
   hourly purge (`ops.retention.purge_pending`), "Discard this file" (asks first), when its last
   page has been sent, and with the person (`erase_user`). Past its time it answers 404 at
