@@ -265,3 +265,227 @@ def test_a_variable_with_a_subscript_is_not_a_formula():
     )
     found = [e for e in layout.analyze(pdf).elements if e.kind is Kind.EQUATION]
     assert [e.reasons for e in found if layout.FORMULA_REASON in e.reasons] == []
+
+
+# ------------------------------------------------- merged lists, half-reactions, labels (C8)
+
+NOTO_MATH = Path("/usr/share/fonts/truetype/noto/NotoSansMath-Regular.ttf")
+needs_dejavu = pytest.mark.skipif(not DEJAVU.exists(), reason="needs DejaVu Sans for the arrows")
+needs_noto = pytest.mark.skipif(not NOTO_MATH.exists(), reason="needs Noto Sans Math")
+FONTS = {"dv": DEJAVU, "nm": NOTO_MATH}
+SENTENCE = "The next line of this paragraph says what happens in the flask here."
+
+
+class Page:
+    """A page written piece by piece at chosen places: the way TeX leaves a stack or a label."""
+
+    def __init__(self) -> None:
+        self.doc = pymupdf.open()
+        self.page = self.doc.new_page()
+        self.faces: dict[str, pymupdf.Font] = {}
+
+    def width(self, text: str, size: float, font: str) -> float:
+        if font == "helv":
+            return pymupdf.get_text_length(text, fontname="helv", fontsize=size)
+        if font not in self.faces:
+            self.page.insert_font(fontname=font, fontfile=str(FONTS[font]))
+            self.faces[font] = pymupdf.Font(fontfile=str(FONTS[font]))
+        return self.faces[font].text_length(text, fontsize=size)
+
+    def put(self, x: float, y: float, text: str, size: float = BODY, font: str = "dv") -> float:
+        self.width(text, size, font)  # registers the face
+        self.page.insert_text((x, y), text, fontsize=size, fontname=font)
+        return x + self.width(text, size, font)
+
+    def sentence(self, y: float) -> None:
+        self.put(72, y, SENTENCE, BODY, "helv")
+
+    def data(self) -> bytes:
+        data = self.doc.tobytes()
+        self.doc.close()
+        return data
+
+
+def labelled_reaction(above: str, below: str | None = None, *, arrow_first: bool = False) -> bytes:
+    """CaCO3 -label-> CaO + CO2 between two lines of prose, the label set over (and under) a
+    long arrow, in the order TeX writes it: the label, then the arrow."""
+    pg = Page()
+    pg.sentence(150)
+    pg.sentence(166)
+    y = 200.0
+    x = pg.put(72, y, "CaCO")
+    x = pg.put(x, y - DOWN, "3", SMALL)
+    x = pg.put(x, y, "  ")
+    width_above = pg.width(above, SMALL, "dv")
+    width_below = pg.width(below, SMALL, "dv") if below else 0.0
+    dash, head = pg.width("−", BODY, "dv"), pg.width("→", BODY, "dv")
+    dashes = max(1, int((max(width_above, width_below) + 4 - head) / dash + 0.999))
+    arrow = "−" * dashes + "→"
+    arrow_width = dashes * dash + head
+
+    def labels() -> None:
+        pg.put(x + (arrow_width - width_above) / 2, y - 8, above, SMALL)
+        if below:
+            pg.put(x + (arrow_width - width_below) / 2, y + 9, below, SMALL)
+
+    if arrow_first:
+        pg.put(x, y, arrow)
+        labels()
+    else:
+        labels()
+        pg.put(x, y, arrow)
+    after = pg.put(x + arrow_width + 4, y, "CaO + CO")
+    pg.put(after, y - DOWN, "2", SMALL)
+    pg.sentence(240)
+    return pg.data()
+
+
+@needs_dejavu
+@pytest.mark.parametrize(
+    ("above", "below"),
+    [
+        ("Δ", None),
+        ("heat", None),
+        ("Pt", None),
+        ("high temperature", None),
+        ("500 °C, Fe", None),
+        ("electrolysis", "600 °C"),
+    ],
+)
+def test_a_label_set_over_an_arrow_keeps_the_reaction_whole(above, below):
+    """Any label over (and under) an arrow, of any length and with a long arrow under it, is
+    part of the reaction: one display line, not a formula, an arrow and a caption."""
+    found = equations(labelled_reaction(above, below))
+    assert [e.display for e in found] == ["block"]
+    text = found[0].text or ""
+    assert text.startswith("CaCO3") and text.endswith("CaO + CO2")
+    for word in (above + " " + (below or "")).split():
+        assert word in text
+
+
+@needs_dejavu
+def test_the_label_over_an_arrow_also_joins_when_the_arrow_is_written_first():
+    found = equations(labelled_reaction("heat", arrow_first=True))
+    assert [e.display for e in found] == ["block"]
+    assert (found[0].text or "").endswith("CaO + CO2")
+
+
+@needs_dejavu
+def test_the_label_is_read_after_the_arrow_in_words_of_its_own():
+    # Not inside the shaft where its position would put it, and not glued to either side.
+    (found,) = equations(labelled_reaction("electrolysis", "600 °C"))
+    assert "→ electrolysis 600 °C CaO" in (found.text or "")
+
+
+@needs_dejavu
+def test_a_script_beside_an_arrow_is_not_its_label():
+    # The charge before an arrow sits at the arrow's height: a script, not a label.
+    pg = Page()
+    pg.sentence(150)
+    pg.sentence(166)
+    x = pg.put(72, 200, "Na")
+    x = pg.put(x, 200 - UP, "+", SMALL)
+    x = pg.put(x + 2, 200, " + Cl")
+    x = pg.put(x, 200 - UP, "−", SMALL)
+    pg.put(x + 2, 200, " → NaCl")
+    pg.sentence(240)
+    (found,) = equations(pg.data())
+    assert (found.display, found.text) == ("block", "Na+ + Cl− → NaCl")
+
+
+@needs_noto
+def test_a_half_reaction_label_far_from_its_reaction_stays_with_it():
+    """`anode (oxidation):` is set apart from `Fe(s) -> Fe2+ + 2e-` by more than the gap that
+    joins the pieces of a line; the block was cut after the label."""
+    pg = Page()
+    pg.sentence(150)
+    pg.sentence(166)
+    pg.put(72, 200, "anode (oxidation):", BODY, "nm")
+    x = pg.put(240, 200, "Fe(s) → Fe", BODY, "nm")
+    x = pg.put(x, 200 - UP, "2+", SMALL, "nm")
+    pg.put(x, 200, "(aq) + 2e", BODY, "nm")
+    pg.sentence(240)
+    found = equations(pg.data())
+    assert len(found) == 1
+    assert (found[0].text or "").startswith("anode (oxidation):")
+    assert "Fe(s)" in (found[0].text or "")
+
+
+@needs_dejavu
+def test_a_colon_label_that_names_no_half_reaction_is_not_joined_across_a_gap():
+    pg = Page()
+    pg.sentence(150)
+    pg.sentence(166)
+    pg.put(72, 200, "Result:")
+    pg.put(240, 200, "A → B")
+    pg.sentence(240)
+    assert not any("Result:" in (e.text or "") for e in equations(pg.data()))
+
+
+@needs_noto
+def test_the_degree_sign_of_a_standard_potential_does_not_cut_its_label():
+    """E°cell: TeX sets the degree over the start of `cell`. Read by position the text layer
+    gave `E c°ell`, and the inline equation was cut in two (`E c` and `ell`)."""
+    pg = Page()
+    pg.put(72, 140, "We relate the work to the potential", BODY, "helv")
+    x = pg.put(72, 166, "that gives the value", BODY, "helv")
+    x = pg.put(x + 4, 166, "E", BODY, "nm")
+    pg.put(x, 166 - DOWN, "cell", SMALL, "nm")
+    pg.put(x, 166 - UP - 1.5, "°", SMALL, "helv")
+    pg.put(72, 192, "and then the next line carries on with plain words here.", BODY, "helv")
+    assert [e.text for e in equations(pg.data())] == ["Ecell°"]
+
+
+@needs_noto
+def test_a_list_of_ions_is_one_equation_per_ion():
+    """`CO3 2-, F-` in the running text is separate ions, as the author wrote them."""
+    pg = Page()
+    pg.put(72, 150, "Which of these are bases among the anions such as", BODY, "helv")
+    x = pg.put(72, 166, "OH", BODY, "nm")
+    x = pg.put(x, 166 - UP, "−", SMALL, "nm")
+    x = pg.put(x, 166, ", CO", BODY, "nm")
+    x = pg.put(x, 166 - DOWN, "3", SMALL, "nm")
+    x = pg.put(x, 166 - UP, "2−", SMALL, "nm")
+    x = pg.put(x, 166, ", F", BODY, "nm")
+    x = pg.put(x, 166 - UP, "−", SMALL, "nm")
+    pg.put(x + 3, 166, "and the like are all listed", BODY, "helv")
+    found = [(e.text or "").replace(" ", "") for e in equations(pg.data())]
+    assert found == ["OH−", "CO32−", "F−"]
+
+
+@needs_noto
+def test_a_list_of_reactions_run_together_is_one_equation_per_reaction():
+    """`(a) A <=> B; (b) C <=> D` is not one display line: each reaction is an equation of its
+    own, without its list marker."""
+    pg = Page()
+    pg.put(72, 150, "Write the conjugate base and the acid for each of these.", BODY, "helv")
+    x = pg.put(72, 166, "(a) HF + OH", BODY, "nm")
+    x = pg.put(x, 166 - UP, "−", SMALL, "nm")
+    x = pg.put(x, 166, " ⇌ F", BODY, "nm")
+    x = pg.put(x, 166 - UP, "−", SMALL, "nm")
+    x = pg.put(x, 166, " + H", BODY, "nm")
+    x = pg.put(x, 166 - DOWN, "2", SMALL, "nm")
+    x = pg.put(x, 166, "O; (b) NH", BODY, "nm")
+    x = pg.put(x, 166 - DOWN, "3", SMALL, "nm")
+    x = pg.put(x, 166, " + H", BODY, "nm")
+    x = pg.put(x, 166 - UP, "+", SMALL, "nm")
+    x = pg.put(x, 166, " ⇌ NH", BODY, "nm")
+    x = pg.put(x, 166 - DOWN, "4", SMALL, "nm")
+    pg.put(x, 166 - UP, "+", SMALL, "nm")
+    found = equations(pg.data())
+    assert [e.display for e in found] == ["inline", "inline"]
+    assert [(e.text or "").replace(" ", "")[:4] for e in found] == ["HF+O", "NH3+"]
+    assert all("(a)" not in (e.text or "") and "(b)" not in (e.text or "") for e in found)
+
+
+@needs_noto
+def test_a_comma_list_of_assignments_is_not_cut_into_species():
+    # "A = 2, B = 3" has capitals and a script ("A2"), but its pieces are not species.
+    pg = Page()
+    pg.put(72, 150, "The constants of the problem are given as follows here:", BODY, "helv")
+    x = pg.put(72, 166, "A", BODY, "nm")
+    x = pg.put(x, 166 - DOWN, "1", SMALL, "nm")
+    pg.put(x, 166, " = 2, B = 3", BODY, "nm")
+    pg.put(72, 192, "and then the next line carries on with plain words here.", BODY, "helv")
+    (found,) = equations(pg.data())
+    assert "= 2, B = 3" in (found.text or "")

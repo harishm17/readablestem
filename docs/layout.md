@@ -718,6 +718,28 @@ raised text (next section).
   formulas and ions), one slide whose reaction line was a heading and is now an equation, and
   a space after "Simplify:" in the two prints of an algebra section. Nothing in physics, algebra,
   statistics or the other slides and Word material gains a formula that is not one.
+- **Lists** (`_split_chemistry_lists`, `_reaction_list_row`). A run of species cut by top-level
+  commas or semicolons into pieces that are each one species (`CO3 2−, F−`: a count or a charge,
+  an element symbol first) is one inline equation per item, and a row that is two or more
+  reactions with a semicolon between them (`(a) A ⇌ B; (b) C ⇌ D`) is a prose row whose
+  reactions are inline equations of their own, the list marker left out, not one display line.
+  This works on the letters whatever their font: chemistry set in a maths font has no
+  upright-text evidence for `pipeline/chem.py`.
+- **Half-reactions** (`_half_reaction_label`). A label that names a half-reaction and ends in a
+  colon (`anode (oxidation):`, `Overall:`) joins the reaction that follows it on the same baseline
+  up to 12 glyph sizes away (`HALF_REACTION_GAP`); the block was cut after the label.
+- **Labels over an arrow** (`_label_over_arrow`, `_arrow_under`, `_arrow_label_flags`). A script-size
+  label over or under an arrow, whatever it says and however long (`Δ`, `heat`, `high
+  temperature`, `500 °C, Fe`, one over and one under), is part of the reaction: it joins the
+  arrow's line, it is read after the arrow in words of its own, and `chem.Word.over_arrow` makes
+  each of its words a label for `pipeline/chem.py`. A long arrow (`−−−−→`) is one arrow word
+  (`chem.MAX_SHAFT`). The labels do not count in the row's size (`_Row.plain`), which a long label
+  used to pull down to the label's size and with it every subscript of the formulas. A script
+  at the height of the arrow (a charge before it) is not a label.
+- **`E°cell`** (`_degree_over_label`). A degree sign over the start of a lowered label
+  (`E°cell`, `E°cathode`) is read after the label, not inside it (`E c°ell`, which cut the inline
+  equation in two); several degree signs in one row are scripts of their own; and the degree sign
+  after a symbol is part of the inline run (`_inline_runs`).
 
 ### Raised and lowered text in prose (backlog T2-4, T2-5)
 

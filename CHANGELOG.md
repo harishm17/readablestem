@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: chemistry spans in the layout (branch chem/layout-spans)
+
+- Chemistry lists are cut into their items: `CO3 2−, F−` is two inline equations and
+  `(a) A ⇌ B; (b) C ⇌ D` one inline equation per reaction (without the list marker), not one span
+  or one display line. Half-reaction labels (`anode (oxidation):`) stay with their reaction when
+  they are set far from it. `E°cell` and `E°cathode` are whole (the degree sign was read inside the
+  lowered label and cut the equation in two). A label over or under an arrow, of any length and
+  with a long arrow, is part of the reaction (`chem.Word.over_arrow`). On the 143 PDFs of
+  `scripts/layout_identity.py` 135 are identical and the 8 that differ are chemistry sections;
+  details and the replay in [docs/chemistry.md](docs/chemistry.md) ("Spans") and
+  [docs/layout.md](docs/layout.md). Tests: `tests/test_layout_chemistry.py`.
 ## Unreleased: speech under screen-reader engines (branch sr/speech-oracle)
 
 - `scripts/screenreader_speech.py` and `eval/speech_oracle.py` run any set's MathML (ours and the
