@@ -684,7 +684,9 @@ def ce_to_latex(source: str) -> str:
     s = source.replace("~", " ").strip()
     if not s:
         raise CeError("empty")
-    if "$" in re.sub(r"\[[^\]]*\]", "", s):
+    # `[^[\]]`, not `[^\]]`: a failed match stops at the next "[", so many "[" without a "]"
+    # cost linear time, not quadratic (CodeQL py/polynomial-redos).
+    if "$" in re.sub(r"\[[^\[\]]*\]", "", s):
         raise CeError("math inside")  # only an arrow's label may hold it: ->[$\Delta$]
     out: list[str] = []
     i, n = 0, len(s)

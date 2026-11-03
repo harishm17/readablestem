@@ -49,6 +49,7 @@ Alt text (`check_alt`)
 
 from __future__ import annotations
 
+import itertools
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
@@ -721,18 +722,75 @@ ALT_MAX_CHARS = 300
 _REDUNDANT_PREFIX = re.compile(
     r"^\s*(an?\s+|the\s+)?(image|picture|graphic|photo|photograph)\s+of\b", re.I
 )
-_FILE_EXTENSION = re.compile(
-    r"\b[\w\-]+\.(png|jpe?g|gif|svg|bmp|tiff?|webp|heic|pdf|eps|emf|wmf|ai|psd)\b", re.I
+# Picture and document extensions that make alt text a file name ("diagram.png").
+_FILE_EXTENSIONS = frozenset(
+    {"png", "jpg", "jpeg", "gif", "svg", "bmp", "tif", "tiff", "webp", "heic"}
+    | {"pdf", "eps", "emf", "wmf", "ai", "psd"}
 )
+# A run of name characters and dots: one pass over the text, no backtracking.
+_NAME_RUN = re.compile(r"[\w.\-]+")
+_LETTERS = re.compile(r"[A-Za-z]+")
+
+
+def _has_file_name(text: str) -> bool:
+    """A name, a dot, then a picture or document extension that ends there ("fig-2.PNG",
+    "scan.jpeg, page 3"). Read token by token instead of with one pattern, so a long run
+    of name characters costs linear time (CodeQL py/polynomial-redos)."""
+    for run in _NAME_RUN.finditer(text):
+        parts = run.group(0).split(".")
+        for stem, after in itertools.pairwise(parts):
+            letters = _LETTERS.match(after)
+            named = any(c.isalnum() or c == "_" for c in stem)  # not "-" alone, as before
+            if not named or letters is None or letters.group(0).lower() not in _FILE_EXTENSIONS:
+                continue
+            rest = after[letters.end() :]
+            if not rest or not (rest[0].isalnum() or rest[0] == "_"):
+                return True
+    return False
+
+
 # Single-token camera, scan and export names: IMG_2041, DSC0042, figure_3_2, scan-0001.
-_FILE_STEM = re.compile(
-    r"^(img|dsc|dscn|dcim|pxl|image|fig|figure|scan|screenshot|pic|photo)[\W_]*\d[\w\-]*$"
-    r"|^\w+_\w+$",
-    re.I,
+_CAMERA_PREFIXES = tuple(
+    re.compile(p, re.I)
+    for p in (
+        *("img", "dsc", "dscn", "dcim", "pxl", "image", "fig", "figure"),
+        *("scan", "screenshot", "pic", "photo"),
+    )
 )
-# URLs, script URLs, data URIs, HTML tags or entities, Markdown links, LaTeX commands.
+
+
+def _word(c: str) -> bool:
+    return c.isalnum() or c == "_"  # what `\w` matches
+
+
+def _is_file_stem(text: str) -> bool:
+    """A camera, scan or export name (a prefix, separators, a digit, then name characters:
+    "IMG_2041", "scan-0001") or two words joined by "_" ("figure_3"). Plain string tests,
+    the same answers as the pattern `^(prefix)[\\W_]*\\d[\\w\\-]*$|^\\w+_\\w+$` they replace,
+    in linear time (that pattern was quadratic on "a_a_a_..." , CodeQL py/polynomial-redos)."""
+    body = text[:-1] if text.endswith("\n") else text  # `$` also matched before a final newline
+    if body and all(_word(c) for c in body) and "_" in body[1:-1]:
+        return True
+    for prefix in _CAMERA_PREFIXES:
+        found = prefix.match(text)
+        if found is None:
+            continue
+        if found.end() > len(body):
+            continue
+        rest, i = body[found.end() :], 0
+        while i < len(rest) and not rest[i].isalnum():  # `[\W_]*`
+            i += 1
+        # `\d`, then `[\w\-]*` to the end
+        digit = i < len(rest) and rest[i].isdecimal()
+        if digit and all(_word(c) or c == "-" for c in rest[i + 1 :]):
+            return True
+    return False
+
+
+# URLs, script URLs, data URIs, HTML tags or entities, Markdown links, LaTeX commands. A tag's
+# body is `[^<>]*`: a failed match stops at the next "<", so many "<a" with no ">" stay linear.
 _URL_OR_MARKUP = re.compile(
-    r"https?://|\bwww\.|\b(?:javascript|vbscript):|\bdata:[a-z]+/[a-z]|</?[A-Za-z!][^>]*>"
+    r"https?://|\bwww\.|\b(?:javascript|vbscript):|\bdata:[a-z]+/[a-z]|</?[A-Za-z!][^<>]*>"
     r"|&#?\w+;|\]\(|\\[A-Za-z]+",
     re.I,
 )
@@ -818,9 +876,7 @@ def check_alt(alt: str, *, decorative: bool, caption: str | None = None) -> list
         length = _check("alt.length", "too_long", "warning")
     else:
         length = _check("alt.length", None)
-    is_filename = bool(_FILE_EXTENSION.search(text)) or (
-        " " not in text and bool(_FILE_STEM.match(text))
-    )
+    is_filename = _has_file_name(text) or (" " not in text and _is_file_stem(text))
     is_placeholder = _is_placeholder(text, plain)
     is_caption_copy = bool(caption and caption.strip()) and _plain(
         _without_figure_label(text)
