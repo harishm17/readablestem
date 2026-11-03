@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import glob
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -115,7 +116,12 @@ def test_not_converted_equations_are_images_that_shrink_instead():
                  display="block")  # fmt: skip
     fix = Fix(element_id="p1-e0", kind=Kind.EQUATION, status=Status.ABSTAINED, reason="x")
     html = render_html(title="T", lang="en", elements=[eq], fixes=[fix], crops={})
-    assert "tabindex" not in html
+    # An image is not a tab stop. The one tabindex in the file is the skip link's target (an
+    # empty span, tabindex="-1": focusable by the link, not a tab stop; the Canvas paste
+    # version removes it with the link).
+    assert re.findall(r"<[^>]*\btabindex=[^>]*>", html) == [
+        '<span id="main-content" tabindex="-1">'
+    ]
 
 
 # --------------------------------------------------------------------------- Chromium
@@ -183,7 +189,9 @@ def test_the_keyboard_reaches_and_scrolls_a_wide_equation():
     script = """() => [document.activeElement.id,
                        document.getElementById('p1-e0').scrollLeft]"""
     scrolled = "document.getElementById('p1-e0').scrollLeft > 0"
-    before, after = in_chromium(html, script, keys=["Tab", "ArrowRight"], until=scrolled)
+    before, after = in_chromium(
+        html, script, keys=["Tab", "Tab", "ArrowRight"], until=scrolled
+    )  # skip link, then the box
     assert before == ["", 0]
     assert after[0] == "p1-e0" and after[1] > 0
 
@@ -213,9 +221,9 @@ def test_a_wide_inline_equation_scrolls_in_its_box_and_the_page_does_not():
               overflows: box.scrollWidth > box.clientWidth + 1,
               active: document.activeElement.className};
     }"""
-    before, after = in_chromium(paragraph_with([SHORT, long_sum()]), script, keys=["Tab"])
+    before, after = in_chromium(paragraph_with([SHORT, long_sum()]), script, keys=["Tab", "Tab"])
     assert before["page"][0] <= before["page"][1] and before["overflows"]
-    assert after["active"] == "equation-scroll"  # the first tab stop on the page
+    assert after["active"] == "equation-scroll"  # the first tab stop after the skip link
 
 
 @pytest.mark.browser

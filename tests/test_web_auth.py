@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import select
-from starlette.middleware.sessions import SessionMiddleware
 
 from fixtures.web.support import (
     ADMIN,
@@ -15,7 +14,7 @@ from fixtures.web.support import (
     login,
     make_settings,
 )
-from readablestem.web.app import create_app
+from readablestem.web.app import RotatingSessionMiddleware, create_app
 from readablestem.web.db import User, session_scope
 from readablestem.web.security import SecurityHeadersMiddleware
 
@@ -129,8 +128,8 @@ def prod_settings(tmp_path, **overrides):
 def test_production_cookie_is_secure_and_hsts_is_on(tmp_path):
     app = create_app(prod_settings(tmp_path))  # no lifespan: nothing connects to the database
     options = {m.cls: m.kwargs for m in app.user_middleware}
-    assert options[SessionMiddleware]["https_only"] is True
-    assert options[SessionMiddleware]["max_age"] == 7 * 24 * 3600
+    assert options[RotatingSessionMiddleware]["https_only"] is True
+    assert options[RotatingSessionMiddleware]["max_age"] == 7 * 24 * 3600
     assert options[SecurityHeadersMiddleware]["hsts"] is True
 
 

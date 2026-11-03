@@ -138,6 +138,7 @@ from readablestem.pipeline import (
     image_page,
     image_page_check,
     layout,
+    page_labels,
     page_math,
     page_math_reconcile,
     page_type,
@@ -1125,6 +1126,18 @@ def _source_facts(
         return None
 
 
+def _page_labels(pdf_bytes: bytes, pages: list[int]) -> dict[int, str]:
+    """`page_labels.read`, which never raises; none if it did anyway (page markers are a
+    convenience: a bug there must not cost the user a finished conversion)."""
+    lock = getattr(layout, "_LOCK", None)
+    try:
+        with lock if lock is not None else contextlib.nullcontext():
+            return page_labels.read(pdf_bytes, pages)
+    except Exception as exc:
+        log.warning("page labels failed: %s", type(exc).__name__)
+        return {}
+
+
 # --------------------------------------------------------------------------- entry point
 
 
@@ -1498,6 +1511,8 @@ def _convert(
             cached.release()  # also when analysis, a step or `progress` failed
 
         ordered = _ordered_fixes(elements, run.fixes)
+        labels = _page_labels(pdf_bytes, page_list)
+        footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]
         source_facts = _source_facts(pdf_bytes, page_list, elements, ordered)
         with _span(tracer, "assemble", elements=len(elements), fixes=len(ordered)):
             _send(stage_progress, "assemble")
@@ -1510,6 +1525,8 @@ def _convert(
                 source_note=source_note,
                 notice=notice,
                 math_alttext=settings.mathml_alttext,
+                page_labels=labels,
+                footnote_ids=footnotes,
             )
             _send(stage_progress, "checks")
             checks = html_checks.static_checks(html)
@@ -1579,6 +1596,7 @@ def _convert(
         image_only_pages=sorted(kept),
         html_checks=checks,
         page_sizes=dict(zip(doc.pages, doc.page_sizes, strict=False)),
+        page_labels=labels,
         notices=notices,
         source_facts=source_facts,
         lang_source=text.lang_source,
