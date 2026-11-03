@@ -16,6 +16,9 @@ on it. The pipeline that feeds it is in docs/steps.md.
 <style>/* ~25 lines, see "Styling" */</style>
 </head>
 <body>
+<a class="skip-link readablestem" href="#main-content">Skip to main content</a>
+<nav class="toc" aria-label="Contents">...</nav>       (3 or more headings, see "Navigation")
+<span id="main-content"></span>
 <main>
   <p class="notice readablestem" role="note">...</p>   (only when a notice is given)
   ... the document, in reading order ...
@@ -169,7 +172,7 @@ What Canvas still removes, and why that is accepted:
 
 | Element | Converted | Not converted (ABSTAINED, FAILED, REJECTED, no fix) |
 |---|---|---|
-| Heading | `<h1>`-`<h6>` from the heading fix | `<p>` with the original text; a bold line a reviewer rejected ("Make them bold text") is `<p><strong>`, bold as in the PDF |
+| Heading | `<h1>`-`<h6>` from the heading fix (with an `id`, and an entry in the contents list, see "Navigation") | `<p>` with the original text; a bold line a reviewer rejected ("Make them bold text") is `<p><strong>`, bold as in the PDF |
 | Paragraph | `<p>`, inline equations placed at their markers | (no fix) |
 | List item | `<li>` in a `<ul>`/`<ol>`, inline equations placed at their markers (see "Lists") | (no fix) |
 | Inline equation | `<math display="inline">` inside the paragraph or list item (a wide one in a `<span class="equation-scroll">`, see "Wide equations") | the crop inline, outlined, with "(equation not converted)" |
@@ -203,6 +206,112 @@ A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assemb
   time: a straight line rising from the origin." width="437" height="267">
   <figcaption>Figure 2.5 Position against time for a cart moving at constant velocity.</figcaption></figure>
 ```
+
+## Navigation (skip link, contents list, page markers, footnotes)
+
+`pipeline/navigation.py` writes the markup; the assembler decides where it goes. All of it
+is the tool's own words, so it carries `AUTHORED_CLASS` (the wording check reads it, and a
+document in another language marks it `lang="en"`).
+
+- **Skip link.** The first thing in `<body>`: `<a class="skip-link" href="#main-content">`
+  "Skip to main content" (WCAG 2.4.1). It is hidden until focused (`.skip-link:not(:focus)`)
+  and jumps over the contents list to the empty `<span id="main-content">` just before
+  `<main>`. The id is on a span, not on `<main>`, because other code reads the file by the
+  literal `<main>` tag and its first child. No `tabindex` is used (Canvas removes it, and
+  browsers move focus to a fragment's target without one). It is the first tab stop of the
+  file, so a test that tabs through a file presses Tab once more.
+- **Contents list.** `<nav class="toc" aria-label="Contents">` after the skip link and before
+  `<main>`: nested `<ul>` of links to the headings, made from the outline as written (after
+  the repair above, and after the move down of "One h1": the title written as the `<h1>`
+  is not an entry), when there are at least 3 headings (`MIN_TOC_HEADINGS`). It is not
+  written when the PDF has a contents page of its own (an element with the reason
+  `contents entry`, `layout.CONTENTS_ENTRY`; a test keeps the two strings equal): a second list
+  of contents would be one too many, and that page's entries already link to their headings.
+  An equation in a heading is called "[equation]" in the list, as in a title. Every heading has
+  an id, so every entry has a target: the heading's pipeline id (`p3-e7`, the same on every
+  render of a result), or `heading-N` for one whose id is missing or repeated.
+- **Page markers.** Between the blocks, at each source page boundary:
+  `<div class="pagebreak"><hr role="doc-pagebreak" aria-label="Page 12" id="pagebreak-N">
+  <span aria-hidden="true">Page 12</span></div>`. The role is on an `<hr>` because axe accepts
+  `doc-pagebreak` on `hr` only; the same words are visible text beside it, so a reader that
+  drops the role or the label, or an LMS that keeps no pseudo-element rules, still shows the
+  page. The id is by the page's position in the PDF (`pagebreak-N`, N from 1), so it never
+  repeats. A marker is written before the first block of each page that has any, never
+  inside a block of text: a paragraph that runs over a page boundary is one element and
+  stays whole (layout joins it), a list that runs over one keeps one `<ul>` and the marker
+  stands at the start of the item that begins the page, and the same for a glossary entry. A
+  document with blocks on one page only has none. The label of a page is, in order:
+  1. the PDF's own page label (`/PageLabels`: "iv", "12"; `Page.get_label`);
+  2. the number printed alone in the top or bottom 7 % of the page ("7", "Page 7", "- 7 -",
+     "7 of 30", a roman numeral), when at least two pages show a number at the same offset
+     from the PDF's position (so one figure number in a margin is not taken for a page
+     number); an arabic offset also labels the pages between them that print none;
+  3. the page's position in the PDF, 1-based.
+
+  `pipeline/page_labels.py` reads 1 and 2 once after layout (`DocumentResult.page_labels`,
+  0-based page to label, only pages that have one; left out of the JSON when empty). The
+  label is a convenience, so a failure there loses nothing. A part of a long PDF is cut
+  out with its pages' labels (`web/pdf_probe.py extract`), and a page without one is labelled
+  with its number in the whole source (`web.combine.number_part_pages`, "31" for the first
+  page of "31-59"; the file is made again when the first render was before that). A page
+  the instructor left out has no marker, and the student note names it.
+- **Footnotes.** A footnote (the notice `footnote`, `layout._layout_notices`) stays where
+  it falls. Its mark in the text above it already linked to it (`layout._footnote_links`);
+  now the mark's `<a>` has `role="doc-noteref"` and, for the first mark of a note,
+  `id="noteref-<note id>"`; the note is `<div role="doc-footnote" id="<note id>"><p>text
+  <a class="backlink" href="#noteref-<note id>" role="doc-backlink">Back to the text</a></p></div>`,
+  with no backlink when no mark was written for it. It is not a `doc-endnotes` section
+  because the notes are not collected at the end. The assembler is told which elements are
+  footnotes by `render_html(footnote_ids=...)` (from the notices; `rerender_html` does the same).
+  A link between two blocks that is not to a footnote is an ordinary link.
+
+The tab order is the skip link, then the contents list's links, then the file.
+
+How the exports treat it (Canvas's allowlist keeps `nav`, `hr`, `role`, `aria-label`, `id` and
+relative `#` links, and removes `<main>` and `tabindex`; `tests/test_navigation_export.py`):
+
+| Part | `index.html` and the cartridge page | `canvas-page.html` (pasted) |
+|---|---|---|
+| Skip link | kept; shown as a plain link at the top, because `.skip-link:not(:focus)` is a pseudo-class rule Canvas cannot carry | left out with its target (it would jump to `<main>`, which Canvas removes; Canvas's page has its own skip link); the README says so |
+| Contents list | kept | kept, nested as in the source (headings go one level down, the list does not) |
+| Page markers | kept; the page is visible text | kept; the sanitizer changes nothing in them |
+| Footnote links | kept | kept |
+| `tabindex` | none added | none added |
+
+An LMS that removes more (Moodle's purifier is not documented to keep `role` or `aria-*`;
+not verified) leaves the page numbers, the contents entries, the notes' marks and "Back to the
+text" as visible text and working `#` links: `test_if_an_lms_strips_roles_and_labels...`
+removes roles, aria attributes, classes, styles and `hr` and checks that.
+
+## Combining the parts of a long source
+
+A source over the page limit is converted in parts of at most 30 pages, each a document of
+its own (web.md, "Large files in parts"). The results page of a part links "Combine parts" when
+two or more finished parts of the same source are kept: `GET /jobs/{id}/combine` (owner only;
+a GET like the other downloads that reads and changes nothing, so it needs no token) returns
+one HTML file. `pipeline/combine.py` joins the parts' elements, decisions and pictures and
+writes them with the same assembler, so the file has one contents list from all the headings,
+page markers that continue (a part's pages are renumbered to the source's), one student note,
+and each part's equations, figures and tables as in the part.
+
+- **Which parts.** `web/combine.py` `kept_parts`: the same `part_group`, the same owner
+  (`user_id`: another person's part is never in it, whatever the group), finished, not past
+  `retain_until` (an expired part counts as deleted before the purge, as `owned_job` does),
+  and whose `part_label` names as many pages as the part has. In page order. With fewer than
+  two it is a 409 page. Parts still converting, or deleted, are not joined, and the results
+  page says so.
+- **Gaps.** Source pages between the first and last part that no joined part holds are named
+  in the student note ("Pages 5, 6, 7 and 8 of the original PDF were left out of this file.",
+  the sentence for a page the instructor left out), so the file never reads as complete when
+  it is not.
+- **Ids.** `p{n}-e{k}` is rewritten to the source page, which no other part has; any other
+  id gets `s{part number}-` in front. The same rewrite is applied everywhere an id is named,
+  including the equation markers inside text (their length changes, so the offsets of links,
+  colour runs, raised and lowered runs and a glossary term's end move with them) and the pictures.
+- **Title.** The title the instructor chose for the first part, else the source file's name
+  without the part tag and extension; the contact line is the first part's that has one.
+- **Not done.** The file is made when it is asked for and is not stored; it is not offered as
+  a Canvas zip or cartridge (download the parts one by one for those).
 
 ## Tables
 
@@ -814,7 +923,12 @@ must reach 4.5:1 on white, and on `#121212` once the file has any dark rule), an
 
 `html_checks.axe_checks(html)` runs the vendored axe-core 4.14.0
 (`src/readablestem/pipeline/vendor/README.md`) in headless Chromium with the `wcag2a`,
-`wcag2aa` and `wcag21aa` rules. The page runs with networking off. Each violation
+`wcag2aa`, `wcag21aa` and `wcag22aa` rules (`AXE_TAGS`; `wcag22aa` is axe's WCAG 2.2 AA set,
+in 4.14.0 target size, 2.5.8). Run on the output fixtures (the golden files, the LaTeX
+conversions, the test documents of the browser suite) it reported nothing in light or dark
+colours, so no change to the output was needed for it; the one violation it did report while
+the navigation was written (`aria-prohibited-attr`: a role axe accepts on `hr` only) is why the
+page markers are an `hr`. The page runs with networking off. Each violation
 becomes `Check(name="axe.<rule>", code="<rule>")`, an error for serious or critical
 impact and a warning otherwise; only rule ids and impact leave the browser, never page
 content. Without Playwright or its Chromium it returns one

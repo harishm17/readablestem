@@ -726,13 +726,14 @@ class _Renderer:
     def link_attrs(self, link: Link) -> str:
         """The mark of a footnote is a `doc-noteref`; the first one for a note also gets the
         id its backlink returns to."""
-        if link.kind != "internal" or link.target_id not in self.footnote_ids:
+        target = link.target_id
+        if link.kind != "internal" or target is None or target not in self.footnote_ids:
             return ""
         attrs = ' role="doc-noteref"'
-        if link.target_id not in self.noterefs:
-            ref = self.claim_id(f"noteref-{link.target_id}")
+        if target not in self.noterefs:
+            ref = self.claim_id(f"noteref-{target}")
             if ref is not None:
-                self.noterefs[link.target_id] = ref
+                self.noterefs[target] = ref
                 attrs = f' id="{_escape(ref)}"{attrs}'
         return attrs
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Navigation in the output, and combining the parts of a long source (branch feat/output-navigation)
+
+- The converted file now has a skip link, a contents list (`<nav aria-label="Contents">`, nested links to the
+  headings, from 3 headings, and not when the PDF has a contents page of its own), page markers at each source
+  page boundary (`role="doc-pagebreak"`, "Page N": the PDF's page label, else the number printed in the margin,
+  else the PDF position) and footnote links both ways (`doc-noteref`, `doc-footnote`, `doc-backlink`)
+  (`pipeline/navigation.py`, `pipeline/page_labels.py`; docs/output.md "Navigation"). Every heading has an id.
+  Every converted file changes by the skip link; golden files regenerated.
+- Canvas page to paste: the skip link is left out (its target, `<main>`, is removed by Canvas); the contents list,
+  markers and note links are kept. The README in the zip says so. The Common Cartridge page is the zip's
+  `index.html`, unchanged.
+- axe in `html_checks.axe_checks` also runs the `wcag22aa` tag; no output fixture failed it.
+- "Combine parts": one HTML file from a person's own finished, still-kept parts of the same long source, in page
+  order, with one contents list, continuous page markers and ids that cannot clash (`GET /jobs/{id}/combine`,
+  `pipeline/combine.py`, `web/combine.py`; docs/output.md "Combining the parts of a long source"). A part cut from a
+  long PDF keeps its pages' labels.
+- The committed demo (`web/static/demo/index.html`) was not regenerated: that needs a paid conversion run. Its
+  golden test renders the stored result and was regenerated.
+
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 
 - `ANALYTICS_ENABLED` (default false): PostHog loaded from and reporting to the app's own `/m/` proxy

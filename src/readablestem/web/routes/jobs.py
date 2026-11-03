@@ -43,6 +43,7 @@ from readablestem.web import (
     sample,
     upload_result,
 )
+from readablestem.web import combine as combine_rules
 from readablestem.web import feedback as feedback_questions
 from readablestem.web import job_page as page_rules
 from readablestem.web import retry as retry_rules
@@ -1352,6 +1353,49 @@ def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response
         media_type="application/zip",
         headers={
             "Content-Disposition": content_disposition(cartridge_filename(title, job_ref)),
+            "Content-Security-Policy": VIEW_CSP,
+        },
+    )
+
+
+@router.get("/jobs/{job_id}/combine")
+def combine_parts(request: Request, job_id: str, user: UserDep) -> Response:
+    """One HTML file from the finished parts of this document's source that the owner still
+    keeps (`web.combine`, `pipeline.combine`). A GET like the other downloads, for the owner
+    only; it reads and changes nothing, so it needs no CSRF token. A part the person deleted
+    (or that expired) is not in it, and the file names the pages that are missing."""
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
+        job = owned_job(session, job_id, user)
+        require_done(job)
+        kept = combine_rules.kept_parts(session, job)
+        if len(kept) < 2:
+            raise PageError(
+                409,
+                "Nothing to combine yet",
+                "Combining needs at least two finished parts of this file that you still "
+                "have. A part you deleted, or one that has not finished, cannot be joined.",
+                context={"job_id": job.id},
+            )
+        try:
+            html, title = combine_rules.combined_html(
+                session, kept, math_alttext=ctx.settings.mathml_alttext
+            )
+        except combine_rules.combine.CombineError as exc:
+            log_event(logger, "combine_failed", code=exc.code)
+            raise PageError(
+                409,
+                "These parts cannot be joined",
+                "The parts of this file could not be put together. Each part is still its own "
+                "document, and you can download them one by one.",
+                context={"job_id": job.id},
+            ) from None
+        name = download_filename(f"{title} combined", job.part_group or job.id)
+    return Response(
+        html,
+        media_type="text/html; charset=utf-8",
+        headers={
+            "Content-Disposition": content_disposition(name),
             "Content-Security-Policy": VIEW_CSP,
         },
     )
