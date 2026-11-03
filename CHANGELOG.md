@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased: handwriting harness for private handwritten notes
+
+- `scripts/handwriting_own.py`: intake of PDFs from a folder outside the repo, a hash-based dev and
+  held-out split registered privately, a blank answer-key form served on 127.0.0.1
+  (`scripts/handwriting_gold_form.html`, no model draft) and a `run` command capped by `--max-usd`
+  (at most 2.00 in total across restarts). `run` sends the PDFs to the model provider. Every command
+  refuses a path inside a git repository; `.gitignore` guards the usual private folder names.
+  Use: [docs/eval-handwriting.md](docs/eval-handwriting.md), "Your own handwritten notes".
+## Unreleased: canonical comparator for two readings (branch eq/math-canonical)
+
+- `pipeline/math_canonical.py`: one comparator for "is this the same formula" (tree, notation-neutral,
+  spoken-equal, symbols) with a reason when it is not. The registered scorer scripts are untouched;
+  tests check the library agrees with them. `tests/test_realworld_registration.py` runs
+  `realworld_register.py --check` for every registered set. No product behaviour changes yet
+  ([docs/steps.md](docs/steps.md), "Comparing two readings").
+## Unreleased
+
+- Equation diagnostics on the recorded real-world runs, no model and no cost: `scripts/eq_diag_tables.py` (why maths in
+  table cells is missed), `scripts/eq_diag_glyphs.py` (glyph evidence of undetected and span-wrong equations),
+  `scripts/eq_diag_unflagged.py` (why wrong equations with other symbols were not flagged). Counts and sample sizes in
+  [docs/eval-equation-diagnostics.md](docs/eval-equation-diagnostics.md). No product behaviour changes.
 ## Unreleased: finished steps are kept when a configuration error ends the run
 
 - When a configuration error (a model that is not set up) ended a conversion while other
