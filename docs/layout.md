@@ -1463,7 +1463,13 @@ figure with a short description, table as a grid), each with a box on a 0 to 100
 confidence, an unreadable word being the marker `[illegible]`. `image_page.build` makes elements
 of them (ids `p{page}-e{n}`, `Element.reasons` has "image page", `Element.image_confidence` the
 model's word), validates every LaTeX and table grid, trims each box to the ink in it, and
-decides each fix:
+decides each fix. A block may also list `alternatives`: symbols of its formulas the reader read one way and
+may have been drawn another way, with other LaTeX for each. They are kept on the equation element as
+`Element.alternatives` (`ReadingAlternatives`: the reading, and for each doubt a span of it, its kind and its
+options; `core/types.py`), for the review to offer as choices; nothing reads them yet, and a block the reader
+called `high` that lists one is `medium`. With course notation in force, the page reader gets it as context
+(`image_page_notation.md`). docs/eval-handwriting.md, "Image page prompts", has the definitions and the first
+measurement. The decisions:
 
 | Block | What it becomes | Tier |
 |---|---|---|

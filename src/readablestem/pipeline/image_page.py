@@ -64,15 +64,18 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from readablestem.config import ConfigError, Settings
 from readablestem.core import triage, types
 from readablestem.core.budget import BudgetExceeded
 from readablestem.core.types import (
     IMAGE_PAGE_OMISSION_REASON,
+    MAX_DOUBTS_PER_READING,
+    MAX_OPTIONS_PER_DOUBT,
     BBox,
     Check,
+    DoubtKind,
     Element,
     EquationFix,
     FigureFix,
@@ -81,8 +84,11 @@ from readablestem.core.types import (
     ImagePagesSummary,
     Kind,
     ModelCall,
+    NotationEntry,
     Notice,
+    ReadingAlternatives,
     Status,
+    SymbolAlternative,
     TableFix,
     inline_marker,
 )
@@ -93,6 +99,7 @@ from readablestem.pipeline import (
     equation_images,
     equation_step,
     layout,
+    notation_memory,
     table_step,
 )
 from readablestem.pipeline import image_page_check as second
@@ -103,6 +110,9 @@ log = logging.getLogger(__name__)
 
 PROMPT_NAME = "image_page"
 PROMPT_VERSION = load_prompt(PROMPT_NAME).version
+# Appended to the prompt only when the conversion has course notation, which then goes as
+# fenced context (`notation_memory.notation_context`); runs without it keep `PROMPT_VERSION`.
+NOTATION_PROMPT_NAME = "image_page_notation"
 
 # `Element.reasons` of everything made from an image page, of the page's own picture, and of
 # an equation whose box could not be used (so it has no second reading).
@@ -179,8 +189,33 @@ class Row(BaseModel):
     cells: list[Cell] = Field(description="The row's cells, left to right.")
 
 
+class SymbolDoubt(BaseModel):
+    """A symbol of a formula the reader read one way and may have been drawn another way,
+    with the other LaTeX it may be. The reader names the symbol and which time it stands in
+    the formula, not a character offset (a model cannot count characters); `resolve_doubts`
+    finds the stretch in the stored LaTeX and drops what it cannot find, so a doubt that does
+    not point at anything costs nothing."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    run: int = Field(
+        description="Position in `runs` of the math run the symbol is in; 0 for an equation."
+    )
+    symbol: str = Field(description="The symbol as it stands in the reader's LaTeX.")
+    occurrence: int = Field(description="1 for the first time the symbol stands, 2 for the second.")
+    kind: DoubtKind
+    options: list[str] = Field(
+        description="One to three other LaTeX spellings of that stretch, likeliest first."
+    )
+
+
 class Block(BaseModel):
-    """One piece of the page. Fields that do not apply to its kind are empty."""
+    """One piece of the page. Fields that do not apply to its kind are empty.
+
+    `alternatives` has a default so that answers recorded before it existed still parse. A
+    block called `high` that lists a doubt is `medium` (the validator below): the doubt is the
+    definition of `medium` in the prompt, and a reader that contradicts itself must not make a
+    block quieter than the doubt it names."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
@@ -198,6 +233,19 @@ class Block(BaseModel):
     description: str = Field(description="A figure's short description; else empty.")
     caption: str = Field(description="A figure's or table's printed caption; else empty.")
     rows: list[Row] = Field(description="A table's rows; else empty.")
+    alternatives: list[SymbolDoubt] = Field(
+        default_factory=list,
+        description="Doubtful symbols of the block's formulas with what else each may be; "
+        "empty when every symbol is clear.",
+    )
+
+    @model_validator(mode="after")
+    def _doubt_is_not_high(self) -> Block:
+        if self.confidence == "high" and any(
+            d.symbol.strip() and any(o.strip() for o in d.options) for d in self.alternatives
+        ):
+            self.confidence = "medium"
+        return self
 
 
 class ImagePageOutput(BaseModel):
@@ -232,17 +280,35 @@ class PageRead:
 class PassResult:
     reads: dict[int, PageRead] = field(default_factory=dict)
     stopped: BudgetExceeded | None = None
+    # The course notation the pages were read with; the recovery of left-out stretches reads
+    # with the same.
+    notation: tuple[NotationEntry, ...] = ()
 
 
-def build_request(settings: Settings, png: bytes) -> VisionRequest:
-    """The request for one page: the page picture only (there is no text to give)."""
+def build_request(
+    settings: Settings,
+    png: bytes,
+    notation: Sequence[NotationEntry] = (),
+) -> VisionRequest:
+    """The request for one page: the page picture, and the course notation in force (when the
+    conversion has any) as fenced context with the prompt section that says how to use it. With
+    none, the request is the picture and `PROMPT_VERSION`'s prompt alone, as it always was.
+    `notation` is read by the caller on its own thread (`notation_memory.entries_in_force`
+    follows the conversion's context, which a pool thread does not have)."""
     prompt = load_prompt(PROMPT_NAME)
+    instructions, version, context = prompt.text, prompt.version, None
+    if notation:
+        extra = load_prompt(NOTATION_PROMPT_NAME)
+        instructions = prompt.text.rstrip("\n") + "\n" + extra.text
+        version = f"{prompt.version}+{extra.version}"
+        context = notation_memory.notation_context(notation, None)
     return VisionRequest(
         step="image_page",
         model=settings.image_pages_model or settings.main_model,
-        prompt_version=prompt.version,
-        instructions=prompt.text,
+        prompt_version=version,
+        instructions=instructions,
         images=[png],
+        context_text=context,
         max_output_tokens=MAX_OUTPUT_TOKENS,
         image_detail="high",
         effort=settings.anthropic_effort_image_pages or DEFAULT_EFFORT,
@@ -250,11 +316,17 @@ def build_request(settings: Settings, png: bytes) -> VisionRequest:
     )
 
 
-def read_page(client: VisionClient, settings: Settings, page: int, png: bytes) -> PageRead:
+def read_page(
+    client: VisionClient,
+    settings: Settings,
+    page: int,
+    png: bytes,
+    notation: Sequence[NotationEntry] = (),
+) -> PageRead:
     """Ask for one page's blocks. Never raises for a bad answer (a refused, cut-off or
     invalid one is a read with no output); `BudgetExceeded`, `ConfigError` and
     `UnknownModelError` propagate."""
-    parsed, call = client.run(build_request(settings, png), ImagePageOutput)
+    parsed, call = client.run(build_request(settings, png, notation), ImagePageOutput)
     return PageRead(page, parsed, [call], call.outcome, png)
 
 
@@ -269,7 +341,7 @@ def run(
     thread, since PyMuPDF is not thread-safe). A page whose picture cannot be made is a read
     with outcome "no_image". A budget refusal stops the pass: the pages answered before it
     stay, the others are not read."""
-    result = PassResult()
+    result = PassResult(notation=tuple(notation_memory.entries_in_force()))
     work: dict[int, bytes] = {}
     for number, render in sorted(pages.items()):
         try:
@@ -284,7 +356,7 @@ def run(
 
     def one(number: int) -> tuple[int, PageRead | None, Exception | None]:
         try:
-            return number, read_page(client, settings, number, work[number]), None
+            return number, read_page(client, settings, number, work[number], result.notation), None
         except (BudgetExceeded, ConfigError, UnknownModelError) as exc:
             return number, None, exc
         except Exception as exc:
@@ -432,7 +504,9 @@ def recover_omissions(
                 )
                 if picture is None:
                     continue
-                parsed, call = client.run(build_request(settings, picture), ImagePageOutput)
+                parsed, call = client.run(
+                    build_request(settings, picture, result.notation), ImagePageOutput
+                )
                 calls.append(call)
                 if parsed is None:
                     continue
@@ -595,6 +669,82 @@ def _spaced(parts: list[tuple[str, str]]) -> list[str]:
     return out
 
 
+# ----------------------------------------------------------------------- the doubts
+
+# A LaTeX token: a command (`\\rho`), an escaped character (`\\%`), or one other character.
+_TOKEN = re.compile(r"\\[A-Za-z]+|\\.|\S", re.DOTALL)
+MAX_DOUBTS_READ = 4 * MAX_DOUBTS_PER_READING  # entries of a block looked at, resolved or not
+
+
+def _tokens(text: str) -> list[tuple[str, int, int]]:
+    return [(m.group(), m.start(), m.end()) for m in _TOKEN.finditer(text)]
+
+
+def find_symbol(latex: str, symbol: str, occurrence: int) -> tuple[int, int] | None:
+    """The span `(start, end)` of the `occurrence`-th time `symbol` stands in `latex`, counted
+    in LaTeX tokens (so `x` is never found inside `\\max` or `\\exp`, and `f_i` is the three
+    tokens `f`, `_`, `i`), or None. Matches do not overlap."""
+    want = [token for token, _, _ in _tokens(symbol)]
+    if not want or occurrence < 1:
+        return None
+    have = _tokens(latex)
+    seen = 0
+    at = 0
+    while at + len(want) <= len(have):
+        if [token for token, _, _ in have[at : at + len(want)]] == want:
+            seen += 1
+            if seen == occurrence:
+                return have[at][1], have[at + len(want) - 1][2]
+            at += len(want)
+        else:
+            at += 1
+    return None
+
+
+def resolve_doubts(
+    doubts: Sequence[SymbolDoubt], run: int, latex: str, display: Literal["block", "inline"]
+) -> ReadingAlternatives | None:
+    """The reader's doubts about one formula as spans of `latex` (the formula as stored), or
+    None when none survives. A doubt is dropped when its symbol is not found, when an option is
+    empty, the symbol itself or a repeat, and an option is dropped when putting it in place
+    leaves LaTeX that does not convert: a choice that breaks the equation is no choice. Doubts
+    that overlap an earlier one are dropped, and at most `MAX_DOUBTS_PER_READING` stay."""
+    found: list[SymbolAlternative] = []
+    for doubt in doubts[:MAX_DOUBTS_READ]:
+        if doubt.run != run:
+            continue
+        span = find_symbol(latex, doubt.symbol, doubt.occurrence)
+        if span is None:
+            continue
+        start, end = span
+        current = latex[start:end]
+        options: list[str] = []
+        for option in doubt.options[: 2 * MAX_OPTIONS_PER_DOUBT]:
+            option = option.strip()
+            if not option or option == current or option in options:
+                continue
+            mathml, checks = equation_step._convert(latex[:start] + option + latex[end:], display)
+            if mathml is None or has_errors(checks):
+                continue
+            options.append(option)
+            if len(options) == MAX_OPTIONS_PER_DOUBT:
+                break
+        if options:
+            found.append(
+                SymbolAlternative(
+                    start=start, end=end, symbol=current, kind=doubt.kind, options=options
+                )
+            )
+    kept: list[SymbolAlternative] = []
+    for alternative in sorted(found, key=lambda a: a.start):
+        if kept and alternative.start < kept[-1].end:
+            continue
+        kept.append(alternative)
+    if not kept:
+        return None
+    return ReadingAlternatives(latex=latex, symbols=kept[:MAX_DOUBTS_PER_READING])
+
+
 # ------------------------------------------------------------------------- building
 
 
@@ -660,10 +810,11 @@ class _Builder:
 
 
 def _inline_equation(
-    latex: str, parent: str, box: BBox, builder: _Builder, block: Block
+    latex: str, parent: str, box: BBox, builder: _Builder, block: Block, run: int = 0
 ) -> Element | None:
-    """The inline equation element and its fix for one formula run, or None when the LaTeX
-    does not validate (the formula then stays in the text)."""
+    """The inline equation element and its fix for one formula run (the `run`-th of the
+    block's runs, which the reader's doubts name), or None when the LaTeX does not validate
+    (the formula then stays in the text)."""
     cleaned = equation_step.strip_trailing_punctuation(equation_step.read_latex(latex))
     if not cleaned.strip():
         return None
@@ -682,6 +833,7 @@ def _inline_equation(
         parent_id=parent,
         reasons=[IMAGE_PAGE_REASON, NO_CROP_REASON],
         image_confidence=block.confidence,
+        alternatives=resolve_doubts(block.alternatives, run, cleaned, "inline"),
     )
     builder.fixes[element_id] = Fix(
         element_id=element_id,
@@ -703,14 +855,14 @@ def _runs_text(
     parts: list[tuple[str, str]] = []
     inline: list[Element] = []
     invalid = 0
-    for run_ in block.runs[:MAX_RUNS]:
+    for position, run_ in enumerate(block.runs[:MAX_RUNS]):
         if run_.kind == "text":
             if run_.value:
                 parts.append(("text", scrub(run_.value)))
             continue
         if not run_.value.strip():
             continue
-        element = _inline_equation(run_.value, parent, box, builder, block)
+        element = _inline_equation(run_.value, parent, box, builder, block, position)
         if element is None:
             invalid += 1
             literal = _clean_literal(run_.value)
@@ -895,8 +1047,12 @@ def lone_formula(block: Block) -> Block | None:
     mathml, checks = equation_step._convert(latex, "block")
     if not latex.strip() or mathml is None or has_errors(checks):
         return None
+    position = next(i for i, r in enumerate(block.runs) if r.kind == "math" and r.value.strip())
     return block.model_copy(
         update={
+            "alternatives": [
+                d.model_copy(update={"run": 0}) for d in block.alternatives if d.run == position
+            ],
             "kind": "equation",
             "latex": latex,
             "label": block.marker if block.kind == "list_item" else "",
@@ -930,6 +1086,7 @@ def _add_equation(block: Block, builder: _Builder, *, skip_marker: bool = False)
         image_confidence=block.confidence,
         page_latex=latex if reading else None,
         page_status="span" if reading and usable else None,
+        alternatives=resolve_doubts(block.alternatives, 0, latex, "block") if reading else None,
     )
     builder.add(element)
     builder.low_confidence += block.confidence != "high"

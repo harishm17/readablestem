@@ -34,6 +34,7 @@ The committed development-set reports (checked against the files by `tests/test_
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same |
 | `latest-headings.json` | 2026-11-02 | 0.5.1 | same (the task calls no model; run with the fake client, model fields kept from the earlier run; `baseline-headings.json` stays the 2026-10-14 file) |
 | `latest-equations.json`, `latest-document.json`, `latest-tables-local.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`) |
+| `latest-image-pages.json` | 2026-11-03 | 0.5.2 | claude-opus-5-5 (the scanned and handwritten pages pass on a 10-page practice set, 74 expressions; one run, no baseline and no gate: it records what the image page prompts measured when they last changed, "Image page prompts" in [eval-handwriting.md](eval-handwriting.md)) |
 
 The dates are when the runs were made, not when the code was last changed: what keeps a
 latest report from going stale is the gate's `--require-current` check on prompt versions and
@@ -890,7 +891,10 @@ unchanged is not a change) fails unless it also changes the matching
 `scripts/eval_guard.py` (tests: `tests/test_eval_guard.py`): a prompt needs the reports of
 the tasks that use it (`equation*.md`: equations and document; `figure*.md`: figures and
 document; `judge_*`: figures; `check_equation` and `check_figure`: that task; `table.md`:
-tables local and document; any other prompt: document); a change to the Claude model pair
+tables local and document; `image_page*.md`, `IMAGE_PAGES_MODEL` and
+`ANTHROPIC_EFFORT_IMAGE_PAGES`: `latest-image-pages.json`, the run of the scanned and handwritten
+pages pass on the practice set, because the document task reads typed PDFs and never calls that
+pass; any other prompt: document); a change to the Claude model pair
 needs all four Claude reports (equations, headings, figures, document); the OpenAI pair
 needs the tables report, which records it; any other model setting needs the document
 report.

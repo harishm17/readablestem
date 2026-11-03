@@ -622,6 +622,81 @@ per arm, the scanned PDF and the vector-ink PDF, with the pipeline of that date)
   picture or a page of writing as not making it typed (docs/layout.md, page-type-v5.5). The thresholds
   rest on those three pages and the repository's fixtures, not on a measured rate.
 
+## Image page prompts: doubtful symbols, `medium`, course notation, chemistry (2026-11-03)
+
+What changed in `image_page.md` (the page prompt), `image_page_crops.md` (the second reading of a
+line) and the new `image_page_notation.md`, and what one run on the practice set above measured.
+The report is `data/eval/latest-image-pages.json` (aggregates only; the set and its answer key are
+CC BY-NC-SA and stay out of the repository). The eval guard asks for it when these prompts, `IMAGE_PAGES_MODEL`
+or `ANTHROPIC_EFFORT_IMAGE_PAGES` change (docs/eval.md, "Eval guard").
+
+**What the reader now returns.** Beside each block, `alternatives`: the symbols of its formulas that
+the reader read one way and may have been drawn another way (a letter's case, Greek or Latin,
+`1`, `l` or `|`, `z` or `2`, `\times` or `x`, a minus or a dash, a script lost or added), each with
+one to three other LaTeX spellings of that stretch. The reader names the symbol and which time it
+stands in the formula (`SymbolDoubt`: `run`, `symbol`, `occurrence`, `kind`, `options`); it is not
+asked to count characters. `image_page.resolve_doubts` finds the stretch in the LaTeX as it is
+stored and keeps `ReadingAlternatives` on the element (`core/types.py`: `Element.alternatives`,
+`SymbolAlternative` with `start`, `end`, `symbol`, `kind`, `options`; `apply(symbol, option)` gives the
+reading with a choice in place). A doubt is dropped when its symbol is not found, an option is
+dropped when it is the symbol itself, a repeat, or leaves LaTeX that does not convert, and at most
+three doubts of three options stay on a formula. `ReadingAlternatives.latex` is the reading the offsets
+belong to: the inline equation's own LaTeX, or `Element.page_latex` for a display equation, whose
+final reading may come from the crop and then differ, so a consumer offers the choices only for
+the string they belong to. The field is optional in the schema, so answers recorded before it still
+parse and replay.
+
+**Prompt changes.**
+
+- Rule 7 no longer makes a Greek-looking letter Greek "when the context is physical or
+  mathematical" (which was always). A letter is Greek when it has the Greek shape; the rest of the page is
+  the evidence for a doubtful one; the subject does not decide.
+- `medium` now means one or two doubts the reader can name (listed in `alternatives` for maths); `low`
+  is three or more, or a part with no second reading; `high` is none. Needing the line around a symbol
+  to read it clear is not a doubt. A block called `high` that lists a doubt is read as `medium`
+  (`Block`'s validator), so a reader that contradicts itself is never quieter than its own doubt.
+- Course notation (`FEATURE_NOTATION_MEMORY`, `pipeline/notation_memory.py`) reaches the page reader as
+  fenced context with the `image_page_notation.md` section, only when the conversion has some;
+  with none the request is as it was. It settles a letter the strokes leave open and never adds a
+  symbol.
+- Chemistry: species and reactions are written `\ce{...}` with the same subset the equation prompt teaches
+  and `pipeline/chem.py` accepts (a test runs the prompt's examples through `expand_ce`); the
+  second reading's prompt says the same so the two compare.
+- Handwritten maths stays a required decision in every case (`enforce_maths_required` is untouched).
+
+**One run on the practice set** (74 expressions on 10 pages; `claude-opus-5-5`; $0.64 for the run,
+the page pass $0.52; one run per prompt, so sampling noise is not measured; the earlier run with
+`image_page-7a9e3a80` is the control, the same 74 expressions):
+
+| | previous prompt | this prompt |
+|---|---|---|
+| exact_lenient, primary (n = 74) | 49 (0.66) | 44 (0.59) |
+| spoken-equal (the speech code says the reading and the label alike) | 53 | 47 |
+| required decisions, 10 pages | 28 | 28 |
+
+- **Reading accuracy did not improve, and may have fallen.** Spoken-equal: 2 expressions gained, 8
+  lost (exact binomial p about 0.11; exact_lenient on my copy of the scorer: 2 gained, 7 lost, p about 0.18).
+  Four of the eight losses are a letter's case (`x` read `X`, `W` for `w`, `C` for `c`); two are spellings
+  of the same notation; two are other letters. One run each cannot separate this from sampling noise.
+  Removing the Greek bias did not show as a gain here: Greek letters read as Latin remain
+  (`w` for `\omega`).
+- **Alternatives are not selective.** 50 of 74 expressions carry at least one (61 doubts, 67 options: 6.1
+  doubts and 6.7 choices per page), and 28 of those 50 were already right. 22 of the 30 wrong
+  page readings carry some.
+- **Coverage.** The gold reading was among the reading's one-click choices for 8 of the 30 wrong page
+  readings (0.27, 95% interval 0.14 to 0.44). Of the 18 that differ from the label in one short
+  stretch (some only in notation: `\ldots` for `...`, `\cdots`, `\perp` spacing), 7 were covered (0.39, interval
+  0.20 to 0.61); 6 had alternatives that did not hold the right option and 5 had none. Below
+  the 0.60 set before the run. Counting a click, the right reading was the page reading or one choice away
+  for 52 of 74 (0.70), against 44 of 74 (0.59) for the page reading alone.
+- **Does not show:** anything about notes written on an iPad (the ink is MathWriting's, drawn on
+  composed pages and degraded like a scan); a rate for a prompt change (one run, one writer mix); whether the
+  choices would be clicked or ignored in review (no review screen shows them yet).
+
+**What would tighten it, not run (a second run would have gone over the probe's $1 cap):** a prompt that lists
+a doubt only when the strokes fit both readings about equally, and a second run to see whether
+the case losses are the new definition of `medium` or noise.
+
 ## Reproduce
 
 ```

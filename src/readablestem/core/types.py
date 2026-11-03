@@ -468,6 +468,71 @@ class HeadingFix(BaseModel):
     text: str
 
 
+# What else a doubtful symbol of a handwritten reading may be (`pipeline.image_page`): how many
+# symbols a formula lists and how many options each has. More would be a menu, not a choice.
+MAX_DOUBTS_PER_READING = 3
+MAX_OPTIONS_PER_DOUBT = 3
+DoubtKind = Literal["case", "greek_latin", "digit_letter", "operator", "script", "other"]
+
+
+class SymbolAlternative(BaseModel):
+    """One doubtful symbol of a reading: the stretch `latex[start:end]` of the reading (`symbol`,
+    as a check) and the other LaTeX it may be, likeliest first. Choosing an option replaces that
+    stretch (`ReadingAlternatives.apply`). `kind` says why it is doubtful, for the wording of the
+    choice: a letter's case, Greek against Latin, a digit against a letter, an operator, a
+    script lost or added, or something else."""
+
+    start: int = Field(ge=0)
+    end: int = Field(ge=1)
+    symbol: str
+    kind: DoubtKind = "other"
+    options: list[str] = Field(min_length=1, max_length=MAX_OPTIONS_PER_DOUBT)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> SymbolAlternative:
+        if self.end <= self.start:
+            raise ValueError("a symbol must end after it starts")
+        return self
+
+
+class ReadingAlternatives(BaseModel):
+    """The doubts of one expression the page reader gave, for the review to offer as one-click
+    choices (data from the reader's own answer; nothing here is a reading the page shows).
+
+    `latex` is the reading the offsets belong to: the page reader's LaTeX as stored (after
+    `\\ce` is written out and the wrappers are removed). It is the element's `Fix.equation.latex`
+    for an inline equation and `Element.page_latex` for a display equation, whose final reading
+    may come from the crop and then differ: a consumer offers the choices only for the string
+    they belong to, never for another one. `symbols` are in reading order and do not overlap, and
+    each `symbol` is `latex[start:end]` (enforced), so a stored value is always consistent."""
+
+    latex: str
+    symbols: list[SymbolAlternative] = Field(min_length=1, max_length=MAX_DOUBTS_PER_READING)
+
+    @model_validator(mode="after")
+    def _consistent(self) -> ReadingAlternatives:
+        previous_end = 0
+        for symbol in self.symbols:
+            stretch = self.latex[symbol.start : symbol.end]
+            if symbol.end > len(self.latex) or stretch != symbol.symbol:
+                raise ValueError("a symbol must be the stretch of the reading it points at")
+            if symbol.start < previous_end:
+                raise ValueError("symbols must be in reading order and not overlap")
+            previous_end = symbol.end
+        return self
+
+    def apply(self, symbol: int, option: int) -> str:
+        """The reading with the `symbol`-th doubt's `option`-th choice in place (indexes into
+        `symbols` and its `options`; IndexError when out of range)."""
+        chosen = self.symbols[symbol]
+        return self.latex[: chosen.start] + chosen.options[option] + self.latex[chosen.end :]
+
+    @property
+    def choices(self) -> int:
+        """How many one-click choices these doubts give (every option of every symbol)."""
+        return sum(len(s.options) for s in self.symbols)
+
+
 class Element(BaseModel):
     """Something on a page, in document reading order."""
 
@@ -519,6 +584,10 @@ class Element(BaseModel):
     image_confidence: Literal["high", "medium", "low"] | None = Field(
         default=None, exclude_if=lambda v: v is None
     )
+    # Equations read from an image of a handwritten page: the symbols the page reader named as
+    # doubtful, with what else each may be (`ReadingAlternatives`, which says which string its
+    # offsets belong to). None when the reader listed none, and for everything else.
+    alternatives: ReadingAlternatives | None = Field(default=None, exclude_if=lambda v: v is None)
     # Tables: the grid layout built from the PDF's own words and lines (source "local").
     table: TableGrid | None = None
     # Paragraphs: program code. `text` keeps its line breaks and the indentation it was

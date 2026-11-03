@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased: the page reader names its doubts (branch hw/schema-prompt)
+
+- The scanned and handwritten pages reader returns, with each block, `alternatives`: the symbols of its
+  formulas it read one way and that may be another (case, Greek or Latin, digit or letter, an operator,
+  a script lost or added), with one to three other LaTeX spellings each. `Element.alternatives`
+  (`ReadingAlternatives`, `SymbolAlternative` in `core/types.py`) holds them as spans of the stored
+  reading, checked and with every option tested to convert; nothing in the review shows them yet.
+  The new field is optional: answers recorded before it parse and replay as they were.
+- `image_page.md`: rule 7 no longer makes a Greek-looking letter Greek in a mathematical context; `medium` means one
+  or two doubts the reader can name (`low`: three or more, or no second reading; `high`: none), and a
+  `high` block that lists a doubt is read as `medium`; chemistry is written `\ce{...}` with the subset
+  `chem.py` accepts; `image_page_crops.md` says the same. Course notation reaches the page reader as
+  context (new `image_page_notation.md`), only when the conversion has some. Handwritten maths is still
+  always a required decision.
+- Eval guard: the image page prompts, `IMAGE_PAGES_MODEL` and `ANTHROPIC_EFFORT_IMAGE_PAGES` need
+  `data/eval/latest-image-pages.json`, a run of the pass on a practice set (new, 74 expressions on 10
+  pages, one run per prompt). On it the new prompt read 44 of 74 expressions exactly (the previous
+  prompt 49, a paired difference inside one run's noise), 50 of 74 carried alternatives, and the right
+  reading was one choice away for 7 of the 18 one-symbol errors. docs/eval-handwriting.md, "Image
+  page prompts".
+
 ## Unreleased: the MathML shape for screen readers (branch mathml/screenreader-shape)
 
 - Chemistry MathML is shaped for MathCAT (NVDA, JAWS) at the one place MathML is made from LaTeX

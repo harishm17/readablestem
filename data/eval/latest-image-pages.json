@@ -1,0 +1,617 @@
+{
+  "schema_version": 1,
+  "task": "image-pages",
+  "date": "2026-11-03",
+  "pipeline_version": "0.5.2",
+  "prompt_versions": {
+    "equation": "equation-68ebbbf9",
+    "figure": "figure-ac51f42d",
+    "image_page": "image_page-90d6ada5",
+    "table": "table-b3769ce7"
+  },
+  "models": {
+    "main": "claude-opus-5-5",
+    "cheap": "claude-haiku-5-5"
+  },
+  "models_used": [
+    "claude-opus-5-5"
+  ],
+  "client": "anthropic",
+  "dataset": {
+    "label": "practice set: 10 composed pages (5 units), 74 expressions (28 display, 46 inline) of handwriting ink written to scanned PDFs; the set and its gold are CC BY-NC-SA and are not in this repository",
+    "manifest_sha256": "f92b86fbc09023b5a8f3a9cce0a95ded1210aa8b433f29eac7acc215262cf0bb",
+    "selection_sha256": "4a41838a7b0b5e1084e2bf7ca5b0c5197fee8e24c3ac34b5bb3a3cfe50a8f2a6",
+    "unit": "page"
+  },
+  "n_planned": 5,
+  "n": 5,
+  "complete": true,
+  "stopped_reason": null,
+  "metrics": {
+    "gold_equations": 74,
+    "predicted_equations": 74,
+    "matched": 74,
+    "detection_precision": 1.0,
+    "detection_recall": 1.0,
+    "detection_recall_by_display": {
+      "block": {
+        "n_gold": 28,
+        "recall": 1.0
+      },
+      "inline": {
+        "n_gold": 46,
+        "recall": 1.0
+      }
+    },
+    "matched_exact_lenient": 0.5945945945945946,
+    "matched_mean_teds": 0.9399909807038963,
+    "end_to_end_exact_lenient": 0.5945945945945946,
+    "unmatched_predicted": 0,
+    "unmatched_by_reason": {
+      "prose_math": 0,
+      "fragment": 0,
+      "other": 0
+    },
+    "detection_precision_excluding_prose_math": 1.0,
+    "unmatched_text_layer_supported": 0,
+    "unmatched_text_layer_supported_by_reason": {
+      "prose_math": 0,
+      "fragment": 0,
+      "other": 0
+    },
+    "unmatched_not_supported": 0,
+    "detection_precision_excluding_text_layer_supported": 1.0,
+    "split_gold_equations": 0,
+    "secondary_stream_v2": {
+      "label": "stream v2 (secondary; the primary scorer is exact_lenient)",
+      "matched_exact": 0.6216216216216216,
+      "matched_mean_similarity": 0.9427991850702521,
+      "end_to_end_exact": 0.6216216216216216,
+      "end_to_end_exact_with_credit": 0.6216216216216216,
+      "credited_split": 0,
+      "credited_merged": 0
+    },
+    "secondary_symbols": {
+      "label": "symbols (secondary; tables flattened; the primary scorer is exact_lenient)",
+      "matched_exact": 0.6621621621621622,
+      "matched_mean_similarity": 0.9532588605737692,
+      "end_to_end_exact": 0.6621621621621622,
+      "end_to_end_exact_with_credit": 0.6621621621621622,
+      "credited_split": 0,
+      "credited_merged": 0
+    },
+    "static_violations": 0,
+    "static_violation_codes": {},
+    "axe_violations": 0,
+    "axe_violation_codes": {},
+    "axe_checked_pages": 5,
+    "axe_skipped_pages": 0,
+    "axe_error_pages": 0,
+    "page_errors": {},
+    "review_load": {
+      "required_decisions": 28,
+      "required_fixes": 28,
+      "optional": 5,
+      "none": 46,
+      "required_by_kind": {
+        "equation": 28
+      },
+      "optional_by_kind": {
+        "heading": 5
+      },
+      "required_by_reason": {
+        "no_text_layer": 28,
+        "page_reading_mismatch": 11
+      },
+      "optional_by_reason": {
+        "image_page": 5
+      },
+      "sections": 5,
+      "pdf_pages": 10,
+      "required_per_section": 5.6,
+      "required_per_pdf_page": 2.8,
+      "optional_per_pdf_page": 0.5,
+      "equation_flags": {
+        "units": 74,
+        "required_units": 28,
+        "required_units_wrong": 12,
+        "wrong": 30,
+        "wrong_required": 12,
+        "flag_precision": 0.42857142857142855,
+        "flag_recall": 0.4
+      },
+      "equation_flags_excluding_scorer_gaps": {
+        "units": 74,
+        "required_units": 28,
+        "required_units_wrong": 12,
+        "wrong": 30,
+        "wrong_required": 12,
+        "flag_precision": 0.42857142857142855,
+        "flag_recall": 0.4
+      },
+      "heading_flags": {
+        "units": 5,
+        "required_units": 0,
+        "required_units_wrong": 0,
+        "wrong": 5,
+        "wrong_required": 0,
+        "flag_precision": null,
+        "flag_recall": 0.0
+      },
+      "flags": {
+        "units": 79,
+        "required_units": 28,
+        "required_units_wrong": 12,
+        "wrong": 35,
+        "wrong_required": 12,
+        "flag_precision": 0.42857142857142855,
+        "flag_recall": 0.34285714285714286
+      },
+      "flags_excluding_scorer_gaps": {
+        "units": 79,
+        "required_units": 28,
+        "required_units_wrong": 12,
+        "wrong": 35,
+        "wrong_required": 12,
+        "flag_precision": 0.42857142857142855,
+        "flag_recall": 0.34285714285714286
+      },
+      "wrong_not_required": [
+        {
+          "page": "handwriting/hw-exp-01",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-01/eq-000",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "\\phi_{SP}=\\phi_{N}, \\phi=\\phi_{2}"
+        },
+        {
+          "page": "handwriting/hw-exp-01",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-01/eq-002",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "P[S_{0}=K]"
+        },
+        {
+          "page": "handwriting/hw-exp-01",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-01/eq-003",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "X+2y-3=0"
+        },
+        {
+          "page": "handwriting/hw-exp-01",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-01/eq-005",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "1/\\sqrt{3}=0.57735\\ldots"
+        },
+        {
+          "page": "handwriting/hw-exp-01",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-01/eq-008",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "\\text{Tr}(\\rho^2) = (\\text{Tr}\\rho)^2"
+        },
+        {
+          "page": "handwriting/hw-exp-01",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-01/eq-009",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "> T_1"
+        },
+        {
+          "page": "handwriting/hw-exp-01",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-01/eq-010",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "L_\\rho^\\sigma = L_\\rho \\cdot (1 \\cdot 1)"
+        },
+        {
+          "page": "handwriting/hw-exp-01",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-01/eq-012",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "|+x\\rangle"
+        },
+        {
+          "page": "handwriting/hw-exp-01",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-01/eq-013",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "\\tilde{U}^a \\equiv \\partial x^a / \\partial s"
+        },
+        {
+          "page": "handwriting/hw-exp-03",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-03/eq-002",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "|f_i(x)-f_i(y)|<\\varepsilon"
+        },
+        {
+          "page": "handwriting/hw-exp-03",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-03/eq-014",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "I_x(M)/\\hat{I}_x(M)"
+        },
+        {
+          "page": "handwriting/hw-exp-04",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-04/eq-001",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "P \\in [\\underline{P}, \\bar{P}]"
+        },
+        {
+          "page": "handwriting/hw-exp-04",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-04/eq-006",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "(X \\perp\\!\\!\\!\\perp Y) \\mid W"
+        },
+        {
+          "page": "handwriting/hw-exp-04",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-04/eq-009",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "\\sum_{e \\in T} d(e)"
+        },
+        {
+          "page": "handwriting/hw-exp-05",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-05/eq-002",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "B_{\\lambda,\\mu} = C_0 J_\\mu(\\lambda r)"
+        },
+        {
+          "page": "handwriting/hw-exp-05",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-05/eq-011",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "\\text{tr}_B(|\\psi\\rangle\\langle\\psi|)=\\rho"
+        },
+        {
+          "page": "handwriting/hw-exp-05",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-05/eq-013",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "W\\sim w^4/m^3\\gamma^4"
+        },
+        {
+          "page": "handwriting/hw-exp-05",
+          "kind": "equation",
+          "gold_id": "handwriting/hw-exp-05/eq-015",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false,
+          "pred_latex": "R_{sp}=c_p-c_v"
+        },
+        {
+          "page": "handwriting/hw-exp-01",
+          "kind": "heading",
+          "text": "Worked examples 8",
+          "level": 1,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "image_page"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "handwriting/hw-exp-02",
+          "kind": "heading",
+          "text": "Practice sheet 8",
+          "level": 1,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "image_page"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "handwriting/hw-exp-03",
+          "kind": "heading",
+          "text": "Worked examples 4",
+          "level": 1,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "image_page"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "handwriting/hw-exp-04",
+          "kind": "heading",
+          "text": "Practice sheet 3",
+          "level": 1,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "image_page"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "handwriting/hw-exp-05",
+          "kind": "heading",
+          "text": "Practice sheet 9",
+          "level": 1,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "image_page"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        }
+      ]
+    },
+    "second_check": {
+      "equations_matched": {
+        "answered": 0,
+        "wrong": 0,
+        "auroc_vs_wrong": null,
+        "auroc_vs_wrong_excluding_scorer_gaps": null,
+        "would_flag": 0,
+        "would_flag_precision": null,
+        "would_flag_recall": null,
+        "would_flag_wrong_excluding_scorer_gaps": 0
+      },
+      "figure_checked": 0,
+      "figure_flagged": 0,
+      "equation_checked": 0,
+      "equation_would_flag": 0,
+      "outcomes": {},
+      "cost_usd": 0,
+      "per_pdf_page_usd": 0.0
+    },
+    "headings": {
+      "gold_headings": 0,
+      "predicted_headings": 5,
+      "matched": 0,
+      "precision": 0.0,
+      "recall": null,
+      "f1": null,
+      "level_accuracy": null
+    },
+    "image_pages": {
+      "pages": 10,
+      "converted": 10,
+      "fell_back": 0,
+      "outcomes": {
+        "converted": 10
+      },
+      "calls": 10,
+      "cost_usd": 0.5164876,
+      "cost_per_page_usd": 0.05164876,
+      "seconds_per_page": 12.6533,
+      "input_tokens_per_page": 12777.0,
+      "output_tokens_per_page": 1164.6,
+      "blocks": 62,
+      "blocks_per_page": 6.2,
+      "by_kind": {
+        "equation": 28,
+        "heading": 5,
+        "paragraph": 29
+      },
+      "illegible": 0,
+      "low_confidence_share": 0.7903225806451613,
+      "kept_as_image": 0,
+      "omitted": 0,
+      "omitted_pages": 0,
+      "required_per_converted_page": 5.7,
+      "optional_per_converted_page": 0.5,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "equation_flags": {
+        "all": {
+          "matched": 74,
+          "wrong": 30,
+          "asked": 74,
+          "precision": 0.40540540540540543,
+          "recall": 1.0,
+          "wrong_not_asked": 0,
+          "wrong_not_asked_per_100_gold": 0.0
+        },
+        "all_symbols": {
+          "matched": 74,
+          "wrong": 25,
+          "asked": 74,
+          "precision": 0.33783783783783783,
+          "recall": 1.0,
+          "wrong_not_asked": 0,
+          "wrong_not_asked_per_100_gold": 0.0
+        },
+        "display": {
+          "matched": 28,
+          "wrong": 12,
+          "asked": 28,
+          "precision": 0.42857142857142855,
+          "recall": 1.0,
+          "wrong_not_asked": 0,
+          "wrong_not_asked_per_100_gold": 0.0
+        },
+        "inline": {
+          "matched": 46,
+          "wrong": 18,
+          "asked": 46,
+          "precision": 0.391304347826087,
+          "recall": 1.0,
+          "wrong_not_asked": 0,
+          "wrong_not_asked_per_100_gold": 0.0
+        },
+        "inline_symbols": {
+          "matched": 46,
+          "wrong": 14,
+          "asked": 46,
+          "precision": 0.30434782608695654,
+          "recall": 1.0,
+          "wrong_not_asked": 0,
+          "wrong_not_asked_per_100_gold": 0.0
+        }
+      },
+      "second_reading": {
+        "display_matched": 28,
+        "agreed": 17,
+        "agreed_wrong": 5,
+        "disagreed": 11,
+        "disagreed_wrong": 7,
+        "no_second_reading": 0
+      }
+    }
+  },
+  "cost": {
+    "total_usd": 0.63817,
+    "pipeline_usd": 0.63817,
+    "per_item_usd": 0.127634,
+    "per_item_unit": "section",
+    "model_calls": 38,
+    "verifier_usd": 0,
+    "verifier_per_item_usd": 0.0,
+    "verifier_requests": 0,
+    "pdf_pages": 10,
+    "per_pdf_page_usd": 0.063817,
+    "verifier_per_pdf_page_usd": 0.0,
+    "image_pages_usd": 0.5164876,
+    "budget_spent_usd": 0.04865099999999999,
+    "budget_calls": 3,
+    "dropped_usd": 0.0
+  },
+  "latency_ms": {
+    "p50": 3617.0,
+    "p95": 14661.199999999997,
+    "n": 5,
+    "basis": "wall-clock conversion of each section's PDF (layout, crops, model calls and assembly; DocumentStats.latency_ms)"
+  },
+  "answers_file": {
+    "by_step": {
+      "image_page/claude-opus-5-5": {
+        "calls": 10.0,
+        "input": 127770.0,
+        "cached": 64088.0,
+        "written": 16022.0,
+        "output": 11646.0,
+        "usd": 0.516488,
+        "steady_usd": 0.439582
+      },
+      "equation/claude-opus-5-5": {
+        "calls": 28.0,
+        "input": 87833.0,
+        "cached": 73372.0,
+        "written": 5644.0,
+        "output": 2176.0,
+        "usd": 0.121682,
+        "steady_usd": 0.094591
+      }
+    },
+    "steady_cost_usd": 0.534173,
+    "answers_file_hits": 35,
+    "answers_file_misses": 3,
+    "live_cost_usd": 0.048651,
+    "replayed_cost_usd": 0.589519
+  },
+  "probe": {
+    "what": "One run of the image page pass with the prompt that lists doubtful symbols (alternatives), against one earlier run of the same pages with the previous prompt. A single run each: model sampling noise is not measured.",
+    "n_expressions": 74,
+    "n_pages": 10,
+    "control": {
+      "prompt_version": "image_page-7a9e3a80",
+      "exact_lenient": 49,
+      "spoken_equal": 53,
+      "required_decisions": 28,
+      "silent_wrong_spoken": 11
+    },
+    "new": {
+      "prompt_version": "image_page-90d6ada5",
+      "exact_lenient": 44,
+      "spoken_equal": 47,
+      "required_decisions": 28,
+      "silent_wrong_spoken": 16
+    },
+    "paired_spoken_equal": {
+      "gained": 2,
+      "lost": 8,
+      "mcnemar_exact_p": 0.109
+    },
+    "paired_exact_lenient_own_scorer": {
+      "gained": 2,
+      "lost": 7,
+      "mcnemar_exact_p": 0.18
+    },
+    "page_reading_alone": {
+      "spoken_right": 44,
+      "of": 74
+    },
+    "alternatives": {
+      "expressions_with_alternatives": 50,
+      "doubts": 61,
+      "chips": 67,
+      "doubts_per_page": 6.1,
+      "chips_per_page": 6.7,
+      "kinds": {
+        "case": 19,
+        "other": 14,
+        "greek_latin": 11,
+        "script": 6,
+        "operator": 6,
+        "digit_letter": 5
+      },
+      "page_reading_wrong": 30,
+      "wrong_that_carry_alternatives": 22,
+      "wrong_gold_reachable_by_one_chip": 8,
+      "one_symbol_errors": 18,
+      "one_symbol_errors_gold_reachable_by_one_chip": 7,
+      "one_symbol_coverage": 0.389,
+      "one_symbol_coverage_ci95": [
+        0.203,
+        0.614
+      ],
+      "right_after_one_click": 52,
+      "right_after_one_click_of": 74,
+      "right_with_alternatives_present": 28,
+      "gate_note": "below the 0.60 coverage of one-symbol errors that was set before the run"
+    },
+    "does_not_show": "One writer-mix of MathWriting ink on composed pages, 74 expressions, one run per arm. A 6-point drop in spoken-equal reading is inside the noise of a single run (paired p about 0.1) and is not shown to come from the prompt; 4 of the 8 spoken-equal losses are a letter's case (x for X, W for w, C for c) and 2 are spellings of the same notation. It says nothing about notes written on an iPad."
+  }
+}

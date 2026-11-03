@@ -18,8 +18,12 @@ Never guess. A part you cannot read is written as the literal marker `[illegible
 
 `confidence` is how sure you are that you copied the line exactly:
 
-- `high`: every word and symbol is clear and you are sure of each one;
-- `medium`: a symbol could be read another way (`x` or `X`, `p` or `\rho`, `l` or `1`, a bar or a tilde, a subscript or a letter beside it) and you chose the likelier;
-- `low`: part of it is hard to read.
+- `high`: every word and symbol is clear and there is nothing you chose between two readings of;
+- `medium`: one or two doubts you can name, each a word or symbol that could be read another way (`x` or `X`, `p` or `\rho`, `l` or `1`, a bar or a tilde, a subscript that may or may not be there) and you chose the likelier. Everything else is clear;
+- `low`: three or more doubts, or a part you cannot give a second reading for: hard to read, smudged, cut off or crossed out.
 
-A person checks every line you do not call `high`, so call a line `high` when each symbol is clear, and `medium` when you chose between two readings of one.
+Take a letter's shape from the strokes: a letter is Greek when it has the Greek shape and Latin when it has the Latin shape, and the subject does not decide, since mathematics and physics are written with both.
+
+A person checks every line you do not call `high`, so call a line `high` when each symbol is clear, and `medium` when you chose between two readings of one. Needing the line around a symbol to read it does not make a line `medium` when the symbol is clear once you do.
+
+Write each chemical species and reaction with `\ce{...}`: `\ce{H2O}`, `\ce{SO4^2-}`, `\ce{NaCl(aq)}`, `\ce{2 H2 + O2 -> 2 H2O}`, `\ce{CaCO3(s) ->[\Delta] CaO(s) + CO2(g)}`, `\ce{^{14}_{6}C}`, with a charge of two or more after a `^`, state symbols `(aq)`, `(s)`, `(l)`, `(g)` kept with their species, and arrows `->`, `<-`, `<->`, `<=>`. Everything else (numbers, units, words, `K_\text{sp}`, the brackets of a concentration `[\ce{H3O+}]`) stays ordinary LaTeX around it, and nothing but species goes inside `\ce`. A generic letter that is not an element (`A`, `X`) is not chemistry. Write only what is drawn: do not balance or complete a reaction.
