@@ -4,7 +4,7 @@
 
 - Inline formulas of TeX-made PDFs start and end where the glyphs say (`pipeline/glyph_math.py`, docs/layout.md "Inline
   span edges from glyphs"): a comma, colon or semicolon set as an index stays in the formula (`\rho_{m,q}(x)` was `q(x)`),
-  a radical is not cut from its radicand, an upright function name touching its bracket (`\Pr(A)`, `\operatorname{CTCS}(n)`)
+  a radical is not cut from its radicand, a known upright operator name touching its bracket (`\Pr(A)`, `\mathrm{supp}(\psi)`)
   and a percent sign after a number are in the formula, and the unit after a number (`24h`, `m^3 kg^{-1}`) is out of it.
   Nothing becomes a formula that was not one, so no text is lost: letters and digits of all 148 PDFs of
   `scripts/layout_identity.py` are equal before and after, 146 PDFs identical, 2 TeX papers differ.

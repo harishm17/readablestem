@@ -737,15 +737,17 @@ OpenStax print from Chromium, where emphasis is italic and the unit is inside th
   On the 25 development papers 27 of 31 formulas cut inside a pair of parentheses had the pair
   outside the author's maths, and of the formulas that ended in an upright unit 37 were span failures
   against 2 that were exact.
-- **Inline span edges from glyphs** (`pipeline/glyph_math.py`, 2026-11-03). Five more rules read what the
+- **Inline span edges from glyphs** (`pipeline/glyph_math.py`, 2026-11-03). Five more rules, all gated on a TeX-made PDF, read what the
   page shows at an edge, and only move the edge of a run that was already maths (none makes text a formula,
   so no text is lost: what leaves a run stays in the paragraph). (1) A comma, colon or semicolon that is
   raised or lowered between two raised or lowered glyphs is part of the index: `\rho_{m,q}` was read as
   `q(x)`, `g_{1:T}` as `g_1`. (2) A blank whose two neighbours touch (gap under 0.1 em) is no space: the
   text layer puts one between a radical and its radicand, and `O(\sqrt T)` was cut at the radical.
-  (3) An upright word of two to eight letters that touches an opening parenthesis, is no English word
-  (`hyphens.words()`) and no chemical formula (element symbols only, `Pr` excepted) is a function name:
-  `\operatorname{CTCS}(n)`, `\mathrm{supp}(\psi)`, `\Pr(A)`; the formula goes on through it. (4) A percent
+  (3) One of a short list of operator names that papers set upright (`glyph_math.OPERATOR_NAMES`: `Pr`, `Cov`,
+  `supp`, `vech`, `Unif`, ...) that touches an opening parenthesis is a function name and the formula goes on through
+  it: `\Pr(A)`, `\mathrm{supp}(\psi)`. The text layer cannot tell an upright name from a word of the prose (both are in
+  the text font), so the rule never guesses: an acronym (`ARFIMA(1, d, 1)`, `CTCS(n)`), a word and a reference (`Eq(4)`,
+  `Smith(2019)`) are left alone. (4) A percent
   sign after a digit is part of the formula (`\phi = 5\%`), and a word space after it ends it. (5) The tail
   of a run that is a unit after a number (upright letters of the text font, a factor's raised or lowered
   exponent figures, other factors after a space: `24h`, `5 m`, `10^{-11} m^3 kg^{-1}`) is out of it,

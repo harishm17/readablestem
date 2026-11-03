@@ -198,18 +198,19 @@ errors were read to find them, the other four parts were only measured.
 
 | part | inline gold | recall (found) | edge error, of gold | precision (predicted) |
 |---|---|---|---|---|
-| dev2 (tuned on) | 2,153 | 0.808 to 0.814 (1,739 to 1,752) | 4.7% to 3.8% (101 to 82) | 0.879 to 0.902 (1,978 to 1,943) |
-| held-out | 1,739 | 0.779 to 0.780 (1,355 to 1,357) | 7.5% to 6.8% (130 to 119) | 0.875 to 0.880 (1,549 to 1,542) |
-| fresh2 | 1,555 | 0.748 to 0.767 (1,163 to 1,193) | 4.2% to 3.3% (66 to 51) | 0.883 to 0.910 (1,317 to 1,311) |
-| fresh3 | 1,637 | 0.725 to 0.725 | 2.4% to 2.3% (40 to 37) | 0.892 to 0.898 |
-| fresh4 | 1,513 | 0.658 to 0.658 | 3.6% to 3.5% (54 to 53) | 0.930 to 0.931 |
-| held-out and fresh2 to 4 (replay only) | 6,444 | 0.730 to 0.734 (4,701 to 4,733) | 4.5% to 4.0% (290 to 260) | 0.893 to 0.902 (5,267 to 5,245) |
+| dev2 (tuned on) | 2,153 | 0.808 to 0.810 (1,739 to 1,745) | 4.7% to 3.9% (101 to 84) | 0.879 to 0.898 (1,978 to 1,944) |
+| held-out | 1,739 | 0.779 to 0.780 (1,355 to 1,357) | 7.5% to 6.8% (130 to 118) | 0.875 to 0.880 (1,549 to 1,542) |
+| fresh2 | 1,555 | 0.748 to 0.752 (1,163 to 1,170) | 4.2% to 4.1% (66 to 64) | 0.883 to 0.892 (1,317 to 1,312) |
+| fresh3 | 1,637 | 0.725 to 0.725 | 2.4% to 2.3% (40 to 38) | 0.892 to 0.892 |
+| fresh4 | 1,513 | 0.658 to 0.660 (996 to 998) | 3.6% to 3.6% (54 to 55) | 0.930 to 0.933 |
+| held-out and fresh2 to 4 (replay only) | 6,444 | 0.730 to 0.731 (4,701 to 4,712) | 4.5% to 4.3% (290 to 275) | 0.893 to 0.897 (5,267 to 5,254) |
 
-On dev2, 14 gold equations are found that were not and none is lost; 31 aligned spans changed. The papers whose inline predictions change: dev2 11 of 25, held-out 2 of 15, fresh2 7, fresh3 3, fresh4 5.
-Gold equations found that were not, in the four replay parts: 39 (held-out 2, fresh2 35, fresh3 0, fresh4 2); lost 7
-(fresh2 5, fresh4 2): a name that touches a bracket now takes in the words around the formula the gold set apart
-(`ARFIMA(1, d(m), 1)` where the gold has `d(m)`), so the prediction no longer aligns to the shorter gold formula although
-it holds all of it. Exact and spoken-equal scores need a model's reading and are not computed here; the formulas read
+On dev2, 6 gold equations are found that were not and none is lost. The papers whose inline predictions change: dev2 10 of 25,
+held-out 2 of 15, fresh2 4, fresh3 2, fresh4 5. In the four replay parts 12 are found that were not (held-out 2, fresh2 8,
+fresh3 0, fresh4 2) and 1 is lost (fresh2, gold `d \sqrt{...}`, whose old prediction `d3T` aligned to it and whose new one does not). The
+first version of the function-name rule took any non-dictionary word before a bracket and lost 7 (`ARFIMA(1, d(m), 1)` against
+gold `d(m)`); it now takes only the names in `glyph_math.OPERATOR_NAMES`, which gives up the all-capitals names of one dev2
+paper (`CTCS(n)`, 8 gold equations) rather than guess. Exact and spoken-equal scores need a model's reading and are not computed here; the formulas read
 are the same glyphs, so only the crop's edges move.
 
 Other layout, 148 PDFs of `scripts/layout_identity.py` (the fixtures, `data/`, the development pages cached for the eval;
