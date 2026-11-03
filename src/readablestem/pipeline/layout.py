@@ -8411,6 +8411,17 @@ def _ends_sentence(pieces: Sequence[str | _Inline]) -> bool:
 RUN_IN_LABELS = frozenset({"solution", "answer", "discussion", "procedure", "proof", "hint"})
 MIN_LABEL_COPIES = 2  # a label word that repeats this often is a label
 LABEL_SIZE_TOLERANCE = 0.05  # of the body size: "exactly body size"
+LABEL_INSET = 3.0  # pt a label sits in from its page's text edge: inside a box, not a section
+
+
+def _text_edge(page: _PageBlocks) -> float | None:
+    """Left edge of the page's body text: the leftmost x where at least three paragraphs of
+    two lines or more start (within 2.5 pt), else the leftmost such paragraph's, else None."""
+    starts = sorted(b.bbox[0] for b in page.blocks if b.kind == Kind.PARAGRAPH and len(b.rows) >= 2)
+    return next(
+        (x for i, x in enumerate(starts) if bisect.bisect_right(starts, x + 2.5) - i >= 3),
+        starts[0] if starts else None,
+    )
 
 
 def _mark_run_in_labels(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
@@ -8421,17 +8432,23 @@ def _mark_run_in_labels(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
     would stop at each. The rule is narrow on purpose (docs/layout.md "Run-in labels"): a
     heading found only by the bold body-size rule (no larger font, no number, no tag), one
     line, at body size, whose text is one of `RUN_IN_LABELS` (a trailing full stop or colon
-    aside), and the same label at least `MIN_LABEL_COPIES` times in the document."""
+    aside), set in from its page's text edge (`LABEL_INSET`: inside a box, where an author
+    sets labels; a section heading sits at the margin, as LaTeX's `\\subsubsection*{Solution}`
+    and a Word heading style do), and the same label at least `MIN_LABEL_COPIES` times in
+    the document."""
     found: dict[str, list[_Block]] = {}
     for page in pages:
+        edge = _text_edge(page)
         for block in page.blocks:
             if (
-                block.kind == Kind.HEADING
+                edge is not None
+                and block.kind == Kind.HEADING
                 and block.reasons[:1] == [REASON_BOLD_BODY]
                 and REASON_LARGER_FONT not in block.reasons
                 and len(block.rows) == 1
                 and block.font_size is not None
                 and abs(block.font_size / ctx.body - 1) <= LABEL_SIZE_TOLERANCE
+                and block.bbox[0] - edge > LABEL_INSET
             ):
                 label = (block.text or "").strip().rstrip(".:").strip().casefold()
                 if label in RUN_IN_LABELS:

@@ -180,17 +180,25 @@ def test_short_numbered_lines_with_no_paragraph_between_are_a_list_not_headings(
     assert texts(analyze(pdf_of(fill)), Kind.HEADING) == []
 
 
-def label_page(number, page):
-    y = para(page, 72)
-    y = one(page, y, "Solution", "hebo")
-    y = para(page, y, "First find the net force on the cart.", lines=1)
-    y = para(page, y)
-    y = one(page, y, "Solution", "hebo")
-    para(page, y, "Then divide by the mass of the cart.", lines=1)
+def label_page(inset: float):
+    """Body text at the margin, and two worked examples whose label and text sit `inset`
+    points in (a box)."""
+
+    def fill(number, page):
+        y = para(page, 72)
+        y = para(page, y)
+        y = para(page, y)
+        y = one(page, y, "Solution", "hebo", x=72 + inset)
+        y = para(page, y, "First find the net force on the cart.", lines=1, x=72 + inset)
+        y = para(page, y)
+        y = one(page, y, "Solution", "hebo", x=72 + inset)
+        para(page, y, "Then divide by the mass of the cart.", lines=1, x=72 + inset)
+
+    return fill
 
 
 def test_a_repeated_bold_run_in_label_is_bold_text_not_a_heading():
-    layout = analyze(pdf_of(label_page))
+    layout = analyze(pdf_of(label_page(18)))
     labels = [e for e in layout.elements if e.kind == Kind.HEADING]
     assert [e.text for e in labels] == ["Solution", "Solution"]
     assert all(REASON_RUN_IN_LABEL in e.reasons for e in labels)
@@ -200,6 +208,14 @@ def test_a_repeated_bold_run_in_label_is_bold_text_not_a_heading():
     html = render_html(title="T", lang="en", elements=layout.elements, fixes=fixes, crops={})
     assert "Solution</h" not in html
     assert html.count("<strong>Solution</strong></p>") == 2
+
+
+def test_a_repeated_label_at_the_text_margin_stays_a_heading():
+    # LaTeX \subsubsection*{Solution} and a Word heading style sit at the margin: the
+    # document says it is a heading (the authored dev-v2 documents do exactly this).
+    layout = analyze(pdf_of(label_page(0)))
+    assert texts(layout, Kind.HEADING) == ["Solution", "Solution"]
+    assert not any(REASON_RUN_IN_LABEL in e.reasons for e in layout.elements)
 
 
 def test_a_single_label_or_another_bold_line_stays_a_heading():
