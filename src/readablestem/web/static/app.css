@@ -136,7 +136,7 @@ button, .button, .button-secondary, .button-danger {
 .field { margin: 0 0 1.25rem; }
 .field label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
 .hint { color: var(--muted); margin: 0 0 0.4rem; }
-input[type="text"], input[type="email"], textarea, select, input[type="file"] {
+input[type="text"], input[type="email"], input[type="number"], textarea, select, input[type="file"] {
   font: inherit;
   max-width: 100%;
   padding: 0.45rem 0.55rem;
@@ -572,7 +572,7 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
 .decision-notice { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; }
 .decision-notice p { margin: 0; }
 .undo-form { margin: 0; }
-.undo-form .link-button { min-height: 24px; min-width: 24px; font-weight: 600; }
+.undo-form .link-button { min-height: 44px; min-width: 44px; padding: 0 0.5rem; font-weight: 600; }
 .live-status { margin: 0.35rem 0 0; font-size: 0.95rem; }
 .live-check:empty { display: none; }
 .live-check { margin-top: 0.4rem; padding: 0.5rem 0.7rem; background: var(--panel); border-radius: var(--radius); }
@@ -690,6 +690,7 @@ fieldset.field legend { font-weight: 600; padding: 0; margin-bottom: 0.4rem; }
 .choice input { width: 1.3rem; height: 1.3rem; margin: 0; }
 .field .choice label { display: inline; font-weight: 400; margin: 0; }
 input[type="text"].input-short { width: 8rem; }
+input[type="number"].input-short { width: 6rem; }
 .feedback { border-top: 1px solid var(--rule); margin-top: 1.25rem; }
 .steps-list li { margin: 0.35rem 0; }
 
@@ -772,3 +773,38 @@ input[type="text"].input-short { width: 8rem; }
 }
 #suggestions p, #suggestions .button { overflow-wrap: anywhere; }
 #suggestions .button { max-width: 100%; white-space: normal; text-align: left; }
+
+/* Review at scale: accept many at once, the decision filter, the preview list, "Report this
+   item", "Leave this page out", the finish notice and the guides list. Existing colours
+   only; every control is a native link, button or field, 44 px high where it stands alone
+   (WCAG 2.5.5 target; 2.5.8 needs 24). */
+.bulk-offers, .decision-filter { margin: 0 0 1.25rem; padding: 0.75rem 1rem; background: var(--panel); border-radius: var(--radius); }
+.bulk-offers h3, .decision-filter h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+.bulk-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; }
+.bulk-list .button-secondary, .decision-filter .button-secondary, .bulk-confirm .button-secondary,
+.bulk-confirm .button, .leave-out .button-secondary, .notify-box .button-secondary { min-height: 2.75rem; }
+.filter-fields { display: flex; flex-wrap: wrap; gap: 0.25rem 1.5rem; align-items: flex-start; }
+.decision-filter .field { margin-bottom: 0.5rem; }
+.decision-filter select, .decision-filter input[type="number"] { min-height: 2.75rem; }
+.filter-result { font-weight: 600; }
+.bulk-preview { padding-left: 1.5rem; }
+.bulk-preview li { margin: 0 0 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+.bulk-preview li p { margin: 0 0 0.35rem; }
+.report-link { margin: 0.75rem 0 0; font-size: 0.95rem; }
+.report-link a { display: inline-flex; align-items: center; min-height: 2.75rem; }
+.leave-out { margin-top: 0.75rem; }
+.leave-out .part-label { margin-top: 0; }
+.notify-box { margin: 0.75rem 0; }
+.notify-box .hint { margin-top: 0.4rem; }
+.notify-box [aria-disabled="true"] { cursor: default; }
+.guide-list { list-style: none; margin: 0; padding: 0; }
+.guide-list li { margin: 0 0 1.5rem; max-width: 48rem; }
+.guide-list h2 { margin: 0 0 0.25rem; font-size: 1.3rem; }
+.crumb { margin: 0.5rem 0 0; }
+.crumb a { display: inline-block; min-height: 24px; }
+.doc-table .row-link { display: block; margin-top: 0.3rem; min-height: 24px; }
+
+@media (forced-colors: active) {
+  .bulk-offers, .decision-filter { border: 2px solid CanvasText; }
+  .notify-box [aria-disabled="true"] { color: GrayText; border-color: GrayText; }
+}

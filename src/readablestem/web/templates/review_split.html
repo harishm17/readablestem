@@ -8,6 +8,8 @@
 {% block head %}<link rel="stylesheet" href="/jobs/{{ job.id }}/review/marks.css">{% endblock %}
 {% from "_table_card.html" import table_split_body with context %}
 {% from "_describe.html" import describe_box with context %}
+{% from "_report_item.html" import report_link with context %}
+{% from "_leave_out.html" import leave_out_forms with context %}
 {# The second Tab stop: straight to the decision's heading, past the site menu, the steps
    and the links (UX review BW11). #}
 {% block skip_links %}<a class="skip-link" href="#decision-title">Skip to the decision</a>{% endblock %}
@@ -393,6 +395,7 @@
 </form>
 {% else %}<p class="group-state">{{ pg.state }}</p>{% endif %}
 <p class="hint" id="hint-{{ key }}">{{ pg.hint }}</p>
+{{ leave_out_forms(pg, "split") }}
 {# T3-16: the text becomes the image's alt text, one box for each page or piece. #}
 {% for member in pg.describe %}{{ describe_box(member, "split") }}{% endfor %}
 {% if pg.hidden %}
@@ -447,6 +450,9 @@
     {% endif %}
     <ul class="review-links">
       <li><a href="{{ list_url }}">All items as a list</a></li>
+      {% for o in bulk_offers %}
+      <li><a href="/jobs/{{ job.id }}/accept/{{ o.slug }}?view=split">{{ o.title }} ({{ o.count }})</a></li>
+      {% endfor %}
       <li><a href="/jobs/{{ job.id }}">Back to the results</a></li>
     </ul>
   </div>
@@ -516,6 +522,10 @@
       {% endif %}
     </details>
     {% endif %}
+
+    {% if panel.item %}{{ report_link(job.id, panel.item.element_id, panel.item.label) }}
+    {% elif panel.group %}{{ report_link(job.id, panel.group.key, "repeated heading “" ~ panel.group.text ~ "”") }}
+    {% elif panel.pages %}{{ report_link(job.id, panel.pages.key, panel.pages.title) }}{% endif %}
 
     {% if panel.prev_href or panel.next_href or panel.back_href %}
     <nav class="decision-nav" aria-label="Previous and next decision">

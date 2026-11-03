@@ -54,12 +54,31 @@ def test_a_hash_that_is_not_the_files_is_not_found(client):
     assert client.get("/static/other.1a2b3c4d5e6f.css").status_code == 404
 
 
-def test_the_plain_name_is_still_served_and_revalidated_with_an_etag(client):
+def test_the_plain_name_is_kept_for_an_hour_then_revalidated_with_an_etag(client):
     first = client.get("/static/app.css")
-    assert first.status_code == 200 and first.headers["cache-control"] == "no-cache"
+    assert first.status_code == 200 and first.headers["cache-control"] == "public, max-age=3600"
     again = client.get("/static/app.css", headers={"If-None-Match": first.headers["etag"]})
     assert again.status_code == 304
-    assert again.headers["cache-control"] == "no-cache"
+    assert again.headers["cache-control"] == "public, max-age=3600"
+
+
+def test_the_demo_has_an_etag_and_a_max_age_and_answers_304(client):
+    first = client.get("/demo")
+    assert first.status_code == 200
+    assert first.headers["cache-control"] == "public, max-age=3600"
+    assert first.headers["etag"].startswith('"')
+    assert "sandbox" in first.headers["content-security-policy"]
+    again = client.get("/demo", headers={"If-None-Match": first.headers["etag"]})
+    assert again.status_code == 304 and again.content == b""
+    assert again.headers["etag"] == first.headers["etag"]
+    assert again.headers["cache-control"] == "public, max-age=3600"
+    other = client.get("/demo", headers={"If-None-Match": '"something-else"'})
+    assert other.status_code == 200
+
+
+def test_per_user_pages_stay_no_store(client):
+    for path in ("/", "/login", "/limits"):
+        assert client.get(path).headers["cache-control"] == "no-store", path
 
 
 def test_vendored_files_carry_their_version_so_they_are_cached_for_a_year(client):

@@ -187,16 +187,17 @@ def test_showcase_pages_are_served_with_their_own_address(showcase):
         landing = client.get("/").text
     assert home.status_code == method.status_code == css.status_code == 200
     assert method.text == same.text
-    assert f'<link rel="canonical" href="{site}/showcase/method/index.html">' in method.text
+    assert f'<link rel="canonical" href="{site}/showcase/method/">' in method.text
     assert method.headers["content-security-policy"] == APP_CSP
     assert json_ld(method.text) and 'name="robots"' not in method.text
     # The stored conversion is the demo's twin: sandboxed, not indexed, pointing at /demo.
     assert converted.headers["content-security-policy"] == VIEW_CSP
     assert '<meta name="robots" content="noindex, follow">' in converted.text
     assert f'<link rel="canonical" href="{site}/demo">' in converted.text
-    assert f"{site}/showcase/method/index.html" in sitemap
+    assert f"<loc>{site}/showcase/method/</loc>" in sitemap
+    assert "index.html" not in sitemap
     assert "converted.html" not in sitemap and "404.html" not in sitemap
-    assert 'href="/showcase/examples/index.html"' in landing
+    assert 'href="/showcase/examples/"' in landing
 
 
 def test_without_a_showcase_build_nothing_links_to_it(env):

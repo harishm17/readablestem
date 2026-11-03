@@ -87,8 +87,9 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 
 | Method and path | Who | What |
 |---|---|---|
-| GET `/` | anyone | What the tool does, why now, how long, how accurate (numbers from docs/eval.md, linked), what to do with the file, sign-in, link to the demo |
-| GET `/demo` | anyone | `web/static/demo/index.html` if present (served with the sandbox CSP), else a "being prepared" page |
+| GET `/` | anyone | What the tool does, why now, how long (with the review load: about 1.8 decisions per page as on `/limits`, a full job, a new account's daily pages read from `OPEN_TIER_DAILY_PAGE_QUOTA`, and the deletion time), how accurate (numbers from docs/eval.md, linked), what to do with the file, sign-in, link to the demo |
+| GET `/demo` | anyone | `web/static/demo/index.html` if present (served with the sandbox CSP, an `ETag` and `Cache-Control: public, max-age=3600`, and a 304 for a matching `If-None-Match`: "Security headers"), else a "being prepared" page |
+| GET `/guides` | anyone | The list of the guides below it, each with its summary and date (`seo.GUIDES`); in the sitemap, `llms.txt` and the footer |
 | GET `/privacy`, `/terms` | anyone | The beta wording, describing the real behaviour (hourly purge, Railway's daily backups kept about 6 days, Langfuse only when tracing is on). `readablestem ops launch-check` lists any unfinished wording left on the public pages |
 | GET `/limits` | anyone | Known limits: the facts that hold today (including tables, links, colour, language and file types, as this server is set up) and the measured accuracy |
 | GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make the HTML the main version and keep the PDF only as a labelled print copy (28 CFR 35.202, the DOJ fact sheet); check with your accessibility office; guidance, not legal advice |
@@ -103,7 +104,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET `/account` | signed in | The address and name held, the access tier, today's limits, and the "Delete my account" link ("Sign-up modes and access tiers") |
 | GET, POST `/account/delete` | signed in | "Delete your account?" confirmation; only a POST with `confirm=yes` (and the CSRF token) erases the account and everything of theirs, signs them out and goes to `/` |
 | POST `/logout` | signed in | Clears the session |
-| GET `/app?revises=` | signed in | My documents as a to-do list (below), then the upload form; with `revises=<job id>` of the person's own finished document, the form for a revised version of it ("Revised versions" below) |
+| GET `/app?revises=` | signed in | My documents as a to-do list (below; each finished row has "Upload a revised version"), then the upload form; with `revises=<job id>` of the person's own finished document, the form for a revised version of it ("Revised versions" below) |
 | GET `/app/documents?v=&course=` | signed in | The documents list alone, polled by htmx while a document is waiting or converting (204 while unchanged); with `course=` only that course's documents (the course page polls it) |
 | POST `/jobs` | signed in | Upload of one file or up to 10: checks, quota, queue, one job each; 303 to `/jobs/{id}` for one file, to `/uploads/{id}` when it is kept for choosing its pages, 303 to `/app/upload/{id}` (the results page) for several ("Uploads and limits") |
 | GET `/app/download` | signed in | One zip of the person's ready documents ("Several files, courses and download all") |
@@ -123,7 +124,9 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation, figure or table |
 | GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | owner | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
-| GET `/jobs/{id}/review/list` | owner | "All items as a list": every fix, grouped by kind (no bulk accept) |
+| GET `/jobs/{id}/review/list?kind=&page=` | owner | "All items as a list": every fix, grouped by kind; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below) |
+| GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept all remaining equations whose checks passed" or "Accept all figures that have generated alt text" would accept, its count, and the form that does it (404 for another kind) |
+| POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item that list shows, as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
 | GET `/jobs/{id}/review/marks.css` | owner | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
 | GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond four renders in progress for one person (a review page asks for the page and up to three crops of a repeated-heading group at once), 503 when the instance's two render slots stay busy |
 | GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
@@ -133,7 +136,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | POST `/jobs/{id}/edit/{element_id}` | owner | Change what the tool did not propose (T3-5): `action=text` changes the words of a paragraph, list item or heading (`text`), `action=heading` makes a paragraph a heading (`level`). Review `version` checked; 422 with the error beside the field |
 | GET `/jobs/{id}/pages/{n}/region.png?left=&top=&right=&bottom=` | owner | The region of page `n` the four edges (percent of the page) describe, cut as it would be added; rendered now in the render child, never stored; 404 for a region that is not one |
 | POST `/jobs/{id}/pages/{n}/add` | owner | Add a picture the tool did not find (`kind=picture`, `alt`) or mark a region as an equation (`kind=equation`: the equation step reads it, the answer is a required decision), the region as `left`, `top`, `right`, `bottom`. Rate limited (`edit_region`, and `reread` for an equation), one read at a time per person, under the job's and the day's spend caps |
-| POST `/jobs/{id}/pages/{n}/omit`, `/restore` | owner | Leave page `n` out of review and of the student file (T3-16), and put it back |
+| POST `/jobs/{id}/pages/{n}/omit`, `/restore` | owner | Leave page `n` out of review and of the student file (T3-16), and put it back. From a kept-image card the form also sends `after=review` (and `view`): the reviewer then goes on to the next decision instead of the page tools |
 | POST `/jobs/{id}/tables/accept-clean` | owner | Accept every table that waits with nothing wrong found in it (T3-11), one write |
 | POST `/jobs/{id}/tables/{element_id}/read-cell` | owner | Read a table's maths cell with the equation step and check it like a typed edit (T3-11); rate limited (`reread`), one read at a time, spend capped |
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <title>? This cannot be undone" confirmation page (the file, its upload time, the decisions made on it); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list |
@@ -1414,7 +1417,13 @@ order, a cell changed from the keyboard, no JavaScript; `browser` marker),
 with accepted items shown, 320 px reflow, target sizes, the selected mark inside the page
 region on narrow and short screens, no JavaScript, Accept after typing, focus, shortcuts,
 forced colours, an image retried; `browser` marker), and for the list view `tests/test_web_review.py` (one fix),
-`tests/test_web_review_bulk.py` (order, landing, no bulk accept),
+`tests/test_web_review_bulk.py` (order, landing, no unconditional bulk accept),
+`tests/test_web_review_bulk_accept.py` (accept many at once: state filtering, CSRF, ownership,
+stale page, Undo as one step; the decision filter; "Report this item"; "Leave this page out"),
+`tests/test_web_scale_pages.py` (guides list, sitemap canonicals, landing numbers, "Upload a
+revised version", the finish notice's markup, link targets) and
+`tests/test_web_scale_browser.py` (the new controls from the keyboard, axe at 1280 and 320 px,
+forced colours, reduced motion, target sizes, the finish notice; `browser` marker),
 `tests/test_web_review_messages.py` (every code has a sentence),
 `tests/test_web_review_triage.py` (decisions, optional checks, heading groups),
 `tests/test_web_review_browser.py` and `tests/test_web_review_triage_browser.py`.
@@ -1548,8 +1557,16 @@ the results".
   "On pages 2 and 3" links each page number. Each page of a waiting group counts the
   decision in the page strip. "Hidden text in the PDF" (folded) gives only a count of the
   hidden characters that were not used, never the text. There is nothing to accept and
-  no promise of a later conversion. The wording is the beta wording;
-  its second button ("Leave this page out of the HTML") is not built.
+  no promise of a later conversion. The wording is the beta wording.
+  Under the first button, for whole pages kept as images (not handwriting on a typed page,
+  whose typed text was converted), **Leave this page out of the HTML** ("Leave page 3 out of
+  the HTML" for each page when there are several; `templates/_leave_out.html`). It posts to
+  the page tools' omit route (`POST /jobs/{id}/pages/{n}/omit`, T3-16) with `after=review`: the
+  page, its fixes and its notices move into `result.omitted`, the file says the page is not
+  there, and the reviewer goes on to the next decision. The hint says that decisions still waiting on the
+  page go with it, and each button says how many. It is recorded like any structural
+  edit, so the notice after it has Undo, and "Put it back" in the page tools works as before.
+  The last page of a document cannot be left out.
 
 **"Reject" is named for what it does** (UX review MF14), per kind
 (`routes/review.py reject_words`): "Keep as image" for an equation, "Keep without a
@@ -1579,6 +1596,11 @@ fragment, which would cancel autofocus) and is described by a status line above 
 "Equation 1: Accepted. 2 decisions left." The page title starts with the position
 ("Decision 2 of 3: Review …"). A refused edit comes back on the same decision (422) with
 the error summary and the field open.
+
+**Target sizes.** Undo is 44 CSS px high and wide. The marks on the page image are at least 24
+px (WCAG 2.5.8, overlapping no other mark) and are grown to 44 px wherever the page has room
+around them (`web.marks._grow`): a mark in a quiet part of the page is a 44 px target, one
+between neighbours keeps 24 px with space around it. The drawn frames do not change.
 
 **Undo** (MF14). The status line after a decision has an **Undo** button (one Shift+Tab
 from the heading that took focus). It puts back every fix the job's last review write
@@ -1998,8 +2020,9 @@ whose write was then refused as stale is spent.
 ### The list view (`/jobs/{id}/review/list`)
 
 Every fix of the document, grouped by kind, as the review screen was before the split
-view, without bulk accept. Its forms send `view=list`, so a decision there comes back to
-the list's next card.
+view. Its forms send `view=list`, so a decision there comes back to the list's next card.
+Accept-many links and the kind and page filter are at the top of "Needs your decision"
+("Review at scale" below).
 
 **Order.** Only meaning-level problems ask for a decision, so the page has three sections:
 
@@ -2135,18 +2158,79 @@ order and wrapping round to the first, or to `#review-progress` when none are le
 that changed ("Equation 1 on page 1: Accepted."), which is unfolded so the link works.
 The landing item has `tabindex="-1"`, so the next Tab reaches that link.
 
-**No bulk accept** (removed 2026-10-09). The list view used to offer "Accept every
-equation proposal at or above X%" and "Accept all N remaining headings". Both took
+**No unconditional bulk accept** (removed 2026-10-09). The list view used to offer "Accept
+every equation proposal at or above X%" and "Accept all N remaining headings". Both took
 proposals that need a decision without anyone opening them, and under the review tiers
-("meaning-level only") every decision asked for could
-change what a student reads: each is now opened and decided on its own (repeated
-headings are already one decision). Optional notes are accepted already and need no
-bulk action. A POST with a kind (`equations`, `figures`, `tables`, `headings`) in place
-of the element id is a 404 and changes nothing; Undo still puts back a bulk write made
-before the change. The one exception, asked for in T3-11, is **Accept all clean tables**
-(`POST /jobs/{id}/tables/accept-clean`, "Rough edges" under the table card): only tables
-where nothing at all was found wrong, only when there are two or more, named in the
-button, and one Undo takes them all back.
+("meaning-level only") every decision asked for could change what a student reads. A POST with
+a kind (`equations`, `figures`, `tables`, `headings`) in place of the element id is still a 404
+and changes nothing. Two bulk actions exist, each limited to items no check found fault with
+and each shown before it is done: **Accept all clean tables** (T3-11, `POST
+/jobs/{id}/tables/accept-clean`, "Rough edges" under the table card) and the two below.
+
+#### Review at scale (`web/bulk_accept.py`, `routes/bulk.py`)
+
+The measured load is about 1.8 decisions per page (the 15 held-out sections; `/limits`), so a
+300-page document would ask for about 540 single decisions. Two kinds of decision wait only
+because the model was not sure enough to accept them itself:
+
+- **Accept all remaining equations whose checks passed**: equations still undecided
+  (`needs_review`) with a usable proposal, no failed check of any kind, no reason code, no
+  second-check answer other than "ran and found nothing" (a possible mismatch, or an answer that
+  failed open or was not judged, `flagged` not false, keeps it for a person; a fix the check never
+  looked at has nothing to doubt), and on their own (not in a group);
+- **Accept all figures that have generated alt text**: figures in the same state with a
+  non-empty alt text that are not marked decorative.
+
+Nothing else is touched: a fix with a failed check (even a warning), a flagged one, an item
+already decided, a repeated-heading group, a page kept as an image, a table or a heading is left
+for the reviewer.
+
+*Where.* Links (with the count) at the top of "Needs your decision" in the list view and under
+"All items as a list" on the review screen, only while there is something to accept. A link
+opens `GET /jobs/{id}/accept/{equations|figures}`: the count, a sentence saying what is and is
+not included, the whole list (each item's label, page, the original crop beside the proposal as the card shows
+it, and a link to decide it on its own), the **Accept all N equations** button and **Cancel**. Nothing is
+written by looking.
+
+*The decision.* `POST /jobs/{id}/accept/{kind}` is CSRF-checked and owner-only like every review
+route, and goes through the same path as a clean-tables accept (`routes/edits.write_review`):
+lock the job, apply an ordinary Accept to each item (`web.review.apply_review`, so every rule of
+a single accept holds), one `ReviewEdit` per item with the kind under `bulk` in its record (the review record says "Accepted, together with the other equations whose checks passed, in one action"), one write
+(`result_version` + 1), one re-render, the usage event `decision_made` with `kind=group`. The
+form must carry the review version the list was drawn at (a blank one is refused like a stale
+one): a document changed since (another tab, an
+Undo) is refused with a 409 and nothing is accepted, so exactly what was listed is what is
+accepted. With nothing left to accept the answer is a notice and no write. The notice names the
+count ("Accepted 12 equations whose checks passed. Undo takes them all back in one step.").
+
+*Undo.* All the fixes are one write, so the notice's Undo ("Undo the last decision" in the list
+view, **Undo** on the review screen) puts every one back to undecided in one step, from the
+`before` snapshots the write stored (`web.review.undo_last`), as it does for a heading group.
+
+*Filter.* A plain GET form ("Show only some decisions", shown when more than one decision is
+waiting): **Kind** (a select of the kinds that still have decisions, with their counts) and
+**Page** (a number from 1 to the page count). `?kind=figures&page=2` keeps the decisions of
+that kind on that page; a repeated-heading group and a group of pages kept as images match
+every page they are on. The form returns to `#filter-result`, a `role="status"` line that takes
+focus ("Showing 4 of 11 decisions: figures on page 2." or "No decision matches: ..."), with a
+"Show all decisions" link. A decision made in the filtered list comes back to the same filtered
+list (hidden `flt` field; `routes/review.keep_filter`). "Accept all N clean tables" is not
+filtered: with a filter on, its note says it covers all N. A kind that is not one of the list's groups and a page outside the
+document are ignored (the list is shown whole). Filtering only hides cards; it decides nothing,
+and the accept-many actions always list everything that qualifies.
+
+*Report this item.* Each card, on both screens, ends with "Report this item"
+(`templates/_report_item.html`, `web/report_item.py`). It opens the footer's feedback path
+(`FEEDBACK_URL` with `job` and `item` added to its query, else a `mailto:` to `CONTACT_EMAIL`
+with the subject, "Job: <id>" and "Item: <id>" and a line asking not to paste text from the
+document). Only the two ids are put in the address: no LaTeX, alt text, heading text or page
+content. With neither setting there is no link. There is no mail provider in production, so
+nothing is sent by the app.
+
+*Accessibility.* Every control is a native link, button, select or number field with a visible
+label; the preview list is an ordered list whose equations scroll in a focusable named group; the
+filter result and the notice after an accept are `role="status"`; borders and fills use the
+existing colours with real borders, so forced-colours mode shows them; nothing animates.
 
 **Job page.** "Need your decision" counts the decisions still waiting (a heading group
 once; failed and not-converted items too, since each needs a decision) and is broken down
@@ -2195,7 +2279,9 @@ Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 Cache-Control: no-store            (everything except /static/; page images and
                                     marks.css: private, no-store)
                                    (/static/: public, max-age=31536000, immutable for
-                                    hashed names and vendor/ files, no-cache otherwise)
+                                    hashed names and vendor/ files, public, max-age=3600
+                                    with an ETag otherwise; /demo and /showcase/ pages:
+                                    public, max-age=3600 with an ETag and 304s)
 Strict-Transport-Security: max-age=31536000; includeSubDomains   (production only)
 ```
 
@@ -2224,7 +2310,11 @@ README) and configured to need no `eval`, inject no `<style>` and keep no histor
 Static files are cached for a year under names that change with their content: pages ask
 for `/static/app.<12 hex>.css` and `.js` (`web/assets.py`, `static_url`; the hash is the
 file's SHA-256, read again only when the file changes), `vendor/` files carry their version
-in the name, and anything else is revalidated (`no-cache`, ETag). The math font is sent as
+in the name, and anything else is kept for an hour and then checked with its ETag (304, no
+body, when nothing changed). The demo (688 KB) and the showcase pages are the same for
+everyone, so they carry an ETag (a hash of the body) and `max-age=3600` too (`assets.cached_html`; a visit the server counts, `/demo?hm_id=`, is
+revalidated every time with `no-cache`, still a 304, so cached hits are not lost);
+only pages of a signed-in person stay `no-store`. The math font is sent as
 WOFF2 (392 KB, against 733 KB for the OpenType file kept beside it). Our own script, `web/static/app.js`, places error summary links (below), shows times in
 the reader's time zone ("Times"), checks a chosen upload before it is sent ("Uploads and
 limits"), shows the questions after a download, and adds the review screen's
@@ -2241,7 +2331,13 @@ box is a polite live region that changes per step, not per element; the counts a
 the list of steps outside it. When the job finishes the status box says so and links to
 the first decision and to the results ("Start the review or show the results", "Show
 the results", or "Show why it stopped"); the page is not reloaded under the reader, which
-would send a screen reader back to the top. Without
+would send a screen reader back to the top. The fragment of a finished job carries `data-finished`, `data-state`, `data-title` and `data-summary`. `app.js` ("When a job
+finishes") sets the tab title from `data-title` and, if the person chose "Notify me when it
+finishes" (a button shown only where the `Notification` API exists and is not blocked; the
+browser's permission question is asked only when it is used, by Enter or a click), shows one browser
+notice with `data-summary` when the tab is in the background. Nothing is sent to the server. A
+page opened after the job finished says nothing more. There is no email: the app has no mail
+provider in production. Without
 JavaScript the status page does not reload by itself, because a reload the user did not
 choose sends a screen reader back to the top each time (WCAG 2.2.1, failure F41; axe
 rule `meta-refresh`, critical). It has a "refresh the status" link and, inside
@@ -2373,6 +2469,8 @@ test fails when a table with a user id is added without it.
 | `uv run pytest -m browser tests/test_web_browser.py` | Chromium: axe-core on every page, CSP, htmx polling, no-JS flow |
 | `uv run pytest -m browser tests/test_web_auth_browser.py` | Chromium: the sign-in pages with Microsoft set up (axe, 320 px reflow) and the whole Microsoft round trip under the real CSP |
 | `uv run pytest -m browser tests/test_web_open_signup_browser.py` | Chromium, open sign-up: the account, delete-confirmation, blocked, sign-ups-full, sign-in, privacy, terms and limits pages and the admin page with blocked accounts pass axe (WCAG 2.2 AA and best practice), reflow at 320 px, and deleting an account works without JavaScript |
+| `uv run pytest tests/test_web_review_bulk_accept.py tests/test_web_scale_pages.py` | Review at scale: bulk accepts (states, CSRF, ownership, stale, Undo), the filter, report links, leave-a-page-out, guides list, sitemap canonicals, landing numbers, revised-version links, finish-notice markup, mark sizes |
+| `uv run pytest -m browser tests/test_web_scale_browser.py` | Chromium: the new controls by keyboard, axe at 1280 and 320 px, forced colours and reduced motion, target sizes, the finish notice with a stubbed Notification |
 | `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |
 | `uv run pytest -m browser tests/test_web_review_figures_browser.py` | Chromium: the figure card with a long description and a data table (axe at 1440 and 390 px, as shown, after a refused edit and with the table added; no sideways scrolling at 320 px, and every number in a six-column table on one line; "Add the data table" then "Remove the data table" without JavaScript) |
 | `uv run pytest tests/test_carry_edits.py tests/test_web_carry_edits.py` | Edits carried to a revised file or a document tried again: words, headings, pictures and equations added, pages left out, descriptions; carried only onto an unchanged item (rules on small results, then the whole path with real PDFs and renders) |

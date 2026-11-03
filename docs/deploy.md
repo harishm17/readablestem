@@ -713,9 +713,10 @@ A second instance (`--max-instances=2`) only runs, and costs, under load.
   `uptime.yml` workflow then fetches `/readyz` and `/demo` and fails (GitHub emails you)
   if either does not answer 2xx. In a public repository GitHub disables scheduled
   workflows after 60 days without activity; re-enable it from the Actions tab.
-- **Live eval**: repository secret `OPENAI_API_KEY`, from a separate OpenAI project with
-  its own small hard limit. `eval-live.yml` runs only when started by hand and refuses a
-  `max_usd` above 10.
+- **Live eval**: repository secret `ANTHROPIC_API_KEY`, from a separate Anthropic workspace
+  with its own small hard limit (the weekly run spends at most $2.95, about $0.70 expected).
+  `eval-live.yml` runs weekly and by hand; without the secret a scheduled run skips with a
+  notice. Each task has its own `--max-usd` (`docs/eval.md`, "Weekly live run").
 
 ## Before the first real users
 
