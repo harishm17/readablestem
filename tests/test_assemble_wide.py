@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import glob
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -115,7 +116,12 @@ def test_not_converted_equations_are_images_that_shrink_instead():
                  display="block")  # fmt: skip
     fix = Fix(element_id="p1-e0", kind=Kind.EQUATION, status=Status.ABSTAINED, reason="x")
     html = render_html(title="T", lang="en", elements=[eq], fixes=[fix], crops={})
-    assert "tabindex" not in html
+    # An image is not a tab stop. The one tabindex in the file is the skip link's target (an
+    # empty span, tabindex="-1": focusable by the link, not a tab stop; the Canvas paste
+    # version removes it with the link).
+    assert re.findall(r"<[^>]*\btabindex=[^>]*>", html) == [
+        '<span id="main-content" tabindex="-1">'
+    ]
 
 
 # --------------------------------------------------------------------------- Chromium
