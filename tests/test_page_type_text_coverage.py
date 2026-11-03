@@ -123,7 +123,8 @@ def test_a_photographed_page_under_a_thin_text_layer_is_scanned_not_typed(mark):
     result = classify(page_of(picture=True, mark=mark))
     assert result.kind == "scan_no_text"
     assert page_type.TEXT_NOT_COVERING in result.reasons
-    assert page_type.kept_reason(result) == page_type.SCANNED_PAGE  # the image page pass reads it
+    assert page_type.kept_reason(result) == page_type.UNREAD_PAGE  # kept, its text read ...
+    assert page_type.reads_image(result)  # ... and the image page pass reads it as a scan
 
 
 @pytest.mark.parametrize("mark", ["watermark", "number", "title"])
@@ -209,7 +210,7 @@ def test_the_probes_count_the_page_and_do_not_stop_at_it():
 
 def test_layout_keeps_the_page_and_still_reads_its_text():
     doc = layout.analyze(page_of(picture=True, mark="watermark"))
-    assert doc.kept_pages == {0: "scanned_page"}
+    assert doc.kept_pages == {0: "unread_page"}
     assert any("Telegram" in (e.text or "") for e in doc.elements)  # not silently dropped
 
 
@@ -248,10 +249,11 @@ def convert(pdf: bytes, *, on: bool = True):
     return run.convert_pdf(pdf, settings=settings, client=fake).result, fake
 
 
-@pytest.mark.parametrize(
-    "pdf", [page_of(picture=True, mark="watermark"), page_of(strokes=400, mark="watermark")]
-)
-def test_the_page_goes_through_the_image_page_pass_and_the_watermark_is_not_repeated(pdf):
+@pytest.mark.parametrize("kind", ["picture", "vector ink"])
+def test_the_page_goes_through_the_image_page_pass_and_the_watermark_is_not_repeated(kind):
+    pdf = page_of(
+        picture=kind == "picture", strokes=0 if kind == "picture" else 400, mark="watermark"
+    )
     result, fake = convert(pdf)
     assert "image_page" in [r.step for r in fake.requests]
     assert result.image_pages is not None and result.image_pages.converted == 1
@@ -265,7 +267,7 @@ def test_with_the_option_off_the_page_is_kept_with_a_reason_and_its_text():
     result, fake = convert(page_of(picture=True, mark="watermark"), on=False)
     assert "image_page" not in [r.step for r in fake.requests]
     assert result.image_only_pages == [0]
-    assert [f.reason for f in result.fixes if f.pending] == ["scanned_page"]
+    assert [f.reason for f in result.fixes if f.pending] == ["unread_page"]
     assert any("Telegram" in (e.text or "") for e in result.elements)
 
 

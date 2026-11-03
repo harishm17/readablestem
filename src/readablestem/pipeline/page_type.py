@@ -1533,8 +1533,6 @@ def kept_reason(page: PageTypeResult | PageType) -> str | None:
     page image). Works on a classifier result and on the stored record alike."""
     if page.kind in HANDWRITTEN_KINDS:
         return HANDWRITTEN_PAGE
-    if page.kind == "scan_no_text" and _visible_chars(page) and TEXT_NOT_COVERING in page.reasons:
-        return SCANNED_PAGE  # a text layer over a picture it does not cover: the picture is it
     if page.kind == "scan_no_text" and _visible_chars(page):
         # A full-page picture with a little visible typed text and nothing hidden: a
         # scan with a typed header, or a title slide on a photo. Not called a scan; its
@@ -1553,11 +1551,25 @@ def kept_reason(page: PageTypeResult | PageType) -> str | None:
     return None
 
 
+def reads_image(page: PageTypeResult | PageType) -> bool:
+    """Is this page one the image page pass reads (ADR 0007)? A scanned or handwritten kept
+    page, and a picture of a page under a text layer that does not cover it
+    (`TEXT_NOT_COVERING`): kept as an unread page, its visible text read, but it is a scan
+    as far as the pass is concerned. Works on a classifier result and on the stored record."""
+    reason = kept_reason(page)
+    if reason in (SCANNED_PAGE, HANDWRITTEN_PAGE):
+        return True
+    return (
+        reason == UNREAD_PAGE and page.kind == "scan_no_text" and TEXT_NOT_COVERING in page.reasons
+    )
+
+
 def keeps_text(page: PageTypeResult | PageType) -> bool:
     """A kept page whose visible typed text is still read (layout): a little text and a
     picture or ink of something unread (`unread_page`), or a text layer that does not cover
-    the page's content (`TEXT_NOT_COVERING`: a title slide on a photo, a watermark). If the
-    image page pass reads the page, what it reads replaces that text (`pipeline.run`)."""
+    the page's content (`TEXT_NOT_COVERING`: a watermark over handwriting, a stamp on a
+    scan). If the image page pass reads the page, what it reads replaces that text
+    (`pipeline.run`)."""
     reason = kept_reason(page)
     if not _visible_chars(page):
         return False
@@ -1755,5 +1767,5 @@ def image_page_count(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -
             continue
         ink = ink_stats(page, drawings, budget)
         record = decide(stats, ink, coverage, hint).to_record(number)
-        found += kept_reason(record) in {SCANNED_PAGE, HANDWRITTEN_PAGE}
+        found += reads_image(record)
     return found

@@ -1472,9 +1472,19 @@ def _convert(
             image_built: dict[int, image_page.Built] = {}
             image_summary: ImagePagesSummary | None = None
             if options.image_pages:
+                # (a picture under a text layer that does not cover it is kept as an
+                # unread page and read as a scan: `page_type.reads_image`)
+                to_read = {
+                    n: page_type.SCANNED_PAGE
+                    if reason == page_type.UNREAD_PAGE
+                    and (kind := (getattr(doc, "page_types", None) or {}).get(n)) is not None
+                    and page_type.reads_image(kind)
+                    else reason
+                    for n, reason in kept.items()
+                }
                 image_built, image_summary = _image_pages_pass(
                     pdf_bytes,
-                    kept,
+                    to_read,
                     boxes,
                     client=client,
                     settings=settings,
