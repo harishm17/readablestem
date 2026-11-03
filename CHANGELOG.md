@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: reader B adapters for handwritten expressions (branch hw/math-readers)
+
+- `models/math_readers/`: one small `MathReader` protocol (a PNG crop in, LaTeX candidates with
+  reported confidences out) and two adapters, a Claude reader built to differ from the page pass
+  (another model, its own instructions, one high-resolution crop, no page text) and an OpenAI
+  vision reader (`store: false`). Worst-case reservation before every send, timeout, retries,
+  refusal and error mapping as in the step clients, no content in logs. Settings
+  `MATH_READER_CLAUDE_*` and `MATH_READER_OPENAI_*`, all off; nothing in the pipeline calls them
+  yet (`docs/math-readers.md`).
+- One list of who receives what (`web/recipients.py`) now writes the privacy page (its provider
+  items, "Where it is processed" and the account deletion notes), so a reader's company is named as
+  soon as the reader is on, whichever `MODEL_PROVIDER` is set. A production start is refused while a
+  reader is on and the rendered page does not name every company that receives pictures; the
+  launch checks (model provider, analytics, tables, notation, Microsoft, sign-up) now read the
+  rendered page, not the template source. `MATH_READER_MAX_USD_PER_JOB` caps all readers of a job
+  together. The vendor sheet and `docs/security.md` are updated to match.
 ## Unreleased: handwriting harness for private handwritten notes
 
 - `scripts/handwriting_own.py`: intake of PDFs from a folder outside the repo, a hash-based dev and
