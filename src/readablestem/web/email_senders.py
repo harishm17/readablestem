@@ -98,7 +98,7 @@ class ConsoleSender:
     """Prints the message. Development only."""
 
     def send(self, message: LoginEmail) -> None:
-        print(f"To: {message.to}\nSubject: {message.subject}\n\n{message.body}", file=sys.stdout)
+        print(f"To: {message.to}\nSubject: {message.subject}\n\n{message.body}", file=sys.stdout)  # noqa: T201 (development mail sender prints to the console by design)
 
 
 register_sender("console", lambda settings: ConsoleSender(), production_ok=False)

@@ -174,6 +174,22 @@ def test_unlisted_prompt_needs_the_document_report() -> None:
     assert guard.check([path, "data/eval/latest-document.json"], "", "")[0] == 0
 
 
+@pytest.mark.parametrize("name", ["image_page", "image_page_crops", "image_page_notation"])
+def test_an_image_page_prompt_needs_the_image_pages_report(name: str) -> None:
+    path = f"src/readablestem/models/prompts/{name}.md"
+    code, lines = guard.check([path], "", "")
+    text = "\n".join(lines)
+    assert code == 1 and "latest-image-pages.json" in text and "latest-document.json" not in text
+    assert guard.check([path, "data/eval/latest-image-pages.json"], "", "")[0] == 0
+
+
+def test_the_image_pages_model_and_effort_need_the_image_pages_report() -> None:
+    for name in ("image_pages_model", "anthropic_effort_image_pages"):
+        assert guard.required_reports([], [name]) == {
+            "latest-image-pages.json": [f"{guard.CONFIG}: {name} changed"]
+        }
+
+
 def test_claude_model_change_needs_every_claude_report() -> None:
     bumped = CONFIG.replace("claude-opus-5-5", "claude-opus-5-6")
     code, lines = guard.check([CFG], CONFIG, bumped)

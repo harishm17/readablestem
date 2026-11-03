@@ -45,6 +45,24 @@ RUN uv sync --locked --no-dev --no-editable --extra tracing
 # src/readablestem/pipeline/table_model.py. Without it, tables use PyMuPDF's own grid.
 RUN /app/.venv/bin/python -m readablestem.pipeline.table_model --dir /app/models
 
+# ---------------------------------------------------------------- local handwriting reader
+# Optional (docs/math-readers.md): the TexTeller model files (Apache-2.0; THIRD_PARTY_NOTICES.md),
+# fetched at a pinned revision, each file refused unless its SHA-256 matches, then rewritten with
+# int8 weights (2.1 GB of float32 becomes about 0.6 GB; the float32 files would not fit the
+# conversion child's memory cap). Built only with
+#   docker build --build-arg INSTALL_MATH_READER=true .
+# (on Railway: the service variable INSTALL_MATH_READER=true). The build needs the network, the
+# running service never does. onnx and onnxruntime live in this stage only: the application
+# needs onnxruntime, which the locked environment already has.
+FROM python:3.12-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS math-reader
+ARG INSTALL_MATH_READER=false
+COPY src/readablestem/models/math_readers/local_weights.py /opt/local_weights.py
+RUN mkdir /out \
+    && if [ "$INSTALL_MATH_READER" = "true" ]; then \
+        pip install --no-cache-dir "onnx==1.23.2" "onnxruntime==1.31.0" \
+        && python -I /opt/local_weights.py --dir /out; \
+    fi
+
 # ---------------------------------------------------------------- runtime
 FROM python:3.12-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS runtime
 
@@ -69,12 +87,16 @@ RUN if [ "$INSTALL_LIBREOFFICE" = "true" ]; then \
 WORKDIR /app
 # Owned by root and read-only to the app user: the process cannot rewrite its own code.
 COPY --from=build /app /app
+# Empty unless the image was built with INSTALL_MATH_READER=true. Nothing reads it while
+# MATH_READER_LOCAL_ENABLED is off (the default).
+COPY --from=math-reader /out /app/math-reader
 
 ENV PATH="/app/.venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8080 \
-    TABLE_MODEL_DIR=/app/models
+    TABLE_MODEL_DIR=/app/models \
+    MATH_READER_LOCAL_DIR=/app/math-reader
 
 USER 10001:10001
 EXPOSE 8080

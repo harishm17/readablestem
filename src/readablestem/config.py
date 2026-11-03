@@ -344,6 +344,16 @@ class Settings(BaseSettings):
     # OpenAI reader (OPENAI_API_KEY); the model must be priced in models/pricing.py.
     math_reader_openai_enabled: bool = False
     math_reader_openai_model: str = "gpt-6-luna"
+    # Local reader (models/math_readers/local_reader.py): TexTeller on CPU, no key and no
+    # network. Off, and not a recipient of anything (it is not in `math_readers_on`).
+    # `math_reader_local_dir` holds the model files (`python -m
+    # readablestem.models.math_readers.local_weights` fetches them; the image does at build
+    # with INSTALL_MATH_READER=true). `_threads` caps ONNX Runtime's threads; `_time_s` is
+    # one read's time budget (a read past it returns no candidates, outcome "timeout").
+    math_reader_local_enabled: bool = False
+    math_reader_local_dir: Path | None = None
+    math_reader_local_threads: int = Field(default=2, ge=1, le=8)
+    math_reader_local_time_s: float = Field(default=20.0, gt=0, le=300)
     # What all readers together may reserve and spend on one job, inside the job's own caps, so
     # second readings cannot starve the conversion (`BudgetExceeded("reader_usd")`: no second
     # reading, not a failed job).

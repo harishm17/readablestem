@@ -622,6 +622,61 @@ per arm, the scanned PDF and the vector-ink PDF, with the pipeline of that date)
   picture or a page of writing as not making it typed (docs/layout.md, page-type-v5.5). The thresholds
   rest on those three pages and the repository's fixtures, not on a measured rate.
 
+## Doubtful symbols: tried, not shipped (2026-11-03)
+
+A change to the page reader's prompts was tried and **not shipped**; the prompts are as they were
+(`image_page-7a9e3a80`). What was tried, what one run measured, and what was kept.
+
+**What was tried.** `image_page.md` and `image_page_crops.md` changed four ways: (1) each block lists
+`alternatives`, the symbols of its formulas it read one way and may have been drawn another way
+(case, Greek or Latin, digit or letter, an operator, a script lost or added), with one to three other
+LaTeX spellings each; (2) rule 7 no longer made a Greek-looking letter Greek "when the context is
+physical or mathematical" (which was always), and a letter was Greek when it had the Greek shape;
+(3) `medium` meant one or two doubts the reader can name, `low` three or more, `high` none, and a
+`high` block that listed a doubt counted as `medium`; (4) chemistry was written `\ce{...}` with the
+subset `pipeline/chem.py` accepts, and the course notation reached the reader as fenced context.
+Handwritten maths stayed a required decision.
+
+**One live run on the practice set** (74 expressions on 10 pages composed from MathWriting test ink,
+CC BY-NC-SA and not in this repository; `claude-opus-5-5`; $0.64, the page pass $0.52; one run per
+prompt, so sampling noise is not measured; the control is the earlier run of the same pages with
+`image_page-7a9e3a80`):
+
+| | current prompt (control) | tried prompt |
+|---|---|---|
+| exact_lenient, primary (n = 74) | 49 (0.66) | 44 (0.59) |
+| spoken-equal (the speech code says the reading and the label alike) | 53 | 47 |
+| required decisions, 10 pages | 28 | 28 |
+
+- **Reading did not improve and may have fallen.** Spoken-equal: 2 expressions gained, 8 lost (exact
+  paired p about 0.11); exact_lenient on a copy of the scorer: 2 gained, 7 lost (p about 0.18). Four of
+  the eight losses are a letter's case (`x` read `X`, `W` for `w`, `C` for `c`), two are spellings of
+  the same notation. Greek letters read as Latin remained (`w` for `\omega`). One run each cannot
+  separate this from sampling noise.
+- **The reader's own doubts are not selective.** 50 of 74 expressions carried at least one (61 doubts,
+  67 options: 6.1 doubts and 6.7 choices per page), and 28 of those 50 were already right; 22 of the
+  30 wrong page readings carried some.
+- **Coverage was below the 0.60 set before the run.** The right reading was among a wrong
+  reading's one-click choices for 8 of 30 (0.27, 95% interval 0.14 to 0.44); for the 18 that differ from the
+  label in one short stretch (some only in notation: `\ldots` for `...`, `\cdots`, `\perp` spacing) it
+  was 7 (0.39, interval 0.20 to 0.61); 6 had alternatives without the right option and 5 had none. Counting
+  a click, the right reading was the page reading or one choice away for 52 of 74 (0.70), against 44 of
+  74 for the page reading alone.
+- **Does not show:** anything about notes written on an iPad; a rate for any one change (the four changes
+  were tested together, in one run); whether choices would be clicked in review.
+
+**Why it was not shipped, and what was kept.** The reader's reports of its own doubt did not separate
+the readings that were wrong from the ones that were right, so they would put choices on most items
+and little at the places that need them. The alternatives are to come from disagreement between
+independent readings instead. What stays in the code is the part that does not depend on the prompt:
+`Element.alternatives` (`core/types.py`, optional), and `pipeline/reading_alternatives.py`, which turns
+another reading of the same expression (`from_reading`) or named doubts (`resolve_doubts`) into
+spans of the stored LaTeX, keeping only options that convert. Nothing reads `Element.alternatives`
+yet. The eval guard now asks for `data/eval/latest-image-pages.json` when an image page prompt or
+`IMAGE_PAGES_MODEL` or `ANTHROPIC_EFFORT_IMAGE_PAGES` changes (docs/eval.md); that report is created
+by the first such change, and the table above is the shape of its probe. The rule 7 rewrite, the
+`medium` definition and the chemistry section can be tried again alone, each with its own run.
+
 ## Reproduce
 
 ```
@@ -650,6 +705,7 @@ The second track (root causes, fixes, the fresh set):
 ```
 uv run python scripts/handwriting_accuracy.py build-fresh   # compose the fresh set (needs `fetch`)
 uv run python scripts/handwriting_accuracy.py verify-fresh  # rebuild and compare with data/handwriting/manifest-fresh.json
+uv run python scripts/handwriting_accuracy.py build-vector --verify  # vector-ink dev set, $0 (needs `fetch`)
 uv run python scripts/handwriting_analysis.py classes --part heldout --arm control   # needs the recorded run
 uv run python scripts/handwriting_errors.py [--arm NAME] [--part PART] [--json FILE]   # every recorded arm, $0
 uv run --env-file .env python scripts/handwriting_accuracy.py run --part dev --arm NAME --max-usd 1 \
@@ -659,6 +715,49 @@ uv run python scripts/typed_scans_check.py compare --arms base new   # docs/eval
 
 The fresh set's live runs refuse to start unless the registered files hash as registered
 (`data/handwriting/REGISTRATION-ACCURACY.sha256`), and a second live run of an arm.
+
+## A vector-ink dev set
+
+The sets above are raster, and the pipeline's stroke reader (`pipeline/ink_strokes.py`) reads only
+vector ink. `src/readablestem/eval/handwriting_vector.py` builds the matching dev set: MathWriting
+expressions (the `test` split, none that a registered part used, by id or by label) drawn into
+PDFs as paths, the way notes apps export. No model is called and the cost is nothing.
+
+```
+uv run python scripts/handwriting_accuracy.py build-vector [--verify] [--units N] [--seed S] [--out DIR]
+```
+
+- **Three drawing styles**, the three `ink_strokes` reads: `path` (one stroked polyline per
+  stroke, round pen), `samples` (one small filled disc per pen sample) and `outline` (one filled
+  pen outline per stroke). Units of two pages cycle through the styles, then plain and ruled paper
+  (pale rules and a margin line: furniture a reader must drop), and every second unit has a short
+  typed header on its first page (at most `page_type.BODY_MAX` characters, so it does not make the
+  page typed). There is no text layer under the ink.
+- **Layout:** one expression to a line, so every gold record is display; there are no typed
+  sentences (the raster sets have them). Pen width and letter size follow the ink.
+- **Gold:** one JSONL file per unit, the same records as the raster sets' (LaTeX label, MathML made
+  by the pipeline's own path), with the drawing style and the stroke count added, so the document
+  task reads the folder as it reads the others.
+- **`manifest.json`** has the identifiers, ink hashes, boxes and stroke counts, and `rebuild_hash`,
+  a SHA-256 over all of it, including each PDF's page content hash (the PDF container's own bytes
+  carry a document id, so the hash is over the drawing operations and the text). `--verify`
+  builds again into a temporary folder and compares. It is not a registered part: no registration,
+  nothing committed. The seed and the pool size are in the script.
+
+The pages, gold and manifest are CC BY-NC-SA 4.0 material (see
+[data/handwriting/ATTRIBUTION.md](../data/handwriting/ATTRIBUTION.md)). They go to
+`~/.cache/readablestem/handwriting-vector/` and the command refuses a folder inside the repository.
+
+**What the first build shows** (default seed, 6 units, 12 pages, 69 expressions; one build, no
+repeats). `ink_strokes.extract_ink` recovers every stroke of the `path` and `outline` pages, and
+the ruled paper is dropped as `rule`. On the 4 `samples` pages it finds 380 strokes for the 374
+drawn, and only 4 of 6 expressions exactly on the worst page (a fast curve splits, and crossing
+strokes join). `page_type.classify` says `handwritten` for all 8 `path` and `outline` pages and
+`vector_no_text` for all 4 `samples` pages, because its stroke test took a closed shape for a pen
+stroke only if it wiggles and a filled disc is a dot to it. It now reads runs of touching samples
+with the same rule `ink_strokes` uses (docs/layout.md, "Vector ink and strokes"), and says
+`handwritten` for all 12 pages. Whether a real GoodNotes page does the same is for the probe on
+real exports to settle.
 
 ## A set of real iPad ink with answer keys nobody typed
 

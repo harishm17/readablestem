@@ -890,7 +890,11 @@ unchanged is not a change) fails unless it also changes the matching
 `scripts/eval_guard.py` (tests: `tests/test_eval_guard.py`): a prompt needs the reports of
 the tasks that use it (`equation*.md`: equations and document; `figure*.md`: figures and
 document; `judge_*`: figures; `check_equation` and `check_figure`: that task; `table.md`:
-tables local and document; any other prompt: document); a change to the Claude model pair
+tables local and document; `image_page*.md`, `IMAGE_PAGES_MODEL` and
+`ANTHROPIC_EFFORT_IMAGE_PAGES`: `latest-image-pages.json`, a run of the scanned and handwritten
+pages pass (the document task reads typed PDFs and never calls that pass; no such report is committed
+yet, the first prompt change adds it, and the practice-set run in docs/eval-handwriting.md, "Doubtful
+symbols: tried, not shipped", is the model for it); any other prompt: document); a change to the Claude model pair
 needs all four Claude reports (equations, headings, figures, document); the OpenAI pair
 needs the tables report, which records it; any other model setting needs the document
 report.

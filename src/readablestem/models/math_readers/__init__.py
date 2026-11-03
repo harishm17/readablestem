@@ -2,8 +2,9 @@
 
 `MathReader.read(ReadRequest(image_png))` returns LaTeX candidates with the confidences
 the reader reported. Adapters: Claude (another model, its own prompt, one high-resolution
-crop: as decorrelated from the page read as a model reading can be made) and OpenAI.
-`build_readers` makes the ones the settings turn on; both are off by default and nothing
+crop: as decorrelated from the page read as a model reading can be made), OpenAI, and a
+local one (TexTeller on CPU: no key, no network, nothing leaves the process).
+`build_readers` makes the ones the settings turn on; all are off by default and nothing
 in the pipeline calls them yet. See `docs/math-readers.md`.
 """
 
@@ -20,6 +21,7 @@ from readablestem.models.math_readers.base import (
 )
 from readablestem.models.math_readers.claude_reader import ClaudeReader
 from readablestem.models.math_readers.engine import ReaderBudget
+from readablestem.models.math_readers.local_reader import LocalReader
 from readablestem.models.math_readers.openai_vision import OpenAIReader
 from readablestem.models.math_readers.transport import Transport
 
@@ -48,4 +50,7 @@ def build_readers(
         readers["claude"] = ClaudeReader(settings, capped, transport=transport)
     if settings.math_reader_openai_enabled:
         readers["openai"] = OpenAIReader(settings, capped, transport=transport)
+    if settings.math_reader_local_enabled:
+        # No key, no network and no dollars: it holds nothing under the budget.
+        readers["local"] = LocalReader.from_settings(settings)
     return readers

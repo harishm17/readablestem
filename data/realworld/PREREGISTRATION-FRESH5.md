@@ -16,7 +16,8 @@ exactly right than the Opus chatbot recipe, with fewer wrong equations that nobo
 The candidate is ReadableSTEM with the equation changes built since fresh4; the control is ReadableSTEM
 as it runs in production today. The set can detect a difference of about 3 points of
 `exact_lenient` (per-unit SD 0.048 from fresh4, 26 units, 80% power, alpha 0.025 with two comparisons);
-a smaller one is not claimed either way.
+a smaller one is not claimed either way. Stratum D (OpenStax chemistry, section 2 D) is outside that count and
+is judged on its own chemistry measure (section 5, stratum D).
 
 ## 2. The units
 
@@ -120,7 +121,50 @@ Accepted (`manifest-fresh5c.json`, with the commit each was read from and the en
 Two Beamer decks come from one repository (the per-repository cap of 2). The licence of a repository does not cover
 third-party material inside a document; the gold is equations only.
 
-Totals: 26 units (12 + 6 + 8), 131 PDF pages (52 + 43 + 36).
+**D. OpenStax chemistry: 3 sections (1 CC BY, 2 CC BY-NC-SA used privately), 24 Letter pages, 115 chemistry gold equations, reported apart and not pooled.**
+
+*Licence handling.* The service is free and non-commercial. The pool has three tiers, and the licence of every book
+whose slug has "chemistry" is read live, in the archive and in the CMS:
+
+- Tier 0, public: the CC BY first editions (Chemistry, Chemistry: Atoms First; both retired, allowed as for stratum B).
+- Tier 1, private: Chemistry 2e and Chemistry: Atoms First 2e (CC BY-NC-SA 4.0 in both places).
+- Tier 2, private, only if the first two do not give enough: Organic Chemistry (CC BY-NC-SA 4.0).
+
+A CC BY-NC-SA section is a private measurement. Its printed PDF, its answer key and the model answers about it stay in
+the cache outside the repository (`gold/fresh5d-private`) and are never committed or published; the repository holds
+only section ids, titles, counts and hashes (`selection-fresh5-D.json`). What is published about those sections is
+aggregate numbers (rates over the stratum, with their sample sizes), with the source named (OpenStax, Rice University)
+and the licence named (CC BY-NC-SA 4.0). No book outside the three tiers, and no other non-commercial or
+no-derivatives licence, is touched.
+
+*Rule.* A section is out if any earlier set used it (the same rule as stratum B, with the 2e editions folded into the
+first editions they are the second edition of), if a section with its title was used, if it could be in the sealed check
+part of dev-v2 (the names are not recorded, so every section of that set's chemistry book under the registered hash
+rule counts, a superset), or if its title is on a topic the development and held-out chemistry sets cover
+(balancing, precipitation, galvanic cells, decay, Nernst, rate laws, Brønsted acids, nuclear equations, measurement,
+thermodynamics, noble gases, representative metals, Lewis structures, titrations, coordination compounds; the
+topic test is a match on the section title). Of 762 sections in the 5 books, 410 were out as used (by name or by
+title) or possibly sealed and 9 on topic, leaving 343. Those are ranked by tier and then by SHA-256 of
+`fresh5-D|<book>|<section>` and walked in that order, taking each that passes four automatic gates: at least 25
+gold equations, at least 40% of them chemistry (a reaction arrow, a state symbol, a formula of two or more element symbols
+or an ion; a lone multiplication sign in the key is counted in neither number), a word 8-gram overlap of at most 20% with
+the text of every used or sealed section and of the sections already taken (so a section of a 2e edition that repeats a
+used first-edition section is measured against it), and at most 15 printed Letter pages. The walk stops at 4 sections
+holding at least 100 chemistry gold equations, and never takes more than 8. The gates were fixed before the draw and are
+not changed after it. All 343 candidates were visited and the walk ran out before it reached 4 sections: 3 passed, 327 had
+too few equations, 4 too small a chemistry share, 9 too much overlap (`selection-fresh5-D.json`, with every gate result).
+**The rule filled 3 of its 4 places** and reached 115 chemistry gold equations; no gate is loosened to add another. Pages are
+pinned to archive release 20260604.144757, printed to Letter PDF with the renderer of stratum B, and the SHA-256 of each PDF and answer key is
+recorded. The answer keys are in the cache outside the repository; no gold file has been opened or read, only the gates' counts.
+
+| Book | Licence | Section | Equations in the key | Letter pages |
+|---|---|---|---|---|
+| Chemistry | CC BY 4.0 | 2.6 Molecular and Ionic Compounds | 35 (33 chemistry) | 11 |
+| Chemistry 2e (private) | CC BY-NC-SA 4.0 | 17.3 Electrode and Cell Potentials | 51 (46 chemistry) | 7 |
+| Chemistry 2e (private) | CC BY-NC-SA 4.0 | 17.1 Review of Redox Chemistry | 37 (36 chemistry) | 6 |
+
+Totals of strata A to C: 26 units (12 + 6 + 8), 131 PDF pages (52 + 43 + 36). Stratum D adds 3 units and 24 pages, and
+every arm runs on it exactly as on the others (the arms table below, the same recipes, settings and caps rules).
 
 ## 3. Arms
 
@@ -172,9 +216,40 @@ criterion 1; otherwise "higher by point estimate", "no difference this set can d
 fails is reported as it is, and the launch rule stands; no setting, scorer, gold or unit changes on this split's
 account.
 
+### Stratum D: chemistry
+
+Chemistry gold is scored by what the chemistry says, not by the shape of its markup (`eval/equations_chem.py`, the scorer
+`chem`), so `exact_lenient` does not decide D and D is not part of criterion 1 above. The numbers published for D, each with
+its sample size (gold equations and sections):
+
+- **Primary: chemically right**, end to end (`exact_chem` or an earlier rung), over the chemistry gold **excluding the lone
+  multiplication sign** (`chem_right_excl_times`). The lone `×` is a layout mark that the answer keys carry as an equation;
+  it is reported separately, and the number with it included (`chem_right`) is printed beside the primary one, so neither
+  replaces the other.
+- **Silent harm:** a chemistry equation that is wrong, was not asked about and is not "input" (`silent_harm_summary`), per 100 gold.
+- Secondary, reported and not the verdict: `exact_lenient`, the symbols scorer, table cells found, flag recall, the notation
+  scorer, each per section.
+
+Stratum D is called a success only if every one of these holds, all set before any model runs on it:
+
+1. The candidate is chemically right on at least **0.80** of the chemistry gold (excluding the lone `×`).
+2. The candidate is at least **5 points** above the control (current production) on the same measure.
+3. The candidate is at least the Opus chatbot as a point estimate.
+4. Silent harm is at most **1 per 100** gold equations.
+
+Otherwise D is reported as it is, with the same wording rules as section 5 ("higher by point estimate", "no difference this
+set can detect", "lower"). D is published whichever way it falls.
+
+**What D can and cannot show.** With 115 chemistry gold equations in 3 sections, the 95% interval around a rate of 0.80 is about
+plus or minus 0.07, and one silent harm in the stratum is about 0.9 per 100. D is evidence about these sections; it is not an
+estimate for chemistry teaching material, and criterion 2 is a point-estimate rule (a paired interval over 3 sections
+is too coarse to be a test). Two of the three sections are CC BY-NC-SA and are used privately, so their answers and
+answer keys cannot be published; a reader can check the stratum's aggregates and the selection by the rule but not the
+per-section content of those two.
+
 ## 6. Budget
 
-Caps on this split, kept in `spend-log.jsonl`: control and candidate $7.5 together, Opus chatbot $10,
+Caps on this split (stratum D included; it adds no cap of its own), kept in `spend-log.jsonl`: control and candidate $7.5 together, Opus chatbot $10,
 Haiku chatbot $0.3. Each arm stops at its cap and is reported as partial; a cap is
 not raised without asking. The API credit balance is checked before each paid step. Nothing is run twice to
 confirm a number; a crash is repeated only for the jobs that did not finish, and named.
@@ -186,7 +261,8 @@ logs, every recorded answer, the report in `docs/` and the README and `PROOF.md`
 Purdue recipe as it is, which critics may call a weak baseline. It will not say whether a wrong equation changes the meaning, whether a person would accept the page,
 anything about scans, Word files or handwriting, or about maths in embedded figures. One run per arm gives no
 run-to-run variation. arXiv gold is dominated by table cells and the authors' `$` boundaries, so a win there may
-not carry to course materials, which is why the strata have a floor and are reported apart. The Beamer
+not carry to course materials, which is why the strata have a floor and are reported apart. Stratum D is three sections of one textbook family
+(two of them second-edition text used privately), so it says nothing about chemistry courses in general. The Beamer
 slide gates were relaxed during the draft to fill the Beamer slots (section 2 C), which the report states. Two of
 the three Beamer decks share a repository, and a deck's maths letters sit in a text font, so glyph evidence is weak
 there.
