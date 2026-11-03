@@ -83,6 +83,11 @@ PROMPT_REPORTS: dict[str, tuple[str, ...]] = {
     "judge_figure": ("latest-figures.json",),
     "judge_long_description": ("latest-figures.json",),
     "table": ("latest-tables-local.json", "latest-document.json"),
+    # The scanned and handwritten pages pass is not in the document task's sections (typed
+    # PDFs), so its report is the practice-set run of the pass itself (docs/eval-handwriting.md).
+    "image_page": ("latest-image-pages.json",),
+    "image_page_crops": ("latest-image-pages.json",),
+    "image_page_notation": ("latest-image-pages.json",),
 }
 DEFAULT_PROMPT_REPORTS = ("latest-document.json",)
 # Model constant (name, lower case) -> the reports that record those models. The OpenAI
@@ -93,6 +98,8 @@ MODEL_REPORTS: dict[str, tuple[str, ...]] = {
     "cheap_model": ("latest-tables-local.json",),
     "anthropic_main_model": ANTHROPIC_REPORTS,
     "anthropic_cheap_model": ANTHROPIC_REPORTS,
+    "image_pages_model": ("latest-image-pages.json",),
+    "anthropic_effort_image_pages": ("latest-image-pages.json",),
 }
 DEFAULT_MODEL_REPORTS = ("latest-document.json",)
 

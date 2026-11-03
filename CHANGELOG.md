@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased: other readings of a formula as choices on its symbols (branch hw/schema-prompt)
+
+- `Element.alternatives` (`ReadingAlternatives`, `SymbolAlternative` in `core/types.py`): the doubtful
+  symbols of a reading as spans of the stored LaTeX, each with other LaTeX it may be, for a review to
+  offer as choices. Optional and empty everywhere today; results stored before it load as they were.
+- `pipeline/reading_alternatives.py` makes it from any other reading of the same expression
+  (`from_reading`, for a second reader) or from named doubts (`resolve_doubts`): spans are found in
+  the LaTeX as stored, an option is kept only when it converts, at most 3 doubts of 3 options.
+- Eval guard: the image page prompts, `IMAGE_PAGES_MODEL` and `ANTHROPIC_EFFORT_IMAGE_PAGES` need
+  `data/eval/latest-image-pages.json` (the document task never calls the image page pass). No such
+  report is committed yet.
+- No prompt changed. A prompt that made the page reader list its own doubts was measured and not
+  shipped: on 74 expressions it read 44 exactly against 49 for the current prompt, 50 carried
+  alternatives, and the right reading was one choice away for 7 of 18 one-symbol errors. docs/eval-handwriting.md,
+  "Doubtful symbols: tried, not shipped".
 ## Unreleased: a vector-ink handwriting dev set (branch hw/vector-devset)
 
 - `scripts/handwriting_accuracy.py build-vector` and `eval/handwriting_vector.py` build a dev set of
