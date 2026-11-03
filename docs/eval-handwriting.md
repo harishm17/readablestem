@@ -594,6 +594,34 @@ call, including a few the answers file did not keep):
 Nothing was repeated to confirm another run. Replays (`--offline`) cost nothing and produced every
 other row of every table (`handwriting_accuracy.py run --offline`, `report`; `handwriting_analysis.py`).
 
+## Note, 2026-11-03: silent wrong equations on a practice set, and text layers
+
+The registered results above are unchanged. Two things were learned afterwards from a small
+practice set (74 expressions on 10 pages, 5 units; composed with `handwriting_set.py` from
+MathWriting test ink, which is licensed CC BY-NC-SA and is not in this repository; one live run
+per arm, the scanned PDF and the vector-ink PDF, with the pipeline of that date).
+
+- **Silent wrong equations.** A first reading of the run counted 14 of 25 wrong readings (scanned
+  arm) and 16 of 30 (vector arm) as "not flagged for review", against the registered 0 and 2. That
+  count read each equation's own `review` field, which is "none" for an inline formula: an inline
+  formula has no decision of its own and rides with its paragraph, list item or heading
+  (`eval/image_pages._asked_about`, ADR 0007 point 12). Counted the way this report counts, by the
+  decision that governs the equation, every wrong reading was asked about: 25 of 25 and 30 of 30
+  (and every right one: 49 of 49 and 44 of 44, since the rule asks about all maths). A replay of the
+  recorded answers on the current code, at $0 (`eval pipeline --task document --answers-offline`, 38 answers
+  replayed, 0 missing), gave the same counts. So the "zero silent" property held on this set; it was
+  not a regression. The set is small and the writers are MathWriting's, so it is a check of the rule
+  and not a new rate. What the rule does not do: it asks about every item, so a person still has
+  to find the wrong ones (about a third of the readings here were wrong). `image_page.enforce_maths_required`
+  now enforces the rule after every step, and a test checks that no equation or table read from an
+  image is governed by a decision that is not required, on every path.
+- **Text layers.** Of five real photographed notebook pages (from a public dataset whose labels are not
+  used; checked by eye, no answer key, not published), three carried a watermark text layer, were
+  called typed, never reached the image page pass and came out "Not converted"; with the text layer
+  removed the pass read them. The classifier now treats a text layer that does not cover a page-sized
+  picture or a page of writing as not making it typed (docs/layout.md, page-type-v5.5). The thresholds
+  rest on those three pages and the repository's fixtures, not on a measured rate.
+
 ## Reproduce
 
 ```

@@ -642,4 +642,6 @@ def test_fragment_resolution_stays_near_linear_on_a_dense_page(monkeypatch):
     elapsed = time.perf_counter() - started
     rows = 16 * 110  # about 1,760 fragment rows
     assert len(calls) < 20 * rows  # the old fixed point made a full n x n pass per row added
-    assert elapsed < 20  # 66 s before the fix, well under a second after
+    # 66 s before the fix, about 5 s alone after; the call count above is the real guard, so
+    # the bound is wide enough for a loaded parallel run (it failed at 20 s under -n 6)
+    assert elapsed < 50

@@ -234,12 +234,16 @@ a different job; [docs/eval-image-pages.md](docs/eval-image-pages.md), [ADR 0007
   end (0.83 on the symbols score), the same as the same pages as typed PDFs; words of the prose
   wrong 3 to 5 % of the time; $0.106 a page. Handwriting was looked at on four public-domain pages
   by eye only: the main model read them well, and a cheaper model misread two section numbers with
-  full confidence.
+  full confidence. Five photographed notebook pages were looked at by eye later (2026-11-03): the
+  pass read the two physics pages well and the three linear-algebra pages mostly right; so nine
+  handwritten pages in all, none with an answer key.
 - **Real papers as scans, never used to build the feature** (the real-world held-out set, 9 of 15
   papers because the $9 spending cap for the run was reached; 42 pages, 1,147 equations, registered
   before the run): 0.66 exactly right (0.69 on the symbols score) against 0.62 (0.66) for the typed
   PDFs of the same papers, a difference inside the noise, with 5 wrong equations in every 100 not
-  asked about (10 for the typed PDFs); $0.136 a page.
+  asked about when it was measured (10 for the typed PDFs); since 2026-10-22 every converted block
+  with maths is a decision, and a replay of the same recorded answers left none unasked
+  (docs/eval-image-pages.md, "Update: maths always required"); $0.136 a page.
 - It is slower (about 20 to 30 seconds a page), it costs four to six times a typed page, and a
   model can misread handwriting and small symbols; the measurement is on synthetic scans, nine
   papers and eight real pages, with no measurement of how long checking takes.

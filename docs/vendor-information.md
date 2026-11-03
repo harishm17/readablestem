@@ -1,7 +1,7 @@
 # ReadableSTEM: information sheet for an accessibility or procurement office
 
 One page. It says what the tool does, what happens to a document, and where it falls short.
-It describes the beta as it behaves today; it is not a contract or an outside audit. The
+It describes the beta as it is today; it is not a contract or an audit. The
 command is `readablestem`; the GitHub repository is `harishm17/readablestem`.
 
 ## What it does
@@ -38,14 +38,15 @@ checks ran, and what was not checked.
   textbook, 23 of 30 equations came out exactly right. PDFs typeset with LaTeX or exported
   from Word may do worse. The instructor is asked about the parts the tool is unsure about;
   the rest is accepted by the tool without a person looking.
-- **Not converted:** handwriting and scanned pages (kept as pictures, marked "Not
-  converted"), chemistry notation, and any equation or figure the tool could not read
-  (kept as a picture of the original, with a note). Two-column pages and slides convert
-  less well than single-column notes.
+- **Converted only on request:** handwriting and scanned pages, when ticked at upload. A model
+  reads each page and can misread handwriting, so a person decides on every converted
+  equation and table. Otherwise they stay pictures marked "Not converted", as does anything
+  the tool could not read. Chemistry needs checking. Two-column pages and slides convert
+  less well.
 - **Checks look at structure, not meaning:** language, title, order of headings, lists,
   tables, links and the alt attribute of every image. Nobody has tested the output with
   NVDA, JAWS or VoiceOver, and it has not been tried in a live course site.
-- **Size:** up to 30 pages and 20 MB per upload (see the application's "Known limits").
+- **Size:** up to 30 pages and 20 MB per upload.
 - **No conformance report.** There is no VPAT or accessibility conformance report for the
   web application itself, and no independent security test. The developer reviewed the
   application against a written checklist and ran automated accessibility tests on its
@@ -55,7 +56,5 @@ checks ran, and what was not checked.
 
 ## Where to read more
 
-`docs/security.md` (controls and audit findings), `docs/web.md` (how the web application
-works), `docs/output.md` (what is in the HTML file), `docs/eval.md` (how accuracy was
-measured). The application's own Privacy, Terms and Known limits pages are the wording
-students and instructors see.
+`docs/security.md`, `docs/web.md`, `docs/output.md` and `docs/eval.md` say more. The
+application's Privacy, Terms and Known limits pages are the wording users see.

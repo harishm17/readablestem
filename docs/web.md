@@ -448,7 +448,10 @@ to each of its parts that has such pages); the flag only offers it.
   image_pages`): it then lets a PDF of scans or handwriting through and counts the pages
   `page_type` calls scanned or handwritten (`page_type.image_page_count`, the same classifier layout
   uses; typed pages are told from their text alone, so only a page that is not clearly typed pays
-  for the ink analysis). A file with none is not refused and not changed: the request does not
+  for the ink analysis; a page whose text covers little of it (under 12 %) pays for it too, as a
+  watermark or a page number can lie over vector handwriting). The count is an estimate: a page
+  whose picture is the template's background is counted by the probe and found typed by layout.
+  A file with none is not refused and not changed: the request does not
   apply, and the job is made as if the box were not ticked. Without the box a PDF of only scans
   or handwriting is refused as before, and the message (`upload_error_message`) says to upload it
   again with the box ticked when the server offers it.
@@ -1557,7 +1560,11 @@ the results".
   one reason (`routes/review.py page_group_view`; their fixes share a "pg-" group key).
   It says which pages and what they are ("Pages 2 and 3 are handwritten."), what students
   get ("This tool does not convert handwriting. In the HTML each page is an image marked
-  “Not converted”, so a student using a screen reader hears only that."), shows the
+  “Not converted”, so a student using a screen reader hears only that."), when "Convert
+  scanned or handwritten pages" was ticked and the page was tried and stayed an image,
+  says why in one more sentence ("The tool tried to read page 3 from an image, but the model's
+  answer could not be used."; `reading_note`, from the page's `ImagePageRecord.outcome`, a code
+  per page, never text), shows the
   first page's image and the pages it is on, and has one button, **Keep the page images,
   marked “Not converted”** (each one's Keep as image, `web.review.apply_page_group`),
   with the hint "To make them accessible, type them up (for example in LaTeX or Word) and
