@@ -468,7 +468,7 @@ class HeadingFix(BaseModel):
     text: str
 
 
-# What else a doubtful symbol of a handwritten reading may be (`pipeline.image_page`): how many
+# What else a doubtful symbol of a reading may be (`pipeline.reading_alternatives`): how many
 # symbols a formula lists and how many options each has. More would be a menu, not a choice.
 MAX_DOUBTS_PER_READING = 3
 MAX_OPTIONS_PER_DOUBT = 3
