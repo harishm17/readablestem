@@ -110,7 +110,9 @@ refused, nothing applied): `POST /jobs/{id}/edit/{element}` (the words of a para
 heading; a paragraph made a heading), `POST /jobs/{id}/pages/{n}/add` (a picture or an equation
 the tool missed), `GET /jobs/{id}/pages/{n}/region.png` (the region about to be added),
 `POST /jobs/{id}/pages/{n}/omit` and `/restore` (a page left out), `POST
-/jobs/{id}/tables/accept-clean` and `POST /jobs/{id}/tables/{element}/read-cell`. Like a
+/jobs/{id}/tables/accept-clean` and `POST /jobs/{id}/tables/{element}/read-cell`, and `POST /jobs/{id}/symbols` (one symbol written as another in the
+handwritten equations, a single write that one Undo takes back; its redirect is built only from
+the checked job id and a fixed view, `routes/review.symbols_url`). Like a
 decision, a text edit, an omission or accepting the clean tables is not rate limited (it
 changes the person's own document, the body limit applies, the document is capped). Two of them
 cost something and are limited: adding a region cuts a crop in the render child (60 in 10
