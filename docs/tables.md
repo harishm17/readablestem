@@ -675,6 +675,34 @@ itself is described in docs/web.md "The table card" and "Rough edges"):
   "What the model costs here").
 
 
+## Maths cells from glyphs (T10, 2026-11-03)
+
+The table step's model reads a table once and writes a cell's maths as LaTeX when it sees it. Most of the maths of a table
+that the pipeline missed was cells it wrote as text ([eval-equation-diagnostics.md](eval-equation-diagnostics.md), D1). A
+table of a TeX paper now has a second reader for the cells whose glyphs say they are maths:
+
+1. **Layout** (`layout._cell_maths`, TeX-made PDFs only, not a rotated table). The glyphs of a cell are read as a row of
+   their own by the rules that find inline maths in a line of prose (`_inline_runs`: a maths font, an italic variable with an
+   operator, a script, a relation with operands). A cell counts when one run covers everything in it (a cell with words and
+   a formula, a bare number, a cell of several lines such as a stacked fraction, a table with more than 60 such cells are
+   left to the table step), and a lone italic letter alone in a cell is a variable. The cell becomes an inline equation
+   element of the table (`parent_id` = the table, reason `table cell maths`) with its crop; `TableCell.equation_id` names
+   it. Layout does not read the tables flag: `run.py` drops these elements (`table_math.without_cell_equations`) when
+   tables are off, because the table stays a picture and nothing would write them.
+2. **The equation step** reads the cell's crop like any inline equation (its glyph checks, its flags, its place in the
+   review). Nothing is guessed in layout: a cell is only marked.
+3. **The page** (`pipeline/table_math.py`, called by `assemble.render_html`): in a table the table step rebuilt, with a grid
+   of the size of the one read from the PDF, a cell the model wrote with no maths takes the equation step's LaTeX and MathML
+   when the equation has them (also when the equation is flagged for review: it has its own decision, as an inline formula
+   of a paragraph has). A cell the model already wrote as maths is not changed, a failed, abstained or rejected equation
+   leaves the cell as the model wrote it, and the cell's text, header and span never change. The equation elements of cells
+   are not written on their own.
+
+Measured offline with the layout alone (`scripts/eq_span_edges.py`, [eval-equation-diagnostics.md](eval-equation-diagnostics.md),
+"Table-cell maths"): gold equations typed in floats found 657 to 908 of 2,153 over the five development and replay parts.
+What the glyphs cannot see: a number set in maths mode in a text font (`0.50` in `0.50 kg`, `1.57 s`) has no glyph that says
+so, and a table whose model reading differs from the equation step's keeps the model's.
+
 ## Tables on, on the development sets (2026-10-21): measured, and the decision
 
 Production runs with `FEATURE_TABLES` off: a detected data table is kept as a picture of the
