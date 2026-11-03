@@ -19,7 +19,7 @@ from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import get_ctx, render
 from readablestem.web.events import EVENT_RETENTION_DAYS
-from readablestem.web.health import readiness
+from readablestem.web.health import ops_freshness, readiness
 from readablestem.web.provider_health import HEALTH
 from readablestem.web.quota import next_day_start
 from readablestem.web.security import VIEW_CSP
@@ -247,4 +247,14 @@ def readyz(request: Request) -> Response:
     return JSONResponse(
         {"status": "ready" if ready else "not_ready", "checks": checks},
         status_code=200 if ready else 503,
+    )
+
+
+@router.get("/healthz/ops")
+def healthz_ops(request: Request) -> Response:
+    """Did the daily backup and the hourly cron finish well lately (ops.heartbeat)? 200, or
+    503 listing only the names that are stale. Content-free, like /readyz."""
+    ok, stale = ops_freshness(get_ctx(request))
+    return JSONResponse(
+        {"status": "ok" if ok else "stale", "stale": stale}, status_code=200 if ok else 503
     )

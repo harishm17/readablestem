@@ -3,9 +3,9 @@
 Retention model: everything derived from a user's document (the upload, crops, the
 result JSON, the output HTML, review edits, stage progress) hangs off `jobs` and is
 deleted with it by `ops.retention`. Tables that survive a job's deletion (`spend_days`,
-`spend_holds`, `quota_days`, `signup_days`, `deleted_accounts`, `error_aggregates`, `events`) hold
-numbers and category codes only (`deleted_accounts` a day-long hash of an address), never
-document text.
+`spend_holds`, `quota_days`, `signup_days`, `deleted_accounts`, `error_aggregates`, `events`,
+`ops_heartbeat`, `erasure_ledger`) hold numbers and category codes only (`deleted_accounts`
+a day-long hash of an address, `erasure_ledger` a hash of a user id), never document text.
 
 User content that is not a document (a user's `courses` and their `notation_entries`)
 and sign-in data (`auth_identities`) belong to the user: they stay until the user deletes
@@ -279,6 +279,9 @@ class SpendHold(Base):
     amount_usd: Mapped[float] = mapped_column(Float)
     in_pool: Mapped[bool] = mapped_column(Boolean, default=False)
     job_id: Mapped[str | None] = mapped_column(String(32), index=True)
+    # The owner of the job, so the settlement can add the cost to their `quota_days` row. Not a
+    # foreign key: a hold must outlive nothing and block nothing, least of all an erasure.
+    user_id: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )
@@ -302,7 +305,9 @@ class DeletedAccount(Base):
 
 class QuotaDay(Base):
     """Pages a user has submitted per UTC day, and the model reads from review they have
-    started (`rereads`, counted for open-tier accounts only: `web.quota`)."""
+    started (`rereads`, counted for open-tier accounts only: `web.quota`), and what their
+    jobs cost that day (`spent_usd`, added by the spend guard when a model call settles).
+    Deleted with the user; `spend_days` stays the global total."""
 
     __tablename__ = "quota_days"
 
@@ -312,6 +317,7 @@ class QuotaDay(Base):
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     pages: Mapped[int] = mapped_column(Integer, default=0)
     rereads: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    spent_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
 
 
 class SignupDay(Base):
@@ -325,6 +331,34 @@ class SignupDay(Base):
 
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     accounts: Mapped[int] = mapped_column(Integer, default=0)
+    # Set by the first refusal of the day, which is the one that logs
+    # `signup_cap_reached` (once per day, however many processes see it).
+    cap_warned: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+
+
+class OpsHeartbeat(Base):
+    """When a scheduled task last finished well: `backup` (the daily dump, verified by a
+    restore) and `cron` (the hourly aggregate and purge). `/healthz/ops` reads it and the
+    outside check turns a stale one into an email (`web.health.ops_freshness`). A name, a
+    time and a short note of counts: no document content."""
+
+    __tablename__ = "ops_heartbeat"
+
+    name: Mapped[str] = mapped_column(String(32), primary_key=True)
+    last_ok_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    detail: Mapped[str | None] = mapped_column(Text)
+
+
+class ErasureLedger(Base):
+    """One row per erased account, so a restored backup can have the erasure done again
+    (`readablestem ops replay-erasures`). `user_hash` is the SHA-256 of the user id (a random
+    128-bit value), so the row says nothing about who the person was. Not deleted with
+    anything: that is its purpose."""
+
+    __tablename__ = "erasure_ledger"
+
+    user_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    erased_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class PendingUpload(Base):
@@ -518,9 +552,12 @@ def make_engine(database_url: str) -> Engine:
             cur.close()
 
         return engine
-    # 3 pooled + 2 overflow = at most 5 connections per process; production runs one web
-    # replica and the cron service opens its own for a few seconds an hour.
-    return create_engine(database_url, pool_pre_ping=True, pool_size=3, max_overflow=2)
+    # 5 pooled + 5 overflow = at most 10 connections per process. The routes are synchronous
+    # (they run in a thread pool), so a burst of requests each hold one while they wait on a
+    # query. Railway's Postgres allows 100 connections (default `max_connections`); the one
+    # web replica, the cron service for a few seconds an hour and the backup's `psql` stay far
+    # under that.
+    return create_engine(database_url, pool_pre_ping=True, pool_size=5, max_overflow=5)
 
 
 def make_sessionmaker(engine: Engine) -> sessionmaker[Session]:
