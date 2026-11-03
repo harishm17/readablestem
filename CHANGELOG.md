@@ -12,6 +12,14 @@
   reviewer's edit gets it too, and the compare table has "Species" rows. Numbers and the
   replay: [docs/steps.md](docs/steps.md), "Chemistry species check";
   `scripts/chem_check_replay.py`; tests in `tests/test_chem_check.py`.
+## Unreleased: finished steps are kept when a configuration error ends the run
+
+- When a configuration error (a model that is not set up) ended a conversion while other
+  steps were still being answered, those steps were not kept for "Try again" if the error
+  reached the scheduler first; they are now (`pipeline/run.py`, `_Run.collect`). The tests
+  for this and for the worker and child-process suites no longer depend on timing luck, and
+  the end-to-end content test renders from the stored result the way the review screen does
+  (page markers included).
 
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)
 
