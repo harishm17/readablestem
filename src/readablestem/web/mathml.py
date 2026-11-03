@@ -17,6 +17,8 @@ from xml.etree.ElementTree import Element
 from defusedxml import ElementTree as SafeET
 from markupsafe import Markup
 
+from readablestem.core.mathml_intent import intent_allowed
+
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 
 ALLOWED_ELEMENTS = frozenset(
@@ -73,6 +75,8 @@ def _write(node: Element, out: list[str], depth: int, flag: frozenset[str] = fro
         local = _local(name)
         if local in ALLOWED_ATTRIBUTES and "{" not in name:
             attrs.append(f' {local}="{escape(value, quote=True)}"')
+        elif depth == 0 and tag == "math" and name == "intent" and intent_allowed(value):
+            attrs.append(f' intent="{value}"')  # the root only, one of the two chemistry values
     if tag == "math":
         attrs.insert(0, f' xmlns="{MATHML_NS}"')
     if flag and tag in TOKENS and any(ch in flag for ch in _fold(node.text or "")):

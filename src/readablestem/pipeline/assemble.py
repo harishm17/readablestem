@@ -1371,6 +1371,7 @@ img { max-width: 100%; height: auto; }
 .equation-label { flex: none; margin-left: auto; }
 math { font-size: 1.1em; }
 math[display="block"] { margin: 0 auto; }
+math[intent] mi { text-transform: none; }
 ul, ol { margin: 0 0 1em; padding-left: 1.75em; }
 li > ul, li > ol { margin: 0.25em 0 0; }
 .printed-markers { list-style: none; }

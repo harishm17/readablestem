@@ -204,9 +204,17 @@ def _decided(fix: Fix) -> bool:
 
 
 def _proposal(fix: Fix) -> dict[str, Any]:
-    return fix.model_dump(
+    """What the tool proposes for the item, for the "same proposal" test. An equation's MathML
+    and speech are made from its LaTeX by code that changes between pipeline versions (the
+    MathML shape for screen readers, the speech rules), so only the LaTeX and the display mode
+    are the proposal: the same reading with another shape is not a new suggestion."""
+    proposal = fix.model_dump(
         mode="json", include={"equation", "figure", "heading", "table"}, exclude_none=True
     )
+    equation = proposal.get("equation")
+    if equation is not None:
+        proposal["equation"] = {k: equation.get(k) for k in ("latex", "display")}
+    return proposal
 
 
 def _same_proposal(old: Fix, new: Fix) -> bool:
@@ -343,7 +351,16 @@ def carry_decisions(
 
 def _put_decision(target: Fix, source: Fix) -> None:
     """Copy what a decision can change from `source` onto `target` (`web.review.snapshot`'s
-    fields), so the new fix reads exactly as the earlier one did after the decision."""
+    fields), so the new fix reads exactly as the earlier one did after the decision.
+
+    An accept is carried only where the tool proposes the same thing now (`_same_proposal`), so
+    the new fix already has that proposal, made by the current pipeline (its MathML shape and
+    reading): only the decision is copied, not the earlier result. An edit or a rejection is the
+    person's own words and is copied whole."""
+    if source.status is Status.ACCEPTED:
+        target.status = source.status
+        target.reviewed = True
+        return
     for name in ("equation", "figure", "heading", "table"):
         value = getattr(source, name)
         setattr(target, name, value.model_copy(deep=True) if value is not None else None)

@@ -236,6 +236,10 @@ progress { width: 16rem; height: 1.1rem; }
 .crop img { max-width: 100%; height: auto; border: 1px solid var(--rule); background: #fff; }
 .crop figcaption { color: var(--muted); font-size: 0.9rem; }
 .mathml-preview { font-size: 1.3rem; padding: 0.75rem; background: var(--panel); border-radius: var(--radius); overflow-x: auto; }
+/* An equation that is all chemistry has no style on its element symbols (the MathML carries
+   intent on <math>; Speech Rule Engine would read an explicit style aloud). Draw them upright
+   wherever MathML is shown: the proposal, the comparison rows, the item lines and tables. */
+math[intent] mi { text-transform: none; }
 .alt-proposal { background: var(--panel); padding: 0.5rem 0.75rem; border-radius: var(--radius); }
 .review-form { margin-top: 1rem; border-top: 1px solid var(--rule); padding-top: 1rem; }
 

@@ -214,6 +214,37 @@ def _fenced_to_mrow(elem: ET.Element) -> ET.Element:
     return row
 
 
+def _multiscripts_to_row(elem: ET.Element) -> ET.Element:
+    """`mmultiscripts` (the shape `pipeline.chem_mathml` writes a nuclide in, for a screen
+    reader's chemistry rules) as the answer keys write it: an empty-based script holding the
+    prefix numbers, then the base with its own scripts. Our shape only, so no recorded gold
+    changes."""
+    kids = list(elem)
+    names = [k.tag for k in kids[1:]]
+    split = names.index("mprescripts") if "mprescripts" in names else len(names)
+    post, pre = kids[1 : 1 + split], kids[2 + split :]
+
+    row = ET.Element("mrow")
+    for sub, sup in zip(pre[0::2], pre[1::2], strict=False):
+        has_sub, has_sup = sub.tag != "none", sup.tag != "none"
+        if has_sub or has_sup:
+            tag = "msubsup" if has_sub and has_sup else "msub" if has_sub else "msup"
+            script = ET.SubElement(row, tag)
+            script.append(ET.Element("mrow"))
+            script.extend(c for c, keep in ((sub, has_sub), (sup, has_sup)) if keep)
+    base = kids[0]
+    for sub, sup in zip(post[0::2], post[1::2], strict=False):
+        has_sub, has_sup = sub.tag != "none", sup.tag != "none"
+        if has_sub or has_sup:
+            tag = "msubsup" if has_sub and has_sup else "msub" if has_sub else "msup"
+            wrapped = ET.Element(tag)
+            wrapped.append(base)
+            wrapped.extend(c for c, keep in ((sub, has_sub), (sup, has_sup)) if keep)
+            base = wrapped
+    row.append(base)
+    return row
+
+
 def _is_empty_token(elem: ET.Element) -> bool:
     return elem.tag in TOKEN_TAGS and not elem.text
 
@@ -233,6 +264,8 @@ def _normalize_node(elem: ET.Element, inherited_variant: str | None = None) -> E
         return None
     if tag == "mfenced":
         return _normalize_node(_fenced_to_mrow(elem), inherited_variant)
+    if tag == "mmultiscripts" and len(elem):
+        return _normalize_node(_multiscripts_to_row(elem), inherited_variant)
 
     attrs = _normalize_attrs(elem)
 

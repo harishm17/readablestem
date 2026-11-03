@@ -21,7 +21,7 @@ import pytest
 
 from readablestem.pipeline.export_epub import build_epub, export_epub
 from test_export_canvas import source_html, source_ids
-from test_export_epub import PAGE
+from test_export_epub import CHEMISTRY_PAGE, PAGE
 
 
 def _skip(reason: str):
@@ -47,11 +47,11 @@ def _ace() -> list[str] | None:
     return [found] if found else None
 
 
-DOCUMENTS = [*source_ids(), "synthetic"]
+DOCUMENTS = [*source_ids(), "synthetic", "chemistry"]
 
 
 def _epub(tmp_path, name: str):
-    html = PAGE if name == "synthetic" else source_html(name)
+    html = {"synthetic": PAGE, "chemistry": CHEMISTRY_PAGE}.get(name) or source_html(name)
     data = build_epub(export_epub(html, modified=datetime(2026, 11, 2, tzinfo=UTC)))
     path = tmp_path / "book.epub"
     path.write_bytes(data)

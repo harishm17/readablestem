@@ -176,7 +176,7 @@ EPUB 3 (no route or button yet). Nothing is read but the file: no network, no mo
 
 | File | What it is |
 |---|---|
-| `EPUB/content.xhtml` | The whole document as XHTML, in one content document. Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet stays. Scripts are not carried. |
+| `EPUB/content.xhtml` | The whole document as XHTML, in one content document. Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet stays. The one MathML change: `intent` on `<math>` (chemistry, docs/chemistry.md) is dropped, because EPUB 3 validation refuses it (RSC-005). Scripts are not carried. |
 | `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); and a `page-list` from `role="doc-pagebreak"` markers when the document has them (hidden in the book, used by reading systems). |
 | `EPUB/images/image-NN.png` | Each `data:` image as a file (one per distinct picture), `alt` kept on the `<img>`. |
 | `EPUB/package.opf` | Title, language, a UUID made from the document, `dcterms:modified`, accessibility metadata, manifest, spine. |
@@ -766,10 +766,29 @@ Formulas, ions, state symbols, reactions and concentrations are inline or displa
 <msup><mi mathvariant="normal">Fe</mi><mrow><mn>3</mn><mo>+</mo></mrow></msup>
 ```
 
-- A charge or a count hangs on the whole element symbol: the converter wrote `\mathrm{Na^+}` as
-  `N`, `msup(a, +)` and a reader said "N a to the power plus"; it is now `msup(mrow(N, a), +)`
-  ("N a plus"). The letters stay one `mi` each, as published MathML has them. Only real element
-  symbols are grouped (`Hz_2` and `km^2` stay as the model wrote them).
+- An element symbol is one `mi` (`Na`, not `N` and `a`; `NaCl` is `Na` and `Cl`; upright by
+  `mathvariant="normal"` only beside other maths, see below), and a
+  charge or a count hangs on the symbol it belongs to: the converter wrote `\mathrm{Na^+}` as
+  `N`, `msup(a, +)` and a reader said "N a to the power plus"; it is now `msup(Na, +)` ("N a
+  plus"). A word the model wrote in one `\text{...}` is split the same way. Only real element
+  symbols in a row that holds chemistry (a count or charge, a state, two symbols side by side, an
+  arrow between formulas, a nuclide) are changed (`Hz_2`, `km^2`, a lone `\text{H}` or `\text{No}`
+  stay as the model wrote them; `pipeline/chem_mathml.py`).
+- A state `(aq)`, `(s)`, `(l)`, `(g)` after a species is `mo (`, `mi aq`, `mo )`; a nuclide
+  `^{14}_{6}C` is `mmultiscripts(C, mprescripts, 6, 14)`; a label over an arrow is in the `mover`
+  directly, without an `mstyle` or `mpadded`.
+- A formula or reaction that is the whole equation has `intent=":chemical-formula"` or
+  `":chemical-equation"` on its `<math>` element, so MathCAT (NVDA, JAWS) reads it as chemistry:
+  state words, "reacts to form". These are the only `intent` values written or accepted, and only
+  on `<math>` ("MathML is rebuilt, never pasted"); a reader that does not know `intent` ignores it.
+- With `intent` on `<math>` the symbols carry no style (Speech Rule Engine reads an explicit
+  `mathvariant="normal"` aloud, "normal H"); the stylesheet of the standalone file draws them
+  upright (`math[intent] mi { text-transform: none; }`). A neutron, proton, positron, alpha, beta or
+  gamma with prefix numbers keeps the converter's shape (an empty base holding the numbers): MathCAT
+  has no nuclide rule for them.
+- `^\circ` after a symbol is the degree sign (U+00B0); `\overline` and `\underline` use the macron
+  and the low line (`pipeline/mathml_shape.py`). The screen-reader measurements and the cases the
+  engines do not read as chemistry are in docs/chemistry.md, "MathML shape".
 - A subscript or superscript after a closing bracket belongs to the whole group, `[A]_0` is
   `msub(mrow([A]), 0)` and `Al_2(SO_4)_3` has `msub(mrow((SO4)), 3)`; the converter used to hang
   it on the bracket alone (`msub(], 0)`), which was read "close bracket sub 0". This is done for
@@ -828,7 +847,10 @@ MathML in the output is re-serialised by `safe_html.sanitize_mathml` (also impor
 2. Walk the tree and write back only allowlisted presentation elements (MathML Core plus
    `menclose`) and layout attributes (`mathvariant`, `stretchy`, `columnalign`, ...).
    `href`, event handlers, `style`, `class`, `id` and colours are dropped. Attribute values
-   must match `[A-Za-z0-9 .%+-]{0,64}`. All text is escaped.
+   must match `[A-Za-z0-9 .%+-]{0,64}`. All text is escaped. The one MathML 4 speech attribute
+   kept is `intent`, on the `<math>` element only and only as `:chemical-formula` or
+   `:chemical-equation` (`core/mathml_intent.py`); any other `intent` value, or `intent` on any
+   other element, is dropped here and refused by `check_mathml` (`unsafe_attribute`).
 3. **Bold letters.** MathML Core (Chromium) draws only `mathvariant="normal"`, so a bold or
    bold-italic token is written as Unicode mathematical bold letters instead
    (`core.mathchars.bake_bold_variants`): `\boldsymbol{\omega}` is U+1D754, `\mathbf{\omega}`

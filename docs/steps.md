@@ -673,6 +673,11 @@ applies it to the chatbot arms' recorded LaTeX. See [chemistry.md](chemistry.md)
 4. Converts with latex2mathml.
 5. Parses the result with defusedxml, sets `display`, and unescapes `\%`, `\_`, `\#`,
    `\$` in `<mtext>` (latex2mathml leaves the backslash in text mode).
+   Then, on the tree, the repairs a reader needs: bold letters (`bake_bold_variants`), a charge
+   or a count on its element symbol, arrows as operators, and the screen-reader shape
+   (`mathml_shape.shape_general`: the degree sign, overline and underline, labelled arrows;
+   `chem_mathml.shape_chemistry`: one `mi` per element symbol, states, nuclides, and
+   `intent` on `<math>` for a formula or reaction on its own; docs/chemistry.md, "MathML shape").
 6. Re-serialises with `serialize_mathml`, which writes one MathML `xmlns` on the root and
    refuses (`UnsafeMathMLError`, message = the code) any tree that fails the allowlist
    rules of `check_mathml`: an unknown element or attribute, markup inside a token, a
@@ -691,7 +696,7 @@ Inputs so deeply nested that the converter recurses too far fail the same way.
 | `mathml.well_formed` | `not_well_formed` / `forbidden_xml` | not XML; or a DTD, entity declaration or external reference (defusedxml refuses them, so entity expansion attacks never run) |
 | `mathml.root` | `wrong_root` / `missing_namespace` / `nested_math` | the root is not `<math>` in the MathML namespace, or a `<math>` appears below the root |
 | `mathml.known_elements` | `unknown_element` | an element outside MathML Core plus common presentation elements (no `maction`, no `mglyph`, nothing from another namespace) |
-| `mathml.safe_attributes` | `unsafe_attribute` / `unknown_attribute` | `href`, `src`, `style`, `class`, `id`, `on*`, any namespaced attribute, or a value containing `javascript:`, `data:`, `url(` or `<`/`>` (unsafe); any other attribute outside the layout allowlist, such as `mathcolor`, or the MathML 4 speech overrides `intent` and `arg` (unknown); `alttext` is allowed on the root only |
+| `mathml.safe_attributes` | `unsafe_attribute` / `unknown_attribute` | `href`, `src`, `style`, `class`, `id`, `on*`, any namespaced attribute, or a value containing `javascript:`, `data:`, `url(` or `<`/`>` (unsafe); any other attribute outside the layout allowlist, such as `mathcolor`, or the MathML 4 speech override `arg` (unknown); `alttext` is allowed on the root only; `intent` is allowed on the root only and only with the value `:chemical-formula` or `:chemical-equation` (any other value, or `intent` anywhere else, is unsafe) |
 | `mathml.token_content` | `markup_in_token` | an element inside `mi`, `mn`, `mo`, `mtext` or `ms` (other than `malignmark`); browsers parse children of `<mtext>` as HTML |
 | `mathml.depth` | `too_deep` | nesting deeper than 64 (measured without recursion) |
 | `mathml.structure` | `bad_arity` | `mfrac`, `mroot`, `msub`, `msup`, `munder`, `mover` without 2 children, or `msubsup`, `munderover` without 3 (latex2mathml turns `\frac{a}` into a one-child `mfrac`) |

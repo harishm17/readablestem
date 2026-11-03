@@ -561,7 +561,7 @@ def test_gold_mathml_passes():
         (f"<math {NS}><mtext><script>alert(1)</script></mtext></math>", "markup_in_token"),
         (f"<math {NS}><mtext><mi>y</mi></mtext></math>", "markup_in_token"),
         (f"<math {NS}><mrow><math><mi>x</mi></math></mrow></math>", "nested_math"),
-        (f'<math {NS}><mn intent="seven">5</mn></math>', "unknown_attribute"),
+        (f'<math {NS}><mn intent="seven">5</mn></math>', "unsafe_attribute"),
         (f'<math {NS}><mrow arg="a"><mi>x</mi></mrow></math>', "unknown_attribute"),
         (f'<math {NS}><mi alttext="seven">x</mi></math>', "unknown_attribute"),
     ],
@@ -593,7 +593,7 @@ def _tree(markup: str):
     ("markup", "code"),
     [
         (f"<math {NS}><mtext><script>alert(1)</script></mtext></math>", "unknown_element"),
-        (f'<math {NS}><mn intent="seven">5</mn></math>', "unknown_attribute"),
+        (f'<math {NS}><mn intent="seven">5</mn></math>', "unsafe_attribute"),
         (f'<math {NS}><mi onclick="x">5</mi></math>', "unsafe_attribute"),
         (f"<math {NS}><mrow><math><mi>x</mi></math></mrow></math>", "nested_math"),
         (f"<math {NS}><mtext><mi>y</mi></mtext></math>", "markup_in_token"),

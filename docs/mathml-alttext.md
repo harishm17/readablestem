@@ -42,6 +42,27 @@ Which of these happens is a property of the reader and its settings, so it has t
 checked, not assumed. Our readings are also not yet reviewed by a math-fluent screen-reader
 user (T2-23 improved matrices, cases, nuclides and units).
 
+## Shape for screen readers
+
+What a student's reader says depends on the MathML as much as on `alttext`, and `alttext` is off
+by default, so the shape the converter writes is the main thing (pipeline 0.5.2; the details and
+the measurements are in docs/chemistry.md, "MathML shape"):
+
+- Chemistry is one `mi` per element symbol with its count or charge on it, a state as
+  `(` `aq` `)`, a nuclide as `mmultiscripts`, an arrow as `mo`, and `intent=":chemical-formula"` or
+  `":chemical-equation"` on `<math>` when the whole equation is chemistry. MathCAT (NVDA, JAWS) then
+  says "aqueous" and "reacts to form"; the only `intent` values accepted anywhere are those two.
+- `^\circ` is the degree sign U+00B0 (read "degrees"), not the ring operator that Speech Rule
+  Engine reads "composed with"; `\overline` and `\underline` are read "bar".
+- Matrices, determinants, `cases`, aligned lines, limits and sums are `mtable`, `munder` and `msub`
+  elements that MathCAT and Speech Rule Engine already read as rows, columns and limits.
+
+Both engines are run offline by `scripts/screenreader_speech.py` (`docs/eval.md`, "Speech under
+screen-reader engines"). That is not a listening test: VoiceOver is not covered, and the
+engines' settings are the defaults. Add chemistry to the manual test below: a formula with a
+charge (SO4 2-), a reaction with states, and a nuclide; record whether the reader says "aqueous"
+and "super 14, sub 6, C" or letters and "(aq)".
+
 ## Manual test with NVDA + MathCAT
 
 You need a Windows machine (or VM) with the current NVDA, the MathCAT add-on, and Firefox

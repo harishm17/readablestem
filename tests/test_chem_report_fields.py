@@ -27,6 +27,14 @@ def tex(latex: str) -> str:
 
 
 TIMES = "<math><mo>×</mo></math>"
+# The authored document's gold for `\mathrm{H_2O}`: the converter's shape before pipeline 0.5.2
+# (one upright `mi` per letter), stored as it was made. The primary scorer sees it differently
+# from a shape made today, which is what the report test below relies on.
+AUTHORED_WATER = (
+    '<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow>'
+    '<msub><mi mathvariant="normal">H</mi><mn>2</mn></msub><mi mathvariant="normal">O</mi>'
+    "</mrow></math>"
+)
 
 
 def element(index: int, text: str) -> Element:
@@ -85,7 +93,7 @@ def test_wrong_on_chem_but_spoken_alike_is_not_harm():
 
 def chem_item() -> dict:
     gold = [
-        equation(PAGE, 0, tex(r"\mathrm{H_2O}"), "inline"),  # read right
+        equation(PAGE, 0, AUTHORED_WATER, "inline"),  # read right
         equation(PAGE, 1, tex(r"\mathrm{CO_2}"), "inline"),  # read wrong, not asked
         equation(PAGE, 2, TIMES, "inline"),  # a lone times sign nobody found
         equation(PAGE, 3, tex(r"\mathrm{NaCl}"), "inline"),  # not found, not a times sign

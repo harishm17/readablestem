@@ -463,3 +463,26 @@ def test_the_compare_table_names_the_species():
 def test_a_table_cell_edit_is_not_given_the_species_check():
     found = edit_check.check_cell_edit(AGCL, AGCL_TEX.replace("^+", "^-", 1))
     assert all(c.name != "equation.text_layer_species" for c in found.checks)
+
+
+# ------------------------------------- a label over the arrow, MathML made by the converter
+# (`safe_latex_to_mathml` writes the label as a bare child of the `mover`)
+
+
+def _labelled(label: str) -> str:
+    return r"\text{N}_2 + 3\text{H}_2 \xrightarrow{" + label + r"} 2\text{NH}_3"
+
+
+@pytest.mark.parametrize("label", [r"\text{heat}", r"\Delta", r"\text{Fe}"])
+def test_a_label_over_the_arrow_does_not_run_into_the_next_species(label):
+    flat = cc.mathml_flat(ml(_labelled(label)))
+    assert flat.endswith(" 2NH3") and "heat2" not in flat and "Fe2" not in flat
+
+
+@pytest.mark.parametrize("label", [r"\text{heat}", r"\Delta"])
+def test_a_reaction_with_a_label_agrees_with_the_text_that_has_none(label):
+    assert kinds("N2 + 3H2 −→ 2NH3", _labelled(label)) == ()
+
+
+def test_a_catalyst_label_after_the_arrow_in_the_text_layer_agrees():
+    assert kinds("N2 + 3H2 −→ Fe 2NH3", _labelled(r"\text{Fe}")) == ()

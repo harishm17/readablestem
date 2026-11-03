@@ -47,10 +47,11 @@ from contextvars import ContextVar
 import defusedxml
 import defusedxml.ElementTree as DET
 
+from readablestem.core.mathml_intent import ALLOWED_INTENTS
 from readablestem.core.notation import canonical_from_parts
 from readablestem.eval.equations import normalize
 from readablestem.pipeline import speech_chem
-from readablestem.pipeline.speech_nuclides import nuclide_words
+from readablestem.pipeline.speech_nuclides import ELEMENTS, nuclide_words
 from readablestem.pipeline.speech_units import unit_words
 
 MAX_DEPTH = 64
@@ -171,6 +172,7 @@ def _parse(mathml: str) -> ET.Element:
         if depth > MAX_DEPTH:
             raise SpeechError("MathML nested too deeply")
         stack.extend((child, depth + 1) for child in elem)
+    _restore_upright_symbols(root)
     return normalize(root)
 
 
@@ -862,6 +864,20 @@ def _speak(node: ET.Element) -> list[str]:
 
 
 _SPACE_BEFORE_PUNCT = re.compile(r"\s+([;:,])")
+
+
+def _restore_upright_symbols(root: ET.Element) -> None:
+    """A formula or reaction that carries `intent` has its element symbols as plain `mi` (the
+    shape Speech Rule Engine reads without "normal", `pipeline.chem_mathml`); the chemistry
+    reading tells a symbol from an italic variable by its upright style, so put it back."""
+    if root.get("intent") not in ALLOWED_INTENTS:
+        return
+    for node in root.iter():
+        if node.tag.rsplit("}", 1)[-1] != "mi":
+            continue
+        text = node.text or ""
+        if len(node) == 0 and node.get("mathvariant") is None and (text in ELEMENTS or text == "e"):
+            node.set("mathvariant", "normal")
 
 
 def mathml_to_speech(mathml: str, *, readings: Mapping[str, str] | None = None) -> str:

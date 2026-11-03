@@ -8,6 +8,10 @@ charge hangs on its element symbol, a long arrow is an operator), the recorded a
 unchanged and their MathML is not. This converts every aligned pair's recorded `pred_latex` with
 the converter as it was (the three repairs off) and as it is, and scores both against the gold:
 
+With `--shape-only` the "as it was" side keeps the 2026-10-21 repairs and switches off only the
+screen-reader shape (`chem_mathml.shape_chemistry`, `mathml_shape.shape_general`; docs/chemistry.md,
+"MathML shape"), so the output is what that change alone does to the scores.
+
 - `stored gold`: the gold's MathML as the gold file has it. For a gold made by people (OpenStax)
   that is the answer key. For a gold made *by this converter* (the authored documents, the arXiv
   set of the real-world evaluation: `gold/arxiv_gold.to_mathml`) it is the old converter's shape,
@@ -33,17 +37,27 @@ from readablestem.pipeline import validate
 class _Converter:
     """`safe_latex_to_mathml` as it is, or with the 2026-10-21 repairs switched off."""
 
-    def __init__(self, repaired: bool) -> None:
+    def __init__(self, repaired: bool, *, shaped: bool = True) -> None:
         self.repaired = repaired
+        self.shaped = shaped
 
     def __call__(self, latex: str) -> str:
-        names = ("group_delimited_scripts", "group_element_symbols", "arrows_as_operators")
+        names = (
+            "group_delimited_scripts",
+            "group_element_symbols",
+            "arrows_as_operators",
+            "shape_chemistry",
+            "shape_general",
+        )
         saved = {n: getattr(validate, n) for n in names}
         try:
             if not self.repaired:
                 validate.group_delimited_scripts = lambda s: s
                 validate.group_element_symbols = lambda root: None
                 validate.arrows_as_operators = lambda root: None
+            if not self.shaped:
+                validate.shape_chemistry = lambda root: False
+                validate.shape_general = lambda root: None
             return validate.safe_latex_to_mathml(latex, "inline")
         finally:
             for n, f in saved.items():
@@ -86,10 +100,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--gold", type=Path, required=True)
     parser.add_argument("runs", nargs="+", metavar="LABEL=items.jsonl")
+    parser.add_argument(
+        "--shape-only",
+        action="store_true",
+        help="compare today's converter with only the screen-reader shape switched off",
+    )
     args = parser.parse_args()
     gold = load_gold(args.gold)
     has_latex = any(r.get("latex") for r in gold.values())
-    old, new = _Converter(False), _Converter(True)
+    old = _Converter(args.shape_only, shaped=False)
+    new = _Converter(True)
     for spec in args.runs:
         label, _, path = spec.partition("=")
         rows = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]

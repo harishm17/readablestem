@@ -252,30 +252,39 @@ def test_a_subscript_after_a_parenthesis_in_a_formula_belongs_to_the_group():
     assert "".join(groups[0][1].itertext()) == "3"
 
 
-def test_a_converted_species_has_its_element_symbols_in_one_token_each():
-    # \text groups: "Na" is one token and the charge hangs on it, as OpenStax writes it.
+def test_a_converted_species_has_one_upright_mi_per_element_symbol():
+    # The shape a screen reader's chemistry rules recognise (`pipeline.chem_mathml`): "Na" is
+    # one upright `mi` and the charge hangs on it.
     root = parse(ce_to_latex("Na+"))
     (msup,) = [n for n in root.iter() if local(n) == "msup"]
-    assert local(msup[0]) == "mtext" and "".join(msup[0].itertext()) == "Na"
+    assert local(msup[0]) == "mi" and "".join(msup[0].itertext()) == "Na"
+    assert msup[0].get("mathvariant") is None  # `intent` says it is a symbol
     assert "".join(msup[1].itertext()) == "+"
     root = parse(ce_to_latex("CaCl2"))
-    tokens = [(local(n), "".join(n.itertext())) for n in root.iter() if local(n) in {"mtext", "mn"}]
-    assert tokens == [("mtext", "CaCl"), ("mn", "2")]
+    tokens = [(local(n), "".join(n.itertext())) for n in root.iter() if local(n) in {"mi", "mn"}]
+    assert tokens == [("mi", "Ca"), ("mi", "Cl"), ("mn", "2")]
+    # A count or charge hangs on the last symbol of a word the converter wrote as one `\text`.
+    root = parse(ce_to_latex("SO4^2-"))
+    (msubsup,) = [n for n in root.iter() if local(n) == "msubsup"]
+    assert "".join(msubsup[0].itertext()) == "O"
 
 
 def test_a_charge_on_a_mathrm_symbol_hangs_on_the_whole_symbol():
     # What a model writes without \ce: the converter hangs the charge on the lowercase letter
-    # (N, msup(a, +)); it belongs to "Na".
+    # (N, msup(a, +)); it belongs to "Na", which is then one upright `mi`.
     root = parse(r"\mathrm{Na^+}")
     (msup,) = [n for n in root.iter() if local(n) == "msup"]
-    assert local(msup[0]) == "mrow" and [local(c) for c in msup[0]] == ["mi", "mi"]
+    assert local(msup[0]) == "mi" and msup[0].get("mathvariant") is None
     assert "".join(msup[0].itertext()) == "Na" and "".join(msup[1].itertext()) == "+"
     root = parse(r"\mathrm{Cl_2}")
     (msub,) = [n for n in root.iter() if local(n) == "msub"]
     assert "".join(msub[0].itertext()) == "Cl" and "".join(msub[1].itertext()) == "2"
-    # A symbol with no script stays two upright letters.
+    # Two symbols side by side are chemistry: the letters are paired into one `mi` each.
     root = parse(r"\mathrm{CaO}")
-    assert ["".join(n.itertext()) for n in root.iter() if local(n) == "mi"] == ["C", "a", "O"]
+    assert ["".join(n.itertext()) for n in root.iter() if local(n) == "mi"] == ["Ca", "O"]
+    # A symbol alone is left as the converter wrote it (a lone `\mathrm{Cl}` is not evidence).
+    root = parse(r"\mathrm{Cl}")
+    assert ["".join(n.itertext()) for n in root.iter() if local(n) == "mi"] == ["C", "l"]
 
 
 def test_symbols_that_are_not_elements_are_not_grouped():
