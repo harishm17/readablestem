@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Equation diagnostics on the recorded real-world runs, no model and no cost: `scripts/eq_diag_tables.py` (why maths in
+  table cells is missed), `scripts/eq_diag_glyphs.py` (glyph evidence of undetected and span-wrong equations),
+  `scripts/eq_diag_unflagged.py` (why wrong equations with other symbols were not flagged). Counts and sample sizes in
+  [docs/eval-equation-diagnostics.md](docs/eval-equation-diagnostics.md). No product behaviour changes.
 ## Unreleased: finished steps are kept when a configuration error ends the run
 
 - When a configuration error (a model that is not set up) ended a conversion while other
