@@ -260,3 +260,21 @@ def test_units_outside_chemistry_read_as_before() -> None:
     )
     assert say(r"2\ \text{m s}^{-1}") == "2 meters per second"
     assert say(r"9.8\ \text{m/s}^2") == "9.8 meters per second squared"
+
+
+@pytest.mark.parametrize(
+    ("latex", "speech"),
+    [
+        (r"\text{H}_2\text{O} + \text{CO}_2 \uparrow", "H 2 O plus C O 2 gas given off"),
+        (
+            r"\text{Ag}^+ + \text{Cl}^- \to \text{AgCl} \downarrow",
+            "A g plus, plus C l minus reacts to form A g C l precipitate",
+        ),
+        (r"\text{AgCl}(\text{s}) \downarrow", "A g C l solid, precipitate"),
+        # outside chemistry the arrows read as arrows
+        (r"x \uparrow", "x up arrow"),
+        (r"f \downarrow", "f down arrow"),
+    ],
+)
+def test_gas_and_precipitate_marks(latex: str, speech: str) -> None:
+    assert say(latex) == speech

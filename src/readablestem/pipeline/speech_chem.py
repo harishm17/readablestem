@@ -468,6 +468,10 @@ def _arrow_words(node: ET.Element) -> list[str] | None:
     return None
 
 
+# After a species in a reaction: ↑ is a gas given off, ↓ a precipitate formed.
+_PRODUCT_MARKS = {"↑": "gas given off", "↓": "precipitate"}
+
+
 def _ends_with_state(kids: list[ET.Element], end: int) -> bool:
     """Does a state symbol ("(aq)", or "(", "aq", ")") end at kids[end]?"""
     for start in range(max(end - _MAX_STATE_SIBLINGS, 1), end + 1):
@@ -587,6 +591,9 @@ def read_at(kids: list[ET.Element], i: int, speak: Speak) -> tuple[list[str], in
         return arrow, 1
     if _couple(kids, i):
         return ["slash"], 1
+    mark = _PRODUCT_MARKS.get(_text(node)) if node.tag in {"mo", "mi"} else None
+    if mark and i > 0 and (_ends_species(kids[i - 1]) or _ends_with_state(kids, i - 1)):
+        return [mark], 1
     return None
 
 

@@ -230,6 +230,8 @@ chemistry set (`tests/test_speech_chem_fixes.py`):
   after a bracket or a closing parenthesis, or between italic letters, is still "divided by".
 - A half-reaction table (species, an arrow in a cell of its own, species) reads each row with
   the arrow between the species ("reacts to form"), not "right arrow" in a cell alone.
+- `↑` after a species in a reaction reads "gas given off" and `↓` "precipitate" (elsewhere "up
+  arrow", "down arrow").
 - An asterisk after a nuclide (`⁶⁰₂₈Ni*`) reads ", excited state". An asterisk after another
   species is not guessed at.
 - In a chemistry row, a unit after a decimal number reads as a unit (`0.0592 V`: V is also
