@@ -633,3 +633,19 @@ def test_a_share_needs_a_proved_address(site):
         assert shares.role_of(session, job, unproved) is None
         assert shares.shared_with(session, unproved, utcnow()) == []
         assert len(shares.shared_with(session, proved, utcnow())) == 1
+
+
+def test_a_person_whose_sign_in_proved_nothing_is_told_to_sign_in_again_and_a_stranger_is_not(site):
+    from types import SimpleNamespace
+
+    from readablestem.web.routes.jobs import SIGN_IN_AGAIN
+
+    with session_scope(site.ctx.factory) as session:
+        job = session.get(Job, site.job_id)
+        named = SimpleNamespace(id="x", email=CAROL, email_verified=False)
+        stranger = SimpleNamespace(id="y", email="nobody@example.org", email_verified=False)
+        proved = SimpleNamespace(id="x", email=CAROL, email_verified=True)
+        assert shares.names_unproved(session, job, named)
+        assert not shares.names_unproved(session, job, stranger)  # nothing leaks to a stranger
+        assert not shares.names_unproved(session, job, proved)
+    assert SIGN_IN_AGAIN[0] == "Sign in again to open this document"

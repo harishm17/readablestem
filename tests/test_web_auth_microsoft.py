@@ -735,7 +735,8 @@ def test_a_share_applies_only_to_an_address_the_directory_verified(ms):
     ms.fake.claims |= {"xms_edov": None}
     assert ms_sign_in(ms, other).status_code == 303
     assert other.get("/app").status_code == 200
-    assert other.get(f"/jobs/{job_id}/download").status_code == 404
+    told = other.get(f"/jobs/{job_id}/download")
+    assert told.status_code == 403 and "Sign in again to open this document" in told.text
     assert "Shared with you" not in other.get("/app").text
     other.close()
 
@@ -751,4 +752,4 @@ def test_a_sign_in_name_that_is_not_the_account_address_proves_nothing(ms):
         "preferred_username": ALICE,
     }
     assert ms_sign_in(ms).status_code == 303
-    assert ms.browser.get(f"/jobs/{job_id}/download").status_code == 404
+    assert ms.browser.get(f"/jobs/{job_id}/download").status_code == 403  # asked to sign in again

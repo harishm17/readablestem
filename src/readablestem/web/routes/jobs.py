@@ -316,12 +316,21 @@ def job_access(
     if job is None:
         raise _missing(session, job_id, user, job)
     role = shares.role_of(session, job, user)
+    if role is None and not expired(job) and shares.names_unproved(session, job, user):
+        raise PageError(403, *SIGN_IN_AGAIN)
     if role is None or expired(job):
         raise _missing(session, job_id, user, job)
     if shares.RANK[role] < shares.RANK[need]:
         raise PageError(403, *_TOO_LITTLE[need], context={"job_id": job.id})
     return job
 
+
+SIGN_IN_AGAIN = (
+    "Sign in again to open this document",
+    "This document was shared with your email address, but this sign-in did not confirm the "
+    "address. Sign out, then sign in again with Google or your university's Microsoft "
+    "account, using that address.",
+)
 
 _TOO_LITTLE = {
     shares.REVIEW: (

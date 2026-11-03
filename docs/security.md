@@ -146,7 +146,14 @@ the `job_shares` table). It adds a way in, so it is described in full here.
   that sign-in *proved* it: Google's verified email, or the Microsoft directory's own
   verification of the `email` claim (`xms_edov`). Microsoft's `preferred_username` (a sign-in
   name, which `email_claims` still offers the allowlist as a fallback) never matches a share,
-  and neither does an email-link sign-in or an admin-linked second address. The session records
+  and neither does an admin-linked second address. An emailed sign-in link does count, for the
+  address it was sent to: it is random, single-use, expires in minutes, is delivered to the
+  address and opened by the person, so using it proves control of that mailbox
+  (`login_links.email`, migration `ecb0b22515e0`; the sign-in is verified only when that
+  address is the account's own, so a link sent to a linked address does not count, nor does a
+  link made before the column existed). Someone whose session proved nothing, and who opens a
+  document whose share names their own address, gets a 403 page asking them to sign in again
+  with Google or Microsoft (`job_access`); anyone else still gets the plain 404. The session records
   this (`CurrentUser.email_verified`, set at sign-in only when the proved address is the
   account's own), so no migration is needed; a session from before this release has no proof
   and must sign in again to use a share. The address is compared in lower case and whole: no

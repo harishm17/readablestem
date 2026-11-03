@@ -4,8 +4,11 @@ The owner of a document can give another person access to that one document by e
 address. There are no links that work without signing in, and nothing is sent: the owner
 copies the document's address and gives it to the person.
 
-- The person must be signed in (Google, Microsoft or an email link, whatever the service
-  offers) with that exact address. The address is matched in lower case and in full; there is
+- The person must be signed in with that exact address, and the sign-in must have proved it:
+  Google's verified email, the Microsoft directory's verification of the email claim
+  (`xms_edov`, never `preferred_username`), or an emailed single-use link sent to that very
+  address (`web.email_login`). A sign-in that proves nothing (an older session) is told to sign
+  in again (`routes.jobs.job_access`). The address is matched in lower case and in full; there is
   no domain rule, no `+tag` folding, and a linked address (`LinkedEmail`) does not count.
   Whether they may sign in at all is still the service's own rule (`users.is_allowed`, or open
   sign-up), so a person who cannot sign in cannot use a share.
@@ -80,6 +83,23 @@ def role_of(session: Session, job: Job, user: Any) -> str | None:
         select(JobShare.role).where(
             JobShare.job_id == job.id, JobShare.email == sign_in_address(user.email)
         )
+    )
+
+
+def names_unproved(session: Session, job: Job, user: Any) -> bool:
+    """A share on this document names this person's address, but their sign-in did not prove
+    it (an older session, a Microsoft sign-in name, an email link sent elsewhere). True only
+    when such a share exists, so the page that asks them to sign in again tells a stranger
+    nothing."""
+    if user.email_verified or job.user_id == user.id:
+        return False
+    return (
+        session.scalar(
+            select(JobShare.id).where(
+                JobShare.job_id == job.id, JobShare.email == sign_in_address(user.email)
+            )
+        )
+        is not None
     )
 
 

@@ -665,7 +665,7 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
   unfinished one cannot be shared; the owner's own address is refused. The address is stored in
   lower case and must be a whole address (`shares._ADDRESS`: no `*` or `?`, a dotted domain);
   there is no domain rule and no `+tag` folding.
-- **The shared person's side.** They sign in as usual (Google, Microsoft or an email link) with
+- **The shared person's side.** They sign in as usual (Google, Microsoft, or an emailed link sent to that address) with
   that exact address, and see the document under "Shared with you" on My documents and at its
   address. A person who cannot sign in at all (not on the allowlist, in allowlist mode) cannot
   use a share.
@@ -2627,7 +2627,9 @@ test fails when a table with a user id is added without it.
   and a count note) and `erasure_ledger`, `quota_days.spent_usd` (server default 0),
   `spend_holds.user_id` and `signup_days.cap_warned` (server default false). Additive; the downgrade
   drops them. `a6c2e9f4b713` above is no longer the head.
-- `b7112167eb0d` (job shares, the head): the table `job_shares` (`job_id`, the sign-in address in
+- `ecb0b22515e0` (the head): `login_links.email`, the address an emailed sign-in link was sent to
+  (nullable; links made before it prove nothing). Additive; the downgrade drops the column.
+- `b7112167eb0d` (job shares): the table `job_shares` (`job_id`, the sign-in address in
   lower case, `role` `view` or `review`; unique per document and address). Additive: nothing else
   changes, and the downgrade drops the table (the shares are lost, the documents are not).
   `a6c2e9f4b713` and `e1a7c3b95d24` above are no longer the head.
