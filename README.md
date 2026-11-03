@@ -392,7 +392,7 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
   you can choose which pages to convert, in parts.
 - **A model is in the loop.** Document images and the text around them are sent to Anthropic's
   Claude API (the beta's provider, `MODEL_PROVIDER=anthropic`), or to OpenAI's API (with
-  `store=False`) if you set `MODEL_PROVIDER=openai`. Models are not deterministic, so two runs on the same file can differ.
+  `store=False`) if you set `MODEL_PROVIDER=openai`; the handwriting readers (off, unused) would send crops to their own company. Models are not deterministic, so two runs on the same file can differ.
 - **Equations are the hard part.** On the development sample 23 of 30 equations match the
   answer key under the lenient scorer, and 5 of the 7 misses are gaps in the scorer, not in
   the transcription. On the held-out sections 1,379 of 2,738 (two runs, 0.504, version 0.4.0) match through
