@@ -698,10 +698,11 @@ repeats). `ink_strokes.extract_ink` recovers every stroke of the `path` and `out
 the ruled paper is dropped as `rule`. On the 4 `samples` pages it finds 380 strokes for the 374
 drawn, and only 4 of 6 expressions exactly on the worst page (a fast curve splits, and crossing
 strokes join). `page_type.classify` says `handwritten` for all 8 `path` and `outline` pages and
-`vector_no_text` for all 4 `samples` pages: its stroke test takes a closed shape for a pen stroke
-only if it wiggles, and a filled disc is a dot to it. Whether a real GoodNotes page does the same
-is for the probe on real exports to settle. The test that expects `handwritten` for these pages is
-marked as an expected failure, so it fails when `page_type` starts to call them that.
+`vector_no_text` for all 4 `samples` pages, because its stroke test took a closed shape for a pen
+stroke only if it wiggles and a filled disc is a dot to it. It now reads runs of touching samples
+with the same rule `ink_strokes` uses (docs/layout.md, "Vector ink and strokes"), and says
+`handwritten` for all 12 pages. Whether a real GoodNotes page does the same is for the probe on
+real exports to settle.
 
 ## A set of real iPad ink with answer keys nobody typed
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: page type reads per-sample pen ink (branch hw/page-type-dotted-ink)
+
+- `page_type` now calls vector handwriting drawn as one small filled disc per pen sample
+  `handwritten` (it was `vector_no_text`). Its ink analysis uses `ink_strokes`'s own rule for a
+  stroke made of samples (`sample_run_end`, `dot_grid_members`) instead of a second one. Dot-grid
+  paper, scatter-plot markers and stippled shading are still not handwriting. On the 846-page
+  labelled corpus no page changes its kind. Documented in docs/layout.md.
+
 ## Unreleased: a vector-ink handwriting dev set (branch hw/vector-devset)
 
 - `scripts/handwriting_accuracy.py build-vector` and `eval/handwriting_vector.py` build a dev set of
