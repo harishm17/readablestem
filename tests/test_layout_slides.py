@@ -665,3 +665,49 @@ def test_a_constant_page_label_does_not_make_a_landscape_file_a_deck():
     # One prefix and no numbers labels every page "A"; not Beamer: nothing says these are slides
     result = analyze(landscape_deck(["red", "red"], creator="Word"))
     assert result.pages == [0, 1]
+
+
+def drawn_deck(draw) -> bytes:
+    """Two Beamer slides, same title and sentence; `draw(page, n)` adds the drawing of step n."""
+    doc = pymupdf.open()
+    for n in range(2):
+        page = doc.new_page(width=720, height=405)
+        page.insert_text((50, 50), "Frame Title", fontsize=28)
+        page.insert_text((50, 120), "The diagram below shows the circuit", fontsize=14)
+        draw(page, n)
+    doc.set_metadata({"creator": "LaTeX with beamer class"})
+    doc.set_page_labels([{"startpage": 0, "prefix": "A", "style": "", "firstpagenum": 1}])
+    return doc.tobytes()
+
+
+def test_a_drawing_of_another_shape_in_the_same_box_keeps_the_step():
+    def draw(page, n):
+        shape = page.new_shape()
+        if n == 0:  # a diagonal one way, then the other: same box, kind and colour
+            shape.draw_line((150, 180), (350, 330))
+        else:
+            shape.draw_line((150, 330), (350, 180))
+        shape.finish(color=(0, 0, 1), width=2)
+        shape.commit()
+
+    assert analyze(drawn_deck(draw)).pages == [0, 1]
+
+
+def test_a_drawing_near_the_top_edge_counts():
+    def draw(page, n):
+        shape = page.new_shape()
+        shape.draw_circle((600, 40), 25 if n == 0 else 12)
+        shape.finish(color=(1, 0, 0), fill=(1, 0, 0))
+        shape.commit()
+
+    assert analyze(drawn_deck(draw)).pages == [0, 1]
+
+
+def test_a_progress_bar_that_grows_does_not_keep_the_step():
+    def draw(page, n):
+        shape = page.new_shape()
+        shape.draw_rect(pymupdf.Rect(0, 0, 300 + 200 * n, 3))
+        shape.finish(fill=(0.9, 0.5, 0.1), color=None)
+        shape.commit()
+
+    assert analyze(drawn_deck(draw)).pages == [1]

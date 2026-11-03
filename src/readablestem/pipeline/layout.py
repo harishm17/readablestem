@@ -9621,9 +9621,10 @@ def _read_deck(
 
 def _slide_marks(page: pymupdf.Page, paths: list[_Path], height: float) -> list[slides.Mark]:
     """Every raster image on the slide (by a digest of its pixels) and every vector drawing
-    in its body (by its kind, colour and size), for the test that a step's pictures are all on
-    the frame's last page. The headline and the footline are left out: they are the margin
-    filter's and `slides.finish`'s."""
+    on the page (by its colours and the shape of its path, `_drawing_key`), for the test that
+    a step's pictures are all on the frame's last page. Drawings near the top and bottom edges
+    count too (a figure can sit there); only a theme's thin progress bar is left out, since it
+    grows on every page and would make every step differ."""
     marks: list[slides.Mark] = []
     display = _Display.of(page)
     for info in page.get_image_info(hashes=True):
@@ -9636,17 +9637,50 @@ def _slide_marks(page: pymupdf.Page, paths: list[_Path], height: float) -> list[
             else f"{info.get('width')}x{info.get('height')}"
         )
         marks.append(slides.Mark("image", key, display.box(info["bbox"])))
+    drawings = page.get_cdrawings() if paths else []
+    width = page.rect.width
     for path in paths:
         centre = (path.bbox[1] + path.bbox[3]) / 2
-        if 0.2 * height <= centre <= (1 - NUMBER_BODY_BAND) * height:
-            key = f"{path.kind}{int(path.curved)}{int(path.filled)}" + "".join(
-                f"{round(c, 2)}" for c in path.colour
-            )
-            marks.append(slides.Mark("drawing", key, path.bbox))
+        in_body = 0.2 * height <= centre <= (1 - NUMBER_BODY_BAND) * height
+        thin_bar = path.bbox[3] - path.bbox[1] <= PROGRESS_BAR_PT and (
+            path.bbox[2] - path.bbox[0] >= 0.25 * width
+        )
+        if not in_body and thin_bar:
+            continue  # a theme's progress bar grows on every page, steps included
+        marks.append(slides.Mark("drawing", _drawing_key(path, drawings), path.bbox))
     return marks
 
 
-NUMBER_BODY_BAND = 0.12  # the footline's share of a slide, left out of the drawings compared
+NUMBER_BODY_BAND = 0.12  # the footline's share of a slide (bare slide numbers live there)
+PROGRESS_BAR_PT = 4.0  # a headline or footline bar at most this tall is furniture
+
+
+def _drawing_key(path: _Path, drawings: list[dict[str, Any]]) -> str:
+    """What a drawing looks like, for "is this drawing also on the last page": its stroke and
+    fill colours and the shape of its path (every point, to the point), so two different
+    drawings in the same box never pass as one. Falls back to the path's summary when the
+    raw drawing is not known (`source` -1)."""
+    summary = f"{path.kind}{int(path.curved)}{int(path.filled)}"
+    if not 0 <= path.source < len(drawings):
+        return summary + "".join(f"{round(c, 2)}" for c in path.colour)
+    raw = drawings[path.source]
+    parts = [summary, repr(raw.get("fill")), repr(raw.get("color")), repr(raw.get("width"))]
+    for item in raw.get("items", ()):
+        parts.append(str(item[0]))
+        for value in item[1:]:
+            if isinstance(value, (tuple, list)):
+                parts.append(",".join(f"{round(float(v))}" for v in _flat(value)))
+    return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
+
+
+def _flat(value: Any) -> list[float]:
+    """The numbers of a drawing item's point, rect or quad, in order."""
+    if isinstance(value, (int, float)):
+        return [float(value)]
+    out: list[float] = []
+    for part in value:
+        out.extend(_flat(part))
+    return out
 
 
 def _kept_whole(kind: page_type.PageTypeResult) -> bool:
