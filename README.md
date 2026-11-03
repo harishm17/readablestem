@@ -239,7 +239,9 @@ a different job; [docs/eval-image-pages.md](docs/eval-image-pages.md), [ADR 0007
   papers because the $9 spending cap for the run was reached; 42 pages, 1,147 equations, registered
   before the run): 0.66 exactly right (0.69 on the symbols score) against 0.62 (0.66) for the typed
   PDFs of the same papers, a difference inside the noise, with 5 wrong equations in every 100 not
-  asked about (10 for the typed PDFs); $0.136 a page.
+  asked about when it was measured (10 for the typed PDFs); since 2026-10-22 every converted block
+  with maths is a decision, and a replay of the same recorded answers left none unasked
+  (docs/eval-image-pages.md, "Update: maths always required"); $0.136 a page.
 - It is slower (about 20 to 30 seconds a page), it costs four to six times a typed page, and a
   model can misread handwriting and small symbols; the measurement is on synthetic scans, nine
   papers and eight real pages, with no measurement of how long checking takes.

@@ -1232,15 +1232,15 @@ The text pass's glyphs (`page_glyphs`) skip the same invisible spans.
 extracts (`_read_page`; image boxes come from MuPDF's image blocks, which decode no
 image) and returns a kind, the characters it may trust, where its content would have to
 come from, and content-free reason codes. It is detect v4 from the research, ported with
-the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.4"):
+the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.5"):
 
 | Kind | What it is | What the app does |
 |---|---|---|
-| `born_digital` | visible text, nothing hidden | reads it as before |
+| `born_digital` | visible text that covers the page's content, nothing hidden | reads it as before |
 | `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count |
 | `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and ticked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple for the stroke test (a tick, a cross, a one-stroke signature) are cut out too ("Small drawings on a typed page") |
-| `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer | the page is kept as its image (`handwritten_page`): no elements |
-| `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements. With a little visible typed text and nothing hidden (a typed header on a scan, a title slide on a photo) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`) |
+| `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer, or a text layer that does not cover the ink (reason `text_not_covering_content`) | the page is kept as its image (`handwritten_page`): no elements, except the visible text of a page whose text layer does not cover the ink, which is still read |
+| `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer, or a visible text layer that does not cover the picture (reason `text_not_covering_content`) | the page is kept as its image (`scanned_page`): no elements, except the visible text of a page whose text layer does not cover the picture, which is still read. With a little visible typed text, nothing hidden and a picture with nothing on it to read (a title slide on a plain background) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`) |
 | `vector_no_text` | drawings, little or no text | read as before (figures); kept as an image (`unread_page`) when it has less than a line (40 characters) of visible text and its ink could not be analysed in time; its visible text is read, its drawings are not sent to the figure model |
 | `blank` | nothing painted, or paper rules alone | nothing |
 
@@ -1270,6 +1270,32 @@ The decisions in the rules, with the measured values next to each threshold in t
   when its hidden characters are at least max(20, its visible characters), or when a page
   image covers half of it and 20 or more characters are hidden (a scan with a visible
   "Downloaded from" stamp; notes under a typed template header).
+- **A text layer makes a page typed only when it covers the page's content**
+  (page-type-v5.5, 2026-11-03; `TEXT_NOT_COVERING`). Three of five real photographed notebook
+  pages carried a watermark text layer (a diagonal channel name, a header, a page number), so
+  they were called typed, skipped the image page pass and came out "Not converted" with only the
+  watermark as text. Now a visible text layer does not make the page typed when (a) pictures
+  cover 75 % of the page or more, 60 % of the page is picture with no visible text over it
+  (boxes of text lines, or of characters on a slanted line), the text covers under 12 % of the
+  page, and a low-resolution render shows ink (tone 45 grey levels from the page's usual one)
+  on at least 2 % of the page outside the text: the page is `scan_no_text` or `scan_ocr`; or
+  (b) the page is a page of writing (40 clean strokes in 3 rows), its text covers under 12 %
+  of the page and there are at least half as many strokes as visible characters: `handwritten`.
+  Both only for a page with a text layer (a title or a number alone over writing was already
+  a handwritten page; a title and a few characters over a picture take (a) too). The render is
+  made only for a page the picture rule might apply to. A picture that is the template's
+  background repeated on the document's pages or one plain colour is not content: layout asks
+  (`_page_picture`) and decides such a page again without the rule (`page_type.without_picture`).
+  Measured on the three real pages: picture 0.88 to 0.91, no text over 0.78 to 0.81, text 0.08,
+  ink outside the text 0.13 to 0.17; the repository's typed fixtures (a transparent overlay
+  over typed text: 0.007) and 153 pages of arXiv papers (pictures at most 0.47 of the page) are
+  not caught. This is a threshold on a handful of cases, not a measured rate. A typed page
+  with a photograph of handwriting that covers less than 75 % of it is still typed with a
+  figure (the figure step describes it; its writing is not read). A page that keeps its
+  visible text beside its image (`page_type.keeps_text`) is read as before when the image
+  page pass is off; when the pass reads the page, what it reads replaces that text. A scan
+  whose OCR layer is hidden (render mode 3, covered) is read from its image as it always was;
+  a visible text layer that covers the picture is the page's text.
 - **A scan is a picture of a page** (C1.5): images cover 85 % of the page, or half of it
   with no visible text at all. A slide title over a photo is a typed page with a figure.
   Hidden text with no picture of a page over vector ink (clean, or rows of writing the

@@ -38,9 +38,12 @@ checks ran, and what was not checked.
   textbook, 23 of 30 equations came out exactly right. PDFs typeset with LaTeX or exported
   from Word may do worse. The instructor is asked about the parts the tool is unsure about;
   the rest is accepted by the tool without a person looking.
-- **Not converted:** handwriting and scanned pages (kept as pictures, marked "Not
-  converted"), chemistry notation, and any equation or figure the tool could not read
-  (kept as a picture of the original, with a note). Two-column pages and slides convert
+- **Not converted:** handwriting and scanned pages, unless the person ticks "Convert
+  scanned or handwritten pages" when uploading (then a model reads each page's picture,
+  every converted equation and table is for a person to check, and a model can misread
+  handwriting); otherwise they are kept as pictures, marked "Not converted". Chemistry
+  notation, and any equation or figure the tool could not read (kept as a picture of the
+  original, with a note). Two-column pages and slides convert
   less well than single-column notes.
 - **Checks look at structure, not meaning:** language, title, order of headings, lists,
   tables, links and the alt attribute of every image. Nobody has tested the output with

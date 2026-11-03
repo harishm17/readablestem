@@ -1484,8 +1484,14 @@ def _convert(
                 )
                 for number in image_built:
                     kept.pop(number)  # read: no longer an image kept whole
+                # What layout read from a page the pass read (the watermark, header or page
+                # number over a photographed page) is the pass's to read again: the page
+                # would hold that text twice.
                 elements = sorted(
-                    [*elements, *(e for b in image_built.values() for e in b.elements)],
+                    [
+                        *(e for e in elements if e.page not in image_built),
+                        *(e for b in image_built.values() for e in b.elements),
+                    ],
                     key=lambda e: (e.page, e.order),
                 )
             page_list = list(dict.fromkeys([*doc.pages, *(e.page for e in elements)]))
@@ -1534,6 +1540,8 @@ def _convert(
         finally:
             cached.release()  # also when analysis, a step or `progress` failed
 
+        if settings.image_pages_maths_always_required and image_built:
+            image_page.enforce_maths_required(elements, run.fixes)
         ordered = _ordered_fixes(elements, run.fixes)
         labels = _page_labels(pdf_bytes, page_list)
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]

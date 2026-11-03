@@ -165,6 +165,21 @@ its image exactly as before.
     ([eval-image-pages.md](../eval-image-pages.md), "Update: maths always required"). It settles the open
     question of the "Consequences" about inline formulas riding with their paragraph.
 
+13. **A text layer that does not cover the page does not make it typed** (2026-11-03,
+    `page_type.TEXT_NOT_COVERING`, classifier page-type-v5.5; [layout.md](../layout.md), "Hidden text and
+    page types"). Three of five real photographed notebook pages carried a watermark text layer, were
+    called typed and never reached the pass. A page-sized picture, or a page of vector writing, that a
+    thin visible text layer does not lie over (a watermark, a header, a stamp, a page number, a typed
+    title) is scanned or handwritten, so the pass reads it (when asked) and replaces the text layer's
+    words, which the page reader reads again from the image. A scan with a *hidden* OCR layer was
+    already read from its image, because nothing can check that layer and for maths it is poor; a
+    *visible* layer that covers the picture is the page's text. The image pass cannot read a region of
+    a page: a typed page with a photograph of handwriting that covers less than 75 % of it stays typed,
+    with the photograph as a figure. A page that stays an image says why on the review screen
+    (`reading_note`). After every step, `image_page.enforce_maths_required` lifts any equation or table
+    read from an image whose governing decision is not a required one (a no-op when the rule of point 12
+    held on every path; `tests/test_image_page_maths_required.py`).
+
 ## Measuring it
 
 Development material only for the design and the choice of model; the sealed check part of
