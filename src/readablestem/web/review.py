@@ -1546,6 +1546,13 @@ def is_clean_table(fix: Fix, element: Element | None = None) -> bool:
     )
 
 
+def reading_order(result: DocumentResult, fixes: list[Fix]) -> list[Fix]:
+    """`fixes` in the review's order: page, then reading order within the page."""
+    position = _positions(result)
+    far = (1 << 30, 1 << 30, 1 << 30)
+    return sorted(fixes, key=lambda f: position.get(f.element_id, far))
+
+
 def clean_tables(result: DocumentResult) -> list[Fix]:
     """The clean tables still waiting, in page and reading order."""
     position = _positions(result)

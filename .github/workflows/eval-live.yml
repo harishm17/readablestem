@@ -1,16 +1,42 @@
 name: Eval (live model)
 
-# Manual only: this calls the OpenAI API and costs money. The eval itself refuses to
-# spend more than --max-usd; the check below also refuses caps above 10 USD per run.
+# Runs the eval tasks against the live production provider (Claude, MODEL_PROVIDER=anthropic
+# in .railway/railway.ts) and fails when a tracked metric dropped. It costs money, so it is
+# limited three ways:
+#   - every task has its own hard --max-usd (the table below; the eval stops and the gate
+#     refuses a partial report), and the sum is checked against MAX_WEEKLY_USD in `plan`;
+#   - it runs weekly (Monday 06:17 UTC) and by hand, never on a pull request;
+#   - without the repository secret ANTHROPIC_API_KEY a scheduled run skips with a notice
+#     and spends nothing (a manual run fails, so a missing key is not silent).
+#
+# The sets are the committed development sets in full (the same items as
+# data/eval/baseline-<task>.json), so each report compares with its baseline. A report is
+# never committed from here: it is an artifact. To move a baseline, re-run locally and
+# promote (docs/eval.md, "How to rerun").
+#
+#   task        cap     what the committed baseline run cost (2026-10-14/21, Claude)
+#   equations   0.50    $0.08 to $0.10 (30 equations)
+#   headings    0.25    $0.00 (no model call)
+#   figures     0.75    $0.12 (13 figures, Opus judge)
+#   document    1.00    $0.24 (3 sections, 43 PDF pages)
+#   tables      0.45    about $0.26 (model mode, grid style plus authored documents)
+#   total cap   2.95    expected about $0.70 a week; at most $2.95
+#
+# A Claude call reserves its worst case first (about $0.29 on claude-opus-5-5 with an image),
+# so a cap below that stops a run at once; --concurrency 2 keeps the reservations in flight
+# few. The tables task has no model-mode baseline: it is gated on its floors alone.
 
 on:
+  schedule:
+    - cron: "17 6 * * 1"
   workflow_dispatch:
     inputs:
-      max_usd:
-        description: "Spend cap for this run, in USD (0 < cap <= 10)"
+      task:
+        description: "Task to run (all runs every task)"
         required: true
-        default: "1.00"
-        type: string
+        default: all
+        type: choice
+        options: [all, equations, headings, figures, document, tables]
 
 permissions:
   contents: read
@@ -19,50 +45,118 @@ concurrency:
   group: eval-live
   cancel-in-progress: false
 
+env:
+  PROVIDER: anthropic
+  MAX_WEEKLY_USD: "3.00"
+  # One entry per task: the CLI arguments after `eval pipeline --provider $PROVIDER`, the cap
+  # and the baseline the report is gated against ("" = floors only).
+  TASKS: >-
+    [
+      {"task": "equations", "args": "--task equations", "max_usd": 0.50, "baseline": "data/eval/baseline-equations.json"},
+      {"task": "headings", "args": "--task headings", "max_usd": 0.25, "baseline": "data/eval/baseline-headings.json"},
+      {"task": "figures", "args": "--task figures", "max_usd": 0.75, "baseline": "data/eval/baseline-figures.json"},
+      {"task": "document", "args": "--task document", "max_usd": 1.00, "baseline": "data/eval/baseline-document.json"},
+      {"task": "tables", "args": "--task tables --mode model --styles grid", "max_usd": 0.45, "baseline": ""}
+    ]
+
 jobs:
-  equations:
-    name: eval pipeline --task equations
+  plan:
+    name: plan (key present, caps within budget)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.plan.outputs.run }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      # Inputs and secrets reach the shell as environment variables, never pasted into the script.
+      - name: Check the key and the caps, choose the tasks
+        id: plan
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          EVENT: ${{ github.event_name }}
+          CHOSEN: ${{ inputs.task || 'all' }}
+        run: |
+          set -euo pipefail
+          total=$(jq '[.[].max_usd] | add' <<<"$TASKS")
+          if ! awk -v t="$total" -v m="$MAX_WEEKLY_USD" 'BEGIN { exit !(t <= m) }'; then
+            echo "::error::the task caps add up to $total USD, above the weekly budget $MAX_WEEKLY_USD"
+            exit 1
+          fi
+          if [ "$HAS_KEY" != "true" ]; then
+            if [ "$EVENT" = "schedule" ]; then
+              echo "::notice::repository secret ANTHROPIC_API_KEY is not set; the weekly live eval is skipped (add the secret to turn it on; at most $total USD a week)"
+              echo "run=false" >> "$GITHUB_OUTPUT"
+              echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::repository secret ANTHROPIC_API_KEY is not set"
+            exit 1
+          fi
+          matrix=$(jq -c --arg t "$CHOSEN" '{include: [.[] | select($t == "all" or .task == $t)]}' <<<"$TASKS")
+          echo "run=true" >> "$GITHUB_OUTPUT"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "Tasks: $(jq -r '[.include[].task] | join(", ")' <<<"$matrix"); caps add up to at most $total USD"
+
+  live:
+    name: eval ${{ matrix.task }} (live)
+    needs: plan
+    if: needs.plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Inputs reach the shell as environment variables, never pasted into the script.
-      - name: Check the spend cap and the API key
-        env:
-          MAX_USD: ${{ inputs.max_usd }}
-          HAS_KEY: ${{ secrets.OPENAI_API_KEY != '' }}
-        run: |
-          if ! [[ "$MAX_USD" =~ ^[0-9]+(\.[0-9]+)?$ ]] \
-            || ! awk -v v="$MAX_USD" 'BEGIN { exit !(v > 0 && v <= 10) }'; then
-            echo "::error::max_usd must be a number above 0 and at most 10 (got '$MAX_USD')"
-            exit 1
-          fi
-          if [ "$HAS_KEY" != "true" ]; then
-            echo "::error::repository secret OPENAI_API_KEY is not set"
-            exit 1
-          fi
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           python-version: "3.12"
           enable-cache: true
-      - name: Install (locked, with the browser group for rendering equations)
+      - name: Install (locked, with the browser group for printing pages)
         run: uv sync --locked --all-groups
       - name: Install Chromium
         run: uv run playwright install --with-deps chromium
-      - name: Run the equations eval (live model, capped)
+      # The fonts the eval renderer names (eval/render.py), as in ci.yml.
+      - name: Install the fonts the printed pages use
+        run: sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-liberation
+      - name: Run the ${{ matrix.task }} eval (live model, capped)
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          MAX_USD: ${{ inputs.max_usd }}
-        run: uv run readablestem eval pipeline --task equations --max-usd "$MAX_USD"
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODEL_PROVIDER: ${{ env.PROVIDER }}
+          TASK_ARGS: ${{ matrix.args }}
+          TASK: ${{ matrix.task }}
+          MAX_USD: ${{ matrix.max_usd }}
+        run: |
+          set -euo pipefail
+          mkdir -p .local/eval/live
+          # TASK_ARGS is split on purpose: it holds the flags of the matrix entry.
+          # shellcheck disable=SC2086
+          uv run readablestem eval pipeline $TASK_ARGS --provider "$PROVIDER" \
+            --max-usd "$MAX_USD" --concurrency 2 --out ".local/eval/live/${TASK}.json" \
+            2>&1 | tee ".local/eval/live/${TASK}.log"
+      - name: Gate the report against the baseline (fails on a regression)
+        env:
+          TASK: ${{ matrix.task }}
+          BASELINE: ${{ matrix.baseline }}
+        run: |
+          set -uo pipefail
+          args=(--require-current --current ".local/eval/live/${TASK}.json")
+          if [ -n "$BASELINE" ]; then args+=(--baseline "$BASELINE"); fi
+          uv run readablestem eval gate "${args[@]}" 2>&1 | tee ".local/eval/live/${TASK}-gate.txt"
+          status=${PIPESTATUS[0]}
+          {
+            echo "### eval ${TASK} (live, ${PROVIDER})"
+            echo
+            cat ".local/eval/live/${TASK}-gate.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
       - name: Upload the report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: eval-equations-${{ github.run_id }}
-          path: |
-            data/eval/
-            .local/eval/
+          name: eval-${{ matrix.task }}-${{ github.run_id }}
+          path: .local/eval/live/
           if-no-files-found: warn
           retention-days: 30
