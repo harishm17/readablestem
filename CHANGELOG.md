@@ -8,7 +8,7 @@
   records), writes each volunteer a brief, matches the PDFs they return to passages (counts only in
   reports; a folder inside the repository is refused), builds the gold from the passage's published
   MathML, and writes a manifest in which a page is published only if its writer's yes is recorded; the
-  other pages are counts. Published PDFs lose their file metadata. Tests in
+  other pages are counts. A person must look at every page (`review`) before it can be published; published PDFs are rebuilt with page content only and checked, failing closed; unpublished pages can be purged. Tests in
   `tests/test_handwriting_copy_set.py`; no page has been collected yet, so there is no result.
 
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)

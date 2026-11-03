@@ -627,6 +627,6 @@ exported from an iPad are vector, and this set has none. The kit in
 few volunteers copy CC BY OpenStax worked examples by hand in their own notes apps. It picks the
 passages with a written, seeded rule behind a licence gate, writes each writer a brief, matches the
 PDFs they send back to passages, and builds the answer key from the textbook's published MathML. A
-writer's pages are published, under CC BY 4.0 and a pseudonymous id, only if that writer said yes; the
+writer's pages are published, under CC BY 4.0 and a pseudonymous id, only if that writer said yes and a person has looked at the page; the
 manifest keeps counts for the rest. No page has been collected and no number comes from it yet.
 

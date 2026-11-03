@@ -26,9 +26,12 @@ uv run python scripts/handwriting_copy_set.py brief   --work $W --send-to "where
 #   ... give each writer their brief-wNN.html; ask the consent question in it; PDFs come back ...
 uv run python scripts/handwriting_copy_set.py intake  --work $W --returns /somewhere/else/returned
 uv run python scripts/handwriting_copy_set.py consent --work $W --writer w01 --publish yes
+uv run python scripts/handwriting_copy_set.py review  --work $W            # PNGs to look at
+uv run python scripts/handwriting_copy_set.py review  --work $W --approve w01-01 w01-02 --reviewer r01
 uv run python scripts/handwriting_copy_set.py gold    --work $W
 uv run python scripts/handwriting_copy_set.py manifest --work $W --out $W/manifest.json
 uv run python scripts/handwriting_copy_set.py export  --work $W --dest data/handwriting-copy
+uv run python scripts/handwriting_copy_set.py purge   --work $W              # unpublished pages
 ```
 
 1. **select** draws the passages with the written rule below and records the seed, the pinned book
@@ -44,22 +47,42 @@ uv run python scripts/handwriting_copy_set.py export  --work $W --dest data/hand
    files naming two passages, codes it does not know, and two files for one passage; it matches none
    of those. A PDF is accepted if it opens, has 1 to 4 pages (a whole notebook is refused, because
    it may hold other notes) and has ink: `vector` (20 or more drawn paths) or `raster` (an image
-   only; flagged, because the vector branch cannot use it). The producer string is recorded for
-   telling apps apart. Reports and `intake.json` hold counts and codes, never original file names
-   or page content.
+   only; flagged, because the vector branch cannot use it). Only a known notes-app name (or
+   `other`) is kept from the file's producer and creator strings, because the raw strings can hold
+   a name or a device name. Reports and `intake.json` hold counts, codes and that app label, never
+   original file names, raw metadata or page content.
 4. **gold** writes `gold.jsonl` from the saved source: one record per formula in reading order, its
    MathML as published, its display mode and context, plus the prose as published. Nothing is typed.
    The records score with `readablestem.eval.equations` (`score_mathml`, `score_latex`).
-5. **consent** records each writer's answer (`yes` or `no`, a date, and a hash of the exact question
-   asked). With no recorded answer, a writer's pages are private.
-6. **manifest** and **export** write the publishable manifest. Writers appear only by id. A page is
-   `published` only when its writer said yes: `export` copies those PDFs, after removing the title,
-   author, subject, keywords, dates and XMP metadata and keeping the app strings and the ink. Pages
-   without a yes are `private`: the manifest keeps only counts for them (pages, ink kind, no file,
-   no hash) and the PDFs stay in the work folder. Published pages are licensed
-   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and credited to the writer id and to the
-   OpenStax source (`ATTRIBUTION.md`). Pages that are `private`, `missing` or `rejected` are listed
-   with their status so the counts add up.
+5. **review** renders every accepted page to a PNG in `$W/review/` (plus a text file of any hidden
+   text layer, which iPad exports often carry) and a person looks at each one for names, faces,
+   other notes or anything else that should not be public. `review --approve CODE ... --reviewer r01`
+   records who (a pseudonymous id like `r01`) and when; `--reject` keeps a page private. A mark is
+   tied to the file's hash, so a replaced page needs a new look.
+6. **consent** records each writer's answer (`yes` or `no`, a date, and a hash of the exact text
+   asked). A yes counts only for that text: if the consent text changes, the answer is out of date
+   and the page stays private until the writer is asked again. With no recorded answer, a writer's
+   pages are private.
+7. **manifest** and **export** write the publishable manifest. Writers appear only by id. A page is
+   `published` only when its writer's current yes is recorded **and** a person has approved that
+   exact file. `export` refuses to run while a consented page is still `awaiting_review`. It writes
+   each published page as a new PDF holding the page content only (annotations are baked into the
+   page first): no outline, attachments, links, annotations, thumbnails, XMP, custom keys or dates,
+   and only a known app name as producer. It then reads the new file back and, if anything
+   identifying is found, keeps nothing and stops (`verify_publishable`). That check covers what
+   notes apps and people are known to leave; it is not a proof, and the content of the page itself
+   is what the person reviewing looks at. Pages without a yes are `private`: the manifest keeps only
+   counts for them (pages, ink kind, no file, no hash) and the PDFs stay in the work folder.
+   Published pages are licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and
+   credited to the writer id and to the OpenStax source (`ATTRIBUTION.md`, which gives each book's
+   own licence). Pages that are `private`, `awaiting_review`, `missing`, `deleted` or `rejected` are
+   listed with their status so the counts add up.
+8. **purge** deletes pages that were not published: those of a writer whose current answer is no,
+   and any page 90 days after it arrived (the period the consent text promises). Counts stay in
+   `intake.json`; the manifest shows such pages as `deleted`.
+
+The consent text asks for adults only (18 or over), says who is asking, that a person looks at every
+page, how to withdraw and where to reply, and how long unpublished pages are kept.
 
 ## The passage rule (version 1)
 
@@ -94,13 +117,13 @@ That run was a check of the rule, not the set.
 - Worked examples only: no diagrams, tables, crossed-out derivations or prose-heavy pages.
 - A page that is `raster` tests the picture path, not the vector path.
 - Handwriting can identify a person even without a name. Consent is asked in the brief and recorded
-  here; a CC BY licence cannot be taken back from copies already made.
+  here, and every page is looked at by a person before it is published; a CC BY licence cannot be taken back from copies already made.
 
 ## Files in this folder after `export`
 
 | File | What it is | Licence |
 |---|---|---|
 | `manifest.json` | passages, sources, versions, per-page status, writers' consent, totals | MIT |
-| `gold.jsonl` | the answer key: published MathML and prose of each passage | CC BY 4.0 (OpenStax) |
+| `gold.jsonl` | the answer key: published MathML and prose of each passage | each book's CC BY licence (OpenStax) |
 | `ATTRIBUTION.md` | books, authors, licences | |
 | `pages/<code>.pdf` | consented handwriting pages only | CC BY 4.0, credited to the writer id |

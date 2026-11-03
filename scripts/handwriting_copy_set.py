@@ -11,6 +11,7 @@ the data (`data/handwriting-copy/README.md`) explains the whole flow.
     uv run python scripts/handwriting_copy_set.py brief --work $W --send-to "an address or link"
     uv run python scripts/handwriting_copy_set.py intake --work $W --returns /path/outside/repo/back
     uv run python scripts/handwriting_copy_set.py consent --work $W --writer w01 --publish yes
+    uv run python scripts/handwriting_copy_set.py review --work $W   # a person looks; --approve
     uv run python scripts/handwriting_copy_set.py gold --work $W
     uv run python scripts/handwriting_copy_set.py manifest --work $W --out $W/manifest.json
     uv run python scripts/handwriting_copy_set.py export --work $W --dest data/handwriting-copy
@@ -120,15 +121,26 @@ MIN_WORDS, MAX_WORDS, MIN_MATH_PER_100_WORDS = 15, 220, 5.0
 PAGES_LICENCE = "CC BY 4.0"
 PAGES_LICENCE_URL = "https://creativecommons.org/licenses/by/4.0/"
 
-CONSENT_QUESTION = (
+RETAIN_DAYS = 90  # unpublished pages are deleted this long after they arrive (`purge`)
+
+# The consent text, one short paragraph each. `{send_to}` is the writer's reply address. The hash
+# of this exact text is recorded with each answer, so a changed text asks again.
+CONSENT_PARTS = (
+    "We are the ReadableSTEM project, maintained by Harish Manoharan. This is only for people "
+    "aged 18 or over. Please don't take part if you are under 18.",
     "May we publish your handwriting pages? If you say yes, they go in the open ReadableSTEM "
-    "repository under the CC BY 4.0 licence, so anyone may reuse them if they credit the source. "
-    "They are credited to your writer id, not your name, and we remove the file name, author and "
-    "other details from each PDF first. Handwriting can still be recognised by people who know "
-    "it. If you say no, your pages stay private and we only count them (how many pages and "
-    "equations). Reply yes or no. You can change your answer until we publish; after that, "
-    "copies other people have made can't be taken back."
+    "repository under the CC BY 4.0 licence, so anyone may reuse them if they credit the source.",
+    "A person looks at every page before anything is published. Pages are credited to your "
+    "writer id, not your name, and we remove the file name, author and other details from each "
+    "PDF first. Handwriting can still be recognised by people who know it.",
+    "If you say no, your pages stay private. We only count them (how many pages and "
+    f"equations), and we delete every page that is not published within {RETAIN_DAYS} days of "
+    "receiving it, sooner if you say no.",
+    "Reply yes or no to {send_to}. To change your answer or withdraw, reply to the same address "
+    "and we will delete your unpublished pages and leave yours out of anything not yet "
+    "published. Once a page is published, copies other people have made can't be taken back.",
 )
+CONSENT_QUESTION = "\n\n".join(CONSENT_PARTS)
 
 BRIEF_TITLE = "Copy worked examples by hand"
 BRIEF_INTRO = (
@@ -153,10 +165,11 @@ BRIEF_PLEASE_DONT = (
     "Don't copy by tracing or from a typed file. Look at the passage and write it.",
     "Don't skip lines. If a line is hard to write, write it as well as you can.",
 )
-BRIEF_CONSENT_TITLE = "Your pages and your name"
+BRIEF_CONSENT_TITLE = "May we publish your handwriting pages?"
 BRIEF_FOOT = (
-    "The passages are from OpenStax textbooks, licensed CC BY 4.0, with credit under each one. "
-    "OpenStax is a service of Rice University."
+    "The passages are from OpenStax textbooks, used under their Creative Commons Attribution "
+    "licences, with the licence and credit under each one. OpenStax is a service of Rice "
+    "University."
 )
 
 # --------------------------------------------------------------------------- small helpers
@@ -546,7 +559,7 @@ def attribution_line(p: dict[str, Any]) -> str:
     authors = ", ".join(p.get("authors") or []) or "OpenStax"
     return (
         f"{p['book_title']}, {p['page_title']}. {authors} and others, OpenStax, "
-        f"{p['license_name'] or 'CC BY'} (CC BY 4.0). {p['details_url']}"
+        f"{p['license_name'] or 'CC BY'}, {p['license_url']}. {p['details_url']}"
     )
 
 
@@ -559,6 +572,7 @@ def brief_html(
         f"<li>{esc(s.format(example=first, send_to=send_to))}</li>" for s in BRIEF_STEPS
     )
     dont = "".join(f"<li>{esc(s)}</li>" for s in BRIEF_PLEASE_DONT)
+    consent = "".join(f"<p>{esc(s.format(send_to=send_to))}</p>" for s in CONSENT_PARTS)
     blocks = []
     for p in passages:
         body = render_passage_html(ET.fromstring(xhtml_for[p["code"]]))
@@ -573,7 +587,7 @@ def brief_html(
         f"<h1>{esc(BRIEF_TITLE)}</h1><p>Your writer id: <strong>{esc(writer)}</strong></p>"
         f"<p>{esc(BRIEF_INTRO.format(n=len(passages)))}</p>"
         f"<h2>What to do</h2><ol>{steps}</ol><h2>Please don't</h2><ul>{dont}</ul>"
-        f'<h2>{esc(BRIEF_CONSENT_TITLE)}</h2><p class="consent">{esc(CONSENT_QUESTION)}</p>'
+        f'<h2>{esc(BRIEF_CONSENT_TITLE)}</h2><div class="consent">{consent}</div>'
         f'<h2>Your passages</h2>{"".join(blocks)}<p class="src">{esc(BRIEF_FOOT)}</p>'
         "</body></html>\n"
     )
@@ -602,10 +616,32 @@ PDF_META_KEYS = (
     "title", "author", "subject", "keywords", "creator", "producer", "creationDate", "modDate",
     "trapped",
 )  # fmt: skip
+# Only these app names ever leave the work folder; the raw producer and creator strings can hold
+# a name or a device name, so they are never stored, published or copied into a public PDF.
+KNOWN_APPS = (
+    ("goodnotes", "GoodNotes"),
+    ("notability", "Notability"),
+    ("noteshelf", "Noteshelf"),
+    ("nebo", "Nebo"),
+    ("onenote", "OneNote"),
+    ("flexcil", "Flexcil"),
+    ("collanote", "CollaNote"),
+    ("concepts", "Concepts"),
+    ("freeform", "Freeform"),
+    ("quartz pdfcontext", "Apple Quartz PDFContext"),
+)
 MAX_PAGES = 4
 MAX_BYTES = 60 * 1024 * 1024
 MIN_VECTOR_PATHS = 20
 CODE_IN_NAME = re.compile(r"(?<![a-z0-9])(w\d{2})[\s_.\-]*p?[\s_.\-]*(\d{1,2})(?!\d)")
+
+
+def app_label(*raw: str | None) -> str | None:
+    """A known notes-app name from the producer or creator string, "other", or None if empty."""
+    text = " ".join(r for r in raw if r).lower()
+    if not text.strip():
+        return None
+    return next((label for key, label in KNOWN_APPS if key in text), "other")
 
 
 def codes_in_name(filename: str) -> set[str]:
@@ -660,6 +696,7 @@ def inspect_pdf(path: Path) -> dict[str, Any]:
             return {"status": "rejected_too_many_pages", "n_pages": n_pages}
         paths = sum(len(page.get_drawings()) for page in doc)
         images = sum(len(page.get_images()) for page in doc)
+        text_words = sum(len(page.get_text("words")) for page in doc)
         meta = doc.metadata or {}
     ink = "vector" if paths >= MIN_VECTOR_PATHS else "raster" if images else "none"
     return {
@@ -668,12 +705,12 @@ def inspect_pdf(path: Path) -> dict[str, Any]:
         "ink": ink,
         "vector_paths": paths,
         "images": images,
-        "producer": meta.get("producer") or None,
-        "creator": meta.get("creator") or None,
+        "text_words": text_words,
+        "app": app_label(meta.get("producer"), meta.get("creator")),
     }
 
 
-def run_intake(work: Path, returns: Path) -> dict[str, Any]:
+def run_intake(work: Path, returns: Path, date: str | None = None) -> dict[str, Any]:
     selection = load_selection(work)
     codes = {p["code"] for p in selection["passages"]}
     result = match_returns(returns, codes)
@@ -685,6 +722,7 @@ def run_intake(work: Path, returns: Path) -> dict[str, Any]:
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, dest)
             info["sha256"] = sha256_file(dest)
+            info["received_on"] = date or dt.date.today().isoformat()
         intake[code] = info
     for code in result["duplicates"]:
         intake[code] = {"status": "rejected_duplicate"}
@@ -702,6 +740,16 @@ def run_intake(work: Path, returns: Path) -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- consent (5)
+
+
+def consent_is_current_text(record: dict[str, Any] | None) -> bool:
+    """True if the answer was given to the question as it reads now."""
+    return bool(record) and record.get("question_sha256") == sha256_text(CONSENT_QUESTION)
+
+
+def consent_is_current(record: dict[str, Any] | None) -> bool:
+    """A yes counts only for the exact text it answered; an older text means ask again."""
+    return consent_is_current_text(record) and record.get("publish") is True
 
 
 def record_consent(work: Path, writer: str, publish: bool, date: str) -> None:
@@ -782,6 +830,7 @@ def build_manifest(work: Path, date: str) -> dict[str, Any]:
     selection = load_selection(work)
     intake = _read_json(work / "intake.json", {})
     consent = _read_json(work / "consent.json", {})
+    reviewed = _read_json(work / "reviewed.json", {})
     gold = gold_records(selection, load_sources(work, selection))
     eq_count = Counter(r["code"] for r in gold if r["kind"] == "equation")
     eq_hash = {
@@ -794,20 +843,32 @@ def build_manifest(work: Path, date: str) -> dict[str, Any]:
     for p in selection["passages"]:
         code, wid = p["code"], p["writer_id"]
         got = intake.get(code)
-        agreed = bool(consent.get(wid, {}).get("publish"))
+        agreed = consent_is_current(consent.get(wid))
         if got is None:
             page: dict[str, Any] = {"status": "missing"}
         elif got["status"] != "ok":
             page = {"status": "rejected", "reason": got["status"]}
+        elif got.get("file_deleted"):
+            page = {"status": "deleted", "n_pages": got["n_pages"], "ink": got["ink"]}
         else:
+            review = reviewed.get(code)
+            looked = bool(review and review["sha256"] == got.get("sha256"))
+            approved = looked and review["status"] == "approved"
+            status = "private"
+            if agreed and approved:
+                status = "published"
+            elif agreed and not looked:
+                status = "awaiting_review"
             page = {
-                "status": "published" if agreed else "private",
+                "status": status,
                 "n_pages": got["n_pages"],
                 "ink": got["ink"],
-                "producer": got.get("producer"),
+                "app": got.get("app"),
             }
-            if agreed:
+            if status == "published":
                 page["file"] = f"pages/{code}.pdf"
+                page["reviewed_by"] = review["reviewer"]
+                page["reviewed_on"] = review["date"]
         passages.append(
             {
                 "code": code,
@@ -835,11 +896,15 @@ def build_manifest(work: Path, date: str) -> dict[str, Any]:
             {
                 "writer_id": wid,
                 "consent_recorded": record is not None,
-                "consent_publish": bool(record and record["publish"]),
+                "consent_publish": consent_is_current(record),
+                "consent_out_of_date": bool(record) and not consent_is_current_text(record),
                 "consent_recorded_on": record["recorded_on"] if record else None,
                 "passages": len(mine),
                 "pages_published": sum(p["page"]["status"] == "published" for p in mine),
                 "pages_private": sum(p["page"]["status"] == "private" for p in mine),
+                "pages_awaiting_review": sum(
+                    p["page"]["status"] == "awaiting_review" for p in mine
+                ),
             }
         )
     return {
@@ -849,7 +914,9 @@ def build_manifest(work: Path, date: str) -> dict[str, Any]:
         "seed": selection["seed"],
         "rule_version": selection["rule_version"],
         "gold": "published OpenStax MathML of each copied passage; nothing typed by a person",
-        "gold_licence": "CC BY 4.0 (OpenStax)",
+        "gold_licence": sorted(
+            {f"{p['license_name']} ({p['license_url']})" for p in selection["passages"]}
+        ),
         "pages_licence": PAGES_LICENCE,
         "pages_licence_url": PAGES_LICENCE_URL,
         "consent_question_sha256": sha256_text(CONSENT_QUESTION),
@@ -862,30 +929,208 @@ def build_manifest(work: Path, date: str) -> dict[str, Any]:
             "equations": sum(p["n_equations"] for p in passages),
             "published": sum(p["page"]["status"] == "published" for p in passages),
             "private": sum(p["page"]["status"] == "private" for p in passages),
+            "awaiting_review": sum(p["page"]["status"] == "awaiting_review" for p in passages),
+            "deleted": sum(p["page"]["status"] == "deleted" for p in passages),
             "missing": sum(p["page"]["status"] == "missing" for p in passages),
             "rejected": sum(p["page"]["status"] == "rejected" for p in passages),
         },
     }
 
 
-def strip_pdf_metadata(src: Path, dst: Path) -> None:
-    """Copy a PDF without file name, author, title or dates; keep the app strings and the ink."""
-    with pymupdf.open(src) as doc:
+class ExportError(SystemExit):
+    """Something that must not be published was found, or a required step is missing."""
+
+
+FORBIDDEN_IN_OBJECTS = re.compile(
+    r"/(Author|Subject|Keywords|Title|Annots|URI|EmbeddedFiles?|Filespec|Names|Outlines|Thumb|"
+    r"PieceInfo|Metadata|AA|OpenAction|AcroForm|CreationDate|ModDate|Dests|JavaScript|JS|"
+    r"Contents\s*\(|Subtype\s*/(Link|Text|FreeText|Ink|Widget|FileAttachment))(?![A-Za-z])(?!\s+null\b)"
+)
+ALLOWED_PAGE_KEYS = {
+    "Type", "Parent", "MediaBox", "CropBox", "Rotate", "Resources", "Contents", "Group",
+    "UserUnit",
+}  # fmt: skip
+ALLOWED_CATALOG_KEYS = {"Type", "Pages", "Version", "Info"}
+ALLOWED_TRAILER_KEYS = {"Size", "Root", "Info", "ID"}
+ALLOWED_PRODUCERS = {label for _, label in KNOWN_APPS} | {"other", ""}
+
+
+def verify_publishable(path: Path) -> list[str]:
+    """What identifying material is left in a PDF (category names only); empty means clean."""
+    found: list[str] = []
+    with pymupdf.open(path) as doc:
         meta = doc.metadata or {}
-        keep = {"producer": meta.get("producer") or "", "creator": meta.get("creator") or ""}
-        # Every key is set: keys left out of the dict would keep their old values.
-        doc.set_metadata({k: keep.get(k, "") for k in PDF_META_KEYS})
-        doc.del_xml_metadata()
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        doc.save(dst, garbage=3, deflate=True)
+        for key in PDF_META_KEYS:
+            value = meta.get(key) or ""
+            if key == "producer":
+                if value not in ALLOWED_PRODUCERS:
+                    found.append("producer")
+            elif value:
+                found.append(f"info:{key}")
+        if doc.get_toc():
+            found.append("outline")
+        if doc.embfile_count():
+            found.append("embedded_files")
+        if doc.xref_xml_metadata():
+            found.append("xmp")
+        if set(doc.xref_get_keys(-1)) - ALLOWED_TRAILER_KEYS:
+            found.append("trailer_keys")
+        info_ref = doc.xref_get_key(-1, "Info")
+        if info_ref[0] == "xref":
+            info_xref = int(info_ref[1].split()[0])
+            extra = {
+                key
+                for key in doc.xref_get_keys(info_xref)
+                if key != "Producer" and doc.xref_get_key(info_xref, key)[0] != "null"
+            }
+            if extra:
+                found.append("info_keys")
+        if set(doc.xref_get_keys(doc.pdf_catalog())) - ALLOWED_CATALOG_KEYS:
+            found.append("catalog_keys")
+        for page in doc:
+            if set(doc.xref_get_keys(page.xref)) - ALLOWED_PAGE_KEYS:
+                found.append("page_keys")
+            if page.first_annot is not None:
+                found.append("annotations")
+            if page.get_links():
+                found.append("links")
+        for xref in range(1, doc.xref_length()):
+            try:
+                text = doc.xref_object(xref, compressed=False)
+            except Exception:  # an unreadable object is not trusted
+                found.append("unreadable_object")
+                continue
+            if FORBIDDEN_IN_OBJECTS.search(text):
+                found.append("forbidden_object")
+    return sorted(set(found))
+
+
+def strip_pdf_metadata(src: Path, dst: Path) -> None:
+    """Write a copy with only the ink: a fresh file, no outline, attachments, links, annotations,
+    thumbnails, XMP or custom keys, and only a known app name as producer.
+
+    Annotations are baked into the page first (iPad ink can be annotations), then every page is
+    copied into a new document without its links and annotations. The result is read back and
+    checked (`verify_publishable`); if anything identifying is left, nothing is kept and
+    ExportError is raised.
+    """
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with pymupdf.open(src) as doc:
+            if doc.needs_pass:
+                raise ExportError("encrypted_pdf")
+            meta = doc.metadata or {}
+            label = app_label(meta.get("producer"), meta.get("creator"))
+            doc.bake(annots=True, widgets=True)
+            with pymupdf.open() as out:
+                out.insert_pdf(doc, links=False, annots=False)
+                out.set_toc([])
+                for name in out.embfile_names():
+                    out.embfile_del(name)
+                # A new Info dictionary with only the allowed key, not edits to the old one.
+                info = out.get_new_xref()
+                producer = f"<</Producer ({label})>>" if label else "<<>>"
+                out.update_object(info, producer)
+                out.xref_set_key(-1, "Info", f"{info} 0 R")
+                out.del_xml_metadata()
+                out.save(dst, garbage=4, deflate=True)
+    except ExportError:
+        dst.unlink(missing_ok=True)
+        raise
+    except Exception as exc:
+        dst.unlink(missing_ok=True)
+        raise ExportError(f"could not clean a PDF: {type(exc).__name__}") from exc
+    left = verify_publishable(dst)
+    if left:
+        dst.unlink(missing_ok=True)
+        raise ExportError(f"a PDF still holds identifying material ({', '.join(left)}); not kept")
+
+
+# ------------------------------------------------------------------------------- review (6)
+
+REVIEWER = re.compile(r"^r\d{2}$")
+REVIEW_DPI = 110
+
+
+def render_review(work: Path) -> dict[str, Any]:
+    """PNGs of every accepted page, and any hidden text, for a person to look at."""
+    intake = _read_json(work / "intake.json", {})
+    out = work / "review"
+    out.mkdir(parents=True, exist_ok=True)
+    summary: dict[str, Any] = {}
+    for code, info in sorted(intake.items()):
+        path = work / "pages" / f"{code}.pdf"
+        if info["status"] != "ok" or not path.exists():
+            continue
+        with pymupdf.open(path) as doc:
+            for n, page in enumerate(doc, 1):
+                page.get_pixmap(dpi=REVIEW_DPI).save(out / f"{code}-{n}.png")
+            words = " ".join(w[4] for page in doc for w in page.get_text("words"))
+        text_path = out / f"{code}.txt"
+        if words:
+            text_path.write_text(words + "\n", encoding="utf-8")
+        else:
+            text_path.unlink(missing_ok=True)
+        summary[code] = {"pngs": info["n_pages"], "hidden_text_words": len(words.split())}
+    return summary
+
+
+def record_review(
+    work: Path, codes: list[str], reviewer: str, date: str, approve: bool
+) -> dict[str, Any]:
+    """Mark pages a person has looked at. The mark is tied to the file's hash."""
+    if not REVIEWER.match(reviewer):
+        raise ExportError("--reviewer must be a pseudonymous id like r01")
+    intake = _read_json(work / "intake.json", {})
+    reviewed = _read_json(work / "reviewed.json", {})
+    for code in codes:
+        path = work / "pages" / f"{code}.pdf"
+        if intake.get(code, {}).get("status") != "ok" or not path.exists():
+            raise ExportError(f"{code} has no accepted page to review")
+        reviewed[code] = {
+            "status": "approved" if approve else "rejected",
+            "sha256": sha256_file(path),
+            "reviewer": reviewer,
+            "date": date,
+        }
+    _write_json(work / "reviewed.json", reviewed)
+    return reviewed
+
+
+def run_purge(work: Path, today: str, older_than_days: int = RETAIN_DAYS) -> list[str]:
+    """Delete pages that were not published: a writer who said no (now), or older than the limit."""
+    intake = _read_json(work / "intake.json", {})
+    consent = _read_json(work / "consent.json", {})
+    exported = set(_read_json(work / "exported.json", []))
+    selection = load_selection(work)
+    writer_of = {p["code"]: p["writer_id"] for p in selection["passages"]}
+    deleted = []
+    for code, info in sorted(intake.items()):
+        path = work / "pages" / f"{code}.pdf"
+        if info["status"] != "ok" or not path.exists() or code in exported:
+            continue
+        record = consent.get(writer_of[code])
+        said_no = bool(record and record["publish"] is False)
+        received = dt.date.fromisoformat(info.get("received_on") or today)
+        too_old = (dt.date.fromisoformat(today) - received).days >= older_than_days
+        if said_no or too_old:
+            path.unlink()
+            for png in (work / "review").glob(f"{code}-*.png"):
+                png.unlink()
+            (work / "review" / f"{code}.txt").unlink(missing_ok=True)
+            info["file_deleted"] = True
+            deleted.append(code)
+    _write_json(work / "intake.json", intake)
+    return deleted
 
 
 def render_attribution(selection: dict[str, Any]) -> str:
     lines = [
         "# Attribution",
         "",
-        "The passages copied for this set come from OpenStax textbooks, licensed CC BY 4.0. "
-        "Each page of handwriting in `pages/` is a hand copy of one passage, published by its "
+        "The passages copied for this set come from OpenStax textbooks, each used under the "
+        "Creative Commons Attribution licence its record names (table below). Each page of "
+        "handwriting in `pages/` is a hand copy of one passage, published by its "
         f"writer (a pseudonymous id) under {PAGES_LICENCE} ({PAGES_LICENCE_URL}). The gold in "
         "`gold.jsonl` is the textbook's own MathML.",
         "",
@@ -900,7 +1145,7 @@ def render_attribution(selection: dict[str, Any]) -> str:
         authors = ", ".join(first.get("authors") or []) or "OpenStax"
         lines.append(
             f"| [{first['book_title']}]({first['details_url']}) ({first['book_state']}) | "
-            f"{authors} and others | {first['license_url']} | {len(ps)} |"
+            f"{authors} and others | {first['license_name']}, {first['license_url']} | {len(ps)} |"
         )
     lines += [
         "",
@@ -912,19 +1157,28 @@ def render_attribution(selection: dict[str, Any]) -> str:
 
 def run_export(work: Path, dest: Path, date: str) -> dict[str, Any]:
     manifest = build_manifest(work, date)
+    waiting = [p["code"] for p in manifest["passages"] if p["page"]["status"] == "awaiting_review"]
+    if waiting:
+        raise ExportError(
+            "no export: a person must look at these pages first (`review`, then "
+            f"`review --approve`): {', '.join(waiting)}"
+        )
     selection = load_selection(work)
     dest.mkdir(parents=True, exist_ok=True)
     pages = dest / "pages"
     if pages.exists():
         for old in pages.glob("*.pdf"):
             old.unlink()
+    published = []
     for p in manifest["passages"]:
         if p["page"]["status"] == "published":
             strip_pdf_metadata(work / "pages" / f"{p['code']}.pdf", dest / p["page"]["file"])
             p["page"]["sha256"] = sha256_file(dest / p["page"]["file"])
+            published.append(p["code"])
     _write_json(dest / "manifest.json", manifest)
     write_gold(work, dest / "gold.jsonl")
     (dest / "ATTRIBUTION.md").write_text(render_attribution(selection), encoding="utf-8")
+    _write_json(work / "exported.json", published)
     return manifest["totals"]
 
 
@@ -965,6 +1219,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("intake", help="match returned PDFs to passages")
     common(p)
     p.add_argument("--returns", type=Path, required=True, help="folder outside the repo")
+    p.add_argument("--date", default=dt.date.today().isoformat())
     p = sub.add_parser("consent", help="record a writer's answer to the publishing question")
     common(p)
     p.add_argument("--writer", required=True)
@@ -977,6 +1232,20 @@ def main(argv: list[str] | None = None) -> int:
     common(p)
     p.add_argument("--out", type=Path)
     p.add_argument("--date", default=dt.date.today().isoformat())
+    p = sub.add_parser(
+        "review", help="render pages for a person to look at, or mark them looked at"
+    )
+    common(p)
+    p.add_argument("--approve", nargs="+", metavar="CODE", help="pages a person has looked at")
+    p.add_argument("--reject", nargs="+", metavar="CODE", help="pages that must not be published")
+    p.add_argument("--reviewer", help="pseudonymous reviewer id, such as r01")
+    p.add_argument("--date", default=dt.date.today().isoformat())
+    p = sub.add_parser(
+        "purge", help=f"delete unpublished pages (a no, or older than {RETAIN_DAYS} days)"
+    )
+    common(p)
+    p.add_argument("--date", default=dt.date.today().isoformat())
+    p.add_argument("--older-than-days", type=int, default=RETAIN_DAYS)
     p = sub.add_parser("export", help="write manifest, gold, attribution and consented pages")
     common(p)
     p.add_argument("--dest", type=Path, default=REPO / "data" / "handwriting-copy")
@@ -1006,7 +1275,7 @@ def main(argv: list[str] | None = None) -> int:
             print(path)
     elif args.cmd == "intake":
         returns = ensure_outside_repo(args.returns, "--returns")
-        print(json.dumps(run_intake(work, returns), indent=2))
+        print(json.dumps(run_intake(work, returns, args.date), indent=2))
     elif args.cmd == "consent":
         record_consent(work, args.writer, args.publish == "yes", args.date)
         print(f"{args.writer}: publish={args.publish}")
@@ -1016,6 +1285,20 @@ def main(argv: list[str] | None = None) -> int:
         out = args.out or work / "manifest.json"
         _write_json(out, build_manifest(work, args.date))
         print(out)
+    elif args.cmd == "review":
+        if args.approve or args.reject:
+            if not args.reviewer:
+                raise ExportError("--reviewer is required to mark pages")
+            for codes, ok in ((args.approve, True), (args.reject, False)):
+                if codes:
+                    record_review(work, codes, args.reviewer, args.date, ok)
+            print("recorded")
+        else:
+            summary = render_review(work)
+            print(f"PNGs in {work / 'review'}; look at every one, then `review --approve CODE ...`")
+            print(json.dumps(summary, indent=2))
+    elif args.cmd == "purge":
+        print(json.dumps(run_purge(work, args.date, args.older_than_days)))
     elif args.cmd == "export":
         print(json.dumps(run_export(work, args.dest, args.date), indent=2))
     return 0
