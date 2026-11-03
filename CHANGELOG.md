@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: security hardening
+
+- The `/m/` analytics relay is rate limited per address (`analytics`, 300 per 10 minutes) and no
+  longer forwards the visitor's address to PostHog.
+- Production refuses `ANALYTICS_ENABLED=true` until the privacy notice names PostHog and no
+  longer says there are no analytics. The notice text is unchanged.
+- Production requires a `CRON_TOKEN` of at least 32 characters.
+- A one-time `proxy_hops_unexpected` log line when `X-Forwarded-For` has more entries than
+  `TRUSTED_PROXY_HOPS + 1`; `launch-check` flags `TRUSTED_PROXY_HOPS=0` in production.
+- `SESSION_SECRET_PREVIOUS`: earlier session secrets accepted for verification only, so the
+  secret can be rotated without signing everyone out ([docs/security.md](docs/security.md)).
+
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 
 - `ANALYTICS_ENABLED` (default false): PostHog loaded from and reporting to the app's own `/m/` proxy

@@ -51,6 +51,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `ENV` | `dev`, `test` or `prod`. Production refuses to start without its limits and secrets (`Settings.check_production`, plus `web.app.check_web_secrets`, which also refuses empty secrets) |
 | `DATABASE_URL` | SQLite locally, Postgres (`postgresql+psycopg://...`) in production |
 | `SESSION_SECRET` | Signs the session cookie. Required in production, at least 32 characters (e.g. `python -c 'import secrets; print(secrets.token_urlsafe(48))'`) |
+| `SESSION_SECRET_PREVIOUS` | Optional, comma-separated earlier secrets, accepted when checking a session cookie and never used to sign (`web.app.RotatingSessionMiddleware`). Each entry at least 32 characters in production. Steps: [security.md](security.md), "Rotating the session secret" |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in. Without them the "Sign in with Google" button is hidden |
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft (Entra ID) sign-in, on only with all three set; tenants are directory ids, comma-separated. Half of them set refuses to start (`check_production`, any environment). See "Sign-in, sessions and CSRF" |
 | `EMAIL_LOGIN_ENABLED`, `EMAIL_SENDER`, `EMAIL_LINK_MINUTES` | Sign in by an emailed one-time link (T3-10). **Off, and no email provider is wired in.** `EMAIL_SENDER` names a registered sender (`web/email_senders.py`); the settings check refuses `EMAIL_LOGIN_ENABLED=true` without one in any environment, and in production refuses a sender that is for development only, which today means always. See "Sign-in, sessions and CSRF" |
@@ -58,7 +59,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default |
 | `FEATURE_PAGE_MATH`, `PAGE_MATH_MODEL`, `ANTHROPIC_EFFORT_PAGE_MATH`, `PAGE_MATH_UNCONFIRMED_FACTOR` | The page math pass (ADR 0006, docs/eval-page-math.md): one cheap-model call per page places the equations; off by default |
 | `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table; see "Usage events"). Both on by default; the questions are stored as events, so they need both |
-| `ANALYTICS_ENABLED` | Product analytics (see "Product analytics"): PostHog loaded and sent through this app's own `/m/` proxy, page views plus a few named funnel events. **Off by default**: the privacy notice's "Cookies" section says there are no analytics, so it needs rewording before this is turned on |
+| `ANALYTICS_ENABLED` | Product analytics (see "Product analytics"): PostHog loaded and sent through this app's own `/m/` proxy, page views plus a few named funnel events. **Off by default**: the privacy notice's "Cookies" section says there are no analytics. Production refuses to start with it on until the notice (`web/templates/privacy.html`) names PostHog and no longer says "no analytics" (`ops.launch.analytics_notice_problem`; `launch-check` lists the same). The notice has no version number, so the check reads its text |
 | `FEEDBACK_URL` | Where the footer's "Send feedback" link goes (http or https only). Unset: an email to `CONTACT_EMAIL`. A form service here is a new data processor: name it in the privacy notice first |
 | `BASE_URL` | Builds the OAuth redirect URIs, `${BASE_URL}/auth/callback` (Google) and `${BASE_URL}/auth/microsoft/callback` (Microsoft). Production: `https://readablestem.com`, so Google's redirect URI is `https://readablestem.com/auth/callback` |
 | `SIGNUP_MODE` | `allowlist` (the default: only people an admin added may sign in) or `open` (anyone with a verified Google identity, or an allowed Microsoft one, gets an account at the first sign-in). See "Sign-up modes and access tiers" |
@@ -79,7 +80,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (`claude-opus-5-5`, `claude-haiku-5-5`), the workspace id an organisation-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let the developer look (`web/retention.py`) |
-| `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`. Required (non-empty) in production, or the purge would never run |
+| `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`, compared in constant time. Required in production, at least 32 characters, or the purge would never run; the route also guards the daily paid canaries. Every call counts against the cron rate limit, wrong tokens included |
 | `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval |
 | `SOURCE_URL`, `CONTACT_EMAIL` | Footer source link (AGPL notice); contact on the 403, privacy and terms pages |
 
@@ -699,8 +700,12 @@ script.
 - **Proxy.** `/m/static/*` goes to PostHog's assets host (cacheable for an hour);
   `/m/array/<token>/config(.js)` goes there too, with the browser's `Origin`, never cached;
   everything else goes to the API host with cookies and the referrer removed, only a
-  `Bearer phc_...` authorization kept, and the caller's address in `X-Forwarded-For`
-  (the address as the rate limits see it). The same rules as the personal site's edge Worker.
+  `Bearer phc_...` authorization kept. The visitor's address is not sent on: there is no
+  `X-Forwarded-For`, so PostHog records the relay's address (PostHog uses the capture
+  request's address unless an `$ip` property is given). The "Discard client IP data" setting in
+  the PostHog project drops even that; it is a setting there, not in this repo. The relay is
+  rate limited per address (`analytics`: 300 calls per 10 minutes). Otherwise the same rules
+  as the personal site's edge Worker.
   An upstream error is a 502; nothing waits on analytics.
 - **Loader.** `static/analytics.js`, included by `base.html` (app pages only). Converted
   documents, the demo, downloads and exports are built from other code and served under
@@ -722,7 +727,8 @@ script.
 - **From the personal site.** `?hm_id=<id>` becomes the PostHog `distinctID` (it must look
   like an id) and `ref: harishmanoharan.com` is registered once; `?ref=<tag>` registers `ref`
   and `first_ref`. Both, `notrack` and `utm_*` are then removed from the address bar.
-- **Before turning it on.** The privacy page's "Cookies" section says "There are no
+- **Before turning it on.** Production refuses `ANALYTICS_ENABLED=true` while the notice
+  still says there are no analytics or does not name PostHog. The privacy page's "Cookies" section says "There are no
   analytics, advertising or third-party tracking cookies" and the usage-events paragraph
   says "No cookies or scripts are used for this". Both need rewording first (the notice is
   Harish's to write); a one-line disclosure belongs in the "Cookies" section, beside the
@@ -2135,7 +2141,7 @@ its own `MAX_UPLOAD_MB` limit the same way.
 Sign-in starts and callbacks, uploads and the cron route are rate limited per address (and
 uploads per person) in memory (`web/abuse.py`; the numbers are in [security.md](security.md)).
 The address is read from `X-Forwarded-For` counting `TRUSTED_PROXY_HOPS` entries from the
-right. A person may have 10 documents waiting or running and 40 kept at once.
+right; more entries than `TRUSTED_PROXY_HOPS + 1` logs `proxy_hops_unexpected` once (counts only). A person may have 10 documents waiting or running and 40 kept at once.
 
 The converted document (`/view`, `/download`, `/demo`) gets its own policy instead:
 `sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'`. It may carry
