@@ -93,6 +93,8 @@ class Settings(BaseSettings):
     anthropic_effort_figure: Effort | None = None
     # Effort of the page math pass (ADR 0006). Unset: low.
     anthropic_effort_page_math: Effort | None = None
+    # Effort of the page witness pass (`pipeline/page_witness.py`). Unset: medium.
+    anthropic_effort_page_witness: Effort | None = None
     # Effort of the image page pass (ADR 0007). Unset: `pipeline.image_page.DEFAULT_EFFORT`.
     anthropic_effort_image_pages: Effort | None = None
     # The fixed untrusted-text notice rides in the cached system block instead of in every
@@ -400,6 +402,18 @@ class Settings(BaseSettings):
     # 1.0 (no change) because, on dev slice A, 16 aligned equations fell under the accept bar
     # for it and 14 of them were right (docs/eval-page-math.md); set below 1 to try it.
     page_math_unconfirmed_factor: float = Field(default=1.0, gt=0, le=1)
+    # A page witness (`pipeline/page_witness.py`, `witness_reconcile.py`): one call per maths page
+    # to a strong model with the page image and the numbered text-layer rows, which reads every
+    # formula on the page (table cells, captions and figure labels included) as LaTeX anchored
+    # in the text layer. Its readings are a second witness beside the crop's: agreement is a
+    # note only (errors are correlated: D2), a formula only the witness found becomes a new
+    # element, a disagreement is a decision showing both readings. Off until the registered dev
+    # run (E1) says it helps; nothing reads these settings while the flag is off.
+    feature_page_witness: bool = False
+    page_witness_model: str = "claude-opus-5-5"
+    # Output limit of one witness call (thinking is allowed on top of it): a dense page lists
+    # a hundred formulas or more, and a call that ends at the limit is split in two.
+    page_witness_max_output_tokens: int = Field(default=12288, ge=1024, le=32000)
     # Scanned and handwritten pages (`page_type`) can be read from an image of the page by one
     # vision call each and put into the document as elements that are all review items (ADR 0007,
     # pipeline/image_page.py). In the web app this flag only OFFERS the option: the upload form

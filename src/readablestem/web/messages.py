@@ -108,6 +108,13 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.page_reading", "page_reading_mismatch"): "Reading the crop and reading the "
     "whole page gave different answers, and a second look at the crop agreed with neither, so "
     "compare this equation with the page symbol by symbol.",
+    ("equation.witness_added", "witness_added"): "A second reading of the page found a "
+    "formula here that was not read before, so check that it is a formula and that it is read "
+    "correctly.",
+    ("equation.witness_extent", "witness_extent_differs"): "A second reading of the page "
+    "marks this formula's boundaries differently, so check where the formula starts and ends.",
+    ("equation.witness_reading", "witness_mismatch"): "A second reading of the page reads "
+    "this formula differently, so compare both readings with the image.",
     ("equation.no_text_layer", "no_text_layer"): "This equation is a picture, so the PDF holds "
     "no text to check the transcription against: compare it with the picture symbol by "
     "symbol.",

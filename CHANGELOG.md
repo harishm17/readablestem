@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: page witness (branch eq/page-witness)
+
+- Page witness (off: `FEATURE_PAGE_WITNESS`): one call per maths page to `PAGE_WITNESS_MODEL`
+  (`claude-opus-5-5`, output limit 12,288) reads every formula on the page, table cells, captions and
+  figure labels included, each anchored in the text layer (`pipeline/page_witness.py`, prompt
+  `page_witness.md`; dense pages in windows, a refusal recorded, budget reserved per call).
+  `pipeline/witness_reconcile.py` lays it against layout's equations by extent (within one glyph).
+  Agreement is a note only: it lifts no confidence and skips no second reading, because on pooled gold
+  (7,390 equations) P(correct | agree) was 94.8%, under the 97% needed. A disagreement is a required
+  decision with the reading nearer the extent's glyphs first and the other in `EquationFix.other_latex`;
+  a formula only the witness read, with maths-glyph evidence and clear of other elements, is a new
+  element and a required decision. New fields: `Element.witness_latex`, `witness_status`,
+  `EquationFix.other_latex`, `other_source`, `DocumentResult.page_witness`. The review card does not
+  show the other reading yet. Documented in docs/steps.md. Not measured (E1 is a later step).
 ## Unreleased: pen strokes check handwritten vector pages (branch hw/stroke-checks)
 
 - `pipeline/image_page_vector.py` (new): on a page `page_type` calls handwritten and `ink_strokes`
