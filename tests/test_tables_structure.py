@@ -260,3 +260,45 @@ def test_a_booktabs_cell_with_a_gap_in_it_is_not_split_into_a_column_without_the
     rows = table_texts(table)
     assert rows[1] == ["Momentum", "p⃗", "p = mv⃗"]
     assert rows[2][:2] == ["Kinetic energy", "K"]
+
+
+# ------------------------------------------ a new caption over the same header is a new table
+
+
+def test_a_new_caption_above_a_repeated_header_in_the_top_band_is_not_a_continuation():
+    def second(page):
+        write(page, 72, 40, "Table 1.4 Other lengths")  # inside the top band
+        unruled_row(page, 90, UNRULED_HEAD)
+        unruled_row(page, 110, ["", "universe", "", "limit)"])
+        write(page, 72, 170, "The next paragraph goes on with the discussion of the values.")
+
+    result = analyze(pdf(unruled_first_page, second))
+    assert not any(tables.REASON_ROW_SPLIT in e.reasons for e in result.elements)
+    assert any(e.text and e.text.startswith("Table 1.4") for e in result.elements)
+
+
+def test_a_continued_caption_does_not_stop_the_continuation():
+    def second(page):
+        write(page, 72, 40, "Table 1.3 (continued)")
+        unruled_row(page, 90, UNRULED_HEAD)
+        unruled_row(page, 110, ["", "universe", "", "limit)"])
+        write(page, 72, 170, "The next paragraph goes on with the discussion of the values.")
+
+    found = found_tables(pdf(unruled_first_page, second))
+    assert tables.REASON_ROW_SPLIT in found[0].reasons
+
+
+def test_the_same_columns_under_a_new_caption_are_not_marked_continued():
+    from test_tables_detect import PENDULUM, grid_table
+
+    def first(page):
+        write(page, 72, 100, "Some text.")
+        grid_table(page, PENDULUM, y0=600)
+
+    def second(page):
+        write(page, 100, 60, "Table 4 Other pendulum")
+        grid_table(page, [["0.80", "17.94", "1.794"], ["1.00", "20.06", "2.006"]], y0=72)
+
+    found = found_tables(pdf(first, second))
+    assert [e.page for e in found] == [0, 1]
+    assert tables.REASON_CONTINUED not in found[1].reasons

@@ -138,7 +138,8 @@ rules above.
    model's reading (SLANet-plus joined neighbouring rows of a list), and of last resort for any
    box that no other structure fits, so a table the model file is missing for is no longer
    dropped when its box was grown past the detector's.
-   Without the model file the text cell grid also competes against PyMuPDF's grid when
+   Without the model file (a fallback for environments without SLANet-plus: the production image
+   installs it, `TABLE_MODEL_DIR=/app/models`, so production grids are unchanged) the text cell grid also competes against PyMuPDF's grid when
    that has more columns than it and no drawn cell grid exists (a booktabs table: rules
    between rows, none between columns), and wins only by a strictly better fit: PyMuPDF puts
    a column more wherever a cell has a wide gap in it ("1.675 x 10^-27", "p = mv"). Only for
@@ -196,7 +197,10 @@ rules above.
    the table before has header rows and reaches below the middle of its page, the page's
    first lines (under a running header at most) repeat those header rows cell for cell, and
    the lines under them keep to the header's columns at the table's own leading and stop at
-   a caption or a line of running text. The one row left under a repeated header is too
+   a caption or a line of running text. A "Table N" line above the repeated header (not saying
+   "continued") makes it a new table, and `continues` likewise does not mark a table whose own
+   caption is a new "Table N". The page is only analysed when a line of it holds the first header
+   cell, and the work counts against the document's detector budget. The one row left under a repeated header is too
    few lines for the aligned-text test, so before this the header, the split row and the
    next row were read as headings and paragraphs.
 

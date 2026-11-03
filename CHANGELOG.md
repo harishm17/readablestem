@@ -5,8 +5,9 @@
 - Tables, structure (`pipeline/tables.py`; [docs/tables.md](docs/tables.md), "Known misses"): the rest of an unruled
   table that a page break carried over is found by its repeated header and joined (a split row is merged, the
   repeated header dropped); a booktabs table with text in only one column is kept; an unruled box that holds two
-  tables is split at a caption or a clear gap; a booktabs table read without the model file no longer gets a column
-  for a cell with a gap in it. Maths in cells is unchanged: it needs the equation step's model calls.
+  tables is split at a caption or a clear gap; a booktabs table read without the model file (a fallback: production has it, so production
+  grids are unchanged) no longer gets a column for a cell with a gap in it. A new "Table N" caption over a repeated
+  header is a new table, not a continuation. Maths in cells is unchanged: it needs the equation step's model calls.
 - Local table eval, gold (45 documents, 197 gold tables): with the model file TEDS 0.941 and detection recall and
   precision 0.985 and 0.985, unchanged; without it TEDS 0.912 to 0.928. The continued-table, sparse-table and split-box fixes change nothing on any PDF
   of the repository's fixtures, the three real-document sets and the eval's prints (128 PDFs, 245 tables); the

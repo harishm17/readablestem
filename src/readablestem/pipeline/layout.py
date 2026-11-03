@@ -7499,7 +7499,7 @@ def _claim_tables(
     if previous and not (found and tables.continues(previous[-1], found[0], page.rect.width)):
         # The rest of an unruled table has too few lines to be found on its own page.
         rest = tables.find_continued(
-            page, frags[number], paths[number], previous[-1], found, clean=_clean
+            page, frags[number], paths[number], previous[-1], found, clean=_clean, budget=budget
         )
         if rest is not None:
             found = [rest, *found]

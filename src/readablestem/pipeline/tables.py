@@ -360,6 +360,7 @@ class PageTable:
     reasons: list[str]
     at_top: bool = False  # nothing but the running header above it on its page
     column_edges: list[float] = field(default_factory=list)  # for continued tables
+    caption_above: bool = False  # its caption is printed above it (`_attach_captions`)
     layout_grid: bool = False  # text set out in boxes (`is_layout_grid`): data only if captioned
 
 
@@ -3487,6 +3488,7 @@ def _attach_captions(view: _PageView, tables: list[PageTable], clean: Callable[[
         members = _caption_lines(view, i, side, table.bbox, inside | used)
         used.update(members)
         table.caption = clean(" ".join(_line_text(view.lines[m]) for m in members))
+        table.caption_above = side == "above"
         table.lines |= set(members)
 
 
@@ -3646,6 +3648,9 @@ def continues(previous: PageTable, table: PageTable, page_width: float) -> bool:
         return False
     if not table.at_top or previous.grid.cols != table.grid.cols:
         return False
+    if table.caption and table.caption_above and _new_caption(table.caption):
+        return False  # "Table 1.4 ..." over the same header: another table (a caption
+        # under it is the whole table's own: the gold's orders-of-magnitude table)
     a, b = previous.column_edges, table.column_edges
     if len(a) != len(b) or not a:
         return False
@@ -3669,19 +3674,48 @@ def find_continued(
     found: Sequence[PageTable] = (),
     *,
     clean: Callable[[str], str] = lambda s: " ".join(s.split()),
+    budget: DetectorBudget | None = None,
 ) -> PageTable | None:
     """The part of `previous` that a page break carried to the top of this page, when the
     detector did not find it: see `_continued_in`. Never raises (one content-free warning);
     None when `found` already holds a table where it would sit."""
+    if budget is not None and not budget.open():
+        return None
+    if not _may_continue(lines, previous):
+        return None
+    started = time.perf_counter()
     try:
         view = _PageView.of(page, lines, paths)
         table = _continued_in(view, previous, clean)
     except Exception as exc:
         log.warning("continued table detection failed on a page: %s", type(exc).__name__)
         return None
+    if budget is not None:
+        budget.spend(time.perf_counter() - started)
     if table is None or any(_overlaps(table.bbox, other.bbox) for other in found):
         return None
     return table
+
+
+def _may_continue(lines: Sequence[LineLike], previous: PageTable) -> bool:
+    """Cheap test before any page analysis: the table before has header rows, and some line of
+    the page has the text of the first header cell in it (a repeated header is on the page)."""
+    grid = previous.grid
+    if not grid.is_data or grid.header_rows < 1:
+        return False
+    first = next((" ".join(t.split()) for t in _row_texts(grid, 0) if t.strip()), "")
+    if not first:
+        return False
+    return any(first in " ".join(_line_text(line).split()) for line in lines if not line.vertical)
+
+
+CONTINUED_WORDS = re.compile(r"\bcont(?:inued|'d|d|\.)", re.IGNORECASE)
+
+
+def _new_caption(text: str) -> bool:
+    """A "Table N" line that does not say it goes on ("Table 1.3 (continued)")."""
+    text = " ".join(text.split())
+    return bool(TABLE_CAPTION.match(text)) and not CONTINUED_WORDS.search(text)
 
 
 def _continued_in(
@@ -3732,6 +3766,8 @@ def _continued_in(
     for i in order[:start]:  # nothing above the repeated header but a running header
         if (min(s.y0 for s in by_line[i]) + max(s.y1 for s in by_line[i])) / 2 > band:
             return None
+        if _new_caption(clean(" ".join(s.text for s in sorted(by_line[i], key=lambda s: s.x0)))):
+            return None  # a new table with the same header, not the rest of the last
     members = order[start : start + wanted]
     header_box = _union_box([s for i in members for s in by_line[i]])
     top = _text_grid(view, header_box, [])
