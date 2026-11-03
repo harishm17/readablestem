@@ -649,7 +649,7 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 | `shard-coverage` | Every collected test ran in exactly one shard |
 | `ci-passed` | Fails if any other job failed or was cancelled; the one check to require in branch protection |
 | `postgres` | `alembic upgrade head` and `alembic check` (models match migrations), then `pytest -m postgres`, against a Postgres 18 service container (the major the backup image uses). Zero collected tests fails the job |
-| `browser` | `pytest -m browser -n 3 --dist loadfile` with Playwright Chromium (axe-core checks); the browsers and axe-core are cached; zero collected tests fails the job |
+| `browser` | `pytest -m browser -n 3 --dist loadfile --shard i/2` (two jobs) with Playwright Chromium (axe-core checks); the browsers and axe-core are cached; zero collected tests fails the job |
 | `dependency-audit` | `pip-audit` over the exported lock (all groups and extras); any known vulnerability fails the job. An unfixable one needs a commented ignore entry in the workflow |
 | `CodeQL` (own workflow) | CodeQL for Python and GitHub Actions on push to main, on pull requests and weekly |
 | `docker` | Builds the image (no push) with BuildKit and again with the legacy builder (`DOCKER_BUILDKIT=0`, as the Cloud Run path's Cloud Build `--tag` build may use), and checks the entry point and non-root user |

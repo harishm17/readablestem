@@ -164,8 +164,8 @@ jobs:
   # durations file. Standard library only: no install.
   shard-coverage:
     name: every test ran in exactly one shard
-    needs: [changes, pytest]
-    if: ${{ !cancelled() && needs.pytest.result == 'success' }}
+    needs: [changes, pytest, browser]
+    if: ${{ !cancelled() && needs.pytest.result == 'success' && needs.browser.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
@@ -182,6 +182,10 @@ jobs:
         run: |
           mkdir r312 && cp reports/*/shard-3.12-*.json r312/
           python3 scripts/check_shards.py r312 "$SHARDS"
+      - name: Browser tests
+        run: |
+          mkdir rbrowser && cp reports/*/shard-browser-*.json rbrowser/
+          python3 scripts/check_shards.py rbrowser 2
       - name: Python 3.14 (full runs only)
         if: ${{ needs.changes.outputs.full314 == 'true' }}
         run: |
@@ -351,9 +355,15 @@ jobs:
         run: uv run pytest -m postgres
 
   browser:
-    name: pytest -m browser (Playwright Chromium)
+    name: pytest -m browser (Playwright Chromium, shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    env:
+      SHARD: ${{ matrix.shard }}/2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -385,13 +395,25 @@ jobs:
       # printed PDFs differ from the ones the tests were written against.
       - name: Install the fonts the printed test pages use
         run: sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-liberation
-      # -n 3 on the 4-core runner: each worker runs its own Chromium, and `--dist loadfile`
-      # keeps a file's tests on one worker so its module-scoped server and browser start
-      # once. Every server binds its own free port and keeps its data in tmp_path_factory,
-      # so workers share nothing but the axe-core file, which is written atomically.
+      # Two shards (`--shard`, by recorded duration), each with -n 3 on the 4-core runner:
+      # each worker runs its own Chromium, and `--dist loadfile` keeps a file's tests on one
+      # worker so its module-scoped server and browser start once. Every server binds its
+      # own free port and keeps its data in tmp_path_factory, so workers share nothing but
+      # the axe-core file, which is written atomically.
       - name: Pytest (browser-marked tests only, including axe-core checks)
         # Exit code 5 (no tests collected) fails the job.
-        run: uv run pytest -m browser -n 3 --dist loadfile
+        run: |
+          mkdir -p shard-reports
+          uv run pytest -m browser -n 3 --dist loadfile --shard "$SHARD" \
+            --shard-report "shard-reports/shard-browser-${SHARD%/*}.json"
+      - name: Keep the shard report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shard-report-browser-${{ matrix.shard }}
+          path: shard-reports/
+          if-no-files-found: ignore
+          retention-days: 3
 
   dependency-audit:
     name: pip-audit (locked dependencies)

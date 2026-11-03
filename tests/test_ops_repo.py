@@ -276,4 +276,4 @@ def test_browser_job_caches_what_it_downloads_and_runs_in_parallel():
     cached = {s["with"]["path"] for s in steps if s.get("uses", "").startswith("actions/cache@")}
     assert {"~/.cache/ms-playwright", ".cache/axe-core"} <= cached
     run = next(s["run"] for s in steps if "pytest -m browser" in s.get("run", ""))
-    assert "-n 3" in run and "--dist loadfile" in run
+    assert "-n 3" in run and "--dist loadfile" in run and '--shard "$SHARD"' in run

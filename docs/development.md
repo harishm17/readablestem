@@ -57,7 +57,7 @@ UTC) and by hand. Jobs, by check name:
 | `ruff + ty (Python 3.12)`, `(Python 3.14)` | ruff, ty and an import of every module; both Pythons on every run |
 | `pytest (Python 3.12, shard i/4)`, `(Python 3.14, ...)` | The offline suite, in four shards |
 | `every test ran in exactly one shard` | Fails if any collected test ran in no shard or in two |
-| `pytest -m browser (Playwright Chromium)` | Browser tests, three xdist workers |
+| `pytest -m browser (Playwright Chromium, shard i/2)` | Browser tests, two shards of three xdist workers each |
 | `CI passed` | Fails if any job failed or was cancelled; require this one in branch protection |
 
 The other jobs (`postgres`, `docker`, `make proof`, `make site`, `pip-audit`, `eval gate`,
@@ -90,7 +90,8 @@ uv run pytest -n 4 --dist loadfile -m "not network and not live_model and not sl
 To change the shard count, edit `SHARDS` in both `plan` and `shard-coverage` in `ci.yml`
 (a test checks that they agree).
 
-**Browser tests in parallel.** `pytest -m browser -n 3 --dist loadfile`: each worker starts
+**Browser tests in parallel.** `pytest -m browser -n 3 --dist loadfile --shard i/2` (two
+jobs, also checked by `every test ran in exactly one shard`): each worker starts
 its own uvicorn server on a free port, keeps its files under `tmp_path_factory` and runs its
 own Chromium. The one shared file is the axe-core download in `.cache/axe-core`, written
 atomically. A new browser test must not use a fixed port, a fixed path or another test's
