@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: fair queue
+
+- The worker takes queued jobs round-robin by person (`web/fair_queue.py`, docs/web.md "Worker"):
+  fewest attempts first as before, then the owner served longest ago, then oldest. Someone with ten
+  queued documents no longer keeps another person's single one waiting behind all ten; a person
+  alone is served in the same order as before. The job page's "documents ahead of yours" replays the
+  same order. Tests: `tests/test_web_fair_queue.py`, one Postgres test in `tests/test_web_postgres.py`.
+
 ## Unreleased: slide decks (branch layout/beamer-slides)
 
 - Slide decks (`pipeline/slides.py`, docs/layout.md "Slide decks"): a Beamer file, or a slide-shaped
