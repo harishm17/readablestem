@@ -101,6 +101,7 @@ main:focus { outline: none; }
 .nav-menu { margin-left: auto; }
 .nav-menu > summary { display: none; list-style: none; cursor: pointer; min-height: 2.75rem; align-items: center; padding: 0 var(--space-4); border: 2px solid var(--border-control); border-radius: var(--radius-control); font-weight: 700; }
 .nav-menu > summary::-webkit-details-marker { display: none; }
+.nav-menu::details-content { content-visibility: visible; }
 .nav-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); align-items: center; }
 .nav-list a { color: var(--ink); text-decoration: none; display: inline-flex; align-items: center; min-height: 2.75rem; }
 .nav-list a:visited { color: var(--ink); }
@@ -116,6 +117,7 @@ main:focus { outline: none; }
   .nav-menu > summary { display: inline-flex; }
   .nav-menu[open] > summary { background: var(--surface-2); }
   .nav-menu[open] { order: 4; flex-basis: 100%; }
+  .nav-menu:not([open])::details-content { content-visibility: hidden; }
   .nav-menu > nav { padding: var(--space-2) 0 var(--space-2); }
   .nav-menu .nav-list { flex-direction: column; align-items: stretch; gap: 0; }
   .nav-menu .nav-list a { width: 100%; border-bottom: 1px solid var(--border-subtle); }

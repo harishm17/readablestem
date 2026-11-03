@@ -699,9 +699,10 @@
   });
 })();
 
-/* The main navigation is a <details> ("Menu") that is open in the markup, so the links are
- * all shown without JavaScript. On a narrow screen this closes it; widening the window opens
- * it again (the Menu button is hidden there). */
+/* The main navigation is a <details> ("Menu"), closed in the markup. A wide screen shows the
+ * links whatever its state (CSS ::details-content); this opens it there for a browser that does
+ * not support that, and closes it again when the window narrows (the Menu button is hidden on a
+ * wide screen). */
 (function () {
   "use strict";
   var menu = document.querySelector(".nav-menu");
