@@ -14,10 +14,11 @@ cover.
 | Decisions canary | Not run in production | Only the HTTP cron route runs it (`ops.canary.maybe_run_daily`), and it is OpenAI's Decisions API, which is off under `MODEL_PROVIDER=anthropic`. By hand only. See "Decisions canary" below |
 | Claude canary | Not run in production | Only the HTTP cron route runs it (`ops.claude_canary.maybe_run_daily`); `ops cron` does not. By hand: `readablestem ops claude-canary --max-usd 0.25`. See docs/steps.md "Second check on Claude" |
 | Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the cron is late |
-| Database backup | Daily at 08:17 UTC, the Railway `backup` service | `pg_dump` to the `/backups` volume, a restore into a scratch database to prove it, then dumps older than 5 days are deleted (the last 6 are kept); logs `backup_ok file=... tables=... alembic=...`. See "Backups and restore" |
-| Failed cron or backup run | Railway | Shows in the service's deployments list; Railway's project notifications can mail it (deploy-railway.md, "Logs and monitoring"). There is no log-based alert |
+| Database backup | Daily at 08:17 UTC, the Railway `backup` service | `pg_dump` to a `.part` file, checked (gzip, completion line, restore into a scratch database, every table and the schema version present), then moved into the `/backups` volume; dumps older than 5 days are deleted (the last 6 are kept); logs `backup_ok file=... tables=... alembic=...`, or `backup_failed reason=...` and exit 1. Records the `backup` heartbeat. See "Backups and restore" |
+| Failed cron or backup run | `/healthz/ops`, checked from outside by GitHub Actions `uptime.yml` every 3 hours | The backup and the cron each write a row of `ops_heartbeat` when they finish well; `/healthz/ops` answers 503 when the backup is older than 26 hours or the cron older than 150 minutes, and the failed workflow run is emailed by GitHub. See "Health, readiness and shutdown". Railway's own deployments list still shows the failed run, and its project notifications can mail it (deploy-railway.md, "Logs and monitoring") |
 | Deploy health check of `/healthz` | On every deploy, Railway | A new deployment takes traffic only once `/healthz` answers (timeout 300 s) |
-| Outside-in check of `/readyz` and `/demo` | Weekly, GitHub Actions `uptime.yml` | Skips unless the repo variable `LIVE_URL` is set. This is the only check of `/readyz` |
+| Outside-in check of `/readyz` | Every 5 minutes, GitHub Actions `uptime.yml` | Skips unless the repo variable `LIVE_URL` is set; a failed run is emailed by GitHub. This is the only check of `/readyz` |
+| Outside-in check of `/healthz/ops` and `/demo` | Every 3 hours, GitHub Actions `uptime.yml` | Same variable and the same email. GitHub turns scheduled workflows off after 60 days with no commit to a public repository ("Health, readiness and shutdown") |
 | Dependency updates | Weekly, Dependabot | One grouped PR per ecosystem (uv, actions, Docker) |
 
 The same tasks run by hand:
@@ -35,7 +36,10 @@ uv run readablestem ops backup-check      # DATABASE_URL could run the app? ("Ba
 uv run readablestem ops restore-drill     # pg_dump, restore into a scratch database, check, drop
 ```
 
-`ops cron` exits 1 if aggregation failed, but only after the purge has run.
+`ops cron` exits 1 if aggregation failed, but only after the purge has run. After a run in which
+both worked it records the `cron` heartbeat (`ops_heartbeat`); a run that failed records nothing,
+so `/healthz/ops` goes stale 150 minutes after the last good one.
+`readablestem ops replay-erasures` is for restoring a backup ("Backups and restore").
 
 ## Retention
 
@@ -341,7 +345,8 @@ failures, for example the weekly GitHub workflow.
 | Endpoint | Answers | Used by |
 |---|---|---|
 | `GET /healthz` | `{"status":"ok"}` when the process answers and a `SELECT 1` works, else 503 | Railway's deploy health check (`.railway/railway.ts`); the Dockerfile's HEALTHCHECK for local Docker |
-| `GET /readyz` | 200 `{"status":"ready","checks":{...}}`, or 503 `not_ready` when any check is not ok | The weekly GitHub `uptime.yml`; you, with `curl` (Cloud Monitoring's uptime check is the Cloud Run path) |
+| `GET /readyz` | 200 `{"status":"ready","checks":{...}}`, or 503 `not_ready` when any check is not ok | GitHub `uptime.yml` every 5 minutes; you, with `curl` (Cloud Monitoring's uptime check is the Cloud Run path) |
+| `GET /healthz/ops` | 200 `{"status":"ok","stale":[]}`, or 503 `{"status":"stale","stale":["backup"]}` naming only the tasks that are late (`database` if the table could not be read) | GitHub `uptime.yml` every 3 hours; you, with `curl` |
 
 `/readyz` has three checks, each one word and never a setting's value (so no key, URL or
 model name can leak): `database` (`ok`, `unreachable`), `worker` (`ok`; `disabled` when
@@ -350,6 +355,33 @@ neither the loop nor a running conversion has shown life for six minutes; `not_s
 `model_provider` (`ok`; `no_key` if the selected provider's key is empty; `unpriced_model`;
 `fake` with `FAKE_MODELS`). A spent daily cap is not "not ready": the service is working
 and says so on `/status`.
+
+`/healthz/ops` says the scheduled tasks ran. The `backup` service and `readablestem ops cron`
+each upsert one row of `ops_heartbeat` (name, `last_ok_at`, a short note of counts) when they
+finish well; the endpoint answers 200 while the backup is fresher than 26 hours (a day and two
+hours of slack) and the cron fresher than 150 minutes (two missed runs). The migration that makes the table
+seeds both names with the time it ran, so the first deploy does not start with the check failing;
+a task that never reports goes stale on schedule. A task with no row at all counts as late. It is public and content-free like `/readyz`, with no rate limit of its
+own (a read of two rows), and it is not in the access log (`logging._QUIET_ROUTES`).
+
+**Alerts without a vendor** (`.github/workflows/uptime.yml`, needs the repository variable
+`LIVE_URL`). GitHub emails a failed scheduled run to the user who last edited the cron lines of
+`uptime.yml` (not necessarily the repository owner; Settings > Notifications > Actions, for that
+account). Whoever should get the mail should be the one who commits any change to those lines. Every 5 minutes one job calls `/readyz` (with two retries), so an outage
+is mailed within about ten minutes, then once per failed run until it is fixed. Every 3 hours a
+second job calls `/healthz/ops` and `/demo` and prints the 503 body, which names the stale task;
+three hours keeps a late backup or cron to a few mails a day instead of one per five minutes, and
+finds a missed cron within five hours and a missed backup within 29. Two limits to know:
+
+- GitHub **disables scheduled workflows in a public repository after 60 days with no commit** (it
+  mails a notice when it does). With no commits there are no checks and no alerts. After a long
+  quiet spell open the Actions tab, choose "Uptime", and press "Enable workflow", or push any
+  commit. Dependabot's weekly PRs normally keep it alive, but only once merged.
+- Runs start late when GitHub is busy, so "every 5 minutes" is a target, not a promise.
+
+When the 503 names `cron`: look at the `cron` service's deployments (`ops cron` failing, or the
+service stopped). When it names `backup`: look at its latest deployment for `backup_failed
+reason=...` (the table in "Backups and restore").
 
 **Shutdown.** On a deploy Railway sends SIGTERM to the old deployment once the new one is
 live, then SIGKILL after `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` (docs.railway.com, "Deployment
@@ -361,9 +393,41 @@ drains open connections for at most 5 seconds (`GRACEFUL_SHUTDOWN_S`) and the ap
 makes sure the worker is stopped (3 seconds). If the process is killed before the lease is
 ended, the lease runs out and the job is requeued by the next worker. The requeued job restarts
 from the beginning on another attempt (three attempts end in `lease_expired`). Look for
-`sigterm_received`, `job_cancelled reason=shutdown` and `worker_stopped` in the logs.
+`sigterm_received`, `job_cancelled reason=shutdown` and `worker_stopped` in the logs. A conversion
+runs in a child process (below): cancelling it kills the child within 0.2 seconds, so shutdown
+leaves nothing running.
 `tests/test_web_health.py` starts a real server, sends SIGTERM, and checks it exits well inside
 10 seconds.
+
+**The conversion child.** Each conversion runs in a child process (`python -m
+readablestem.web.conversion_child`, started by `web/isolated_convert.py`), so a PDF that crashes,
+exhausts memory or hangs MuPDF fails that one job and the web process, its sessions and the
+worker go on. The child is limited to `CONVERSION_MEMORY_MB` of address space (default 3072, plus
+twice the PDF; resident memory is far lower, 330-460 MB measured) and 4 times the job's time limit
+in CPU seconds, and is killed at the job's time limit, when the job is deleted or taken over, and
+at shutdown. Web service and child share the service's RAM: while a job converts, expect the web
+process plus one child; a service limit below about 1 GB would not hold both (docs/deploy-railway.md,
+"Memory"). Do not set `CONVERSION_MEMORY_MB` below 1536: the table detector's ONNX runtime then
+hangs instead of failing, and the job ends as `timeout`. What to look for:
+
+| Log line or job code | Meaning |
+|---|---|
+| `job_failed error_code=conversion_crashed`, preceded by `conversion_child_died signal=6` (abort), `11` (segfault) or `exit_code=N` | MuPDF or another native library killed the child. That file will do it again: nothing to retry (the job page does not offer "Try again"). Keep the document id; reproduce with `readablestem convert` on a copy only if the owner agrees |
+| `error_code=conversion_oom` (after `conversion_child_retry` when it was `signal=9`) | The child ran out of memory (its cap), or was SIGKILLed from outside twice. Raise `CONVERSION_MEMORY_MB` only if documents that should fit are failing; a single large file is better split |
+| `error_code=conversion_unavailable`, `conversion_child_unavailable` (ERROR, with `error_type` or `exit_code`), `conversion_child_check_failed` at start | The child itself cannot run (an import, a library, the table model file at `TABLE_MODEL_DIR`), not the PDF. Every job fails this way until it is fixed; the job page offers "Try again". Check the image and the volume, then redeploy |
+| `conversion_child_retry` | The child was killed by a SIGKILL this process did not send; the conversion was run once more. `cgroup_oom_kills` on `conversion_child_died` says whether the kernel's OOM killer did it (cgroup v2). Frequent ones mean the service is short of memory: raise its allowance, not `CONVERSION_MEMORY_MB` |
+| `conversion_child_frame_refused` | The child's result was over 128 MB: the job fails `conversion_crashed` |
+| `conversion_child_timeout` | The converter's own backstop fired (the worker's limit normally does first: `job_timeout`, `error_code=timeout`). `conversion_child_died signal=24` is the CPU limit |
+| `conversion_child_protocol` | The child sent something that is not the protocol (a bug, or a compromised child): the job is failed `conversion_crashed`. Treat repeated ones on one account as an incident |
+| `conversion_child_unreaped` | A child did not die within 5 s of SIGKILL (a process stuck in the kernel); check the host |
+| `conversion_abandoned` | No longer expected for a hung MuPDF; it would mean a callback in the web process (the database) hung |
+
+A crashed or out-of-memory child fails the job at once; it is not requeued, so one poison PDF
+costs one attempt and not three lease expiries. `PRELOAD_TABLE_MODELS` has no effect while
+conversions run in a child: each child loads what it needs (a job pays about 1.4-2 s for the child's start and
+imports on the development box, more on 1 vCPU, and with `FEATURE_TABLES` on the table models
+load in about 4-5 s on 1 vCPU; docs/web.md, "The conversion runs in a child process"). Tracing records the web
+process's spans only.
 
 **Error pages.** Every page that fails answers in the app's plain style with a way home:
 404 "Page not found", 500 "Something went wrong" (the same page whether the error was
@@ -390,27 +454,63 @@ for the account row).
 
 **What production runs.** The `backup` service (`.railway/railway.ts`): daily at 08:17 UTC it
 runs `pg_dump` of the Postgres service into `/backups/readablestem-<date>.sql.gz` on its own
-volume, restores that file into a scratch database `restore_check`, counts its tables, reads
-`alembic_version`, drops the scratch database and logs
-`backup_ok file=... tables=... alembic=...`. A dump that does not restore fails the run. It then
-deletes dumps older than 5 days (`find -mtime +5`), so the last 6 are kept. There is no
+volume, restores that file into a scratch database `restore_check`, compares it with the live
+database, drops the scratch database and logs `backup_ok file=... tables=... alembic=...`. The
+command is a bash script (`set -euo pipefail`, kept readable as `backupScript` at the top of
+`.railway/railway.ts` and tested by `tests/test_railway_backup_script.py`: `bash -n`, shellcheck,
+and runs against stub `pg_dump` and `psql`). The dump is written to a `.part` file and moved into
+place only after every check has passed: `gzip -t` reads it back, it ends with pg_dump's
+`-- PostgreSQL database dump complete` line (a dump cut short does not), it restores with
+`ON_ERROR_STOP`, every public table of the live database exists in the restore and
+`alembic_version` matches. Any failure removes the `.part` file, prints `backup_failed
+reason=...` and exits 1, so the run shows as failed and the heartbeat stays old. Reasons: `dump`,
+`gzip_test`, `dump_read`, `dump_incomplete`, `restore_prepare`, `restore`, `read_live`,
+`read_restore`, `no_tables`, `missing_tables`, `alembic_mismatch`, `restore_cleanup`, `move`,
+`heartbeat` (the dump was kept but `ops_heartbeat` could not be written, usually because the
+migration that makes the table has not run). Only after a good run does it upsert the `backup`
+heartbeat, then delete dumps older than 5 days (and `.part` leftovers older than a day), so the
+last 6 are kept. There is no
 point-in-time recovery and Railway's own scheduled volume backups are not used (they need a Pro
 workspace). That is deliberate: every dump holds the documents present when it ran, so keeping
 more would stretch "deleted after 24 hours" past the "about a week" the privacy page promises
 (deploy-railway.md, "As deployed"). The cost is a restore point up to a day old. If you want more,
 change the privacy page first.
 
-**Check it weekly** (a calendar reminder is enough): open the `backup` service's latest
-deployment in Railway and look for a `backup_ok` line from today, with `tables=` and `alembic=`
-as expected (`ls -l /backups` at the end of the log lists the dumps kept). A run that failed shows
-in the deployments list.
+**Check it** when `/healthz/ops` names `backup`, and now and then by hand: open the `backup`
+service's latest deployment in Railway and look for a `backup_ok` line from today, with `tables=`
+and `alembic=` as expected (`ls -l /backups` at the end of the log lists the dumps kept). A run
+that failed shows in the deployments list and as `backup_failed reason=...`.
 
 **Restoring for real.** Restore into an empty database, never over the live one without a
 decision (deploy-railway.md, "As deployed", has the commands: `railway ssh --service backup`, then
 `gunzip -c /backups/readablestem-<date>.sql.gz | psql "$PGURL"`). Then run the cron right after
 (redeploy the `cron` service): the restore brings back documents that retention had already
-deleted, and the purge removes them again. Then `uv run readablestem ops backup-check` against
-the restored database and a sign-in.
+deleted, and the purge removes them again. Then replay the erasures (next paragraphs), run
+`uv run readablestem ops backup-check` against the restored database and sign in.
+
+**Accounts erased after the backup come back with it.** Erasing an account (the Account page,
+`readablestem users delete`) writes a row to `erasure_ledger`: a SHA-256 of the user id and the
+time, nothing that says who it was, kept for ever. The backup has the ledger as it was when it
+ran, so its newer entries are missing. To erase the people who asked after the backup was made:
+
+1. **If the current database can still be reached**, before restoring, export its ledger:
+   `psql "$OLD_DATABASE_URL" -c "\copy erasure_ledger to 'ledger.csv' csv header"`.
+2. Restore the dump (above).
+3. Replay, against the restored database:
+   `DATABASE_URL=... uv run readablestem ops replay-erasures --ledger-csv ledger.csv`
+   (leave the option out when there is no export). It merges the file into the ledger, then erases
+   every account whose hashed id is in it, with the same code as a deletion request, and prints
+   `ledger_imported=N accounts_erased=M`. Running it twice does nothing the second time; it never
+   touches an account the ledger does not name.
+
+What this does not cover: if the database is lost entirely and the newest dump is the only copy,
+the ledger entries written after that dump are gone with it, and the people who erased their
+accounts in that window (up to a day, plus whatever the last good dump missed) are back with
+their accounts, though not their documents (those expire after 24 hours anyway). Nothing in this
+repository can know about them; if you have a record of such requests (email), run
+`readablestem users delete EMAIL --yes` for each. Sign-in identities, courses and notation memory
+return with the account until you do. Usage events, accounts and all other rows of the person
+are removed by the replay in full, as by a normal deletion.
 
 `backup-check` reads the copy and prints table names and row counts only. It exits 1 unless
 the schema is at this release's migration head (`schema=head`; `ahead` means a newer
@@ -438,6 +538,18 @@ tiers".
   accounts by tier and blocked, the open pool's spend, and every account with its tier. A day
   that fills the account count early, or the pool by mid-morning, is the thing to notice; the
   public `/status` page says when conversions are paused (it does not distinguish the pool).
+- **The day's cap.** The first time in a UTC day that `MAX_NEW_ACCOUNTS_PER_DAY` turns someone
+  away the app logs `signup_cap_reached` (a WARNING with `code=daily_cap`, nothing about the
+  person), once per day however many sign-ins are refused (`signup_days.cap_warned`), and the Admin
+  page shows a notice above the sign-up numbers until midnight UTC. Nothing mails you: look at the
+  Admin page, or search the logs for `signup_cap_reached`.
+- **Spend by person.** The Admin page lists the 20 biggest spenders today, and over all days kept,
+  by the same pseudonym as the usage tables (`u-` and the start of the user id), never next to an
+  email. The figure is `quota_days.spent_usd`, added when a model call settles, for the person who
+  owns the job (conversions and reads from review; a hold that was given back and settled late
+  still counts). It lives and dies with the person's `quota_days` rows (deleted when they are
+  erased). To see who a pseudonym is, match the id prefix in the database. The global daily total
+  stays in `spend_days`; spend recorded before this release has no person.
 - **Logs.** `signup` (one per new account, provider only), `login_refused` with `reason` =
   `blocked`, `signups_full` or `not_allowlisted`, `rate_limited` with `rule=signup`,
   `upload_rejected` with `code=open_pool`, `reread_refused` with `scope=allowance` and
@@ -509,18 +621,20 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 
 | Symptom | Look at | Usual fix |
 |---|---|---|
-| The weekly GitHub uptime run failed, or a Railway deploy or crash notification | `@severity:WARNING` logs; the web service's deployments list | Roll back to the last good deployment (deploy-railway.md, "Ship a new version") |
+| The GitHub uptime `/readyz` run failed, or a Railway deploy or crash notification | `@severity:WARNING` logs; the web service's deployments list | Roll back to the last good deployment (deploy-railway.md, "Ship a new version") |
 | `/healthz` answers 503, or `/readyz` shows `database: unreachable` | The database: the Postgres service's state and connections. Users meanwhile see a calm "Not available right now" page (503 with `Retry-After`) | See "Too many connections" below |
-| `/readyz` shows `worker: stalled` or `stopped`, or documents wait for ever | `worker_loop_error`, `lease_refresh_failed` and `conversion_abandoned` in the logs | The worker thread is stuck or dead; documents are queued but nothing converts. Redeploy the web service (`railway up --service web`, or Redeploy on its latest deployment) to replace the process; the running job's lease expires and it is requeued |
+| `/readyz` shows `worker: stalled` or `stopped`, or documents wait for ever | `worker_loop_error`, `lease_refresh_failed` and `conversion_abandoned` in the logs (a hung MuPDF no longer stalls the worker: its child is killed at the time limit) | The worker thread is stuck or dead; documents are queued but nothing converts. Redeploy the web service (`railway up --service web`, or Redeploy on its latest deployment) to replace the process; the running job's lease expires and it is requeued |
 | `/readyz` shows `model_provider: no_key` or `unpriced_model` | `ANTHROPIC_API_KEY` is set on the web service; `ANTHROPIC_MAIN_MODEL` names a model in `models/pricing.py` | Set the variable and redeploy, or fix the model name |
 | Conversions fail with `reason:budget_daily`, jobs end `error:budget_daily`, or `claims_paused` in the logs | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed: users see "Stopped early" or "Waiting", and queued jobs start after 00:00 UTC. Raise the cap only on purpose |
 | Conversions fail with provider errors | `call:<model>:outcome:api_error` counts; OpenAI or Anthropic dashboard | The OpenAI project limit may be reached (HTTP 429 `project_spend_limit_exceeded`); with Claude, the workspace limit or rate limit (HTTP 429 `rate_limit_error`), or a key not scoped to a workspace (HTTP 400, set `ANTHROPIC_WORKSPACE_ID`) |
 | The `cron` service's run failed, or `purge_backstop_deleted` in the web logs | The `cron` service's deployments list and logs; `@message:purge_backstop_deleted OR @message:aggregate_failed` | The worker's backstop keeps purging meanwhile, so documents are still deleted on time; fix the cron anyway. `aggregate_failed` (with `error_type` and `stack`): the purge still ran, so fix the bug; jobs stay unaggregated until then. A job that expires first is aggregated as it is deleted, or, if that fails too (`aggregate_on_delete_failed`), counted in `unaggregated_deleted` |
-| The `backup` service's run failed, or no `backup_ok` line today | The `backup` service's latest deployment log | Read the error (a full `/backups` volume, a database that cannot be reached, a dump that did not restore). Fix it before the dumps age out |
+| `/healthz/ops` is 503 naming `backup`, or no `backup_ok` line today | The `backup` service's latest deployment log: `backup_failed reason=...` ("Backups and restore") | Read the reason (a full `/backups` volume, a database that cannot be reached, a dump that was cut short or did not restore, a missing table). The previous good dump is kept until it ages out; fix it before then |
+| `/healthz/ops` is 503 naming `cron` | The `cron` service's latest deployment and logs | `ops cron` is failing (`aggregate_failed`, a database error) or the service has stopped; fix it and redeploy the service, or run `readablestem ops cron` once by hand |
+| The GitHub "Uptime" workflow stopped running, or its last run is over 60 days old | The Actions tab: a "disabled" banner | GitHub turns off scheduled workflows in a public repository after 60 days with no commit. Press "Enable workflow" |
 | `unaggregated_deleted` above 0 | The cron history | Some statistics are lost for those jobs; nothing else to do |
 | Purge itself failing | `purge_done` missing for over an hour (from both `source=cron` and `source=worker`), or `purge_backstop_failed` | Treat as a privacy incident: run `readablestem ops purge` by hand, then fix the cause. Job pages already answer 404 once `retain_until` has passed, purged or not |
-| Too many connections | The Postgres service's connection count (`max_connections`, `SHOW max_connections`) | The web process pools up to 5 connections (3 plus 2 overflow) and the cron service opens its own for a few seconds an hour; keep one web replica |
-| Weekly GitHub uptime run failed | The run's log | Check `/readyz` first; also the custom domain and certificate |
+| Too many connections | The Postgres service's connection count (`max_connections`, `SHOW max_connections`) | The web process pools up to 10 connections (5 plus 5 overflow; the routes are synchronous, so each request in a query holds one) and the cron service opens its own for a few seconds an hour, the backup's `psql` a few more once a day; Railway's Postgres allows 100 by default (`max_connections`), so one web replica uses a tenth. Two replicas would still fit, but the rate limits and the upload gate are per process |
+| The GitHub uptime run failed | The run's log (`/readyz` job or `/healthz/ops` job) | For `/readyz`: the rows above and the custom domain and certificate. For `/healthz/ops`: the two rows above for `backup` and `cron` |
 | `decisions_canary_drift` (OpenAI provider, run by hand) | The line's `drifted_cases` and `max_delta`; `readablestem ops decisions-canary --max-usd 0.02` to see each moved answer | The Decisions API's answers changed under the thresholds. Conversions are unaffected (the check is a note or a shadow and fails open); to stop the figure notes meanwhile set `DECISIONS_FIGURE_VERIFY=false`. Re-measure the thresholds (docs/eval.md), then re-record the canary |
 | Many `decision_call` WARNINGs or `verify:*:outcome:timeout` counts | `outcome`, `status`, `code` on the lines | Decisions API trouble. Nothing to do for conversions (fail-open); the check's answers are missing for those fixes |
 
@@ -530,13 +644,19 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 
 | Job | What it checks |
 |---|---|
-| `lint-test` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, `pytest` (offline; Postgres tests use the embedded server on 3.12) |
-| `postgres` | `pytest -m postgres` against a Postgres 16 service container |
-| `browser` | `pytest -m browser` with Playwright Chromium (axe-core checks) |
+| `lint-test` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, `pytest -n auto` (offline, parallel; Postgres tests use the embedded server on 3.12) |
+| `postgres` | `alembic upgrade head` and `alembic check` (models match migrations), then `pytest -m postgres`, against a Postgres 18 service container (the major the backup image uses). Zero collected tests fails the job |
+| `browser` | `pytest -m browser` with Playwright Chromium (axe-core checks); zero collected tests fails the job |
+| `dependency-audit` | `pip-audit` over the exported lock (all groups and extras); any known vulnerability fails the job. An unfixable one needs a commented ignore entry in the workflow |
+| `CodeQL` (own workflow) | CodeQL for Python and GitHub Actions on push to main, on pull requests and weekly |
 | `docker` | Builds the image (no push) with BuildKit and again with the legacy builder (`DOCKER_BUILDKIT=0`, as the Cloud Run path's Cloud Build `--tag` build may use), and checks the entry point and non-root user |
 | `eval-gate` | `readablestem eval gate --require-current` for every committed `data/eval/baseline-<task>.json` against its `latest-<task>.json` (skips while none is committed). Fails on a regression, a changed judge, or a latest report the current prompts did not produce |
 | `secret-scan` | gitleaks over the full history |
 
 Every action is pinned to a commit SHA with its tag in a comment; Dependabot proposes
-updates weekly. `eval-live.yml` (manual, costs money) runs the equations eval against
-the live models with a `max_usd` cap and uploads the report as an artifact.
+updates weekly. `eval-guard.yml` fails a pull request that changes a model constant or a
+prompt without the matching `data/eval/latest-*.json` (label `eval-unchanged` or trailer
+`Eval-Unchanged: <reason>` to opt out). `eval-live.yml` (costs money; weekly and by hand)
+runs every eval task against the production provider with a hard cap per task (at most
+$2.95 a week), gates each report against its baseline and uploads it as an artifact; it
+skips with a notice while `ANTHROPIC_API_KEY` is not set. Both: `docs/eval.md`.

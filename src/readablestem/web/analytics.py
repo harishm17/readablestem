@@ -35,8 +35,11 @@ secret is needed and an analytics failure cannot fail a request.
 The proxy follows the personal site's (`edge/worker.js`): `/m/static/*` goes to PostHog's
 assets host and is cacheable; `/m/array/<token>/config(.js)` goes there too but is never
 cached and carries the browser's `Origin`; everything else goes to the API host with cookies
-removed, only a `Bearer phc_...` authorization kept, and the caller's address in
-`X-Forwarded-For`.
+removed and only a `Bearer phc_...` authorization kept. The visitor's address is not
+forwarded: no `X-Forwarded-For` is sent, so PostHog records the relay's own address, never the
+visitor's (PostHog uses the address of the capture request unless an `$ip` property is
+given; the project's "Discard client IP data" setting, in PostHog, drops even that). The
+relay is rate limited per address (`analytics` in `web/abuse.py`).
 """
 
 from __future__ import annotations
@@ -47,10 +50,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
 
-from readablestem.web.abuse import client_ip
 from readablestem.web.database import as_utc
 
 logger = logging.getLogger(__name__)
@@ -70,6 +72,14 @@ SESSION_KEY = "analytics_events"
 MAX_QUEUED = 3
 
 router = APIRouter(include_in_schema=False)
+
+
+def _limit(request: Request) -> None:
+    """Count the call against the `analytics` rule (imported here: `deps` imports this
+    module)."""
+    from readablestem.web.deps import enforce
+
+    enforce(request, "analytics")
 
 
 def new_client() -> httpx.AsyncClient:
@@ -105,9 +115,10 @@ def _reply(upstream: httpx.Response, extra: dict[str, str], *, body: bool = True
     )
 
 
-@router.api_route(PREFIX + "/{path:path}", methods=["GET", "HEAD", "POST"])
+@router.api_route(
+    PREFIX + "/{path:path}", methods=["GET", "HEAD", "POST"], dependencies=[Depends(_limit)]
+)
 async def proxy(request: Request, path: str) -> Response:
-    ctx = request.app.state.ctx
     if ".." in path or "\\" in path or path.startswith("/"):
         return Response(status_code=404)
     query = f"?{request.url.query}" if request.url.query else ""
@@ -145,7 +156,7 @@ async def proxy(request: Request, path: str) -> Response:
             head=head,
         )
     # Everything else is the API: events, and any call the script makes.
-    headers["x-forwarded-for"] = client_ip(request, ctx.settings.trusted_proxy_hops)
+    # No X-Forwarded-For: the visitor's address stays here (module docstring).
     body = await request.body() if request.method == "POST" else None
     return await _fetch(
         request.method if not head else "GET",

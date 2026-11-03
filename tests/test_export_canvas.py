@@ -113,6 +113,7 @@ def test_the_only_styles_left_behind_are_known(made):
     assert notes.uncarried_selectors <= {
         ":root",
         ":focus-visible",
+        ".skip-link:not(:focus)",  # with the rule gone the link is plainly visible
         "@media (min-width: 44rem)",
         "@media print",
         "@media screen and (prefers-color-scheme: dark)",  # Canvas has its own colours
@@ -244,9 +245,19 @@ def test_the_page_loses_nothing_in_the_sanitizer(made):
     assert after == before
 
 
+def without_skip_link(html: str) -> str:
+    """The source without its skip link and the anchor it jumps to: the paste version leaves
+    both out on purpose (`<main>`, where the link goes, is removed by Canvas)."""
+    html = re.sub(r'<a class="skip-link[^>]*>[^<]*</a>\n?', "", html)
+    return re.sub(r'<span id="main-content"[^>]*></span>\n?', "", html)
+
+
 def test_the_page_keeps_what_a_reader_needs(made):
     html, export = made
-    source = cs.content(cs.parse(html))
+    page = export.page_html or ""
+    assert ("skip-link" in html) == export.notes.skip_link_left_out  # deliberately left out
+    assert "skip-link" not in page and "main-content" not in page  # left out on purpose
+    source = cs.content(cs.parse(without_skip_link(html)))
     got = cs.content(cs.sanitize(cs.parse(export.page_html or "")))
     # every image, with its alt text (an empty alt stays empty), at an address Canvas keeps
     assert [alt for _, alt in got.images] == [alt for _, alt in source.images]

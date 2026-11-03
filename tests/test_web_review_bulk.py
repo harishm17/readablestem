@@ -210,11 +210,17 @@ def test_landing_item_is_focusable_and_its_notice_comes_first(rich):
 
 def test_the_list_view_offers_no_bulk_accept(rich):
     """Every decision the pipeline asks for is meaning-level (review tiers, "meaning-level
-    only"): none is accepted in bulk without being opened, by confidence or "accept all"
-    (removed 2026-10-09)."""
+    only"): none is accepted in bulk by confidence or an unconditional "accept all" (removed
+    2026-10-09). The one bulk action is the explicit, previewed one for items whose checks
+    all passed (`test_web_review_bulk_accept.py`)."""
     page = page_of(rich)
-    for gone in ("bulk-form", "min_confidence", "accept_confident", "accept_all", "Accept all"):
+    for gone in ("bulk-form", "min_confidence", "accept_confident", "accept_all"):
         assert gone not in page
+    assert "Accept all remaining equations whose checks passed" in page  # a link to a preview
+    assert (
+        'action="/jobs/'
+        not in page[page.index("bulk-offers") : page.index("</ul>", page.index("bulk-offers"))]
+    )
     assert not hasattr(review, "apply_bulk_accept")
 
 

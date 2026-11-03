@@ -1,0 +1,67 @@
+{
+  "source": "beamer_theme_bars.tex",
+  "frames": [
+    {
+      "title": "Wave Speed",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "title": "Beat Frequency",
+      "pages": [
+        1
+      ]
+    }
+  ],
+  "equations": [
+    {
+      "latex": "\\lambda",
+      "display": false,
+      "env": "$",
+      "frame": 0
+    },
+    {
+      "latex": "f",
+      "display": false,
+      "env": "$",
+      "frame": 0
+    },
+    {
+      "latex": "v = \\lambda f .",
+      "display": true,
+      "env": "equation",
+      "frame": 0
+    },
+    {
+      "latex": "k = 2\\pi/\\lambda",
+      "display": false,
+      "env": "$",
+      "frame": 0
+    },
+    {
+      "latex": "f_1",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    },
+    {
+      "latex": "f_2",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    },
+    {
+      "latex": "f_b = |f_1 - f_2|",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    },
+    {
+      "latex": "\\cos a + \\cos b = 2 \\cos\\frac{a+b}{2} \\cos\\frac{a-b}{2}.",
+      "display": true,
+      "env": "align",
+      "frame": 1
+    }
+  ]
+}

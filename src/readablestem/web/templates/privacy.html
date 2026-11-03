@@ -127,6 +127,8 @@
   already received. For the rest of that day we keep a scrambled fingerprint of the address
   (a keyed hash, not the address) with the day's page and read counts, so that deleting an
   account and signing up again does not reset the day's limits; it is deleted the next day.
+  We also keep one line for each deleted account: a one-way hash of its random account id and the
+  time. It identifies nobody and is used only to repeat the deletion if a backup is restored.
   An account that an administrator has blocked is kept, with its address, so that the block
   holds; write to us to have it deleted.</p>
 {% else %}

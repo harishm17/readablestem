@@ -1,0 +1,85 @@
+{
+  "source": "beamer_columns_table.tex",
+  "frames": [
+    {
+      "title": "Two Views of a Spring",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "title": "Measured Quantities",
+      "pages": [
+        1
+      ]
+    }
+  ],
+  "equations": [
+    {
+      "latex": "F = -k x",
+      "display": false,
+      "env": "$",
+      "frame": 0
+    },
+    {
+      "latex": "U = \\tfrac{1}{2} k x^2",
+      "display": false,
+      "env": "$",
+      "frame": 0
+    },
+    {
+      "latex": "x = 0",
+      "display": false,
+      "env": "$",
+      "frame": 0
+    },
+    {
+      "latex": "m",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    },
+    {
+      "latex": "0.50",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    },
+    {
+      "latex": "k",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    },
+    {
+      "latex": "8.0",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    },
+    {
+      "latex": "\\omega = \\sqrt{k/m}",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    },
+    {
+      "latex": "4.0",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    },
+    {
+      "latex": "T = 2\\pi/\\omega",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    },
+    {
+      "latex": "1.57",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    }
+  ]
+}
