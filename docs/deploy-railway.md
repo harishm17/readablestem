@@ -149,6 +149,7 @@ production if a required one is missing, and logs the reason):
 | Variable | Why | Suggested |
 |---|---|---|
 | `SIGNUP_MODE` | `allowlist` (the default) or `open`: whether anyone with a verified Google (or allowed Microsoft) account gets an account at the first sign-in (docs/web.md, "Sign-up modes and access tiers"). | **`open`** for the free beta anyone can try. Set it last, after the checks below. |
+| `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft sign-in. All three or none. | Next section: "Microsoft sign-in on Railway". |
 | `OPEN_TIER_DAILY_PAGE_QUOTA` | Pages a day for an account that signed itself up. Invited people keep `PER_USER_DAILY_PAGE_QUOTA` (90). | **`20`** (a couple of short handouts a day; the default). |
 | `OPEN_TIER_DAILY_REREADS` | Model reads from the review screen (a marked equation, a table cell) a day for such an account. Each costs model spend that no page count bounds. | **`30`** (the default). |
 | `MAX_NEW_ACCOUNTS_PER_DAY` | Accounts open sign-up may make per UTC day, for the whole service. When it is used up, new sign-ins get "Sign-ups are full for today"; people with accounts are not affected. `0` pauses sign-up. | **`100`** (the default). |
@@ -173,6 +174,87 @@ is 2; with the wrong value the rate limits are shared by everyone or can be dodg
 `X-Forwarded-For`. After the first deploy, check that two people on different networks hit separate
 limits, or that the log's limiter key is not Railway's address (**confirm**: Railway's edge adds the
 client address to `X-Forwarded-For`).
+
+## Microsoft sign-in on Railway
+
+Microsoft sign-in ("Sign in with your university account") is built (`web/microsoft.py`) and stays off
+until three variables exist on the **web** service. `.railway/railway.ts` already names them
+(`MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS`, all `preserve()`), so `railway config apply`
+keeps whatever you set. Naming a variable that has no value yet changes nothing in the plan. Cron does
+not need them. The portal labels below are explained in deploy.md, "3b. Optional: create the Microsoft
+sign-in app (Entra ID)"; how the app checks the tokens is in web.md, "Sign-in, sessions and CSRF".
+
+**1. Register the app** at entra.microsoft.com, in your own directory (a free one works), not a
+university's.
+
+- App registrations, **New registration**: name `ReadableSTEM`; supported account types **Multiple
+  Entra ID tenants** (older wording: "Accounts in any organizational directory"); no personal
+  accounts. Copy the **Application (client) ID**.
+- Authentication, **Add Redirect URI**, platform **Web**: `https://readablestem.com/auth/microsoft/callback`
+  (the app sends `BASE_URL` + `/auth/microsoft/callback`, and the match is exact), plus
+  `http://localhost:8000/auth/microsoft/callback` for local work. Leave both implicit-grant boxes unticked.
+- API permissions: keep `openid`, `profile` and `email` and remove `User.Read`.
+- Token configuration, **Add optional claim**, type **ID**: `email` and `xms_edov`.
+
+**2. Create the client secret.** Certificates & secrets, **New client secret**, 12 months. Copy the
+**Value** (not the Secret ID); Microsoft shows it once. Put the expiry date in your calendar a few weeks
+ahead: on that day Microsoft sign-in stops working (Google keeps working). To rotate, create a second
+secret, run the `MS_CLIENT_SECRET` command below with the new Value, redeploy, then delete the old secret.
+
+**3. Allowed directories.** `MS_ALLOWED_TENANTS` lists the directory (tenant) ids that may sign in,
+comma-separated, lower-case GUIDs (the app refuses to start on anything else, such as a domain name or
+`common`). People from any other directory see "Your organisation is not set up for this beta" with their
+directory id. The ids read on 2026-11-03 (re-check one with
+`https://login.microsoftonline.com/DOMAIN/v2.0/.well-known/openid-configuration`, the id in `issuer`):
+
+| Domain | Directory id |
+|---|---|
+| utdallas.edu | `8d281d1d-9c4d-4bf7-b16e-032d15de9f6c` |
+| illinois.edu | `44467e6f-462c-4ea2-823f-7800de5434e3` |
+| purdue.edu | `4130bd39-7c53-419c-b1e5-8758d6d63f21` |
+| tamu.edu | `68f381e3-46da-47b9-ba57-6f322b8f0da1` |
+| gatech.edu | `482198bb-ae7b-4b25-8b7a-6d7f32faa083` |
+
+Start with UTD only and add a university when its IT team has approved the app (step 6). Being in
+the list is not enough to get in: the person's address must be on the allowlist
+(`readablestem users allow EMAIL`), or `SIGNUP_MODE=open`.
+
+**4. Set the variables** from a checkout linked to the project (`railway link -p readablestem -e
+production`). The app refuses to start when a client id or a secret is set without the rest, so set all
+three with `--skip-deploys` and deploy once, never in between. Without `--skip-deploys`, each
+`railway variable set` starts a deployment at once. Apply this `railway.ts` first (plan, review, apply:
+"Changing the infrastructure"), so the next apply does not delete the values.
+
+```sh
+railway variable set -s web MS_CLIENT_ID=<application-client-id> --skip-deploys
+printf %s '<client-secret-value>' | railway variable set -s web MS_CLIENT_SECRET --stdin --skip-deploys
+railway variable set -s web MS_ALLOWED_TENANTS=8d281d1d-9c4d-4bf7-b16e-032d15de9f6c --skip-deploys
+# later, to add a university: the whole list again, comma-separated
+railway variable set -s web MS_ALLOWED_TENANTS=<id-1>,<id-2> --skip-deploys
+```
+
+Type the real values only in your terminal. `printf` keeps the secret out of the process list; to
+keep it out of the shell history too, run `read -rs S` first and use `printf %s "$S"`. Never put a real
+value in a file of this repository.
+
+**5. Deploy and check.** `railway redeploy -s web` (the same build with the new variables) or the next
+`railway up --service web`. Then:
+
+```sh
+railway run -s web -- uv run readablestem ops launch-check
+```
+
+The launch check lists a half-set group (`settings: MS_...`); the app logs the same reason and does not
+start. Open `https://readablestem.com/login`, choose the Microsoft button and sign in with your UTD account.
+
+**6. Admin consent.** If Microsoft says "Need admin approval", a UTD IT administrator opens this once
+(one line; use the directory id of that university and your client id):
+
+```
+https://login.microsoftonline.com/<directory-id>/v2.0/adminconsent?client_id=<application-client-id>&scope=openid%20profile%20email&redirect_uri=https%3A%2F%2Freadablestem.com%2Fauth%2Fmicrosoft%2Fcallback
+```
+
+Publisher verification (Branding & properties) is only needed if an IT team asks for it.
 
 ## First deploy: checklist
 

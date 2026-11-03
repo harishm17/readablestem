@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Microsoft sign-in configuration
+
+- `.railway/railway.ts` declares `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and `MS_ALLOWED_TENANTS` on the web service as `preserve()`, so values set with `railway variable set` survive `railway config apply`. `docs/deploy-railway.md` has a "Microsoft sign-in on Railway" section with the app registration, the secret's expiry, the allowed directory ids and the exact commands.
+- `readablestem ops launch-check` also lists `MS_ALLOWED_TENANTS` set without a client id and secret (the sign-in would be quietly off). A client id or secret alone was already refused.
+
 ### Monitoring and recovery
 
 - The daily backup keeps a dump only after it has been proved: gzip reads it back, it ends with pg_dump's completion line, it restores with errors fatal, every live table is in the restore and `alembic_version` matches. A failure prints `backup_failed reason=...`, removes the file and fails the run. The command is a readable bash script (`set -euo pipefail`) with tests (`tests/test_railway_backup_script.py`). `railway config apply` is needed to put it live.
