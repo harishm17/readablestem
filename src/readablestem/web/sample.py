@@ -96,7 +96,7 @@ def _build() -> Sample:
     # The pictures are cut again exactly as a conversion cuts them (an unconverted equation
     # sharp for the size of the file's text), and the file is written by today's assembler:
     # the sample shows the current output, not the output of the day it was recorded.
-    crops = recrop(pdf, result.elements)
+    crops = recrop(pdf, result.elements, {p.page: p.kind for p in result.page_types})
     html = rerender_html(result, crops)
     result.html = ""
     return Sample(

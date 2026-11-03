@@ -145,6 +145,16 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("image_page.omitted_region", "omitted_region"): "There is writing here that nothing in "
     "the converted page accounts for, so the reading probably left it out: look at the picture "
     "of this part of the page, then write what it says or keep it as an image.",
+    ("image_page.case_check", "case_mismatch"): "A letter here is written taller or shorter than "
+    "the capital or small letter it was read as, so check the case of each letter against the "
+    "picture.",
+    ("image_page.script_check", "script_lost"): "The ink has a small raised or lowered mark that "
+    "the reading shows as an ordinary symbol, or leaves out, so check for a missing power or "
+    "subscript.",
+    ("image_page.script_check", "script_added"): "The reading has a power or subscript on a "
+    "symbol that is written at full size on the line, so check whether it should be there.",
+    ("image_page.script_check", "script_moved"): "A power is written as a subscript here, or the "
+    "reverse, so check which way each small mark sits.",
     ("table.no_text_layer", "no_text_layer"): "This table was read from an image of the page, "
     "so nothing in the PDF can confirm its cells: compare every value with the original.",
     ("equation.region", "half_fraction"): "The part of the page this equation was read "

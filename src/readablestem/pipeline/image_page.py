@@ -42,6 +42,10 @@ What becomes of each block (`build`; the tiers are the table in the ADR):
   element (`IMAGE_PAGE_OMISSION_REASON`) with a required decision (`image_page.omitted_region`),
   because a reader that stops early says nothing about what it did not write.
 
+- On a handwritten page whose ink is vector (`image_page_vector`) the omission check compares
+  the pen strokes, not the picture, with the boxes; the pictures of lines are drawn from the
+  strokes; and the reading of each display equation is checked against them (case, scripts).
+
 The page also gets one figure element for the whole page (`ORIGINAL_REASON`): the output
 writes it as the "show the original page" toggle after the page's notice.
 
@@ -92,6 +96,7 @@ from readablestem.models.prompts import load_prompt
 from readablestem.pipeline import (
     equation_images,
     equation_step,
+    image_page_vector,
     layout,
     table_step,
 )
@@ -226,6 +231,9 @@ class PageRead:
     verdicts: dict[int, second.Verdict] = field(default_factory=dict)
     # Blocks added by reading the stretches the first reading left out (`recover_omissions`).
     recovered: int = 0
+    # The page's pen strokes when its ink is vector (`image_page_vector`): the pictures of lines
+    # are drawn from them and the omission check reads them. None: the page's picture only.
+    vector: image_page_vector.VectorPage | None = None
 
 
 @dataclass
@@ -307,11 +315,30 @@ def run(
     return result
 
 
-def second_reading_crops(output: ImagePageOutput, png: bytes) -> list[second.Crop]:
+def _picture(
+    page: image_page_vector.VectorPage | None,
+    png: bytes,
+    ink: Ink,
+    pixels: tuple[int, int, int, int],
+    margin: int = second.CROP_MARGIN_PX,
+) -> bytes | None:
+    """The picture of a region of the page: drawn from the strokes when the page has them (clean,
+    cut to the ink), else cut out of the page picture."""
+    if page is not None:
+        drawn = page.cut(pixels, (ink.width, ink.height))
+        if drawn is not None:
+            return drawn
+    return second.cut(png, pixels, margin=margin)
+
+
+def second_reading_crops(
+    output: ImagePageOutput, png: bytes, page: image_page_vector.VectorPage | None = None
+) -> list[second.Crop]:
     """The lines to read a second time: each `medium` paragraph or list item that holds a
-    formula and has a usable box, cut out of the page picture. A block of one formula only is a
-    display equation and the equation step reads its crop; `high` and `low` blocks are not
-    asked about again (the first is an optional note already, the second always required)."""
+    formula and has a usable box, cut out of the page picture (drawn from the strokes when the
+    page has them). A block of one formula only is a display equation and the equation step
+    reads its crop; `high` and `low` blocks are not asked about again (the first is an optional
+    note already, the second always required)."""
     try:
         ink = Ink(png)
     except Exception as exc:  # an unreadable picture only costs the second reading
@@ -325,7 +352,7 @@ def second_reading_crops(output: ImagePageOutput, png: bytes) -> list[second.Cro
         units = _units(block)
         if not formulas or units is None or lone_formula(block) is not None:
             continue
-        picture = second.cut(png, ink.region(units))
+        picture = _picture(page, png, ink, ink.region(units))
         if picture is None:
             continue
         words = "".join(r.value for r in block.runs[:MAX_RUNS] if r.kind == "text")
@@ -344,7 +371,9 @@ def second_readings(
     read's `verdicts`, its `calls` and `result.stopped`). Fail-safe: no verdict for a block the
     second reading could not give."""
     work = {
-        number: second_reading_crops(read.output, read.png)
+        number: second_reading_crops(
+            read.output, read.png, read.vector if settings.image_pages_vector_crops else None
+        )
         for number, read in sorted(result.reads.items())
         if read.output is not None and read.png
     }
@@ -412,7 +441,9 @@ def recover_omissions(
         added = 0
         try:
             ink = Ink(read.png)
-            regions = omitted_regions(blocks, ink)
+            regions = omitted_regions(
+                blocks, ink, read.vector if settings.image_pages_vector_checks else None
+            )
             for region in regions:
                 grown = (
                     max(0, region.x0 - RECOVERY_MARGIN),
@@ -420,8 +451,10 @@ def recover_omissions(
                     min(1000, region.x1 + RECOVERY_MARGIN),
                     min(1000, region.y1 + RECOVERY_MARGIN),
                 )
-                picture = second.cut(
+                picture = _picture(
+                    read.vector if settings.image_pages_vector_crops else None,
                     read.png,
+                    ink,
                     (
                         round(grown[0] / 1000 * ink.width),
                         round(grown[1] / 1000 * ink.height),
@@ -1110,24 +1143,32 @@ def _original_figure(builder: _Builder) -> Element:
     return element
 
 
-def omitted_regions(blocks: Sequence[Block], ink: Ink | None) -> list[omission.Region]:
-    """The stretches of ink no block accounts for (`image_page_omission`). A page with a block
-    that has no usable box cannot be judged: none."""
-    if ink is None:
-        return []
+def omitted_regions(
+    blocks: Sequence[Block], ink: Ink | None, page: image_page_vector.VectorPage | None = None
+) -> list[omission.Region]:
+    """The stretches of ink no block accounts for (`image_page_omission`; on a page with vector
+    ink, the strokes' own groups, `image_page_vector.leftover`, which see pale ink too). A page
+    with a block that has no usable box cannot be judged: none."""
     boxes = [_units(b) for b in blocks]
     if not boxes or any(u is None for u in boxes):
         return []
-    return omission.find(ink.mask, [u for u in boxes if u is not None])
+    units = [u for u in boxes if u is not None]
+    if page is not None:
+        return image_page_vector.leftover(page, image_page_vector.block_boxes(page, units))
+    if ink is None:
+        return []
+    return omission.find(ink.mask, units)
 
 
-def _add_omissions(builder: _Builder, blocks: Sequence[Block]) -> None:
+def _add_omissions(
+    builder: _Builder, blocks: Sequence[Block], page: image_page_vector.VectorPage | None = None
+) -> None:
     """Make each stretch of ink that no block accounts for (`image_page_omission`) a figure
     element with a required decision, placed after the last block above it. A page with a
     block that has no usable box cannot be judged and is left as it is."""
     x0, y0, x1, y1 = builder.box
     width, height = x1 - x0, y1 - y0
-    for region in omitted_regions(blocks, builder.ink):
+    for region in omitted_regions(blocks, builder.ink, page):
         bbox: BBox = (
             round(x0 + region.x0 / 1000 * width, 2),
             round(y0 + region.y0 / 1000 * height, 2),
@@ -1179,8 +1220,12 @@ def build(
     verdicts: Mapping[int, second.Verdict] | None = None,
     accept_agreed: bool = False,
     maths_required: bool = False,
+    page_ink: image_page_vector.VectorPage | None = None,
 ) -> Built | None:
     """The elements and decided fixes of one page, or None when nothing on it was usable.
+
+    `page_ink` is the page's pen strokes when its ink is vector: the omission check then
+    compares the strokes (not the picture) with the blocks' boxes.
 
     `box` is the page's frame in points (layout's), `png` the picture the model read (its
     ink trims the boxes and is compared with them; None leaves them as given and skips the
@@ -1219,7 +1264,7 @@ def build(
         return None
     if check_omission:
         try:
-            _add_omissions(builder, output.blocks[:MAX_BLOCKS])
+            _add_omissions(builder, output.blocks[:MAX_BLOCKS], page_ink)
         except Exception as exc:  # the check only adds; a failure leaves the page as read
             log.warning("image page omission check failed: %s", type(exc).__name__)
     required = sum(1 for f in builder.fixes.values() if f.review == "required")

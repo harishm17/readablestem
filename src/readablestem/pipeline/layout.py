@@ -604,6 +604,31 @@ def render_page(pdf_bytes: bytes, page: int, *, dpi: int = 150, max_side_px: int
             pymupdf.TOOLS.reset_mupdf_warnings()
 
 
+def page_ink(pdf_bytes: bytes, page: int, *, budget: Any = None) -> tuple[Any, BBox]:
+    """The pen strokes of a page (`ink_strokes.PageInk`) and the page's box in points, read
+    within the document's ink `budget` (`page_type.InkBudget`). Same document cache and lock as
+    `crop`."""
+    from readablestem.pipeline import ink_strokes
+
+    with _LOCK:
+        _quiet_mupdf()
+        try:
+            key, doc = _CACHE.document(pdf_bytes)
+            if not 0 <= page < doc.page_count:
+                raise ValueError(f"page {page} is not in the PDF")
+            _ensure_probed(pdf_bytes, key, [page])
+            sheet = doc[page]
+            rect = sheet.rect
+            return ink_strokes.extract_ink(sheet, budget=budget), (
+                rect.x0,
+                rect.y0,
+                rect.x1,
+                rect.y1,
+            )
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()
+
+
 def release(pdf_bytes: bytes | None = None) -> None:
     """Drop a cached document (or all of them with no argument).
 

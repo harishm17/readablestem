@@ -706,6 +706,7 @@ The second track (root causes, fixes, the fresh set):
 uv run python scripts/handwriting_accuracy.py build-fresh   # compose the fresh set (needs `fetch`)
 uv run python scripts/handwriting_accuracy.py verify-fresh  # rebuild and compare with data/handwriting/manifest-fresh.json
 uv run python scripts/handwriting_accuracy.py build-vector --verify  # vector-ink dev set, $0 (needs `fetch`)
+uv run python scripts/handwriting_vector_checks.py DIR [DIR ...]  # the stroke checks on built vector sets, $0
 uv run python scripts/handwriting_analysis.py classes --part heldout --arm control   # needs the recorded run
 uv run python scripts/handwriting_errors.py [--arm NAME] [--part PART] [--json FILE]   # every recorded arm, $0
 uv run --env-file .env python scripts/handwriting_accuracy.py run --part dev --arm NAME --max-usd 1 \
@@ -758,6 +759,84 @@ stroke only if it wiggles and a filled disc is a dot to it. It now reads runs of
 with the same rule `ink_strokes` uses (docs/layout.md, "Vector ink and strokes"), and says
 `handwritten` for all 12 pages. Whether a real GoodNotes page does the same is for the probe on
 real exports to settle.
+
+## Checks from strokes (`pipeline/image_page_vector.py`, H8)
+
+A clean re-render of vector ink did not beat the scan for the reader (0.60 against 0.66 exact on 74
+expressions, one run, not significant: "Note, 2026-11-03"), so the strokes are not used to re-read.
+They are used for four things, none of which asks a model (docs/layout.md, "Strokes in the image
+page pass"): the picture of each expression drawn from the ink, and three checks that add a reason
+or a note and never take away the required decision. `scripts/handwriting_vector_checks.py` measures
+the checks at no cost, from readings written by the script: the gold LaTeX of the vector dev set
+with errors put in, and the drawn boxes moved about. No model was asked and no spend.
+
+```
+uv run python scripts/handwriting_vector_checks.py DIR [DIR ...] [--jitter PT]
+```
+
+**Data.** Calibration set: `build-vector --units 10 --seed vec-A` (20 pages, 115 expressions, 1,686
+strokes). Held-out: three more builds, seeds `vec-B`, `vec-C` and `vec-D` (54 pages, 318
+expressions, 4,559 strokes; 1 to 2 expressions of each also in the calibration set). The ink is
+MathWriting `test` ink, drawn as `path`, `samples` and `outline` strokes on plain and ruled paper,
+one expression to a line, letters 15 to 21 pt tall, pens 1.2 to 2.2 pt; it is CC BY-NC-SA, built into `~/.cache`, never
+committed. The thresholds were set on the calibration set. One decision was taken on both: after the
+first held-out run I dropped the letters p and y from the case check (see below), so the held-out
+case numbers are not a clean single look.
+
+**How errors are put in.** A "recall" is the share of put-in errors the check names, and a "false
+alarm" the share of untouched gold readings it names; precision is given at one error to one control
+(recall over recall plus false-alarm rate), which is not what a real page has (21 of 74 readings
+were wrong on the practice set).
+
+| Check | Put-in error | Held-out recall | False alarms on gold | Precision at 1:1 | Calibration set |
+|---|---|---|---|---|---|
+| Case | one of c o s u v w x z in the other case, line has its own letters to measure against | 21 of 37 (0.57) | 6 of 25 (0.24) | 0.70 | 24/27, 2/16 |
+| Case | the same, line has none, page heights used | 6 of 7 | 1 of 3 | 0.72 | 0/2, 1/1 |
+| Script lost | a raised script (a digit or letter in it) taken out | 27 of 65 (0.42) | 12 of 172 (0.07) | 0.86 | 13/27 |
+| Script lost | a lowered script taken out | 40 of 129 (0.31) | (same) | 0.82 | 11/46 |
+| Script added | a symbol read as the superscript of the one before | 9 of 47 (0.19) | 12 of 172 (0.07) | 0.73 | 8/24 |
+| Script moved | a raised script read as lowered, or the reverse | 58 of 190 (0.31) | 4 of 172 (0.02) | 0.93 | 23/72 |
+| Leftover ink | one block of a page left out, boxes off by up to 14 pt | 314 of 318 (0.99) | 0 of 54 pages | 1.00 | 114/115, 0/20 |
+| Leftover, raster check (for comparison) | the same pages | 290 of 318 (0.91) | 11 of 54 (0.20) | 0.82 | 103/115, 4/20 |
+| Leftover, raster check, ink at 30% strength | the same pages, pale pen | 0 of 318 | 11 of 54 | 0 | 0/115, 4/20 |
+
+How to read it:
+
+- **Case.** By letter (held-out): c 4/6, o 1/1, s 4/10, u 1/1, v 1/1, w 3/3, x 11/16, z 2/6. The check is
+  only as good as the hand: a writer who makes a small x as tall as a capital is a false alarm. It
+  says nothing about 6 of the 34 controls that have a letter in doubt (no letter on the line to
+  measure against and no page heights) and about every expression whose symbols and glyphs do not
+  pair one to one (a letter written touching its neighbour, a symbol written in two pieces that do
+  not overlap). Of the 318 held-out expressions, 28 gave a case verdict. k, p and y are not measured:
+  with p and y measured from the baseline, over both sets, 58 of 105 put-in errors were named and 16
+  of 56 controls (0.55 and 0.29); without them 51 of 105 and 10 of 56 (0.49 and 0.18). The tail
+  letters were right about as often as chance (p 2 of 12, y 0 of 5 on held-out), and k as tall as K
+  (0 of 4).
+- **Script.** The raised scripts are the signal: a power sits well above the line, and where the
+  reading keeps its digit on the line the check names it 0.42 of the time at 0.07 false alarms.
+  Subscripts are written close to the baseline and are weaker. Scripts made of a minus, a prime or
+  a comma are smaller than the dots the check ignores and are not in the put-in errors. "Added" is
+  the weakest, and some of the 12 false alarms are real: the writer wrote a subscript as large as the
+  letter before it. A check that finds a third of dropped scripts is a pointer, not a guard: the
+  required decision stays.
+- **Leftover ink.** Every dropped block is found unless it lies within the box margin of a block
+  that stayed. The comparison was run on pages with 100 pt between lines. On a notebook page with
+  lines 25 to 30 pt apart a missing line between two read lines is closer than the margin
+  (1.2 glyph heights, about 20 pt for writing of this size) and is missed, as it is by the raster
+  check (its margin is 6% of the page height, about 47 pt). Stretches of three or more glyphs count, so a
+  single dropped symbol does not.
+- **Cost.** Per page, the leftover check takes 1.6 ms (18 pages, no budget needed); the case and script
+  checks 1.1 ms an equation; drawing a picture 17 ms. Reading the strokes (`extract_ink`) is the page
+  type's cost and is bounded by its budget. Grouping gives up past 2 million stroke pairs.
+
+**What was not measured.** No page was converted: the readings are the gold with put-in errors, so
+the share of real model errors that these checks name is not known (the kinds of error are those of
+"Note, 2026-11-03": about 9 of 21 wrong readings were a case or script ambiguity). Real iPad ink
+(filled shapes drawn by GoodNotes, a slow writer, a notebook) has not been tried; the thresholds are
+for the sizes and slopes of these pages. The case check cannot tell a capital from a small
+letter written large, and none of the checks can tell Greek from Latin. The sharp pictures are not
+measured at all: a live run of the page reader on them is a paid step, and the earlier result says
+not to expect a gain, so `IMAGE_PAGES_VECTOR_CROPS` can be turned off alone.
 
 ## A set of real iPad ink with answer keys nobody typed
 

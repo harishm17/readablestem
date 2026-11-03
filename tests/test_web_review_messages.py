@@ -49,6 +49,7 @@ PIPELINE_MODULES = (
     "table_step",
     "notation_memory",
     "image_page",
+    "image_page_vector",
 )
 CHECK_NAME = re.compile(r"^[a-z_]+(\.[a-z_]+)+$")
 PLACEHOLDER = "{}"

@@ -407,6 +407,16 @@ class Settings(BaseSettings):
     # left out is converted (with its own decision) and not only flagged
     # (`image_page.recover_omissions`). Costs a request only for a page the check flags.
     image_pages_recover_omissions: bool = True
+    # On a handwritten page whose ink is vector (`page_type` says handwritten and
+    # `ink_strokes` read strokes from it), draw the picture of each expression from the strokes
+    # alone, black on white at high resolution, for the model and the review screen
+    # (`pipeline.image_page_vector`). The measurement in docs/eval-handwriting.md found a clean
+    # re-render no better than a scan for the reader, so this can be turned off alone.
+    image_pages_vector_crops: bool = True
+    # ... and check the reading against the strokes: a letter in the other case, a script lost,
+    # added or moved, ink no block accounts for (`image_page_vector`). Each only adds a reason
+    # or an omission note; the maths stays a required decision.
+    image_pages_vector_checks: bool = True
     # Read each `medium` block that holds a formula a second time from a picture of that line
     # alone (`pipeline.image_page_check`) and record whether the two readings agree. Costs one
     # request for every few such lines. OFF until the measurement in docs/eval-handwriting.md
