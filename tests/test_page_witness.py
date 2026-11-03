@@ -83,6 +83,16 @@ def test_the_model_and_limit_come_from_settings():
     assert client.requests[0].max_output_tokens == 8000
 
 
+def test_a_witness_call_may_take_longer_than_a_crop_call():
+    # a dense page with thinking takes more than the default 60 s; a timeout is charged in full
+    client = client_with()
+    page_witness.run_page(client, settings(), ROWS, b"png")
+    assert client.requests[0].timeout_s == 240.0
+    s = settings(page_witness_timeout_s=10.0, model_timeout_s=60.0)
+    page_witness.run_page(client, s, ROWS, b"png")
+    assert client.requests[1].timeout_s == 60.0  # never below the client's own
+
+
 # -------------------------------------------------------------------------------- anchors
 
 

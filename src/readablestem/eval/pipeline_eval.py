@@ -2132,6 +2132,14 @@ def _document_section(
         item["page_math_cost_usd"] = pass_.cost_usd
         item["cost_usd"] += pass_.cost_usd
         item["model_calls"] += pass_.calls
+    if result.page_witness is not None:
+        # The page witness (docs/steps.md) is a model call of the pipeline's: its cost is in the
+        # item's cost, and apart as `page_witness_cost_usd`; its counts are in `page_witness`.
+        witness = result.page_witness
+        item["page_witness"] = witness.model_dump()
+        item["page_witness_cost_usd"] = witness.cost_usd
+        item["cost_usd"] += witness.cost_usd
+        item["model_calls"] += witness.calls
     if result.image_pages is not None:
         # The image page pass (ADR 0007) is a model call of the pipeline's: its cost is in the
         # item's cost, and apart as `image_pages_cost_usd`.
@@ -2268,6 +2276,10 @@ def _cost(task: str, items: Sequence[dict], budget: JobBudget | None) -> dict:
         if any("page_math" in i for i in items):  # the page math pass ran (ADR 0006)
             out["page_math_usd"] = page_math_cost
             out["page_math_per_pdf_page_usd"] = page_math_cost / pdf_pages if pdf_pages else None
+        if any("page_witness" in i for i in items):  # the page witness ran (docs/steps.md)
+            witness_cost = sum(i.get("page_witness_cost_usd", 0.0) for i in items)
+            out["page_witness_usd"] = witness_cost
+            out["page_witness_per_pdf_page_usd"] = witness_cost / pdf_pages if pdf_pages else None
     if budget is not None:
         out["budget_spent_usd"] = budget.spent_usd
         out["budget_calls"] = budget.calls

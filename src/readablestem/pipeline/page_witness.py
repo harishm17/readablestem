@@ -266,6 +266,7 @@ def build_request(settings: Settings, rows: Sequence[PageRow], png: bytes) -> Vi
         context_limit=CONTEXT_CHARS + 600,
         image_detail="high",
         effort=settings.anthropic_effort_page_witness or DEFAULT_EFFORT,
+        timeout_s=max(settings.model_timeout_s, settings.page_witness_timeout_s),
     )
 
 
