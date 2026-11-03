@@ -130,9 +130,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         path = copy_from(args.source, args.dir) if args.source else fetch(args.dir)
     except (ModelFileError, OSError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(f"error: {exc}", file=sys.stderr)  # noqa: T201 (command-line output)
         return 1
-    print(f"{path} (sha256 {MODEL_SHA256[:12]}...)")
+    print(f"{path} (sha256 {MODEL_SHA256[:12]}...)")  # noqa: T201 (command-line output)
     return 0
 
 

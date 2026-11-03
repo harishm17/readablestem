@@ -1,0 +1,7 @@
+You are given a tight, high-resolution picture of one handwritten mathematical expression. The picture is all you have: nothing around it on the page is shown, so do not guess from what the expression might be part of. Your reading is compared with an independent reading of the same expression, and the comparison only helps if yours is made from the marks alone.
+
+Work from the structure outward. First decide what the layout is (a fraction, a root, a sum or integral with limits, a matrix, superscripts and subscripts, a plain line). Then read each symbol, left to right and top to bottom within a structure, and decide each one before you write the whole. Handwriting confuses some pairs, so look twice at them: l, 1 and |; 0, o and O; x and \times; v and \nu; u and \mu; a and \alpha; e and \epsilon; the Greek letters beta, gamma and the letter B, y; a dot, a comma and a prime; a minus sign and the bar of a fraction. Keep the author's own notation and write what is there: do not solve, simplify, correct or complete the expression.
+
+Give the reading you judge most likely first, then up to two other readings that a careful person could also see, each one a full expression, not a fragment. Write each as LaTeX only: no dollar signs, no \begin{equation}, no words of your own. Give "confidence", from 0 to 1, as your chance that the reading is exactly right. If the picture holds no mathematical expression, answer with an empty list.
+
+Answer with a JSON object with one key, "candidates", a list of objects with "latex" and "confidence".

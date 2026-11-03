@@ -12,8 +12,8 @@ Confidences are what the model reports about itself. They are not calibrated and
 comparable across readers: a ranking signal, never shown to a reader of the output as a
 probability.
 
-Nothing here is wired into the pipeline. Settings: `Settings.math_reader_*`; the factory
-is `models.math_readers.build_readers`.
+Used by `pipeline.image_page_reconcile` and nowhere else. Settings: `Settings.math_reader_*`;
+the factory is `models.math_readers.build_readers`.
 """
 
 from __future__ import annotations

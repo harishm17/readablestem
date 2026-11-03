@@ -127,6 +127,19 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("image_page.second_reading", "second_reading_agrees"): "The line was read a second time "
     "from a picture of it alone and both readings agree; the page is still the only thing "
     "that can confirm them.",
+    # A second reader's reading of a handwritten equation (pipeline.image_page_reconcile)
+    ("image_page.second_reader", "second_reader_differs"): "A second reader looked at the "
+    "picture of this equation and read it differently, so compare it with the original page "
+    "symbol by symbol.",
+    ("image_page.second_reader", "second_reader_agrees"): "A second reader looked at the "
+    "picture of this equation and read it the same way; the original page is still the only "
+    "thing that can confirm it.",
+    ("image_page.second_reader", "second_reader_unavailable"): "A second reading of this "
+    "equation could not be made, so only the first reading is here: compare it with the "
+    "original page symbol by symbol.",
+    ("image_page.second_reader", "budget_reader_usd"): "The second reading of this equation "
+    "was skipped because its share of this document's budget was used, so the first reading "
+    "stands and still needs your decision.",
     ("image_page.maths_always_checked", "maths_checked"): "This was read from an image and holds "
     "maths, and every such block is checked, however sure the reader was: compare each formula "
     "with the original page symbol by symbol.",

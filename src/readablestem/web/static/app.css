@@ -420,6 +420,19 @@ math[intent] mi { text-transform: none; }
 .suggest .button { min-width: 7rem; min-height: 2.75rem; font-weight: 600; }
 .suggest .hint { margin: 0.35rem 0 0; }
 code.latex { overflow-wrap: anywhere; }
+
+/* A second reader's other readings of a doubtful symbol: plain buttons, none chosen, each a
+   44 px target; the spoken result sits beside its button and wraps on a narrow screen. */
+.chips { margin: 1rem 0 0.75rem; }
+.chip-group { margin: 0.5rem 0 0.75rem; }
+.chip-lead { margin: 0 0 0.35rem; overflow-wrap: anywhere; }
+.chip-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.chip-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; }
+.chip { min-height: 44px; min-width: 44px; font-weight: 600; max-width: 100%; white-space: normal; text-align: left; }
+.chip-said { color: var(--muted); overflow-wrap: anywhere; }
+@media (forced-colors: active) {
+  .chip { border: 2px solid ButtonText; }
+}
 .unseen-line { color: var(--muted); margin: 0 0 0.75rem; font-size: 0.95rem; }
 .group-state { font-weight: 600; margin: 0.25rem 0 0; }
 .redo-lead { margin: 0.9rem 0 0; }
