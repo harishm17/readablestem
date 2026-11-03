@@ -23,7 +23,9 @@ Conversion (`safe_latex_to_mathml`)
     `&` tokens, and `align`/`split` with the relation glued into the second cell. These
     environments are rewritten to `\begin{array}{rl...}` (right/left alternating
     columns, as many as the widest row needs) before conversion. The result is parsed,
-    escaped specials in text (`\%`, `\_`, `\#`, `\$`) are unescaped, and the tree is
+    escaped specials in text (`\%`, `\_`, `\#`, `\$`) are unescaped, the tree is reshaped for
+    screen readers (`mathml_shape`: degree sign, overline, labelled arrows; `chem_mathml`:
+    element symbols, states, nuclides, `intent` on `math`), and the tree is
     re-serialised only if every element and attribute is on the MathML allowlist, so
     the string handed on is always well-formed, namespaced and safe to insert, even for
     a caller that skips `check_latex` and `check_mathml`.
@@ -31,7 +33,8 @@ Conversion (`safe_latex_to_mathml`)
 MathML (`check_mathml`)
     Parsed with defusedxml (no DTDs, no entity expansion). Only presentation elements
     and layout attributes are allowed: no `href`, event handlers, `style`, `class`,
-    colours or speech overrides (`intent`, `arg`). Token elements hold text only, and
+    colours or speech overrides (`arg`; `intent` only on `math`, with the two chemistry values,
+    `:chemical-formula` and `:chemical-equation`). Token elements hold text only, and
     `math` appears only at the root. Size and depth are capped, fixed-arity elements
     must have the right number of children, and LaTeX leftovers (`\foo` or `\%` copied
     into a token) are flagged.
@@ -58,8 +61,11 @@ from latex2mathml.tokenizer import PATTERN as _LATEX2MATHML_TOKEN
 
 from readablestem.core.latex_groups import group_delimited_scripts
 from readablestem.core.mathchars import bake_bold_variants
+from readablestem.core.mathml_intent import intent_allowed
 from readablestem.core.types import Check
 from readablestem.pipeline.chem import arrows_as_operators, group_element_symbols
+from readablestem.pipeline.chem_mathml import shape_chemistry
+from readablestem.pipeline.mathml_shape import shape_general
 
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 
@@ -526,6 +532,8 @@ def safe_latex_to_mathml(latex: str, display: str = "block") -> str:
     bake_bold_variants(root)
     group_element_symbols(root)
     arrows_as_operators(root)
+    shape_general(root)
+    shape_chemistry(root)
     try:
         return serialize_mathml(root)
     except UnsafeMathMLError as exc:
@@ -550,9 +558,10 @@ ALLOWED_ELEMENTS = _words(
     """
 )
 # Layout attributes only. Deliberately absent: href, src, style, class, id, event
-# handlers, mathcolor/mathbackground (could hide content), xlink:*, and intent/arg
-# (MathML 4 speech overrides: a screen reader would say something other than what
-# sighted readers and the reviewer see; latex2mathml never emits them).
+# handlers, mathcolor/mathbackground (could hide content), xlink:*, and arg (a MathML 4
+# speech override: a screen reader would say something other than what sighted readers
+# and the reviewer see). `intent` is accepted on the root only, for exactly two values, the
+# chemistry ones `chem_mathml` writes (`core.mathml_intent`); see `_attribute_code`.
 ALLOWED_ATTRIBUTES = _words(
     """
     display displaystyle scriptlevel mathvariant mathsize dir fence form stretchy
@@ -605,6 +614,10 @@ def _attribute_code(elem: ET.Element, *, is_root: bool) -> str | None:
     code = None
     for key, value in elem.attrib.items():
         name = _local_name(key)
+        if name == "intent" and not key.startswith("{"):
+            if not (is_root and intent_allowed(value)):  # the `math` element, two values
+                return "unsafe_attribute"
+            continue
         if (
             key.startswith("{")
             or _UNSAFE_ATTRIBUTE_NAMES.match(name)

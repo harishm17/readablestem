@@ -25,6 +25,7 @@ import defusedxml.ElementTree as SafeET
 from defusedxml import DefusedXmlException
 
 from readablestem.core.mathchars import bake_bold_variants
+from readablestem.core.mathml_intent import intent_allowed
 
 Display = Literal["block", "inline"]
 
@@ -162,4 +163,6 @@ def sanitize_mathml(
         return None
     id_attr = f' id="{escape_text(element_id)}"' if element_id else ""
     alt_attr = f' alttext="{escape_text(alttext)}"' if alttext and alttext.strip() else ""
-    return f'<math display="{display}"{id_attr}{alt_attr}>{inner}</math>'
+    intent = root.get("intent", "")
+    intent_attr = f' intent="{intent}"' if intent_allowed(intent) else ""  # one of the two values
+    return f'<math display="{display}"{id_attr}{alt_attr}{intent_attr}>{inner}</math>'

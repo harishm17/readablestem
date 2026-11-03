@@ -46,7 +46,8 @@ def test_a_ce_answer_is_converted_checked_and_spoken():
     assert fix.equation is not None
     assert fix.equation.latex == r"\text{H}_3\text{O}^+"
     assert fix.equation.speech == "H 3 O plus"
-    assert "<mtext>H</mtext>" in fix.equation.mathml
+    assert '<mi mathvariant="normal">H</mi>' in fix.equation.mathml
+    assert 'intent=":chemical-formula"' in fix.equation.mathml
     assert [r.model for r in client.requests] == [CHEAP_MODEL]
 
 

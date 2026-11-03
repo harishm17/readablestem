@@ -105,6 +105,8 @@ def _walk(elem: ET.Element) -> list[str]:
             for cell in cells:
                 out += _walk(cell)
         return out
+    if tag == "mmultiscripts" and children:
+        return _multiscripts(children)
     if tag in _SCRIPT_TAGS and len(children) in (2, 3):
         base = _walk(children[0])
         if tag in _SUP and len(children) == 2:
@@ -133,6 +135,28 @@ def _walk(elem: ET.Element) -> list[str]:
     for child in children:
         out += _walk(child)
     return out
+
+
+def _multiscripts(children: list[ET.Element]) -> list[str]:
+    """`mmultiscripts` (what a screen reader's chemistry rules want for a nuclide, `pipeline.
+    chem_mathml`) in the stream the answer key's shape gives: the prefix scripts first (`_`
+    below, `^` above), then the base, then its own scripts. An empty (`none`) script adds
+    nothing."""
+    base, rest = children[0], children[1:]
+    names = [c.tag for c in rest]
+    split = names.index("mprescripts") if "mprescripts" in names else len(rest)
+    post, pre = rest[:split], rest[split + 1 :]
+
+    def scripts(items: list[ET.Element]) -> list[str]:
+        out: list[str] = []
+        for sub, sup in zip(items[0::2], items[1::2], strict=False):
+            if sub.tag != "none":
+                out += ["_", *_slot(sub)]
+            if sup.tag != "none":
+                out += ["^", *_slot(sup)]
+        return out
+
+    return [*scripts(pre), *_walk(base), *scripts(post)]
 
 
 def _no_bar(frac: ET.Element) -> bool:

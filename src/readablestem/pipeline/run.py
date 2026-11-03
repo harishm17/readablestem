@@ -169,7 +169,13 @@ log = logging.getLogger(__name__)
 # breaks (element ids after the first join shift), inline maths joined over a line break.
 # Heading fingerprints of the review carry change where a heading had math-italic letters.
 # Results from 0.5.0 load unchanged; their numbers were made under the old rules.
-PIPELINE_VERSION = "0.5.1"
+# 0.5.2 (2026-11-03): the MathML shape for screen readers (docs/chemistry.md, "MathML shape"):
+# one upright mi per element symbol, states as ( aq ), nuclides as mmultiscripts, `intent` on the
+# math element of a formula or a reaction, the degree sign, the overline and a labelled arrow.
+# The MathML of an equation with chemistry in it (and `^\circ`, `\overline`, `\xrightarrow`)
+# changes; its LaTeX does not, and review carry compares the LaTeX, so revised uploads carry what
+# is unchanged. Results from 0.5.1 load unchanged; their MathML keeps the old shape.
+PIPELINE_VERSION = "0.5.2"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
