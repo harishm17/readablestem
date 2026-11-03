@@ -216,9 +216,14 @@ our own would be a second MathML reader to keep right.
   of the flagged boxes (their words and each image's alt text stay), inline SVG, remote
   pictures, and any conformance claim: the tool assists, and nobody has checked how the file
   reads in Word with a screen reader. The review record says so.
-- **Not in "Download all".** That zip stays the HTML files: up to 25 documents through pandoc
-  would hold a request for a minute or more, and the HTML is the file to post. Word and EPUB
-  are one document at a time.
+- **In "Download all" and "Combine parts".** `?format=docx` on `/app/download`,
+  `/courses/{id}/download` and `/jobs/{id}/combine` gives a zip of Word files (or the joined
+  file as Word), with the single download's rules (`routes.exports.make_file`: the same two
+  pandoc turns, the same errors). Each document in a Word zip is a pandoc run, so a Word zip
+  holds at most 10 documents (`web.bundle.MAX_DOCUMENTS_BY_FORMAT`; the rest are named in
+  `contents.txt` as not included, and not made); a document that cannot be made is left out and
+  counted there too, and if none can be made the page says so. The default stays the HTML
+  files, the file to post. Each document counts as downloaded as `docx`.
 - **Tests** (`tests/test_export_docx.py`): the demo, the golden documents and the LaTeX
   conversions opened with python-docx (as many `m:oMath` as `<math>`, heading styles in the
   HTML's order, alt text on every picture and never an address, the language, the title);
@@ -230,7 +235,11 @@ our own would be a second MathML reader to keep right.
 
 A third form of the same document, made from the finished HTML alone like the two above
 (no pipeline step changes). `readablestem export epub FILE.html OUT.epub [--title T]` writes an
-EPUB 3; the job page's "Download as EPUB" (`GET /jobs/{id}/download.epub`) serves the same file. Nothing is read but the file: no network, no model.
+EPUB 3; the job page's "Download as EPUB" (`GET /jobs/{id}/download.epub`) serves the same file. "Download all" (`?format=epub` on `/app/download` and
+`/courses/{id}/download`) and "Combine parts" (`?format=epub`) give a zip of EPUB files and the
+joined file as an EPUB, up to the HTML zip's 25 documents; a document with a picture the EPUB
+cannot hold is left out of the zip and counted in `contents.txt`. Nothing is read but the file:
+no network, no model.
 
 | File | What it is |
 |---|---|

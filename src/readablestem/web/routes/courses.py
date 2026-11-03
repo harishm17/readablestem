@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from readablestem.core.notation import canonical_symbol
 from readablestem.core.types import DocumentResult
+from readablestem.pipeline import export_docx
 from readablestem.pipeline.notation_memory import describe, phrase
 from readablestem.web import documents, notation
 from readablestem.web.db import Course, CourseNotation, Job, session_scope, utcnow
@@ -145,6 +146,7 @@ def _course_page(
             "ready_documents": sum(
                 1 for row in listing.rows if row.status == "done" and not row.open_decisions
             ),
+            "word_export": export_docx.available(),  # "Download all as Word" needs pandoc
             "suggestions": notation.course_suggestions(session, get_ctx(request).settings, course),
         }
     return render(request, "course.html", context | (extra or {}), status_code=status)

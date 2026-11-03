@@ -19,6 +19,15 @@
 - Wording: the privacy notice, the accessibility-office page, the landing page and the job page no longer say
   that only the owner can see a document. docs/web.md, docs/security.md. Test: `tests/test_job_shares.py` (every
   job route against the owner, a viewer, a reviewer, a removed person and a stranger).
+## Unreleased: Word and EPUB in "Download all" (branch export/w3-download-all-formats)
+
+- "Download all" (My documents and the course page) and "Combine parts" offer Word (.docx, where pandoc is
+  installed) and EPUB as well as HTML: `?format=docx` or `?format=epub` on `/app/download`,
+  `/courses/{id}/download` and `/jobs/{id}/combine`. Same wording and pattern as the single downloads
+  ("Other file types"). A Word zip holds at most 10 documents (each is a pandoc run); a document that cannot
+  be made in the file type is left out and counted in `contents.txt`. Each document counts as downloaded in
+  that file type, so the review record lists it. The HTML zip no longer restarts the deletion clock of ready
+  documents it left out for the 25-document cap. docs/output.md, docs/web.md, docs/security.md.
 
 ## Unreleased: slide decks (branch layout/beamer-slides)
 

@@ -35,6 +35,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from readablestem.web.auth import normalise_email
+from readablestem.web.database import rowcount
 from readablestem.web.db import Job, JobShare, JobStatus, User, utcnow
 
 VIEW = "view"
@@ -124,7 +125,7 @@ def revoke(session: Session, job_id: str, share_id: str) -> bool:
     result = session.execute(
         delete(JobShare).where(JobShare.id == share_id, JobShare.job_id == job_id)
     )
-    return bool(result.rowcount)  # type: ignore[attr-defined]
+    return rowcount(result) > 0
 
 
 @dataclass(frozen=True)
