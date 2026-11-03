@@ -633,12 +633,25 @@ uv run python scripts/handwriting_eval.py report --part heldout   # needs the re
 A new live run needs `ANTHROPIC_API_KEY`, `run --part dev|heldout --max-usd N`, and a registration
 whose hashes hold; it refuses a second live run of a part.
 
+`scripts/handwriting_errors.py` classifies every wrong equation of every recorded arm by what
+differs (case, Greek against Latin, another letter, digit against letter, `z` against `2`, `x`
+against `×`, minus against dash, lost or added or changed script, fraction, root, structure,
+accent, operator or bracket, left out), the edit distance in symbols, and whether the product's
+speech code says the reading and the label alike. It reads the recorded answers and the gold, calls
+no model and writes a text table and, with `--json`, counts and examples per arm. The kinds are
+found from the symbol stream the symbol score uses, so one equation can have several, and a wrong
+equation with identical speech is a notation the label did not use. The JSON examples hold gold
+and reading LaTeX from the evaluation set (CC BY-NC-SA 4.0): keep the file out of the repo (the
+script prints this warning when it writes one). `--arms-root` and `--gold-root`
+point it at another recording.
+
 The second track (root causes, fixes, the fresh set):
 
 ```
 uv run python scripts/handwriting_accuracy.py build-fresh   # compose the fresh set (needs `fetch`)
 uv run python scripts/handwriting_accuracy.py verify-fresh  # rebuild and compare with data/handwriting/manifest-fresh.json
 uv run python scripts/handwriting_analysis.py classes --part heldout --arm control   # needs the recorded run
+uv run python scripts/handwriting_errors.py [--arm NAME] [--part PART] [--json FILE]   # every recorded arm, $0
 uv run --env-file .env python scripts/handwriting_accuracy.py run --part dev --arm NAME --max-usd 1 \
     [--prompt FILE] [--env KEY=VALUE ...] [--offline]
 uv run python scripts/typed_scans_check.py compare --arms base new   # docs/eval-image-pages.md, "Update"

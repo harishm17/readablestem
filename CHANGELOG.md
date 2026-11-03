@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased: chemistry speech fixes
+
+- The review screen's "read aloud roughly as" text (and the checks that compare readings) now
+  reads a state with conditions, `(aq, 0.10 M)`, as "aqueous, 0.10 molar"; a redox couple
+  `Cu²⁺/Cu` as "C u 2 plus slash C u" (it said "divided by"); the arrow in its own cell of a
+  half-reaction table as "reacts to form" (it said "right arrow" with the species cut off from it);
+  an excited nuclide `⁶⁰₂₈Ni*` as "nickel 60, atomic number 28, excited state"; and units after a
+  decimal in a chemistry row consistently (`0.000 V − 0.0592 V` both "volts"; `mol L⁻¹ s⁻¹` as one unit).
+  Speech for sets that are not chemistry is unchanged (`docs/chemistry.md`, "Reading it aloud").
+## Unreleased: handwriting error classifier (branch hw/error-analysis)
+
+- `scripts/handwriting_errors.py` classifies every handwriting error in the recorded answers: kind
+  (case, Greek against Latin, other letter, digit against letter, `z` against `2`, `x` against `×`,
+  minus against dash, lost or added script, fraction, root, structure, left out), edit distance in
+  symbols, and whether the product's speech code reads the answer and the label alike. Text table
+  plus JSON with examples per arm; tests in `tests/test_handwriting_errors.py`; usage in
+  docs/eval-handwriting.md. It calls no model and changes no product behaviour.
+## Unreleased: vector ink to strokes (branch hw/ink-strokes)
+
+- New `pipeline/ink_strokes.py`: reads a PDF page's vector ink into ordered strokes (stroked
+  paths, one filled shape per pen sample, filled outlines), keeps colour and paint order, drops
+  page furniture (ruled and squared paper, dot grids, dashed lines, frames, backgrounds), groups
+  strokes into lines and regions, and writes each region as normalised point lists or InkML.
+  It uses `page_type`'s caps and `InkBudget` and groups with a grid hash (near linear), so a
+  hostile page cannot stall a worker. Nothing in the pipeline calls it yet, so conversions are
+  unchanged. What is read and the limits:
+  [docs/layout.md](docs/layout.md), "Vector ink and strokes" (`tests/test_ink_strokes.py`).
 ## Unreleased: text layers that do not cover the page, and the maths rule as a guard (branch fix/handwriting-skip-and-flags)
 
 - A visible text layer no longer makes a page "typed" when it does not cover the page's content
