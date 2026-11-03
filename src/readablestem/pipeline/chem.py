@@ -26,9 +26,13 @@ parentheses with counts (`Ca(OH)2`, `[Cu(NH3)4]^2+`), charges (`Na+`, `OH-`, `SO
 `Fe^{3+}`), state symbols (`(aq)`, `(s)`, `(l)`, `(g)`), coefficients (`2`, `0.5`, `1/2`), `+`
 between species, the electron and particles (`e-`, `n`, `p`), hydrates (`CuSO4.5H2O`), bonds
 (`-`, `=`, `#`), nuclide prefixes (`^{14}_{6}C`, `^{0}_{-1}e`), and the arrows `->` `-->` `<-`
-`<->` `<=>`, with a label (`->[\Delta]`, `->[heat]`). Not supported (`CeError`): `<=>>`, `<<=>`,
-`^` and `v` as gas and precipitate marks, `$...$`, concentrations inside a state symbol
-(`(aq, 0.10 M)`), two-part arrow labels, and any text that is not a species.
+`<->` `<=>`, with a label (`->[\Delta]`, `->[heat]`, or two). A state symbol may carry a condition
+(`(aq, 0.10 M)`: a number and a unit from `_STATE`'s short list), a nuclide the excited state
+(`^{60}_{28}Ni^*`) and a mark for gas or precipitate (`CO2 ^`, `AgCl v`, after a species and a
+space, not before a number).
+Not supported (`CeError`): `<=>>`, `<<=>`, a mark anywhere else, `$...$`, other conditions,
+three-part arrow labels, and any text that is not a species. The module stays an allowlist:
+every construct is matched by name, and what is not matched is refused.
 """
 
 # ruff: noqa: RUF001
@@ -368,7 +372,14 @@ _ARROWS: list[tuple[str, str | None]] = [
 ]
 _COEFFICIENT = re.compile(r"(\d+(?:\.\d+)?)(?:/(\d+))?")
 _GREEK = re.compile(r"\\(alpha|beta|gamma|nu)(?![A-Za-z])")
-_STATE = re.compile(r"\((?:aq|s|l|g)\)")
+# A state symbol, with an optional condition after a comma: `(aq)`, `(aq, 0.10 M)`, `(g, 1 atm)`.
+# The condition is a number and a unit from a short list; anything else is outside the subset.
+_STATE = re.compile(
+    r"\((?:aq|s|l|g)(?:, ?\d+(?:\.\d+)?(?: ?(?:mM|M|m|atm|bar|kPa|Pa|mmHg|torr))?)?\)"
+)
+# A gas or precipitate mark after a species, set apart by a space: `BaSO4 v`, `CO2 ^`.
+_MARK = re.compile(r"([v^])(?=$|[ ,])")
+_MARKS = {"v": "\\downarrow", "^": "\\uparrow"}
 _LABEL_CHARS = re.compile(r"^[A-Za-z0-9 .,]+$")
 _SIGNS = "+−–-"
 _CARET_CHARGE = re.compile(r"\^([+−–-]?)(\d*)([+−–-]?)(?![A-Za-z0-9{])")
@@ -431,6 +442,8 @@ def _nuclide_prefix(s: str, i: int) -> tuple[str, int] | None:
 
 def _caret(s: str, i: int) -> tuple[str, int]:
     """A `^...` after a species at `s[i]`: the LaTeX superscript and the index after."""
+    if s.startswith("^*", i):
+        return "^*", i + 2  # the excited state: Ni^*
     if i + 1 < len(s) and s[i + 1] == "{":
         inner, j = _read_braced(s, i + 1)
         inner = inner.replace("−", "-").replace("–", "-")
@@ -450,6 +463,19 @@ def _bond_next(s: str, i: int) -> bool:
     not a state symbol: `C-C` and `C-(CH3)` are bonds, `Cl-(aq)` is a charge?"""
     after = s[i : i + 1]
     return bool(after) and (after.isalpha() or after in "([") and not _STATE.match(s, i)
+
+
+def _state_text(state: str) -> str:
+    """A state symbol as written in `\\text{...}`, with one space after the comma and one
+    before the unit: `(aq,0.10M)` is `(aq, 0.10 M)`."""
+    head, sep, rest = state[1:-1].partition(",")
+    if not sep:
+        return state
+    found = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*(\D*)", rest)
+    if found is None:
+        raise CeError("unreadable state condition")
+    number, unit = found.groups()
+    return f"({head}, {number}{' ' + unit if unit else ''})"
 
 
 def _species_latex(s: str, i: int) -> tuple[str, int]:
@@ -481,7 +507,7 @@ def _species_latex(s: str, i: int) -> tuple[str, int]:
             break  # the arrow after the species, not a charge or a bond
         state = _STATE.match(s, i) if c == "(" and base else None
         if state:
-            put("\\text{" + state.group(0) + "}")
+            put("\\text{" + _state_text(state.group(0)) + "}")
             i = state.end()
             base = False
         elif c in "([":
@@ -528,6 +554,10 @@ def _species_latex(s: str, i: int) -> tuple[str, int]:
             if not base:
                 raise CeError("superscript with nothing before it")
             latex, i = _caret(s, i)
+            if "*" in latex and not prefix:
+                # speech reads a star only on a nuclide (`^{60}_{28}Ni^*`, "excited state"); on a
+                # bare species it would say "to the power times", so a person decides
+                raise CeError("excited-state star outside a nuclide")
             put(latex)
         elif c == "_":
             if not base:
@@ -639,6 +669,15 @@ def _is_species_latex(piece: str) -> bool:
     return piece not in {"+", ","} and not piece.startswith(("\\long", "\\xr", "\\xl", "\\over"))
 
 
+def _ends_species(piece: str) -> bool:
+    """Is the last thing written a species with no mark yet (not a coefficient, plus or arrow)?"""
+    return (
+        _is_species_latex(piece)
+        and not re.fullmatch(r"[\d.]+|\\frac\{\d+\}\{\d+\}", piece)
+        and not piece.endswith(("\\downarrow", "\\uparrow"))
+    )
+
+
 def ce_to_latex(source: str) -> str:
     r"""Plain LaTeX for the body of one `\ce{...}`. Raises `CeError` for anything outside the
     subset in the module docstring. The result uses only commands the LaTeX check allows."""
@@ -677,9 +716,16 @@ def ce_to_latex(source: str) -> str:
             out.append(c)
             i += 1
             continue
+        mark = _MARK.match(s, i)
+        if mark and out and s[i - 1].isspace() and _ends_species(out[-1]):
+            if s[mark.end() :].lstrip()[:1].isdigit():
+                raise CeError("mark followed by a number")  # `H2 ^ 2` is not H2 given off
+            out[-1] += _MARKS[mark.group(1)]
+            i = mark.end()
+            continue
         state = _STATE.match(s, i)
         if state and out and _is_species_latex(out[-1]):
-            out[-1] += "\\text{" + state.group(0) + "}"
+            out[-1] += "\\text{" + _state_text(state.group(0)) + "}"
             i = state.end()
             continue
         match = _COEFFICIENT.match(s, i)
@@ -744,6 +790,20 @@ def convert_ce_commands(latex: str) -> str:
         inner, end = _read_braced(latex, j)
         out.append(ce_to_latex(inner))
         pos = end
+
+
+def expand_ce(latex: str) -> str:
+    r"""`latex` with each `\ce{...}` written out as plain LaTeX (`convert_ce_commands`) and the
+    bare `\middle|` of a cell's phase boundary made a bar (`tidy_cell_notation`). A `\ce`
+    outside the subset is left as it is, so the LaTeX check refuses it (`unsupported_ce`):
+    nothing is guessed. The one entry every LaTeX path uses (`equation_step.read_latex`)."""
+    latex = tidy_cell_notation(latex)
+    if "\\ce" not in latex:
+        return latex
+    try:
+        return convert_ce_commands(latex)
+    except CeError:
+        return latex
 
 
 # ================================================================================== MathML

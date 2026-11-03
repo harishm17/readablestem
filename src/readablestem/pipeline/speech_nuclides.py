@@ -39,10 +39,20 @@ PARTICLES = {"n": "neutron", "p": "proton", "α": "alpha particle", "β": "beta 
              "γ": "gamma ray"}  # fmt: skip
 
 
-def nuclide_words(symbol: str, mass: str | None, number: str | None) -> str | None:
+def nuclide_words(
+    symbol: str, mass: str | None, number: str | None, *, excited: bool = False
+) -> str | None:
     """The reading of a nuclide: `symbol` its letters, `mass` the mass number and `number`
-    the atomic number as printed (a signed integer, either may be None). None when the
+    the atomic number as printed (a signed integer, either may be None). `excited` is the
+    asterisk after the symbol (`Ni*`): ", excited state" ends the reading. None when the
     letters are not an element or a particle, so the caller reads the markup plainly."""
+    words = _nuclide_words(symbol, mass, number)
+    if words is None or not excited:
+        return words
+    return f"{words}, excited state"
+
+
+def _nuclide_words(symbol: str, mass: str | None, number: str | None) -> str | None:
     if mass is None and number is None:
         return None
     for value in (mass, number):

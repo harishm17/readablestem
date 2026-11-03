@@ -221,7 +221,7 @@ def test_launch_check_wants_tables_and_notation_in_the_privacy_notice(tmp_path, 
     assert launch.launch_blockers(settings=make_settings(tmp_path)) == [
         item for item in launch.launch_blockers() if "privacy" in item
     ]
-    privacy.write_text("<p>... and to rebuild tables ... the course's notation ...</p>")
+    privacy.write_text("<p>OpenAI ... and to rebuild tables ... the course's notation ...</p>")
     assert not any("privacy.html" in item for item in launch.launch_blockers(settings=on))
 
 

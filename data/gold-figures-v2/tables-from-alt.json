@@ -1,0 +1,170 @@
+{
+ "openstax/chemistry-atoms-first/8-2-relating-pressure-volume-amount-and-temperature-the-ideal-gas-law/fig-002": {
+  "header": [
+   "Temperature (°C)",
+   "Temperature (K)",
+   "Pressure (kPa)"
+  ],
+  "rows": [
+   [
+    "-150",
+    "173",
+    "36.0"
+   ],
+   [
+    "-100",
+    "223",
+    "46.4"
+   ],
+   [
+    "-50",
+    "273",
+    "56.7"
+   ],
+   [
+    "0",
+    "323",
+    "67.1"
+   ],
+   [
+    "50",
+    "373",
+    "77.5"
+   ],
+   [
+    "100",
+    "423",
+    "88.0"
+   ]
+  ],
+  "read_by": "set builder, from the OpenStax alt text",
+  "checked_against_image_by": "set builder, 2026-11-02"
+ },
+ "openstax/biology/46-3-biogeochemical-cycles/fig-000": {
+  "header": [
+   "Water",
+   "Percent"
+  ],
+  "rows": [
+   [
+    "Saltwater (of all water on Earth)",
+    "97.5"
+   ],
+   [
+    "Freshwater (of all water on Earth)",
+    "2.5"
+   ],
+   [
+    "Glaciers and permanent snow cover (of freshwater)",
+    "68.9"
+   ],
+   [
+    "Groundwater (of freshwater)",
+    "30.8"
+   ],
+   [
+    "Lakes and rivers (of freshwater)",
+    "0.3"
+   ]
+  ],
+  "read_by": "set builder, from the OpenStax alt text",
+  "checked_against_image_by": "set builder, 2026-11-02"
+ },
+ "openstax/principles-macroeconomics-2e/20-2-what-happens-when-a-country-has-an-absolute-advantage-in-all-goods/fig-000": {
+  "header": [
+   "Country (40 workers)",
+   "Most shoes",
+   "Most refrigerators"
+  ],
+  "rows": [
+   [
+    "United States",
+    "10000",
+    "40000"
+   ],
+   [
+    "Mexico",
+    "8000",
+    "10000"
+   ]
+  ],
+  "read_by": "set builder, from the OpenStax alt text",
+  "checked_against_image_by": "set builder, 2026-11-02"
+ },
+ "openstax/statistics/6-1-the-standard-normal-distribution/fig-000": {
+  "header": [
+   "Range",
+   "Percent of the distribution"
+  ],
+  "rows": [
+   [
+    "-1σ to 1σ",
+    "68"
+   ],
+   [
+    "-2σ to 2σ",
+    "95"
+   ],
+   [
+    "-3σ to 3σ",
+    "99.7"
+   ]
+  ],
+  "read_by": "set builder, from the OpenStax alt text",
+  "checked_against_image_by": "set builder, 2026-11-02"
+ },
+ "openstax/astronomy/21-5-exoplanets-everywhere-what-we-are-learning/fig-001": {
+  "header": [
+   "Planet size (Earth = 1)",
+   "Planets (number printed above the bar)"
+  ],
+  "rows": [
+   [
+    "0.5–0.7",
+    "55"
+   ],
+   [
+    "0.7–1",
+    "165"
+   ],
+   [
+    "1–1.4",
+    "381"
+   ],
+   [
+    "1.4–2",
+    "520"
+   ],
+   [
+    "2–2.8",
+    "567"
+   ],
+   [
+    "2.8–4",
+    "268"
+   ],
+   [
+    "4–5.7",
+    "94"
+   ],
+   [
+    "5.7–8",
+    "54"
+   ],
+   [
+    "8–11",
+    "53"
+   ],
+   [
+    "11–16",
+    "39"
+   ],
+   [
+    "16–23",
+    "17"
+   ]
+  ],
+  "read_by": "set builder, from the OpenStax alt text",
+  "checked_against_image_by": "set builder, 2026-11-02"
+ }
+}

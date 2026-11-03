@@ -43,6 +43,8 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "read files or change settings, so it is never allowed.",
     ("latex.allowed_commands", "unknown_command"): "The LaTeX uses a command that is not on "
     "the list of supported maths commands, so check for a typo or rewrite it.",
+    ("latex.allowed_commands", "unsupported_ce"): "The chemistry in \\ce{...} is outside what "
+    "this tool can read, so write the formula with ordinary LaTeX.",
     ("latex.allowed_environments", "unknown_environment"): "The LaTeX uses an environment "
     "(\\begin{...}) that is not supported.",
     ("latex.command_arguments", "bad_argument"): "A command has an argument in a form that is "
@@ -344,6 +346,11 @@ REASON_MESSAGES: dict[str, str] = {
     "budget_job_usd": "This document's spending limit was reached before this item was converted.",
     "budget_job_calls": "This document's limit on model calls was reached before this item "
     "was converted.",
+    # The handwriting readers' own share of the budget (models.math_readers.engine.ReaderBudget).
+    # A note on a fix that stands, never the reason of a failed one: `run._budget_scope` stops the
+    # job on a failed fix with a budget_ reason.
+    "budget_reader_usd": "The second reading of this expression was skipped because its share of "
+    "this document's budget was used, so the first reading stands and still needs your decision.",
     "budget_cancelled": "The conversion was stopped before this item was converted.",
     "budget_unknown": "A spending limit was reached before this item was converted.",
     # Pages and handwriting kept as images before any model work (pipeline.page_type).

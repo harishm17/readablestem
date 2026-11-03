@@ -9162,18 +9162,26 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any
             height = doc[number].rect.height
             paths[number] = [p for p in paths[number] if _box_zone(p.bbox, height) is not None]
     margins = _margin_filter(doc, selected, frags, paths)
+    for number in selected:
+        # A thin text layer over a page-sized picture makes the picture the page's content
+        # (`page_type.TEXT_NOT_COVERING`) unless the picture is the template's background
+        # or one plain colour: a title slide on a repeated background is typed.
+        result = types[number]
+        if (
+            page_type.TEXT_NOT_COVERING in result.reasons
+            and result.kind in ("scan_no_text", "scan_ocr")
+            and not _page_picture(doc[number], margins)
+        ):
+            types[number] = page_type.without_picture(result)
     # Handwritten and scanned pages are kept as their page image: nothing on them is read
     # (there is no handwriting or scan conversion). On a typed page with handwriting on
     # it, the ink stays out of the figures; each region of it is cut out instead.
     kept = {n: reason for n in selected if (reason := page_type.kept_reason(types[n]))}
     # A page kept as an image that has some visible typed text and nothing hidden (a title
-    # slide on a photo, a page of notes not analysed in time under its typed title) keeps
-    # that text; nothing drawn on it goes to the figure model.
-    text_kept = {
-        n
-        for n, reason in kept.items()
-        if reason == page_type.UNREAD_PAGE and types[n].text.visible_chars
-    }
+    # slide on a photo, a page of notes not analysed in time under its typed title, a
+    # watermark over a photographed page) keeps that text; nothing drawn on it goes to the
+    # figure model. The image page pass, when it reads such a page, replaces that text.
+    text_kept = {n for n in kept if page_type.keeps_text(types[n])}
     prepared = {}
     found: dict[int, list[tables.PageTable]] = {}
     detector = tables.DetectorBudget()  # the slow detections of this document (tables.py)
@@ -9284,8 +9292,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any
 def _kept_whole(kind: page_type.PageTypeResult) -> bool:
     """The page is kept as its page image and nothing on it is read (a kept page that has
     visible typed text keeps that text, `text_kept` in `_analyze_document`)."""
-    reason = page_type.kept_reason(kind)
-    return reason is not None and not (reason == page_type.UNREAD_PAGE and kind.text.visible_chars)
+    return page_type.kept_reason(kind) is not None and not page_type.keeps_text(kind)
 
 
 def _kept_page(page: pymupdf.Page, number: int) -> _PageBlocks:

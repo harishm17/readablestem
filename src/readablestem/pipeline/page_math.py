@@ -308,12 +308,21 @@ def verify(output: PageMathOutput | None, rows: Sequence[PageRow]) -> tuple[list
             continue
         segments.sort(key=lambda s: (_row_number(s.row), s.start))
         candidates.append(
-            Span(tuple(segments), expression.display, expression.role, expression.latex)
+            Span(tuple(segments), expression.display, expression.role, _latex_of(expression))
         )
     spans = [_retrimmed(span, by_id) for span in _resolve_overlaps(candidates, stats)]
     spans = [s for s in spans if s.segments]
     stats.verified = len(spans)
     return spans, stats
+
+
+def _latex_of(expression: Expression) -> str:
+    r"""The expression's LaTeX as the other readings are stored: a mathematics `\ce{...}`
+    written out and cleaned (`equation_step.read_latex`, as on every other path; one outside
+    the subset stays and does not convert)."""
+    from readablestem.pipeline.equation_step import read_latex  # equation_step imports this
+
+    return read_latex(expression.latex) if expression.role == "math" else expression.latex
 
 
 def _retrimmed(span: Span, rows: dict[str, PageRow]) -> Span:
