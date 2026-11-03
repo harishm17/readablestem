@@ -18,20 +18,22 @@ from __future__ import annotations
 from functools import cache
 
 from readablestem.gold import arxiv_gold as ag
-from readablestem.pipeline import math_canonical as mc
+from readablestem.pipeline import validate
+from readablestem.pipeline.equation_step import clean_latex
+from readablestem.pipeline.speech import mathml_to_speech
 
 
 @cache
 def _gold_speech(latex: str) -> str | None:
     try:
-        return mc.speech_of(ag.to_mathml(latex, False))
+        return mathml_to_speech(ag.to_mathml(latex, False))
     except Exception:  # gold the speech cannot read never matches
         return None
 
 
 def _pred_speech(latex: str) -> str | None:
     try:
-        return mc.speech_of(mc.latex_to_mathml(latex))
+        return mathml_to_speech(validate.safe_latex_to_mathml(clean_latex(latex), "inline"))
     except Exception:  # an unconvertible prediction is not right
         return None
 
