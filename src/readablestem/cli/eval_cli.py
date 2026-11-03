@@ -708,10 +708,11 @@ def _cmd_promote(args: argparse.Namespace) -> int:
     if client not in ("openai", "anthropic") and not (no_model and client == "none"):
         return _error("only real-model reports can be baselines (this one is a fake run)")
     if client == "anthropic" and args.out_dir is None:
-        # The committed baselines in data/eval are the OpenAI runs the CI gate compares with.
+        # The committed baselines in data/eval are the Claude runs the CI gate compares with.
         return _error(
-            "a report made with the anthropic provider would replace the OpenAI baseline "
-            "of the same name; give --out-dir to keep it apart"
+            "a report made with the anthropic provider is not copied into data/eval unless you "
+            "say where: give --out-dir (data/eval replaces the committed Claude baseline of the "
+            "same name, on purpose)"
         )
     if args.kind == "latest":
         if client == "anthropic":

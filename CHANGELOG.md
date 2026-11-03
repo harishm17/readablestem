@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- `eval-live.yml` runs weekly (Monday 06:17 UTC) and by hand, for the production provider (Claude):
+  equations, headings, figures, document and tables, each with its own hard `--max-usd` (total at most
+  $2.95 a week, about $0.70 expected), each report gated with `eval gate --require-current` against its
+  committed baseline (tables: floors), reports uploaded as artifacts and never committed. It needs the
+  secret `ANTHROPIC_API_KEY` (was `OPENAI_API_KEY`, equations only); a scheduled run without it skips
+  with a notice. Chromium fonts are installed as in `ci.yml`.
+- `eval-guard.yml` and `scripts/eval_guard.py`: a pull request that changes a model constant in
+  `config.py` or a prompt under `models/prompts/` fails without the matching `data/eval/latest-*.json`.
+  Opt-out: label `eval-unchanged` or commit trailer `Eval-Unchanged: <reason>`.
+- Docs: `docs/eval.md` says which pipeline version and date made each committed report (0.5.0, Claude,
+  2026-10-14 and 2026-10-21; it said 0.4.0) and tells `PIPELINE_VERSION` (`pipeline/run.py`, what reports
+  record) from the package `__version__` (0.1.0); `tests/test_eval_docs.py` keeps the table true. The 0.4.0
+  results sections are labelled as historical and are not rewritten.
 ### Monitoring and recovery
 
 - The daily backup keeps a dump only after it has been proved: gzip reads it back, it ends with pg_dump's completion line, it restores with errors fatal, every live table is in the restore and `alembic_version` matches. A failure prints `backup_failed reason=...`, removes the file and fails the run. The command is a readable bash script (`set -euo pipefail`) with tests (`tests/test_railway_backup_script.py`). `railway config apply` is needed to put it live.
