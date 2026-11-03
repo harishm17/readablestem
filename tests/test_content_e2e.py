@@ -40,10 +40,11 @@ from readablestem.core.types import (
 from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.base import VisionRequest
 from readablestem.models.fake import FakeVisionClient, image_key
-from readablestem.pipeline import assemble, table_step
+from readablestem.pipeline import table_step
 from readablestem.pipeline.html_checks import axe_checks, static_checks
 from readablestem.pipeline.run import convert_pdf
 from readablestem.web.messages import NOTICE_MESSAGES
+from readablestem.web.review import rerender_html
 
 LATEX = Path(__file__).parent / "fixtures" / "layout" / "latex"
 FIXTURES = sorted(p.name for p in LATEX.glob("*.pdf"))
@@ -145,14 +146,7 @@ def test_every_fixture_converts_with_every_feature_on(name):
     assert errors == [], failed
     # Rendering reads the stored result only: the same file from the stored JSON.
     stored = DocumentResult.model_validate_json(result.model_dump_json())
-    again = assemble.render_html(
-        title=stored.title,
-        lang=stored.lang,
-        elements=stored.elements,
-        fixes=stored.fixes,
-        crops=output.crops,
-        page_labels=stored.page_labels,
-    )
+    again = rerender_html(stored, output.crops)
     assert again == html
     # Notices: known codes with a sentence each; they never add a decision.
     assert all(n.code in NOTICE_CODES and n.code in NOTICE_MESSAGES for n in result.notices)
