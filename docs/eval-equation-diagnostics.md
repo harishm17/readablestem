@@ -232,12 +232,12 @@ a figure or an algorithm: `in_float`) is the nearest the gold has to "typed in a
 
 | part | inline gold | recall (found) | gold in floats found | precision (predicted) | cell equations: predicted, aligned |
 |---|---|---|---|---|---|
-| dev2 (tuned on) | 2,153 | 0.814 to 0.844 (1,752 to 1,818) | 186 to 247 of 442 | 0.902 to 0.902 | 75, 68 (0.907) |
-| held-out | 1,739 | 0.780 to 0.819 (1,357 to 1,424) | 94 to 161 of 326 | 0.880 to 0.881 | 69, 61 (0.884) |
-| fresh2 | 1,555 | 0.767 to 0.803 (1,193 to 1,249) | 112 to 167 of 329 | 0.910 to 0.905 | 46, 42 (0.913) |
-| fresh3 | 1,637 | 0.725 to 0.751 (1,187 to 1,229) | 85 to 125 of 473 | 0.898 to 0.898 | 73, 67 (0.918) |
+| dev2 (tuned on) | 2,153 | 0.814 to 0.844 (1,752 to 1,818) | 186 to 247 of 442 | 0.902 to 0.902 | 73, 67 (0.918) |
+| held-out | 1,739 | 0.780 to 0.819 (1,357 to 1,424) | 94 to 161 of 326 | 0.880 to 0.881 | 75, 68 (0.907) |
+| fresh2 | 1,555 | 0.767 to 0.803 (1,193 to 1,249) | 112 to 167 of 329 | 0.910 to 0.905 | 69, 61 (0.884) |
+| fresh3 | 1,637 | 0.725 to 0.751 (1,187 to 1,229) | 85 to 125 of 473 | 0.898 to 0.898 | 46, 42 (0.913) |
 | fresh4 | 1,513 | 0.658 to 0.679 (996 to 1,028) | 180 to 208 of 583 | 0.931 to 0.892 | 83, 34 (0.410) |
-| held-out and fresh2 to 4 (replay only) | 6,444 | 0.734 to 0.765 (4,733 to 4,930) | 471 to 661 of 1,711 | 0.902 to 0.893 (5,245 to 5,518) | 271, 204 (0.753) |
+| held-out and fresh2 to 4 (replay only) | 6,444 | 0.734 to 0.765 (4,733 to 4,930) | 471 to 661 of 1,711 | 0.902 to 0.893 (5,245 to 5,518) | 273, 205 (0.751) |
 
 Only dev2 was read to build the rule. Overall precision of the predicted inline equations falls on one part, fresh4
 (0.931 to 0.892), and the reason is one paper: 2309.04589 sets 39 results as `68.8±0.7`, whose gold types only the
