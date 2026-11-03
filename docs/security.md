@@ -87,7 +87,7 @@ cannot skip these checks unnoticed.
 
 | Class | Routes |
 |---|---|
-| Public | `/`, `/demo`, `/privacy`, `/terms`, `/limits`, `/help/posting`, `/status`, `/healthz`, `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
+| Public | `/`, `/demo`, `/privacy`, `/terms`, `/limits`, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (names of late scheduled tasks only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
 | Signed-in user, owner only | `/account`, `/account/delete` (GET, POST), `/app`, `/app/documents`, `/app/download`, `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages), everything under `/courses/...` (including `/courses/{id}/download`) |
 | Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
 | Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
@@ -281,7 +281,11 @@ a wrong alt text or equation, which the instructor reviews.
 - Erasure of a person (`readablestem users delete EMAIL --yes`, or the person's own "Delete my
   account", `ops.retention.erase_user`)
   removes their jobs, blobs, review edits, courses and notation, events, sign-in identities,
-  quota rows and the user. Only content-free aggregates and global daily spend remain. A test
+  quota rows (with the person's daily model spend) and the user. Only content-free aggregates and
+  global daily spend remain, and one ledger row (`erasure_ledger`: a SHA-256 of the random user id
+  and the time) so that restoring a backup can erase the account again (`readablestem ops
+  replay-erasures`, docs/operations.md "Backups and restore"). The ledger cannot be turned back into
+  a person; its limit is the window after the newest dump if the whole database is lost. A test
   fails when a table with a user id is added without being listed there.
 - **What deletion does not reach:** Postgres keeps dead rows until vacuum; the daily database
   backups hold every document that existed when they ran (the `backup` service on Railway keeps
@@ -369,6 +373,9 @@ Triage of what the scanners reported:
   the recipient's mail provider hold it until it expires or is used, and anyone who reads the
   mailbox can sign in.
 - Rate limits and the upload gate are per instance and in memory.
+- `/healthz/ops` is public and has no rate limit: it reads two rows and answers with at most the
+  words `backup`, `cron` or `database`. Scheduled-task failures are found by a GitHub Actions job
+  that stops after 60 days without a commit to the public repository, unless re-enabled.
 - The session cookie is readable by its owner (signed, not encrypted).
 - A copy of the converted HTML opened from disk has no CSP; it is built to need none.
 - Ingress is the public internet; nothing here is behind an identity-aware proxy.

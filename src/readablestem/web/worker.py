@@ -663,12 +663,15 @@ class Worker:
 
     # ------------------------------------------------------------------ one attempt
 
-    def _guard_for(self, pool: str | None, job_id: str | None = None) -> SpendGuard:
+    def _guard_for(
+        self, pool: str | None, job_id: str | None = None, user_id: str | None = None
+    ) -> SpendGuard:
         """The spend guard as the job `job_id` of `pool` sees it (`DbSpendGuard.scoped`:
-        its holds are in the pool and recorded against the job); a guard with no pools
-        (tests, CLI) is the same for everyone."""
+        its holds are in the pool and recorded against the job and its owner `user_id`, whose
+        day's spend the settlements add to); a guard with no pools (tests, CLI) is the same
+        for everyone."""
         scoped = getattr(self.guard, "scoped", None)
-        return scoped(pool, job_id) if callable(scoped) else self.guard
+        return scoped(pool, job_id, user_id) if callable(scoped) else self.guard
 
     def release_holds(
         self, *, job_ids: list[str] | None = None, older_than_s: float | None = None
@@ -704,6 +707,7 @@ class Worker:
         page_count: int,
         pool: str | None = None,
         image_pages: bool = False,
+        user_id: str | None = None,
     ) -> _Attempt:
         max_usd, max_calls = job_caps(self.settings, page_count, image_pages)
         attempt = _Attempt(
@@ -715,7 +719,7 @@ class Worker:
             pool=pool,
         )
         attempt.budget = _AttemptBudget(
-            guard=self._guard_for(pool, claim.job_id),
+            guard=self._guard_for(pool, claim.job_id, user_id),
             max_usd=max(0.0, max_usd - prior_usd),
             max_calls=max(0, max_calls - prior_calls),
             hold_on_job=lambda amount, calls: self._hold_on_job(attempt, amount, calls),
@@ -957,6 +961,7 @@ class Worker:
             page_count,
             pool,
             bool(job.image_pages),
+            job.user_id,
         )
         if pdf is None:
             return self._finish_failed(attempt, "upload_missing")

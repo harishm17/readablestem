@@ -152,6 +152,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | POST `/admin/linked-emails`, `/admin/linked-emails/remove` | admins | Let an allowed instructor also sign in with another Google address, or take that away (T3-10; "Sign-in, sessions and CSRF") |
 | POST `/internal/cron/aggregate-and-purge` | a scheduler (Cloud Scheduler on the Cloud Run path; production runs the `cron` service instead and does not call it) | `X-Cron-Token` header; aggregates, then purges, then runs the daily canaries |
 | GET `/healthz` | anyone | `{"status": "ok"}` after a database ping, else 503 |
+| GET `/healthz/ops` | anyone | `{"status": "ok", "stale": []}`, or 503 `{"status": "stale", "stale": ["backup"]}` naming only the late tasks: the daily backup (older than 26 h) and the hourly cron (older than 2 h), from `ops_heartbeat` (`ops/heartbeat.py`). No setting, no content |
 | GET `/readyz` | anyone | `{"status": "ready", "checks": {"database", "worker", "model_provider"}}`, one word per check, 503 `not_ready` if any is not ok (docs/operations.md, "Health, readiness and shutdown") |
 
 Every `/jobs/*` route answers 404 for a job that does not exist or belongs to someone
@@ -328,7 +329,8 @@ What the open tier changes, and where:
 **Accounts delete themselves.** `/account` lists what is held and the limits; `/account/delete`
 asks, and a POST with `confirm=yes` runs `ops.retention.erase_user` (the path of `readablestem
 users delete`: every job counted first, review decisions, waiting files, courses and notation,
-usage events, identities, linked addresses, sign-in links, daily counts, the row), clears the
+usage events, identities, linked addresses, sign-in links, daily counts, the row, and one
+content-free line in `erasure_ledger`), clears the
 session and goes to `/` with a notice. Usage events go with the account (they hold a pseudonymous
 user id and no content, and are deleted with the user, as before); what remains is the content-free
 daily totals. **Deleting is not a reset** (`web/tombstones.py`, table `deleted_accounts`): when an
@@ -341,8 +343,20 @@ purged the next day (`ops.retention.purge_tombstones`). Without this one person 
 delete and sign-up and drain the open spend pool and the day's places. `signup_days` itself is never
 given back.
 
+**The erasure ledger** (`erasure_ledger`: SHA-256 of the user id, `erased_at`; written by
+`ops.retention.erase_user`, kept for ever, no foreign key) exists so that restoring a backup does
+not resurrect an erased account. `readablestem ops replay-erasures [--ledger-csv FILE]` merges a
+ledger exported from the database that was replaced, then runs `erase_user` for every user whose
+hashed id is in the ledger (docs/operations.md, "Backups and restore"). User ids are random 128-bit
+values, so the hash says nothing about who the person was.
+
+**When the day's new accounts are used up** `quota.try_take_signup` logs `signup_cap_reached`
+(WARNING, `code=daily_cap`, no person) for the first refusal of the UTC day only, decided by one
+conditional UPDATE of `signup_days.cap_warned`, and `/admin` shows a notice until midnight UTC.
+
 **Admins.** `/admin` shows accounts today against the limit, accounts by tier and blocked, each
-person's tier, the open pool's spend, and a "Blocked accounts" table with Unblock. Block is
+person's tier, the open pool's spend, the 20 biggest spenders today and over all days kept by
+pseudonym (`quota_days.spent_usd`), and a "Blocked accounts" table with Unblock. Block is
 `auth.set_blocked(blocked=True)`: `set_allowed(allowed=False)`, so sessions end, queued and
 running jobs fail with `access_removed`, and admin rights are lost (not given back by
 unblocking). An admin cannot block themselves. With thousands of accounts the page lists the
@@ -994,8 +1008,16 @@ the day for claiming: while less than one call's worth is left in it, open-tier 
 are not claimed. Without `open_cap_usd` (tests, the command line) the pool's spend is
 recorded and never refuses.
 
+**Spend per person.** `scoped(pool, job_id, user_id)` records the owner on each hold
+(`spend_holds.user_id`, no foreign key) and the settlement adds the actual cost to the owner's
+`quota_days.spent_usd` for the day the hold was made, in the same transaction as the global
+`spend_days` update, whether the hold was still there or had been given back. It is kept as long
+as the `quota_days` row (until the person is erased) and shown on `/admin` by pseudonym. If the
+owner was erased while the call ran, the person's row cannot be made (its foreign key) and the cost
+counts in `spend_days` only. Spend settled before this existed has no person.
+
 **Holds do not outlive their process** (`spend_holds`). Every hold is also a row (id, day, amount,
-pool flag, job id, time) written in the same transaction as the hold, and the settlement deletes it
+pool flag, job id, user id, time) written in the same transaction as the hold, and the settlement deletes it
 first; whichever statement deletes a row is the one that releases its amount, so a hold is given
 back once however many settle or release it, and a late settlement of a released hold counts its
 spend and releases nothing. `DbSpendGuard.release_holds` gives back holds by job (the worker calls it
@@ -2321,12 +2343,16 @@ test fails when a table with a user id is added without it.
   it when the two were merged) and `d3f8a1c5b920` (`upload_results`: the answer to an upload of
   several files, kept an hour). `tests/test_web_migrations.py` checks the chain, the one head
   and both downgrades.
-- Last, `a6c2e9f4b713` (open sign-up, the head): `users.access_tier` (server default
+- `a6c2e9f4b713` (open sign-up): `users.access_tier` (server default
   `invited`, which is also the backfill: every existing account was added by an admin),
   `spend_days.open_spent_usd` and `open_held_usd`, `quota_days.rereads` (all server default 0)
   and the tables `signup_days`, `spend_holds` and `deleted_accounts`. Additive, so a release from before it keeps working on the
   migrated schema; the downgrade drops them. `tests/test_web_open_signup_migration.py` runs it
   up and down on SQLite with real rows, and `tests/test_web_postgres.py` on Postgres.
+- `e1a7c3b95d24` (ops monitoring, the head): the tables `ops_heartbeat` (`backup` and `cron`, a time
+  and a count note) and `erasure_ledger`, `quota_days.spent_usd` (server default 0),
+  `spend_holds.user_id` and `signup_days.cap_warned` (server default false). Additive; the downgrade
+  drops them. `a6c2e9f4b713` above is no longer the head.
 - New migration: change `web/db.py`, then
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic upgrade head` followed by
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic revision --autogenerate -m "..."`,
