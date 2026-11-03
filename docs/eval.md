@@ -1417,10 +1417,9 @@ decision, so "wrong cells not flagged" is 0 by construction; the floor matters f
 runs, which were not repeated. The wrapped last row of the orders-of-magnitude table is
 joined in the `grid` print (17 rows, "the known universe", "(current upper limit)");
 in the `booktabs` print the page break falls between rows; in the `norules` print the
-next page's part (one row under a repeated header, no rules) is not detected, so the
-row ends "(current" and the rest is read as headings and paragraphs (a detection miss of
-unruled tables, docs/tables.md "Known misses"; not fixed: tables get no further work
-for now).
+next page's part (one row under a repeated header, no rules) was not detected when this
+was measured, so the row ended "(current" and the rest was read as headings and
+paragraphs; `tables.find_continued` now finds it (docs/tables.md, "Continued tables").
 
 ## Page types (2026-10-09, no model)
 

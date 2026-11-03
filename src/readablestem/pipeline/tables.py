@@ -123,6 +123,7 @@ SCRIPT_SIZE = 0.85  # x the line's largest glyph: smaller glyphs may be scripts 
 RAISED = 0.2  # x the full-size glyph: a smaller one with its baseline this far up is raised
 STACK_GAP = 3.0  # x font size: furthest apart two rules of one booktabs table may be
 BLOCK_ROW_GAP = 1.3  # x font size: widest white gap between two lines of one text block
+MIN_TEXT_CELL_COLUMNS = 3  # fewer columns than this are left to PyMuPDF's grid (`_build`)
 TITLE_ROW_WORDS = 6  # a title row of a group of rows has no more words than this
 HEADER_GAP = 3.5  # x font size: widest white gap under a header row of a block
 RUNNING_WIDTH = 0.6  # share of a framed box's width that a line of running text covers
@@ -213,10 +214,13 @@ REASON_ROW_CONTINUED = "first row ends the last row of the page before"
 # starts: probably the rest of a cell the box ended a line too early (`_edge_text`). The grid
 # and a model that reads the crop both miss it, so the table step asks a person.
 REASON_EDGE_TEXT = "text at the table's edge outside its box"
+# One box of the detector held two tables, one under the other (`_split_boxes`).
+REASON_SPLIT_BOX = "one of two tables in a box, split at the gap between them"
 
 # Verdicts of `judge` (codes, safe to log and count).
 SOURCE_FRAME = "rule frame"  # `_rule_frames`: the span of a stack of rules of one extent
 SOURCE_TEXT = "text block"  # `_text_blocks`: lines of text in aligned columns
+SOURCE_SPLIT = "split part"  # `_split_boxes`: one of two tables a detector box held
 TABLE = "table"
 DROPPED = (
     "toc",
@@ -1359,6 +1363,48 @@ def _intersection(a: BBox, b: BBox) -> BBox:
     return max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])
 
 
+def _sparse_stack(grid: _Grid, row_rules: Sequence[float], page_width: float) -> bool:
+    """Is this a stack of at least three rules (top, under the header, bottom) whose header
+    row names two or more columns and whose body, in two or more lines, keeps to those
+    columns: every cell lies in one column and lines up with a header cell on its left edge,
+    its right edge or its centre? That is a table with one filled column (or two) between
+    its rules: the grid lines the text grid counts are only the header row. A line of running
+    text across the columns, or one that matches no header cell, is not that."""
+    rules = sorted(row_rules)
+    if len(rules) < FRAME_WHOLE_RULES or grid.columns < 2:
+        return False
+    head_end = rules[1]
+    by_line: dict[int, list[_Seg]] = {}
+    for seg in grid.segs:
+        by_line.setdefault(seg.line, []).append(seg)
+    head: list[_Seg] = []
+    body: list[list[_Seg]] = []
+    for members in by_line.values():
+        y = sum(s.y0 + s.y1 for s in members) / (2 * len(members))
+        if rules[0] < y < head_end:
+            head += members
+        elif head_end < y < rules[-1]:
+            body.append(members)
+    if len({s.columns[0] for s in head if len(s.columns) == 1}) < 2 or len(body) < 2:
+        return False
+    if any(len(s.columns) != 1 for s in head):
+        return False
+    for members in body:
+        if len(members) > 1 and sum(s.x1 - s.x0 for s in members) > 0.6 * page_width:
+            return False
+        for seg in members:
+            if len(seg.columns) != 1 or not any(
+                h.columns == seg.columns
+                and min(
+                    abs(h.x0 - seg.x0), abs(h.x1 - seg.x1), abs((h.x0 + h.x1 - seg.x0 - seg.x1) / 2)
+                )
+                <= 1.5 * ALIGN_TOL
+                for h in head
+            ):
+                return False
+    return True
+
+
 def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judgement:
     """Keep a proposed box as a data table, or say why not (`DROPPED` codes). `joined`: the box
     is a stack of rule spans that a table of the detector's lies in (`_joined_frames`), so
@@ -1399,6 +1445,12 @@ def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judge
     ruled_cells = ruled and len(row_rules) >= 3 and len(column_rules) >= 3
     drawing = _drawing(view, box, grid.size)
     own = proposal.source != "detector"
+    # A booktabs stack whose header names the columns and whose body fills only some of them
+    # has no row of cells for the text grid to see, but the three rules and the header say
+    # what it is.
+    sparse = (
+        proposal.source == SOURCE_FRAME and ruled and _sparse_stack(grid, row_rules, view.width)
+    )
     # Lines of "symbol    if condition" are aligned enough whatever their scripts do to it.
     strong = grid.strong or (
         own and grid.columns >= 2 and grid.grid_lines >= CONDITION_LINES and _conditions(grid)
@@ -1435,7 +1487,7 @@ def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judge
         verdict.verdict = "labels"
     elif drawing and not (grid.strong and grid.grid_lines >= 0.5 * grid.lines):
         verdict.verdict = "figure"
-    elif strong or (ruled and grid.weak and not own) or ruled_cells or captioned:
+    elif strong or (ruled and grid.weak and not own) or ruled_cells or captioned or sparse:
         verdict.verdict = TABLE
         if ruled:
             verdict.reasons.append(REASON_RULED)
@@ -1455,7 +1507,7 @@ def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judge
             if not joined and (
                 _running_text(_text_grid(view, box, []), box)
                 or grid.lines < BLOCK_MIN_LINES
-                or grid.grid_lines < FRAME_GRID_SHARE * grid.lines
+                or (grid.grid_lines < FRAME_GRID_SHARE * grid.lines and not sparse)
             ):
                 verdict.verdict = "no_grid"  # rules around paragraphs, or around one line
             else:
@@ -2574,6 +2626,7 @@ def _find_in(
     judged = [(p, judge(p, view)) for p in proposals]
     judged += _joined_frames(judged, view)
     _split_stacked(judged)
+    judged += _split_boxes(judged, view)
     _mark_containers(judged)
     kept: list[tuple[Proposal, Judgement]] = []
 
@@ -2755,6 +2808,107 @@ def _split_stacked(judged: list[tuple[Proposal, Judgement]]) -> None:
         ]
         if len(parts) >= 2 and sum(_area(j.bbox) for j in parts) >= 0.6 * _area(box):
             judgement.verdict = "split"
+
+
+SPLIT_GAP = 2.0  # x the median gap between lines: a gap this wide can separate two tables
+SPLIT_GAP_SIZE = 1.5  # x font size: ... and is at least this wide
+SPLIT_MIN_LINES = 3  # lines a part needs to be a table of its own (header and two rows)
+
+
+def _split_boxes(
+    judged: list[tuple[Proposal, Judgement]], view: _PageView
+) -> list[tuple[Proposal, Judgement]]:
+    """The detector boxes two tables set one under the other as one table, its columns the
+    union of both. A kept, unruled box of the detector is cut at a clear separator: a gap
+    between two lines at least `SPLIT_GAP` times the usual gap, and `SPLIT_GAP_SIZE` times
+    the text size, or a "Table N" line in the middle of it. Where the gap is all there is, the
+    two sides must differ: other columns, or each begins with a header row (a line with no
+    value) over lines with values. Each part must then pass `judge` on its own, with the
+    evidence of an aligned grid, or the box is left as it was. Returns the parts' (proposal,
+    judgement) pairs; the box's verdict becomes "split"."""
+    out: list[tuple[Proposal, Judgement]] = []
+    for proposal, judgement in judged:
+        if (
+            proposal.source != "detector"
+            or judgement.verdict != TABLE
+            or REASON_RULED in judgement.reasons
+        ):
+            continue
+        parts = _split_at_gaps(view, judgement.bbox)
+        if len(parts) < 2:
+            continue
+        verdicts = [
+            (part, judge(part, view))
+            for part in (Proposal(box, [], 0, SOURCE_SPLIT) for box in parts)
+        ]
+        if any(v.verdict != TABLE or REASON_RULED in v.reasons for _, v in verdicts):
+            continue
+        for _, v in verdicts:
+            v.reasons.append(REASON_SPLIT_BOX)
+        judgement.verdict = "split"
+        out += verdicts
+    return out
+
+
+def _split_at_gaps(view: _PageView, box: BBox) -> list[BBox]:
+    """The boxes of the parts of `box` between its separators (`_split_boxes`); [] when it has
+    none, or a part is too short."""
+    lines = sorted(
+        (ln for ln in _visual_lines(view.glyphs_in(box)) if any(not c.blank for c in ln)),
+        key=lambda ln: min(c.y0 for c in ln if not c.blank),
+    )
+    if len(lines) < 2 * SPLIT_MIN_LINES:
+        return []
+    segs, _, _ = _segments(lines, [])
+    by_line: dict[int, list[_Seg]] = {}
+    for seg in segs:
+        by_line.setdefault(seg.line, []).append(seg)
+    if len(by_line) != len(lines):
+        return []
+    top = [min(s.y0 for s in by_line[i]) for i in range(len(lines))]
+    bottom = [max(s.y1 for s in by_line[i]) for i in range(len(lines))]
+    gaps = [top[i + 1] - bottom[i] for i in range(len(lines) - 1)]
+    usual = statistics.median(gaps)
+    size = statistics.median(s.size for s in segs)
+    cuts_at = []
+    for i, gap in enumerate(gaps):
+        text = " ".join(s.text for s in sorted(by_line[i + 1], key=lambda s: s.x0))
+        captioned = bool(TABLE_CAPTION.match(" ".join(text.split())))
+        wide = gap >= SPLIT_GAP * usual and gap >= SPLIT_GAP_SIZE * size
+        if captioned or wide:
+            cuts_at.append((i + 1, captioned))
+    if not cuts_at:
+        return []
+    bounds = [0, *(i for i, _ in cuts_at), len(lines)]
+    groups = [range(a, b) for a, b in pairwise(bounds)]
+    if any(len(g) < SPLIT_MIN_LINES for g in groups):
+        return []
+    if not all(captioned for _, captioned in cuts_at):
+        # Only a gap between them: the parts must be different tables.
+        shapes = []
+        for g in groups:
+            part = _union_box([s for i in g for s in by_line[i]])
+            grid = _text_grid(view, part, [])
+            lefts: dict[int, list[float]] = {}
+            for seg in grid.segs:
+                lefts.setdefault(seg.columns[0], []).append(seg.x0)
+            starts = [statistics.median(lefts[c]) for c in sorted(lefts)]
+            shapes.append((starts, _header_first(by_line[g[0]], [by_line[i] for i in g[1:]])))
+        same = all(
+            len(a[0]) == len(b[0])
+            and all(abs(x - y) <= 2 * ALIGN_TOL for x, y in zip(a[0], b[0], strict=True))
+            for a, b in pairwise(shapes)
+        )
+        if same and not all(header for _, header in shapes):
+            return []
+    return [_union_box([s for i in g for s in by_line[i]]) for g in groups]
+
+
+def _header_first(first: list[_Seg], rest: list[list[_Seg]]) -> bool:
+    """Does a part begin with a header row: no value in its first line, a value below it?"""
+    if any(_QUANTITY.match(s.text) for s in first):
+        return False
+    return any(_QUANTITY.match(s.text) for line in rest for s in line)
 
 
 # ------------------------------------------------------------- a page whose text is set sideways
@@ -2995,6 +3149,22 @@ def _build(
         # are the evidence it was found by, so on a tie they beat a model's reading, which
         # joins neighbouring rows of a list; the drawn cells, when there are any, still win.
         candidates.insert(1 if ruled is not None else 0, (REASON_TEXT_CELLS, *cells))
+    elif (
+        cells is not None
+        and ruled is None
+        and found is None
+        and _columns_of(cells[0]) >= MIN_TEXT_CELL_COLUMNS
+        and not any(len(seg.text.split()) > PROSE_WORDS + 1 for seg in text.segs)
+        and any(_columns_of(slots) > _columns_of(cells[0]) for _, slots, _ in candidates)
+    ):
+        # Without the model file, last, so that it only wins where it fits the glyphs strictly
+        # better: PyMuPDF infers a grid from the rules between rows of a booktabs table and puts
+        # an extra column wherever a cell has a gap in it ("1.675 | x 10^-27"). Only against a
+        # grid with more columns than the text's, for a table of at least three columns and no
+        # running text in its cells (a justified cell has gaps of its own, and with the
+        # model SLANet-plus is the better reader of a narrow gutter), and not beside a drawn
+        # cell grid (the table's own).
+        candidates.append((REASON_TEXT_CELLS, *cells))
     best: tuple[int, int, TableGrid, str] | None = None
     for attempt in range(2):
         for rank, (reason, slots, header_rows) in enumerate(candidates):
@@ -3023,6 +3193,10 @@ def _build(
         layout_grid=is_layout_grid(best[2])
         and (proposal.source != SOURCE_TEXT or _bold_terms(text)),
     )
+
+
+def _columns_of(slots: Sequence[Slot]) -> int:
+    return max((s.col + s.col_span for s in slots), default=0)
 
 
 def _slanet_slots(page: pymupdf.Page, box: BBox) -> tuple[list[Slot], int] | None:
@@ -3144,9 +3318,17 @@ def _text_slots(view: _PageView, box: BBox, text: _Grid) -> tuple[list[Slot], in
     bottoms = {i: max(s.y1 for s in by_line[i]) for i in order}
     pitches = [tops[b] - tops[a] for a, b in pairwise(order)]
     leading = min((p for p in pitches if p > 0.3 * text.size), default=text.size)
+    # A row starts at a line with text in the first column; a table whose body leaves that
+    # column empty (only the header has text in it) starts its rows in the first column
+    # that the body fills on two lines or more.
+    used = [{c for s in by_line[line] for c in s.columns} for line in order]
+    lead = 0
+    if sum(1 for cols in used if 0 in cols) <= 1:
+        filled = Counter(c for cols in used[1:] for c in cols)
+        lead = min((c for c, n in filled.items() if n >= 2), default=0)
     rows: list[list[int]] = []
     for k, line in enumerate(order):
-        starts = any(0 in s.columns for s in by_line[line])
+        starts = min(used[k]) <= lead
         tight = k > 0 and tops[line] - tops[order[k - 1]] <= 1.15 * leading
         if starts or not rows or not tight:
             rows.append([line])
@@ -3469,3 +3651,171 @@ def continues(previous: PageTable, table: PageTable, page_width: float) -> bool:
         return False
     tolerance = CONTINUED_TOL * page_width
     return all(abs(x - y) <= tolerance for x, y in zip(a, b, strict=True))
+
+
+# ----------------------------------------------------------------------------- continued, unruled
+
+
+CONTINUED_GAP = 1.6  # x font size: widest white gap between two lines of one continued table
+CONTINUED_BOTTOM = 0.5  # the table before reaches below this share of its page's height
+CONTINUED_PROSE_WORDS = 7  # a lone first-column line of more words than this is running text
+
+
+def find_continued(
+    page: pymupdf.Page,
+    lines: Sequence[LineLike],
+    paths: Sequence[PathLike],
+    previous: PageTable,
+    found: Sequence[PageTable] = (),
+    *,
+    clean: Callable[[str], str] = lambda s: " ".join(s.split()),
+) -> PageTable | None:
+    """The part of `previous` that a page break carried to the top of this page, when the
+    detector did not find it: see `_continued_in`. Never raises (one content-free warning);
+    None when `found` already holds a table where it would sit."""
+    try:
+        view = _PageView.of(page, lines, paths)
+        table = _continued_in(view, previous, clean)
+    except Exception as exc:
+        log.warning("continued table detection failed on a page: %s", type(exc).__name__)
+        return None
+    if table is None or any(_overlaps(table.bbox, other.bbox) for other in found):
+        return None
+    return table
+
+
+def _continued_in(
+    view: _PageView, previous: PageTable, clean: Callable[[str], str]
+) -> PageTable | None:
+    """A table with no rules that goes on at the top of the page: the table before
+    (`previous`, a data table with header rows reaching down its page) has its header rows
+    repeated here, word for word, in the same cells, with nothing above them but a running
+    header. A table of one row under a repeated header (the rest of a row the page break
+    split) has too few lines to be found as an aligned grid, and was read as headings and
+    paragraphs. The columns are the header's (they must be as many as `previous` has); the
+    lines under it are rows while their cells sit in one column each, at the table's own
+    leading, and stop at a caption or a line of running text. Layout then treats it as
+    any other continued table (`continues`, `join_split_row`)."""
+    before = previous.grid
+    wanted = before.header_rows
+    if (
+        not before.is_data
+        or wanted < 1
+        or before.cols < 2
+        or not previous.column_edges
+        or previous.bbox[3] < CONTINUED_BOTTOM * view.height
+    ):
+        return None
+    head = [
+        [" ".join(t.split()) for t in _row_texts(before, r) if t.strip()] for r in range(wanted)
+    ]
+    whole = (0.0, 0.0, view.width, view.height)
+    vlines = [
+        ln for ln in _visual_lines(view.glyphs_in(whole, pad=0.0)) if any(not c.blank for c in ln)
+    ]
+    vlines.sort(key=lambda ln: min(c.y0 for c in ln if not c.blank))
+    segs, _, _ = _segments(vlines, [])
+    by_line: dict[int, list[_Seg]] = {}
+    for seg in segs:
+        by_line.setdefault(seg.line, []).append(seg)
+    order = [i for i in range(len(vlines)) if i in by_line]
+
+    def cells_of(index: int) -> list[str]:
+        return [clean(" ".join(s.text.split())) for s in sorted(by_line[index], key=lambda s: s.x0)]
+
+    start = next((k for k, i in enumerate(order) if cells_of(i) == head[0]), None)
+    if start is None or start + wanted > len(order):
+        return None
+    if any(cells_of(order[start + r]) != head[r] for r in range(wanted)):
+        return None
+    band = TOP_BAND * view.height
+    for i in order[:start]:  # nothing above the repeated header but a running header
+        if (min(s.y0 for s in by_line[i]) + max(s.y1 for s in by_line[i])) / 2 > band:
+            return None
+    members = order[start : start + wanted]
+    header_box = _union_box([s for i in members for s in by_line[i]])
+    top = _text_grid(view, header_box, [])
+    if top.columns != before.cols:
+        return None
+    cuts = top.cuts
+    size = top.size
+    _assign_columns(segs, cuts)
+    body: list[int] = []
+    last = members[-1]
+    for i in order[start + wanted :]:
+        mine = by_line[i]
+        gap = min(s.y0 for s in mine) - max(s.y1 for s in by_line[last])
+        text = " ".join(s.text for s in sorted(mine, key=lambda s: s.x0))
+        if (
+            gap > CONTINUED_GAP * size
+            or any(len(s.columns) != 1 for s in mine)
+            or any(abs(s.size - size) > EDGE_SIZE_TOLERANCE for s in mine)
+            or TABLE_CAPTION.match(clean(text))
+            or (
+                len(mine) == 1
+                and 0 in mine[0].columns
+                and len(text.split()) > CONTINUED_PROSE_WORDS
+            )
+        ):
+            break
+        body.append(i)
+        last = i
+    if not body:
+        return None
+    rows: list[list[int]] = [[i] for i in members]
+    leading = min(
+        (
+            min(s.y0 for s in by_line[b]) - min(s.y0 for s in by_line[a])
+            for a, b in pairwise([*members, *body])
+        ),
+        default=size,
+    )
+    for k, i in enumerate(body):
+        before_line = [*members, *body][wanted + k - 1]
+        starts = any(0 in s.columns for s in by_line[i])
+        tight = (
+            min(s.y0 for s in by_line[i]) - min(s.y0 for s in by_line[before_line])
+            <= 1.15 * leading
+        )
+        if starts or k == 0 or not tight:
+            rows.append([i])
+        else:
+            rows[-1].append(i)
+    box = _union_box([s for r in rows for i in r for s in by_line[i]])
+    text_grid = _text_grid(view, box, cuts)
+    if text_grid.columns != before.cols:
+        return None
+    xs = [box[0], *cuts, box[2]]
+    tops = [min(s.y0 for i in r for s in by_line[i]) for r in rows]
+    bottoms = [max(s.y1 for i in r for s in by_line[i]) for r in rows]
+    edges = [box[1], *((bottoms[k] + tops[k + 1]) / 2 for k in range(len(rows) - 1)), box[3]]
+    slots = [
+        Slot(r, c, 1, 1, (xs[c], edges[r], xs[c + 1], edges[r + 1]))
+        for r in range(len(rows))
+        for c in range(before.cols)
+    ]
+    grid = fill(slots, text_grid.words, header_rows=wanted, clean=clean)
+    if grid is None or grid.header_rows != wanted:
+        return None
+    table = PageTable(
+        bbox=_rounded(box),
+        grid=grid,
+        caption=None,
+        lines=set(),
+        paths=set(),
+        reasons=[REASON_TEXT_CELLS],
+        at_top=True,
+        column_edges=list(previous.column_edges),
+    )
+    table.lines = _claimed_lines(view, table.bbox)
+    _attach_captions(view, [table], clean)
+    return table
+
+
+def _union_box(segs: Sequence[_Seg]) -> BBox:
+    return (
+        min(s.x0 for s in segs),
+        min(s.y0 for s in segs),
+        max(s.x1 for s in segs),
+        max(s.y1 for s in segs),
+    )

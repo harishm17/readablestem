@@ -114,6 +114,16 @@ rules above.
    prose columns, or one gutter in the middle of the page), references, numbered or bulleted
    lines, algorithm lines, equations (lines of relations, equation numbers), authors and
    addresses, a block of bare numbers (a matrix) or running text in a box (`_text_block_dropped`).
+   A stack of three rules (top, under the header, bottom) whose header row names two or more
+   columns and whose body keeps to them in two lines or more (every cell in one column, lined
+   up with a header cell by left edge, right edge or centre) is a table even with text in only
+   one column (`_sparse_stack`); a note framed by the same rules, with a title and running
+   text, is not. A kept unruled box of the detector that holds two tables is cut at a clear
+   separator (`_split_boxes`): a "Table N" line in the middle of it, or a gap at least twice
+   the usual one between lines (and 1.5 x the text size) where the two sides differ in columns
+   or each begins with a header row; each part must be kept by `judge` on its own, else the
+   box stays as it was. A table and a plot in one box, and two ruled tables in one box, are
+   not split.
 3. **Structure.** Up to three grids compete: the **drawn cell grid** (the lattice of the
    rules, cells merged where a rule is missing; only for a table ruled on all four
    sides), **SLANet-plus** (PaddlePaddle's table-structure model, run as RapidTable does,
@@ -128,6 +138,13 @@ rules above.
    model's reading (SLANet-plus joined neighbouring rows of a list), and of last resort for any
    box that no other structure fits, so a table the model file is missing for is no longer
    dropped when its box was grown past the detector's.
+   Without the model file the text cell grid also competes against PyMuPDF's grid when
+   that has more columns than it and no drawn cell grid exists (a booktabs table: rules
+   between rows, none between columns), and wins only by a strictly better fit: PyMuPDF puts
+   a column more wherever a cell has a wide gap in it ("1.675 x 10^-27", "p = mv"). Only for
+   a table of three columns or more with no running text in its cells: a justified cell has
+   gaps of its own, and with the model SLANet-plus reads a narrow gutter better (the text
+   grid merged a three-column table's first two columns on a real paper's page).
 4. **Fill.** Each cell's text is the PDF's own words, never OCR: a word goes to the cell
    its box falls in (by the medians of the cells' edges, so one badly placed cell box
    does not matter). A subscript stays in its word, an accent drawn above a letter
@@ -174,6 +191,14 @@ rules above.
    (`"first row ends the last row of the page before"`), and a second table left with
    only its repeated header is dropped (its caption goes to the first). The table step
    reads the model's answers the same way (`table_step.with_split_rows`).
+   A continued table with no rules is found on its own (`find_continued`, called by
+   layout when the detector found nothing at the top of a page that goes on from a table):
+   the table before has header rows and reaches below the middle of its page, the page's
+   first lines (under a running header at most) repeat those header rows cell for cell, and
+   the lines under them keep to the header's columns at the table's own leading and stop at
+   a caption or a line of running text. The one row left under a repeated header is too
+   few lines for the aligned-text test, so before this the header, the split row and the
+   next row were read as headings and paragraphs.
 
 What layout does with the result: the table's lines, rules and caption lines leave the
 page, and a TABLE element is placed in reading order like a figure (a grid of terms:
@@ -290,15 +315,27 @@ local` (docs/eval.md, "Tables").
   documents"). Still missed: lists of relations (`X_n ~ f(n)  if ... -> 1`, 2 of 25 on the real-document
   development set), an unruled table of bare numbers with no caption (a matrix looks the same), and
   label-value pairs joined by leader lines.
-- **A sparse table** whose body has text in only one column, between two rules, has no
-  grid to see and is dropped.
-- **Two tables in one box** (or a table and a plot) stay one table.
+- **A sparse table** with text in one column is kept when it has three rules and a header
+  that names two columns (see "How a page's tables are found"). One with only a top and a
+  bottom rule, a header-less one, or one whose only filled column lines up with no header
+  cell is still dropped.
+- **Two tables in one box** are split when they are unruled, one under the other, and
+  separated by a caption or a wide gap that the table's own structure confirms, each at
+  least three lines long. Not split: two ruled tables in one box, a table and a plot, tables
+  side by side, and a table of two lines or fewer.
 - **Maths in cells** is flattened to characters in the local grid (only superscripts are
-  kept, as superscript characters). With `FEATURE_TABLES` off the table is a picture and the
+  kept, as superscript characters). Reading a cell's maths-font runs the way the body's
+  inline equations are read would not be a contained change: the body's path finds the run
+  (`layout._inline_runs`) and then sends it to the equation step, a model call, for its
+  LaTeX; the grid keeps no per-glyph font data, and a table cell is not an inline element.
+  Left as it is. With `FEATURE_TABLES` off the table is a picture and the
   formulas in its cells are lost (102 of the 335 gold equations of the dev chemistry sections);
   with it on the table step reads them (59% found there), see the end of this page.
-- **Without the model file**, booktabs tables with spanning headers or maths cells can
-  get a column too many (PyMuPDF splits "Specific heat (J/kg K)" or "p = mv").
+- **Without the model file**, a booktabs table whose cell has a wide gap in it (a spanning
+  header, "p = mv") no longer gets an extra column when the text's own cells have fewer
+  (three columns or more, no running text). Tables of two columns, with running text in a
+  cell, or whose rows wrap onto several lines keep PyMuPDF's grid, which can still read a
+  wrapped cell as more rows than it has.
 - **Prose layout grids** (one column, or a term and its definition in two columns) keep
   the paragraph path, which can still read two columns as text columns. A key-terms
   grid printed so that a term wraps onto a row of its own (one print of the gold's
@@ -307,11 +344,11 @@ local` (docs/eval.md, "Tables").
   Instructor | Dr. Alex Rivera, Office | Science Building 2.104): with `FEATURE_TABLES`
   off it is an image and a required decision; the local check cannot tell it from a
   two-column table of data.
-- **A row split by a page break in an unruled table**: the next page's part (one row
-  under a repeated header, no rules) is not detected, so `join_split_row` has nothing to
-  join: the repeated header, the split row's last line and the next row are read as
-  headings and paragraphs (the `norules` print of the gold's 1-3 orders-of-magnitude
-  table). Not fixed: tables get no further work while `FEATURE_TABLES` is off.
+- **A row split by a page break in an unruled table** is joined when the next page's part
+  repeats the table's header rows (see "Continued tables"). A table with no header rows, a
+  repeated header that is not word for word the same, a second page with text above the
+  repeated header, and a page break that leaves only a part of a row with no header repeated
+  are not joined.
 
 ### Upgrade check
 
@@ -345,6 +382,11 @@ exception's class name), never text. MuPDF's own messages are counted and droppe
   the detected tables are kept as images with a required decision.
 - `tests/test_tables_model.py`: the checked download, the command, the Docker step, the
   licence files and the vendored pre- and post-processing.
+- `tests/test_tables_structure.py`: the structure fixes of 2026-11 (generated pages): the split row of an
+  unruled table joined across the page break and its negatives, a sparse booktabs table with its
+  one filled column first, in the middle and last, two tables in one box split (other columns,
+  same columns with header rows, a caption in the middle) and a gap inside one table left
+  alone, and the booktabs cell with a gap in it that no longer gets a column without the model file.
 - `tests/test_tables_recall.py`: the real-document misses one by one (pages of `data/real-tables`),
   unruled lists and what must stay text (page columns, numbered equations, references, algorithm
   lines, matrices), a table set sideways, Roman-numeral captions, a caption over a ruled box, a
