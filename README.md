@@ -234,7 +234,9 @@ a different job; [docs/eval-image-pages.md](docs/eval-image-pages.md), [ADR 0007
   end (0.83 on the symbols score), the same as the same pages as typed PDFs; words of the prose
   wrong 3 to 5 % of the time; $0.106 a page. Handwriting was looked at on four public-domain pages
   by eye only: the main model read them well, and a cheaper model misread two section numbers with
-  full confidence.
+  full confidence. Five photographed notebook pages were looked at by eye later (2026-11-03): the
+  pass read the two physics pages well and the three linear-algebra pages mostly right; so nine
+  handwritten pages in all, none with an answer key.
 - **Real papers as scans, never used to build the feature** (the real-world held-out set, 9 of 15
   papers because the $9 spending cap for the run was reached; 42 pages, 1,147 equations, registered
   before the run): 0.66 exactly right (0.69 on the symbols score) against 0.62 (0.66) for the typed

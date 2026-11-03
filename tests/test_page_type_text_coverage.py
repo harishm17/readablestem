@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import random
+from pathlib import Path
 from typing import Any
 
 import pymupdf
@@ -127,18 +128,33 @@ def test_a_photographed_page_under_a_thin_text_layer_is_scanned_not_typed(mark):
     assert page_type.reads_image(result)  # ... and the image page pass reads it as a scan
 
 
-@pytest.mark.parametrize("mark", ["watermark", "number", "title"])
-def test_a_page_of_vector_handwriting_under_a_thin_text_layer_is_handwritten(mark):
+@pytest.mark.parametrize("mark", ["number", "title"])
+def test_a_page_of_vector_handwriting_under_a_number_or_title_is_handwritten(mark):
     result = classify(page_of(strokes=400, mark=mark))
     assert result.kind == "handwritten"
     assert page_type.kept_reason(result) == page_type.HANDWRITTEN_PAGE
 
 
-def test_the_reason_is_recorded_when_a_text_layer_over_ink_is_not_the_content():
+def test_vector_ink_under_a_text_layer_stays_mixed_ink():
+    """Typed text with handwriting over it keeps the text and cuts the ink out as images
+    with a decision, as the labelled corpus wants (a typed header or box over ink is
+    `mixed_ink`); the pass reads whole pages only, so this is not routed to it."""
     result = classify(page_of(strokes=400, mark="watermark"))
-    assert page_type.TEXT_NOT_COVERING in result.reasons
-    record = result.to_record(0)
-    assert page_type.keeps_text(record)  # its visible text is still read when the page is kept
+    assert result.kind == "mixed_ink"
+    assert page_type.TEXT_NOT_COVERING not in result.reasons
+
+
+def test_a_cover_page_with_body_text_over_a_picture_stays_typed():
+    """Text in the middle of the page, opaque and upright, is body text: a designed cover or
+    a slide on a photo is typed, whatever the picture shows (the labelled corpus's cases)."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_image(page.rect, stream=notebook_jpeg())
+    page.insert_text(
+        (60, 400), "Annual review of the science and technology programme", fontsize=18
+    )
+    result = classify(doc.tobytes())
+    assert page_type.TEXT_NOT_COVERING not in result.reasons
 
 
 def test_a_genuinely_typed_page_still_takes_the_typed_path():
@@ -200,9 +216,6 @@ def test_the_probes_count_the_page_and_do_not_stop_at_it():
     with pymupdf.open(stream=data, filetype="pdf") as doc:
         assert page_type.image_page_count(doc) == 1
         assert page_type.document_refusal(doc) is None  # a watermark never refuses the upload
-    vector = page_of(strokes=400, mark="watermark")
-    with pymupdf.open(stream=vector, filetype="pdf") as doc:
-        assert page_type.image_page_count(doc) == 1
 
 
 # --------------------------------------------------------------------- layout and run
@@ -249,12 +262,8 @@ def convert(pdf: bytes, *, on: bool = True):
     return run.convert_pdf(pdf, settings=settings, client=fake).result, fake
 
 
-@pytest.mark.parametrize("kind", ["picture", "vector ink"])
-def test_the_page_goes_through_the_image_page_pass_and_the_watermark_is_not_repeated(kind):
-    pdf = page_of(
-        picture=kind == "picture", strokes=0 if kind == "picture" else 400, mark="watermark"
-    )
-    result, fake = convert(pdf)
+def test_the_page_goes_through_the_image_page_pass_and_the_watermark_is_not_repeated():
+    result, fake = convert(page_of(picture=True, mark="watermark"))
     assert "image_page" in [r.step for r in fake.requests]
     assert result.image_pages is not None and result.image_pages.converted == 1
     texts = [e.text or "" for e in result.elements if e.kind is not Kind.EQUATION]
@@ -288,3 +297,32 @@ def test_the_review_screen_says_why_a_page_that_was_tried_stayed_an_image():
     )
     off = convert(page_of(picture=True, mark="watermark"), on=False)[0]
     assert reading_note(off, [1]) == ""
+
+
+# ------------------------------------------------------------ the labelled corpus
+
+CORPUS = Path("/home/harish/code/a11y-research/handwriting/detect/corpus/labels.json")
+
+
+@pytest.mark.skipif(not CORPUS.exists(), reason="the labelled page-type corpus is not here")
+def test_no_page_of_the_labelled_corpus_gets_worse_against_its_label():
+    """The calibration set for these rules (846 pages on the author's machine, not in the
+    repository; `scripts/page_type_corpus_compare.py`): switching the rules on changes no
+    page's kind against its label for the worse."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "page_type_corpus_compare",
+        Path(__file__).parent.parent / "scripts" / "page_type_corpus_compare.py",
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    import sys
+
+    argv = sys.argv
+    sys.argv = ["compare", "--labels", str(CORPUS)]
+    try:
+        assert module.main() == 0
+    finally:
+        sys.argv = argv

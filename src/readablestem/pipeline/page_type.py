@@ -132,7 +132,9 @@ SHARE_GRID = 128  # finer, for the shares below: a line of type is under one 64-
 UNCOVERED_PICTURE = 0.6  # share of the page that is picture with no visible text over it
 PAGE_PICTURE = 0.75  # and the pictures cover this much of the page
 THIN_TEXT = 0.12  # and the visible text covers less than this share of it
-INK_PER_CHAR = 0.5  # pen strokes of a page of handwriting per visible character, at least
+BODY_MAX = 20  # characters of body text (not furniture) a text layer may have and still not cover
+FURNITURE_BAND = 0.08  # header and footer bands, as a share of the page height
+FURNITURE_ALPHA = 200  # spans fainter than this (of 255) are a watermark's
 PICTURE_INK_MIN = 0.02  # share of the page: less is a blank or see-through picture (0.007)
 INK_RENDER_DPI = 72  # the render that is measured
 INK_TONE_DELTA = 45  # grey levels (of 255) from the page's usual tone that count as ink
@@ -295,6 +297,7 @@ class TextStats:
     # Measured only when the picture rule might apply: the share of the page, outside the
     # text, with ink on it (`_ink_outside_text`); 1.0 when it was not measured.
     picture_ink: float = 1.0
+    body_chars: int = 0  # visible characters that are not furniture (`_furniture`)
 
     @property
     def untrusted(self) -> int:
@@ -506,6 +509,8 @@ def text_stats(
                 stats.visible_chars += n
                 b = span["bbox"]
                 spans.append((b[0], b[1], b[2], b[3]))
+                if not _furniture(span, line.get("dir"), b, page.cropbox.height):
+                    stats.body_chars += n
                 if _axis_aligned(line.get("dir")):
                     glyphs.append((b[0], b[1], b[2], b[3]))
                 else:  # a slanted line's box is mostly empty page: its characters' boxes
@@ -535,6 +540,18 @@ def text_stats(
     return stats
 
 
+def _furniture(
+    span: dict[str, Any], direction: Sequence[float] | None, box: Sequence[float], height: float
+) -> bool:
+    """Text that is a page's furniture, not its body: translucent (a watermark), slanted, or in
+    the header or footer band (a running header, a page number, a stamp). A text layer made only
+    of furniture does not cover a picture it lies over (`TEXT_NOT_COVERING`)."""
+    if int(span.get("alpha", 255)) < FURNITURE_ALPHA or not _axis_aligned(direction):
+        return True
+    middle = (box[1] + box[3]) / 2
+    return middle < FURNITURE_BAND * height or middle > (1 - FURNITURE_BAND) * height
+
+
 def _axis_aligned(direction: Sequence[float] | None) -> bool:
     if not direction:
         return True
@@ -562,6 +579,7 @@ def _text_shares(
             and pictures.fraction >= PAGE_PICTURE
             and stats.uncovered_picture >= UNCOVERED_PICTURE
             and stats.text_share < THIN_TEXT
+            and stats.body_chars < BODY_MAX
         ):
             stats.picture_ink = _ink_outside_text(page, spans)
 
@@ -1437,14 +1455,7 @@ def decide(
     # photographed page, a stamp, a page number, a typed title over a page of handwriting)
     # does not make the page typed: the picture or the ink is the content.
     uncovered_picture = picture_counts and _text_misses_picture(text, image_coverage)
-    uncovered_ink = (
-        writing and text.text_share < THIN_TEXT and ink.strokes >= INK_PER_CHAR * text.visible_chars
-    )
-    if (
-        text.visible_chars
-        and not hidden_page
-        and (uncovered_picture or (has_text and uncovered_ink))
-    ):
+    if text.visible_chars and not hidden_page and uncovered_picture:
         reasons.append(TEXT_NOT_COVERING)
     if has_text and not hidden_page and TEXT_NOT_COVERING not in reasons:
         # A page with a real visible text layer is never a picture of a page as a whole.
@@ -1711,6 +1722,7 @@ def _text_misses_picture(text: TextStats, coverage: float) -> bool:
         and text.uncovered_picture >= UNCOVERED_PICTURE
         and text.text_share < THIN_TEXT
         and text.picture_ink >= PICTURE_INK_MIN
+        and text.body_chars < BODY_MAX
     )
 
 
@@ -1752,9 +1764,7 @@ def image_page_count(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -
         raw = page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]
         images, coverage = image_boxes(page)
         stats = text_stats(page, raw, images, None)
-        # Thin text may sit over handwriting drawn as vector ink (a watermark, a header):
-        # such a page pays for the ink analysis too.
-        if not clearly_convertible(stats, coverage) or stats.text_share < THIN_TEXT:
+        if not clearly_convertible(stats, coverage):
             candidates.append((number, page, stats, coverage))
     if not candidates:
         return 0

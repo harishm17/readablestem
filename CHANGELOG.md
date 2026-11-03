@@ -3,15 +3,18 @@
 ## Unreleased: text layers that do not cover the page, and the maths rule as a guard (branch fix/handwriting-skip-and-flags)
 
 - A visible text layer no longer makes a page "typed" when it does not cover the page's content
-  (`page_type.TEXT_NOT_COVERING`, classifier page-type-v5.5). A watermark, a header, a stamp, a page
-  number or a typed title over a page-sized picture (a photographed notebook page) or over a page of
-  vector handwriting made the page typed: it skipped the image page pass and came out "Not converted"
+  (`page_type.TEXT_NOT_COVERING`, classifier page-type-v5.5). A watermark, a header, a stamp or a page
+  number over a page-sized picture (a photographed notebook page) made the page typed: it skipped the image page pass and came out "Not converted"
   with only that text. Three of five real photographed pages hit it. Such a page is now scanned or
   handwritten and read by the pass when asked; its visible text is still read when the pass is off, and
   the pass's reading replaces it when on (`page_type.keeps_text`, `layout._analyze_document`,
   `run.convert_pdf`). A background picture repeated on the pages, a plain one, or one with nothing on
   it is not content. Details, thresholds and what was measured: docs/layout.md, "Hidden text and page
   types"; ADR 0007 point 13. `tests/test_page_type_text_coverage.py`.
+- `scripts/page_type_corpus_compare.py` compares the classifier with and without these rules on a
+  labelled corpus (0 pages worse of 846 on the author's corpus; a test runs it when the corpus is there).
+- Production refuses `FEATURE_IMAGE_PAGES` or `IMAGE_PAGES_ACCEPT_AGREED` with
+  `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED=false` (`Settings.check_production`).
 - The review card of a page that was tried from an image and stayed an image says why (`reading_note`).
 - `image_page.enforce_maths_required` runs after every step: any equation or table read from an image
   whose governing decision is not a required one is lifted to one (a no-op when every path kept

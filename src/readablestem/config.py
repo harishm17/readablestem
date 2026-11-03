@@ -628,6 +628,16 @@ class Settings(BaseSettings):
             raise ConfigError("FAKE_MODELS must be false in production")
         if not self.rate_limits_enabled:
             raise ConfigError("RATE_LIMITS_ENABLED must be true in production")
+        if (self.feature_image_pages or self.image_pages_accept_agreed) and (
+            not self.image_pages_maths_always_required
+        ):
+            # ADR 0007 point 12: maths read from an image is always a decision. The switch
+            # exists for the eval's A/B replay; with it off, a block with maths can be an
+            # optional note (and an agreed second reading can lift it out).
+            raise ConfigError(
+                "IMAGE_PAGES_MATHS_ALWAYS_REQUIRED must be true in production when "
+                "FEATURE_IMAGE_PAGES or IMAGE_PAGES_ACCEPT_AGREED is on"
+            )
         if self.database_url.startswith("sqlite"):
             raise ConfigError("production needs Postgres (DATABASE_URL=postgresql+psycopg://...)")
         if not self.base_url.startswith("https://"):

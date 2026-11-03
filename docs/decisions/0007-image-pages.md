@@ -168,11 +168,11 @@ its image exactly as before.
 13. **A text layer that does not cover the page does not make it typed** (2026-11-03,
     `page_type.TEXT_NOT_COVERING`, classifier page-type-v5.5; [layout.md](../layout.md), "Hidden text and
     page types"). Three of five real photographed notebook pages carried a watermark text layer, were
-    called typed and never reached the pass. A page-sized picture, or a page of vector writing, that a
-    thin visible text layer does not lie over (a watermark, a header, a stamp, a page number, a typed
-    title) is read by the pass (when asked) as a scan or as handwriting (`page_type.reads_image`; the
-    page's kept reason stays `unread_page` for a picture, so what it says on the review screen is
-    unchanged, and `handwritten_page` for ink), and the page reader's reading replaces the text layer's
+    called typed and never reached the pass. A page-sized picture that a
+    text layer of only furniture (a watermark, a header, a stamp, a page number) does not lie over is
+    read by the pass (when asked) as a scan (`page_type.reads_image`; the page's kept reason stays
+    `unread_page`, so what it says on the review screen is unchanged; calibrated on the labelled
+    corpus with no page worse, layout.md). Vector handwriting under a watermark stays `mixed_ink`. The page reader's reading replaces the text layer's
     words, which it reads again from the image. A scan with a *hidden* OCR layer was
     already read from its image, because nothing can check that layer and for maths it is poor; a
     *visible* layer that covers the picture is the page's text. The image pass cannot read a region of
