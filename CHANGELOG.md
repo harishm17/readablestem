@@ -10,6 +10,17 @@
   wrong 8.58 per 100 gold and decisions a page 4.35 unchanged. `scripts/eq_dev_run.py` has an offline arm
   `witness-sonnet-r2` for it and passes the two flags `realworld_run` gained. docs/eval-equation-round5.md.
 
+## Unreleased: page witness dev run (branch eq/e1-witness-dev)
+
+- `scripts/eq_dev_run.py` (new): the page witness on or off over twelve development papers, crop answers
+  replayed, with a report and a pair-by-pair `witness` summary; `scripts/realworld_run.py rs` takes
+  `--section-workers` and `--concurrency`. Result in docs/eval-equation-round5.md: no accuracy or
+  detection gain with Sonnet as the witness, silent errors down 2.1 per 100 gold, one more decision a page,
+  +2.4 cents a page. The flag stays off.
+- Fix: the page witness's calls had the client's 60 s timeout, so a dense page timed out and was charged
+  its whole reservation; `PAGE_WITNESS_TIMEOUT_S` (default 240) is set on the request.
+- Fix: `eval pipeline` left the witness's cost out of an item's `cost_usd`; items now carry `page_witness`
+  and `page_witness_cost_usd`, and the cost block `page_witness_usd` and `page_witness_per_pdf_page_usd`.
 ## Unreleased: calibrated flag policy (branch eq/flag-policy)
 
 - Flag policy (off: `FLAG_POLICY`): `pipeline/flag_policy.py` turns an accepted equation that nobody is asked
@@ -46,17 +57,6 @@
   bold-letter fix of running text), including Latin Modern's `LMMathItalic10-Bold`, whose text-layer code point
   says only "bold". Measured by replay of the recorded fresh4 run in docs/eval-equation-glyph-checks.md.
 - `scripts/realworld_run.py rs --glyph-checks` turns the setting on for a replay.
-## Unreleased: page witness dev run (branch eq/e1-witness-dev)
-
-- `scripts/eq_dev_run.py` (new): the page witness on or off over twelve development papers, crop answers
-  replayed, with a report and a pair-by-pair `witness` summary; `scripts/realworld_run.py rs` takes
-  `--section-workers` and `--concurrency`. Result in docs/eval-equation-round5.md: no accuracy or
-  detection gain with Sonnet as the witness, silent errors down 2.1 per 100 gold, one more decision a page,
-  +2.4 cents a page. The flag stays off.
-- Fix: the page witness's calls had the client's 60 s timeout, so a dense page timed out and was charged
-  its whole reservation; `PAGE_WITNESS_TIMEOUT_S` (default 240) is set on the request.
-- Fix: `eval pipeline` left the witness's cost out of an item's `cost_usd`; items now carry `page_witness`
-  and `page_witness_cost_usd`, and the cost block `page_witness_usd` and `page_witness_per_pdf_page_usd`.
 
 ## Unreleased: page witness (branch eq/page-witness)
 
