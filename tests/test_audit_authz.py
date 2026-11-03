@@ -40,6 +40,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/status"): PUBLIC,
     ("GET", "/healthz"): PUBLIC,
     ("GET", "/readyz"): PUBLIC,  # is the database reachable; no document data
+    ("GET", "/healthz/ops"): PUBLIC,  # names of stale scheduled tasks; no document data
     # Crawler files and the static showcase (routes/discovery.py): no user data.
     ("GET", "/robots.txt"): PUBLIC,
     ("GET", "/sitemap.xml"): PUBLIC,
