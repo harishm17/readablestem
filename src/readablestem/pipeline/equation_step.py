@@ -84,7 +84,7 @@ from readablestem.models import router
 from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.models.prompts import load_prompt
 from readablestem.pipeline import equation_images, layout, notation_memory, page_math
-from readablestem.pipeline.chem import CeError, convert_ce_commands, tidy_cell_notation
+from readablestem.pipeline.chem import expand_ce as chem_expand_ce
 from readablestem.pipeline.chem_check import compare_species
 from readablestem.pipeline.signs import compare_signs
 from readablestem.pipeline.speech import SpeechError, mathml_to_speech
@@ -222,18 +222,20 @@ _BARE_SCRIPT = re.compile(r"(?:^|(?<=[+\-=(\[,<>]))(\s*)(?=[\^_])")
 def expand_ce(latex: str) -> str:
     r"""`latex` with each `\ce{...}` (mhchem, which the prompt asks the model to use for
     chemical species) written out as plain LaTeX (`pipeline.chem`). A `\ce` outside the
-    converted subset is left as it is, so the LaTeX check refuses it (`unknown_command`) and
+    converted subset is left as it is, so the LaTeX check refuses it (`unsupported_ce`) and
     the equation goes to the main model or to a person: nothing is guessed. Not part of
     `clean_latex`, which the proof also applies to the chatbot arms' LaTeX as recorded. The
     bare `\middle|` the model writes for the phase boundary of a cell is made a bar here too
     (`chem.tidy_cell_notation`), for the same reason."""
-    latex = tidy_cell_notation(latex)
-    if "\\ce" not in latex:
-        return latex
-    try:
-        return convert_ce_commands(latex)
-    except CeError:
-        return latex
+    return chem_expand_ce(latex)
+
+
+def read_latex(latex: str) -> str:
+    r"""The LaTeX of a reading as every path stores it: `\ce` written out (`expand_ce`), then
+    `clean_latex`. The equation step, the table step, the image-page reader and its check,
+    the review screen's edit box and the table HTML all go through this one function, so a
+    `\ce` is accepted or refused the same way everywhere."""
+    return clean_latex(expand_ce(latex))
 
 
 def clean_latex(latex: str) -> str:
@@ -825,7 +827,7 @@ def _evaluate(
     candidate = _Candidate(output, calls, confidence=output.confidence)
     if not output.is_equation:
         return candidate
-    candidate.latex = restyle_bold_italic(clean_latex(expand_ce(output.latex)), element.text)
+    candidate.latex = restyle_bold_italic(read_latex(output.latex), element.text)
     if display == "inline":
         candidate.latex = strip_trailing_punctuation(candidate.latex)
         candidate.latex = drop_neighbour_brackets(candidate.latex, element.text)

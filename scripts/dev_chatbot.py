@@ -83,7 +83,11 @@ def main() -> int:
         "its own answers (the proof's converter cannot read `\\ce`; this shows what the chatbot "
         "wrote, not what the converter could read)",
     )
-    parser.add_argument("--out", type=Path, help="score: items JSONL for scripts/dev_buckets.py")
+    parser.add_argument(
+        "--out",
+        type=Path,
+        help="score: items JSONL for scripts/dev_buckets.py (default: items-ARM.jsonl)",
+    )
     parser.add_argument(
         "--cache", type=Path, default=Path.home() / ".cache/readablestem/dev-v2/eval-cache"
     )
@@ -120,8 +124,10 @@ def main() -> int:
         item["status"] = run.status if run is not None else "missing"
         item["review"] = pe.load_counts([])  # a chatbot asks nobody about anything
         items.append(item)
-    if args.out:
-        args.out.write_text("\n".join(json.dumps(i) for i in items) + "\n", encoding="utf-8")
+    out = args.out or args.out_dir / f"items-{arm.id}.jsonl"  # the rows are always kept
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(json.dumps(i) for i in items) + "\n", encoding="utf-8")
+    print("items:", out)
     for item in items:
         print(
             item["id"],

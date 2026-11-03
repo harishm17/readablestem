@@ -315,6 +315,7 @@
     <h4 id="{{ pg.anchor }}-title">{{ pg.title }}</h4>
     <p class="group-question">{{ pg.lead }}</p>
     <p>{{ pg.explain }}</p>
+    {% if pg.reading %}<p>{{ pg.reading }}</p>{% endif %}
     {% if pg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ pg.error }}</p>{% endif %}
     {% if pg.waiting %}
     <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">

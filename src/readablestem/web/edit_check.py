@@ -96,7 +96,7 @@ def check_equation_edit(element: Element | None, fix: Fix, typed: str) -> EditCh
         display = fix.equation.display
     else:
         display = (element.display if element else None) or "block"
-    latex = equation_step.clean_latex(typed)
+    latex = equation_step.read_latex(typed)
     if display == "inline":
         latex = equation_step.strip_trailing_punctuation(latex)
     text = element.text if element is not None else None
@@ -142,7 +142,7 @@ def check_cell_edit(layer: str | None, typed: str, *, current: str | None = None
     sentences (the equation compare is about a whole equation's picture)."""
     from readablestem.pipeline import equation_step
 
-    latex = equation_step.clean_latex(typed)
+    latex = equation_step.read_latex(typed)
     out = EditCheck(latex=latex, mathml=None, speech="", checks=[], display="inline")
     out.has_text_layer = bool(layer and any(ch.isalnum() for ch in layer))
     if not latex:
@@ -286,6 +286,11 @@ def latex_problems(latex: str, failed: list[Check]) -> list[str]:
         code = check.code or ""
         if code == "unbalanced_braces":
             sentence = _braces(latex)
+        elif code == "unsupported_ce":
+            sentence = (
+                "The chemistry in \\ce{...} is outside what this tool can read: write the "
+                "formula with ordinary LaTeX, or check it for a typo."
+            )
         elif code == "unknown_command":
             sentence = _unknown_commands(latex) or explain_check(check).text
         elif code == "forbidden_command":

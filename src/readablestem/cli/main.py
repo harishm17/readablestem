@@ -19,6 +19,7 @@ from typing import Any
 from readablestem import __version__
 from readablestem.cli import convert, eval_cli, ops, serve
 from readablestem.cli import devset as devset_cli_reg
+from readablestem.cli import export as export_cli
 from readablestem.cli import heldout as heldout_cli
 from readablestem.cli import proof as proof_cli
 
@@ -423,6 +424,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     convert.register(sub)
     serve.register(sub)
+    export_cli.register(sub)
     ops.register(sub)
     proof_cli.register(sub)
     return parser
