@@ -1391,6 +1391,7 @@ def review_action(
     long_description: Annotated[str | None, Form()] = None,
     remove_data_table: Annotated[str | None, Form()] = None,
     description: Annotated[str | None, Form()] = None,
+    origin: Annotated[str | None, Form()] = None,
     version: Annotated[str, Form()] = "",
     flt: Annotated[str, Form()] = "",
 ) -> Response:
@@ -1442,6 +1443,7 @@ def review_action(
         "long_description": long_description,
         "remove_data_table": remove_data_table,
         "description": description,
+        "origin": origin,  # a second reader's choice pressed on the card (`CHOICE_ORIGIN`)
     }
     form = {name: value for name, value in sent.items() if value is not None}
     # "Use my edit anyway": an edit the reviewer chose to use although it differs from

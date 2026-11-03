@@ -122,7 +122,11 @@ its image exactly as before.
    No model call and no prompt change (the prompt hash is unchanged, so nothing was re-recorded);
    `IMAGE_PAGES_OMISSION_CHECK=false` turns it off. It cannot see a reading that is wrong, a
    dropped line next to a block (inside the margin of error of the boxes), content whose ink
-   the boxes cover, and a page whose blocks have no usable box (it is not judged).
+   the boxes cover, and a page whose blocks have no usable box (it is not judged). On a handwritten
+   page whose ink is vector, the same comparison is made with the pen strokes (groups of strokes
+   that no box is within 1.2 glyph heights of; `pipeline/image_page_vector.py`,
+   `IMAGE_PAGES_VECTOR_CHECKS`), which sees pale ink; the same figure and decision result
+   ([eval-handwriting.md](../eval-handwriting.md), "Checks from strokes").
 
 9. **A line that holds only a formula is a display equation** (added 2026-10-22,
    `image_page.lone_formula`; [eval-handwriting.md](../eval-handwriting.md), "Root causes and fixes").

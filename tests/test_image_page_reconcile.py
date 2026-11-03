@@ -37,6 +37,7 @@ class FakeReader:
 
     name = "local"
     model = "fake"
+    max_read_s = 1.0
 
     def __init__(self, *script: str | Exception) -> None:
         self.script = list(script)
@@ -133,14 +134,14 @@ def test_a_wholly_different_reading_is_a_note_without_choices():
 
 def test_a_reading_that_does_not_convert_is_no_second_reading():
     element, fix, summary, _ = run_one(r"x = 1", r"\frac{x")
-    assert note(fix).code == rec.UNAVAILABLE and element.alternatives is None  # type: ignore[union-attr]
+    assert note(fix) is None and element.alternatives is None
     assert summary.unavailable == 1 and summary.differed == 0
 
 
 @pytest.mark.parametrize("outcome", ["timeout", "refused", "invalid_output", "api_error"])
-def test_a_reader_with_no_answer_leaves_a_note_only(outcome):
+def test_a_reader_with_no_answer_leaves_the_item_as_it_was(outcome):
     element, fix, summary, _ = run_one(r"x = 1", outcome)
-    assert note(fix).code == rec.UNAVAILABLE and not note(fix).passed  # type: ignore[union-attr]
+    assert note(fix) is None  # no per-equation line: the document gets one notice
     assert element.alternatives is None and (fix.status, fix.review) == (
         Status.NEEDS_REVIEW,
         "required",
@@ -159,8 +160,8 @@ def test_a_reader_that_raises_costs_one_expression_its_second_reading():
         reader,
         settings(),
     )
-    assert (note(fa).code, note(fb).code) == (rec.UNAVAILABLE, rec.AGREES)  # type: ignore[union-attr]
-    assert (summary.unavailable, summary.agreed) == (1, 1)
+    assert (note(fa), note(fb).code) == (None, rec.AGREES)  # type: ignore[union-attr]
+    assert (summary.unavailable, summary.agreed, summary.read) == (1, 1, 1)
 
 
 def test_a_setup_failure_stops_asking_and_leaves_notes():
@@ -175,13 +176,13 @@ def test_a_setup_failure_stops_asking_and_leaves_notes():
         settings(),
     )
     assert reader.reads == 1  # the second is not asked: it would fail the same way
-    assert (note(fa).code, note(fb).code) == (rec.UNAVAILABLE, rec.UNAVAILABLE)  # type: ignore[union-attr]
+    assert (note(fa), note(fb)) == (None, None)
 
 
-def test_the_time_budget_stops_reading_and_notes_the_rest():
+def test_a_read_is_not_started_unless_its_worst_case_fits_the_time_share():
     a, fa = equation("p1-e0", "x = 1")
     b, fb = equation("p1-e1", "y = 2")
-    now = iter([0.0, 1.0, 500.0, 500.0, 500.0])
+    now = iter([0.0, 1.0, 9.5, 9.5, 9.5])  # the second read could take 1 s: 9.5 + 1 > 10
     reader = FakeReader("x = 1", "y = 2")
     summary = rec.reconcile(
         [a, b],
@@ -192,8 +193,38 @@ def test_the_time_budget_stops_reading_and_notes_the_rest():
         clock=lambda: next(now),
     )
     assert reader.reads == 1
-    assert (note(fa).code, note(fb).code) == (rec.AGREES, rec.UNAVAILABLE)  # type: ignore[union-attr]
-    assert summary.unavailable == 1
+    assert (note(fa).code, note(fb)) == (rec.AGREES, None)  # type: ignore[union-attr]
+    assert (summary.unavailable, summary.read) == (1, 1)
+    assert [n.code for n in summary.notices()] == ["second_reader_unavailable"]
+
+
+def test_the_share_never_outlasts_what_the_jobs_own_limit_leaves():
+    s = settings(image_pages_second_reader_time_s=120)
+    assert rec.share_s(s, None, 50) == 120
+    # a 100 s job keeps 20% for everything after: 100 * 0.8 - 30 elapsed = 50
+    assert rec.share_s(s, 100, 30) == pytest.approx(50)
+    assert rec.share_s(s, 100, 95) == 0  # nothing left: no read is started
+    reader = FakeReader()
+    a, fa = equation("p1-e0", "x = 1")
+    rec.reconcile([a], {fa.element_id: fa}, {a.id: PNG}, reader, s, share_s=0.0)
+    assert reader.reads == 0
+
+
+def test_no_unavailable_note_on_each_equation_but_one_notice_for_the_document():
+    a, fa = equation("p1-e0", "x = 1")
+    b, fb = equation("p1-e1", "y = 2")
+    reader = FakeReader("timeout", "refused")
+    summary = rec.reconcile(
+        [a, b],
+        {fa.element_id: fa, fb.element_id: fb},
+        {a.id: PNG, b.id: PNG},
+        reader,
+        settings(),
+    )
+    [notice] = summary.notices()
+    assert (notice.code, notice.count, notice.page) == ("second_reader_unavailable", 2, None)
+    record = summary.record()
+    assert (record.considered, record.read, record.unavailable) == (2, 0, 2)
 
 
 # ------------------------------------------------------------------ what it reads
@@ -294,6 +325,9 @@ def test_a_run_with_a_fake_reader_adds_notes_and_choices_and_asks_about_every_eq
     for e in equations:  # handwritten maths is always asked, agreed or not
         fix = result.fix_for(e.id)
         assert fix is not None and fix.review == "required" and fix.pending
+    summary = result.image_pages.second_reader  # type: ignore[union-attr]
+    assert (summary.reader, summary.considered, summary.read) == ("local", 2, 2)
+    assert (summary.agreed, summary.differed, summary.with_choices) == (1, 1, 1)
     # and it survives storage
     from readablestem.core.types import DocumentResult
 
@@ -301,7 +335,7 @@ def test_a_run_with_a_fake_reader_adds_notes_and_choices_and_asks_about_every_eq
     assert [e.alternatives for e in again.elements] == [e.alternatives for e in result.elements]
 
 
-def test_the_readers_own_sub_cap_stop_is_a_note_and_never_stops_the_job():
+def test_the_readers_own_sub_cap_stop_is_a_notice_and_never_stops_the_job():
     """`run._budget_scope` stops the whole job on a failed fix whose reason starts `budget_`:
     a reader's own spend limit must only ever be a note on a fix that stands."""
     s = Settings(  # type: ignore[call-arg]
@@ -328,15 +362,22 @@ def test_the_readers_own_sub_cap_stop_is_a_note_and_never_stops_the_job():
         fix = result.fix_for(e.id)
         assert fix is not None
         assert fix.status is not Status.FAILED and run._budget_scope(fix) is None
-        assert (note(fix).code if note(fix) else None) == rec.BUDGET
+        assert note(fix) is None
         assert fix.review == "required" and fix.pending
+    # one notice for the document says how many equations have only the first reading
+    [notice] = [n for n in result.notices if n.code == rec.BUDGET]
+    assert (notice.count, notice.page, notice.element_id) == (2, None, None)
+    summary = result.image_pages.second_reader  # type: ignore[union-attr]
+    assert (summary.reader, summary.considered, summary.over_budget, summary.read) == (
+        "claude", 2, 2, 0,
+    )  # fmt: skip
     # every other step still ran: the equations were read from their crops, and nothing
     # in the document carries a budget reason
     assert all((f.reason or "").startswith("budget_") is False for f in result.fixes)
     assert all(f.equation is not None for f in result.fixes if f.kind is Kind.EQUATION)
 
 
-def test_a_job_scope_stop_inside_a_reader_is_a_note_too():
+def test_a_job_scope_stop_inside_a_reader_is_a_notice_too():
     class Refused(FakeReader):
         def read(self, request: Any) -> ReadResult:
             self.reads += 1
@@ -351,4 +392,7 @@ def test_a_job_scope_stop_inside_a_reader_is_a_note_too():
     for e in (e for e in result.elements if e.kind is Kind.EQUATION):
         fix = result.fix_for(e.id)
         assert fix is not None and run._budget_scope(fix) is None
-        assert note(fix).code == rec.UNAVAILABLE  # type: ignore[union-attr]
+        assert note(fix) is None
+    assert [n.code for n in result.notices if n.code.startswith("second_reader")] == [
+        rec.UNAVAILABLE
+    ]

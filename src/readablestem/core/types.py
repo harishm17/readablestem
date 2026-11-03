@@ -767,6 +767,10 @@ NOTICE_CODES = frozenset(
         "page_omitted",
         # A scanned or handwritten page converted from an image of it (ADR 0007).
         "image_page_converted",
+        # A second reader of handwritten equations (pipeline.image_page_reconcile) that gave
+        # no reading for some equations: `count` of them, one notice for the document.
+        "second_reader_unavailable",
+        "second_reader_budget",
     }
 )
 
@@ -954,6 +958,22 @@ class ImagePageRecord(BaseModel):
     optional: int = 0  # optional notes the page's blocks start with
 
 
+class SecondReaderSummary(BaseModel):
+    """What the second reader of handwritten equations did in one job (`pipeline.image_page_
+    reconcile`). Counts and seconds only, so the parent process can log it for an operator."""
+
+    reader: str
+    considered: int = 0  # handwritten display equations it could have read
+    read: int = 0  # reads that gave a reading
+    agreed: int = 0
+    differed: int = 0
+    with_choices: int = 0  # differed, and the difference became choices on the card
+    unavailable: int = 0  # no reading: an error, a timeout, an unusable answer, or no time left
+    over_budget: int = 0  # not asked: the readers' own dollar share was spent
+    seconds: float = 0.0
+    cost_usd: float = 0.0
+
+
 class ImagePagesSummary(BaseModel):
     """The image page pass for a document (ADR 0007). Content-free; `cost_usd` is also in
     `DocumentStats.cost_usd`."""
@@ -966,6 +986,7 @@ class ImagePagesSummary(BaseModel):
     blocks: int = 0
     stopped_by: str | None = None  # a spend cap that ended the pass early
     per_page: list[ImagePageRecord] = Field(default_factory=list)
+    second_reader: SecondReaderSummary | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class DocumentResult(BaseModel):

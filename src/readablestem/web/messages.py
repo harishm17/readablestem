@@ -141,12 +141,6 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("image_page.second_reader", "second_reader_agrees"): "A second reader looked at the "
     "picture of this equation and read it the same way; the original page is still the only "
     "thing that can confirm it.",
-    ("image_page.second_reader", "second_reader_unavailable"): "A second reading of this "
-    "equation could not be made, so only the first reading is here: compare it with the "
-    "original page symbol by symbol.",
-    ("image_page.second_reader", "budget_reader_usd"): "The second reading of this equation "
-    "was skipped because its share of this document's budget was used, so the first reading "
-    "stands and still needs your decision.",
     ("image_page.maths_always_checked", "maths_checked"): "This was read from an image and holds "
     "maths, and every such block is checked, however sure the reader was: compare each formula "
     "with the original page symbol by symbol.",
@@ -165,6 +159,16 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("image_page.omitted_region", "omitted_region"): "There is writing here that nothing in "
     "the converted page accounts for, so the reading probably left it out: look at the picture "
     "of this part of the page, then write what it says or keep it as an image.",
+    ("image_page.case_check", "case_mismatch"): "A letter here is written taller or shorter than "
+    "the capital or small letter it was read as, so check the case of each letter against the "
+    "picture.",
+    ("image_page.script_check", "script_lost"): "The ink has a small raised or lowered mark that "
+    "the reading shows as an ordinary symbol, or leaves out, so check for a missing power or "
+    "subscript.",
+    ("image_page.script_check", "script_added"): "The reading has a power or subscript on a "
+    "symbol that is written at full size on the line, so check whether it should be there.",
+    ("image_page.script_check", "script_moved"): "A power is written as a subscript here, or the "
+    "reverse, so check which way each small mark sits.",
     ("table.no_text_layer", "no_text_layer"): "This table was read from an image of the page, "
     "so nothing in the PDF can confirm its cells: compare every value with the original.",
     ("equation.region", "half_fraction"): "The part of the page this equation was read "
@@ -434,6 +438,11 @@ NOTICE_MESSAGES: dict[str, str] = {
     "image_page_converted": "A scanned or handwritten page was converted from an image of "
     "it: nothing in the PDF can confirm the reading, so check it against the original, which "
     "is kept with the page.",
+    "second_reader_unavailable": "A second reader could not read some handwritten equations, "
+    "so they have only the first reading, and each one is still a decision for you.",
+    "second_reader_budget": "The second reader's share of this document's budget ran out before "
+    "some handwritten equations, so they have only the first reading, and each one is still a "
+    "decision for you.",
     "page_omitted": "You left this page out of the student file and of the review, and the "
     "file says that it is not there.",
 }

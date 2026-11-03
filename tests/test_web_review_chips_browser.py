@@ -112,7 +112,7 @@ def test_the_choices_are_operated_from_the_keyboard_and_nothing_is_preselected(s
     # be read aloud.
     described = chip.get_attribute("aria-describedby")
     assert "read aloud roughly as" in page.locator(f"#{described}").inner_text().lower()
-    group = page.get_by_role("group", name="Where the page reading has")
+    group = page.get_by_role("group", name="Where the proposal above has")
     assert group.count() == 1
     # Keyboard only: focus it by Tab from the heading, press Enter.
     page.locator("#decision-title").focus()

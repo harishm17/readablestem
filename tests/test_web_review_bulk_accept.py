@@ -637,3 +637,28 @@ def test_demo_hits_that_are_counted_are_revalidated_and_others_cached(tmp_path, 
         )
         assert again.status_code == 304
         assert client.get("/demo").headers["cache-control"] == "public, max-age=3600"
+
+
+def test_an_item_read_from_an_image_is_never_a_bulk_candidate_whatever_its_checks_say():
+    """ADR 0007, point 12: handwritten and scanned maths and tables are each their own decision,
+    also when nothing failed and a second reader agreed (the failed check that normally keeps
+    them out is not what the rule rests on)."""
+    from readablestem.core.types import IMAGE_PAGE_REASON, Check
+    from readablestem.web.review import is_clean_table, is_image_page_item
+
+    result = scaled_output().result
+    element = next(e for e in result.elements if e.id == "p1-e2")
+    fix = result.fix_for("p1-e2")
+    assert fix is not None and bulk_accept.is_bulk_candidate(fix, "equations", element)
+    element.reasons = [*element.reasons, IMAGE_PAGE_REASON]
+    fix.checks = [Check(name="image_page.second_reader", passed=True, code="second_reader_agrees")]
+    assert is_image_page_item(element)
+    assert not bulk_accept.is_bulk_candidate(fix, "equations", element)
+    assert "p1-e2" not in [f.element_id for f in bulk_accept.candidates(result, "equations")]
+    offers = {o.slug: o.count for o in bulk_accept.offers(result)}
+    assert offers["equations"] == len(EQUATION_CANDIDATES) - 1
+    changes = bulk_accept.accept_all(result, "equations")
+    assert "p1-e2" not in [c.element_id for c in changes]
+    assert result.fix_for("p1-e2").pending  # type: ignore[union-attr]
+    # the table rule too: an image-page table is not a clean table
+    assert not is_clean_table(result.fixes[0], element)
