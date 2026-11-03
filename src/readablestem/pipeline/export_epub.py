@@ -233,6 +233,9 @@ def _prepare(root: _Node, images: set[str]) -> tuple[bool, bool]:
         if node.tag == "math":
             has_math = True
             node.attrs["xmlns"] = NS_MATHML
+            # `intent` (MathML 4, the chemistry hint for MathCAT) is not in the schema EPUB 3
+            # validates against: epubcheck reports RSC-005 on it. Everything else stays.
+            node.attrs.pop("intent", None)
         elif node.tag == "svg":
             has_svg = True
             node.attrs["xmlns"] = NS_SVG

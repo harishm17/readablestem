@@ -387,6 +387,15 @@ and precipitate marks are the operators `↑` and `↓` after the species (MathC
 "precipitate"); the excited nuclide is as above. Every one of them reads through both our speech
 (`tests/test_mathml_shape.py`) and MathCAT (`tests/test_screenreader_shape.py`).
 
+A bare word of capitals is not evidence by itself, because `ON`, `IS`, `SO`, `IN`, `OK`, `PH`,
+`NY`, `FBI`, `CPU`, `HIV` and `V_{\text{IN}}` are words and acronyms as often as formulas: a
+multi-symbol `mtext` needs a lowercase letter (`NaCl`, `HCl`, `NaOH`), or a count or charge, or a
+state, or a coefficient in front of it, or a bracket pair with a count on it (`Ca(OH)_2`, where `OH`
+is then a group), or a reaction arrow with such a species somewhere in it; an arrow between two
+bare words does not count. An `mi` word that is not upright (`\operatorname{Co}`, `\mathit{Na}`)
+is not a symbol. `tests/test_chem_mathml.py` keeps a list of words, acronyms and units that must
+convert exactly as before.
+
 A row is chemistry only with evidence: a symbol with a count or a charge, a nuclide prefix, two
 symbols side by side, a state after a species, or an arrow with symbols on both sides. A lone
 `\text{H}` (hydrogen or a variable), `\text{No}`, `\text{Pa}` or `\mathrm{d}x` is left as it was.
@@ -408,7 +417,13 @@ The review screen and `alttext` read the new shape the same words as before
 (`tests/test_mathml_shape.py`). Review carry compares an equation's LaTeX and display, not its
 MathML or reading (`web/carry.py`), so an accepted equation of an earlier upload is still carried
 when the MathML is made another way; the fingerprint is the picture's hash and does not change.
-The step cache key holds the pipeline version, so a re-converted file asks again.
+A carried accept keeps the new fix's own equation (its MathML shape and reading) and copies only the
+decision; an edit is the person's words and is copied whole. The step cache key holds the pipeline
+version, so a re-converted file asks again. Where the shape goes: the student file and the review
+screen draw an `intent` equation's symbols upright by one CSS rule each (`assemble.py`,
+`web/static/app.css`); the EPUB export drops `intent` (it is not in the EPUB 3 MathML schema:
+epubcheck 5.4.0 reports RSC-005) and keeps everything else; Canvas and the Common Cartridge
+exports carry the MathML as it is.
 
 ### Measured (offline, $0)
 
@@ -419,7 +434,7 @@ words as the gold's reading.
 
 | set (gold equations) | MathCAT ClearSpeak | MathCAT SimpleSpeak | SRE clearspeak | SRE mathspeak |
 |---|---|---|---|---|
-| chemistry (443) | 133 to 132 | 133 to 132 | 61 to 33 | 83 to 45 |
+| chemistry (443) | 133 to 136 | 133 to 136 | 61 to 35 | 83 to 45 |
 | OpenStax algebra (1,120) | 736 to 736 | 727 to 727 | 517 to 517 | 456 to 456 |
 | authored exercises, slides, matrices, Word images, HTML slides (246) | 221 to 222 | 221 to 222 | 221 to 220 | 206 to 205 |
 
@@ -431,7 +446,7 @@ is the number of the 318 chemistry proposals whose Speech Rule Engine reading sa
 | `mi` with `mathvariant="normal"` always (first version) | 132 | 44 | 50 | 199 | 155 of 155 |
 | `mi` with no style at all | 132 | 33 | 51 | 6 | 155 of 155 |
 | `mathvariant="normal"` on multi-letter symbols only (Na, Cl) | 132 | 33 | 51 | 6 | 155 of 155 |
-| **no style when the whole equation is chemistry, `normal` beside other maths (kept)** | 132 | 33 | 45 | 68 | 153 of 153 |
+| **no style when the whole equation is chemistry, `normal` beside other maths (kept, with the stricter evidence below)** | 136 | 35 | 45 | 64 | 153 of 153 |
 
 MathCAT's reading and recognition are the same in all four, so the style is a choice about the
 other readers. Speech Rule Engine says the `mathvariant` aloud ("normal H"), so the first version
@@ -442,7 +457,7 @@ single letter is a variable to our own chemistry reading (`pipeline/speech_chem.
 the upright style to tell the `H` of water from an enthalpy `H`. So the style is dropped only where
 `intent` says the whole equation is chemistry (the review screen's reading puts it back from
 `intent`, `speech._restore_upright_symbols`) and kept on a symbol beside other maths (a rate law, an
-equilibrium constant), which is the 68. The standalone file draws a symbol of an `intent` equation
+equilibrium constant), which is the 64 (the first three rows were measured before the evidence rule below was tightened). The standalone file draws a symbol of an `intent` equation
 upright with one rule (`math[intent] mi { text-transform: none }`; Chromium draws it the same as
 `mathvariant="normal"`, checked; Firefox and Safari were not); Canvas has no stylesheet, so a Canvas
 page draws those symbols italic.
@@ -465,9 +480,9 @@ page draws those symbols italic.
   better, so they were not changed (no regression). In a reaction they are still read "n pre sub 0
   and pre super 1" while its other nuclides are read as nuclides; a neutron or a positron alone
   has no `intent`. 9 of the 37 correct all-chemistry outputs that hold a nuclide are in that case.
-- **"Equal to the gold" does not rise on chemistry** (133 to 132: 16 gained, 17 lost; one more in
-  the slides set) and the SRE columns fall. The gold is not the right reading: of the 17 lost under
-  MathCAT, 14 are where the gold's `mtext` is a word ("NO sub 2", "OH", "CO", "CH sub 3 OH") and ours
+- **"Equal to the gold" rises by 3 on chemistry** (133 to 136: 16 gained, 13 lost; one more in
+  the slides set) and the SRE columns fall. The gold is not the right reading: of the 13 lost under
+  MathCAT, 10 are where the gold's `mtext` is a word ("NO sub 2", "OH", "CO", "CH sub 3 OH") and ours
   is spelled letter by letter ("cap n cap o sub 2"), and 3 are nuclear equations the gold's shape
   does not let MathCAT take as chemistry ("Be pre sub 4 and pre super 9") and ours is read as
   nuclides ("super 9, sub 4, cap b e"). The 16 gained are the states. Algebra and the authored sets
@@ -482,7 +497,7 @@ page draws those symbols italic.
 - **Scorers** (`scripts/dev_converter_effect.py --shape-only`, same run). The chem scorer is
   unchanged at 293 of 443. The symbols scorer is unchanged at 1,289 of 1,809 (its "before" is
   1,289, not the 1,271 it gave before the change below). The primary (`exact_lenient`) goes 827 to
-  826 (-0.06 points); the non-chemistry sets change by 0 equations.
+  827; the non-chemistry sets change by 0 equations.
   - The symbols scorer first lost 1,271 to 1,196, all in chemistry sets. That was an artefact, not
     a change in content: it keeps a letter's style as an atom (`normal:H`), so an upright `mi`
     symbol read as a different symbol from the gold's `mtext` one (75 OpenStax and 11 authored
@@ -492,7 +507,7 @@ page draws those symbols italic.
     as an `mtext` one; an upright `d` is still not a plain `d`. On the old converter's output that is
     +18 equations on this run (chemistry sets and one slides document only, 0 elsewhere), on the new
     output +62, so the two sides are alike.
-  - The primary scorer loses 11 and gains 10. The 10 gained are the states. The 11 lost are rate
+  - The primary scorer loses 10 and gains 10. The 10 gained are the states. The 10 lost are rate
     laws and the like where the gold's `mtext` is a packed word ("CH", "NO") against our one symbol
     per token or where a symbol keeps `normal` beside other maths, and one authored equation whose
     gold has the old converter's shape. That is the packing gap the primary scorer documents

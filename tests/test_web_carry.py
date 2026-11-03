@@ -139,6 +139,10 @@ def test_an_accept_is_carried_when_only_the_mathml_and_speech_were_made_another_
     report, changes = carry.carry_decisions(old, {"p1-e0": png(1)}, new, {"p1-e0": png(1)})
     assert report.carried == ["p1-e0"] and report.suggestion_changed == []
     assert new_f.status is Status.ACCEPTED and [c.element_id for c in changes] == ["p1-e0"]
+    # the carried accept keeps what the current pipeline made, not the earlier MathML and reading
+    assert new_f.equation is not None
+    assert "mathvariant" in new_f.equation.mathml and new_f.equation.speech == "H 2 O"
+    assert new_f.reviewed and not new_f.pending
 
 
 def test_an_accept_is_not_carried_when_the_tool_now_proposes_something_else():

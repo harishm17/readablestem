@@ -22,20 +22,27 @@
 - Measured with MathCAT 0.7.7 and Speech Rule Engine 4.1.5 on the recorded dev run of 2026-10-26
   (no model call): of the correct dev outputs that are a formula or reaction on its own, MathCAT
   recognised 136 of 153 before and 153 of 153 now; states read as words (36 of 36 where the gold's
-  reading has one, 34 before); speech equal to the gold on the chemistry set 133 to 132, on
+  reading has one, 34 before); speech equal to the gold on the chemistry set 133 to 136, on
   OpenStax algebra 736 to 736 (the gold's own reading is the difference), and Speech Rule Engine
-  equal to the gold falls on chemistry (61 to 33 clearspeak, 83 to 45 mathspeak). A symbol has no
+  equal to the gold falls on chemistry (61 to 35 clearspeak, 83 to 45 mathspeak). A symbol has no
   explicit style when `intent` is on (Speech Rule Engine reads `mathvariant="normal"` aloud: "normal"
-  in 68 of 318 chemistry readings, 199 with the style always; the standalone file draws it upright
+  in 64 of 318 chemistry readings, 199 with the style always; the standalone file draws it upright
   with `math[intent] mi { text-transform: none }`). Chem scorer unchanged (293 of 443); the
   symbols scorer unchanged at 1,289 after it stopped counting an upright symbol and an `mtext`
-  one as different (its drop of 75 equations was that artefact); the primary 827 to 826. Details,
+  one as different (its drop of 75 equations was that artefact); the primary 827 to 827. Details,
   the four spellings compared and what MathCAT does not read as chemistry:
   [docs/chemistry.md](docs/chemistry.md), "MathML shape".
 - Pipeline version 0.5.1 to 0.5.2. Review carry now compares an equation's LaTeX and display, not
   its MathML and reading (`web/carry.py`), so a revised upload keeps its accepted equations when
   only the MathML is made another way; fingerprints (the picture's hash) are unchanged. The step
   cache key holds the version, so a re-converted file asks the model again for equations.
+- A bare word of capitals (`ON`, `IN`, `OK`, `PH`, `HIV`, `V_{\text{IN}}`) is not chemistry; the shaping
+  needs a count, a charge, a state, a coefficient, a lowercase formula word (`NaCl`), a counted bracket
+  group or an arrow with such a species. The EPUB export drops `intent` (epubcheck 5.4.0 reports
+  RSC-005 on it; the EPUB validator tests have a chemistry page). The chemistry check's flat text puts
+  a space after an arrow's label, so `->(Fe) 2NH3` no longer reads `Fe2NH3`. A carried accept keeps the
+  new fix's equation (shape and reading) and copies only the decision; an edit is copied whole. The
+  review screen draws `intent` symbols upright (`web/static/app.css`).
 - `scripts/dev_converter_effect.py --shape-only`: the effect of this change alone on the scorers.
   `equations_symbols` reads `mmultiscripts` as the gold's prefix scripts and an upright element
   symbol like an `mtext` one; the primary scorer reads `mmultiscripts` as the answer keys' shape.

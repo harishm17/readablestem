@@ -184,6 +184,25 @@ def test_math_stays_native_with_namespace_and_property():
     assert 'properties="mathml"' in export.package
 
 
+CHEMISTRY_PAGE = PAGE.replace(
+    "</main>",
+    '<p><math display="block" intent=":chemical-equation"><mrow><mn>2</mn><msub><mi>H</mi>'
+    "<mn>2</mn></msub><mo>+</mo><msub><mi>O</mi><mn>2</mn></msub><mo>\u27f6</mo><mn>2</mn>"
+    "<msub><mi>H</mi><mn>2</mn></msub><mi>O</mi></mrow></math></p></main>",
+)
+
+
+def test_intent_is_not_written_to_the_epub_but_the_chemistry_markup_is_kept():
+    """epubcheck 5.4.0 reports RSC-005 `attribute "intent" not allowed here`."""
+    export, parts = make(CHEMISTRY_PAGE)
+    assert b"intent" not in parts[ee.CONTENT]
+    content = xml(parts, ee.CONTENT)
+    maths = list(content.iter(f"{MATHML}math"))
+    assert len(maths) == 2 and all(m.get("intent") is None for m in maths)
+    assert len(list(maths[1].iter(f"{MATHML}msub"))) == 3
+    assert 'properties="mathml"' in export.package
+
+
 def test_images_are_extracted_with_alt_and_deduplicated():
     page = PAGE.replace("</main>", f'<img src="{DATA_URI}" alt="Same dot again"></main>')
     export, parts = make(page)

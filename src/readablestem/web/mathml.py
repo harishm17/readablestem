@@ -75,7 +75,7 @@ def _write(node: Element, out: list[str], depth: int, flag: frozenset[str] = fro
         local = _local(name)
         if local in ALLOWED_ATTRIBUTES and "{" not in name:
             attrs.append(f' {local}="{escape(value, quote=True)}"')
-        elif tag == "math" and name == "intent" and intent_allowed(value):
+        elif depth == 0 and tag == "math" and name == "intent" and intent_allowed(value):
             attrs.append(f' intent="{value}"')  # the root only, one of the two chemistry values
     if tag == "math":
         attrs.insert(0, f' xmlns="{MATHML_NS}"')

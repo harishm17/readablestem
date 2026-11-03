@@ -384,3 +384,82 @@ def test_the_gas_and_precipitate_marks_are_operators_after_the_species() -> None
     precipitate = ce("Ag+(aq) + Cl-(aq) -> AgCl v")
     assert "↓" in [n.text for n in precipitate.iter() if local(n) == "mo"]
     assert precipitate.get("intent") == ":chemical-equation"
+
+
+# ------------------------------------------------------- words and units are not chemistry
+
+NOT_CHEMISTRY = [
+    r"\text{ON} \to \text{OFF}",
+    r"\text{IS}",
+    r"\text{SO}",
+    r"\text{IN}",
+    r"\text{OK}",
+    r"\text{PH}",
+    r"\text{FBI}",
+    r"\text{CPU}",
+    r"\text{HIV}",
+    r"\text{NIH}",
+    r"\text{NY}",
+    r"\text{NaN}",
+    r"V_{\text{CC}}",
+    r"V_{\text{IN}}",
+    r"V_{\text{IN}} \to V_{\text{OUT}}",
+    r"\text{IF} \Rightarrow \text{THEN}",
+    r"\text{ON} \rightleftharpoons \text{OFF}",
+    r"\text{CPU} + \text{GPU}",
+    r"\text{No}",
+    r"\text{Pa}",
+    r"\text{Co}",
+    r"\text{In}",
+    r"\text{As}",
+    r"\text{Be}",
+    r"\text{Na}",
+    r"\operatorname{Co}(x)",
+    r"\mathit{Na} + \mathit{No}",
+    r"5\ \text{Pa}",
+    r"101\ \text{kPa}",
+    r"2\ \text{N} \cdot \text{m}",
+    r"I(s) + I(t)",
+    r"f(s) = \mathrm{Re}(s)",
+    r"\text{As in the text}, x",
+    r"A \to B",
+    r"\text{start} \to \text{end}",
+]
+
+
+@pytest.mark.parametrize("latex", NOT_CHEMISTRY)
+def test_words_acronyms_and_units_are_converted_as_before(latex: str, monkeypatch) -> None:
+    after = convert(latex)
+    monkeypatch.setattr(validate, "shape_chemistry", lambda root: False)
+    assert after == convert(latex)
+    assert "intent" not in after
+
+
+@pytest.mark.parametrize(
+    "latex",
+    [
+        r"\text{HCl} + \text{NaOH} \to \text{NaCl} + \text{H}_2\text{O}",
+        r"2\text{CO} + \text{O}_2 \to 2\text{CO}_2",
+        r"2 \text{CO} \to 2 \text{C} + \text{O}_2",
+        r"\text{NaCl}",
+        r"\text{Cu}\text{(s)}",
+        r"\text{Ag}^+",
+    ],
+)
+def test_real_chemistry_next_to_those_words_is_still_shaped(latex: str, monkeypatch) -> None:
+    after = convert(latex)
+    monkeypatch.setattr(validate, "shape_chemistry", lambda root: False)
+    assert after != convert(latex)
+
+
+def test_intent_on_a_nested_math_element_is_dropped_by_the_review_sanitiser() -> None:
+    nested = MATH.format('<mrow><math intent=":chemical-formula"><mi>x</mi></math></mrow>')
+    assert "intent" not in str(web_mathml.sanitize_mathml(nested))
+
+
+def test_a_bare_group_with_a_count_is_chemistry_and_its_state_is_shaped() -> None:
+    """`Ca(OH)_2(aq)`: `OH` alone is a word of capitals; a count on the bracket makes a group."""
+    root = ce("Ca(OH)2(aq)")
+    assert not [n for n in root.iter() if local(n) == "mtext"]
+    assert words(root)[-3:] == ["(", "aq", ")"]
+    assert root.get("intent") == ":chemical-formula"

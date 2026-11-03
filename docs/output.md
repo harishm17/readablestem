@@ -176,7 +176,7 @@ EPUB 3 (no route or button yet). Nothing is read but the file: no network, no mo
 
 | File | What it is |
 |---|---|
-| `EPUB/content.xhtml` | The whole document as XHTML, in one content document. Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet stays. Scripts are not carried. |
+| `EPUB/content.xhtml` | The whole document as XHTML, in one content document. Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet stays. The one MathML change: `intent` on `<math>` (chemistry, docs/chemistry.md) is dropped, because EPUB 3 validation refuses it (RSC-005). Scripts are not carried. |
 | `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); and a `page-list` from `role="doc-pagebreak"` markers when the document has them (hidden in the book, used by reading systems). |
 | `EPUB/images/image-NN.png` | Each `data:` image as a file (one per distinct picture), `alt` kept on the `<img>`. |
 | `EPUB/package.opf` | Title, language, a UUID made from the document, `dcterms:modified`, accessibility metadata, manifest, spine. |

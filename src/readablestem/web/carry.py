@@ -351,7 +351,16 @@ def carry_decisions(
 
 def _put_decision(target: Fix, source: Fix) -> None:
     """Copy what a decision can change from `source` onto `target` (`web.review.snapshot`'s
-    fields), so the new fix reads exactly as the earlier one did after the decision."""
+    fields), so the new fix reads exactly as the earlier one did after the decision.
+
+    An accept is carried only where the tool proposes the same thing now (`_same_proposal`), so
+    the new fix already has that proposal, made by the current pipeline (its MathML shape and
+    reading): only the decision is copied, not the earlier result. An edit or a rejection is the
+    person's own words and is copied whole."""
+    if source.status is Status.ACCEPTED:
+        target.status = source.status
+        target.reviewed = True
+        return
     for name in ("equation", "figure", "heading", "table"):
         value = getattr(source, name)
         setattr(target, name, value.model_copy(deep=True) if value is not None else None)

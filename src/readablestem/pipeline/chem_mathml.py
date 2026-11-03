@@ -112,13 +112,8 @@ def _symbols(node: ET.Element) -> list[str] | None:
     if tag not in {"mtext", "mi"} or len(node):
         return None
     text = node.text or ""
-    if (
-        tag == "mi"
-        and node.get("mathvariant") != "normal"
-        and len(text) < 2
-        and node.get(_MARK) is None
-    ):
-        return None  # an italic letter is a variable
+    if tag == "mi" and node.get("mathvariant") != "normal" and node.get(_MARK) is None:
+        return None  # an italic letter or word (`\operatorname{Co}`, `\mathit{Na}`) is not one
     return _split_symbols(text) if text[:1].isupper() else None
 
 
@@ -232,27 +227,68 @@ def _ends_species(node: ET.Element, marked: _Marked) -> bool:
     return _local(node) == "mo" and _text(node) in _CLOSERS
 
 
+_NOT_FORMULAS = frozenset({"NaN"})  # words that spell two symbols
+
+
+def _formula_word(token: ET.Element) -> bool:
+    """An `mtext` of two or more symbols that has a lowercase letter (`NaCl`, `HCl`, `NaOH`).
+    All capitals (`ON`, `IN`, `SO`, `OK`, `PH`, `CPU`, `HIV`, `NY`) are words and acronyms as
+    often as formulas (`CO`, `NO`), so they are no evidence on their own."""
+    text = token.text or ""
+    return (
+        _local(token) == "mtext"
+        and len(_symbols(token) or []) >= 2
+        and any(c.islower() for c in text)
+        and text not in _NOT_FORMULAS
+    )
+
+
+def _cased(node: ET.Element) -> bool:
+    """A symbol of two letters (`Ca`, `Cl`), as a token or under a script."""
+    base = node[0] if _is_script(node) else node
+    return _symbols(base) is not None and any(c.islower() for c in _text(base))
+
+
+def _strong(kids: list[ET.Element], i: int, marked: _Marked) -> bool:
+    """Is kids[i] a species that only chemistry writes that way: a symbol with a count or a
+    charge, a formula word, a nuclide or a group already shaped, or a species with a number in
+    front of it (a coefficient)?"""
+    node = kids[i]
+    found = _species(node, marked)
+    if found is not None:
+        token, wrapper = found
+        if wrapper is not None and _scripts_ok(wrapper):
+            return True
+        if _formula_word(token):
+            return True
+        return i > 0 and _local(kids[i - 1]) == "mn" and _text(kids[i - 1]).isdigit()
+    return id(node) in marked or _local(node) == "mmultiscripts"
+
+
 def _has_evidence(kids: list[ET.Element], marked: _Marked) -> bool:
-    """Does this row hold what only chemistry has (see the module docstring)?"""
+    """Does this row hold what only chemistry has (see the module docstring)? A bare word of
+    capitals is not enough: `\\text{ON} \\to \\text{OFF}` and `V_{\\text{IN}}` are not chemistry."""
     first_species: int | None = None
     arrow_at: int | None = None
-    previous_species = False
+    previous: int | None = None
+    strong_seen = False
+    crossed = False  # a species before an arrow and one after it
     for i, node in enumerate(kids):
-        found = _species(node, marked)
-        if found is not None:
-            token, wrapper = found
-            if wrapper is not None and _scripts_ok(wrapper):
-                return True
-            if len(_symbols(token) or []) >= 2 and _local(token) == "mtext":
-                return True
+        if _strong(kids, i, marked):
+            return True  # a count, a charge, a formula word, a coefficient, a nuclide, a group
         if _prefix_scripts(node) and i + 1 < len(kids) and _nuclide_symbol(kids[i + 1]):
             return True
         species = _is_species_node(node, marked)
-        if species and previous_species:
-            return True
+        if (
+            species
+            and previous == i - 1
+            and (_cased(node) or _cased(kids[previous]) or _strong(kids, previous, marked))
+        ):
+            return True  # two symbols side by side, one of them `Ca`, `Na` or with a count
+        text = node.text or ""
         if (
             _local(node) == "mtext"
-            and (_STATE_TEXT.match(node.text or "") or _CONDITIONED_STATE.match(node.text or ""))
+            and (_STATE_TEXT.match(text) or _CONDITIONED_STATE.match(text))
             and i > 0
             and _is_species_node(kids[i - 1], marked)
         ):
@@ -263,9 +299,11 @@ def _has_evidence(kids: list[ET.Element], marked: _Marked) -> bool:
             if first_species is None:
                 first_species = i
             elif arrow_at is not None and first_species < arrow_at:
-                return True
-        previous_species = species
-    return False
+                crossed = True
+        if species:
+            previous = i
+            strong_seen = strong_seen or _strong(kids, i, marked)
+    return crossed and strong_seen
 
 
 def _unwrap(node: ET.Element) -> ET.Element:
@@ -339,6 +377,7 @@ def _merge_letter_pairs(kids: list[ET.Element]) -> list[ET.Element]:
             and (node.text or "") + (nxt.text or "") in _TWO_LETTER_SYMBOLS
         ):
             merged = _like(node, "mi", (node.text or "") + (nxt.text or ""))
+            merged.set(_MARK, "1")
             out.append(merged)
             i += 2
         elif _is_script(node) and len(node):
@@ -347,6 +386,7 @@ def _merge_letter_pairs(kids: list[ET.Element]) -> list[ET.Element]:
                 pair = (base[0].text or "") + (base[1].text or "")
                 if pair in _TWO_LETTER_SYMBOLS:
                     merged = _like(base, "mi", pair)
+                    merged.set(_MARK, "1")
                     node = _with_base(node, merged)  # a copy: the row may not be chemistry
             out.append(node)
             i += 1
@@ -356,10 +396,28 @@ def _merge_letter_pairs(kids: list[ET.Element]) -> list[ET.Element]:
     return out
 
 
-def _shape_row(parent: ET.Element, marked: _Marked) -> bool:
+def _counted_groups(root: ET.Element) -> set[int]:
+    """The rows of `(OH)_2`, `[Cu(NH3)4]^{2+}`, `(SO4)_3`: a bracket pair around symbols with a
+    count or a charge on the whole group. The group is chemistry whatever is inside it, even a
+    bare `OH` that alone would be a word."""
+    found: set[int] = set()
+    for node in root.iter():
+        if _is_script(node) and _scripts_ok(node) and _local(node[0]) == "mrow":
+            group = node[0]
+            if (
+                len(group) >= 3
+                and _text(group[0]) in {"(", "["}
+                and _text(group[-1]) in _CLOSERS
+                and any(_symbols(k) is not None or _is_script(k) for k in list(group)[1:-1])
+            ):
+                found.add(id(group))
+    return found
+
+
+def _shape_row(parent: ET.Element, marked: _Marked, forced: frozenset[int] | set[int]) -> bool:
     """Rewrite one row in place; True when it was chemistry."""
     kids = _merge_letter_pairs(list(parent))
-    if not _has_evidence(kids, marked):
+    if id(parent) not in forced and not _has_evidence(kids, marked):
         return False
     out: list[ET.Element] = []
     i = 0
@@ -480,9 +538,10 @@ def shape_chemistry(root: ET.Element) -> bool:
     if _deeper_than(root, MAX_SHAPED_DEPTH):
         return False
     marked: _Marked = set()
+    forced = _counted_groups(root)
     chemical = False
     for node in reversed([n for n in root.iter() if _local(n) in _ROWS]):
-        chemical = _shape_row(node, marked) or chemical  # innermost rows first
+        chemical = _shape_row(node, marked, forced) or chemical  # innermost rows first
     if not chemical:
         return False
     top = root[0] if len(root) == 1 and _local(root[0]) == "mrow" else root

@@ -264,7 +264,7 @@ def _normalize_node(elem: ET.Element, inherited_variant: str | None = None) -> E
         return None
     if tag == "mfenced":
         return _normalize_node(_fenced_to_mrow(elem), inherited_variant)
-    if tag == "mmultiscripts" and elem:
+    if tag == "mmultiscripts" and len(elem):
         return _normalize_node(_multiscripts_to_row(elem), inherited_variant)
 
     attrs = _normalize_attrs(elem)

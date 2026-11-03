@@ -430,6 +430,7 @@ def mathml_flat(mathml: str) -> str:
             for child in children[1:]:
                 parts.append(" ")
                 walk(child, False)
+                parts.append(" ")  # a label (`->(Fe)`) must not run into the next species
         elif name == "mfrac":
             for child in children:
                 parts.append(" ")
