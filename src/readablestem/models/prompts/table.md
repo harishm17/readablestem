@@ -69,33 +69,8 @@ Each cell has:
 7. Use standard commands only: Greek letters, operators and relations (`\times`,
    `\cdot`, `\pm`, `\leq`, `\approx`), functions (`\sin`, `\log`), `\sum`, `\int`,
    accents (`\hat`, `\bar`, `\vec`). Never use `\def`, `\newcommand`, `\href`, `\url`,
-   `\color`, `\label`, `\tag` or package-specific commands (`\ce` for chemical species is
-   the one exception, see Chemistry below).
+   `\color`, `\label`, `\tag` or package-specific commands.
 8. A minus sign is a minus sign: keep every sign as printed.
-
-## Chemistry (cells with formulas and reactions)
-
-A cell that holds a chemical formula, an ion, a reaction or a nuclide has subscripts, charges
-or arrows that plain text cannot show, so it gets `latex`, and a screen reader says
-"aqueous" or "reacts to form" only when the species are written with `\ce{...}`. Write each
-species and reaction with `\ce{...}` and everything else in the cell (numbers, units, words)
-as ordinary LaTeX around it. The examples are illustrative.
-
-- Formulas and ions: `\ce{H2O}`, `\ce{Al2(SO4)3}`, `\ce{Na+}`, `\ce{SO4^2-}`, `\ce{Fe^3+}`,
-  `\ce{[Cu(NH3)4]^2+}`. A state stays with its species, and a condition follows it after a
-  comma: `\ce{CO2(g)}`, `\ce{Zn^2+(aq, 0.10 M)}`.
-- A reaction is one `\ce` for the whole cell, coefficients in front of their species:
-  `\ce{2 H2 + O2 -> 2 H2O}`; arrows are `->`, `<-`, `<->` and `<=>`.
-- A half-reaction cell next to a potential: the reaction in `\ce` and the value as maths,
-  `\ce{Cu^2+(aq) + 2 e- -> Cu(s)}\quad E^\circ = +0.34\ \text{V}`, or in separate cells when
-  the table has separate columns.
-- Nuclides: `\ce{^{14}_{6}C}`; an excited nuclide carries its star: `\ce{^{60}_{28}Ni^*}`.
-- A cell with only words, such as an element name ("Sodium"), stays a plain text cell with
-  no `latex`. For a formula cell, `text` is its plain Unicode reading: `H₂O`, `SO₄²⁻`.
-- Inside `\ce` write only species, coefficients, charges, states, arrows and marks: no
-  `\text`, no `$`, no other commands. A unit or a quantity (`K_\text{sp}`, `\Delta H^\circ`)
-  is ordinary LaTeX beside it.
-
 
 ## Context text
 
