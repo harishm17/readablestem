@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: agreement oracle on the recorded chatbot answers (branch eq/agreement-oracle)
+
+- `scripts/eq_oracle_agreement.py` and a D2 section of docs/eval-equation-diagnostics.md: how often
+  a second whole-page reading (the recorded Opus chatbot answers) is right where ours is wrong, how
+  often our reading is right when the two agree under `math_canonical`, how well disagreement
+  flags our wrong readings, and how many of our undetected equations it found. Measurement only,
+  offline, no change to the product.
+
 ## Unreleased: a local handwriting reader (branch hw/local-reader)
 
 - New reader B, `local` (`models/math_readers/local_reader.py`): TexTeller on CPU with ONNX
