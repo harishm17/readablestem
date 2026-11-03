@@ -22,6 +22,7 @@ arrived at; read them by question, not front to back.
 | How are volunteers' hand copies of OpenStax examples collected, with answer keys from the source, and published only with consent? | [data/handwriting-copy/README.md](../data/handwriting-copy/README.md) |
 | What is reader B (a second reading of a handwritten expression), what does it cost, and what must change before one is turned on? | [math-readers.md](math-readers.md) |
 | How does it do on real LaTeX PDFs from arXiv (not Chromium prints), against the chatbot recipe? | [eval-realworld.md](eval-realworld.md) |
+| Where does ReadableSTEM stand today on the 25 real-world development papers, against the recorded Opus and Haiku chatbot answers (pipeline 0.5.3, production flags)? | [eval-dev-baseline-2026-11-03.md](eval-dev-baseline-2026-11-03.md) |
 | Why did it lose equations to the chatbot recipe on real papers, what was fixed, and what did a fresh set of papers say? | [eval-equation-rootcause.md](eval-equation-rootcause.md) |
 | What did the second round of equation fixes do, on a third registered set of papers? | [eval-equation-round2.md](eval-equation-round2.md) |
 | Why did it trail a chatbot on equations, and what did reading each inline equation with its line do? | [eval-equation-round3.md](eval-equation-round3.md) |
@@ -43,6 +44,7 @@ arrived at; read them by question, not front to back.
 | What is in the EPUB export? | [output.md](output.md), "The EPUB export" |
 | How do I test the Canvas export in a real Canvas? | [canvas-sandbox-test.md](canvas-sandbox-test.md) |
 | How do I check what a screen reader says (VoiceOver in Safari) on the demo, a converted file and the review screen? | [screen-reader-test.md](screen-reader-test.md) |
+| What has been tested for keyboard use and WCAG 2.2 on the web app, and what has not (the draft accessibility conformance report)? | [acr/README.md](acr/README.md) and [acr/acr-draft.md](acr/acr-draft.md) |
 
 ## If you want to know why a choice was made
 

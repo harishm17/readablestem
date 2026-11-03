@@ -1011,6 +1011,44 @@ def _write_json(data: dict, path: Path) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _cmd_figures_spotcheck(args: argparse.Namespace) -> int:
+    """Offline: draw the sheet a person reads (every long-judge fail, some passes), or score
+    their labels against the key. Calls no model."""
+    from readablestem.eval import figures_spotcheck as spot
+
+    try:
+        if args.items:
+            if not args.sheet:
+                return _error("--items needs --sheet (where to write the labelling sheet)")
+            key_path = args.key or args.sheet.with_suffix(".key.json")
+            counts = spot.write_sheet(
+                spot.load_items(args.items),
+                args.sheet,
+                key_path,
+                passes=args.passes,
+                seed=args.seed,
+            )
+            print(
+                f"wrote {counts['judge_fails'] + counts['passes_sampled']} rows to {args.sheet} "
+                f"({counts['judge_fails']} judge fails, {counts['passes_sampled']} of "
+                f"{counts['judge_passes']} passes; {counts['not_judged']} figures not graded) "
+                f"and the key to {key_path}"
+            )
+            print("Fill human_accurate, human_complete, human_invented_values (yes/no).")
+            return 0
+        if args.key and args.labels:
+            rep = spot.report(spot.load_key(args.key), spot.load_labels(args.labels))
+            if args.out:
+                _write_json(rep, args.out)
+            print(spot.format_report(rep), end="")
+            return 0
+    except FileNotFoundError as exc:
+        return _error(f"file not found: {exc.filename}")
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _error(str(exc))
+    return _error("give --items and --sheet, or --key and --labels")
+
+
 # ========================================================================== render
 
 
@@ -1598,6 +1636,19 @@ def register(
     calibrate.add_argument("--out", type=Path, help="write the report as JSON")
     calibrate.add_argument("--items", type=Path, help="--probes: per-judgement rows (JSONL)")
     calibrate.set_defaults(func=_cmd_calibrate)
+
+    spotcheck = group.add_parser(
+        "figures-spotcheck",
+        help="offline: sheet of every long-judge fail plus sampled passes for a person to check",
+    )
+    spotcheck.add_argument("--items", type=Path, help="judged.jsonl from a long-description run")
+    spotcheck.add_argument("--sheet", type=Path, help="labelling sheet to write (.csv or .jsonl)")
+    spotcheck.add_argument("--key", type=Path, help="key file (default: <sheet>.key.json)")
+    spotcheck.add_argument("--labels", type=Path, help="the filled sheet, to score against --key")
+    spotcheck.add_argument("--passes", type=int, default=10, help="judge passes to sample (10)")
+    spotcheck.add_argument("--seed", default="figures-spotcheck", help="seed for the draw")
+    spotcheck.add_argument("--out", type=Path, help="write the report as JSON")
+    spotcheck.set_defaults(func=_cmd_figures_spotcheck)
 
     render = group.add_parser("render", help="print a gold page to PDF or pre-render equations")
     render.add_argument("--page", help="OpenStax page slug, e.g. 2-2-speed-and-velocity")

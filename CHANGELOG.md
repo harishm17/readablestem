@@ -11,6 +11,49 @@
   links as before. Forced-colours and reduced-motion rules cover the new components. The app's
   side-stripe notices and cards became full borders. `/style` (noindex, not in the sitemap) shows
   every component. Docs: `docs/site.md` "Design system", `static/vendor/README.md`.
+## Unreleased: keyboard walk and draft ACR
+
+- New keyboard-only walk of the web app (`tests/test_web_keyboard_browser.py`, browser-marked,
+  helpers in `tests/fixtures/web/keyboard.py`): Tab through every page at 1280, 390 and 320 CSS px
+  (skip link, focus visible and not covered, names, no trap, no change on focus, landmark order)
+  and the main flows by key alone, with where focus lands after each redirect.
+  `tests/test_web_focus_style.py` checks the focus ring's colours offline.
+- Fix (found by the walk): after leaving a page out, putting it back, or choosing a line to change
+  in the page tools, focus stayed on the page itself because the redirect named a fragment that was
+  not focusable (a browser skips `autofocus` when the address has a fragment). The redirects and
+  links now name `#page-tools-summary`, and the tool sections take focus (`tabindex="-1"`).
+- Draft accessibility conformance report in `docs/acr/` (VPAT 2.5Rev WCAG edition layout, WCAG 2.2
+  A and AA), not published and not a claim of conformance: each row names its test or code, and
+  rows that need a screen reader session are "Not yet evaluated". `tests/test_acr_draft.py` holds
+  the report to its own rules.
+## Unreleased: development baseline (branch eval/dev-baseline-2026-11-03)
+
+- Measurement report `docs/eval-dev-baseline-2026-11-03.md`: ReadableSTEM at pipeline 0.5.3 with production flags on the 25
+  real-world development papers, against the recorded Opus (6 papers) and Haiku (25) chatbot answers. One
+  run, $0.1186 of model spend; no code, prompt or setting changed.
+## Unreleased: figures spot check
+
+- `eval figures-spotcheck` (`eval/figures_spotcheck.py`, docs/eval.md "Figure spot check"): offline,
+  no model call. From a figures run with long descriptions on, writes a blind sheet of every
+  long-judge fail plus a seeded sample of 10 passes for a person to label, and scores the labels
+  against a key (judge fails confirmed, sampled passes the person would fail, each with n and a
+  Wilson interval). Tests: `tests/test_eval_figures_spotcheck.py`.
+## Unreleased: fair queue
+
+- The worker takes queued jobs round-robin by person (`web/fair_queue.py`, docs/web.md "Worker"):
+  fewest attempts first as before, then the owner served longest ago, then oldest. Someone with ten
+  queued documents no longer keeps another person's single one waiting behind all ten; a person
+  alone is served in the same order as before. The job page's "documents ahead of yours" replays the
+  same order. Tests: `tests/test_web_fair_queue.py`, one Postgres test in `tests/test_web_postgres.py`.
+## Unreleased: Word and EPUB in "Download all" (branch export/w3-download-all-formats)
+
+- "Download all" (My documents and the course page) and "Combine parts" offer Word (.docx, where pandoc is
+  installed) and EPUB as well as HTML: `?format=docx` or `?format=epub` on `/app/download`,
+  `/courses/{id}/download` and `/jobs/{id}/combine`. Same wording and pattern as the single downloads
+  ("Other file types"). A Word zip holds at most 10 documents (each is a pandoc run); a document that cannot
+  be made in the file type is left out and counted in `contents.txt`. Each document counts as downloaded in
+  that file type, so the review record lists it. The HTML zip no longer restarts the deletion clock of ready
+  documents it left out for the 25-document cap. docs/output.md, docs/web.md, docs/security.md.
 
 ## Unreleased: slide decks (branch layout/beamer-slides)
 
