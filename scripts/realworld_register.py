@@ -31,6 +31,7 @@ FRESH5_FILES = (  # hashed when the owner signs PREREGISTRATION-FRESH5.md, not b
     "../../scripts/fresh5_select.py",
     "../../src/readablestem/gold/course_corpus.py",
     "../../src/readablestem/gold/safe_tex.py",
+    "../../src/readablestem/pipeline/math_canonical.py",
     "../../src/readablestem/gold/arxiv_gold.py",
     "../../scripts/rw_notation_neutral.py",
 )
