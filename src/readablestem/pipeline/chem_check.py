@@ -75,6 +75,7 @@ _SEPARATOR = re.compile(r"(?<!\d)[,;](?!\d)|(?<=\d)[,;](?!\d)|(?<!\d)[,;](?=\d)|
 _LABEL = re.compile(r"(?<![\w)\]+−])\(([a-fh-km-rt-z]|iii?|iv)\)")
 # A charge followed by a glued operator ("OH−+ H+", "CO3 2−+ H+").
 _CHARGE_PLUS = re.compile(r"\s*([+−])\+(?=\s|$)")
+_STATE_GLUED = re.compile(r"\((aq|s|l|g)\)(?=[A-Z\[])")
 _VARIABLE = "·"  # stands for a variable the PDF prints in a math italic or bold style
 _VARIABLE_BEFORE = re.compile(r"(?<![A-Za-z])([a-z·])(?=\[)")
 _VARIABLE_AFTER = re.compile(r"\](?=[a-z·])")
@@ -172,6 +173,17 @@ def _body_end(text: str, i: int, depth: int = 0) -> int | None:
     if depth and i < len(text) and text[i] not in ")]":
         return None
     return i
+
+
+def _is_formula(body: str) -> bool:
+    """More than a lone element symbol: two element symbols, or a count."""
+    atoms = 0
+    i = 0
+    while i < len(body):
+        n = _element_at(body, i)
+        atoms += bool(n)
+        i += n or 1
+    return atoms >= 2 or any(ch.isdigit() for ch in body)
 
 
 def _two_elements_with_count(body: str) -> bool:
@@ -294,6 +306,8 @@ def _fold(text: str) -> str:
         else:
             out.append(_MINUS if folded in _MINUS_LIKE else folded)
     text = _CONDITIONS.sub(r"(\1)", _CHARGE_PLUS.sub(r"\1 +", "".join(out)))
+    # a state glued to the next word ("I(s)Z(s)", MathML's way) is a word of its own
+    text = _STATE_GLUED.sub(r"(\1) ", text)
     text = _DISPLACED.sub("", text)
     # rate laws: a variable or an exponent letter stuck to a concentration ("k[NO]m[Cl2]n")
     text = _VARIABLE_BEFORE.sub(r"\1 ", text)
@@ -455,12 +469,17 @@ class SpeciesDiff:
 
 
 def has_evidence(tokens: list[Token]) -> bool:
-    """Chemistry-only evidence in a text's tokens: a state, a formula of two element symbols
-    with a count (`H2O`, `CO2`), two charged species, or a charged species in a reaction
-    (an arrow). A lone `Na+` or `B+` is not enough: a letter and a sign are algebra often
-    enough."""
+    """Chemistry-only evidence in a text's tokens: a formula of two element symbols with a
+    count (`H2O`, `CO2`), a state on a formula of more than one letter or with a count
+    (`NaCl(aq)`, `H2(g)`), two charged species, or a charged species in a reaction (an
+    arrow). A state alone is not evidence (`V(s) = I(s) Z(s)` is a Laplace transform), nor
+    is a lone `Na+` or `B+`: a letter and a sign are algebra often enough."""
     species = [t for t in tokens if isinstance(t, Species)]
-    if any(t.state or _two_elements_with_count(t.body.rstrip("+" + _MINUS)) for t in species):
+    if any(
+        _two_elements_with_count(t.body.rstrip("+" + _MINUS))
+        or (t.state and _is_formula(t.body.rstrip("+" + _MINUS)))
+        for t in species
+    ):
         return True
     charged = [t for t in species if t.body[-1:] in "+" + _MINUS]
     arrow = any(isinstance(t, Arrow) for t in tokens)

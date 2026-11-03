@@ -267,9 +267,11 @@ arrow read as another (`→` for `⇌`), missing or extra; a neighbour word take
 (a species the text layer lacks, or letters stuck to a formula so it is no longer one); and a
 reaction cut mid-way (species or an arrow at either end that the reading lacks).
 
-**When it runs.** Only when the text layer has evidence only chemistry has: a state symbol,
-a formula of two element symbols with a count (`H2O`), two charged species, or a charged
-species in a reaction. A lone `Na+` or `B+` is not enough, a text with a variable and a
+**When it runs.** Only when the text layer has evidence only chemistry has: a formula of two
+element symbols with a count (`H2O`), a state on a formula of more than one letter or with a
+count (`NaCl(aq)`, `H2(g)`), two charged species, or a charged species in a reaction. A state
+alone is not (`V(s) = I(s) Z(s)`, a Laplace transform, is mathematics), and neither is a lone
+`Na+` or `B+`; a text with a variable and a
 number that is no element (`T1`, `x2`) is mathematics, and a letter in a math italic or bold
 style (what TeX and Chromium print for variables) is never an element. Anything the parser
 cannot read is left out, never failed. Bare formulas (`HCl`, `NaOH`) and one-letter words (a
@@ -285,20 +287,20 @@ the species ("Species" rows).
 **Measured (2026-11-03, $0).** `scripts/chem_check_replay.py`, on the recorded development
 answers (`round4/on.jsonl`, 1,519 aligned pairs of 28 documents):
 
-- applied to 149 pairs (all chemistry: the two documents that are not chemistry's own hold
-  five chemistry equations among their 48 pairs); flagged 1, a real error already a required
-  decision; 0 flags on the 140 right readings it applied to (a count of the development set
+- applied to 147 pairs (all chemistry: the two documents that are not chemistry's own hold
+  five chemistry equations among their 48 pairs); flagged 0 (7 of the 147 are wrong readings,
+  none of them one the text layer shows); 0 flags on the 140 right readings it applied to (a count of the development set
   it was written on);
 - 0 of the 1,262 pairs of the non-chemistry documents (algebra, the authored exercises, matrices
   and Word documents) got the check, and for them the step's checks and confidence are
   identical with the check off (`--step-diff`); in the chemistry documents the only change is
-  the added check, passed, on the 149 pairs it applies to;
+  the added check, passed, on the 147 pairs it applies to;
 - the gold readings of the 1,369 equations of the registered held-out set against their own
   print (15 sections, 3 of them chemistry; the set is used for this count only, nothing was
   tuned on it afterwards): the check applied to 35 of the 97 chemistry equations and to none of
   the 1,272 others, and flagged 1 of the 35 (a unit letter stuck to a formula by the text
   layer, `MCH3 CO2`);
-- errors written into the 149 right readings it applies to (`--mutate`): a subscript read as
+- errors written into the right readings it applies to (`--mutate`): a subscript read as
   a coefficient 77 of 77 (the other text-layer checks: 0), an arrow changed 89 of 91 (0), a
   charge dropped 78 of 78 (77), and the same-bag errors the symbol and signs checks already
   catch (a neighbour formula 134 of 134, a flipped sign 78 of 78, a cut reaction 85 of 85,

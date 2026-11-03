@@ -259,6 +259,16 @@ def test_another_element_and_a_moved_count():
         ("B+", "B^+"),
         ("Na+", r"\text{Na}^+"),
         ("sin2 𝜃+ cos2 𝜃= 1", r"\sin^2\theta+\cos^2\theta=1"),
+        # control systems and signals: a state symbol's letters are also Laplace's s
+        ("V(s) = I(s) Z(s)", r"V(s) = I(s)Z(s)"),
+        ("V(s) = I(s)Z(s)", r"V(s) = I(s) Z(s)"),
+        ("C(s) = 1/(1 + C(s) P(s))", r"C(s) = \frac{1}{1 + C(s)P(s)}"),
+        ("𝑃(𝑠) = 𝑘 / (𝑠+ 2)", r"P(s) = \frac{k}{s+2}"),
+        ("H(s) = Y(s) X(s)", r"H(s) = \frac{Y(s)}{X(s)}"),
+        ("G(s) = N(s) D(s)", r"G(s) = \frac{N(s)}{D(s)}"),
+        ("Y(z) = H(z)X(z)", r"Y(z) = H(z)X(z)"),
+        ("C(s) = K(s) G(s)", r"C(s) = K(s)G(s)"),
+        ("I(l) = V(g) / R", r"I(l) = V(g)/R"),
     ],
 )
 def test_text_that_is_not_chemistry_is_not_checked(text, latex):
@@ -290,6 +300,13 @@ def test_italic_letters_are_variables_not_elements():
 
 
 # --------------------------------------------------------------------- the parser
+
+
+def test_a_state_glued_to_the_next_word_is_still_a_state_of_its_own():
+    # MathML joins what the text layer spaces: NaCl(aq)H2O(l)
+    text = "NaCl(aq) + H2O(l) −→Na+(aq) + Cl−(aq)"
+    latex = r"\text{NaCl}\text{(aq)} + \text{H}_2\text{O}\text{(l)} \rightarrow \text{Na}^+\text{(aq)}\text{Cl}^-\text{(aq)}"
+    assert kinds(text, latex) == ()
 
 
 def test_the_flat_mathml_matches_what_a_pdf_prints():
