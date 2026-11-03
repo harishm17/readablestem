@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased: speech under screen-reader engines (branch sr/speech-oracle)
+
+- `scripts/screenreader_speech.py` and `eval/speech_oracle.py` run any set's MathML (ours and the
+  gold's: OpenStax, authored, chemistry, handwriting, arXiv) through MathCAT 0.7.7 (NVDA 2026.1,
+  JAWS; ClearSpeak and SimpleSpeak) and Speech Rule Engine 4.1.5 (MathJax, ChromeVox). Per
+  equation: the spoken strings, whether MathCAT recognised chemistry, a word diff. Per set: the
+  share of ours that sounds like the gold under each engine, with an interval, and the worst
+  classes. `eval pipeline --speech` adds the aggregates to an equations or document report.
+  `scripts/speech_oracles/build.sh` builds the engines (rustup into `~/.cargo`, no sudo); without
+  them everything skips with a message. Offline, $0. See `docs/eval.md`, `docs/chemistry.md`.
+## Unreleased: `\ce` subset and `\ce` on every LaTeX path (branch chem/ce-subset)
+
+- The `\ce{...}` subset (`pipeline/chem.py`) now reads a condition in a state symbol
+  (`(aq, 0.10 M)`), the excited state of a nuclide (`^{60}_{28}Ni^*`) and gas and precipitate marks (`CO2 ^`, `AgCl v`);
+  every other construct is still refused.
+- `\ce` is accepted on every path that takes LaTeX: the review screen's edit box (equation and
+  table cell), scanned pages and their second reading, table cells' HTML and page-math spans, all
+  through `equation_step.read_latex`. A `\ce` outside the subset fails the LaTeX check with the new
+  code `unsupported_ce` (was `unknown_command`) and the edit box says so in words. See
+  [docs/chemistry.md](docs/chemistry.md).
 ## Unreleased: chemistry speech fixes
 
 - The review screen's "read aloud roughly as" text (and the checks that compare readings) now
