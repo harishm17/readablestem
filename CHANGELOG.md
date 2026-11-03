@@ -8,6 +8,14 @@
   symbols, and whether the product's speech code reads the answer and the label alike. Text table
   plus JSON with examples per arm; tests in `tests/test_handwriting_errors.py`; usage in
   docs/eval-handwriting.md. It calls no model and changes no product behaviour.
+## Unreleased: finished steps are kept when a configuration error ends the run
+
+- When a configuration error (a model that is not set up) ended a conversion while other
+  steps were still being answered, those steps were not kept for "Try again" if the error
+  reached the scheduler first; they are now (`pipeline/run.py`, `_Run.collect`). The tests
+  for this and for the worker and child-process suites no longer depend on timing luck, and
+  the end-to-end content test renders from the stored result the way the review screen does
+  (page markers included).
 
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)
 
