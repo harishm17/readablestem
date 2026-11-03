@@ -1,11 +1,13 @@
 # Changelog
 
-## Unreleased
+## Unreleased: canonical comparator for two readings (branch eq/math-canonical)
 
 - `pipeline/math_canonical.py`: one comparator for "is this the same formula" (tree, notation-neutral,
-  spoken-equal, symbols) with a reason when it is not; the notation-neutral and spoken scorers
-  share its folding and speech helpers (recorded-run numbers unchanged). No product behaviour
-  changes yet ([docs/steps.md](docs/steps.md), "Comparing two readings").
+  spoken-equal, symbols) with a reason when it is not. The registered scorer scripts are untouched;
+  tests check the library agrees with them. `tests/test_realworld_registration.py` runs
+  `realworld_register.py --check` for every registered set. No product behaviour changes yet
+  ([docs/steps.md](docs/steps.md), "Comparing two readings").
+
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)
 
 - The whole conversion (`convert_pdf`) now runs in a child process the worker can kill

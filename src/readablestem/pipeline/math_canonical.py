@@ -25,8 +25,10 @@ structure) and "symbols" (other symbols). `detail` is "index:a_atom|b_atom" of t
 difference in the symbol streams. It holds formula text: never log it.
 
 Pure functions, no model call, no network. `fold_upright_words`, `latex_to_mathml` and `speech_of`
-are the pieces the offline scorers (`scripts/rw_notation_neutral.py`, `scripts/rw_spoken.py`)
-share with it.
+repeat the steps of the offline scorers `scripts/rw_notation_neutral.py` and
+`scripts/rw_spoken.py`. Those scripts are hashed by the registrations
+(`scripts/realworld_register.py`) and must not change, so they do not import this module;
+`tests/test_math_canonical_scale.py` fails if the two ever disagree.
 """
 
 from __future__ import annotations
@@ -114,18 +116,32 @@ _DOUBLE_BRACE = re.compile(r"\{\{([^{}]*)\}\}")
 _BARE_SINGLE = re.compile(r"(^|[+\-=*/(,<>|&])\{\s*(\\[A-Za-z]+|[^\s{}\\])\s*\}")
 
 
-def _read_arg(s: str, i: int) -> int | None:
+def _brace_ends(s: str) -> dict[int, int]:
+    """Index of each `{` to the index just past its matching `}` (one pass; escaped braces
+    are not groups)."""
+    ends: dict[int, int] = {}
+    stack: list[int] = []
+    i = 0
+    while i < len(s):
+        ch = s[i]
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == "{":
+            stack.append(i)
+        elif ch == "}" and stack:
+            ends[stack.pop()] = i + 1
+        i += 1
+    return ends
+
+
+def _read_arg(s: str, i: int, ends: dict[int, int]) -> int | None:
     """End index of the argument that starts at `i`: a braced group, a command or one
     character; None when there is none."""
     if i >= len(s) or s[i] in "^_}":
         return None
     if s[i] == "{":
-        depth = 0
-        for j in range(i, len(s)):
-            depth += (s[j] == "{") - (s[j] == "}")
-            if depth == 0:
-                return j + 1
-        return None
+        return ends.get(i)
     if s[i] == "\\":
         j = i + 1
         while j < len(s) and s[j].isascii() and s[j].isalpha():
@@ -136,18 +152,19 @@ def _read_arg(s: str, i: int) -> int | None:
 
 def _order_scripts(s: str) -> str:
     """`x^b_a` as `x_a^b` (one `^` argument directly followed by one `_` argument)."""
+    ends = _brace_ends(s)
     out: list[str] = []
     i = 0
     while i < len(s):
         if s[i] == "\\":  # a command or an escaped character: copy it whole
-            j = _read_arg(s, i) or len(s)
+            j = _read_arg(s, i, ends) or len(s)
             out.append(s[i:j])
             i = j
             continue
         if s[i] == "^":
-            sup_end = _read_arg(s, i + 1)
+            sup_end = _read_arg(s, i + 1, ends)
             if sup_end is not None and sup_end < len(s) and s[sup_end] == "_":
-                sub_end = _read_arg(s, sup_end + 1)
+                sub_end = _read_arg(s, sup_end + 1, ends)
                 if sub_end is not None:
                     out.append("_" + s[sup_end + 1 : sub_end] + "^" + s[i + 1 : sup_end])
                     i = sub_end
@@ -158,17 +175,25 @@ def _order_scripts(s: str) -> str:
 
 
 def _squeeze(s: str) -> str:
-    """Spaces removed, except the one that ends a command name before a letter."""
+    """Spaces removed, except the one that ends a command name before a letter (one pass)."""
     out: list[str] = []
+    in_macro = False  # the text so far ends in a backslash and letters: `\\alpha`
+    after_backslash = False
+    n = len(s)
     for i, ch in enumerate(s):
         if not ch.isspace():
             out.append(ch)
+            letter = ch.isascii() and ch.isalpha()
+            in_macro = letter and (in_macro or after_backslash)
+            after_backslash = ch == "\\"
             continue
-        before = "".join(out)
-        macro = re.search(r"\\[A-Za-z]+$", before)
-        rest = s[i + 1 :].lstrip()
-        if macro and rest[:1].isascii() and rest[:1].isalpha() and not before.endswith(" "):
-            out.append(" ")
+        if in_macro:
+            j = i + 1
+            while j < n and s[j].isspace():
+                j += 1
+            if j < n and s[j].isascii() and s[j].isalpha():
+                out.append(" ")
+        in_macro = False  # a dropped space leaves a backslash before it still the last
     return "".join(out)
 
 

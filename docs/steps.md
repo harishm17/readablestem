@@ -745,9 +745,9 @@ braces around one symbol, `x^b_a` as `x_a^b`); `spoken` (`speech.mathml_to_speec
 (the same with styles ignored, the comparison `page_math` makes). The kinds are not strictly nested, so
 `holds` lists every one that is true. When none holds, `reason` is a code (`empty_a`, `empty_b`,
 `unreadable_a`, `unreadable_b`, `order`, `symbols`) and `detail` points at the first differing
-symbol; `detail` is formula text and is never logged. It makes no model call. The offline scorers
-`scripts/rw_notation_neutral.py` and `scripts/rw_spoken.py` use its folding rule and its speech and
-conversion helpers; their numbers on the recorded runs are unchanged.
+symbol; `detail` is formula text and is never logged. It makes no model call. The registered scorer
+scripts `scripts/rw_notation_neutral.py` and `scripts/rw_spoken.py` do not import it (their hashes are
+part of the registrations); a test checks that its folding, conversion and speech helpers agree with theirs.
 
 ## Privacy
 
@@ -762,6 +762,8 @@ never reaches the instructions, and that the equation's text layer is never sent
 |---|---|
 | `tests/test_steps_validate.py` | every code of every validator; the allowlist-vs-converter tests (no allowed command converts with leftovers, every command whose argument is copied verbatim is treated as text mode); alignment rewriting; `\text{}` injection and a fuzz test showing `safe_latex_to_mathml` output is always allowlisted; defusedxml refusing DTDs and entity bombs; deep and oversize input; gold MathML and OpenStax alt text as real-data sanity checks |
 | `tests/test_math_canonical.py` | the comparator: pairs equal as a tree, only after notation folding, only as speech, only as unstyled symbols, and unequal pairs with their reason; MathML against LaTeX; empty and unreadable readings; text bodies kept; folding is idempotent |
+| `tests/test_math_canonical_scale.py` | the comparator stays linear on large input; its folding, conversion and speech agree with the registered scorer scripts |
+| `tests/test_realworld_registration.py` | `realworld_register.py --check` for every registered set whose files are in the checkout |
 | `tests/test_steps_speech.py` | all 30 gold equations produce speech; targeted rules |
 | `tests/test_steps_equation_escalation.py` | the 0.80 band skipped and accepted with a note, the old rule below it, with a failed check, with an invalid or speech-failed answer; `ACCEPT_SINGLE_READING` off; `Fix.escalation` same / changed / failed / skipped, braces and spaces aside, the JSON round trip |
 | `tests/test_steps_equation.py` | every status path, routing, escalation, fallback, the cross-check, strict schema, budget propagation, prompt version and context hygiene |
