@@ -72,18 +72,18 @@ def test_a_blank_between_touching_glyphs_is_no_space():
     assert not glyph_math.touching(chars, 1)
 
 
-def test_a_word_touching_an_opening_bracket_is_a_function_name():
-    chars = row("Cov(")
-    assert glyph_math.function_name(chars, 0, 3, known_word=False)
-    spaced = row("Cov(", gaps={3: 3.0})
-    assert not glyph_math.function_name(spaced, 0, 3, known_word=False)
+def test_a_known_operator_name_touching_an_opening_bracket_is_a_function_name():
+    assert glyph_math.function_name(row("Cov("), 0, 3)
+    assert glyph_math.function_name(row("Pr("), 0, 2)
+    assert not glyph_math.function_name(row("Cov(", gaps={3: 3.0}), 0, 3)
 
 
-def test_an_english_word_or_a_chemical_formula_is_no_function_name():
-    assert not glyph_math.function_name(row("form("), 0, 4, known_word=True)
-    assert not glyph_math.function_name(row("NaOH("), 0, 4, known_word=False)
-    assert not glyph_math.function_name(row("Mg("), 0, 2, known_word=False)
-    assert glyph_math.function_name(row("Pr("), 0, 2, known_word=False)  # probability, not Pr
+def test_an_acronym_a_word_or_a_chemical_formula_is_no_function_name():
+    assert not glyph_math.function_name(row("ARFIMA("), 0, 6)
+    assert not glyph_math.function_name(row("CTCS("), 0, 4)
+    assert not glyph_math.function_name(row("form("), 0, 4)
+    assert not glyph_math.function_name(row("NaOH("), 0, 4)
+    assert not glyph_math.function_name(row("Mg("), 0, 2)
 
 
 def unit_of(text: str, *, upright: str, script: str = "") -> int | None:
@@ -257,3 +257,55 @@ def test_the_rules_leave_a_document_not_made_by_tex_alone():
     assert equations(analyze(one_page(fill)).elements) == ["t=24"]
     # A browser print sets units inside the maths: its formulas keep the unit.
     assert equations(analyze(one_page(fill, producer="Skia/PDF m120")).elements) == ["t=24h"]
+
+
+def test_a_word_in_brackets_after_an_indexed_variable_stays_prose():
+    """`$x_i$ Eq(4)`: a script-ended operand does not make the next word a function name."""
+    for word in ("Eq", "Fig", "Prob", "Smith"):
+
+        def fill(page, word=word):
+            sentence(
+                page,
+                "As shown for ",
+                " in the text above and in every later section of it.",
+                [
+                    ("x", "heit", BODY, 0),
+                    ("i", "heit", 7.7, 2.5),
+                    (" ", "helv", BODY, 0),
+                    (word, "helv", BODY, 0),
+                    ("(4)", "helv", BODY, 0),
+                ],
+            )
+
+        found = equations(analyze(one_page(fill)).elements)
+        assert not any(t.startswith(word) for t in found), (word, found)
+
+
+def test_the_edge_rules_do_not_touch_a_document_not_made_by_tex():
+    """Index comma, percent and unit rules are TeX conventions: a browser print is as before."""
+
+    def comma(page):
+        sentence(
+            page,
+            "We write the density profile ",
+            " for every boundary condition we study in this paper.",
+            [
+                ("p", "heit", BODY, 0),
+                ("m,q", "heit", 7.7, 2.5),
+                ("(", "helv", BODY, 0),
+                ("x", "heit", BODY, 0),
+                (")", "helv", BODY, 0),
+            ],
+        )
+
+    def percent(page):
+        sentence(
+            page,
+            "At a volume fraction ",
+            " the sample stays clear throughout the whole run.",
+            [("f", "heit", BODY, 0), (" = 5%", "helv", BODY, 0)],
+        )
+
+    chrome = "Skia/PDF m120"
+    assert equations(analyze(one_page(comma, producer=chrome)).elements) != ["pm,q(x)"]
+    assert equations(analyze(one_page(percent, producer=chrome)).elements) == ["f=5"]

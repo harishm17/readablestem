@@ -2882,7 +2882,7 @@ def _word_lengths(
             and not italic_variables
             and not script[i]
             and not any(c.italic for c in chars[i:j])
-            and glyph_math.function_name(chars, i, j, known_word=word in hyphens.words())
+            and glyph_math.function_name(chars, i, j)
         )
         for k in range(i, j):
             lengths[k] = 1 if italic_variables else j - i
@@ -3373,8 +3373,8 @@ def _inline_runs(
                 or (c == "," and (depth > 0 or _ellipsis_comma(chars, i)))
                 or (c in _ELLIPSIS_CHARS and _in_ellipsis(chars, i))
                 or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
-                or glyph_math.script_punctuation(chars, info.script, i)  # m,q of rho_{m,q}
-                or glyph_math.percent_of_number(chars, i)  # the 5% of "phi = 5%"
+                or (_TEX_MADE and glyph_math.script_punctuation(chars, info.script, i))
+                or (_TEX_MADE and glyph_math.percent_of_number(chars, i))  # the 5% of "phi = 5%"
             )
             accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
             # The degree sign of E°cell or ΔG°, a raised glyph of the text font after a symbol.
@@ -3384,7 +3384,7 @@ def _inline_runs(
             if (
                 chars[i].blank
                 and (_between_formulas(chars, i) or _word_space_between_operands(chars, info, i))
-                and not glyph_math.touching(chars, i)
+                and not (_TEX_MADE and glyph_math.touching(chars, i))
             ):
                 break
             if info.mathy(i) or chars[i].blank or inside or accent:

@@ -1894,7 +1894,10 @@ def undo(
         flash(request, "Undone. The document is as it was before.", element_id=None)
         page = structural[0].page
         where = review_url(
-            owned_id, page=page + 1 if page is not None else None, anchor="page-tools", tools=True
+            owned_id,
+            page=page + 1 if page is not None else None,
+            anchor="page-tools-summary",
+            tools=True,
         )
         if view == LIST_VIEW:
             where = list_url(owned_id, "review-progress")

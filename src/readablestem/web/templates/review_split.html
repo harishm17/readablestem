@@ -667,7 +667,7 @@
       {% endif %}
       <a class="toggle-accepted" href="{{ page.accepted_href }}">{% if show_accepted %}Hide accepted{% else %}Show accepted{% if page.hidden_accepted %} ({{ page.hidden_accepted }}){% endif %}{% endif %}</a>
     </div>
-    {% if page.omitted %}<p class="page-note page-left-out" id="page-left-out">This page is left out of the student file and of the review. <a href="#page-tools">Put it back</a></p>{% endif %}
+    {% if page.omitted %}<p class="page-note page-left-out" id="page-left-out">This page is left out of the student file and of the review. <a href="#page-tools-summary">Put it back</a></p>{% endif %}
     <div class="page-scroll" role="region" tabindex="0" aria-label="Page {{ page.number }} image{% if page.boxes %} with {{ page.boxes|length }} {{ 'mark' if page.boxes|length == 1 else 'marks' }}{% endif %}">
       <div class="page-frame">
         <img class="page-image" src="{{ page.image_url }}" alt="Page {{ page.number }} of the PDF." width="{{ (page.width or 612)|round|int }}" height="{{ (page.height or 792)|round|int }}">
