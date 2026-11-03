@@ -420,3 +420,48 @@ def test_axe_finds_no_problems_with_the_navigation_in_either_scheme(scheme):
         pytest.skip("Chromium for Playwright is not installed")
     assert [c for c in checks if not c.passed] == []
     assert "doc-footnote" in html and "doc-noteref" in html
+
+
+def test_a_paragraph_over_two_pages_does_not_swallow_the_marker_of_its_last_page():
+    pairs = numbered(
+        [
+            block(0, Kind.PARAGRAPH, "Before it."),
+            block(1, Kind.PARAGRAPH, "Runs over the break and ends.", last_page=1),
+            block(0, Kind.PARAGRAPH, "Third page.", page=2),
+        ]
+    )
+    html = render(pairs)
+    assert re.findall(r'aria-label="(Page \d+)"', html) == ["Page 1", "Page 2", "Page 3"]
+    # the marker comes after the joined paragraph, never inside it
+    assert html.index("Runs over the break and ends.") < html.index("pagebreak-2")
+    assert html.index("pagebreak-2") < html.index("Third page.")
+    inside = re.search(r"<p[^>]*>Runs over the break and ends\.</p>", html)
+    assert inside, "the paragraph is written whole"
+
+
+def test_a_paragraph_over_three_pages_marks_each_page_in_order():
+    pairs = numbered(
+        [
+            block(0, Kind.PARAGRAPH, "Runs over two breaks.", last_page=2),
+            block(0, Kind.PARAGRAPH, "Then the fourth page.", page=3),
+        ]
+    )
+    html = render(pairs)
+    assert re.findall(r'aria-label="(Page \d+)"', html) == ["Page 1", "Page 2", "Page 3", "Page 4"]
+    assert html.index("pagebreak-3") < html.index("Then the fourth page.")
+
+
+def test_the_next_block_on_the_last_page_of_a_joined_paragraph_gets_no_second_marker():
+    pairs = numbered(
+        [
+            block(0, Kind.PARAGRAPH, "Runs over.", last_page=1),
+            block(0, Kind.PARAGRAPH, "Rest of page two.", page=1),
+        ]
+    )
+    html = render(pairs)
+    assert re.findall(r'aria-label="(Page \d+)"', html) == ["Page 1", "Page 2"]
+
+
+def test_a_two_page_document_whose_second_page_is_only_a_continuation_is_marked():
+    html = render(numbered([block(0, Kind.PARAGRAPH, "Runs over.", last_page=1)]))
+    assert re.findall(r'aria-label="(Page \d+)"', html) == ["Page 1", "Page 2"]

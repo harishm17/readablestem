@@ -47,7 +47,7 @@
 - Math-italic and bold variable letters in a heading or a caption's plain text are plain letters; the
   number sets and letterlike symbols stay.
 - A paragraph (not a list item) that goes on over a page break is one element (`Element.last_page` is its
-  last page); inline maths that wraps at a relation
+  last page, and the page markers of the pages it runs over are written after it); inline maths that wraps at a relation
   sign is one equation; at a line break a hyphenated compound follows the document's own spelling
   (`eigen-vector` written elsewhere keeps its hyphen, `antiderivative` written whole elsewhere loses
   it). Details and what stays open: [docs/layout.md](docs/layout.md), "Known failure modes".

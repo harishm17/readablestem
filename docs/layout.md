@@ -175,9 +175,10 @@ Element conventions:
    a line break. A paragraph that starts with maths, a break between a column on one page
    and a column on the next, and a list item (a lowercase paragraph after a list item at a
    page foot is a new paragraph) are not joined. `Element.last_page` is the 0-based page of
-   the last part (None when it ends on its own page): a writer that marks page breaks writes
-   the markers of the pages between `page` and `last_page` before or after the element,
-   never inside it.
+   the last part (None when it ends on its own page). The assembler writes the page markers
+   of the pages after `page` up to `last_page` right after the joined paragraph (`marks_after`),
+   never inside it, so the markers stay in order and continuous (Page 1, Page 2, Page 3) and the
+   next element on the last page gets none; `pipeline/combine.py` maps `last_page` with `page`.
    Pipeline 0.5.1: the joins shift element ids after them, and a heading's words change
    where it had math-italic letters. The review carry (`web/carry.py`, `carry_edits.py`)
    matches by content (a heading by its words, size and weight; an equation by its crop; a
