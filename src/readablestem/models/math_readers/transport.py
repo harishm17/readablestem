@@ -1,7 +1,7 @@
 """The one HTTP seam of the readers: tests put a fake behind it, production uses httpx.
 
 A reader builds the whole request (URL, headers, body bytes) and reads the reply bytes
-itself, so the exact bytes that were signed (MyScript) are the bytes that are sent.
+itself, so the bytes sent are exactly the bytes that were built.
 `TransportError.kind` tells the engine whether the request can have reached the provider:
 "not_sent" (it cannot have: not billed), "timeout" and "broken" (it may have been
 processed and billed, as in `models.openai_client`).

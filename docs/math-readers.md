@@ -45,10 +45,15 @@ The send loop (`engine.py`) follows `models/openai_client.py`:
   for the actual image) and settled at the usage the reply states. `count_call=False`: a reader
   is an optional extra reading, so it holds dollars under every cap but does not use up the
   job's call cap.
+- `MATH_READER_MAX_USD_PER_JOB` (default $0.50) is a sub-cap for every reader of one job
+  together, inside the job's own caps (`engine.ReaderBudget`, shared by the readers
+  `build_readers` makes). Past it a read raises `BudgetExceeded("reader_usd")` before the job's
+  budget is touched: the caller treats that as "no second reading for this expression", never
+  as a failed job, so second readings cannot use up the dollars the conversion needs.
 - Each send is bounded by `MODEL_TIMEOUT_S`. Connection errors, timeouts and HTTP 408, 409,
   429 and 5xx are resent up to `MODEL_MAX_RETRIES` times, each resend reserving and settling on
-  its own, with the same backoff and `retry-after` rule; a 429 pauses the provider's gate for
-  the process. A refused resend returns the failure already had.
+  its own, with the same backoff and `retry-after` rule; a 429 pauses the gate of the provider ("anthropic"
+  or "openai"), which the step clients of that provider share. A refused resend returns the failure already had.
 - Charge per send: the reply's usage; an HTTP error or a connection that never left, $0; a
   timeout or a connection that broke after sending, the whole reservation.
 - Logs carry the reader name, status, outcome, counts and dollars. Never the crop, the
@@ -58,20 +63,25 @@ The send loop (`engine.py`) follows `models/openai_client.py`:
 ## Turning one on
 
 Each reader sends a crop of the instructor's handwriting to a model provider. That can change
-who the deployment's providers are: with `MODEL_PROVIDER=openai`, the Claude reader makes
-Anthropic a new recipient, and the other way round for the OpenAI reader. Before either is
-turned on in production:
+who the deployment's recipients are: with `MODEL_PROVIDER=openai`, the Claude reader makes
+Anthropic a new recipient, and the other way round for the OpenAI reader.
 
-1. Name the provider in the privacy notice (`web/templates/privacy.html`) as sending
-   handwriting crops, and update the "Where it goes" row of `docs/vendor-information.md` and
-   the "Where document data goes" table in `docs/security.md`.
-2. A production start (`Settings.check_production`) is refused while a reader is on and the
-   notice does not contain the provider's name ("Anthropic", "OpenAI"), and `readablestem ops
-   launch-check` lists the same. This is a text match on the template as written: the
-   template shows some provider names only for the selected `MODEL_PROVIDER`, so read the
-   rendered page as well.
-3. Check the provider's retention terms for the key used and state them as the sheet does for
-   the existing providers.
+One list says who receives what: `web/recipients.py` (`recipients(settings)`: the model
+provider, each reader that is on, the host, tracing when on). The privacy page
+(`privacy.html` and `_recipients.html`), the "Where it is processed" sentence and the account
+deletion notes are all written from it, so the page names a reader's company as soon as the
+reader is on. Before one is turned on in production:
+
+1. Update the "Where it goes" row of `docs/vendor-information.md` (keep the sheet under 900
+   words, `tests/test_web_record.py`) and the table in `docs/security.md`; read the rendered
+   `/privacy` page, and check the provider's retention terms for the key used.
+2. A new provider (not Anthropic or OpenAI) needs a name in `web/recipients.py` and a branch
+   in `_recipients.html`.
+3. The guard: a production start is refused while a reader is on and the privacy page,
+   rendered with the production settings and stripped to text (`web.recipients.notice_text`),
+   does not name every company that receives pictures. `readablestem ops launch-check` lists
+   the same, and now also reads the rendered page for the model provider, analytics, tables,
+   notation and Microsoft items rather than the template's source.
 
 The page's wording about handwriting ("not converted") stays true until a later change uses a
-reader's output; this change does not alter any page.
+reader's output.

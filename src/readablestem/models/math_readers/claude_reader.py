@@ -25,11 +25,11 @@ import json
 from typing import Any
 
 from readablestem.config import Settings
-from readablestem.core.budget import JobBudget
 from readablestem.models.anthropic_client import WORKSPACE_HEADER
 from readablestem.models.math_readers import prompt
 from readablestem.models.math_readers.base import ReadRequest
 from readablestem.models.math_readers.engine import (
+    Budget,
     HttpReader,
     Parsed,
     Prepared,
@@ -53,11 +53,12 @@ _CUT_OFF = frozenset({"max_tokens", "model_context_window_exceeded"})
 
 class ClaudeReader(HttpReader):
     name = "claude"
+    provider = "anthropic"
 
     def __init__(
         self,
         settings: Settings,
-        budget: JobBudget,
+        budget: Budget,
         *,
         transport: Transport | None = None,
         **kw: Any,

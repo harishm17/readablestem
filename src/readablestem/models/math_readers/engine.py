@@ -2,7 +2,8 @@
 
 Same rules as `models.openai_client`, in the same order:
 
-- Reserve the worst case before every send (`JobBudget.reserve`, `count_call=False`: a
+- Reserve the worst case before every send (through a `ReaderBudget` over the job's budget,
+  `count_call=False`: a
   reader is an optional second reading, not one of the steps' own calls, so it must not use
   up the job's call cap; every dollar cap still holds it). A malformed request raises before
   the reservation. A refused reservation raises `BudgetExceeded` and nothing is sent; a
@@ -23,13 +24,15 @@ from __future__ import annotations
 import json
 import logging
 import random
+import threading
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from readablestem.config import Settings
-from readablestem.core.budget import BudgetExceeded, JobBudget
+from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation
 from readablestem.core.types import Outcome
 from readablestem.models.base import rate_gate
 from readablestem.models.math_readers.base import (
@@ -106,6 +109,48 @@ class _Send:
     output_tokens: int = 0
 
 
+class Budget(Protocol):
+    """What a reader reserves against: a `JobBudget`, or a `ReaderBudget` over one."""
+
+    def reserve(self, amount_usd: float, *, count_call: bool = True) -> Reservation: ...
+
+    def settle(self, reservation: Reservation, actual_usd: float) -> None: ...
+
+
+class ReaderBudget:
+    """A dollar sub-cap for everything the readers of one job spend, inside the job's caps.
+
+    Without it a page full of handwriting could let the optional second readings use the
+    whole job cap and leave nothing for the conversion itself. A reservation that would pass
+    the sub-cap raises `BudgetExceeded("reader_usd")` before the job's own budget is touched:
+    the caller treats it as "no second reading for this expression", never as a job failure
+    (the job's own scopes are "daily", "job_usd" and "job_calls"). Readers never count against
+    the job's call cap."""
+
+    def __init__(self, job: JobBudget, max_usd: float) -> None:
+        self._job = job
+        self.max_usd = max_usd
+        self.spent_usd = 0.0
+        self._held: dict[str, float] = {}
+        self._lock = threading.Lock()
+
+    def reserve(self, amount_usd: float, *, count_call: bool = False) -> Reservation:
+        with self._lock:
+            if self.spent_usd + sum(self._held.values()) + amount_usd > self.max_usd + 1e-12:
+                raise BudgetExceeded(
+                    "reader_usd", f"handwriting reader spend cap ${self.max_usd:.2f} reached"
+                )
+            reservation = self._job.reserve(amount_usd, count_call=False)
+            self._held[reservation.id] = amount_usd
+            return reservation
+
+    def settle(self, reservation: Reservation, actual_usd: float) -> None:
+        with self._lock:
+            self._held.pop(reservation.id, None)
+            self.spent_usd += max(0.0, actual_usd)
+        self._job.settle(reservation, actual_usd)
+
+
 def retry_delay_s(sends: int, retry_after: float | None, jitter: float = 0.0) -> float:
     """Wait before resend number `sends` (1 for the first). `jitter` in [0, 1) takes up to
     25% off the backoff, as the OpenAI client does."""
@@ -150,12 +195,15 @@ class HttpReader(ABC):
     read the reply; this class does the budget, the retries and the outcome mapping."""
 
     name: str
+    provider: (
+        str  # "anthropic" | "openai": the name of the rate gate it shares with the step clients
+    )
     model: str = ""
 
     def __init__(
         self,
         settings: Settings,
-        budget: JobBudget,
+        budget: Budget,
         *,
         transport: Transport | None = None,
         jitter: Callable[[], float] = random.random,
@@ -180,7 +228,7 @@ class HttpReader(ABC):
         prepared = self._prepare(request)  # raises before any reservation
         estimate = self._worst_case_usd(request)
         started = time.perf_counter()
-        gate = rate_gate(self.name)
+        gate = rate_gate(self.provider)
         gate.wait()
         reservation = self._budget.reserve(estimate, count_call=False)
         sends: list[_Send] = []

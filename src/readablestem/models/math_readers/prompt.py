@@ -1,4 +1,4 @@
-"""The instructions and answer shape the two vision-model readers (Gemini, OpenAI) share.
+"""The instructions and answer shape of the two readers (Claude and OpenAI).
 
 The text is constant: the crop is the only thing that varies, so no document text is ever
 sent with it (there is nothing to inject through). The answer is a JSON object, read with

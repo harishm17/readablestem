@@ -72,14 +72,21 @@ NO_ANALYTICS_CLAIM = "no analytics"
 FAKE_DEMO_MARKER = 'data-readablestem-demo="placeholder"'
 
 
-def analytics_notice_problem() -> str | None:
-    """Why the privacy notice cannot stand with analytics on, or None when it describes it.
-    The notice is read from the template as written (matched as text, like the other
-    checks here)."""
-    privacy = TEMPLATES_DIR / "privacy.html"
-    if not privacy.is_file():
+def rendered_notice(settings: Settings) -> str | None:
+    """The privacy page as a visitor would read it with `settings` (rendered from the real
+    template, tags stripped), or None when the template is missing. Every check below reads
+    this rather than the template's source, so a sentence that a template condition hides
+    for these settings does not count as said."""
+    from readablestem.web.recipients import notice_text
+
+    return notice_text(settings, templates_dir=TEMPLATES_DIR)
+
+
+def analytics_notice_problem(settings: Settings) -> str | None:
+    """Why the privacy notice cannot stand with analytics on, or None when it describes it."""
+    text = rendered_notice(settings)
+    if text is None:
         return "web/templates/privacy.html is missing"
-    text = privacy.read_text(encoding="utf-8")
     if NO_ANALYTICS_CLAIM in text.lower():
         return 'the privacy notice still says there are "no analytics"'
     if ANALYTICS_NOTICE_WORD not in text:
@@ -87,27 +94,37 @@ def analytics_notice_problem() -> str | None:
     return None
 
 
-# Reader B providers (settings.math_readers_on) -> the word the privacy notice must
-# carry while that reader is on: each one receives the crop of an expression.
-MATH_READER_NOTICE_WORDS = {"claude": "Anthropic", "openai": "OpenAI"}
+def unnamed_recipients(settings: Settings) -> list[tuple[str, str]] | None:
+    """(company, what it receives) for each company that gets pictures from a document with
+    these settings (the model provider and each handwriting reader that is on; the list is
+    `web.recipients.recipients`) that the rendered privacy notice does not name. None when
+    the template is missing."""
+    from readablestem.web.recipients import recipients
+
+    text = rendered_notice(settings)
+    if text is None:
+        return None
+    found = []
+    for r in recipients(settings):
+        if not r.gets_documents or r.name in text:
+            continue
+        what = []
+        if "model" in r.purposes:
+            what.append(f"MODEL_PROVIDER={settings.model_provider} sends document images")
+        if "handwriting" in r.purposes:
+            what.append("a handwriting reader sends crops of handwritten expressions")
+        found.append((r.name, " and ".join(what)))
+    return found
 
 
-def math_reader_notice_problem(readers: list[str]) -> str | None:
-    """Why the privacy notice cannot stand with these handwriting readers on,
-    or None when it names each provider. Matched as text on the template as written, like
-    the analytics check; it does not know that a template block may show a name only for
-    one model provider, so read the rendered page too (docs/math-readers.md)."""
-    privacy = TEMPLATES_DIR / "privacy.html"
-    if not privacy.is_file():
+def recipients_notice_problem(settings: Settings) -> str | None:
+    """Why the privacy notice does not name every company that receives pictures from a
+    document with these settings, or None when it does."""
+    missing = unnamed_recipients(settings)
+    if missing is None:
         return "web/templates/privacy.html is missing"
-    text = privacy.read_text(encoding="utf-8")
-    missing = [
-        MATH_READER_NOTICE_WORDS[name]
-        for name in readers
-        if MATH_READER_NOTICE_WORDS[name] not in text
-    ]
     if missing:
-        return "the privacy notice does not name " + ", ".join(missing)
+        return "the privacy notice does not name " + ", ".join(name for name, _ in missing)
     return None
 
 
@@ -118,17 +135,11 @@ def launch_blockers(
     items: list[str] = []
     if settings is not None:
         items.extend(_settings_items(settings))
-    privacy = TEMPLATES_DIR / "privacy.html"
-    notice = privacy.read_text(encoding="utf-8") if privacy.is_file() else None
+    notice = rendered_notice(settings) if settings is not None else None
     if settings is not None and notice is not None:
         # A feature that sends or keeps something new needs its words in the notice.
         for on, word, what in (
             (settings.ms_sign_in_enabled, "Microsoft", "Microsoft sign-in is on (MS_CLIENT_ID)"),
-            (
-                settings.model_provider == "anthropic",
-                "Anthropic",
-                "MODEL_PROVIDER=anthropic sends document images to Anthropic",
-            ),
             (
                 settings.analytics_enabled,
                 ANALYTICS_NOTICE_WORD,
@@ -149,13 +160,11 @@ def launch_blockers(
                 items.append(
                     f"web/templates/privacy.html: {what} but the privacy notice does not say so"
                 )
-        for name in settings.math_readers_on:
-            word = MATH_READER_NOTICE_WORDS[name]
-            if word not in notice:
-                items.append(
-                    f"web/templates/privacy.html: the {name} handwriting reader is on and sends "
-                    f"handwriting to {word}, but the privacy notice does not name {word}"
-                )
+        for name, what in unnamed_recipients(settings) or []:
+            items.append(
+                f"web/templates/privacy.html: {what} to {name} but the privacy notice does "
+                f"not name {name}"
+            )
     if settings is not None and settings.signup_open and notice is not None:
         for phrase, what in OPEN_SIGNUP_NOTICE:
             if phrase not in notice:

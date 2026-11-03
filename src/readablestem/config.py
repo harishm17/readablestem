@@ -334,7 +334,7 @@ class Settings(BaseSettings):
     # of one handwritten expression, made to differ from the page pass's. Both readers are OFF
     # and nothing in the pipeline calls one yet. Each sends the crop to a model provider, so a
     # production start is refused while one is on and the privacy notice does not name that
-    # provider (`ops.launch.math_reader_notice_problem`). Timeout and retries are
+    # provider (`ops.launch.recipients_notice_problem`). Timeout and retries are
     # `model_timeout_s` and `model_max_retries`.
     # Claude reader (ANTHROPIC_API_KEY): another model than the page pass, a prompt of its own
     # and one high-resolution crop of the expression, with no page text.
@@ -344,6 +344,10 @@ class Settings(BaseSettings):
     # OpenAI reader (OPENAI_API_KEY); the model must be priced in models/pricing.py.
     math_reader_openai_enabled: bool = False
     math_reader_openai_model: str = "gpt-6-luna"
+    # What all readers together may reserve and spend on one job, inside the job's own caps, so
+    # second readings cannot starve the conversion (`BudgetExceeded("reader_usd")`: no second
+    # reading, not a failed job).
+    math_reader_max_usd_per_job: float = Field(default=0.5, gt=0, le=100)
 
     # --- content features. Each is off until its eval
     # says it helps; ConversionOptions.from_settings reads them for every conversion.
@@ -644,15 +648,15 @@ class Settings(BaseSettings):
         if self.analytics_enabled:
             from readablestem.ops.launch import analytics_notice_problem
 
-            if (problem := analytics_notice_problem()) is not None:
+            if (problem := analytics_notice_problem(self)) is not None:
                 raise ConfigError(
                     f"ANALYTICS_ENABLED=true is refused in production: {problem}. "
                     "Update the notice (web/templates/privacy.html) first"
                 )
         if self.math_readers_on:
-            from readablestem.ops.launch import math_reader_notice_problem
+            from readablestem.ops.launch import recipients_notice_problem
 
-            if (problem := math_reader_notice_problem(self.math_readers_on)) is not None:
+            if (problem := recipients_notice_problem(self)) is not None:
                 raise ConfigError(
                     "a handwriting reader (MATH_READER_CLAUDE_ENABLED, "
                     f"MATH_READER_OPENAI_ENABLED) is refused in production: {problem}. "

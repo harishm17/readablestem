@@ -19,6 +19,7 @@ from readablestem.models.math_readers.base import (
     ReadResult,
 )
 from readablestem.models.math_readers.claude_reader import ClaudeReader
+from readablestem.models.math_readers.engine import ReaderBudget
 from readablestem.models.math_readers.openai_vision import OpenAIReader
 from readablestem.models.math_readers.transport import Transport
 
@@ -35,12 +36,16 @@ __all__ = [
 def build_readers(
     settings: Settings, budget: JobBudget, *, transport: Transport | None = None
 ) -> dict[str, MathReader]:
-    """The readers `settings` turns on, by name (empty with the defaults). Raises
+    """The readers `settings` turns on, by name (empty with the defaults), sharing a dollar
+    sub-cap inside the job's budget; a reader raises `BudgetExceeded("reader_usd")` once the
+    sub-cap is spent, which the caller treats as no second reading. Raises
     `ConfigError` for an enabled reader without its key and `UnknownModelError` for one
     whose model has no price. `transport` replaces HTTP for every reader (tests)."""
     readers: dict[str, MathReader] = {}
+    # One sub-cap shared by the readers of this job (`ReaderBudget`).
+    capped = ReaderBudget(budget, settings.math_reader_max_usd_per_job)
     if settings.math_reader_claude_enabled:
-        readers["claude"] = ClaudeReader(settings, budget, transport=transport)
+        readers["claude"] = ClaudeReader(settings, capped, transport=transport)
     if settings.math_reader_openai_enabled:
-        readers["openai"] = OpenAIReader(settings, budget, transport=transport)
+        readers["openai"] = OpenAIReader(settings, capped, transport=transport)
     return readers

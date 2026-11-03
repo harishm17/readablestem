@@ -14,10 +14,10 @@ import json
 from typing import Any
 
 from readablestem.config import Settings
-from readablestem.core.budget import JobBudget
 from readablestem.models.math_readers import prompt
 from readablestem.models.math_readers.base import ReadRequest
 from readablestem.models.math_readers.engine import (
+    Budget,
     HttpReader,
     Parsed,
     Prepared,
@@ -33,11 +33,12 @@ URL = "https://api.openai.com/v1/responses"
 
 class OpenAIReader(HttpReader):
     name = "openai"
+    provider = "openai"
 
     def __init__(
         self,
         settings: Settings,
-        budget: JobBudget,
+        budget: Budget,
         *,
         transport: Transport | None = None,
         **kw: Any,
@@ -118,6 +119,9 @@ class OpenAIReader(HttpReader):
                     raise Rejected("refused", "refusal", cost, **seen)
                 if part.get("type") == "output_text" and isinstance(part.get("text"), str):
                     text = part["text"]
+        details = data.get("incomplete_details")
+        if isinstance(details, dict) and details.get("reason") == "content_filter":
+            raise Rejected("refused", "content_filter", cost, **seen)
         found = prompt.candidates_from_json(text)
         if found is None:
             code = "incomplete" if data.get("status") == "incomplete" else "bad_json"

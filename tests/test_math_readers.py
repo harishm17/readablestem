@@ -396,3 +396,60 @@ def test_an_unpriced_model_is_refused_at_construction():
             make_settings(math_reader_claude_enabled=True, math_reader_claude_model="nope"),
             RecordingBudget(),
         )
+
+
+# ------------------------------------------------------------------ sub-cap, gates, filter
+
+
+def test_the_reader_sub_cap_stops_readers_without_touching_the_job_cap():
+    job = RecordingBudget(cap=10.0)
+    settings = make_settings(math_reader_claude_enabled=True, math_reader_max_usd_per_job=0.01)
+    transport = FakeTransport([claude_message()] * 20)
+    reader = build_readers(settings, job, transport=transport)["claude"]
+    reads = 0
+    with pytest.raises(BudgetExceeded) as caught:
+        for _ in range(20):
+            reader.read(ReadRequest(PNG))
+            reads += 1
+    assert caught.value.scope == "reader_usd"
+    assert 0 <= reads < 20
+    assert job.spent_usd <= 0.01 + 1e-9 and job.calls == 0  # the job keeps the rest
+
+
+def test_the_readers_share_one_sub_cap():
+    settings = make_settings(
+        math_reader_claude_enabled=True,
+        math_reader_openai_enabled=True,
+        math_reader_max_usd_per_job=0.5,
+    )
+    readers = build_readers(settings, RecordingBudget(cap=10.0), transport=FakeTransport([]))
+    assert readers["claude"]._budget is readers["openai"]._budget
+
+
+def test_a_resend_the_sub_cap_refuses_returns_the_failure_already_had():
+    probe, _, probe_budget = claude([TransportError("timeout")], model_max_retries=0)
+    probe.read(ReadRequest(PNG))
+    one = probe_budget.reserved[0]
+    settings = make_settings(math_reader_claude_enabled=True, math_reader_max_usd_per_job=one * 1.5)
+    transport = FakeTransport([TransportError("timeout")] * 3)
+    reader = build_readers(settings, RecordingBudget(cap=10.0), transport=transport)["claude"]
+    result = reader.read(ReadRequest(PNG))
+    assert (result.call.outcome, result.call.sends) == ("timeout", 1)
+
+
+def test_rate_gates_are_the_providers_shared_with_the_step_clients():
+    from readablestem.models.base import rate_gate
+
+    assert ClaudeReader.provider == "anthropic" and OpenAIReader.provider == "openai"
+    reader, _, _ = claude([json_reply({}, 429, **{"retry-after": "3"}), claude_message()])
+    reader.read(ReadRequest(PNG))
+    assert rate_gate("anthropic").remaining() > 0
+    assert rate_gate("claude").remaining() == 0
+
+
+def test_openai_content_filter_is_refused():
+    reader, _, _ = openai(
+        [openai_response("{", status="incomplete", incomplete_details={"reason": "content_filter"})]
+    )
+    result = reader.read(ReadRequest(PNG))
+    assert (result.candidates, result.call.outcome) == ([], "refused")
