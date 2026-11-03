@@ -51,7 +51,7 @@ def notebook_jpeg(seed: int = 1) -> bytes:
     return out.getvalue()
 
 
-def watermark(page: pymupdf.Page) -> None:
+def watermark(page: pymupdf.Page, header: bool = True) -> None:
     """What the real pages carried: a large translucent diagonal name and a header line."""
     at = pymupdf.Point(120, 600)
     page.insert_text(
@@ -62,7 +62,8 @@ def watermark(page: pymupdf.Page) -> None:
         fill_opacity=0.15,
         morph=(at, pymupdf.Matrix(40)),
     )
-    page.insert_text((40, 20), HEADER, fontsize=10)
+    if header:
+        page.insert_text((40, 20), HEADER, fontsize=10)
 
 
 def typed_lines(page: pymupdf.Page, lines: int, top: float = 70) -> None:
@@ -90,6 +91,8 @@ def page_of(
         _append(doc, page, _strokes(strokes, 3, points=8))
     if mark == "watermark":
         watermark(page)
+    elif mark == "diagonal":
+        watermark(page, header=False)
     elif mark == "number":
         page.insert_text((290, 825), "[ 12 ]", fontsize=11)
     elif mark == "title":
@@ -135,13 +138,32 @@ def test_a_page_of_vector_handwriting_under_a_number_or_title_is_handwritten(mar
     assert page_type.kept_reason(result) == page_type.HANDWRITTEN_PAGE
 
 
-def test_vector_ink_under_a_text_layer_stays_mixed_ink():
-    """Typed text with handwriting over it keeps the text and cuts the ink out as images
-    with a decision, as the labelled corpus wants (a typed header or box over ink is
-    `mixed_ink`); the pass reads whole pages only, so this is not routed to it."""
+@pytest.mark.parametrize("mark", ["diagonal", "number"])
+def test_vector_handwriting_under_furniture_only_goes_to_the_image_pass(mark):
+    """iPad notes with a translucent diagonal watermark, or a page number, as their only text."""
+    result = classify(page_of(strokes=400, mark=mark))
+    assert result.kind == "handwritten"
+    assert page_type.reads_image(result)
+
+
+def test_vector_handwriting_under_a_typed_header_stays_mixed_ink():
+    """A typed header line is text, not furniture: the corpus labels these `mixed_ink`."""
     result = classify(page_of(strokes=400, mark="watermark"))
     assert result.kind == "mixed_ink"
     assert page_type.TEXT_NOT_COVERING not in result.reasons
+
+
+def test_a_typed_slide_with_ink_annotations_stays_mixed_ink():
+    result = classify(page_of(typed=30, strokes=400))
+    assert result.kind == "mixed_ink"
+    assert not page_type.reads_image(result)
+
+
+def test_vector_handwriting_under_a_watermark_is_read_by_the_pass():
+    result, fake = convert(page_of(strokes=400, mark="diagonal"))
+    assert "image_page" in [r.step for r in fake.requests]
+    assert result.image_pages is not None and result.image_pages.converted == 1
+    assert not any("Watermark" in (e.text or "") for e in result.elements)
 
 
 def test_a_cover_page_with_body_text_over_a_picture_stays_typed():

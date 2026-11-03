@@ -172,7 +172,7 @@ its image exactly as before.
     text layer of only furniture (a watermark, a header, a stamp, a page number) does not lie over is
     read by the pass (when asked) as a scan (`page_type.reads_image`; the page's kept reason stays
     `unread_page`, so what it says on the review screen is unchanged; calibrated on the labelled
-    corpus with no page worse, layout.md). Vector handwriting under a watermark stays `mixed_ink`. The page reader's reading replaces the text layer's
+    corpus with no page worse, layout.md). A page of vector handwriting under furniture-only text is read the same way (`handwritten_page`). The page reader's reading replaces the text layer's
     words, which it reads again from the image. A scan with a *hidden* OCR layer was
     already read from its image, because nothing can check that layer and for maths it is poor; a
     *visible* layer that covers the picture is the page's text. The image pass cannot read a region of

@@ -1289,14 +1289,18 @@ The decisions in the rules, with the measured values next to each threshold in t
   repeated on the pages or one plain colour is not content: layout asks (`_page_picture`) and
   decides such a page again without the rule (`page_type.without_picture`).
   Calibration: on the 846-page labelled corpus (the author's machine, not in the repository;
-  `scripts/page_type_corpus_compare.py`) the rule changes no page's kind or action; a first version
+  `scripts/page_type_corpus_compare.py`) the rules change no page's kind or action; a first version
   without the body-text gate changed 10 pages, all against their labels (designed covers and
   background-image pages with real text over a picture; typed slides and boxes with ink
   annotations, which a rule for vector writing under thin text had turned into `handwritten`; that
-  rule was dropped). The three real pages: picture 0.88 to 0.91, no text over it 0.78 to 0.81, text
-  0.08, ink outside the text 0.13 to 0.17. Not caught, on purpose or for lack of evidence: vector
-  handwriting under a watermark stays `mixed_ink` (its text read, its ink cut out as images with
-  a decision, not read by the pass); a watermarked page whose body text is real; a typed page
+  rule was dropped). The rule for vector writing is back with the same gate (below). The three real pages: picture 0.88 to 0.91, no text over it 0.78 to 0.81, text
+  0.08, ink outside the text 0.13 to 0.17. **Vector writing** (a page of writing, 40 clean strokes in 3
+  rows, as iPad notes) under furniture-only text goes the same way: `handwritten`, read by the pass
+  (`reads_image`), its text still read when the pass is off. For writing a header or footer line
+  counts as furniture only when it is a page number (15 characters or fewer); a typed header line
+  over notes is text (the corpus labels such pages `mixed_ink`, and a looser rule turned 2 of them
+  into `handwritten`). Ink-annotated typed slides have body text and stay `mixed_ink`. Not caught:
+  a watermarked page whose body text is real; a typed page
   with a photograph of handwriting covering less than 75 % of it (a figure; its writing is not
   read). A scan whose OCR layer is hidden (render mode 3, covered) is read from its image as it
   always was; a visible text layer that covers the picture is the page's text.

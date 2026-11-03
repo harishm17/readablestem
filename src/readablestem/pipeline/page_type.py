@@ -132,6 +132,7 @@ SHARE_GRID = 128  # finer, for the shares below: a line of type is under one 64-
 UNCOVERED_PICTURE = 0.6  # share of the page that is picture with no visible text over it
 PAGE_PICTURE = 0.75  # and the pictures cover this much of the page
 THIN_TEXT = 0.12  # and the visible text covers less than this share of it
+PAGE_NUMBER_CHARS = 15  # a header or footer span this short is furniture over writing
 BODY_MAX = 20  # characters of body text (not furniture) a text layer may have and still not cover
 FURNITURE_BAND = 0.08  # header and footer bands, as a share of the page height
 FURNITURE_ALPHA = 200  # spans fainter than this (of 255) are a watermark's
@@ -298,6 +299,9 @@ class TextStats:
     # text, with ink on it (`_ink_outside_text`); 1.0 when it was not measured.
     picture_ink: float = 1.0
     body_chars: int = 0  # visible characters that are not furniture (`_furniture`)
+    # ... and, for a page of writing, a header or footer line longer than a page number is
+    # not furniture either (a typed header over notes is a typed header).
+    typed_chars: int = 0
 
     @property
     def untrusted(self) -> int:
@@ -511,6 +515,8 @@ def text_stats(
                 spans.append((b[0], b[1], b[2], b[3]))
                 if not _furniture(span, line.get("dir"), b, page.cropbox.height):
                     stats.body_chars += n
+                if not _furniture(span, line.get("dir"), b, page.cropbox.height, short=n):
+                    stats.typed_chars += n
                 if _axis_aligned(line.get("dir")):
                     glyphs.append((b[0], b[1], b[2], b[3]))
                 else:  # a slanted line's box is mostly empty page: its characters' boxes
@@ -541,7 +547,11 @@ def text_stats(
 
 
 def _furniture(
-    span: dict[str, Any], direction: Sequence[float] | None, box: Sequence[float], height: float
+    span: dict[str, Any],
+    direction: Sequence[float] | None,
+    box: Sequence[float],
+    height: float,
+    short: int | None = None,
 ) -> bool:
     """Text that is a page's furniture, not its body: translucent (a watermark), slanted, or in
     the header or footer band (a running header, a page number, a stamp). A text layer made only
@@ -549,6 +559,8 @@ def _furniture(
     if int(span.get("alpha", 255)) < FURNITURE_ALPHA or not _axis_aligned(direction):
         return True
     middle = (box[1] + box[3]) / 2
+    if short is not None and short > PAGE_NUMBER_CHARS:  # (strict: a typed header is text)
+        return False
     return middle < FURNITURE_BAND * height or middle > (1 - FURNITURE_BAND) * height
 
 
@@ -1455,7 +1467,9 @@ def decide(
     # photographed page, a stamp, a page number, a typed title over a page of handwriting)
     # does not make the page typed: the picture or the ink is the content.
     uncovered_picture = picture_counts and _text_misses_picture(text, image_coverage)
-    if text.visible_chars and not hidden_page and uncovered_picture:
+    # The same for a page of writing (vector ink): text that is only furniture over it.
+    uncovered_ink = has_text and writing and text.typed_chars < BODY_MAX
+    if text.visible_chars and not hidden_page and (uncovered_picture or uncovered_ink):
         reasons.append(TEXT_NOT_COVERING)
     if has_text and not hidden_page and TEXT_NOT_COVERING not in reasons:
         # A page with a real visible text layer is never a picture of a page as a whole.

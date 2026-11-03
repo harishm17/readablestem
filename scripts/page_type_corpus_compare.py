@@ -23,9 +23,9 @@ from readablestem.pipeline import page_type
 
 
 def run(entries: list[dict], *, rules: bool) -> dict[tuple[str, int], tuple[str, str]]:
-    saved = page_type.UNCOVERED_PICTURE
+    saved = page_type.BODY_MAX
     if not rules:
-        page_type.UNCOVERED_PICTURE = 9.0
+        page_type.BODY_MAX = -1
     try:
         out = {}
         by_file: dict[str, list[int]] = {}
@@ -40,7 +40,7 @@ def run(entries: list[dict], *, rules: bool) -> dict[tuple[str, int], tuple[str,
                 )
         return out
     finally:
-        page_type.UNCOVERED_PICTURE = saved
+        page_type.BODY_MAX = saved
 
 
 def main() -> int:
