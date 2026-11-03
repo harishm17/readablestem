@@ -109,7 +109,7 @@ and a long arrow is an operator and not an identifier.
 `MATHML_ALTTEXT` is on. A row of MathML counts as chemistry only with evidence (a lowered count or
 a raised charge on an upright element symbol, a state symbol, two element symbols side by side, a
 bracket around one species), so a variable that is set upright is not "H". Both shapes of MathML
-are read: the converter's (one upright `mi` per element symbol, see "MathML shape" below) and
+are read: the converter's (one `mi` per element symbol, see "MathML shape" below) and
 OpenStax's (`mtext` for `HSO` or `2e`, an empty-based charge). A state is read as `(` `aq` `)` or as
 one `mtext (aq)`, a nuclide as `mmultiscripts` or as an empty base with its numbers.
 
@@ -179,7 +179,7 @@ What the numbers say, and what they do not:
   not rise, and the primary falls: its gold was made by the converter as it was (one upright
   `mi` per letter, a bracket's subscript on the bracket, an arrow as an `mi`) and the model's
   chemistry is now written the OpenStax way (an `mtext` per run of element symbols, scripts on the
-  group, an arrow as an operator; since pipeline 0.5.2 one upright `mi` per symbol, see "MathML
+  group, an arrow as an operator; since pipeline 0.5.2 one `mi` per symbol, see "MathML
   shape" below). Both scorers compare the shape of the MathML, so they call the
   better MathML wrong against a gold that has the old shape; `content` compares what is written.
 - **On the OpenStax sections the system was already near what these scores can see**: their
@@ -299,10 +299,10 @@ chemistry shape:
 
 | Written | Shape | Why |
 |---|---|---|
-| an element symbol | one upright `mi` per symbol (`<mi mathvariant="normal">Na</mi>`); `NaCl` is two | MathCAT marks an element `mi` or `mtext`; one token per symbol is what its own repairs aim for |
+| an element symbol | one `mi` per symbol (`<mi>Na</mi>`); `NaCl` is two. Beside other maths a one-letter symbol keeps `mathvariant="normal"` | MathCAT marks an element `mi` or `mtext`; one token per symbol is what its own repairs aim for. With `intent` on the root no style is needed, and Speech Rule Engine reads an explicit one aloud ("normal H") |
 | a count or a charge | on the last symbol of the species (`msub`, `msup`, `msubsup`); `SO4^2-` is `S` then `msubsup(O, 4, 2−)` | the shape MathCAT writes itself for sulfate |
 | a state `(aq)` `(s)` `(l)` `(g)` after a species | `mo (`, `mi aq`, `mo )` | an `mtext` of four characters is not taken apart (`(aq)` read "(aq)"), one of three is |
-| a nuclide | `mmultiscripts(C, mprescripts, 6, 14)` | an empty-based `msubsup` is read "C with 2 prescripts"; MathCAT checks the numbers against the element |
+| a nuclide of an element, or the electron | `mmultiscripts(C, mprescripts, 6, 14)` | an empty-based `msubsup` is read "C with 2 prescripts"; MathCAT checks the numbers against the element. A neutron, proton, positron, alpha, beta or gamma keeps the converter's shape: MathCAT has no rule for them |
 | an arrow | `mo`; a labelled arrow is the `mo` and its label in a `mover` | the `mstyle` and `mpadded` around `\xrightarrow` made MathCAT fail with "Pattern match/replacement failure" and say nothing, once the symbols are `mi` |
 | a formula or reaction on its own | `intent=":chemical-formula"` or `":chemical-equation"` on the `math` element | MathCAT reads `intent` only there; a small reaction (`H2 -> O2`) is under its own likelihood threshold without it |
 
@@ -338,50 +338,87 @@ words as the gold's reading.
 
 | set (gold equations) | MathCAT ClearSpeak | MathCAT SimpleSpeak | SRE clearspeak | SRE mathspeak |
 |---|---|---|---|---|
-| chemistry (443) | 133 to 132 | 133 to 132 | 61 to 44 | 83 to 50 |
+| chemistry (443) | 133 to 132 | 133 to 132 | 61 to 33 | 83 to 45 |
 | OpenStax algebra (1,120) | 736 to 736 | 727 to 727 | 517 to 517 | 456 to 456 |
-| authored exercises, slides, matrices, Word images, HTML slides (246) | 221 to 222 | 221 to 222 | 221 to 221 | 206 to 206 |
+| authored exercises, slides, matrices, Word images, HTML slides (246) | 221 to 222 | 221 to 222 | 221 to 220 | 206 to 205 |
 
-- **Recognised as chemistry.** Of the correct dev outputs that are a formula or a reaction on
-  their own (exact on the chem scorer in the recorded run, `intent` written; n=155), MathCAT
-  recognised 136 before (0.877, 95% Wilson 0.816 to 0.920) and recognises 155 now (1.000, 0.976 to
-  1.000). Of all 293 correct chemistry outputs, 141 before and 160 now; the other 133 are chemistry
-  beside other maths (rate laws, thermodynamics, cell notation) that MathCAT does not call
-  chemistry whatever the shape. `tests/test_screenreader_shape.py` pins a list of 36 formulas and
-  reactions at 95% or better when the engines are built.
-- **States.** Where the gold's reading has a state word ("aqueous", "solid", "liquid", "gas";
-  36 of the 318 proposals' equations), ours had it in 34 before and has it in 36 now. Ours read a
-  state literally (`(aq)`, "of s") in 69 of 318 before and in 16 now: a state written with
-  conditions (`(aq, 1 M)`, outside the `\ce` subset), or in a table cell.
+**Which spelling of the symbol.** Four were measured on the same run (chemistry set; "normal said"
+is the number of the 318 chemistry proposals whose Speech Rule Engine reading says "normal"):
+
+| symbol written as | MathCAT ClearSpeak equal | SRE clearspeak equal | SRE mathspeak equal | "normal" said | recognised as chemistry |
+|---|---|---|---|---|---|
+| `mi` with `mathvariant="normal"` always (first version) | 132 | 44 | 50 | 199 | 155 of 155 |
+| `mi` with no style at all | 132 | 33 | 51 | 6 | 155 of 155 |
+| `mathvariant="normal"` on multi-letter symbols only (Na, Cl) | 132 | 33 | 51 | 6 | 155 of 155 |
+| **no style when the whole equation is chemistry, `normal` beside other maths (kept)** | 132 | 33 | 45 | 68 | 153 of 153 |
+
+MathCAT's reading and recognition are the same in all four, so the style is a choice about the
+other readers. Speech Rule Engine says the `mathvariant` aloud ("normal H"), so the first version
+cost every single-letter symbol; with no style it reads "H sub 2 O". "Equal to the gold" is lower
+for the unstyled forms because the gold writes `mtext` and Speech Rule Engine reads an `mtext` and
+an `mi` differently, not because the reading is worse. The unstyled `mi` has a cost: an italic
+single letter is a variable to our own chemistry reading (`pipeline/speech_chem.py`), which needs
+the upright style to tell the `H` of water from an enthalpy `H`. So the style is dropped only where
+`intent` says the whole equation is chemistry (the review screen's reading puts it back from
+`intent`, `speech._restore_upright_symbols`) and kept on a symbol beside other maths (a rate law, an
+equilibrium constant), which is the 68. The standalone file draws a symbol of an `intent` equation
+upright with one rule (`math[intent] mi { text-transform: none }`; Chromium draws it the same as
+`mathvariant="normal"`, checked; Firefox and Safari were not); Canvas has no stylesheet, so a Canvas
+page draws those symbols italic.
+
+- **Recognised as chemistry.** Of the correct dev outputs that are a formula or a reaction on their
+  own (exact on the chem scorer in the recorded run, `intent` written; n=153), MathCAT recognised
+  136 before (0.889, 95% Wilson 0.829 to 0.929) and recognises all 153 now (1.000, 0.976 to 1.000).
+  Of all 293 correct chemistry outputs, 141 before and 158 now; the rest are chemistry beside other
+  maths (rate laws, thermodynamics, cell notation) that MathCAT does not call chemistry whatever
+  the shape. `tests/test_screenreader_shape.py` pins a list of 36 formulas and reactions at 95% or
+  better when the engines are built.
+- **States.** Where the gold's reading has a state word ("aqueous", "solid", "liquid", "gas"; 36 of
+  the 318 proposals' equations), ours had it in 34 before and has it in 36 now. Ours read a state
+  literally (`(aq)`, "of s") in 69 of 318 before and in 16 now: a state written with conditions
+  (`(aq, 1 M)`, outside the `\ce` subset), or in a table cell.
 - **Errors.** Neither engine fails on any of the 1,564 proposals.
-- **Read as maths, not as nuclides.** MathCAT 0.7.7 has a rule for the electron as a nuclide but
-  not for a neutron, proton, positron, or alpha, beta or gamma with prefix numbers, nor an excited
-  `*`: such a particle is still read "n pre sub 0 and pre super 1" and the other nuclides in the
-  reaction are read as nuclides. 9 of the 45 correct all-chemistry outputs that hold a nuclide are
-  in that case. They are still taken as chemistry, because of `intent`.
-- **"Equal to the gold" does not rise on chemistry** (133 to 132: 16 gained, 17 lost; one more
-  in the slides set) and the SRE columns fall. The gold is not the right reading: of the 17 lost
-  under MathCAT, 14 are where the gold's `mtext` is a word ("NO sub 2", "OH", "CO", "CH sub 3 OH")
-  and ours is spelled letter by letter ("cap n cap o sub 2"), and 3 are nuclear equations the gold's
-  shape does not let MathCAT take as chemistry ("Be pre sub 4 and pre super 9") and ours is read
-  as nuclides ("super 9, sub 4, cap b e"). The 16 gained are the states. Algebra and the authored
-  sets do not move: what is left there is the gold's own reading ("negative" for a minus sign in
-  a number, matrices as "array of", a trailing "period"), where ours is the better reading.
-- **SRE reads the new shape worse than the gold's** ("equal" 61 to 44 and 83 to 50). A
-  single-letter upright `mi` is read "normal H" (SRE says the `mathvariant` aloud) where an `mtext`
-  is read "H"; a symbol with a count followed by another is read "H sub 2 of O" (a function of O)
-  where an `mtext` is not; nuclides are read "left sub 8 left super 16" where the gold's
-  empty-based `msubsup` is "sub 8 to the 16th power". One `mtext` per symbol was tried and is not
-  better (SRE equal 37 and 62, MathCAT 135), and an invisible times between symbols removes the
-  "of" but lowers both engines' equality. The shape is the one MathCAT wants, the reader of NVDA
-  and JAWS; a MathJax or ChromeVox reader hears "normal" before a single-letter symbol. VoiceOver
-  was not run (docs/mathml-alttext.md has the manual test).
+- **A neutron, proton, positron, alpha, beta or gamma with prefix numbers keeps the converter's
+  shape** (an empty base holding the numbers, then the symbol). MathCAT 0.7.7 has a nuclide rule
+  for elements and for the electron (`{}^0_{-1}e`) only, and reads `mmultiscripts` of the others no
+  better, so they were not changed (no regression). In a reaction they are still read "n pre sub 0
+  and pre super 1" while its other nuclides are read as nuclides; a neutron or a positron alone
+  has no `intent`. 9 of the 37 correct all-chemistry outputs that hold a nuclide are in that case.
+- **"Equal to the gold" does not rise on chemistry** (133 to 132: 16 gained, 17 lost; one more in
+  the slides set) and the SRE columns fall. The gold is not the right reading: of the 17 lost under
+  MathCAT, 14 are where the gold's `mtext` is a word ("NO sub 2", "OH", "CO", "CH sub 3 OH") and ours
+  is spelled letter by letter ("cap n cap o sub 2"), and 3 are nuclear equations the gold's shape
+  does not let MathCAT take as chemistry ("Be pre sub 4 and pre super 9") and ours is read as
+  nuclides ("super 9, sub 4, cap b e"). The 16 gained are the states. Algebra and the authored sets
+  do not move: what is left there is the gold's own reading ("negative" for a minus in a number,
+  matrices as "array of", a trailing "period"), where ours is the better reading.
+- **Speech Rule Engine on the rest.** A symbol with a count followed by another is read "H sub 2 of
+  O" (a function of O) where an `mtext` is not; an invisible times between symbols removes some of
+  the "of" but lowers both engines' equality, so it was not kept. Nuclides are read "left sub 8 left
+  super 16" where the gold's empty-based `msubsup` is "sub 8 to the 16th power". One `mtext` per
+  symbol was tried and is not better (SRE equal 37 and 62, MathCAT 135). VoiceOver and JAWS have
+  their own engines and were not measured; the shapes are the standard MathML ones.
 - **Scorers** (`scripts/dev_converter_effect.py --shape-only`, same run). The chem scorer is
-  unchanged at 293 of 443 (`equations_symbols` reads `mmultiscripts` as the gold's prefix
-  scripts). The primary (`exact_lenient`) goes 827 to 819 of 1,809 (-0.44 points) and the symbols
-  scorer 1,271 to 1,196 (-4.15 points), all in the chemistry sets (gold `mtext` against our upright
-  `mi`); the non-chemistry sets change by 0 equations. A reading with the same words and another
-  shape loses on those two scorers by construction: use the chem scorer for chemistry.
+  unchanged at 293 of 443. The symbols scorer is unchanged at 1,289 of 1,809 (its "before" is
+  1,289, not the 1,271 it gave before the change below). The primary (`exact_lenient`) goes 827 to
+  826 (-0.06 points); the non-chemistry sets change by 0 equations.
+  - The symbols scorer first lost 1,271 to 1,196, all in chemistry sets. That was an artefact, not
+    a change in content: it keeps a letter's style as an atom (`normal:H`), so an upright `mi`
+    symbol read as a different symbol from the gold's `mtext` one (75 OpenStax and 11 authored
+    equations, for example `\text{NH}_4^+`, `\text{H}_2\text{O}\text{(s)} \to \text{H}_2\text{O}\text{(l)}`,
+    `\text{Ni}^{2+}\text{(aq)} + 2\text{e}^- \to \text{Ni}\text{(s)}`; the same symbols in the same
+    order). `equations_symbols` now calls an upright element symbol, and the electron `e`, the same
+    as an `mtext` one; an upright `d` is still not a plain `d`. On the old converter's output that is
+    +18 equations on this run (chemistry sets and one slides document only, 0 elsewhere), on the new
+    output +62, so the two sides are alike.
+  - The primary scorer loses 11 and gains 10. The 10 gained are the states. The 11 lost are rate
+    laws and the like where the gold's `mtext` is a packed word ("CH", "NO") against our one symbol
+    per token or where a symbol keeps `normal` beside other maths, and one authored equation whose
+    gold has the old converter's shape. That is the packing gap the primary scorer documents
+    (docs/eval.md); it is left as registered, so the registered held-out numbers stay
+    reproducible. The primary does read `mmultiscripts` as the answer keys' prefix scripts (our
+    shape only: no recorded gold has one), which keeps the nuclides equal. Use the chem scorer for
+    chemistry.
 
 ## Side effect on maths that is not chemistry
 
@@ -654,8 +691,9 @@ scorers as the existing secondary ones.
   does with `intent` and `mmultiscripts` is the manual test of docs/mathml-alttext.md and was not
   done.
 - **MathCAT reads some nuclear particles as maths** (a neutron, proton or positron with prefix
-  numbers, an excited `*`), and Speech Rule Engine says "normal" before a single-letter upright
-  symbol ("MathML shape"): both are in the engines, not in the markup we can change.
+  numbers, an excited `*`), and Speech Rule Engine says "normal" before a one-letter symbol
+  beside other maths ("MathML shape"; an equation that is all chemistry has no style to say):
+  both are in the engines, not in the markup we can change.
 
 ## Spend (list price, from the answer files)
 

@@ -3,10 +3,11 @@
 ## Unreleased: the MathML shape for screen readers (branch mathml/screenreader-shape)
 
 - Chemistry MathML is shaped for MathCAT (NVDA, JAWS) at the one place MathML is made from LaTeX
-  (`validate.safe_latex_to_mathml`, new `pipeline/chem_mathml.py`): one upright `mi` per element
+  (`validate.safe_latex_to_mathml`, new `pipeline/chem_mathml.py`): one `mi` per element
   symbol with its count or charge on it, a state as `(` `aq` `)` (MathCAT does not take a four-
   character `mtext` apart, so `(aq)` was read "(aq)"), a nuclide as `mmultiscripts`, a label over
-  an arrow directly in the `mover`. Only a row with evidence of chemistry is changed: a lone `H`,
+  an arrow directly in the `mover`. A neutron, proton, positron, alpha, beta or gamma with prefix
+  numbers keeps the converter's shape (MathCAT has no rule for them). Only a row with evidence of chemistry is changed: a lone `H`,
   `No`, `Pa` or `\mathrm{d}x` stays as it was.
 - `intent=":chemical-formula"` and `":chemical-equation"` on `<math>` for an equation that is all
   chemistry. These are the only `intent` values the allowlists accept (`validate.check_mathml`,
@@ -19,19 +20,25 @@
   symbols). Matrices, cases, limits and sums were already read right by both engines.
 - Measured with MathCAT 0.7.7 and Speech Rule Engine 4.1.5 on the recorded dev run of 2026-10-26
   (no model call): of the correct dev outputs that are a formula or reaction on its own, MathCAT
-  recognised 136 of 155 before and 155 of 155 now; states read as words (36 of 36 where the gold's
+  recognised 136 of 153 before and 153 of 153 now; states read as words (36 of 36 where the gold's
   reading has one, 34 before); speech equal to the gold on the chemistry set 133 to 132, on
   OpenStax algebra 736 to 736 (the gold's own reading is the difference), and Speech Rule Engine
-  equal to the gold falls on chemistry (61 to 44 clearspeak, 83 to 50 mathspeak: it says "normal"
-  before an upright single letter). Chem scorer unchanged (293 of 443); the primary and the symbols
-  scorer fall 0.44 and 4.15 points on the chemistry sets only. Details and what MathCAT does not
-  read as chemistry: [docs/chemistry.md](docs/chemistry.md), "MathML shape".
+  equal to the gold falls on chemistry (61 to 33 clearspeak, 83 to 45 mathspeak). A symbol has no
+  explicit style when `intent` is on (Speech Rule Engine reads `mathvariant="normal"` aloud: "normal"
+  in 68 of 318 chemistry readings, 199 with the style always; the standalone file draws it upright
+  with `math[intent] mi { text-transform: none }`). Chem scorer unchanged (293 of 443); the
+  symbols scorer unchanged at 1,289 after it stopped counting an upright symbol and an `mtext`
+  one as different (its drop of 75 equations was that artefact); the primary 827 to 826. Details,
+  the four spellings compared and what MathCAT does not read as chemistry:
+  [docs/chemistry.md](docs/chemistry.md), "MathML shape".
 - Pipeline version 0.5.1 to 0.5.2. Review carry now compares an equation's LaTeX and display, not
   its MathML and reading (`web/carry.py`), so a revised upload keeps its accepted equations when
   only the MathML is made another way; fingerprints (the picture's hash) are unchanged. The step
   cache key holds the version, so a re-converted file asks the model again for equations.
 - `scripts/dev_converter_effect.py --shape-only`: the effect of this change alone on the scorers.
-  `equations_symbols` reads `mmultiscripts` as the gold's prefix scripts.
+  `equations_symbols` reads `mmultiscripts` as the gold's prefix scripts and an upright element
+  symbol like an `mtext` one; the primary scorer reads `mmultiscripts` as the answer keys' shape.
+  The five golden HTML files gain one stylesheet line.
 
 ## Unreleased: speech under screen-reader engines (branch sr/speech-oracle)
 

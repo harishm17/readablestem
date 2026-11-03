@@ -48,7 +48,7 @@ What a student's reader says depends on the MathML as much as on `alttext`, and 
 by default, so the shape the converter writes is the main thing (pipeline 0.5.2; the details and
 the measurements are in docs/chemistry.md, "MathML shape"):
 
-- Chemistry is one upright `mi` per element symbol with its count or charge on it, a state as
+- Chemistry is one `mi` per element symbol with its count or charge on it, a state as
   `(` `aq` `)`, a nuclide as `mmultiscripts`, an arrow as `mo`, and `intent=":chemical-formula"` or
   `":chemical-equation"` on `<math>` when the whole equation is chemistry. MathCAT (NVDA, JAWS) then
   says "aqueous" and "reacts to form"; the only `intent` values accepted anywhere are those two.

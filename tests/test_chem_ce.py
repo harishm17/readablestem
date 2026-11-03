@@ -227,7 +227,7 @@ def test_a_converted_species_has_one_upright_mi_per_element_symbol():
     root = parse(ce_to_latex("Na+"))
     (msup,) = [n for n in root.iter() if local(n) == "msup"]
     assert local(msup[0]) == "mi" and "".join(msup[0].itertext()) == "Na"
-    assert msup[0].get("mathvariant") == "normal"
+    assert msup[0].get("mathvariant") is None  # `intent` says it is a symbol
     assert "".join(msup[1].itertext()) == "+"
     root = parse(ce_to_latex("CaCl2"))
     tokens = [(local(n), "".join(n.itertext())) for n in root.iter() if local(n) in {"mi", "mn"}]
@@ -243,7 +243,7 @@ def test_a_charge_on_a_mathrm_symbol_hangs_on_the_whole_symbol():
     # (N, msup(a, +)); it belongs to "Na", which is then one upright `mi`.
     root = parse(r"\mathrm{Na^+}")
     (msup,) = [n for n in root.iter() if local(n) == "msup"]
-    assert local(msup[0]) == "mi" and msup[0].get("mathvariant") == "normal"
+    assert local(msup[0]) == "mi" and msup[0].get("mathvariant") is None
     assert "".join(msup[0].itertext()) == "Na" and "".join(msup[1].itertext()) == "+"
     root = parse(r"\mathrm{Cl_2}")
     (msub,) = [n for n in root.iter() if local(n) == "msub"]

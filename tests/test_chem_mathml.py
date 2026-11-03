@@ -66,10 +66,10 @@ def test_the_intent_values_are_exactly_the_two_chemistry_ones() -> None:
 # ------------------------------------------------------------------------------- the shape
 
 
-def test_water_is_one_upright_mi_per_symbol_with_the_count_on_its_symbol() -> None:
+def test_water_is_one_mi_per_symbol_with_the_count_on_its_symbol() -> None:
     root = ce("H2O")
     (msub,) = [n for n in root.iter() if local(n) == "msub"]
-    assert local(msub[0]) == "mi" and msub[0].get("mathvariant") == "normal"
+    assert local(msub[0]) == "mi" and msub[0].get("mathvariant") is None
     assert words(msub) == ["H", "2"]
     tokens = [(local(n), "".join(n.itertext())) for n in root.iter() if len(n) == 0]
     assert tokens == [("mi", "H"), ("mn", "2"), ("mi", "O")]
@@ -80,7 +80,7 @@ def test_a_multi_letter_word_is_split_into_its_element_symbols() -> None:
     root = ce("NaCl")
     assert words(root) == ["Na", "Cl"]
     symbols = [n for n in root.iter() if local(n) == "mi"]
-    assert len(symbols) == 2 and all(n.get("mathvariant") == "normal" for n in symbols)
+    assert len(symbols) == 2 and all(n.get("mathvariant") is None for n in symbols)
 
 
 def test_an_ion_has_its_charge_on_the_last_symbol() -> None:
@@ -140,11 +140,42 @@ def test_a_charge_on_a_group_stays_on_the_group() -> None:
     assert words(outer[0])[1] == "Cu"
 
 
-def test_an_electron_and_a_neutron_are_upright_mi() -> None:
+def test_an_electron_is_a_plain_mi_in_a_reaction() -> None:
     root = tree(r"\text{Fe}^{3+} + 3\text{e}^- \to \text{Fe}")
     assert [n.text for n in root.iter() if local(n) == "mi" and n.text == "e"] == ["e"]
     (e,) = [n for n in root.iter() if local(n) == "mi" and n.text == "e"]
-    assert e.get("mathvariant") == "normal"
+    assert e.get("mathvariant") is None  # all chemistry: `intent` is on the root
+
+
+def test_a_symbol_has_no_explicit_style_when_the_equation_is_all_chemistry() -> None:
+    """`mathvariant="normal"` is read aloud by Speech Rule Engine ("normal H"); `intent` already
+    says these are symbols, so the attribute is not written. Beside other maths it is kept, to
+    tell a symbol from an italic variable."""
+    whole = tree(ce_to_latex("2 H2 + O2 -> 2 H2O"))
+    assert not [n for n in whole.iter() if n.get("mathvariant")]
+    mixed = tree(r"\text{rate} = k[\text{NO}_2]^m")
+    symbols = [n for n in mixed.iter() if local(n) == "mi" and n.text in {"N", "O"}]
+    assert len(symbols) == 2 and all(n.get("mathvariant") == "normal" for n in symbols)
+    assert not [n for n in mixed.iter() if n.get("data-chem-symbol")]  # the working mark is gone
+
+
+def test_a_neutron_a_positron_and_the_greek_particles_keep_the_converters_shape() -> None:
+    """MathCAT has no nuclide rule for them (it reads `mmultiscripts` of them no better)."""
+    for latex in (
+        r"{}^1_0\text{n}",
+        r"{}^1_1\text{p}",
+        r"{}^0_{+1}\text{e}",
+        r"{}^4_2\alpha",
+        r"{}^0_{-1}\beta",
+        r"{}^0_0\gamma",
+    ):
+        root = tree(latex)
+        assert not [n for n in root.iter() if local(n) == "mmultiscripts"], latex
+        assert [local(n) for n in root.iter() if local(n) == "msubsup"], latex
+    electron = tree(r"{}^0_{-1}\text{e}")  # the one particle MathCAT reads as a nuclide
+    assert [n for n in electron.iter() if local(n) == "mmultiscripts"]
+    helium = tree(r"{}^4_2\text{He} + {}^1_0\text{n}")
+    assert len([n for n in helium.iter() if local(n) == "mmultiscripts"]) == 1
 
 
 def test_the_shaped_output_passes_the_mathml_check_and_is_stable() -> None:

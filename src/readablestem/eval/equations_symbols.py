@@ -39,6 +39,11 @@ unified here:
    same symbols as the answer key's brackets around a one-column table.
 4. **Under and over are scripts.** `\lim_{x \to 0}` (limits) and `\lim_{x \to 0}` written as
    a subscript are the same symbols.
+5. **An upright element symbol is an `mtext` one.** A one-letter `mi` set upright and an `mtext`
+   letter are the same symbol when it is an element symbol or the electron `e` (an upright `d`
+   stays different from a plain one). Added with the screen-reader MathML shape (docs/chemistry.md,
+   "MathML shape"); on the recorded dev run it moves chemistry sets only.
+   `mmultiscripts` is read as the answer keys' prefix scripts.
 
 Of the 872 aligned pairs in the development runs of docs/eval-page-math.md that stream v2 calls
 exact, this scorer calls every one exact too (it forgives more, nothing less). The score is
@@ -55,6 +60,7 @@ from dataclasses import asdict, dataclass
 
 from readablestem.eval import equations_v2 as v2
 from readablestem.eval.equations import MathMLError, latex_to_mathml, normalize
+from readablestem.pipeline.speech_nuclides import ELEMENTS
 
 LABEL = "symbols (secondary; tables flattened; the primary scorer is exact_lenient)"
 SCORER = "symbols"
@@ -78,8 +84,18 @@ _SUBSUP = {"msubsup", "munderover"}
 _SCRIPT_TAGS = _SUB | _SUP | _SUBSUP
 
 
+def _upright_symbol(atom: str) -> str:
+    """`normal:H` -> `H` for an element symbol. An `mtext` is upright by nature and carries no
+    style atom, a single-letter `mi` set upright does; both are the same upright symbol (what
+    `pipeline.chem_mathml` writes beside other maths, where it keeps `mathvariant="normal"` to
+    tell a symbol from an italic variable). Only element symbols and the electron `e`: an upright
+    `d` stays one."""
+    head, sep, tail = atom.partition(":")
+    return tail if sep and head == "normal" and (tail in ELEMENTS or tail == "e") else atom
+
+
 def _atoms(elem: ET.Element) -> list[str]:
-    return [_EXTRA_MAP.get(a, a) for a in v2._leaf(elem)]
+    return [_EXTRA_MAP.get(a, a) for a in map(_upright_symbol, v2._leaf(elem))]
 
 
 def _plain(stream: list[str]) -> list[str]:

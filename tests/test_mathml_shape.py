@@ -111,6 +111,15 @@ def test_the_product_speech_reads_the_shaped_chemistry_as_before(source: str, wo
     assert mathml_to_speech(convert(ce_to_latex(source))) == words
 
 
+def test_the_speech_reads_plain_mi_symbols_only_where_intent_says_they_are_symbols() -> None:
+    plain = (
+        '<math xmlns="http://www.w3.org/1998/Math/MathML"{}><mrow><msub><mi>H</mi><mn>2</mn></msub>'
+        "<mi>O</mi></mrow></math>"
+    )
+    assert mathml_to_speech(plain.format(' intent=":chemical-formula"')) == "H 2 O"
+    assert mathml_to_speech(plain.format("")) != "H 2 O"  # an italic H is a variable
+
+
 def test_the_speech_of_the_old_shape_is_unchanged() -> None:
     old = (
         '<math xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mtext>H</mtext>'
@@ -154,3 +163,25 @@ def test_the_chemistry_scorer_calls_the_new_shape_the_same_chemistry_as_the_old(
     new = convert(ce_to_latex("H2O(l)"))
     assert chem.score_chem(new, old).exact
     assert not chem.score_chem(convert(ce_to_latex("H2O(g)")), old).exact
+
+
+def test_the_primary_scorer_reads_mmultiscripts_as_the_answer_keys_shape() -> None:
+    from readablestem.eval.equations import score_mathml
+
+    key = (
+        '<math xmlns="http://www.w3.org/1998/Math/MathML"><msubsup><mrow></mrow><mn>6</mn>'
+        "<mn>14</mn></msubsup><mtext>C</mtext></math>"
+    )
+    assert score_mathml(convert(ce_to_latex("^{14}_{6}C")), key).exact_lenient
+
+
+def test_the_symbols_scorer_calls_an_upright_symbol_and_an_mtext_one_alike_only_for_symbols() -> (
+    None
+):
+    ns = 'xmlns="http://www.w3.org/1998/Math/MathML"'
+    upright = f"<math {ns}><mi mathvariant='normal'>H</mi><mi mathvariant='normal'>e</mi></math>"
+    text = f"<math {ns}><mtext>H</mtext><mtext>e</mtext></math>"
+    assert sym.score_symbols(upright, text).exact
+    d_up = f"<math {ns}><mi mathvariant='normal'>d</mi></math>"
+    d_text = f"<math {ns}><mi>d</mi></math>"
+    assert not sym.score_symbols(d_up, d_text).exact  # an upright d is still not a plain d

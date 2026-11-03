@@ -706,7 +706,8 @@ Formulas, ions, state symbols, reactions and concentrations are inline or displa
 <msup><mi mathvariant="normal">Fe</mi><mrow><mn>3</mn><mo>+</mo></mrow></msup>
 ```
 
-- An element symbol is one upright `mi` (`Na`, not `N` and `a`; `NaCl` is `Na` and `Cl`), and a
+- An element symbol is one `mi` (`Na`, not `N` and `a`; `NaCl` is `Na` and `Cl`; upright by
+  `mathvariant="normal"` only beside other maths, see below), and a
   charge or a count hangs on the symbol it belongs to: the converter wrote `\mathrm{Na^+}` as
   `N`, `msup(a, +)` and a reader said "N a to the power plus"; it is now `msup(Na, +)` ("N a
   plus"). A word the model wrote in one `\text{...}` is split the same way. Only real element
@@ -720,6 +721,11 @@ Formulas, ions, state symbols, reactions and concentrations are inline or displa
   `":chemical-equation"` on its `<math>` element, so MathCAT (NVDA, JAWS) reads it as chemistry:
   state words, "reacts to form". These are the only `intent` values written or accepted, and only
   on `<math>` ("MathML is rebuilt, never pasted"); a reader that does not know `intent` ignores it.
+- With `intent` on `<math>` the symbols carry no style (Speech Rule Engine reads an explicit
+  `mathvariant="normal"` aloud, "normal H"); the stylesheet of the standalone file draws them
+  upright (`math[intent] mi { text-transform: none; }`). A neutron, proton, positron, alpha, beta or
+  gamma with prefix numbers keeps the converter's shape (an empty base holding the numbers): MathCAT
+  has no nuclide rule for them.
 - `^\circ` after a symbol is the degree sign (U+00B0); `\overline` and `\underline` use the macron
   and the low line (`pipeline/mathml_shape.py`). The screen-reader measurements and the cases the
   engines do not read as chemistry are in docs/chemistry.md, "MathML shape".

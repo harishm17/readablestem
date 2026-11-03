@@ -13,6 +13,14 @@ from readablestem.eval.equations import latex_to_mathml, score_latex
 from readablestem.pipeline.validate import safe_latex_to_mathml
 from test_eval_support import eq_fix, equation
 
+# What the authored document's gold has for `\mathrm{H_2O}`: the converter's shape before pipeline
+# 0.5.2 (one upright `mi` per letter, stored as it was made).
+AUTHORED_WATER = (
+    '<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow>'
+    '<msub><mi mathvariant="normal">H</mi><mn>2</mn></msub><mi mathvariant="normal">O</mi>'
+    "</mrow></math>"
+)
+
 
 def mml(body: str) -> str:
     return f"<math>{body}</math>"
@@ -51,7 +59,7 @@ def test_water_is_water_in_every_markup_the_primary_scorer_calls_different(pred)
 def test_the_primary_scorer_does_not_see_it_and_is_not_changed():
     """`\\text{H}_2\\text{O}` is `mtext`, the gold's `\\mathrm{H_2O}` is one upright `mi` per
     letter: the primary scorer calls it wrong, the chemistry scorer right."""
-    gold = safe_latex_to_mathml(r"\mathrm{H_2O}", "inline")
+    gold = AUTHORED_WATER
     assert not score_latex(r"\text{H}_2\text{O}", gold).exact_lenient
     assert chem.score_chem_latex(r"\text{H}_2\text{O}", gold).exact
 
@@ -215,7 +223,7 @@ def test_the_primary_scorer_and_the_symbols_scorer_are_unchanged_for_algebra():
 def test_pairs_carry_exact_chem_and_the_predicted_mathml_beside_the_other_scorers():
     from readablestem.core.types import Element, Kind
 
-    gold = [equation("p-1", 0, safe_latex_to_mathml(r"\mathrm{H_2O}", "inline"), "inline")]
+    gold = [equation("p-1", 0, AUTHORED_WATER, "inline")]
     element = Element(
         id="p1-e0",
         kind=Kind.EQUATION,
@@ -229,7 +237,7 @@ def test_pairs_carry_exact_chem_and_the_predicted_mathml_beside_the_other_scorer
     item = pe.document_page_item("p", gold, [element], fixes, [], [])
     pair = item["pairs"][0]
     assert pair["exact_lenient"] is False
-    assert pair["exact_symbols"] is False
+    assert pair["exact_symbols"] is True  # an upright `mi` symbol and an `mtext` one are alike
     assert pair["exact_chem"] is True
     assert pair["pred_mathml"]
     assert pe.document_metrics([item])["matched_exact_lenient"] == 0.0  # primary, unchanged

@@ -603,7 +603,7 @@ applies it to the chatbot arms' recorded LaTeX. See [chemistry.md](chemistry.md)
    Then, on the tree, the repairs a reader needs: bold letters (`bake_bold_variants`), a charge
    or a count on its element symbol, arrows as operators, and the screen-reader shape
    (`mathml_shape.shape_general`: the degree sign, overline and underline, labelled arrows;
-   `chem_mathml.shape_chemistry`: one upright `mi` per element symbol, states, nuclides, and
+   `chem_mathml.shape_chemistry`: one `mi` per element symbol, states, nuclides, and
    `intent` on `<math>` for a formula or reaction on its own; docs/chemistry.md, "MathML shape").
 6. Re-serialises with `serialize_mathml`, which writes one MathML `xmlns` on the root and
    refuses (`UnsafeMathMLError`, message = the code) any tree that fails the allowlist

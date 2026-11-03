@@ -4,7 +4,7 @@ The converter writes `\\text{H}_2\\text{O}` as `msub(mtext H, 2)` then `mtext O`
 `msup(mtext Na, +)`, a state as `mtext (aq)`, and a nuclide as an `msubsup` with an empty base
 before an `mtext`. A reader that follows the markup (MathCAT in NVDA and JAWS, Speech Rule Engine
 in MathJax, VoiceOver) then sees words and loose scripts. MathCAT recognises chemistry from the
-structure: one upright `mi` per element symbol, a charge or count on the symbol it belongs to, a
+structure: one `mi` per element symbol, a charge or count on the symbol it belongs to, a
 state as `(` `aq` `)`, a nuclide as `mmultiscripts`, and an arrow as `mo` (docs/chemistry.md,
 "MathML shape"). `shape_chemistry` rewrites a converted tree to that shape.
 
@@ -15,6 +15,13 @@ species, or an arrow with symbols on both sides. A lone upright `H` or `N` (hydr
 (`:chemical-formula` or `:chemical-equation`) when everything in it is chemistry; `intent` is the
 one MathML 4 speech attribute the allowlists accept, and only with those two values
 (`core.mathml_intent`).
+
+Style. A one-letter symbol is written `mathvariant="normal"` (upright) so that our own reading can
+tell it from an italic variable, and the attribute is dropped again when `intent` is set: Speech
+Rule Engine says it aloud ("normal H"), and `intent` already says the letters are symbols. The
+working mark `data-chem-symbol` on the `mi` this module writes lives only until `shape_chemistry`
+returns. A neutron, proton, positron, alpha, beta or gamma with prefix numbers is not changed
+(MathCAT has no nuclide rule for them; the electron `^0_{-1}e` is the exception).
 
 Pure tree work: no model, no I/O. Applied for every path that makes MathML from LaTeX, at the one
 place that does (`validate.safe_latex_to_mathml`).
@@ -40,6 +47,9 @@ _GREEK_PARTICLES = frozenset({"α", "β", "γ"})
 _SIGNS = frozenset({"+", "−", "–", "-"})
 _STATE_TEXT = re.compile(r"^\((" + "|".join(sorted(STATE_SYMBOLS)) + r")\)$")
 _CLOSERS = frozenset({")", "]"})
+# Temporary marker on the `mi` this module writes, so its later passes know a single capital is a
+# symbol and not an italic variable; removed before `shape_chemistry` returns.
+_MARK = "data-chem-symbol"
 _FORMULA_OPERATORS = frozenset({"+", "(", ")", "[", "]", "·", INVISIBLE_SEPARATOR})
 _SCRIPT_MARKS = frozenset({"*", "∗", "′", "•", "⋅", "∙"})
 _TWO_LETTER_SYMBOLS = frozenset(s for s in ELEMENTS if len(s) == 2)
@@ -99,7 +109,12 @@ def _symbols(node: ET.Element) -> list[str] | None:
     if tag not in {"mtext", "mi"} or len(node):
         return None
     text = node.text or ""
-    if tag == "mi" and node.get("mathvariant") != "normal" and len(text) < 2:
+    if (
+        tag == "mi"
+        and node.get("mathvariant") != "normal"
+        and len(text) < 2
+        and node.get(_MARK) is None
+    ):
         return None  # an italic letter is a variable
     return _split_symbols(text) if text[:1].isupper() else None
 
@@ -110,9 +125,8 @@ def _is_particle(node: ET.Element) -> bool:
     if tag == "mtext" and not len(node):
         return text in _PARTICLES
     if tag == "mi" and not len(node):
-        return (node.get("mathvariant") == "normal" and text in _PARTICLES) or (
-            text in _GREEK_PARTICLES
-        )
+        marked = node.get("mathvariant") == "normal" or node.get(_MARK) is not None
+        return (marked and text in _PARTICLES) or text in _GREEK_PARTICLES
     return False
 
 
@@ -178,6 +192,14 @@ def _nuclide_symbol(node: ET.Element) -> tuple[ET.Element, ET.Element | None] | 
     if _is_particle(base):
         return base, wrapper
     return None
+
+
+def _is_electron_prefix(prefix: ET.Element, token: ET.Element) -> bool:
+    """`{}^0_{-1}e`: the one particle MathCAT's rules read as a nuclide."""
+    if _text(token) != "e" or _local(prefix) != "msubsup" or len(prefix) != 3:
+        return False
+    below, above = _text(prefix[1]).replace("\u2212", "-"), _text(prefix[2])
+    return below == "-1" and above == "0"
 
 
 def _is_arrow(node: ET.Element) -> bool:
@@ -249,11 +271,13 @@ def _unwrap(node: ET.Element) -> ET.Element:
 
 
 def _symbol_nodes(token: ET.Element) -> list[ET.Element]:
-    """One upright `mi` per element symbol of the token."""
+    """One `mi` per element symbol of the token, marked as ours until `shape_chemistry` ends."""
     out = []
     for symbol in _symbols(token) or [_text(token)]:
         mi = _like(token, "mi", symbol)
-        mi.set("mathvariant", "normal")
+        mi.set(_MARK, "1")
+        if len(symbol) == 1:
+            mi.set("mathvariant", "normal")  # upright; dropped again when `intent` says why
         out.append(mi)
     return out
 
@@ -312,7 +336,6 @@ def _merge_letter_pairs(kids: list[ET.Element]) -> list[ET.Element]:
             and (node.text or "") + (nxt.text or "") in _TWO_LETTER_SYMBOLS
         ):
             merged = _like(node, "mi", (node.text or "") + (nxt.text or ""))
-            merged.set("mathvariant", "normal")
             out.append(merged)
             i += 2
         elif _is_script(node) and len(node):
@@ -321,7 +344,6 @@ def _merge_letter_pairs(kids: list[ET.Element]) -> list[ET.Element]:
                 pair = (base[0].text or "") + (base[1].text or "")
                 if pair in _TWO_LETTER_SYMBOLS:
                     merged = _like(base, "mi", pair)
-                    merged.set("mathvariant", "normal")
                     node = _with_base(node, merged)  # a copy: the row may not be chemistry
             out.append(node)
             i += 1
@@ -344,7 +366,13 @@ def _shape_row(parent: ET.Element, marked: _Marked) -> bool:
         nuclide = _nuclide_symbol(following) if following is not None else None
         if _prefix_scripts(node) and nuclide is not None:
             token, wrapper = nuclide
-            out.append(_prescripted(node, _symbol_nodes(token)[0], wrapper))
+            if _symbols(token) is None and not _is_electron_prefix(node, token):
+                # MathCAT has no nuclide rule for a neutron, proton, positron, alpha, beta or
+                # gamma: it reads `mmultiscripts` of them no better, so they keep the converter's
+                # shape (an empty base with the numbers, then the symbol).
+                out.extend(kids[i : i + 2])
+            else:
+                out.append(_prescripted(node, _symbol_nodes(token)[0], wrapper))
             i += 2
             continue
         state = _STATE_TEXT.match(node.text or "") if _local(node) == "mtext" else None
@@ -388,6 +416,8 @@ def _only_chemistry(node: ET.Element) -> bool:
         return bool(text) and (
             _symbols(node) is not None or text in STATE_SYMBOLS or _is_particle(node)
         )
+    if tag == "mtext":
+        return _is_particle(node)  # a neutron or a positron keeps the converter's shape
     if tag == "mo":
         return text in ARROW_HEADS or text in _FORMULA_OPERATORS
     if tag in _ARROW_HOLDERS:
@@ -447,8 +477,14 @@ def shape_chemistry(root: ET.Element) -> bool:
     if not chemical:
         return False
     top = root[0] if len(root) == 1 and _local(root[0]) == "mrow" else root
-    if _all_chemistry(top):
+    whole = _all_chemistry(top)
+    if whole:
         root.set(
             "intent", EQUATION_INTENT if any(_is_arrow(k) for k in top.iter()) else FORMULA_INTENT
         )
+    for node in root.iter():
+        if node.attrib.pop(_MARK, None) is not None and whole:
+            # `intent` already says these are symbols, so the explicit upright style goes:
+            # Speech Rule Engine reads `mathvariant="normal"` aloud ("normal H").
+            node.attrib.pop("mathvariant", None)
     return True
