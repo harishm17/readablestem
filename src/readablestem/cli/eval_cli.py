@@ -521,16 +521,46 @@ def _run_pipeline(
         except NotImplementedError as exc:
             return _error(f"a pipeline module is still a stub ({exc}); integrate it first")
     run.report.update(extra or {})
+    if getattr(args, "speech", False):
+        speech = _speech_block(args.task, run.items, gold_dir)
+        if speech is not None:
+            run.report["speech"] = speech
     if hasattr(client, "summary"):
         run.report["answers_file"] = client.summary()
     pe.write_report(run.report, out)
     if args.items:
         pe.write_items(run.items, args.items)
     print(pe.format_markdown(run.report), end="")
+    if "speech" in run.report:
+        print(_speech_lines(run.report["speech"]), end="")
     print(f"\nwrote {_shown(out)}" + (f" and {_shown(args.items)}" if args.items else ""))
     if hasattr(client, "summary"):
         print(f"answers file: {dict(client.summary())}")
     return 0
+
+
+def _speech_block(task: str, items: Any, gold_dir: Path) -> dict | None:
+    """`--speech`: the share of equations whose speech equals the gold's under MathCAT and
+    Speech Rule Engine (eval.speech_oracle). Equations and document tasks only; a note, and a
+    report block that says so, when the engines are not built."""
+    from readablestem.eval import speech_oracle
+
+    if task not in {"equations", "document"}:
+        print(f"--speech applies to the equations and document tasks, not {task}; skipped")
+        return None
+    block = speech_oracle.report_for_run(task, items, gold_dir)
+    if block.get("skipped"):
+        print(block["skipped"])
+    return block
+
+
+def _speech_lines(block: dict) -> str:
+    if "engines" not in block:
+        return ""
+    lines = ["\nSpeech equal to the gold's (no proposal counts as different):"]
+    for engine, v in block["engines"].items():
+        lines.append(f"- {engine}: {v['equal']} / {v['n']}")
+    return "\n".join(lines) + "\n"
 
 
 def staged_error() -> type[Exception]:
@@ -1281,6 +1311,13 @@ def register(
         "--answers-offline",
         action="store_true",
         help="with --answers: a request not in the file is refused, not sent (spends nothing)",
+    )
+    pipeline.add_argument(
+        "--speech",
+        action="store_true",
+        help="equations and document tasks: add the share of equations whose speech equals the "
+        "gold's under MathCAT (NVDA, JAWS) and Speech Rule Engine (MathJax); skips with a "
+        "message if they are not built (scripts/speech_oracles/build.sh)",
     )
     pipeline.add_argument(
         "--notation",
