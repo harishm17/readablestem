@@ -1,0 +1,39 @@
+% Layout fixture: Beamer deck with frame titles, itemize with inline maths, display
+% equations, align and a slide-number footer. Written for ReadableSTEM's tests (MIT);
+% no third-party text.
+\documentclass{beamer}
+\usepackage{amsmath}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\begin{document}
+
+\begin{frame}{Harmonic Motion}
+  \begin{itemize}
+    \item A mass $m$ on a spring of stiffness $k$ oscillates.
+    \item The angular frequency is $\omega = \sqrt{k/m}$.
+    \item The period is $T = 2\pi/\omega$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{The Equation of Motion}
+  Newton's second law for the spring gives
+  \begin{equation*}
+    m \ddot{x} = -k x .
+  \end{equation*}
+  Its solution is
+  \begin{equation*}
+    x(t) = A \cos(\omega t + \phi).
+  \end{equation*}
+\end{frame}
+
+\begin{frame}{Energy}
+  The two forms of energy are
+  \begin{align*}
+    K &= \tfrac{1}{2} m v^2, \\
+    U &= \tfrac{1}{2} k x^2,
+  \end{align*}
+  and their sum $E = K + U$ stays constant.
+\end{frame}
+
+\end{document}

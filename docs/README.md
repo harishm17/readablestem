@@ -35,6 +35,7 @@ arrived at; read them by question, not front to back.
 | What is the threat model, what protects it, and how do I report a problem? | [security.md](security.md) |
 | What do I give an accessibility or procurement office? | [vendor-information.md](vendor-information.md), and the review record each document has (web.md "The review record") |
 | How do I test the Canvas export in a real Canvas? | [canvas-sandbox-test.md](canvas-sandbox-test.md) |
+| How do I check what a screen reader says (VoiceOver in Safari) on the demo, a converted file and the review screen? | [screen-reader-test.md](screen-reader-test.md) |
 
 ## If you want to know why a choice was made
 

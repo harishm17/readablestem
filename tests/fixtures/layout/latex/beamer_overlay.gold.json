@@ -1,0 +1,65 @@
+{
+  "source": "beamer_overlay.tex",
+  "frames": [
+    {
+      "title": "Deriving the Range",
+      "pages": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "title": "Checking the Result",
+      "pages": [
+        3,
+        4,
+        5
+      ]
+    }
+  ],
+  "equations": [
+    {
+      "latex": "v_0",
+      "display": false,
+      "env": "$",
+      "frame": 0
+    },
+    {
+      "latex": "\\theta",
+      "display": false,
+      "env": "$",
+      "frame": 0
+    },
+    {
+      "latex": "t_{\\text{flight}} = \\frac{2 v_0 \\sin\\theta}{g}",
+      "display": true,
+      "env": "equation",
+      "frame": 0
+    },
+    {
+      "latex": "R = v_0 \\cos\\theta \\; t_{\\text{flight}} = \\frac{v_0^2 \\sin 2\\theta}{g}",
+      "display": true,
+      "env": "equation",
+      "frame": 0
+    },
+    {
+      "latex": "\\theta = 45^\\circ",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    },
+    {
+      "latex": "\\theta = 0",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    },
+    {
+      "latex": "R_{\\max} = v_0^2 / g",
+      "display": false,
+      "env": "$",
+      "frame": 1
+    }
+  ]
+}
