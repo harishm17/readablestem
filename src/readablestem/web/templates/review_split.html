@@ -509,6 +509,9 @@
       {% for o in bulk_offers %}
       <li><a href="/jobs/{{ job.id }}/accept/{{ o.slug }}?view=split">{{ o.title }} ({{ o.count }})</a></li>
       {% endfor %}
+      {% if symbols_offer %}
+      <li><a href="/jobs/{{ job.id }}/symbols?view=split">Symbols in the handwritten equations</a></li>
+      {% endif %}
       <li><a href="/jobs/{{ job.id }}">Back to the results</a></li>
     </ul>
   </div>

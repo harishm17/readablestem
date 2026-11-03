@@ -832,6 +832,36 @@ input[type="number"].input-short { width: 6rem; }
   .notify-box [aria-disabled="true"] { color: GrayText; border-color: GrayText; }
 }
 
+/* The Symbols screen (templates/review_inventory.html): one form per symbol, the places it
+   stands as a list under a <details>, a small picture of each equation beside its LaTeX. */
+.symbols-intro { max-width: 48rem; }
+.symbol-family { margin: 1.5rem 0; }
+.symbol-family > h2 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+.family-glyphs { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", serif; letter-spacing: 0.1em; }
+.symbol-form { margin: 0 0 1rem; padding: 0.75rem 1rem; border: 1px solid var(--rule); border-radius: var(--radius); max-width: 48rem; }
+.symbol-form h3 { margin: 0 0 0.25rem; font-size: 1.1rem; }
+.symbol-glyph { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", serif; font-size: 1.4rem; margin-right: 0.25rem; }
+.symbol-count { margin: 0 0 0.5rem; }
+.symbol-form select { min-height: 2.75rem; max-width: 100%; }
+.symbol-form .button { min-height: 2.75rem; }
+.symbol-places { margin: 0.75rem 0; }
+.symbol-places summary { display: list-item; min-height: 2.75rem; padding: 0.6rem 0; box-sizing: border-box; cursor: pointer; }
+.places { list-style: none; margin: 0.25rem 0 0; padding: 0; }
+.place { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: flex-start; padding: 0.5rem 0; border-top: 1px solid var(--rule); }
+.place-crop { max-height: 3.5rem; max-width: 12rem; width: auto; height: auto; border: 1px solid var(--rule); background: #fff; }
+.place-text { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
+.place-text p { margin: 0 0 0.25rem; }
+.place-where a { display: inline-flex; align-items: center; min-height: 2.75rem; }
+.place-keep { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; }
+.place-keep input { width: 1.5rem; height: 1.5rem; flex: none; }
+.symbols-notice { margin: 1rem 0; }
+.symbols-notice .notice { margin: 0; flex: 1 1 auto; }
+
+@media (forced-colors: active) {
+  .symbol-form, .symbols-notice .notice { border: 2px solid CanvasText; }
+  .symbol-form .button { border: 2px solid ButtonText; }
+  .place-crop { forced-color-adjust: none; }
+}
 /* The data-flow diagram on /for-accessibility-offices: one column, scaled to the screen. */
 .data-flow-figure { margin: 0.5rem 0 1rem; max-width: 26rem; }
 .data-flow { display: block; width: 100%; height: auto; }

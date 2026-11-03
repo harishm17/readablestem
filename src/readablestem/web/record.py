@@ -44,9 +44,11 @@ from readablestem.web.messages import explain_check, explain_reason, severity_la
 from readablestem.web.review import (
     BULK_KEY,
     CHOICE_KEY,
+    INVENTORY_KEY,
     MODEL_READ_KEY,
     UNDO_ACTION,
     WITNESS_KEY,
+    WRITE_KEY,
     item_labels,
 )
 from readablestem.web.views import KIND_LABELS
@@ -76,6 +78,7 @@ ACTION_WORDS = {
     "omit_page": "Left the page out of the student file and of the review",
     "restore_page": "Put the page back into the student file and the review",
     "carried": "Carried over from the earlier version of the document",
+    "relabel": "Changed a symbol in several equations at once",
     UNDO_ACTION: "Undid the decision before",
 }
 # A decision with a mark in its `after` (web.review.BULK_KEY, MODEL_READ_KEY) says more.
@@ -87,6 +90,12 @@ BULK_KIND_WORDS = {
     "equations": "Accepted, together with the other equations whose checks passed, in one action",
     "figures": "Accepted, together with the other figures with generated alt text, in one action",
 }
+# One row for a symbol changed in many equations from the Symbols screen (web.inventory).
+RELABEL_WORDS = (
+    "Changed {was} to {now} in {n} equations at once, from the list of symbols. Each equation "
+    "stayed waiting for a decision."
+)
+MAX_NAMED_EQUATIONS = 6
 MODEL_READ_WORDS = "Table cell read by the AI service at the person's request, then saved"
 # What a carried edit was (web.carry_edits.CARRIED_KEY).
 CARRIED_EDIT_WORDS = {
@@ -224,6 +233,49 @@ def _decision_words(edit: Any) -> str:
     return ACTION_WORDS.get(action, "Changed")
 
 
+def _relabel_mark(edit: Any) -> dict[str, Any] | None:
+    """The `INVENTORY_KEY` mark of an edit made from the Symbols screen, or None."""
+    after = edit.after if isinstance(edit.after, dict) else {}
+    mark = after.get(INVENTORY_KEY)
+    return mark if isinstance(mark, dict) else None
+
+
+def _relabel_rows(
+    edits: list[Any], labels: dict[str, str], who: dict[str, str], owner: str
+) -> list[DecisionRow]:
+    """One row for each write that changed a symbol in many equations: the writes' edits
+    (one per equation, what Undo needs) are one decision of the person."""
+    from readablestem.web import inventory
+
+    writes: dict[Any, list[Any]] = {}
+    for edit in edits:
+        after = edit.after if isinstance(edit.after, dict) else {}
+        writes.setdefault((edit.user_id, after.get(WRITE_KEY)), []).append(edit)
+    rows = []
+    for group in writes.values():
+        first = group[0]
+        mark = _relabel_mark(first) or {}
+        named = [labels.get(e.element_id, "Equation") for e in group]
+        shown = ", ".join(named[:MAX_NAMED_EQUATIONS])
+        if len(named) > MAX_NAMED_EQUATIONS:
+            shown += f" and {len(named) - MAX_NAMED_EQUATIONS} more"
+        rows.append(
+            DecisionRow(
+                when=as_utc(first.created_at) or first.created_at,
+                item=shown,
+                page=None,
+                tool_had=TOOL_STATUS_WORDS["needs_review"],
+                decision=RELABEL_WORDS.format(
+                    was=inventory.name_of(str(mark.get("from", ""))),
+                    now=inventory.name_of(str(mark.get("to", ""))),
+                    n=len(group),
+                ),
+                by=who.get(first.user_id, owner),
+            )
+        )
+    return rows
+
+
 def _page_number(element_id: str) -> int | None:
     """1-based page of a page-level edit recorded under "page-3"."""
     head, _, tail = element_id.partition("-")
@@ -334,7 +386,10 @@ def build(
     labels = item_labels(result)
     counts = job_page.breakdown(result.fixes)
     decisions = []
-    for edit in sorted(edits, key=lambda e: (as_utc(e.created_at) or e.created_at, e.id)):
+    ordered = sorted(edits, key=lambda e: (as_utc(e.created_at) or e.created_at, e.id))
+    relabeled = [e for e in ordered if _relabel_mark(e) is not None]
+    ordered = [e for e in ordered if _relabel_mark(e) is None]
+    for edit in ordered:
         fix = fixes.get(edit.element_id)
         element = elements.get(edit.element_id)
         kind = fix.kind.value if fix is not None else (element.kind.value if element else "")
@@ -352,6 +407,8 @@ def build(
                 by=who.get(edit.user_id, owner),
             )
         )
+    decisions.extend(_relabel_rows(relabeled, labels, who, owner))
+    decisions.sort(key=lambda d: d.when)
     images = [
         ImageRow(
             item=labels.get(f.element_id, KIND_LABELS.get(f.kind, f.kind.value.title())),

@@ -438,6 +438,11 @@ CHOICE_ORIGIN = "second_reader_choice"
 # witness): the whole reading or one of its symbols, offered by `reading_chips.other_reading_for`.
 WITNESS_KEY = "page_witness_choice"
 WITNESS_ORIGIN = "page_witness_choice"
+# A symbol changed in many equations at once from the Symbols screen (`web.inventory`): the
+# ReviewEdit's action, and the mark in its `after` (what was changed to what, in how many
+# equations) that lets the record show the write as one row.
+RELABEL_ACTION = "relabel"
+INVENTORY_KEY = "symbol_inventory"
 # A `before` that holds a structural snapshot instead of a fix's (`web.page_edits.capture`).
 STRUCTURE_KEY = "structure"
 CHOICE_ORIGINS = {CHOICE_ORIGIN: CHOICE_KEY, WITNESS_ORIGIN: WITNESS_KEY}

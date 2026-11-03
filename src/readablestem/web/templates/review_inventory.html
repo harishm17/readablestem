@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{# The Symbols screen (routes/inventory.py, web/inventory.py): every letter and symbol read in
+   the handwritten equations, grouped with the ones that look alike, one form per symbol that
+   changes it everywhere. A plain form: it works without JavaScript, and the places a symbol
+   stands are a list of checkboxes under a <details>, so the keyboard reaches them all. #}
+{% block title %}{% if errors %}Error: {% endif %}Symbols in the handwritten equations: {{ job.filename }}{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{{ back_href }}">Back to the review</a></p>
+<h1>Symbols in the handwritten equations</h1>
+<p class="lede">{{ job.filename }}</p>
+{% include "_error_summary.html" %}
+{% include "_stale_notice.html" %}
+{% if notice %}
+<div class="decision-notice symbols-notice">
+  <div class="notice" role="status" tabindex="-1" autofocus><p>{{ notice }}</p></div>
+  {% if undo %}
+  <form method="post" action="/jobs/{{ job.id }}/undo" class="undo-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="symbols"><input type="hidden" name="version" value="{{ result_version }}">
+    <button type="submit" class="link-button" data-role="undo">Undo<span class="visually-hidden"> the change to the symbols</span></button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+{% macro places_list(row, can_leave_out) %}
+<ul class="places">
+  {% for p in row.places %}
+  <li class="place">
+    {% if p.crop %}<img class="place-crop" loading="lazy" src="/jobs/{{ job.id }}/crops/{{ p.element_id }}.png" alt="{{ p.label }}, page {{ p.page }}, as it is written in the PDF">{% endif %}
+    <div class="place-text">
+      <p class="place-where"><a href="/jobs/{{ job.id }}/review?item={{ p.element_id }}">{{ p.label }}<span class="visually-hidden">, on the review screen</span></a>, page {{ p.page }}{% if p.which %}, {{ p.which }}{% endif %}</p>
+      <p class="place-latex"><span class="visually-hidden">In the LaTeX: </span><code class="latex">{{ p.before }}<mark class="said-diff">{{ row.key }}</mark>{{ p.after }}</code></p>
+      {% if p.changeable and can_leave_out %}
+      <label class="place-keep"><input type="checkbox" name="exclude" value="{{ p.value }}"> Leave this one as it is<span class="visually-hidden">: {{ p.label }}{% if p.which %}, {{ p.which }}{% endif %}</span></label>
+      {% elif not p.changeable %}
+      <p class="hint">Already decided: not changed.</p>
+      {% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+
+{% if not inv.families %}
+<p>This document has no handwritten equations with a proposal to list.</p>
+<p><a href="{{ back_href }}">Back to the review</a></p>
+{% else %}
+<div class="symbols-intro">
+  <p>These are the letters and symbols the tool read in the handwritten equations: {{ inv.symbols }} different {{ "symbol" if inv.symbols == 1 else "symbols" }}, {{ inv.places }} in all, in {{ inv.equations }} {{ "equation" if inv.equations == 1 else "equations" }}. They are grouped with the ones that look alike when written by hand.</p>
+  <p>If one was read wrongly throughout, change it everywhere here, and tick the places where it was right. Each equation you change stays waiting for your decision: you still look at it and accept it yourself. Undo takes the whole change back in one step.</p>
+</div>
+
+{% for family in inv.families %}
+<section class="symbol-family" aria-labelledby="family-{{ loop.index }}">
+  {% if family.members %}
+  <h2 id="family-{{ loop.index }}">Looks alike: <span aria-hidden="true" class="family-glyphs">{% for m in family.members %}{{ m.glyph }}{% if not loop.last %} {% endif %}{% endfor %}</span><span class="visually-hidden">{% for m in family.members %}{{ m.name }}{% if not loop.last %}, {% endif %}{% endfor %}</span></h2>
+  {% else %}
+  <h2 id="family-{{ loop.index }}">{{ family.name }}</h2>
+  {% endif %}
+  {% for row in family.rows %}
+  {% set rid = row.element_id %}
+  <form method="post" action="/jobs/{{ job.id }}/symbols" class="symbol-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="version" value="{{ result_version }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="symbol" value="{{ row.key }}">
+    <h3 id="{{ rid }}-title"><span class="symbol-glyph" aria-hidden="true">{{ row.glyph }}</span> {{ row.name[0]|upper }}{{ row.name[1:] }}</h3>
+    <p class="symbol-count">Read {{ row.times }} {{ "time" if row.times == 1 else "times" }}, in {{ row.equations }} {{ "equation" if row.equations == 1 else "equations" }}.{% if row.changeable < row.times %} {{ row.times - row.changeable }} of them {{ "is" if row.times - row.changeable == 1 else "are" }} in equations you already decided, and {{ "is" if row.times - row.changeable == 1 else "are" }} not changed.{% endif %}</p>
+    {% if family.members and row.changeable %}
+    <div class="field">
+      <label for="to-{{ rid }}">Change every {{ row.name }} to</label>
+      <select id="to-{{ rid }}" name="to" required>
+        <option value="">Choose a symbol</option>
+        {% for t in family.targets(row.key) %}<option value="{{ t.key }}">{{ t.name }} ({{ t.glyph }})</option>{% endfor %}
+      </select>
+    </div>
+    <details class="symbol-places">
+      <summary>Show the {{ row.times }} {{ "place" if row.times == 1 else "places" }}, and leave some out</summary>
+      {{ places_list(row, True) }}
+    </details>
+    <div class="button-row">
+      <button type="submit" class="button" data-role="relabel" aria-describedby="{{ rid }}-note">Change all {{ row.name }}</button>
+    </div>
+    <p class="hint" id="{{ rid }}-note">The places you tick under “Show the places” are left as they are. Equations that already have your decision are not changed.</p>
+    {% else %}
+    <details class="symbol-places">
+      <summary>Show the {{ row.times }} {{ "place" if row.times == 1 else "places" }}</summary>
+      {{ places_list(row, False) }}
+    </details>
+    {% endif %}
+  </form>
+  {% endfor %}
+</section>
+{% endfor %}
+{% endif %}
+{% endblock %}
