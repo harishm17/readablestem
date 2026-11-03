@@ -69,6 +69,24 @@
 - New check messages for the agree and differ notes (`image_page.second_reader`) and two notice messages.
 - Not measured: how often the choices contain the right reading, or whether decisions per page fall
   (docs/eval-handwriting.md).
+## Unreleased: glyph checks for equations (branch eq/bag-extended-extent)
+
+- `EQUATION_GLYPH_CHECKS` (off): the glyphs under an equation's box, and for an inline equation read with
+  its line the glyphs beside it, are kept with the element (`Element.glyphs`, `core.types.GlyphContext`; read
+  by `layout.line_glyphs`, which shares the line crop's region with `crop_line` through `_line_clip`).
+- A reading that goes past the box (`EQUATION_LINE_CONTEXT`) is compared with the glyphs it covers, not the
+  box's text (`text_layer_compare.extend_text_layer`, `equation_step.reading_layer`): symbols, numbers, case,
+  style, signs and chemistry checks, a reviewer's edit (`web.edit_check`), the review screen's compare table
+  (`web.compare`) and the eval's "supported" test all use that one layer. A wrong letter in the extended part
+  is still a decision.
+- New check `equation.glyph_style`, code `glyph_style_mismatch` (meaning-level, a required decision): a letter's
+  style in the reading's LaTeX against its glyph's font (italic against upright, bold against bold italic, script,
+  double-struck; `text_layer_compare.compare_letter_styles`). New review message and compare-table row.
+- `\mathbf` is written `\boldsymbol` for a letter the glyphs say is bold italic (`restyle_bold_italic`, the
+  bold-letter fix of running text), including Latin Modern's `LMMathItalic10-Bold`, whose text-layer code point
+  says only "bold". Measured by replay of the recorded fresh4 run in docs/eval-equation-glyph-checks.md.
+- `scripts/realworld_run.py rs --glyph-checks` turns the setting on for a replay.
+
 ## Unreleased: a local handwriting reader (branch hw/local-reader)
 
 - New reader B, `local` (`models/math_readers/local_reader.py`): TexTeller on CPU with ONNX

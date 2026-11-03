@@ -18,7 +18,7 @@ links, language, colour, notation memory) are described in docs/web.md and docs/
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 from urllib.parse import urlsplit
@@ -542,6 +542,57 @@ class ReadingAlternatives(BaseModel):
         return sum(len(s.options) for s in self.symbols)
 
 
+# One character per letter style in `GlyphContext`: "-" is a glyph with no style to tell.
+GLYPH_STYLE_CODES = {
+    "italic": "i",
+    "upright": "u",
+    "bold": "b",
+    "bold-italic": "B",
+    "script": "s",
+    "double-struck": "d",
+    "fraktur": "f",
+}
+_GLYPH_STYLES = {code: style for style, code in GLYPH_STYLE_CODES.items()}
+
+
+class GlyphContext(BaseModel):
+    """What the PDF's glyphs say about an equation, kept with it so every check of a reading
+    (the equation step's, and the review screen's of an edit) compares with the same evidence.
+
+    Three runs of glyphs, each a string of character pairs: the glyph as `Element.text` writes it
+    (a bold letter as the Unicode bold letter) and the code of its letter style
+    (`GLYPH_STYLE_CODES`). `span`: the glyphs under the element's box. `before` and `after`: an
+    inline equation's neighbours on its row, left and right of the box, nearest first, the
+    glyphs a reading that reaches past the box may cover (`text_layer_compare.extend_text_layer`).
+    Written by `layout.line_glyphs`; None on an element nobody read the glyphs of."""
+
+    span: str = ""
+    before: str = ""
+    after: str = ""
+
+    @staticmethod
+    def encode(glyphs: Iterable[tuple[str, str | None]]) -> str:
+        return "".join(c[:1] + GLYPH_STYLE_CODES.get(style or "", "-") for c, style in glyphs if c)
+
+    @staticmethod
+    def decode(pairs: str) -> tuple[tuple[str, str | None], ...]:
+        return tuple(
+            (pairs[i], _GLYPH_STYLES.get(pairs[i + 1])) for i in range(0, len(pairs) - 1, 2)
+        )
+
+    @property
+    def span_glyphs(self) -> tuple[tuple[str, str | None], ...]:
+        return self.decode(self.span)
+
+    @property
+    def before_glyphs(self) -> tuple[tuple[str, str | None], ...]:
+        return self.decode(self.before)
+
+    @property
+    def after_glyphs(self) -> tuple[tuple[str, str | None], ...]:
+        return self.decode(self.after)
+
+
 class Element(BaseModel):
     """Something on a page, in document reading order."""
 
@@ -575,6 +626,9 @@ class Element(BaseModel):
     # plain, so a bold reading of it (a scalar read as a vector) is a real difference.
     # None when layout did not record it (older results, equations built outside layout).
     regular_letters: str | None = None
+    # Equations: the glyphs under the box and beside it, with each letter's style, for the
+    # checks of a reading against the PDF (`GlyphContext`). None when nobody read them.
+    glyphs: GlyphContext | None = Field(default=None, exclude_if=lambda v: v is None)
     # Equations, only with the page math pass (ADR 0006): its LaTeX reading of this span
     # (a second reading, never output text), and whether the pass placed the span ("span")
     # or only layout found it on a page the pass read ("layout"). None: no pass.
