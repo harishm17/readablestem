@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `pipeline/math_canonical.py`: one comparator for "is this the same formula" (tree, notation-neutral,
+  spoken-equal, symbols) with a reason when it is not; the notation-neutral and spoken scorers
+  share its folding and speech helpers (recorded-run numbers unchanged). No product behaviour
+  changes yet ([docs/steps.md](docs/steps.md), "Comparing two readings").
+
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 
 - `ANALYTICS_ENABLED` (default false): PostHog loaded from and reporting to the app's own `/m/` proxy

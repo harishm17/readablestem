@@ -18,27 +18,15 @@ those of the primary, and the detection, span and silent-error counts are not to
 
 from __future__ import annotations
 
-import re
-
 from readablestem.eval import equations as eq
 from readablestem.gold import arxiv_gold as ag
-from readablestem.pipeline import validate
-from readablestem.pipeline.equation_step import clean_latex
+from readablestem.pipeline import math_canonical as mc
 
-_WORD = re.compile(
-    r"\\(?:mathrm|textrm|mbox|textnormal|operatorname\*?|text)\s*\{([^{}]*)\}|\{\\rm\s+([^{}]*)\}"
-)
-
-
-def fold(latex: str) -> str:
-    """The folding rule of the module docstring."""
-    return _WORD.sub(
-        lambda m: "\\text{" + (m.group(1) if m.group(1) is not None else m.group(2)) + "}", latex
-    )
+fold = mc.fold_upright_words  # the folding rule of the module docstring
 
 
 def _converted(latex: str) -> str:
-    return validate.safe_latex_to_mathml(clean_latex(latex), "inline")
+    return mc.latex_to_mathml(latex)
 
 
 def neutral_exact(pred_latex: str | None, gold_latex: str, registered: bool) -> bool:
