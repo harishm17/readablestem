@@ -160,7 +160,11 @@ cap (`CONVERSION_MEMORY_MB`, default 3072), so the image ships only int8. The mi
 leaves no room under the cap next to PyMuPDF and the table model. Measured as the child runs
 it (PyMuPDF imported, the table model loaded, a 3072 MB address-space cap, `MALLOC_ARENA_MAX=2`),
 the int8 reader read five crops at about 1 s each with a peak address space of 2.07 GB and
-1.1 GB resident. The experiment's scan-degraded crops cost the float32 model 13 points (0.527);
+1.1 GB resident. Repeated on 2026-11-03 with files built by `local_weights` at the pinned
+revision (`RLIMIT_AS` 3072 MB, `MALLOC_ARENA_MAX=2`, PyMuPDF imported, table model not loaded, five
+rendered-text crops, so timing and memory only): first read 3.0 s (the load), then 1.0 to 1.1 s;
+peak address space 1.95 GB, peak resident 1.10 GB, no allocation failure under the cap. The
+experiment's scan-degraded crops cost the float32 model 13 points (0.527);
 the int8 files were not run on them.
 
 **The image.** `docker build --build-arg INSTALL_MATH_READER=true .` (on Railway, the service
