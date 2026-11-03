@@ -24,6 +24,8 @@ PAIRS = [
     ("\\omega t", "w t", "greek_latin", 1),
     ("k+1", "h+1", "other_letter", 1),
     ("1+y", "l+y", "digit_letter", 1),
+    ("a=1", "a=7", "digit_digit", 1),
+    ("0+b", "6+b", "digit_digit", 1),
     ("U(z)", "U(2)", "z_2", 1),
     ("a x b", "a \\times b", "x_times", 1),
     ("a-b", "a–b", "minus_dash", 1),
@@ -124,3 +126,37 @@ def test_main_counts_wrong_and_missed_and_writes_json(tmp_path: Path, capsys) ->
 def test_main_fails_without_recordings(tmp_path: Path) -> None:
     _, gold_root = _write_run(tmp_path)
     assert hwe.main(["--arms-root", str(tmp_path / "none"), "--gold-root", str(gold_root)]) == 2
+
+
+def test_symbol_error_inside_a_fraction_is_reported() -> None:
+    record = hwe.classify_pair("\\frac{x}{2}", "\\frac{X}{2}")
+    assert "case" in record["kinds"]
+    record = hwe.classify_pair("\\sqrt{k}", "\\sqrt{h}")
+    assert "other_letter" in record["kinds"]
+    # a whole fraction lost is still a fraction error
+    assert "fraction" in hwe.classify_pair("\\frac{a}{b}", "a b")["kinds"]
+
+
+def test_gold_is_keyed_by_part_and_id(tmp_path: Path) -> None:
+    gold_root = tmp_path / "gold"
+    for part, latex in (("dev", "x"), ("fresh", "y")):
+        (gold_root / part).mkdir(parents=True)
+        (gold_root / part / "u.jsonl").write_text(json.dumps({"id": "u/eq-000", "latex": latex}))
+    gold = hwe.load_gold(gold_root)
+    assert gold[("dev", "u/eq-000")]["latex"] == "x"
+    assert gold[("fresh", "u/eq-000")]["latex"] == "y"
+
+
+def test_json_write_warns_about_the_licence(tmp_path: Path, capsys) -> None:
+    arms, gold_root = _write_run(tmp_path)
+    hwe.main(
+        [
+            "--arms-root",
+            str(arms),
+            "--gold-root",
+            str(gold_root),
+            "--json",
+            str(tmp_path / "o.json"),
+        ]
+    )
+    assert "CC BY-NC-SA" in capsys.readouterr().err

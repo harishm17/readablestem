@@ -46,6 +46,7 @@ KINDS = (
     "greek_greek",
     "other_letter",
     "digit_letter",
+    "digit_digit",
     "z_2",
     "x_times",
     "minus_dash",
@@ -104,6 +105,8 @@ def kind_of_replacement(x: str, y: str) -> str:
         return "operator_bracket"
     if {x.lower(), y.lower()} == {"z", "2"}:
         return "z_2"
+    if x.isdigit() and y.isdigit():
+        return "digit_digit"
     digit_letter = (x.isdigit() and (_is_letter(y) or y in "|")) or (
         y.isdigit() and (_is_letter(x) or x in "|")
     )
@@ -121,10 +124,18 @@ def kind_of_replacement(x: str, y: str) -> str:
 def kinds_of_opcode(gold: list[str], pred: list[str]) -> set[str]:
     """Kinds of one difference (a run of gold symbols read as a run of other symbols)."""
     both = gold + pred
+    block = None
     if any(t in FRACTION for t in both):
-        return {"fraction"}
-    if any(t in ROOT for t in both):
-        return {"root"}
+        block = "fraction"
+    elif any(t in ROOT for t in both):
+        block = "root"
+    if block:
+        # a block that is only partly missing can hide symbol errors inside it
+        marks = FRACTION | ROOT | {"|"}
+        inner, _ = classify(
+            [t for t in gold if t not in marks], [t for t in pred if t not in marks]
+        )
+        return {block, *inner}
     if any(t in SCRIPT for t in both):
         marks = [t for t in both if t not in SCRIPT and t not in GROUPING]
         if both and all(t in SCRIPT or t in ACCENT_MARKS for t in both) and marks:
@@ -224,13 +235,14 @@ def classify_pair(gold_latex: str, pred_latex: str, *, gold_id: str = "") -> dic
 # -------------------------------------------------------------------------------- recordings
 
 
-def load_gold(gold_root: Path) -> dict[str, dict]:
-    gold: dict[str, dict] = {}
+def load_gold(gold_root: Path) -> dict[tuple[str, str], dict]:
+    """Gold rows keyed by (part, id): the part is the directory, so two parts cannot collide."""
+    gold: dict[tuple[str, str], dict] = {}
     for path in sorted(gold_root.glob("*/*.jsonl")):
         for line in path.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 row = json.loads(line)
-                gold[row["id"]] = row
+                gold[(path.parent.name, row["id"])] = row
     return gold
 
 
@@ -243,7 +255,7 @@ def arm_dirs(arms_root: Path, arm: str | None, part: str | None) -> list[tuple[s
     return found
 
 
-def analyse_arm(items_path: Path, gold: dict[str, dict]) -> dict:
+def analyse_arm(items_path: Path, gold: dict[tuple[str, str], dict], part: str) -> dict:
     """Every wrong equation of one recorded arm and part, classified."""
     wrong: list[dict] = []
     n_gold = 0
@@ -256,7 +268,7 @@ def analyse_arm(items_path: Path, gold: dict[str, dict]) -> dict:
         for pair in item.get("pairs", []):
             if pair.get("exact_lenient"):
                 continue
-            row = gold.get(pair["gold_id"])
+            row = gold.get((part, pair["gold_id"]))
             if row is None:
                 n_missing_gold += 1
                 continue
@@ -264,7 +276,7 @@ def analyse_arm(items_path: Path, gold: dict[str, dict]) -> dict:
                 classify_pair(row["latex"], pair.get("pred_latex") or "", gold_id=pair["gold_id"])
             )
         for gold_id in item.get("missed_gold_ids") or []:
-            row = gold.get(gold_id)
+            row = gold.get((part, gold_id))
             if row is None:
                 n_missing_gold += 1
                 continue
@@ -313,6 +325,12 @@ def render_table(summaries: dict[str, dict]) -> str:
     return "\n".join(lines)
 
 
+JSON_WARNING = (
+    "warning: the JSON examples hold gold and reading LaTeX from the evaluation set "
+    "(CC BY-NC-SA 4.0). Do not commit or publish the file."
+)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--arms-root", type=Path, default=DEFAULT_ARMS)
@@ -332,7 +350,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"no recorded arms under {args.arms_root}", file=sys.stderr)
         return 2
     summaries = {
-        f"{arm}/{part}": summarise(analyse_arm(items, gold), args.examples)
+        f"{arm}/{part}": summarise(analyse_arm(items, gold, part), args.examples)
         for arm, part, items in arms
     }
     print(render_table(summaries))
@@ -342,6 +360,7 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(summaries, indent=1, ensure_ascii=False) + "\n", encoding="utf-8"
         )
         print(f"wrote {args.json}")
+        print(JSON_WARNING, file=sys.stderr)
     return 0
 
 

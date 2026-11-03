@@ -612,7 +612,9 @@ accent, operator or bracket, left out), the edit distance in symbols, and whethe
 speech code says the reading and the label alike. It reads the recorded answers and the gold, calls
 no model and writes a text table and, with `--json`, counts and examples per arm. The kinds are
 found from the symbol stream the symbol score uses, so one equation can have several, and a wrong
-equation with identical speech is a notation the label did not use. `--arms-root` and `--gold-root`
+equation with identical speech is a notation the label did not use. The JSON examples hold gold
+and reading LaTeX from the evaluation set (CC BY-NC-SA 4.0): keep the file out of the repo (the
+script prints this warning when it writes one). `--arms-root` and `--gold-root`
 point it at another recording.
 
 The second track (root causes, fixes, the fresh set):
