@@ -84,6 +84,7 @@ def pick(env, latex: str):
             "view": "split",
             "version": version,
             "action": "edit",
+            "origin": "second_reader_choice",
             "latex": latex,
         },
     )
@@ -104,7 +105,7 @@ def test_the_card_offers_the_other_reading_as_a_button_named_for_what_it_means(c
     assert 'name="latex" value="x + y = 2"' in buttons[0]
     assert 'type="submit"' in buttons[0]
     # Where it is, how it is said now, and how the choice would be said aloud.
-    assert "Where the page reading has <code" in chips and "(said “capital X”)" in chips
+    assert "Where the proposal above has <code" in chips and "(said “capital X”)" in chips
     assert "Then read aloud roughly as: “x plus y equals 2”" in text_of(chips)
     described = re.search(r'aria-describedby="([^"]+)"', buttons[0]).group(1)  # type: ignore[union-attr]
     assert f'id="{described}"' in chips
@@ -241,3 +242,38 @@ def test_three_symbols_of_three_options_are_nine_choices_at_most():
     chips = reading_chips.chips_for(element, fix)
     assert chips is not None and chips.count == 9
     assert chips.groups[1].chips[0].latex == "a + x + c"
+
+
+def test_a_chosen_reading_is_recorded_as_a_choice_and_a_typed_one_is_not(chipped):
+    from readablestem.web import record
+    from readablestem.web.review import CHOICE_KEY
+
+    pick(chipped, "x + y = 2")
+    with session_scope(chipped.ctx.factory) as session:
+        [edit] = [e for e in session.scalars(select(ReviewEdit)).all() if e.element_id == ID]
+    assert edit.after.get(CHOICE_KEY) is True
+    assert record.CHOICE_WORDS.startswith("Edited: chose the reading a second reader gave")
+
+
+def test_the_mark_is_only_for_a_reading_the_card_offered():
+    from readablestem.web.review import CHOICE_KEY, CHOICE_ORIGIN, apply_review
+
+    for latex, marked in (("x + y = 2", True), ("X + y = 3", False)):
+        result = handwritten_output().result
+        change = apply_review(result, ID, "edit", {"latex": latex, "origin": CHOICE_ORIGIN})
+        assert change.after.get(CHOICE_KEY, False) is marked, latex
+    # without the form's say-so a matching edit is an ordinary one
+    result = handwritten_output().result
+    assert CHOICE_KEY not in apply_review(result, ID, "edit", {"latex": "x + y = 2"}).after
+
+
+def test_a_symbol_that_stands_twice_says_which_one():
+    reading = reading_alternatives.from_reading("x + X = 2", "x + x = 2", "block")
+    element, fix = element_and_fix("x + X = 2", reading)
+    [group] = reading_chips.chips_for(element, fix).groups  # type: ignore[union-attr]
+    assert group.symbol == "X" and group.which == ""  # only one capital X
+    reading = reading_alternatives.from_reading("x + x = 2", "x + y = 2", "block")
+    element, fix = element_and_fix("x + x = 2", reading)
+    [group] = reading_chips.chips_for(element, fix).groups  # type: ignore[union-attr]
+    assert (group.symbol, group.which) == ("x", "the 2nd ")
+    assert group.chips[0].latex == "x + y = 2"

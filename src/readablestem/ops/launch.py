@@ -128,6 +128,32 @@ def recipients_notice_problem(settings: Settings) -> str | None:
     return None
 
 
+def second_reader_problem(settings: Settings) -> str | None:
+    """Why `IMAGE_PAGES_SECOND_READER` cannot work with these settings, or None. Only the local
+    reader runs in the conversion child (no keys, no network); a Claude or OpenAI reader needs
+    the parent to read crops for the child, which is not built, so choosing one would
+    silently read nothing. The local reader needs its model files in place: without them every
+    equation would only get a "no second reading" notice."""
+    name = settings.image_pages_second_reader
+    if name == "off":
+        return None
+    if name != "local":
+        return (
+            f"IMAGE_PAGES_SECOND_READER={name} is not built: only 'local' runs in the "
+            'conversion child (docs/math-readers.md, "Which reader runs where")'
+        )
+    from readablestem.models.math_readers.local_reader import LocalReader
+
+    if settings.math_reader_local_dir is None:
+        return "IMAGE_PAGES_SECOND_READER=local but MATH_READER_LOCAL_DIR is not set"
+    if not LocalReader.from_settings(settings).available():
+        return (
+            "IMAGE_PAGES_SECOND_READER=local but the model files are not in "
+            "MATH_READER_LOCAL_DIR (build with INSTALL_MATH_READER=true)"
+        )
+    return None
+
+
 def launch_blockers(
     repo_root: Path | None = None, *, settings: Settings | None = None
 ) -> list[str]:

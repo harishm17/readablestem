@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from readablestem.core.types import DocumentResult, Fix, Kind, Status
+from readablestem.core.types import DocumentResult, Element, Fix, Kind, Status
 from readablestem.web.review import (
     BULK_KEY,
     FieldError,
@@ -29,6 +29,7 @@ from readablestem.web.review import (
     ReviewInvalid,
     apply_review,
     can_accept,
+    is_image_page_item,
     is_kept_image,
     reading_order,
 )
@@ -75,11 +76,17 @@ def _flagged(fix: Fix) -> bool:
     return any(v.flagged is not False for v in fix.verifications)
 
 
-def is_bulk_candidate(fix: Fix, slug: str) -> bool:
+def is_bulk_candidate(fix: Fix, slug: str, element: Element | None = None) -> bool:
     """Whether the bulk action for `slug` accepts this fix: undecided, a usable proposal,
-    nothing failed, nothing flagged, and on its own (not in a group)."""
+    nothing failed, nothing flagged, and on its own (not in a group). Never an item read from
+    an image of a page (`element`): handwritten and scanned maths is always its own decision,
+    whatever its checks say."""
     spec = BULK_KINDS[slug]
     if fix.kind is not spec.kind or fix.status is not Status.NEEDS_REVIEW:
+        return False
+    if is_image_page_item(element) or any(
+        c.name == "image_page.maths_always_checked" for c in fix.checks
+    ):
         return False
     if fix.group_key or fix.reason or is_kept_image(fix):
         return False
@@ -93,7 +100,8 @@ def is_bulk_candidate(fix: Fix, slug: str) -> bool:
 
 def candidates(result: DocumentResult, slug: str) -> list[Fix]:
     """The fixes the action for `slug` would accept now, in page and reading order."""
-    found = [f for f in result.fixes if is_bulk_candidate(f, slug)]
+    elements = {e.id: e for e in result.elements}
+    found = [f for f in result.fixes if is_bulk_candidate(f, slug, elements.get(f.element_id))]
     return reading_order(result, found)
 
 

@@ -508,6 +508,7 @@ def _convert(link: Link, init: dict[str, Any], faults: _Faults, convert_pdf, set
         notice=init["notice"],
         source_note=init["source_note"],
         options=init["options"],
+        time_limit_s=init.get("limit_s"),
         **kwargs,
     )
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from readablestem.core.types import Element, Fix, ReadingAlternatives, SymbolAlternative
+from readablestem.pipeline import reading_alternatives
 
 
 @dataclass(frozen=True)
@@ -29,7 +30,8 @@ class Chip:
 
 @dataclass(frozen=True)
 class ChipGroup:
-    symbol: str  # the page reading's LaTeX for this symbol
+    symbol: str  # the proposal's LaTeX for this symbol
+    which: str  # "the 2nd " when the symbol stands more than once, else ""
     said: str  # ... and how it is spoken
     chips: list[Chip]
 
@@ -69,13 +71,31 @@ def phrase(symbol: SymbolAlternative, option: str) -> str:
     return said
 
 
+def _ordinal(n: int) -> str:
+    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def _which(reading: ReadingAlternatives, symbol: SymbolAlternative) -> str:
+    """ "the 2nd " when the symbol stands more than once in the reading (`x + x`), found from
+    where this one starts, so the person knows which of them is meant."""
+    seen, found = 0, 0
+    while span := reading_alternatives.find_symbol(reading.latex, symbol.symbol, seen + 1):
+        seen += 1
+        if span[0] == symbol.start:
+            found = seen
+    return f"the {_ordinal(found)} " if seen > 1 and found else ""
+
+
 def _group(reading: ReadingAlternatives, index: int) -> ChipGroup:
     symbol = reading.symbols[index]
     chips = []
     for number, option in enumerate(symbol.options):
         whole = reading.apply(index, number)
         chips.append(Chip(phrase(symbol, option), whole, _say(whole, "block")))
-    return ChipGroup(symbol.symbol, _say(symbol.symbol) or symbol.symbol, chips)
+    return ChipGroup(
+        symbol.symbol, _which(reading, symbol), _say(symbol.symbol) or symbol.symbol, chips
+    )
 
 
 def chips_for(element: Element | None, fix: Fix) -> Chips | None:
