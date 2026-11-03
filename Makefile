@@ -1,5 +1,5 @@
 # Common tasks. Everything runs through uv; no global installs needed.
-.PHONY: site sync test test-network lint fmt check ci-local gold gold-licenses eval-plumbing eval-latex-check \
+.PHONY: site sync test test-fast test-network lint fmt check ci-local gold gold-licenses eval-plumbing eval-latex-check \
 	table-model fuzz-tables proof proof-check proof-list proof-sources proof-live proof-add-chatbot proof-add-parsers proof-interim reproduce reproduce-rerun
 
 # Sample gold set: 3 numbered sections of chapter 2 of OpenStax Physics (CC BY 4.0).
@@ -26,6 +26,11 @@ reproduce-rerun:
 
 test:
 	uv run pytest
+
+# Unit tests only, in parallel (pytest-xdist): no Postgres, browser, network, live-model or
+# slow tests. Much faster than `make test`; CI still runs everything.
+test-fast:
+	uv run pytest -n auto -m 'not postgres and not browser and not network and not live_model and not slow'
 
 test-network:  ## live OpenStax API check (skipped by default)
 	uv run pytest -m network

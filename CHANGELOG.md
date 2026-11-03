@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased: dependency and CI hardening
+
+- Locked dependencies upgraded for known advisories: pillow 12.3.0 to 13.0.0 (floor now `>=13.0`),
+  certifi to 2026.10.23, joserfc to 1.7.7.
+- CI: a `dependency-audit` job (`pip-audit` over the exported lock), a CodeQL workflow (Python and
+  GitHub Actions; push to main, pull requests, weekly), `alembic upgrade head` plus `alembic check` in
+  the `postgres` job, which now runs Postgres 18 (the backup image's major). Zero collected tests in the
+  `postgres` and `browser` jobs now fails them. The main `pytest` step runs in parallel (`-n auto`).
+- `make test-fast`; pytest-xdist and pytest-timeout in the dev group. The review-UX browser tests wait
+  with Playwright's `expect` and have a 120 s per-test timeout.
 ## The interim held-out report is replayed at the tag, and CI runs it (2026-11-02, branch fix/proof-interim-repro)
 
 - `tests/test_proof_interim.py` used to rebuild the registered report with the current scorer, and
