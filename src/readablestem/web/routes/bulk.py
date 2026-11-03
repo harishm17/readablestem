@@ -34,6 +34,7 @@ from readablestem.web.routes.review import (
     _stale_page,
     list_url,
 )
+from readablestem.web.routes.split import review_url
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -74,7 +75,7 @@ def confirm_page(
         "result_version": version,
         "view": _view(view),
         "back_href": (
-            f"/jobs/{job.id}/review" if view == "split" else list_url(job.id, "needs-decision")
+            review_url(job.id) if view == "split" else list_url(job.id, "needs-decision")
         ),
     }
     return render(request, "review_bulk.html", context)
@@ -95,7 +96,7 @@ def accept(
     if not version.strip():  # a form without the version it was drawn at proves nothing
         return _stale_page(request, job_id, user, view, slug)
     try:
-        changes, result = write_review(
+        changes, result, owned_id = write_review(
             request,
             job_id,
             user,
@@ -109,7 +110,7 @@ def accept(
         log_event(logger, "review_invalid", job_id=job_id, action=f"bulk_{slug}")
         flash(request, " ".join(e.message for e in exc.errors), undo=False)
         where = (
-            list_url(job_id, "needs-decision") if view == LIST_VIEW else f"/jobs/{job_id}/review"
+            list_url(exc.job_id, "needs-decision") if view == LIST_VIEW else review_url(exc.job_id)
         )
         return RedirectResponse(where, status_code=303)
     n = len(changes)
@@ -118,5 +119,5 @@ def accept(
     message = f"Accepted {n} {what} {spec.tail}. Undo takes them all back in one step."
     flash(request, message, element_id=GROUP_FLASH + slug)
     if view == LIST_VIEW:
-        return RedirectResponse(_landing(job_id, result, changes[-1].element_id), status_code=303)
-    return _split_redirect(job_id, result, None)
+        return RedirectResponse(_landing(owned_id, result, changes[-1].element_id), status_code=303)
+    return _split_redirect(owned_id, result, None)

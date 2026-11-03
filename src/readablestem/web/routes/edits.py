@@ -83,19 +83,24 @@ def write_structure(
     user: CurrentUser,
     version: str,
     make: Callable[[DocumentResult, Job, Session], StructureChange],
-) -> tuple[StructureChange, DocumentResult]:
+) -> tuple[StructureChange, DocumentResult, str]:
     """One structural edit as one transaction: `make` applies it to the stored result and
-    returns what to record. Raises ReviewStale, ReviewInvalid (nothing saved) or a
-    PageError (404)."""
+    returns what to record, with the id of the owned job row (what a redirect is built
+    from, never the request's). Raises ReviewStale, ReviewInvalid (nothing saved; both
+    carry that id as `job_id`) or a PageError (404)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user, lock=True)
         require_done(job)
         if is_stale(job.result_version, version):
-            raise ReviewStale()
+            raise ReviewStale(job.id)
         result = DocumentResult.model_validate(job.result_json or {})
         open_before = _open_decisions(result)
-        change = make(result, job, session)
+        try:
+            change = make(result, job, session)
+        except ReviewInvalid as exc:
+            exc.job_id = job.id
+            raise
         for element_id, png in change.crops.items():
             session.add(
                 Blob(
@@ -123,7 +128,8 @@ def write_structure(
             # a document that asked for none is not a finished review.
             open_after=_open_decisions(result) if open_before else 1,
         )
-    return change, result
+        owned_id = job.id
+    return change, result, owned_id
 
 
 def _open_decisions(result: DocumentResult) -> int:
@@ -132,11 +138,12 @@ def _open_decisions(result: DocumentResult) -> int:
     return triage.open_decisions(result.fixes)
 
 
-def back_to_page(job_id: str, number: int) -> RedirectResponse:
-    """The Split View on page `number` (1-based), at the page tools."""
+def back_to_page(owned_id: str, number: int) -> RedirectResponse:
+    """The Split View of the owned job on page `number` (1-based), at the page tools.
+    `owned_id` is the id of the row the ownership check found, never the request's."""
     from readablestem.web.routes.split import review_url
 
-    where = review_url(job_id, page=number, anchor="page-tools", tools=True)
+    where = review_url(owned_id, page=number, anchor="page-tools", tools=True)
     return RedirectResponse(where, status_code=303)
 
 
@@ -160,15 +167,15 @@ def _page_action(
     from readablestem.web.routes.review import LIST_VIEW, keep_filter, list_url
     from readablestem.web.routes.split import _owned_page_count, review_url
 
-    def back(page_number_: int, result: DocumentResult | None = None) -> Response:
+    def back(owned_id: str, page_number_: int, result: DocumentResult | None = None) -> Response:
         if after != "review":
-            return back_to_page(job_id, page_number_)
+            return back_to_page(owned_id, page_number_)
         if view == LIST_VIEW:
-            where = RedirectResponse(list_url(job_id, "needs-decision"), status_code=303)
+            where = RedirectResponse(list_url(owned_id, "needs-decision"), status_code=303)
             return keep_filter(where, flt)
         if result is None:
-            return RedirectResponse(review_url(job_id), status_code=303)
-        return _split_redirect(job_id, result, None)
+            return RedirectResponse(review_url(owned_id), status_code=303)
+        return _split_redirect(owned_id, result, None)
 
     count = _owned_page_count(request, job_id, user)
     page = page_number(number, count)
@@ -180,18 +187,18 @@ def _page_action(
         return page_edits.restore_page(result, page)
 
     try:
-        change, result = write_structure(request, job_id, user, version, make)
-    except ReviewStale:
-        log_event(logger, "review_stale", job_id=job_id)
-        flash(request, STALE_FLASH, undo=False)
-        return back(page + 1)
-    except ReviewInvalid as exc:
-        log_event(logger, "review_invalid", job_id=job_id, action=f"{action}_page")
-        flash(request, " ".join(e.message for e in exc.errors), undo=False)
-        return back(page + 1)
+        change, result, owned_id = write_structure(request, job_id, user, version, make)
+    except (ReviewStale, ReviewInvalid) as exc:
+        if isinstance(exc, ReviewInvalid):
+            log_event(logger, "review_invalid", job_id=job_id, action=f"{action}_page")
+            flash(request, " ".join(e.message for e in exc.errors), undo=False)
+        else:
+            log_event(logger, "review_stale", job_id=job_id)
+            flash(request, STALE_FLASH, undo=False)
+        return back(exc.job_id, page + 1)
     log_event(logger, f"page_{action}", job_id=job_id)
     flash(request, change.message)
-    return back(page + 1, result)
+    return back(owned_id, page + 1, result)
 
 
 @router.post("/jobs/{job_id}/pages/{number}/omit", dependencies=[Depends(require_csrf)])
@@ -296,19 +303,19 @@ def edit_element(
         return page_edits.make_heading(result, element_id, level)
 
     try:
-        change, _ = write_structure(request, job_id, user, version, make)
+        change, _, owned_id = write_structure(request, job_id, user, version, make)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
-    except ReviewStale:
+    except ReviewStale as exc:
         log_event(logger, "review_stale", job_id=job_id)
         flash(request, STALE_FLASH, undo=False)
-        return back_to_page(job_id, page)
+        return back_to_page(exc.job_id, page)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action=f"edit_{action}")
         return _invalid_screen(request, job_id, user, page, element_id, exc, change=element_id)
     log_event(logger, f"edit_{action}", job_id=job_id)
     flash(request, change.message, element_id=element_id)
-    return back_to_page(job_id, page)
+    return back_to_page(owned_id, page)
 
 
 # --------------------------------------------------------------------------- a region of a page
@@ -434,7 +441,7 @@ def add_region(
             job = owned_job(session, job_id, user)
             require_done(job)
             if is_stale(job.result_version, version):
-                raise ReviewStale()
+                raise ReviewStale(job.id)
             result = DocumentResult.model_validate(job.result_json or {})
         page_edits.refuse_left_out(result, page, field_id("add", str(page + 1)))
         if kind == PICTURE:
@@ -454,11 +461,11 @@ def add_region(
                 return page_edits.add_equation(result, page, box, layer, png, read)
             return page_edits.add_figure(result, page, box, alt, png)
 
-        change, result = write_structure(request, job_id, user, version, make)
-    except ReviewStale:
+        change, result, owned_id = write_structure(request, job_id, user, version, make)
+    except ReviewStale as exc:
         log_event(logger, "review_stale", job_id=job_id)
         flash(request, STALE_FLASH, undo=False)
-        return back_to_page(job_id, page + 1)
+        return back_to_page(exc.job_id, page + 1)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action=f"add_{kind}")
         exc.values = values
@@ -473,7 +480,7 @@ def add_region(
     from readablestem.web.routes.split import review_url
 
     return RedirectResponse(
-        review_url(job_id, item=change.shows, page=page + 1, anchor="decision-title"),
+        review_url(owned_id, item=change.shows, page=page + 1, anchor="decision-title"),
         status_code=303,
     )
 
@@ -523,10 +530,12 @@ def write_review(
     make: Callable[[DocumentResult], list[ReviewChange]],
     *,
     kind: str,
-) -> tuple[list[ReviewChange], DocumentResult]:
+) -> tuple[list[ReviewChange], DocumentResult, str]:
     """Review decisions as one write, as the decision route makes them: lock the job, apply
     `make` to the stored result, store a `ReviewEdit` for each fix it changed, count the
-    write. Raises ReviewStale, ReviewInvalid (nothing saved) or a PageError."""
+    write. Returns the id of the owned job row too (what a redirect is built from, never
+    the request's). Raises ReviewStale, ReviewInvalid (nothing saved; both carry that id
+    as `job_id`) or a PageError."""
     ctx = get_ctx(request)
     with (
         session_scope(ctx.factory) as session,
@@ -535,9 +544,13 @@ def write_review(
         job = owned_job(session, job_id, user, lock=True)
         require_done(job)
         if is_stale(job.result_version, version):
-            raise ReviewStale()
+            raise ReviewStale(job.id)
         result = DocumentResult.model_validate(job.result_json or {})
-        changes = make(result)
+        try:
+            changes = make(result)
+        except ReviewInvalid as exc:
+            exc.job_id = job.id
+            raise
         job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
         job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
         written = bump_result_version(job)
@@ -552,7 +565,8 @@ def write_review(
             changed=len(changes),
             open_after=_open_decisions(result),
         )
-    return changes, result
+        owned_id = job.id
+    return changes, result, owned_id
 
 
 def _marked_bulk(result: DocumentResult) -> list[ReviewChange]:
@@ -578,13 +592,17 @@ def accept_clean_tables(
 
     view = LIST_VIEW if view == LIST_VIEW else "split"
     try:
-        changes, result = write_review(request, job_id, user, version, _marked_bulk, kind="group")
+        changes, result, owned_id = write_review(
+            request, job_id, user, version, _marked_bulk, kind="group"
+        )
     except ReviewStale:
         return _stale_page(request, job_id, user, view, "tables")
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action="accept_clean")
         flash(request, " ".join(e.message for e in exc.errors), undo=False)
-        where = list_url(job_id, "group-tables") if view == LIST_VIEW else review_url(job_id)
+        where = (
+            list_url(exc.job_id, "group-tables") if view == LIST_VIEW else review_url(exc.job_id)
+        )
         return RedirectResponse(where, status_code=303)
     n = len(changes)
     log_event(logger, "review_accept_clean", job_id=job_id, changed=n)
@@ -594,8 +612,8 @@ def accept_clean_tables(
         element_id=GROUP_FLASH + "tables",
     )
     if view == LIST_VIEW:
-        return RedirectResponse(_landing(job_id, result, changes[-1].element_id), status_code=303)
-    return _split_redirect(job_id, result, None)
+        return RedirectResponse(_landing(owned_id, result, changes[-1].element_id), status_code=303)
+    return _split_redirect(owned_id, result, None)
 
 
 @router.post("/jobs/{job_id}/tables/{element_id}/read-cell", dependencies=[Depends(require_csrf)])
@@ -664,7 +682,7 @@ def read_cell(
         return refuse(NOT_READ)
     form = {"change": "cell", "row": row, "col": col, "cell": read.equation.latex}
     try:
-        changes, result = write_review(
+        changes, result, owned_id = write_review(
             request,
             job_id,
             user,
@@ -687,7 +705,7 @@ def read_cell(
     flash(request, message, element_id=element_id)
     from readablestem.web.routes.split import review_url
 
-    return RedirectResponse(review_url(job_id, item=element_id), status_code=303)
+    return RedirectResponse(review_url(owned_id, item=element_id), status_code=303)
 
 
 NOT_READ = "The tool could not read this cell as maths. Type the LaTeX yourself."

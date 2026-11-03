@@ -1105,7 +1105,7 @@ def draft(request: Request, job_id: str, user: UserDep) -> Response:
                         context={"job_id": job_id})  # fmt: skip
     decisions = job.page.counts.decisions
     if not decisions:
-        return RedirectResponse(f"/jobs/{job_id}#ready", status_code=303)
+        return RedirectResponse(f"/jobs/{job.id}#ready", status_code=303)
     item = f"?item={job.page.first_open}" if job.page.first_open else ""
     context = {
         "job": job,
@@ -1129,6 +1129,7 @@ def set_language(
     one the document already has, is taken."""
     with session_scope(get_ctx(request).factory) as session:
         job = owned_job(session, job_id, user, lock=True)
+        owned_id = job.id  # the redirect is built from the owned row, not the request
         require_done(job)
         result = DocumentResult.model_validate(job.result_json or {})
         refused = PageError(
@@ -1166,7 +1167,7 @@ def set_language(
     )
     # No fragment: the confirmation (the flash at the top) takes focus on load, as after
     # any other change; a fragment would scroll past it and keep focus on the page.
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+    return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
 
 # --------------------------------------------------------------------------- try again
@@ -1199,6 +1200,7 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
     refused = ""
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user, lock=True)
+        owned_id = job.id  # the redirect is built from the owned row, not the request
         others = int(
             session.scalar(
                 select(func.count())
@@ -1236,7 +1238,7 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
         "was counted against your daily pages.",
         undo=False,
     )
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+    return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
 
 def _crops(session: Session, job_id: str) -> dict[str, bytes]:

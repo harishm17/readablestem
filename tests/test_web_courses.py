@@ -427,6 +427,18 @@ def test_remember_checks_the_job_and_the_course(reviewing):
     assert not any(e.canonical == BOLD_OMEGA for e in rows(reviewing, CourseNotation))
 
 
+def test_remember_never_copies_an_item_the_stored_result_does_not_have(reviewing):
+    """The address is built from the owned job and from an element the stored result has:
+    a crafted `item` is not reflected."""
+    path = f"/courses/{reviewing.course_id}/remember"
+    fields = {"job": reviewing.job_id, "symbol": BOLD_OMEGA, "meaning": "vector"}
+    response = post(reviewing.browser, path, **(fields | {"item": "p9-e9999"}))
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/jobs/{reviewing.job_id}/review#decision-title"
+    response = post(reviewing.browser, path, **(fields | {"item": "//evil.example/"}))
+    assert response.headers["location"] == f"/jobs/{reviewing.job_id}/review#decision-title"
+
+
 def test_the_review_screen_without_a_course_has_no_notation(web):
     web.converter.output = review_output()
     web.job_id = job_id_from(upload_for(web.browser, None, review_pdf()))
