@@ -90,8 +90,8 @@ cannot skip these checks unnoticed.
 | Public | `/`, `/demo`, `/privacy`, `/terms`, `/limits`, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (names of late scheduled tasks only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
 | Signed-in user, owner only | `/account`, `/account/delete` (GET, POST), `/app`, `/app/documents`, `/app/download`, `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages), everything under `/courses/...` (including `/courses/{id}/download`) |
 | Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
-| Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
-| Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare) |
+| Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), rate limited per address (`analytics`, 300 per 10 minutes), the visitor's address is not forwarded (PostHog sees the relay's own), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
+| Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare; production refuses a `CRON_TOKEN` shorter than 32 characters; wrong tokens count against the cron limit below) |
 
 `POST /jobs/{id}/retry` ("Try again") is owner-only and CSRF-checked like every other write on a job, and rate limited; it refuses with 409 when the document is not stopped or has had its 3 tries, and with 429 when the person already has 10 documents waiting or converting.
 
@@ -99,7 +99,7 @@ The job page's three settings, `POST /jobs/{id}/title`, `/contact` and `/keep`, 
 and CSRF-checked like every other write on a job. They are not rate limited: each costs one
 re-render of the person's own document (the same as a review decision or a language change,
 which are not limited either), the body limit applies, and the number of documents a person
-can hold is capped. `/jobs/{id}/download/canvas` and `/jobs/{id}/download/cartridge` (the same page as an IMS Common Cartridge) are GETs for the owner, like `/download`. A
+can hold is capped. `/jobs/{id}/download/canvas` and `/jobs/{id}/download/cartridge` (the same page as an IMS Common Cartridge) are GETs for the owner, like `/download`. So is `/jobs/{id}/combine` (one file from the person's own finished, still-kept parts of one source; another person's part in the same group is never included, a part with a decision open is held back, and it restarts the clock of the parts it took and records the downloads, as "Download all" does). A
 download restarts the deletion clock of the person's own document (`retention.restart_clock`),
 which is the one thing a GET changes; `test_get_requests_change_nothing` allows that and no
 other change.
@@ -189,13 +189,44 @@ script injected into an app page is refused by the policy.
 | Emailed sign-in links, per target address (off) | 3 per 15 minutes, whoever asks | `web/abuse.py` (`email_link`) |
 | Sign-in callbacks, per address | 20 per 5 minutes | `web/abuse.py` |
 | Uploads, per address / per person | 30 / 15 per 10 minutes | `web/abuse.py` |
-| Cron route, per address | 10 per 5 minutes | `web/abuse.py` |
+| Cron route, per address (every call counts, so wrong tokens are limited too) | 10 per 5 minutes | `web/abuse.py` |
+| Analytics relay `/m/` (only with `ANALYTICS_ENABLED`), per address | 300 per 10 minutes | `web/abuse.py` (`analytics`) |
 
 The rate limit is on by default and production refuses to start with `RATE_LIMITS_ENABLED=false`. It is in memory, per instance: with two instances the allowance is doubled, and a
 restart forgets it. It is a seatbelt for a few people, not a flood defence. The address is the
 entry `TRUSTED_PROXY_HOPS` places from the right of `X-Forwarded-For` (1 with Railway's edge alone, which is production; 2 if another proxy such as Cloudflare's sits in
 front as well); entries further left are written by the client and never
 believed. **If this is set wrong the limits are shared by everyone or by no one**.
+Two checks help catch it. At run time, an `X-Forwarded-For` with more than
+`TRUSTED_PROXY_HOPS + 1` entries logs `proxy_hops_unexpected` once per process (the two counts,
+never an address): a proxy is missing from the setting, or a client is forging the header. And
+`readablestem ops launch-check` lists `TRUSTED_PROXY_HOPS=0` in production, which makes every
+visitor share the platform's address. Launch-check runs from the repo and the settings, so it
+cannot see the live header; the log line is the only live check.
+
+### Rotating the session secret
+
+`SESSION_SECRET` signs the session cookie. To change it without signing everyone out:
+
+1. Generate a new value (`python -c 'import secrets; print(secrets.token_urlsafe(48))'`).
+2. Set `SESSION_SECRET_PREVIOUS` to the old value (several, comma-separated, if rotating
+   again before step 4), set `SESSION_SECRET` to the new one, and redeploy. New cookies are
+   signed with the new secret; a cookie signed with a listed old one is still accepted, and is
+   re-signed the next time the session changes. Production refuses an entry shorter than 32
+   characters.
+3. Wait 7 days (the cookie's lifetime), after which no cookie signed with the old secret is
+   valid anyway.
+4. Remove `SESSION_SECRET_PREVIOUS` and redeploy.
+
+Leaked secret: skip the wait. Rotate with `SESSION_SECRET_PREVIOUS` unset, so every session
+ends. The secret is also the key of two HMACs that do not accept an old key: the upload
+fingerprints in usage events (`web/events.py`, after rotation a repeat upload no longer counts
+as the same file again) and the deleted-account tombstones (`web/tombstones.py`, a person
+deleted before the rotation who signs up again the same day is no longer matched to the
+earlier use). Both are only statistics and quota carry-over for that day.
+
+`CRON_TOKEN` and the provider keys rotate by changing the variable on the service (and on the
+scheduler that calls the route, if any); the token needs at least 32 characters in production.
 
 A Word or PowerPoint file (T3-30) is handled the same way, with more care because
 LibreOffice is far larger than MuPDF and, unlike it, reads files and not pipes. In a child

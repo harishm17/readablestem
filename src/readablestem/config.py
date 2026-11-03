@@ -45,6 +45,9 @@ PROVIDER_LIMIT_DEFAULTS: dict[str, dict[str, float]] = {
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
 
+MIN_CRON_TOKEN_CHARS = 32  # the scheduler's shared secret in production
+
+
 class ConfigError(RuntimeError):
     """A required setting is missing or inconsistent."""
 
@@ -283,6 +286,10 @@ class Settings(BaseSettings):
     # Shared secret that a scheduler sends to /internal/cron/* (header X-Cron-Token). Production
     # does not call that route: its cron service runs `readablestem ops cron` instead.
     cron_token: SecretStr | None = None
+    # Earlier SESSION_SECRET values, comma-separated, accepted for checking a session cookie
+    # only (new cookies are signed with SESSION_SECRET). For rotating the secret without
+    # signing everyone out: docs/security.md "Rotating the session secret".
+    session_secret_previous: SecretStr | None = None
     # Run the background worker thread inside the web process (one web service).
     run_worker: bool = True
     worker_poll_s: float = Field(default=2.0, gt=0)
@@ -495,6 +502,14 @@ class Settings(BaseSettings):
         return value
 
     @property
+    def previous_session_secrets(self) -> list[str]:
+        """`SESSION_SECRET_PREVIOUS` as a list (blank entries dropped)."""
+        raw = (
+            self.session_secret_previous.get_secret_value() if self.session_secret_previous else ""
+        )
+        return [part.strip() for part in raw.split(",") if part.strip()]
+
+    @property
     def admin_email_list(self) -> list[str]:
         return [e.strip() for e in self.admin_emails.split(",") if e.strip()]
 
@@ -594,6 +609,19 @@ class Settings(BaseSettings):
         ]
         if missing:
             raise ConfigError("production start refused; missing: " + ", ".join(missing))
+        cron = self.cron_token.get_secret_value() if self.cron_token else ""
+        if len(cron) < MIN_CRON_TOKEN_CHARS:
+            raise ConfigError(
+                f"CRON_TOKEN must be at least {MIN_CRON_TOKEN_CHARS} characters in production"
+            )
+        if self.analytics_enabled:
+            from readablestem.ops.launch import analytics_notice_problem
+
+            if (problem := analytics_notice_problem()) is not None:
+                raise ConfigError(
+                    f"ANALYTICS_ENABLED=true is refused in production: {problem}. "
+                    "Update the notice (web/templates/privacy.html) first"
+                )
         if self.dev_login_enabled:
             raise ConfigError("DEV_LOGIN_ENABLED must be false in production")
         if self.fake_models:

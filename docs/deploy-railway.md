@@ -172,7 +172,15 @@ domain's DNS goes through Cloudflare's proxy ("orange cloud"), there are two pro
 is 2; with the wrong value the rate limits are shared by everyone or can be dodged with a forged
 `X-Forwarded-For`. After the first deploy, check that two people on different networks hit separate
 limits, or that the log's limiter key is not Railway's address (**confirm**: Railway's edge adds the
-client address to `X-Forwarded-For`).
+client address to `X-Forwarded-For`). After a deploy, search the logs for `proxy_hops_unexpected`:
+it is logged once per process when `X-Forwarded-For` has more than `TRUSTED_PROXY_HOPS + 1`
+entries, which means a proxy is missing from the setting (or a client forged the header). It
+carries counts, no addresses. `readablestem ops launch-check` cannot see the live header; it
+only flags `TRUSTED_PROXY_HOPS=0`.
+
+`CRON_TOKEN` must be at least 32 characters (production refuses to start otherwise). To rotate
+`SESSION_SECRET` without signing people out, use `SESSION_SECRET_PREVIOUS`
+([security.md](security.md), "Rotating the session secret").
 
 ## First deploy: checklist
 

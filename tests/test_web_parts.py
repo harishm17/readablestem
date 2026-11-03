@@ -435,7 +435,7 @@ def test_the_known_limits_and_privacy_pages_say_what_happens_to_a_large_file(web
     limits = text_of(web.alice.get("/limits").text)
     assert "Up to 5 pages and 1 MB per upload." in limits
     assert "A bigger file, up to 40 pages and 5 MB, is kept for a day so you can choose" in limits
-    assert "the parts are not joined into one file" in limits
+    assert "each part becomes a document of its own" in limits
     privacy = text_of(web.alice.get("/privacy").text)
     assert "A PDF that is too large to convert at once is kept, as uploaded" in privacy
     assert "Nothing is sent to an AI service until you choose the pages" in privacy
