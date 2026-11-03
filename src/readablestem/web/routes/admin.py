@@ -16,12 +16,12 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 
 from readablestem.web import access, events, linked_emails
 from readablestem.web.auth import normalise_email, set_allowed, set_blocked
 from readablestem.web.database import as_utc, utc_today
-from readablestem.web.db import ErrorAggregate, Job, JobStatus, User, session_scope
+from readablestem.web.db import ErrorAggregate, Job, JobStatus, QuotaDay, User, session_scope
 from readablestem.web.deps import (
     AdminDep,
     flash,
@@ -42,12 +42,40 @@ USAGE_DAYS = 28  # four weeks: the return-visit measure of the beta
 # of accounts: the page lists the newest and says so, and the "Block by email" form reaches
 # any account, listed or not.
 PEOPLE_ROWS = 300
+SPEND_PEOPLE_ROWS = 20  # the biggest spenders shown in "Model spend by person"
 
 
 def admin_context(request: Request) -> dict[str, Any]:
     ctx = get_ctx(request)
     since = utc_today() - timedelta(days=AGGREGATE_DAYS)
     with session_scope(ctx.factory) as session:
+        today = utc_today()
+        listed = list(
+            session.scalars(
+                select(User)
+                .where(User.is_allowed.is_(True))
+                .order_by(User.created_at.desc(), User.email)
+                .limit(PEOPLE_ROWS)
+            )
+        )
+        # What each person's jobs cost (`quota_days.spent_usd`): the biggest spenders today and
+        # over every day kept, by pseudonym like the usage tables, never next to an email.
+        on_today = func.sum(case((QuotaDay.day == today, QuotaDay.spent_usd), else_=0.0))
+        total = func.sum(QuotaDay.spent_usd)
+        spend_people = [
+            {
+                "person": events.pseudonym(str(user_id)),
+                "today": float(today_usd or 0.0),
+                "total": float(total_usd or 0.0),
+            }
+            for user_id, today_usd, total_usd in session.execute(
+                select(QuotaDay.user_id, on_today, total)
+                .group_by(QuotaDay.user_id)
+                .having(total > 0)
+                .order_by(on_today.desc(), total.desc(), QuotaDay.user_id)
+                .limit(SPEND_PEOPLE_ROWS)
+            )
+        ]
         users = [
             {
                 "email": u.email,
@@ -56,12 +84,7 @@ def admin_context(request: Request) -> dict[str, Any]:
                 "last_login_at": as_utc(u.last_login_at),
                 "linked": linked_emails.linked_to(session, u.id),
             }
-            for u in session.scalars(
-                select(User)
-                .where(User.is_allowed.is_(True))
-                .order_by(User.created_at.desc(), User.email)
-                .limit(PEOPLE_ROWS)
-            )
+            for u in listed
         ]
         blocked = [
             {
@@ -86,8 +109,9 @@ def admin_context(request: Request) -> dict[str, Any]:
         }
         signup = {
             "open": ctx.settings.signup_open,
-            "today": signups_today(session, utc_today()),
+            "today": (accounts_today := signups_today(session, today)),
             "limit": ctx.settings.max_new_accounts_per_day,
+            "full": accounts_today >= ctx.settings.max_new_accounts_per_day,
             "invited": by_group.get((True, access.INVITED), 0),
             "open_accounts": by_group.get((True, access.OPEN), 0),
             "blocked": sum(n for (allowed, _), n in by_group.items() if not allowed),
@@ -119,6 +143,8 @@ def admin_context(request: Request) -> dict[str, Any]:
         "signup": signup,
         "people_rows": PEOPLE_ROWS,
         "spend": ctx.guard.snapshot(),
+        "spend_people": spend_people,
+        "spend_people_rows": SPEND_PEOPLE_ROWS,
         "queue": {status.value: counts.get(status.value, 0) for status in JobStatus},
         "aggregates": aggregates,
         "aggregate_days": AGGREGATE_DAYS,

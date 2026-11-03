@@ -17,6 +17,7 @@ has depends on their tier (`web.access`).
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy import select, update
@@ -24,6 +25,9 @@ from sqlalchemy.orm import Session
 
 from readablestem.web.database import insert_ignore, rowcount
 from readablestem.web.db import QuotaDay, SignupDay
+from readablestem.web.logsafe import log_event
+
+logger = logging.getLogger(__name__)
 
 
 def try_consume_pages(
@@ -106,7 +110,25 @@ def try_take_signup(session: Session, *, limit: int, day: date) -> bool:
         .values(accounts=SignupDay.accounts + 1)
         .execution_options(synchronize_session=False)
     )
-    return rowcount(session.execute(stmt)) == 1
+    if rowcount(session.execute(stmt)) == 1:
+        return True
+    _warn_signups_full_once(session, day)
+    return False
+
+
+def _warn_signups_full_once(session: Session, day: date) -> None:
+    """The first refusal of the day logs `signup_cap_reached` (a WARNING with a category code,
+    nothing about the person); later ones do not. The flag is one conditional UPDATE, so two
+    processes refusing at once log once between them. It lives in the caller's transaction,
+    which commits on a refusal (the sign-in returns normally)."""
+    won = session.execute(
+        update(SignupDay)
+        .where(SignupDay.day == day, SignupDay.cap_warned.is_(False))
+        .values(cap_warned=True)
+        .execution_options(synchronize_session=False)
+    )
+    if rowcount(won) == 1:
+        log_event(logger, "signup_cap_reached", logging.WARNING, code="daily_cap")
 
 
 def signups_today(session: Session, day: date) -> int:

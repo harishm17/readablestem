@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import select
-from starlette.middleware.sessions import SessionMiddleware
 
 from fixtures.web.support import (
     ADMIN,
@@ -15,7 +14,7 @@ from fixtures.web.support import (
     login,
     make_settings,
 )
-from readablestem.web.app import create_app
+from readablestem.web.app import RotatingSessionMiddleware, create_app
 from readablestem.web.db import User, session_scope
 from readablestem.web.security import SecurityHeadersMiddleware
 
@@ -129,8 +128,8 @@ def prod_settings(tmp_path, **overrides):
 def test_production_cookie_is_secure_and_hsts_is_on(tmp_path):
     app = create_app(prod_settings(tmp_path))  # no lifespan: nothing connects to the database
     options = {m.cls: m.kwargs for m in app.user_middleware}
-    assert options[SessionMiddleware]["https_only"] is True
-    assert options[SessionMiddleware]["max_age"] == 7 * 24 * 3600
+    assert options[RotatingSessionMiddleware]["https_only"] is True
+    assert options[RotatingSessionMiddleware]["max_age"] == 7 * 24 * 3600
     assert options[SecurityHeadersMiddleware]["hsts"] is True
 
 
@@ -300,6 +299,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/dev-login",
         "/internal/cron/aggregate-and-purge",  # token-authenticated, no session
         "/jobs",
+        "/jobs/{job_id}/accept/{slug}",  # many accepts at once, after a preview
         "/jobs/{job_id}/contact",  # the student file's contact line (T1-17)
         "/jobs/{job_id}/delete",
         "/jobs/{job_id}/edit/{element_id}",  # the words of a paragraph; a heading made (T3-5)
@@ -328,7 +328,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
     for path in posts:
         url = path.replace("{job_id}", JOB).replace("{element_id}", "p1-e1")
         url = url.replace("{course_id}", JOB).replace("{entry_id}", JOB).replace("{number}", "1")
-        url = url.replace("{upload_id}", JOB)
+        url = url.replace("{upload_id}", JOB).replace("{slug}", "equations")
         if path == "/jobs":
             response = web.browser.post(
                 url, data={"csrf_token": "forged"}, files={"pdf": ("a.pdf", b"%PDF-1.4", "x")}

@@ -65,10 +65,37 @@ class PublicPage:
 
 ADA_GUIDE = "/guides/ada-title-ii-stem-course-materials"
 COMPARE_GUIDE = "/guides/readablestem-mathpix-latexml"
+GUIDES_INDEX = "/guides"
+
+
+@dataclass(frozen=True)
+class Guide:
+    path: str
+    title: str
+    summary: str
+
+
+# The guides, in the order /guides lists them (templates/guides.html); each is also in
+# PUBLIC_PAGES with its dates.
+GUIDES = (
+    Guide(
+        ADA_GUIDE,
+        "ADA Title II and STEM course materials",
+        "What the Justice Department's web rule asks of STEM course materials, its technical "
+        "standard and dates, with sources, and what ReadableSTEM does and does not do.",
+    ),
+    Guide(
+        COMPARE_GUIDE,
+        "ReadableSTEM, Mathpix and LaTeXML compared",
+        "What each tool takes in and gives back, what it automates and what it costs, from "
+        "each project's own documentation.",
+    ),
+)
 PUBLIC_PAGES = (
-    PublicPage("/", "2026-10-28"),
+    PublicPage("/", "2026-11-02"),
     PublicPage("/demo", "2026-10-14"),
     PublicPage("/limits", "2026-10-22"),
+    PublicPage(GUIDES_INDEX, "2026-11-02"),
     PublicPage("/help/posting", "2026-10-27"),
     PublicPage("/privacy", "2026-10-27"),
     PublicPage("/terms", "2026-10-20"),
@@ -78,13 +105,20 @@ PUBLIC_PAGES = (
 PUBLIC_PATHS = frozenset(page.path for page in PUBLIC_PAGES)
 
 
+def showcase_canonical(path: str) -> str:
+    """The one address a showcase page is known by: a folder's `index.html` is the folder
+    (`/showcase/method/index.html` -> `/showcase/method/`). The page's canonical link, its
+    structured data and the sitemap all use it; both addresses serve the same page."""
+    return path.removesuffix("index.html") if path.endswith("/index.html") else path
+
+
 def showcase_pages(root: Path | None = None) -> list[str]:
-    """The indexable showcase pages, as site paths (`/showcase/method/index.html`)."""
+    """The indexable showcase pages, as canonical site paths (`/showcase/method/`)."""
     root = SHOWCASE_DIR if root is None else root
     if not root.is_dir():
         return []
     return sorted(
-        SHOWCASE_PREFIX + path.relative_to(root).as_posix()
+        showcase_canonical(SHOWCASE_PREFIX + path.relative_to(root).as_posix())
         for path in root.rglob("*.html")
         if path.name not in SHOWCASE_NOINDEX and path.name != "404.html"
     )
@@ -182,6 +216,7 @@ def llms_txt(site: str, showcase: bool) -> str:
         "",
         "## Guides",
         "",
+        f"- [All guides]({site}{GUIDES_INDEX})",
         f"- [ADA Title II and STEM course materials]({site}{ADA_GUIDE}): "
         "the Justice Department's web rule, its technical standard and dates, with sources, "
         "and what ReadableSTEM does and does not do",
@@ -193,11 +228,11 @@ def llms_txt(site: str, showcase: bool) -> str:
     ]
     if showcase:
         lines += [
-            f"- [Worked examples]({site}/showcase/examples/index.html): PDF pages beside the "
+            f"- [Worked examples]({site}/showcase/examples/): PDF pages beside the "
             "HTML they became, and the review decisions",
-            f"- [Before and after]({site}/showcase/before-after/index.html): how equations are "
+            f"- [Before and after]({site}/showcase/before-after/): how equations are "
             "read aloud from the PDF and from the HTML",
-            f"- [Method and limits]({site}/showcase/method/index.html): how the numbers were made",
+            f"- [Method and limits]({site}/showcase/method/): how the numbers were made",
         ]
     lines += [
         f"- [PROOF.md]({PROOF_URL}): the pre-registered evaluation on held-out OpenStax "

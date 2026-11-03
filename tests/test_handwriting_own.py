@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import threading
 import urllib.error
@@ -314,13 +315,20 @@ def test_run_passes_the_cap_and_records_once(root: Path, monkeypatch: pytest.Mon
 
     def fake(ns, gold_dir, out, **kw):
         seen.update(max_usd=ns.max_usd, gold=Path(gold_dir), live=not ns.answers_offline)
+        seen["env"] = {k: os.environ.get(k) for k in own.PIPELINE_ENV}
         return 0
 
     monkeypatch.setattr(eval_cli, "_run_pipeline", fake)
+    monkeypatch.setenv("IMAGE_PAGES_MODEL", "gpt-6.1-sol")
+    monkeypatch.setenv("IMAGE_PAGES_DPI", "300")
     with pytest.raises(SystemExit, match="run dev first"):
         own.cmd_run(run_args("heldout"))
     assert own.cmd_run(run_args("dev", 1.5)) == 0
     assert seen["max_usd"] == 1.5 and seen["live"] and not own.inside_repo(seen["gold"])
+    assert seen["env"] == own.PIPELINE_ENV  # the registered settings applied during the run
+    assert os.environ["IMAGE_PAGES_MODEL"] == "gpt-6.1-sol"  # and nothing leaks afterwards
+    assert os.environ["IMAGE_PAGES_DPI"] == "300"
+    assert "FEATURE_IMAGE_PAGES" not in os.environ or os.environ["FEATURE_IMAGE_PAGES"] != "true"
     assert len(list(seen["gold"].glob("own-*.jsonl"))) == 2
     assert len(list((seen["gold"] / "pdfs").glob("*.pdf"))) == 2
     with pytest.raises(SystemExit, match="already recorded"):
@@ -339,6 +347,61 @@ def test_status_prints_counts_only(root: Path, capsys: pytest.CaptureFixture[str
     out = capsys.readouterr().out
     assert "dev: 2 PDFs, 2 finished, 2 expressions typed" in out
     assert "alpha" not in out and "notes-" not in out
+
+
+def test_max_usd_is_a_total_across_restarts(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from readablestem.cli import eval_cli
+
+    registration = own.intake(root)
+    finish_part(root, registration, "dev")
+    seen: dict = {}
+
+    def fake(ns, gold_dir, out, **kw):
+        seen["max_usd"] = ns.max_usd
+        return 1  # a failed start: no marker, so a restart is allowed
+
+    monkeypatch.setattr(eval_cli, "_run_pipeline", fake)
+    answers = root / "runs" / "dev" / "answers.jsonl"
+    answers.parent.mkdir(parents=True, exist_ok=True)
+    answers.write_text(json.dumps({"call": {"cost_usd": 0.75}}) + "\n")
+    own.cmd_run(run_args("dev", 1.0))
+    assert seen["max_usd"] == 0.25  # 1.00 total minus the 0.75 already spent
+    with pytest.raises(SystemExit, match="total across restarts"):
+        own.cmd_run(run_args("dev", 0.75))
+
+
+def test_bad_content_length_is_a_400(server) -> None:
+    import http.client
+
+    registration, base = server
+    unit = registration["units"][0]["unit"]
+    conn = http.client.HTTPConnection(base.removeprefix("http://"))
+    conn.putrequest("POST", f"/api/gold/{unit}")
+    conn.putheader("Content-Type", "application/json")
+    conn.putheader("Content-Length", "abc")
+    conn.endheaders()
+    assert conn.getresponse().status == 400
+    conn.close()
+
+
+def test_concurrent_saves_use_distinct_temp_files(tmp_path: Path) -> None:
+    target = tmp_path / "gold" / "x.json"
+    errors: list[Exception] = []
+
+    def save(n: int) -> None:
+        try:
+            for _ in range(20):
+                own.write_json(target, {"n": n})
+        except Exception as exc:  # pragma: no cover
+            errors.append(exc)
+
+    threads = [threading.Thread(target=save, args=(n,)) for n in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert not errors and json.loads(target.read_text())["n"] in range(6)
+    assert [p.name for p in target.parent.iterdir()] == ["x.json"]
 
 
 # --------------------------------------------------------- the form itself, in a real browser

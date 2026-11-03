@@ -374,7 +374,8 @@ feature on, and on the replay of the committed proof bundle):
 - the text pass and the heading decisions, which no step reads, run while the models
   answer instead of before the first request;
 - the worker loads the table models when it starts (`PRELOAD_TABLE_MODELS`, production
-  only), while it waits for its first job: the first conversion after a start no longer
+  only; since conversions run in a child process, which loads them itself, this applies only to a
+  conversion run in the web process), while it waits for its first job: the first conversion after a start no longer
   pays for them (6 pages: 9.3 s to 8.2 s here, 1.7 s of CPU moved out of the job; measured
   on a busy 16-core machine, so on one vCPU the saving is the 4-5 s the model load takes
   there).
@@ -408,7 +409,7 @@ What follows from it:
   while a 30-page conversion ran on the single CPU.
 - **Concurrency** `20` requests per instance is far above need; nothing is CPU bound in a
   request. `--max-instances=2` keeps database connections under db-f1-micro's 25 (each
-  instance pools up to 5: 3 plus 2 overflow), and a second instance would only take pages, not a job.
+  instance pools up to 10: 5 plus 5 overflow), and a second instance would only take pages, not a job.
 - **Request timeout** `300` seconds: it covers the upload request (a 20 MB file on a slow
   link) and every page; the conversion runs on the worker thread, which a request timeout
   does not stop. It was 900.
@@ -712,9 +713,10 @@ A second instance (`--max-instances=2`) only runs, and costs, under load.
   `uptime.yml` workflow then fetches `/readyz` and `/demo` and fails (GitHub emails you)
   if either does not answer 2xx. In a public repository GitHub disables scheduled
   workflows after 60 days without activity; re-enable it from the Actions tab.
-- **Live eval**: repository secret `OPENAI_API_KEY`, from a separate OpenAI project with
-  its own small hard limit. `eval-live.yml` runs only when started by hand and refuses a
-  `max_usd` above 10.
+- **Live eval**: repository secret `ANTHROPIC_API_KEY`, from a separate Anthropic workspace
+  with its own small hard limit (the weekly run spends at most $2.95, about $0.70 expected).
+  `eval-live.yml` runs weekly and by hand; without the secret a scheduled run skips with a
+  notice. Each task has its own `--max-usd` (`docs/eval.md`, "Weekly live run").
 
 ## Before the first real users
 
@@ -846,7 +848,7 @@ Log queries: Logs Explorer with `resource.type="cloud_run_revision"` and
 | `/readyz` shows `model_provider: no_key` | The `anthropic-api-key` secret has a version and the service reads `:latest` | Add the secret version and redeploy |
 | "cron not running" or "cron or purge problem" alert | `jsonPayload.message=("cron_done" OR "cron_refused" OR "aggregate_failed" OR "purge_backstop_deleted")`; Cloud Scheduler > job history | The worker's backstop keeps purging meanwhile; fix the scheduler anyway |
 | Cron returns 403 | `cron_refused` in logs | The scheduler's token differs from the secret, usually after a rotation: `./deploy/deploy.sh cron` |
-| Too many connections | Cloud SQL connection count (25 on db-f1-micro) | Each instance pools up to 5 connections (3 plus 2 overflow); keep `--max-instances=2` or move to `db-g1-small` (50) |
+| Too many connections | Cloud SQL connection count (25 on db-f1-micro) | Each instance pools up to 10 connections (5 plus 5 overflow) and two instances can reach 20 of the 25: keep `--max-instances=2` (not more) or move to `db-g1-small` (50) |
 
 The `decisions_canary_drift` ERROR line has no alert policy. To be emailed, add it to the
 `$SERVICE-cron-problems` log metric in `deploy/deploy.sh`, or give it a policy of its own.

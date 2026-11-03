@@ -1,4 +1,4 @@
-"""The owner's own handwritten notes as a handwriting test set (docs/eval-handwriting.md, "Your own
+"""Own handwritten notes as a handwriting test set (docs/eval-handwriting.md, "Own handwritten
 notes"): intake, a blind split, a typed-by-hand answer key, and a run capped in dollars.
 
     uv run python scripts/handwriting_own.py intake [--src DIR]  # register, split dev/held-out
@@ -18,8 +18,9 @@ Everything private lives in one folder OUTSIDE the repository, by default
 
 The notes are never copied into the repository. Every command refuses a folder inside the
 repository, or inside any git working tree. The model is never shown anything but the PDFs; the
-answer key is typed by the owner from a blank form with no model draft. `run` is the only command
-that can spend money: it needs `--max-usd` (at most 2.00), the part's answer key finished and the
+answer key is typed by hand from a blank form with no model draft. `run` is the only command
+that can spend money, and it sends the PDFs to the model provider (Anthropic). It needs
+`--max-usd` (at most 2.00, a total across restarts), the part's answer key finished and the
 registration unchanged, and it will not record a part twice.
 """
 
@@ -34,6 +35,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import threading
 import webbrowser
 from http import HTTPStatus
@@ -100,9 +102,14 @@ def sha256_file(path: Path) -> str:
 
 def write_json(path: Path, data: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    tmp.replace(path)
+    fd, name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+    tmp = Path(name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(data, indent=1, sort_keys=True) + "\n")
+        tmp.replace(path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------- intake + split
@@ -422,7 +429,11 @@ def make_server(root: Path, registration: dict, part: str | None, port: int = 0)
             if self.headers.get_content_type() != "application/json":
                 self.reply({"error": "send JSON"}, HTTPStatus.UNSUPPORTED_MEDIA_TYPE)
                 return
-            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                self.reply({"error": "bad Content-Length"}, HTTPStatus.BAD_REQUEST)
+                return
             if not 0 < length <= MAX_BODY:
                 self.reply({"error": "bad size"}, HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
                 return
@@ -468,6 +479,38 @@ def answers_cost(path: Path) -> float:
     return total
 
 
+# The registered settings of the handwriting evaluation: Opus reads the pages, no second check.
+PIPELINE_ENV = {
+    "CLAUDE_SECOND_CHECK": "off",
+    "FEATURE_IMAGE_PAGES": "true",
+    "IMAGE_PAGES_MODEL": "claude-opus-5-5",
+}
+PIPELINE_UNSET = ("IMAGE_PAGES_DPI", "ANTHROPIC_EFFORT_IMAGE_PAGES")
+
+
+@contextlib.contextmanager
+def scoped_env(values: dict[str, str], unset: tuple[str, ...] = ()):
+    """Set and unset environment variables for the block only (settings are read from the
+    environment when the pipeline starts), then restore them: nothing leaks to the caller."""
+    saved = {k: os.environ.get(k) for k in (*values, *unset)}
+    os.environ.update(values)
+    for key in unset:
+        os.environ.pop(key, None)
+    try:
+        yield
+    finally:
+        for key, old in saved.items():
+            if old is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old
+
+
+def total_spent(runs: Path) -> float:
+    """Dollars already spent on these notes, from the recorded answers of both parts."""
+    return sum(answers_cost(runs / part / "answers.jsonl") for part in PARTS)
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     if args.max_usd is None or not 0 < args.max_usd <= MAX_CAP_USD:
         raise OwnError(f"--max-usd is required and must be above 0 and at most {MAX_CAP_USD:.2f}")
@@ -484,12 +527,13 @@ def cmd_run(args: argparse.Namespace) -> int:
     if counts["expressions"] == 0:
         raise OwnError(f"the {args.part} answer key has no expressions")
 
-    # The registered settings of the handwriting evaluation: Opus reads the pages, no second check.
-    os.environ["CLAUDE_SECOND_CHECK"] = "off"
-    os.environ["FEATURE_IMAGE_PAGES"] = "true"
-    os.environ["IMAGE_PAGES_MODEL"] = "claude-opus-5-5"
-    os.environ.pop("IMAGE_PAGES_DPI", None)
-    os.environ.pop("ANTHROPIC_EFFORT_IMAGE_PAGES", None)
+    spent_before = total_spent(runs)
+    remaining = round(args.max_usd - spent_before, 4)
+    if not args.offline and remaining <= 0:
+        raise OwnError(
+            f"--max-usd {args.max_usd:.2f} is a total across restarts and ${spent_before:.2f} "
+            "is already spent on these notes"
+        )
     from readablestem.cli import eval_cli
     from readablestem.cli.main import build_parser
     from readablestem.eval.realworld_media import RealWorldMedia
@@ -504,21 +548,22 @@ def cmd_run(args: argparse.Namespace) -> int:
         "eval", "pipeline", "--task", "document", "--provider", "anthropic",
         "--answers", str(answers), "--items", str(items), "--out", str(report),
         "--section-workers", "1", "--cache", str(out_dir / "cache"),
-        "--max-usd", str(args.max_usd),
+        "--max-usd", str(args.max_usd if args.offline else remaining),
     ]  # fmt: skip
     if args.offline:
         argv.append("--answers-offline")
     ns = build_parser().parse_args(argv)
     before = answers_cost(answers)
-    code = eval_cli._run_pipeline(
-        ns,
-        gold_dir,
-        report,
-        gold_label=f"own handwriting ({args.part})",
-        media_cls=RealWorldMedia,
-        cache_dir=out_dir / "cache",
-        openstax_cache=out_dir / "cache",
-    )
+    with scoped_env(PIPELINE_ENV, PIPELINE_UNSET):
+        code = eval_cli._run_pipeline(
+            ns,
+            gold_dir,
+            report,
+            gold_label=f"own handwriting ({args.part})",
+            media_cls=RealWorldMedia,
+            cache_dir=out_dir / "cache",
+            openstax_cache=out_dir / "cache",
+        )
     spent = answers_cost(answers) - before
     if code == 0 and not args.offline:
         entry = {

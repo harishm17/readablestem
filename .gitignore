@@ -49,3 +49,6 @@ src/readablestem/web/showcase/
 readablestem-private/
 handwriting-own/
 handwriting-private/
+
+# Local re-score of the interim held-out report (make proof-interim); the committed one is registered
+proof/interim/rebuilt-here.md

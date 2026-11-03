@@ -40,6 +40,7 @@ RETRYABLE_FAILURES = frozenset(
     {
         "timeout",
         "lease_expired",
+        "conversion_unavailable",
         "store_failed",
         "internal_error",
         "model_not_configured",

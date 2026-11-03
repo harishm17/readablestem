@@ -20,13 +20,23 @@ The rule, for a lower-case continuation (a capital after the hyphen keeps it, as
 
 A piece is the run of letters next to the hyphen: "mass-energy-" / "balance" tests
 "energy" and "balance".
+
+The document can overrule the list, because its own spelling is better evidence than any
+dictionary: when the same two pieces are written with a hyphen inside a line elsewhere
+("eigen-vector"), the hyphen stays; when the joined word is written whole elsewhere
+("antiderivative"), a break in the middle of it is soft hyphenation and the hyphen goes,
+even for two pieces that are words with a join the list lacks. A single letter before the
+hyphen (rule 1) is never overruled by the second.
 """
 
 from __future__ import annotations
 
 import gzip
+import re
+from collections.abc import Iterable
 from functools import lru_cache
 from importlib import resources
+from itertools import pairwise
 
 HYPHENS = "-\u2010"
 MIN_PIECE = 2  # the word list holds words of two letters or more
@@ -60,15 +70,46 @@ def _head_letters(text: str) -> str:
     return text[:end]
 
 
-def keeps_hyphen(before: str, after: str) -> bool:
+_TOKEN = re.compile(r"[^\W\d_]+(?:[-\u2010][^\W\d_]+)*")
+
+
+def document_spellings(lines: Iterable[str]) -> tuple[frozenset[str], frozenset[str]]:
+    """(hyphenated pairs, whole words) the lines write inside a line, all lower-case.
+
+    "mass-energy-balance" gives the pairs "mass-energy" and "energy-balance"; a word with
+    no hyphen is a whole word. A word cut at the end of a line is not counted (its second
+    half is on the next line), so a break never vouches for itself."""
+    pairs: set[str] = set()
+    whole: set[str] = set()
+    for line in lines:
+        for token in _TOKEN.findall(line):
+            parts = [part.lower() for part in re.split("[-\u2010]", token)]
+            if len(parts) == 1:
+                whole.add(parts[0])
+            else:
+                pairs.update(f"{a}-{b}" for a, b in pairwise(parts))
+    return frozenset(pairs), frozenset(whole)
+
+
+def keeps_hyphen(
+    before: str,
+    after: str,
+    compounds: frozenset[str] = frozenset(),
+    whole: frozenset[str] = frozenset(),
+) -> bool:
     """Is the hyphen that ends `before` (it is its last character) part of a compound?
 
     `after` is the next line and starts with a lower-case letter; the caller has decided
-    that already. See the module docstring for the rules."""
+    that already. `compounds` and `whole` are the document's own spellings
+    (`document_spellings`). See the module docstring for the rules."""
     stem = _tail_letters(before[:-1])
     head = _head_letters(after)
+    if stem and head and f"{stem}-{head}".lower() in compounds:
+        return True
     if len(stem) == 1:
         return True
+    if (stem + head).lower() in whole:
+        return False
     vocabulary = words()
     if not vocabulary or len(stem) < MIN_PIECE or len(head) < MIN_PIECE:
         return False

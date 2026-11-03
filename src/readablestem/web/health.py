@@ -1,5 +1,6 @@
 """Readiness (`/readyz`) and the SIGTERM hook.
 
+`/healthz/ops` says the scheduled tasks ran: the backup within 26 hours, the cron within 2.
 `/healthz` says the process answers and the database does. `/readyz` says the service can
 do its job: the database answers, the worker thread is alive and not stuck, and the model
 provider is set up. Each check is one word; nothing in the answer comes from a setting's
@@ -22,7 +23,9 @@ from collections.abc import Callable
 from types import FrameType
 
 from readablestem.config import Settings
+from readablestem.ops import heartbeat
 from readablestem.web.database import ping
+from readablestem.web.db import session_scope
 from readablestem.web.deps import AppContext
 from readablestem.web.logsafe import log_event
 
@@ -40,6 +43,18 @@ def readiness(ctx: AppContext) -> tuple[bool, dict[str, str]]:
         "model_provider": _provider_check(ctx.settings),
     }
     return all(v in {"ok", "disabled", "fake"} for v in checks.values()), checks
+
+
+def ops_freshness(ctx: AppContext) -> tuple[bool, list[str]]:
+    """(fresh, stale names): the backup ran in the last 26 hours and the cron in the last 2
+    (`ops.heartbeat`). Names only. A database that does not answer is reported as
+    "database", so the outside check cannot pass on a failed read."""
+    try:
+        with session_scope(ctx.factory) as session:
+            stale = heartbeat.stale_names(session)
+    except Exception:
+        return False, ["database"]
+    return not stale, stale
 
 
 def _worker_check(ctx: AppContext) -> str:

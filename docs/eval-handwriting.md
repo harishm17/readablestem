@@ -619,14 +619,19 @@ uv run python scripts/typed_scans_check.py compare --arms base new   # docs/eval
 The fresh set's live runs refuse to start unless the registered files hash as registered
 (`data/handwriting/REGISTRATION-ACCURACY.sha256`), and a second live run of an arm.
 
-## Your own notes (the owner's iPad pages)
+## Own handwritten notes
 
 The measured set above is other people's ink on composed pages. `scripts/handwriting_own.py` and
-`scripts/handwriting_gold_form.html` are the harness for the owner's own handwritten notes, so the
-same question can be asked of real exported pages. The notes never enter the repository: they and
-everything derived from them live in one private folder outside it, and every command refuses a
+`scripts/handwriting_gold_form.html` are the harness for a set of one's own handwritten notes, so
+the same question can be asked of real exported pages. The notes never enter the repository: they
+and everything derived from them live in one private folder outside it, and every command refuses a
 folder inside this repo or any git working tree (`.gitignore` also guards `readablestem-private/`,
-`handwriting-own/` and `handwriting-private/`). Only counts may be published, with the owner's OK.
+`handwriting-own/` and `handwriting-private/`). Only counts are published, and only with the
+notes' author agreeing.
+
+**`run` sends the PDFs to Anthropic**, the model provider, so the pages leave the machine. Nothing
+else in this harness does: intake, the split and the form are local, and the form's server listens
+on 127.0.0.1 only. Do not run it on notes that must stay private.
 
 **When the notes are ready (about 30 to 45 minutes of typing):**
 
@@ -647,9 +652,11 @@ folder inside this repo or any git working tree (`.gitignore` also guards `reada
 4. `uv run python scripts/handwriting_own.py status` shows counts only.
 5. Later, with the answer key finished for a part and `ANTHROPIC_API_KEY` set:
    `uv run --env-file .env python scripts/handwriting_own.py run --part dev --max-usd 1`, then the
-   same with `--part heldout`. `--max-usd` is required and at most 2.00; held-out needs dev
-   recorded first; a part is recorded live once (`--offline` replays). The settings are those of
-   the evaluation above (image pages pass, `claude-opus-5-5`, no second check).
+   same with `--part heldout`. `--max-usd` is required, at most 2.00, and a total for the notes
+   across restarts: what the recorded answers of both parts already cost is subtracted, and a run
+   stops at the rest. Held-out needs dev recorded first; a part is recorded live once (`--offline`
+   replays). The settings are those of the evaluation above (image pages pass, `claude-opus-5-5`,
+   no second check), applied for the run only.
 
 Under the private folder: `pdfs/` the notes, `pages/` the page pictures, `registration.json` and
 `registration.sha256`, `gold/<unit>.json` the typed answer key, and `runs/<part>/` the gold in the

@@ -31,6 +31,14 @@
 </div>
 {% if not job.finished %}
 {% include "_job_progress.html" %}
+{# Opt-in browser notice when the conversion finishes (static/app.js "When a job finishes").
+   Hidden until the script finds the Notification API; nothing is asked until the button is
+   used, and nothing leaves the device. #}
+<div id="notify-box" class="notify-box" hidden>
+  <button type="button" id="notify-button" class="button-secondary" aria-describedby="notify-hint">Notify me when it finishes</button>
+  <p class="hint" id="notify-hint">Your browser asks first. The notice shows on this device only, while this page stays open.</p>
+  <p class="hint" id="notify-state" role="status"></p>
+</div>
 <p>With JavaScript on, the status above updates by itself. You can also
   <a href="/jobs/{{ job.id }}{% if auto_reload %}?auto=1{% endif %}">refresh the status</a>,
   or leave and come back later.</p>
@@ -57,6 +65,7 @@
   <li><a class="button" href="{{ review_url }}">Review {{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }}</a></li>
   <li><a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a></li>
   <li><a href="/jobs/{{ job.id }}/draft">Download a draft ({{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} open)</a></li>
+  {% if not job.is_sample %}<li><a href="/app?revises={{ job.id }}#upload-heading" data-role="revise">Upload a revised version</a></li>{% endif %}
 </ul>
 {# ux-a: under the download link, where to post the file and the two questions. #}
 {% include "_after_download.html" %}

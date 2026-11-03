@@ -269,8 +269,12 @@ def test_a_long_link_wraps_at_320_px_and_links_are_tab_stops():
             widths = page.evaluate(
                 "() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]"
             )
-            page.keyboard.press("Tab")
-            focused = page.evaluate("() => document.activeElement.getAttribute('href')")
+            focused = None
+            for _ in range(40):  # the skip link and the contents list come first
+                page.keyboard.press("Tab")
+                focused = page.evaluate("() => document.activeElement.getAttribute('href')")
+                if focused and not focused.startswith("#"):
+                    break
         finally:
             browser.close()
     assert widths[0] <= widths[1]

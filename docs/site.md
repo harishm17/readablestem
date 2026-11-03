@@ -17,7 +17,9 @@ The app serves the build at `https://readablestem.com/showcase/` (`web/routes/di
 The Docker image runs `site/build.py` into `src/readablestem/web/showcase/` before installing the
 package (`.dockerignore` lets the lecture-notes PDF and `proof/sets/` through for it). The app adds
 each page's canonical address, link-preview tags and structured data as it sends it, and lists the
-pages in `/sitemap.xml`; the stored conversions and the stemcheck sample are sent sandboxed, like
+pages in `/sitemap.xml` under their canonical address (a folder's `index.html` is the folder:
+`/showcase/method/`, in the canonical link, the structured data and the sitemap alike;
+`web.seo.showcase_canonical`); the stored conversions and the stemcheck sample are sent sandboxed, like
 `/demo`, and marked `noindex`. Without a build (local development, tests) `/showcase/` is a 404
 and nothing links to it; `make site OUT=src/readablestem/web/showcase` makes one.
 

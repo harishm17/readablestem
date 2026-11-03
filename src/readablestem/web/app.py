@@ -19,18 +19,21 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import itsdangerous
 import jinja2
 from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from itsdangerous.exc import BadSignature
 from markupsafe import Markup
 from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as SATimeoutError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import HTMLResponse
+from starlette.types import ASGIApp
 
 from readablestem.config import ConfigError, Settings, get_settings
 from readablestem.observability.logging import configure_logging, request_logging_middleware
@@ -56,6 +59,7 @@ from readablestem.web.return_to import decision_link, remember_return, signed_ou
 from readablestem.web.routes import (
     account,
     admin,
+    bulk,
     bundle,
     courses,
     cron,
@@ -293,6 +297,42 @@ def check_web_secrets(settings: Settings) -> None:
         raise ConfigError(
             f"SESSION_SECRET must be at least {MIN_SESSION_SECRET_CHARS} characters in production"
         )
+    if any(len(old) < MIN_SESSION_SECRET_CHARS for old in settings.previous_session_secrets):
+        raise ConfigError(
+            "every SESSION_SECRET_PREVIOUS entry must be at least "
+            f"{MIN_SESSION_SECRET_CHARS} characters in production"
+        )
+
+
+class RotatingSigner:
+    """Signs with the current secret, accepts a cookie signed by it or by an earlier one
+    (`SESSION_SECRET_PREVIOUS`). Stands in for the middleware's single signer."""
+
+    def __init__(self, current: str, previous: list[str]) -> None:
+        self.current = itsdangerous.TimestampSigner(current)
+        self.accepted = [self.current] + [
+            itsdangerous.TimestampSigner(old) for old in previous if old != current
+        ]
+
+    def sign(self, value: bytes) -> bytes:
+        return bytes(self.current.sign(value))
+
+    def unsign(self, value: bytes, max_age: int | None = None) -> bytes:
+        error: BadSignature | None = None
+        for signer in self.accepted:
+            try:
+                return bytes(signer.unsign(value, max_age=max_age))
+            except BadSignature as exc:
+                error = exc
+        raise error or BadSignature("bad signature")
+
+
+class RotatingSessionMiddleware(SessionMiddleware):
+    """Starlette's session middleware with `RotatingSigner` for the cookie signature."""
+
+    def __init__(self, app: ASGIApp, *, previous: list[str], **kwargs: Any) -> None:
+        super().__init__(app, **kwargs)
+        self.signer = RotatingSigner(str(kwargs["secret_key"]), previous)  # type: ignore[assignment]
 
 
 def _session_secret(settings: Settings) -> str:
@@ -399,8 +439,9 @@ def create_app(
     # CrawlerRequests (HEAD, www and trailing-slash redirects) > routes.
     app.add_middleware(CrawlerRequestsMiddleware, base_url=settings.base_url)
     app.add_middleware(
-        SessionMiddleware,
+        RotatingSessionMiddleware,
         secret_key=_session_secret(settings),
+        previous=settings.previous_session_secrets,
         session_cookie=(HOST_PREFIX if settings.env == "prod" else "") + SESSION_COOKIE,
         max_age=SESSION_MAX_AGE_S,
         same_site="lax",
@@ -427,6 +468,7 @@ def create_app(
         jobs,
         parts,
         bundle,
+        bulk,
         sample,
         job_settings,
         split,
