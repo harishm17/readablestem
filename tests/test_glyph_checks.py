@@ -175,6 +175,7 @@ def char(c: str, font: str, flags: int = 0) -> _Char:
         ("a", "Times-BoldItalic", 18, "bold-italic"),
         ("\U0001d465", "CambriaMath", 0, "italic"),
         ("\U0001d41d", "CambriaMath", 0, "bold"),
+        ("A", "ABCDEF+LMMathSymbols10-Regular", 6, None),  # calligraphic, flagged italic
         ("a", "ABCDEF+MysteryFont", 0, None),
         ("a", "CourierNew", 8, None),
         ("5", "ABCDEF+CMR10", 0, None),

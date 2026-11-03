@@ -625,6 +625,14 @@ _CODE_POINT_STYLE = {
     "fraktur": "fraktur",
     "bold-fraktur": "fraktur",
 }
+# Maths symbol and extension fonts: their capitals are calligraphic (CMSY, Latin Modern Symbols)
+# and their flags say italic whatever the letter is, so a letter in one says nothing but script
+# (`_LETTER_STYLE_FONTS`, which names the ones the text layer can show).
+_MATH_SYMBOL_FONT = re.compile(
+    r"^(?:lmmathsymbols|lmmathextension|cmsy|cmbsy|cmex|msam|msbm|txsy|txex|pxsy|pxex|"
+    r"symbol|stixmathsymbols|stixsizeone|mnsy|rsfs|eusm|eusb|eufm|eufb)",
+    re.IGNORECASE,
+)
 LINE_GLYPH_REACH = 24  # glyphs either side of the span `line_glyphs` keeps, nearest first
 LINE_GLYPH_ROW = 0.5  # x the span's height: how far off the span's row a neighbour may sit
 
@@ -643,11 +651,13 @@ def glyph_style(c: _Char) -> str | None:
     style = _letter_style(c.font)
     if style is not None and (base.isupper() or not style[1]):
         return style[0]
+    face = c.font.split("+", 1)[-1].replace(" ", "")
+    if _MATH_SYMBOL_FONT.match(face):
+        return None
     if _bold_italic(c.font) or (c.bold and c.italic):
         return STYLE_BOLD_ITALIC
     if c.bold:
         return STYLE_BOLD
-    face = c.font.split("+", 1)[-1].replace(" ", "")
     if c.italic or _MATH_ITALIC_FONT.match(face):
         return STYLE_ITALIC
     if c.mono:
