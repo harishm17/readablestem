@@ -1,9 +1,9 @@
 # Registration of the fifth fresh real-world split (fresh5): the candidate against the chatbot recipe
 
-**DRAFT. UNSIGNED. NOT HASHED.** Nothing in this file is registered until Harish signs it off. Until
-then `REGISTRATION-fresh5.sha256` does not exist, the items in
-section 8 are open, and no model has been run on any unit of this split. On signing, section 8 is
-deleted, the candidate commit and settings are written into section 3, the file is hashed with
+**DRAFT. UNSIGNED. NOT HASHED.** Nothing in this file is registered until the owner signs it off. Until
+then `REGISTRATION-fresh5.sha256` does not exist, the candidate commit and settings in section 3 are
+open, and no model has been run on any unit of this split. On signing, the candidate commit and
+settings are written into section 3, the file is hashed with
 `scripts/realworld_register.py --set fresh5`, and that is committed before the first request of
 any arm. It follows `PREREGISTRATION-FRESH4.md` (used). What the set is and how its gold is made:
 `docs/eval-realworld.md`.
@@ -72,8 +72,10 @@ no-derivatives, copyleft software licences, none, "other") is refused. The repos
 order (SHA-256 of seed and name), their documents in the seeded order, at most 2 accepted and 6 tried per
 repository, non-Beamer documents capped at 5 so that 3 Beamer slots stay open. Each document is compiled from its
 source and the gold is made by the arXiv path (`arxiv_gold`) from the same source, so the PDF and the answer key
-agree. Engines, in order: pdflatex, xelatex and lualatex from a user-level TeX Live 2026 (latexmk, shell escape off),
-then Tectonic 0.17.0 (`--untrusted`); the first that compiles the document wins and each document's engine and
+agree. Engines, in order: pdflatex and xelatex from a user-level TeX Live 2026 (latexmk), then
+Tectonic 0.17.0 (`--untrusted`, cached packages only); every compile runs in a bubblewrap sandbox (no network, a minimal read-only root, the source as a discarded overlay,
+no rc file, shell escape off, reads and writes only below the working tree: `safe_tex.py`), and the first engine that
+compiles the document wins; each document's engine and
 version are in the manifest (`tex_engine`). Gates are those of the arXiv path (at most 10% unconvertible
 equations, at least 4 usable pages, 4 to 6 pages drawn by hash) with a text floor of 300 characters per page (100
 per Beamer slide) and 5 equations on a usable page (3 on a slide).
@@ -87,13 +89,19 @@ recorded so the signed text can be read against them:
 2. The pool was widened with the phrases "lecture slides", "course slides", "beamer lecture", "beamer
    presentation", the three topics, and 100 results per query instead of 50, and regenerated before signing. The
    pool changes with time on GitHub, so `pool-fresh5-course.json` is the registered pool and is not harvested again.
-3. With TeX Live and the wider pool, the slide gates as first written (300 characters and 5 equations on a slide)
-   gave 7 documents with 2 Beamer decks, both from one repository, and the pool was exhausted
-   (`candidates-fresh5-C-slidegates-300-5.json`: 98 Beamer documents failed the text floor, because a slide carries
-   little text). The slide floors were then set to 100 characters and 3 equations, which is the rule of the final draw
-   above (`candidates-fresh5-C.json`, 514 visits: 8 accepted; the Beamer sources that still failed: 71 compile, 34
-   too few usable pages, 19 no equations, 17 page count outside 6 to 200, 3 text floor, 2 unconvertible). The notes' gates
-   did not change. The relaxation is a choice made to fill the Beamer slots, and the report states it.
+3. With TeX Live and the wider pool, the slide gates as first written (300 characters of text and 5 equations on a
+   slide) were tried first. They gave 7 documents with 2 Beamer decks, both from one repository, and the pool was
+   exhausted; 98 Beamer documents failed the text floor, because a slide carries little text (this observation is from a
+   pass made before the compile sandbox below was added, and its log is not kept). The slide floors were then set to
+   100 characters and 3 equations, which is the rule of the final draw (`candidates-fresh5-C.json`, 513 visits, all
+   compiled in the sandbox: 8 accepted; the Beamer sources that still failed: 77 compile, 31 too few usable pages, 18
+   no equations, 13 page count outside 6 to 200, 3 text floor, 2 unconvertible). The notes' gates did not change. The
+   relaxation is a choice made to fill the Beamer slots, and the report states it.
+4. A review found that compiling downloaded TeX unsandboxed could run code (an rc file) or read local files (an absolute
+   `\input`), so every unpacking and compile now goes through `safe_tex.py` (archives with links, unsafe paths or
+   more than 20,000 files or 400 MB are refused, which skipped 1 repository; engines run in a bubblewrap sandbox
+   with no network, `latexmk -norc`, shell escape off, `openin_any=p`, `openout_any=p`; lualatex was dropped from the
+   engine list). The whole draw was repeated from fresh downloads under it; it gave the same 8 documents.
 
 Accepted (`manifest-fresh5c.json`, with the commit each was read from and the engine):
 
@@ -122,8 +130,7 @@ All Claude, one run each, one machine, every model answer recorded.
 | **Chatbot, Haiku** | `chatbot-haiku-purdue`, `proof.chatbot.record_arms` unchanged: `claude-haiku-5-5`, the PDF, a 150 dpi PNG of every page, the Purdue sentence verbatim, no system prompt |
 | **Chatbot, Opus** | the same on `claude-opus-5-5` |
 | **Control** | ReadableSTEM at the commit that holds this registration with the production settings (document task, provider anthropic, main `claude-opus-5-5` effort medium, cheap `claude-haiku-5-5` low, `FEATURE_TABLES=true`, `FEATURE_NOTATION_MEMORY=true`) and every new equation setting off |
-| **Candidate** | the same code with the new equation settings on: **(to settle before signing: commit SHA and the exact settings, fixed by the development runs; no setting changes after the first request)** |
-| **Chatbot, Opus, strong prompt** (optional) | the Opus chatbot with a prompt that asks for every formula, tables and captions included: **only if Harish decides to include it (about +$9)** |
+| **Candidate** | the same code with the new equation settings on (commit SHA and exact settings are written here at signing; no setting changes after the first request) |
 
 The control and the candidate share recorded answers, so a request they have in common is answered once.
 No `src/` file changes between the first request of the first arm and the end of the last. The chatbots run
@@ -167,7 +174,7 @@ account.
 ## 6. Budget
 
 Caps on this split, kept in `spend-log.jsonl`: control and candidate $7.5 together, Opus chatbot $10,
-Haiku chatbot $0.3, strong-prompt arm $9 if included. Each arm stops at its cap and is reported as partial; a cap is
+Haiku chatbot $0.3. Each arm stops at its cap and is reported as partial; a cap is
 not raised without asking. The API credit balance is checked before each paid step. Nothing is run twice to
 confirm a number; a crash is repeated only for the jobs that did not finish, and named.
 
@@ -175,19 +182,10 @@ confirm a number; a crash is repeated only for the jobs that did not finish, and
 
 Published whichever way the result falls: this registration (final text and hash), the manifests and candidate
 logs, every recorded answer, the report in `docs/` and the README and `PROOF.md` rows. The Opus chatbot runs the
-Purdue recipe as it is, which critics may call a weak baseline; the optional strong-prompt arm exists for that
-reason. It will not say whether a wrong equation changes the meaning, whether a person would accept the page,
+Purdue recipe as it is, which critics may call a weak baseline. It will not say whether a wrong equation changes the meaning, whether a person would accept the page,
 anything about scans, Word files or handwriting, or about maths in embedded figures. One run per arm gives no
 run-to-run variation. arXiv gold is dominated by table cells and the authors' `$` boundaries, so a win there may
 not carry to course materials, which is why the strata have a floor and are reported apart. The Beamer
 slide gates were relaxed during the draft to fill the Beamer slots (section 2 C), which the report states. Two of
 the three Beamer decks share a repository, and a deck's maths letters sit in a text font, so glyph evidence is weak
 there.
-
-## 8. To settle before signing (delete on signing)
-
-1. **Slide floors.** Section 2 C records that the slide gates were relaxed (100 characters, 3 equations) after the
-   strict ones left the Beamer slots unfilled. Harish confirms this stands, or asks for the strict result (7
-   documents, 2 Beamer decks) to be used instead.
-2. **Candidate commit and settings;** whether the strong-prompt arm is included; the cap split.
-3. **The hash file** (`REGISTRATION-fresh5.sha256`) is written only after 1 and 2, by Harish's decision.

@@ -458,8 +458,12 @@ No command reads a gold file's content. The registration is `data/realworld/PRER
 Stratum C (`src/readablestem/gold/course_corpus.py`). The licence is GitHub's SPDX id for the repository and is read again
 when the repository is fetched; forks, archived repositories and anything else (NC, ND, GPL, no licence) are refused. Documents
 are the files with `\documentclass` and `\begin{document}`; Beamer is the class or the package. A document is compiled with
-pdflatex, xelatex or lualatex from a user-level TeX Live (latexmk, shell escape off), then Tectonic (`--untrusted`); the first
-that compiles it wins, and its engine and version are in the manifest. A source no engine can compile is skipped and logged,
+pdflatex or xelatex from a user-level TeX Live (latexmk), then Tectonic (`--untrusted`, cached packages only); the first
+that compiles it wins, and its engine and version are in the manifest. Every compile and every unpacking goes through
+`src/readablestem/gold/safe_tex.py`: archives are refused if they hold links, absolute or `..` paths, more than 20,000 files
+or more than 400 MB, and are renamed into place only when complete; the engine runs in a bubblewrap sandbox with no network,
+a minimal read-only root, the source as a discarded overlay, `latexmk -norc`, shell escape off, `openin_any=p` and
+`openout_any=p`, and a timeout kills its whole process group. A source no engine can compile is skipped and logged,
 never replaced by choice. The gates are those of the arXiv path (at most 10% unconvertible equations, at least 4 usable
 pages, 4 to 6 pages drawn by hash), with a lower text and equation floor for slides (100 characters and 3 equations,
 against 300 and 5); the draft registration records why. At most 2 documents per repository are taken and at most 6 tried.

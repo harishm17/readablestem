@@ -24,6 +24,7 @@ licences, hashes, counts. No command here reads a gold file's content; the gates
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import importlib.util
 import json
@@ -32,6 +33,7 @@ import subprocess
 import sys
 from collections import Counter
 from collections.abc import Callable, Iterable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -441,6 +443,18 @@ def cmd_course_harvest(args: argparse.Namespace) -> int:
     return 0
 
 
+def prefetch(client: httpx.Client, repos: list[cc.Repo], base: Path, workers: int = 8) -> None:
+    """Download and unpack every repository of the pool in parallel (the walk then finds them
+    cached). A repository that fails is left for the walk to log; nothing is compiled here."""
+
+    def one(repo: cc.Repo) -> None:
+        with contextlib.suppress(cc.Skip, httpx.HTTPError):
+            cc.fetch_repo(client, repo, base / repo.full_name.replace("/", "__"))
+
+    with ThreadPoolExecutor(workers) as pool:
+        list(pool.map(one, repos))
+
+
 def cmd_course_draw(args: argparse.Namespace) -> int:
     pool = json.loads((REPO_DATA / "pool-fresh5-course.json").read_text(encoding="utf-8"))
     repos = [cc.Repo(**r) for r in pool["repos"]]
@@ -477,6 +491,7 @@ def cmd_course_draw(args: argparse.Namespace) -> int:
 
             return docs, build
 
+        prefetch(client, repos, base)  # downloads only: nothing is compiled here
         accepted = cc.draw(repos, SEED, documents, log)
     for old in sorted(gold_dir.rglob("*")) if gold_dir.is_dir() else []:
         if old.is_file():

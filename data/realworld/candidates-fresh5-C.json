@@ -297,8 +297,8 @@
    "path": "slides/slides.tex",
    "beamer": true,
    "outcome": "skipped",
-   "reason": "pdf_page_count",
-   "detail": "4"
+   "reason": "compile_failed",
+   "detail": ""
   },
   {
    "repo": "erfanhamdi/beamer_template",
@@ -329,8 +329,8 @@
    "path": "Additional/H atom.tex",
    "beamer": false,
    "outcome": "skipped",
-   "reason": "fewer_than_4_usable_pages",
-   "detail": "0"
+   "reason": "compile_failed",
+   "detail": ""
   },
   {
    "repo": "Eran-Rehani/77605-Quantum-Theory-2-",
@@ -1319,8 +1319,8 @@
    "path": "report.tex",
    "beamer": false,
    "outcome": "skipped",
-   "reason": "pdf_page_count",
-   "detail": "2"
+   "reason": "compile_failed",
+   "detail": ""
   },
   {
    "repo": "okayama-daiki/latex-skeleton",
@@ -1773,8 +1773,8 @@
    "path": "lectures/2025-11-27-DML-zapocet/main.tex",
    "beamer": true,
    "outcome": "skipped",
-   "reason": "fewer_than_4_usable_pages",
-   "detail": "0"
+   "reason": "compile_failed",
+   "detail": ""
   },
   {
    "repo": "onurerenarpaci/uwaterloo-beamer-claude",
@@ -2075,8 +2075,8 @@
    "path": "botnet/main.tex",
    "beamer": false,
    "outcome": "skipped",
-   "reason": "fewer_than_4_usable_pages",
-   "detail": "0"
+   "reason": "compile_failed",
+   "detail": ""
   },
   {
    "repo": "ECUTMathematicalModelingAssociation/ECUT-Beamer-Presentation-Template",
@@ -2476,8 +2476,8 @@
    "path": "poster.tex",
    "beamer": true,
    "outcome": "skipped",
-   "reason": "pdf_page_count",
-   "detail": "1"
+   "reason": "compile_failed",
+   "detail": ""
   },
   {
    "repo": "wuji-technology/robotics-rigid-body-mechanics",
@@ -2608,8 +2608,8 @@
    "path": "Graph_Theory.tex",
    "beamer": true,
    "outcome": "skipped",
-   "reason": "pdf_page_count",
-   "detail": "5"
+   "reason": "compile_failed",
+   "detail": ""
   },
   {
    "repo": "lid-ufpa/lid-slides",
@@ -3239,8 +3239,8 @@
    "path": "2019/DynkinDiagrams/DynkinDiagrams.tex",
    "beamer": true,
    "outcome": "skipped",
-   "reason": "fewer_than_4_usable_pages",
-   "detail": "0"
+   "reason": "compile_failed",
+   "detail": ""
   },
   {
    "repo": "usami-k/mathematics",
@@ -3278,8 +3278,8 @@
    "path": "2019/OnsagerAlgebra/OnsagerAlgebra.tex",
    "beamer": true,
    "outcome": "skipped",
-   "reason": "fewer_than_4_usable_pages",
-   "detail": "0"
+   "reason": "compile_failed",
+   "detail": ""
   },
   {
    "repo": "tetutaro/knit_markdown",
@@ -3575,7 +3575,7 @@
    "path": "main.tex",
    "beamer": true,
    "outcome": "skipped",
-   "reason": "no_equations",
+   "reason": "compile_failed",
    "detail": ""
   },
   {
@@ -3711,19 +3711,9 @@
   },
   {
    "repo": "Bili-Sakura/Latex-Slides-Template-GenAI",
-   "path": "portal/keynote.tex",
-   "beamer": true,
    "outcome": "skipped",
-   "reason": "compile_failed",
-   "detail": ""
-  },
-  {
-   "repo": "Bili-Sakura/Latex-Slides-Template-GenAI",
-   "path": "presentation/keynote.tex",
-   "beamer": true,
-   "outcome": "skipped",
-   "reason": "compile_failed",
-   "detail": ""
+   "reason": "unsafe_member",
+   "detail": "link or special file"
   },
   {
    "repo": "pawelboczek/TeX-presentation",
@@ -3752,8 +3742,8 @@
    "path": "sample-doc.tex",
    "beamer": true,
    "outcome": "skipped",
-   "reason": "pdf_page_count",
-   "detail": "3"
+   "reason": "compile_failed",
+   "detail": ""
   },
   {
    "repo": "fyqqyf/WHU-Beamer-Theme",

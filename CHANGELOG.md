@@ -63,8 +63,10 @@
 
 - Fifth fresh real-world split, builder only (no system run): `scripts/fresh5_select.py` (arXiv continuation, OpenStax
   sections never used and printed to PDF, course-style LaTeX incl. Beamer decks from GitHub under CC BY, CC BY-SA
-  or MIT, compiled with a user-level TeX Live and Tectonic as fallback), `gold/course_corpus.py`, and the registration as an unsigned draft
-  (`data/realworld/PREREGISTRATION-FRESH5.md`). `arxiv_gold.analyse` takes `min_equations` (default unchanged, 5).
+  or MIT, compiled with a user-level TeX Live and Tectonic as fallback inside a bubblewrap sandbox), `gold/course_corpus.py`, and the registration as an unsigned draft
+  (`data/realworld/PREREGISTRATION-FRESH5.md`). `arxiv_gold.analyse` takes `min_equations` (default unchanged, 5). New `gold/safe_tex.py`: the one place that unpacks
+  (no links or unsafe paths, size and file caps, atomic) and compiles downloaded TeX (sandbox, `-norc`, no network or shell
+  escape); `realworld_build.py` unpacks through it too.
   [docs/eval-realworld.md](docs/eval-realworld.md).
 
 ### Layout structure: bookmarks, numbered and run-in headings, joins (2026-11-02, branch fix/layout-structure)

@@ -306,6 +306,7 @@ def run_in_sandbox(
     bin_dir: Path | None,
     timeout: int,
     ro_extra: tuple[tuple[Path, str], ...] = (),
+    rw_extra: tuple[tuple[Path, str], ...] = (),
 ) -> Result:
     """Run `command` with the source at /work (a throw-away overlay: writes are discarded) and
     `out` at /out, no network, the TeX Live tree read-only. A timeout kills the whole group."""
@@ -324,6 +325,8 @@ def run_in_sandbox(
     args += ["--tmpfs", home]  # before the extra mounts: one of them sits below it
     for host, inside in ro_extra:
         args += ["--ro-bind", str(host), inside]
+    for host, inside in rw_extra:
+        args += ["--bind", str(host), inside]
     for key, value in {**env, "PATH": path}.items():
         args += ["--setenv", key, value]
     args += ["--chdir", f"/work/{cwd_rel}".rstrip("/"), *command]
@@ -364,7 +367,43 @@ def compile_tex(src: Path, main: str, out: Path, engine: str, *, timeout: int) -
     bin_dir = texlive_bin()
     if bin_dir is None:
         raise SandboxUnavailable("TeX Live is not installed")
+    cache = warm_font_cache(bin_dir)
     return run_in_sandbox(
         latexmk_command(engine, name), src=src, out=out, cwd_rel=cwd_rel, env=env,
-        bin_dir=bin_dir, timeout=timeout,
+        bin_dir=bin_dir, timeout=timeout, ro_extra=((cache, f"{home}/.cache"),),
     )  # fmt: skip
+
+
+def font_cache_dir() -> Path:
+    return Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / (
+        "readablestem/tex-fontcache"
+    )
+
+
+def warm_font_cache(bin_dir: Path) -> Path:
+    """The font cache (fontconfig's, for xelatex), built once from a trivial document of our own
+    and mounted read-only in every compile: building it takes seconds, and a downloaded document
+    must not be able to change what the next one sees."""
+    cache = font_cache_dir()
+    marker = cache / ".warm"
+    if marker.is_file():
+        return cache
+    cache.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix="warm-"))
+    try:
+        (work / "src").mkdir()
+        (work / "src" / "w.tex").write_text(
+            "\\documentclass{article}\\begin{document}warm\\end{document}\n", encoding="utf-8"
+        )
+        home = "/tmp/home"
+        env = tex_env(home, "/work", "/work")
+        for engine in ("pdflatex", "xelatex"):
+            run_in_sandbox(
+                latexmk_command(engine, "w.tex"), src=work / "src", out=work / f"out-{engine}",
+                cwd_rel="", env=env, bin_dir=bin_dir, timeout=600,
+                rw_extra=((cache, f"{home}/.cache"),),
+            )  # fmt: skip
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    marker.write_text("warm\n", encoding="utf-8")
+    return cache

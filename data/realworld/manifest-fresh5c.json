@@ -20,11 +20,11 @@
    ],
    "equations": 158,
    "display": 3,
-   "pdf_sha256": "1b35f6e012e8ef039023af11c76d0d3a6d27792d61dedef3c215b99f675bfd0c",
+   "pdf_sha256": "d13e42ec0ae626632ea9a3911b72030881f4dce15e4df7be1ce29a84812bff36",
    "tex_engine": "pdflatex: pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
    "source_sha256": "ab64dc1c48d197a0eb5e3779e665cb9c725fe2f8",
-   "extract_pdf_sha256": "acfd7530ad466a351c5abf075cfc15016dd28818087b65ecc82f152f1b541c51",
-   "gold_sha256": "6b8db770215e743e05c4721fed0c1241e54e91bd430c3365cec266c51e83967e"
+   "extract_pdf_sha256": "f16bfd20649486d6164e0aa619deb6d8e7dde9d7b67f4a2119bbda51c1bf33af",
+   "gold_sha256": "93d9f263f95c646bd498c0d98772a1ae5b34f93e555d761b36008acbf21a780a"
   },
   {
    "id": "course/agormp/evolintro/evolintro",
@@ -44,11 +44,11 @@
    ],
    "equations": 46,
    "display": 2,
-   "pdf_sha256": "271845af7fd005e0a1ae6aa6432badd5031f96267df2ae4a31d57750fa9604c7",
+   "pdf_sha256": "c3d851b16bdca3f8dec55cffedd9f25c78b0ec4a8a3e9fbcd059ab3bd43024f5",
    "tex_engine": "pdflatex: pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
    "source_sha256": "14c2864dd2f1593a8214a17c37da8ceeeba9cc2d",
-   "extract_pdf_sha256": "04f72c096648103521ffd195fa9dc324548a24508b415e8b1d4abd47d7d05a98",
-   "gold_sha256": "da1bc452b1ecf7cf63b96ed39624a1e996928533d5d0dee3b11b14b8a478c8c6"
+   "extract_pdf_sha256": "5588a0fbd1d95ec7cecf9e4975ae60f5462515708e1e2d507d39543422c15e2d",
+   "gold_sha256": "edc8ed56d2737e0fbe39e3625239fe40295c5f69b9903b730341d1d3d6517586"
   },
   {
    "id": "course/fairyflies9/Fluid-Dynamics-and-IBM-Theory/1-Immersed-Boundary-Method/1-3-Integral-Transform",
@@ -68,11 +68,11 @@
    ],
    "equations": 12,
    "display": 6,
-   "pdf_sha256": "0a65b1e2d411390af31f639cfe3d9dcee6df7faf2bbbffa7ee2475936d284d5c",
+   "pdf_sha256": "9dd60816a2e6fc6c6c280642fb4cd6678f6df79df4fba66596e7840d206b297e",
    "tex_engine": "pdflatex: pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
    "source_sha256": "f29eb1a8af14cc258f2311e2ec4576da79515f2e",
-   "extract_pdf_sha256": "405316c8d64e8e9f51333d7232a672704bf9aec095e6c461c7aa685c8ea458e2",
-   "gold_sha256": "d19796e7832f066409c9570847951f523c62485016b1a87e7a9573baa3cb379d"
+   "extract_pdf_sha256": "e1c8d1a72dffa660e46a20c876f0fbcd041da56a8bc899f782a7bb6d06a8f1a6",
+   "gold_sha256": "ad25226ddc3ea28314d8de9ff9d15e0d085fb0ccc99f54572c9f5b79007c54f7"
   },
   {
    "id": "course/fairyflies9/Fluid-Dynamics-and-IBM-Theory/5-Turbulence/5-2-Intro-RANS-Part2",
@@ -92,11 +92,11 @@
    ],
    "equations": 37,
    "display": 8,
-   "pdf_sha256": "772f9d4981b58c42a15be7ed6010f12bcae4711d77110cbdaefc50445e41f7f1",
+   "pdf_sha256": "e0302d0aecc04dfcedfb31bcd99004f4cc63a498a9c39cbbd77a0c8ac5825fcf",
    "tex_engine": "pdflatex: pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
    "source_sha256": "f29eb1a8af14cc258f2311e2ec4576da79515f2e",
-   "extract_pdf_sha256": "f6f06b754c91dc7b3e103b3d1f714932ef2b9d00896ff91cf3ad86a17cc6148c",
-   "gold_sha256": "c267dd517a5c34e93caa9d4f5738c292e8fba3ebd57aa9dc6f1111d9a01b1a25"
+   "extract_pdf_sha256": "188583fcef225e055309a3821147e5e2b16c7cb7c7bcd1b3acd041476c0b9d5b",
+   "gold_sha256": "0083ff6d76201dd229f2d6c38d6208ccf18f3a0059c92a95c32997471b7e5a68"
   },
   {
    "id": "course/gmarciani/research/computer-security/main",
@@ -116,11 +116,11 @@
    ],
    "equations": 87,
    "display": 4,
-   "pdf_sha256": "c936fb637b641b61d14ad6943e02e91602f0a451e1f9c10e01c1a803adcf7820",
+   "pdf_sha256": "3b1f35ca50167d1d6795bbc1546e7a840aec942e1dc9ab19f0a83527571a51d0",
    "tex_engine": "tectonic: Tectonic 0.17.0",
    "source_sha256": "20847e0559f065089f30a0d895d568004a0d1b4c",
-   "extract_pdf_sha256": "207514ba92430a6b80ed275229e1134a5098cdda954613ca35205a65366439eb",
-   "gold_sha256": "25fca992a02e393367512393dd010931d7529c85dc8c4b21e2640bc1f5968801"
+   "extract_pdf_sha256": "f255385691a21428507e2a33fd390a8b5b9d32e21c7321f6886ad9fbcb7048b7",
+   "gold_sha256": "3f368168cb31c34d77b5d28ffc5f74b47bc952603ea3e5fb1ce9099778eb5627"
   },
   {
    "id": "course/ondrejch/PHANES-course/mod/04/lecture04",
@@ -140,11 +140,11 @@
    ],
    "equations": 15,
    "display": 1,
-   "pdf_sha256": "9e975bb5e7e99bc697717133a388e0e25048f3e23562b196da4b33623910fb3d",
+   "pdf_sha256": "d9ac84cd45d7eb27180b9d6f22869e327aa848c4394faad92764c0c2c44d6fc9",
    "tex_engine": "pdflatex: pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
    "source_sha256": "b80a0395ecd5254b65f334f3a14ab149a44298a6",
-   "extract_pdf_sha256": "3a5b7a674aaf52dbfa857e3d6e37bdd6a7eed62e11c5c40b6631827de3285b76",
-   "gold_sha256": "9c0a0f234ee01e3be94d179bb0dbb90dec3dee4c4c66bed324559e16513d7e80"
+   "extract_pdf_sha256": "abace466ff2f3484dd196e06723e2d42383e713cac365ad38d3b1da243d3677d",
+   "gold_sha256": "eda36d765a612149127fa9985f545ed280ee30f49ba78e2fea2a1df599d6aee3"
   },
   {
    "id": "course/robmelfi/PatternRecognitionLectureNotes/book",
@@ -166,11 +166,11 @@
    ],
    "equations": 105,
    "display": 20,
-   "pdf_sha256": "0ad05b23f14a5627510e940a35e42bfe84b2bd79d959118359dbe5069daee0ca",
+   "pdf_sha256": "0175d09c7d855b9f1d2d915e99add98368154ec1c5d17b5323f93dc2cded5d6f",
    "tex_engine": "xelatex: XeTeX 3.141592653-2.6-0.999998 (TeX Live 2026)",
    "source_sha256": "e5ccb888741ed14019024c78746bc4f3830df2f3",
-   "extract_pdf_sha256": "e7a6d9556b17a1e8a3f5bb4277b2a9013687e9f9ded86a2429d27c8b5feef8d5",
-   "gold_sha256": "e2333878f37bf135d301ac60167c4b300233d79f3c3cda491e4f0e33e2749da6"
+   "extract_pdf_sha256": "a70df652826eb74dc1d35aeaccc98566c4e6d4419814e72fdf752b71f1d000c8",
+   "gold_sha256": "ed8c96d694c53d890951cdaf06232d6fd0f477186b974414e3eac14c9c3677c3"
   },
   {
    "id": "course/sim1-99/medical-physics-notes/main",
@@ -192,11 +192,11 @@
    ],
    "equations": 42,
    "display": 5,
-   "pdf_sha256": "a95c8cf17120831cdeed412f890c4f8df656a04063309cfeb23f873963e0f163",
+   "pdf_sha256": "d8216d4efee81f6827b94f08ee7bfb95a3e09d491048625edbfdb1b797023955",
    "tex_engine": "pdflatex: pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
    "source_sha256": "a55044430aa8e99972c334d7946f16a6fca72492",
-   "extract_pdf_sha256": "750b6d9b12a849da787b0693ddddb3c56777a68ad589eba8c98045913047e50c",
-   "gold_sha256": "527d1f47e368cd865bacd1f8615224e02ec910e90f34b64ca741a66b591486b4"
+   "extract_pdf_sha256": "2d984ed7bd107ec0a28bf69fb465ce83642d892b167b20f5520211e8b52e25d1",
+   "gold_sha256": "bb1c409ca72294acc790a0a001e70d0514676200141cc471712811565b7552e5"
   }
  ],
  "n_papers": 8,

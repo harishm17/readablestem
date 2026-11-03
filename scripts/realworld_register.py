@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "realworld"
-FRESH5_FILES = (  # hashed when Harish signs PREREGISTRATION-FRESH5.md, not before
+FRESH5_FILES = (  # hashed when the owner signs PREREGISTRATION-FRESH5.md, not before
     "PREREGISTRATION-FRESH5.md",
     "manifest-fresh5a.json",
     "candidates-fresh5-A.json",
@@ -26,10 +26,12 @@ FRESH5_FILES = (  # hashed when Harish signs PREREGISTRATION-FRESH5.md, not befo
     "selection-fresh5-B.json",
     "pool-fresh5-course.json",
     "candidates-fresh5-C.json",
-    "candidates-fresh5-C-slidegates-300-5.json",
     "manifest-fresh5c.json",
     "pool.json",
     "../../scripts/fresh5_select.py",
+    "../../src/readablestem/gold/course_corpus.py",
+    "../../src/readablestem/gold/safe_tex.py",
+    "../../src/readablestem/gold/arxiv_gold.py",
     "../../scripts/rw_notation_neutral.py",
 )
 FRESH4_FILES = (
