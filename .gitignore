@@ -44,3 +44,6 @@ site/_build_again/
 # Railway IaC SDK (.railway/package.json)
 node_modules/
 src/readablestem/web/showcase/
+
+# Local re-score of the interim held-out report (make proof-interim); the committed one is registered
+proof/interim/rebuilt-here.md

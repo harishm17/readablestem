@@ -1,5 +1,17 @@
 # Changelog
 
+## The interim held-out report is replayed at the tag, and CI runs it (2026-11-02, branch fix/proof-interim-repro)
+
+- `tests/test_proof_interim.py` used to rebuild the registered report with the current scorer, and
+  skipped without the held-out key, which CI never fetches. With the key it failed on main: the
+  chemistry converter change moved one parser's exact equations (238 to 241 of 1,369) and the rename
+  of Addendum 8 moved coverage by 210 6-grams. It now replays `report.py` at the tag
+  `proof-heldout-2026-10` with the key the tag's code fetches (`make heldout-gold-at-tag`) and
+  requires the registered bytes. No registered number or file changed.
+- `make proof-interim` writes `proof/interim/rebuilt-here.md` instead of the registered file.
+- `.github/workflows/proof-interim.yml` fetches the key and runs the test (a missing key fails) on
+  pull requests touching `proof/`, the scorer modules, the dependencies or the test, and weekly.
+
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 
 - `ANALYTICS_ENABLED` (default false): PostHog loaded from and reporting to the app's own `/m/` proxy

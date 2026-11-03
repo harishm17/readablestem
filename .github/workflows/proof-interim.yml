@@ -1,0 +1,76 @@
+name: Proof interim report
+
+# tests/test_proof_interim.py reproduces the registered interim held-out report at the tag
+# proof-heldout-2026-10, but only when the held-out answer key is on disk, so the main CI job
+# (which never fetches it) skips that test. This workflow fetches the key, with the tag's own
+# code (`make heldout-gold-at-tag`: network to OpenStax only, no model, no key, no cost), and
+# runs the file with PROOF_INTERIM_REQUIRE_GOLD set, so a missing key or tag fails here
+# instead of skipping.
+
+on:
+  pull_request:
+    paths:
+      - "proof/**"
+      - "tests/test_proof_interim.py"
+      - "tests/test_proof_registered.py"
+      - "src/readablestem/eval/**"
+      - "src/readablestem/proof/**"
+      - "src/readablestem/core/**"
+      - "src/readablestem/gold/**"
+      - "src/readablestem/pipeline/validate.py"
+      - "src/readablestem/pipeline/equation_step.py"
+      - "src/readablestem/pipeline/figure_details.py"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Makefile"
+      - ".github/workflows/proof-interim.yml"
+  schedule:
+    - cron: "17 5 * * 1" # weekly, Monday 05:17 UTC: dependencies and OpenStax's archive can drift
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proof-interim-${{ github.ref }}
+  cancel-in-progress: true
+
+# Actions are pinned to full commit SHAs, the same ones as ci.yml (tag in the comment).
+
+jobs:
+  interim:
+    name: interim held-out report at the tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PROOF_INTERIM_REQUIRE_GOLD: "1"
+      XDG_CACHE_HOME: ${{ github.workspace }}/.xdg-cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the tag, and `git archive` of it, must be available
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install (locked)
+        run: uv sync --locked --all-extras
+      # The key is rebuilt byte for byte from OpenStax's pinned archive and checked against the
+      # registered manifest hash (e9e7e429...), so the cache key names that hash.
+      - name: Cache the held-out answer key (as the tag's code fetches it)
+        id: gold-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .xdg-cache/readablestem/at-tag
+          key: heldout-gold-at-tag-e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb
+      - name: Fetch the held-out answer key (network to OpenStax only; checks the manifest hash)
+        if: steps.gold-cache.outputs.cache-hit != 'true'
+        run: |
+          for attempt in 1 2 3 4; do
+            make heldout-gold-at-tag && exit 0
+            echo "attempt $attempt failed; retrying"; sleep $((attempt * 20))
+          done
+          exit 1
+      - name: Test the interim report
+        run: uv run pytest tests/test_proof_interim.py -v -rs

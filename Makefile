@@ -156,8 +156,22 @@ proof-add-chatbot:  ## record the chatbot arms into a recorded run: make proof-a
 	uv run $(if $(ENV_FILE),--env-file $(ENV_FILE)) --group browser readablestem proof --add-systems chatbot \
 		--max-usd $(MAX_USD) $(PROOF_ARGS)
 
-proof-interim:  ## the held-out results that need no model (headings, parsers): needs `make heldout-gold`
-	uv run python proof/interim/report.py --gold "$${HELDOUT_GOLD:-$$(uv run python -c 'from readablestem.cli.heldout import default_root; print(default_root() / "gold")')}"
+# The committed INTERIM-heldout-2026-10.md is a registered record (Addendum 5 pins its hash)
+# and is reproduced at the tag (heldout-gold-at-tag, tests/test_proof_interim.py), so this
+# target writes a separate file and never the registered one: this checkout's scorer gives
+# other numbers (docs/proof.md, "The part of the held-out run that needs no model").
+proof-interim:  ## re-score the interim held-out results here into proof/interim/rebuilt-here.md (needs `make heldout-gold`)
+	uv run python proof/interim/report.py --out proof/interim/rebuilt-here.md --gold "$${HELDOUT_GOLD:-$$(uv run python -c 'from readablestem.cli.heldout import default_root; print(default_root() / "gold")')}"
+
+# The answer key as the code at the tag fetches it (network to OpenStax only, no model), into
+# $(AT_TAG_CACHE). tests/test_proof_interim.py replays the registered interim report with it.
+AT_TAG_CACHE = $(or $(XDG_CACHE_HOME),$(HOME)/.cache)/readablestem/at-tag
+.PHONY: heldout-gold-at-tag
+heldout-gold-at-tag:  ## fetch the held-out answer key with the tag's own code (for tests/test_proof_interim.py)
+	@dir=$$(mktemp -d) && git archive $(PROOF_TAG) | tar -x -C "$$dir" && \
+	pkg=$$(ls "$$dir/src") && \
+	XDG_CACHE_HOME="$(AT_TAG_CACHE)" PYTHONPATH="$$dir/src" uv run python -m "$$pkg.cli.main" \
+		gold fetch --set heldout --allow-retired --date 2026-10-13
 
 proof-add-parsers:  ## record the open parsers (hours, resumable; run `make -C proof/parsers setup` once)
 	uv run readablestem proof --add-systems parsers $(PROOF_ARGS)

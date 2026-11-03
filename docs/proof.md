@@ -273,15 +273,48 @@ PROOF_EXTRA="--out proof/PROOF-development-sample.md"`.
 
 ### The part of the held-out run that needs no model
 
-`make proof-interim` (after `make heldout-gold`, which needs the network; the report stops with
-that instruction if the answer key is missing) rebuilds `proof/interim/INTERIM-heldout-2026-10.md`
-from the printed PDFs, ReadableSTEM's headings task and the parsers' outputs committed under
+`proof/interim/INTERIM-heldout-2026-10.md` is built by `proof/interim/report.py` from the printed
+PDFs, ReadableSTEM's headings task and the parsers' outputs committed under
 `proof/interim/heldout-2026-10/`. It exists because the paid parts of the run could not be made
 (no API credit); it compares ReadableSTEM's heading detection with the parsers' and scores the
 parsers on equations, invented content and coverage, and it claims nothing else. It is not a
 recorded run in the sense of the bundles above and does not replace one. It is a record of
 what existed before the model runs; the recorded held-out run (on Claude, Addenda 6 and 7) is in
 `proof/bundles/heldout-2026-10/` and its report is `PROOF.md`.
+
+The committed report is a registered record (Addendum 5 pins its SHA-256), so, like the recorded
+run, it is reproduced at the tag `proof-heldout-2026-10`, not by whatever commit is checked out:
+
+```
+make heldout-gold-at-tag                  # the answer key, fetched by the tag's own code (network to OpenStax, no model)
+uv run pytest tests/test_proof_interim.py # replays report.py at the tag and compares the bytes
+```
+
+The test unpacks the tag, runs its `report.py` with the key the tag's code fetches, and requires
+the tag's committed report byte for byte. `proof/verify-rename.py` (Addendum 8) shows that the
+file in this branch is the tag's with only the product's name (and the hashes of changed
+files) renewed. Without the tag or the key the test skips. `.github/workflows/proof-interim.yml`
+fetches both and runs it, with a missing key a failure, on pull requests that touch `proof/`, the
+scorer modules, the dependencies or the test, and weekly.
+
+`make proof-interim` (after `make heldout-gold`) re-scores the same inputs with this checkout
+and writes `proof/interim/rebuilt-here.md` (not tracked), never the registered file. It differs
+from the registered report for two known reasons, neither of which changes a registered result:
+
+- **The scorer converts each parser's LaTeX with the pipeline's converter**, which later commits
+  changed on purpose (chemistry: bracket grouping and element symbols). mineru-basic's exact
+  equations go from 238 to 241 of 1,369 (aligned pairs 647 to 649 of 1,179), and the rows,
+  intervals and the unflagged count that follow from them move with it. The converter's output,
+  not the parser's, is what changed; the other two arms stay at 0.
+- **The rename of Addendum 8 changed the parsers' outputs but not the printed PDFs.** The
+  outputs carry a footer line naming the product; the PDFs are binary and print the old name.
+  Fourteen word 6-grams per section no longer match, so "PDF word 6-grams found in the output" is
+  32,696 of 45,467 (was 32,906) for each of the three parsers.
+
+Neither difference comes from a library version or the machine. At the commit that made the
+rename, with the locked dependencies, the re-score already shows 32,696 and still 238 equations; the
+three equations first appear with the chemistry merge (#17); and the replay at the tag reproduces the
+registered file with today's locked dependencies.
 
 ### Recording the other systems
 
