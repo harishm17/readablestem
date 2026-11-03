@@ -16,6 +16,27 @@
   launch checks (model provider, analytics, tables, notation, Microsoft, sign-up) now read the
   rendered page, not the template source. `MATH_READER_MAX_USD_PER_JOB` caps all readers of a job
   together. The vendor sheet and `docs/security.md` are updated to match.
+## Unreleased: handwriting harness for private handwritten notes
+
+- `scripts/handwriting_own.py`: intake of PDFs from a folder outside the repo, a hash-based dev and
+  held-out split registered privately, a blank answer-key form served on 127.0.0.1
+  (`scripts/handwriting_gold_form.html`, no model draft) and a `run` command capped by `--max-usd`
+  (at most 2.00 in total across restarts). `run` sends the PDFs to the model provider. Every command
+  refuses a path inside a git repository; `.gitignore` guards the usual private folder names.
+  Use: [docs/eval-handwriting.md](docs/eval-handwriting.md), "Your own handwritten notes".
+## Unreleased: canonical comparator for two readings (branch eq/math-canonical)
+
+- `pipeline/math_canonical.py`: one comparator for "is this the same formula" (tree, notation-neutral,
+  spoken-equal, symbols) with a reason when it is not. The registered scorer scripts are untouched;
+  tests check the library agrees with them. `tests/test_realworld_registration.py` runs
+  `realworld_register.py --check` for every registered set. No product behaviour changes yet
+  ([docs/steps.md](docs/steps.md), "Comparing two readings").
+## Unreleased
+
+- Equation diagnostics on the recorded real-world runs, no model and no cost: `scripts/eq_diag_tables.py` (why maths in
+  table cells is missed), `scripts/eq_diag_glyphs.py` (glyph evidence of undetected and span-wrong equations),
+  `scripts/eq_diag_unflagged.py` (why wrong equations with other symbols were not flagged). Counts and sample sizes in
+  [docs/eval-equation-diagnostics.md](docs/eval-equation-diagnostics.md). No product behaviour changes.
 ## Unreleased: finished steps are kept when a configuration error ends the run
 
 - When a configuration error (a model that is not set up) ended a conversion while other
@@ -86,6 +107,9 @@
   `max-age` instead of `no-store` or `no-cache`.
 ## Unreleased
 
+### EPUB export
+
+- `readablestem export epub FILE.html OUT.epub`: an EPUB 3 from the finished HTML (`pipeline/export_epub.py`): XHTML with native MathML, images as files with their alt text, a contents list from the headings, a page list from page markers when present, language, title and accessibility metadata. No `conformsTo`; the summary makes no conformance claim; a feature is claimed only when every item has it. Scripts, frames, forms, remote pictures and `url()` styles are not carried. EPUBCheck and DAISY Ace run on it in `.github/workflows/epub.yml` and locally when installed ([docs/output.md](docs/output.md), "The EPUB export"). No route or button yet.
 ### Documentation
 
 - `docs/screen-reader-test.md`: a 15-minute VoiceOver (Safari) protocol for the demo, a converted file and the review screen, with a results table that maps to WCAG 2.2 criteria.
