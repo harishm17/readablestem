@@ -10,6 +10,14 @@
   MathML, and writes a manifest in which a page is published only if its writer's yes is recorded; the
   other pages are counts. A person must look at every page (`review`) before it can be published; published PDFs are rebuilt with page content only and checked, failing closed; unpublished pages can be purged. Tests in
   `tests/test_handwriting_copy_set.py`; no page has been collected yet, so there is no result.
+## Unreleased: finished steps are kept when a configuration error ends the run
+
+- When a configuration error (a model that is not set up) ended a conversion while other
+  steps were still being answered, those steps were not kept for "Try again" if the error
+  reached the scheduler first; they are now (`pipeline/run.py`, `_Run.collect`). The tests
+  for this and for the worker and child-process suites no longer depend on timing luck, and
+  the end-to-end content test renders from the stored result the way the review screen does
+  (page markers included).
 
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)
 

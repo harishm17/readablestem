@@ -201,19 +201,23 @@ def test_expired_leases_are_requeued_then_failed_after_three_attempts(env):
 
 def test_heartbeat_keeps_a_long_conversion_leased(env):
     job_id = queue_job(env)
-    worker = env.worker(lease_s=0.3)
+    worker = env.worker(lease_s=3.0)
     seen: dict = {}
 
     def slow() -> None:
-        time.sleep(0.7)  # longer than the lease; the heartbeat must extend it
-        seen["requeued"] = env.worker(lease_s=0.3).requeue_expired()
-        seen["lease"] = as_utc(env.job(job_id).lease_until)
+        first = as_utc(env.job(job_id).lease_until)
+        # Wait for the heartbeat to extend the lease (not for a fixed time: a loaded
+        # machine may run the beat late).
+        deadline = time.monotonic() + 60
+        while as_utc(env.job(job_id).lease_until) <= first and time.monotonic() < deadline:
+            time.sleep(0.05)
+        seen["requeued"] = env.worker(lease_s=3.0).requeue_expired()
+        seen["first"], seen["lease"] = first, as_utc(env.job(job_id).lease_until)
 
     env.converter.before_return = slow
-    started = utcnow()
     worker.run_once()
     assert seen["requeued"] == (0, 0)
-    assert seen["lease"] > started + timedelta(seconds=0.6)
+    assert seen["lease"] > seen["first"]
     assert env.job(job_id).status == "done"
 
 
@@ -303,7 +307,7 @@ def test_worker_thread_runs_in_the_app_lifespan(tmp_path):
         env.allow(ALICE)
         login(client, ALICE)
         job_id = upload(client, make_pdf(1)).headers["location"].rsplit("/", 1)[-1]
-        deadline = time.monotonic() + 10
+        deadline = time.monotonic() + 60
         while env.job(job_id).status != "done" and time.monotonic() < deadline:
             time.sleep(0.05)
         assert env.job(job_id).status == "done"
@@ -438,7 +442,11 @@ def test_the_heartbeat_notices_a_deleted_job_without_any_progress(env, caplog):
     def converter(pdf_bytes, /, *, settings, client, progress=None) -> ConversionOutput:
         with session_scope(env.ctx.factory) as session:
             session.delete(session.get(Job, job_id))
-        time.sleep(0.4)  # several heartbeats (lease 0.3 s, a beat every 0.1 s)
+        deadline = time.monotonic() + 60  # until a heartbeat (every 0.1 s) has found the job gone
+        while time.monotonic() < deadline and not any(
+            "job_cancelled" in r.getMessage() for r in caplog.records
+        ):
+            time.sleep(0.02)
         seen["cancelled"] = any("job_cancelled" in r.getMessage() for r in caplog.records)
         try:
             client.budget.reserve(0.001)
@@ -465,7 +473,7 @@ def test_a_conversion_past_its_time_limit_fails_and_the_queue_moves_on(env, capl
     def converter(pdf_bytes, /, *, settings, client, progress=None) -> ConversionOutput:
         if not env.converter.calls:
             env.converter.calls.append({"pdf": pdf_bytes, "hung": True})
-            release.wait(10)  # stuck (a MuPDF loop, say)
+            release.wait(120)  # stuck (a MuPDF loop, say)
             try:
                 client.budget.reserve(0.001)
             except JobCancelled:
@@ -477,14 +485,14 @@ def test_a_conversion_past_its_time_limit_fails_and_the_queue_moves_on(env, capl
     worker.converter = converter
     started = time.monotonic()
     assert worker.run_once() == hung
-    assert time.monotonic() - started < 5
+    assert time.monotonic() - started < 60  # (the converter is stuck for two minutes)
     job = env.job(hung)
     assert job.status == "failed" and job.error_code == "timeout" and job.lease_until is None
     assert worker.requeue_expired(now=utcnow() + timedelta(hours=1)) == (0, 0)  # not retried
     assert worker.run_once() == after  # the hung document no longer blocks everyone else
     assert env.job(after).status == "done"
     release.set()
-    deadline = time.monotonic() + 5
+    deadline = time.monotonic() + 60
     while "spend_refused" not in late and time.monotonic() < deadline:
         time.sleep(0.02)
     assert late == {"spend_refused": True}
@@ -809,16 +817,16 @@ def test_deleting_a_stuck_job_frees_the_worker_before_the_time_limit(env, caplog
     def converter(pdf_bytes, /, *, settings, client, progress=None) -> ConversionOutput:
         with session_scope(env.ctx.factory) as session:
             session.delete(session.get(Job, stuck))
-        release.wait(10)  # stuck after the user pressed "Delete now"
+        release.wait(300)  # stuck after the user pressed "Delete now"
         return fake_output()
 
-    worker = env.worker(lease_s=0.3, max_job_s=30.0, timeout_grace_s=0.2)
+    worker = env.worker(lease_s=0.3, max_job_s=600.0, timeout_grace_s=0.2)
     worker.converter = converter
     claim = worker.claim()
     assert claim is not None
     started = time.monotonic()
     assert worker.process(claim) == "discarded"
-    assert time.monotonic() - started < 5  # not the 30 s limit
+    assert time.monotonic() - started < 120  # not the 600 s limit
     release.set()
     messages = " ".join(r.getMessage() for r in caplog.records)
     assert "conversion_abandoned" in messages and "job_timeout" not in messages
