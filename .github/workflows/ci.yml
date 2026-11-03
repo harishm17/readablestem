@@ -51,7 +51,7 @@ jobs:
       # Includes tests/test_gold_sample.py: known-correct LaTeX must match the gold sample.
       # On 3.12 the Postgres tests also run, against the embedded pgserver.
       - name: Pytest (offline; live OpenStax and model tests are opt-in)
-        run: uv run pytest
+        run: uv run pytest -n auto
 
   proof-replay:
     name: make proof (replay of the recorded run)
@@ -148,12 +148,12 @@ jobs:
           diff -r site/_build site/_build_again
 
   postgres:
-    name: pytest -m postgres (Postgres 16)
+    name: pytest -m postgres (Postgres 18)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_DB: a11y_test
           # Throwaway container reachable only from this job; no password needed.
@@ -180,20 +180,25 @@ jobs:
         run: uv sync --locked --all-extras
       # tests/test_ops_backup.py runs pg_dump and pg_restore against the service container
       # (locally pgserver ships them). The client major version must match the service's
-      # (postgres:16); Ubuntu 24.04 packages 16.
-      - name: Install the Postgres 16 client tools (pg_dump, pg_restore)
+      # (postgres:18, as the backup image in .railway/railway.ts). Ubuntu 24.04 packages 16,
+      # so the 18 client comes from the PostgreSQL project's apt repository.
+      - name: Install the Postgres 18 client tools (pg_dump, pg_restore)
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client-16
+          sudo apt-get install -y --no-install-recommends postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y --no-install-recommends postgresql-client-18
           pg_dump --version
-      # Exit code 5 means no test carries the marker yet; anything else is a real result.
+      # The service DB is brought to head with the real migrations, then compared with the
+      # models: `alembic check` fails when a model change has no migration. Alembic runs
+      # `compare_type=True` (migrations/env.py), so a changed column type counts as drift.
+      - name: Migrations apply (alembic upgrade head)
+        run: uv run alembic upgrade head
+      - name: Models and migrations agree (alembic check)
+        run: uv run alembic check
+      # No exit-code special case: pytest's exit code 5 (no tests collected) fails the job.
       - name: Pytest (Postgres-marked tests only)
-        run: |
-          set +e
-          uv run pytest -m postgres
-          status=$?
-          if [ "$status" -eq 5 ]; then echo "::warning::no postgres tests collected"; exit 0; fi
-          exit "$status"
+        run: uv run pytest -m postgres
 
   browser:
     name: pytest -m browser (Playwright Chromium)
@@ -217,12 +222,35 @@ jobs:
       - name: Install the fonts the printed test pages use
         run: sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-liberation
       - name: Pytest (browser-marked tests only, including axe-core checks)
+        # Exit code 5 (no tests collected) fails the job.
+        run: uv run pytest -m browser
+
+  dependency-audit:
+    name: pip-audit (locked dependencies)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      # Audits every locked package (all groups and extras), exactly as the lock pins them.
+      # A known vulnerability fails the job. A vulnerability with no fixed release may be
+      # listed in IGNORE below, one `--ignore-vuln <ID>` per line, each with a comment that
+      # says why, what would be exploitable and when to remove it. There are none now.
+      - name: Export the lock and audit it
         run: |
-          set +e
-          uv run pytest -m browser
-          status=$?
-          if [ "$status" -eq 5 ]; then echo "::warning::no browser tests collected"; exit 0; fi
-          exit "$status"
+          set -euo pipefail
+          IGNORE=(
+            # --ignore-vuln PYSEC-0000-0000  # example: no fix released; <reason>; remove when fixed
+          )
+          uv export --frozen --all-groups --all-extras --no-emit-project --no-hashes \
+            --output-file "$RUNNER_TEMP/audit-requirements.txt"
+          uvx pip-audit==2.10.1 --no-deps --disable-pip --strict \
+            -r "$RUNNER_TEMP/audit-requirements.txt" "${IGNORE[@]}"
 
   docker:
     name: docker build (no push)
