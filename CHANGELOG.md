@@ -41,6 +41,29 @@
   symbol like an `mtext` one; the primary scorer reads `mmultiscripts` as the answer keys' shape.
   The five golden HTML files gain one stylesheet line.
 
+## Unreleased: chemistry species check against the text layer (branch chem/species-check)
+
+- New check `equation.text_layer_species` (code `species_mismatch`, `pipeline/chem_check.py`): a
+  chemistry reading's species (coefficient, formula with counts, charge, state) and arrows are
+  compared, in order, with the PDF's text layer. It finds a subscript read as a coefficient, a
+  flipped or dropped charge sign, a changed state or arrow, another element or count, a
+  neighbour word taken into a formula and a reaction cut mid-way. A failure is a required
+  decision like the other meaning-level checks (confidence x 0.6, a cheap answer escalates).
+  It runs only on a text layer with chemistry-only evidence, so mathematics is unchanged. A
+  reviewer's edit gets it too, and the compare table has "Species" rows. Numbers and the
+  replay: [docs/steps.md](docs/steps.md), "Chemistry species check";
+  `scripts/chem_check_replay.py`; tests in `tests/test_chem_check.py`.
+## Unreleased: chemistry spans in the layout (branch chem/layout-spans)
+
+- Chemistry lists are cut into their items: `CO3 2−, F−` is two inline equations and
+  `(a) A ⇌ B; (b) C ⇌ D` one inline equation per reaction (without the list marker), not one span
+  or one display line. Half-reaction labels (`anode (oxidation):`) stay with their reaction when
+  they are set far from it. `E°cell` and `E°cathode` are whole (the degree sign was read inside the
+  lowered label and cut the equation in two). A label over or under an arrow, of any length and
+  with a long arrow, is part of the reaction (`chem.Word.over_arrow`). On the 143 PDFs of
+  `scripts/layout_identity.py` 135 are identical and the 8 that differ are chemistry sections;
+  details and the replay in [docs/chemistry.md](docs/chemistry.md) ("Spans") and
+  [docs/layout.md](docs/layout.md). Tests: `tests/test_layout_chemistry.py`.
 ## Unreleased: speech under screen-reader engines (branch sr/speech-oracle)
 
 - `scripts/screenreader_speech.py` and `eval/speech_oracle.py` run any set's MathML (ours and the
@@ -195,6 +218,17 @@
   accounting and the database writes are as before. Results are unchanged
   (`tests/test_web_isolated_convert.py`). `PRELOAD_TABLE_MODELS` no longer loads models in the web
   process. Details and measurements: [docs/web.md](docs/web.md), "The conversion runs in a child process".
+## Unreleased: faster CI
+
+- The pytest job is split into four shards balanced by recorded durations (`--shard i/4`,
+  `tests/shard_durations.json`), with a check that every test ran in exactly one shard. Python
+  3.14 runs the full suite on main, nightly and on dependency or workflow changes, and a smoke
+  (ruff, ty, import of every module, one shard in eight) on other pull requests. The browser job
+  runs in two shards of three xdist workers each and caches Chromium and axe-core; the axe-core download is written
+  atomically. Pull request runs cancel when superseded, main runs do not. Job names changed:
+  `ruff + ty + pytest (Python 3.x)` is now `ruff + ty (Python 3.x)` plus `pytest (...)` shards; a
+  `CI passed` job summarises them. See [docs/development.md](docs/development.md), "CI".
+
 ## Unreleased: dependency and CI hardening
 
 - Locked dependencies upgraded for known advisories: pillow 12.3.0 to 13.0.0 (floor now `>=13.0`),
@@ -244,6 +278,14 @@
   `max-age` instead of `no-store` or `no-cache`.
 ## Unreleased
 
+- Fifth fresh real-world split, builder only (no system run): `scripts/fresh5_select.py` (arXiv continuation, OpenStax
+  sections never used and printed to PDF, course-style LaTeX incl. Beamer decks from GitHub under CC BY, CC BY-SA
+  or MIT, compiled with a user-level TeX Live and Tectonic as fallback inside a bubblewrap sandbox), `gold/course_corpus.py`, and the registration as an unsigned draft
+  (`data/realworld/PREREGISTRATION-FRESH5.md`). `arxiv_gold.analyse` takes `min_equations` (default unchanged, 5). New `gold/safe_tex.py`: the one place that unpacks
+  (no links or unsafe paths, size and file caps, atomic) and compiles downloaded TeX (sandbox, `-norc`, no network or shell
+  escape, no environment from the parent, a cap on what a compile writes); `realworld_build.py` and
+  `figures_v2_arxiv.py` unpack and compile through it too.
+  [docs/eval-realworld.md](docs/eval-realworld.md).
 ### Figure gold v2 and a draft pre-registration for long descriptions
 
 - `data/gold-figures-v2/`: 50 figures (14 data charts, 14 diagrams, 10 photos and illustrations, 12 chemistry

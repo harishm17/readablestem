@@ -29,9 +29,12 @@ as a cross product. That is meaning-level too, and asked only when the
 letters and digits mostly agree with the text layer (so it can be trusted). When the
 letters and digits agree exactly, two more checks run (`text_layer_number_case_checks`):
 the digits must make the same numbers (36 is not 63, 9.81 is not 98.1) and the capitals
-must be the same capitals (W/g is not w/g); either is meaning-level too. Any failed
-text-layer check on a cheap-model answer, a cosmetic one included, escalates to the main
-model.
+must be the same capitals (W/g is not w/g); either is meaning-level too. A chemistry
+reading's species and arrows are compared as well (`chem_check`, check
+`equation.text_layer_species`): a subscript read as a coefficient, a flipped charge sign,
+a changed state or arrow, a neighbour word in a formula, a reaction cut short; meaning-level
+too. Any failed text-layer check on a cheap-model answer, a cosmetic one included,
+escalates to the main model.
 
 Course notation (`pipeline.notation_memory`, with `FEATURE_NOTATION_MEMORY` on and the
 job's course list in the run's options): the list goes to the model as a fenced block
@@ -82,6 +85,7 @@ from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.models.prompts import load_prompt
 from readablestem.pipeline import equation_images, layout, notation_memory, page_math
 from readablestem.pipeline.chem import expand_ce as chem_expand_ce
+from readablestem.pipeline.chem_check import compare_species
 from readablestem.pipeline.signs import compare_signs
 from readablestem.pipeline.speech import SpeechError, mathml_to_speech
 from readablestem.pipeline.text_layer_compare import compare_case, numbers_differ
@@ -899,6 +903,20 @@ def _evaluate(
             )
         )
         meaning = meaning or signs.mismatch
+    # Chemistry: the species (formulas with their counts, charges and states) and arrows of
+    # the text layer against the reading's, in order. Only a text layer with chemistry
+    # evidence is asked, and not one the symbol check already found to be another equation.
+    species = None if mismatch else compare_species(element.text, candidate.mathml)
+    if species is not None:
+        candidate.checks.append(
+            Check(
+                name="equation.text_layer_species",
+                passed=not species.differ,
+                severity="warning",
+                code="species_mismatch" if species.differ else None,
+            )
+        )
+        meaning = meaning or species.differ
     if meaning and candidate.confidence is not None:
         candidate.confidence *= MEANING_MISMATCH_FACTOR
     return candidate

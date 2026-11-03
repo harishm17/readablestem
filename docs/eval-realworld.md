@@ -443,6 +443,34 @@ turned on for a deployment with the three settings of the "on" arm (`.env.exampl
 Spend: fresh `off` $2.458, `on` $1.063: **$3.52** of the $8 (86 pages, so $0.0287 and $0.0302 a page with the shared answers counted in each). The whole real-world work is $18.91
 (`tally` prints more because the shared answers folder also holds runs of another task, `cw*`, not counted here). The invented-content rates of the fresh arms were not replayed.
 
+## The fifth fresh split: how its units are selected
+
+`scripts/fresh5_select.py` builds the units of the fifth fresh split (26 units in three strata) by rule and seed, and
+writes only manifests, candidate logs and hashes to `data/realworld/`; gold, downloads and compiled PDFs stay in the cache.
+No command reads a gold file's content. The registration is `data/realworld/PREREGISTRATION-FRESH5.md`.
+
+| Stratum | Units | Rule | Command |
+|---|---|---|---|
+| A, arXiv LaTeX | 12 papers | the fresh4 order continued after its last visited candidate, same gates as above | `arxiv-order`, `arxiv-build` |
+| B, OpenStax | 6 sections | CC BY books (archive and CMS), sections no earlier set used, a title no earlier set used, sibling editions folded, at most 2 per book family, seeded by SHA-256 | `openstax`, `openstax-render` |
+| C, course-style LaTeX | 8 documents, at least 3 Beamer decks | GitHub repositories from a fixed query set, licence gate (CC BY, CC BY-SA, MIT), seeded order, compiled with TeX Live (Tectonic as fallback), gold by the arXiv path | `course-harvest`, `course-draw` |
+
+Stratum C (`src/readablestem/gold/course_corpus.py`). The licence is GitHub's SPDX id for the repository and is read again
+when the repository is fetched; forks, archived repositories and anything else (NC, ND, GPL, no licence) are refused. Documents
+are the files with `\documentclass` and `\begin{document}`; Beamer is the class or the package. A document is compiled with
+pdflatex or xelatex from a user-level TeX Live (latexmk), then Tectonic (`--untrusted`, cached packages only); the first
+that compiles it wins, and its engine and version are in the manifest. Every compile and every unpacking goes through
+`src/readablestem/gold/safe_tex.py`: archives are refused if they hold links, absolute or `..` paths, more than 20,000 files
+or more than 400 MB, and are renamed into place only when complete; the engine runs in a bubblewrap sandbox with no network,
+a minimal read-only root, the source as a discarded overlay, `latexmk -norc`, shell escape off, no environment from the
+parent, and a cap on what it writes; a timeout or the cap kills its whole process group. What keeps a document from reading
+local files is the mount namespace; `openin_any=p` and `openout_any=p` are set as well but do not restrict absolute reads. A source no engine can compile is skipped and logged,
+never replaced by choice. The gates are those of the arXiv path (at most 10% unconvertible equations, at least 4 usable
+pages, 4 to 6 pages drawn by hash), with a lower text and equation floor for slides (100 characters and 3 equations,
+against 300 and 5); the draft registration records why. At most 2 documents per repository are taken and at most 6 tried.
+The licence of a repository does not cover
+third-party material inside a document (figures, quotations); the gold holds equations only.
+
 ## What it does not say
 
 The registered difference is not significant, and one run per arm gives no run-to-run noise. The papers are 15 (and 25) of ten fields,
@@ -477,7 +505,8 @@ No run was repeated. The offline replays (ReadableSTEM's HTML for the invented-c
 | Reports | `scripts/realworld_report.py`, `scripts/realworld_invented.py`; results `data/realworld/results-*.json`, `invented-*.json` |
 | Registration | `data/realworld/PREREGISTRATION.md`, `-ADDENDUM-1.md`, `-ADDENDUM-2.md`, `REGISTRATION.sha256`, `scripts/realworld_register.py` |
 | Manifests and the candidate log | `data/realworld/manifest-dev.json`, `manifest-heldout.json`, `pool.json`, `order-*.json`, `candidates.json`, `spend-log.jsonl` |
-| Tests | `tests/test_arxiv_tex.py`, fixtures in `tests/fixtures/arxiv_tex/` |
+| Fifth fresh split | `scripts/fresh5_select.py`, `src/readablestem/gold/course_corpus.py`, `data/realworld/PREREGISTRATION-FRESH5.md` (draft), `selection-fresh5-B.json`, `pool-fresh5-course.json`, `manifest-fresh5a.json`, `manifest-fresh5c.json` |
+| Tests | `tests/test_arxiv_tex.py` (fixtures in `tests/fixtures/arxiv_tex/`), `tests/test_fresh5_select.py` |
 | Corpus, gold, PDFs, recorded answers (not in the repository) | `~/.cache/readablestem/realworld/{papers,gold,runs}` |
 
 ```

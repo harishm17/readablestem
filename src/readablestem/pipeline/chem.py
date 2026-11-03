@@ -55,6 +55,7 @@ STATE_SYMBOLS = frozenset({"aq", "s", "l", "g"})
 # glued to the head in some fonts) is a dash in front of the head.
 ARROW_HEADS = frozenset("→⟶⇌⇄↔⟷←⟵⇋⇒⟹")
 _SHAFTS = frozenset("−-–—=═")
+MAX_SHAFT = 12  # dashes: the longest shaft a font sets as a run of minus signs before a head
 _HYDRATE_DOTS = frozenset("·•∙⋅.")
 # What TeX sets over an arrow (`\\xrightarrow{\\Delta}`): the text layer has it as a word of its
 # own just before the arrow, so it is part of the reaction and not a species.
@@ -62,7 +63,7 @@ ARROW_LABELS = frozenset({"\u2206", "\u0394", "heat", "light"})
 _TRIM_END = frozenset(",.;:!?\"'’”")
 _TRIM_START = frozenset("\"'‘“")
 _MINUS_SIGNS = "−–-"
-_CHARGE = re.compile(r"^\d*[+−–-]$")  # "+", "2-"; not "-1", which is an exponent
+_CHARGE = re.compile(r"^ ?\d*[+−–-]$")  # "+", "2-", " 2-" (a stack); not "-1", an exponent
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?(?:/\d+)?")
 
 
@@ -78,6 +79,9 @@ class Word:
     end: int
     text: str
     kinds: tuple[ScriptKind | None, ...]
+    # Every glyph is script-size text set over or under an arrow: its label (TeX
+    # `\xrightarrow{...}`), whatever it says.
+    over_arrow: bool = False
 
 
 @dataclass(frozen=True)
@@ -247,11 +251,13 @@ def label_word(word: Word) -> Labelled:
     plain = all(k is None for k in kinds)
     if not text:
         return Labelled(word, "other", 0, 0)
+    if word.over_arrow:
+        return Labelled(word, "label", 0, len(text))
     if plain and text == "+":
         return Labelled(word, "plus", 0, 1)
     if (
         plain
-        and len(text) <= 3
+        and len(text) <= MAX_SHAFT + 1
         and text[-1] in ARROW_HEADS
         and all(c in _SHAFTS for c in text[:-1])
     ):

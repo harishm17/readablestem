@@ -723,7 +723,7 @@ A second instance (`--max-instances=2`) only runs, and costs, under load.
 
 TODO(Harish): none of this has run yet; the code and CI are ready for it. In order:
 
-1. Push `feat/beta-app` as a pull request so every CI job (lint-test on 3.12 and 3.14,
+1. Push `feat/beta-app` as a pull request so every CI job (static and pytest on 3.12 and 3.14,
    postgres, browser, docker, eval-gate, gitleaks) runs on the beta code once. Run
    `make ci-local` first.
 2. Set the model provider's hard monthly limit (step 2) before the first deploy.

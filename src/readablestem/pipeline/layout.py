@@ -1218,7 +1218,10 @@ class _Row:
     def plain(self) -> list[_Char]:
         """The ink without the glyphs of inline fractions: they set the row's size and
         baseline no more than a sub- or superscript does."""
-        return [c for c in self.ink if not c.stacked] or self.ink
+        ink = [c for c in self.ink if not c.stacked]
+        if any(c.c in chem.ARROW_HEADS for c in ink):  # a label set over an arrow is no text
+            ink = [c for c, label in zip(ink, _arrow_label_flags(ink), strict=True) if not label]
+        return ink or self.ink
 
     @cached_property
     def size(self) -> float:
@@ -1758,8 +1761,10 @@ def _merge_baselines(
                     continue
                 frag = rest
                 gap = frag.x0 - current.x1
-            if (-0.5 * current.size <= gap <= 4 * max(current.size, frag.size) and not crosses) or (
-                gap < 0 and not crosses and _label_over_arrow(current, frag)
+            if (
+                (-0.5 * current.size <= gap <= 4 * max(current.size, frag.size) and not crosses)
+                or (gap < 0 and not crosses and _label_over_arrow(current, frag))
+                or (not crosses and gap >= 0 and _half_reaction_label(current, frag))
             ):
                 current = _join_rows(current, frag)
             else:
@@ -1778,10 +1783,10 @@ def _label_over_arrow(current: _Row, frag: _Row) -> bool:
     over the arrow: the text layer has one line end at the label and the next start at the
     arrow, and the two overlap by the width of the label. Without this the reaction is cut in
     three (docs/chemistry.md, "Accuracy"). Only a label no larger than a script, ending the
-    row, with the arrow starting under it."""
+    row, with the arrow reaching under it: a long arrow (`-----→`) as well as `−→`."""
     ink = frag.ink
     head = next((i for i, c in enumerate(ink) if c.c in chem.ARROW_HEADS), None)
-    if head is None or head > 1 or any(c.c not in _CHEM_DASHES for c in ink[:head]):
+    if head is None or any(c.c not in _CHEM_DASHES for c in ink[:head]):
         return False
     label: list[_Char] = []
     for c in reversed(current.ink):
@@ -1791,7 +1796,104 @@ def _label_over_arrow(current: _Row, frag: _Row) -> bool:
     if not label:
         return False
     x0, x1 = min(c.x0 for c in label), max(c.x1 for c in label)
-    return x0 - 0.5 * current.size <= frag.x0 <= x1 + 0.2 * current.size
+    return frag.x0 <= x1 + 0.2 * current.size and ink[head].x1 >= x0 - 0.5 * current.size
+
+
+HALF_REACTION_GAP = 12  # x glyph size: the widest gap between a half-reaction's label and it
+_HALF_REACTION_LABEL = re.compile(
+    r"^(?=[^:]*\b(?:anode|cathode|overall|oxidation|reduction|net|reaction|equation)\b)"
+    r"[A-Za-z][A-Za-z()\- ]*:$",
+    re.IGNORECASE,
+)
+
+
+def _half_reaction_label(current: _Row, frag: _Row) -> bool:
+    """Is `current` the label of the half-reaction or reaction that `frag` holds ("anode
+    (oxidation):", "Overall:"), set apart from it by more than a word space? A short phrase
+    ending in a colon that names a half-reaction, with a reaction arrow in the piece that
+    follows it on the same baseline: one line of the half-reaction block, not a caption and
+    an equation."""
+    if frag.x0 - current.x1 > HALF_REACTION_GAP * max(current.size, frag.size):
+        return False
+    text = current.clean
+    return (
+        len(text.split()) <= 4
+        and _HALF_REACTION_LABEL.match(text) is not None
+        and any(c.c in chem.ARROW_HEADS for c in frag.chars)
+    )
+
+
+MAX_ARROW_LABEL = 40  # characters: the longest label set over an arrow that is kept with it
+
+
+def _arrow_spans(chars: Sequence[_Char]) -> list[tuple[int, int]]:
+    """(index of the first glyph, index of the head) of each reaction arrow in `chars`: the
+    head, and the dashes that are its shaft when the font sets a long arrow as a run of
+    minus signs ending in the head (`−−−→`)."""
+    spans = []
+    for i, c in enumerate(chars):
+        if c.c not in chem.ARROW_HEADS:
+            continue
+        first = i
+        while (
+            first > 0
+            and chars[first - 1].c in _CHEM_DASHES
+            and chars[first].x0 - chars[first - 1].x1 <= CHEM_WORD_GAP * c.size
+        ):
+            first -= 1
+        spans.append((first, i))
+    return spans
+
+
+def _over_arrow(chars: Sequence[_Char], span: tuple[int, int], c: _Char) -> bool:
+    """Is `c` a script-size glyph set over or under the arrow `span` of `chars`: its centre
+    within the arrow's length and its baseline off the arrow's own? The arrow is the line's
+    text size (`size`: a long label can outnumber the glyphs of the formulas)."""
+    first, head = span
+    size = chars[head].size
+    if c.blank or c.size > SCRIPT_RATIO * size or c.c in chem.ARROW_HEADS:
+        return False
+    if abs(c.baseline - chars[head].baseline) < 0.25 * size:
+        return False  # a script of the line, at the height of the arrow
+    return chars[first].x0 <= (c.x0 + c.x1) / 2 <= chars[head].x1
+
+
+def _arrow_under(host: _Row, label: _Row) -> int | None:
+    """Index in `host.chars` of the head of the arrow that the small row `label` is set over
+    or under (a reaction condition: `\\xrightarrow{high temperature}`), or None."""
+    chars = host.chars
+    for span in _arrow_spans(chars):
+        if all(_over_arrow(chars, span, c) for c in label.ink):
+            return span[1]
+    return None
+
+
+def _insert_label(host: list[_Char], label: list[_Char], head: int) -> list[_Char]:
+    """`label`'s glyphs after the arrow whose head is at `head`, and after the labels that
+    already stand there (the one over the arrow, then the one under it): not inside the
+    shaft where an x-position would put them."""
+    at = head + 1
+    span = next(s for s in _arrow_spans(host) if s[1] == head)
+    k = at
+    while k < len(host) and (host[k].blank or _over_arrow(host, span, host[k])):
+        k += 1
+        if not host[k - 1].blank:
+            at = k
+    # A space on each side: the label is words of its own, not the end of the arrow's word.
+    gap = replace(label[-1], c=" ", x0=label[-1].x1, y0=label[-1].y0, x1=label[-1].x1)
+    before = [] if at == 0 or host[at - 1].blank else [replace(gap, x0=label[0].x0, x1=label[0].x0)]
+    after = [] if at == len(host) or host[at].blank else [gap]
+    return [*host[:at], *before, *label, *after, *host[at:]]
+
+
+def _arrow_label_flags(chars: Sequence[_Char]) -> list[bool]:
+    """For each glyph of `chars`, is it part of a label set over or under an arrow?"""
+    flags = [False] * len(chars)
+    for span in _arrow_spans(chars):
+        for k, c in enumerate(chars):
+            if not flags[k] and _over_arrow(chars, span, c):
+                flags[k] = True
+    return flags
 
 
 def _attach_scripts(rows: list[_Row]) -> list[_Row]:
@@ -1810,7 +1912,8 @@ def _attach_scripts(rows: list[_Row]) -> list[_Row]:
     merged: dict[int, _Row] = {}
     dropped: set[int] = set()
     for i, small in enumerate(rows):
-        if small.vertical or len(small.clean) > 12 or i in merged:
+        long = len(small.clean) > 12
+        if small.vertical or (long and len(small.clean) > MAX_ARROW_LABEL) or i in merged:
             continue
         glyph = max(c.size for c in small.ink)  # the largest glyph, see the docstring
         best = None
@@ -1826,11 +1929,23 @@ def _attach_scripts(rows: list[_Row]) -> list[_Row]:
             near_y = host.y0 - 0.5 * host.size <= centre <= host.y1 + 0.5 * host.size
             near_x = host.x0 - host.size <= small.x0 and small.x1 <= host.x1 + 2 * host.size
             if near_y and near_x and host.column == small.column:
+                if long and _arrow_under(host, small) is None:
+                    continue  # only an arrow's label is a script that long
                 best = j
                 break
         if best is not None:
             host = merged.get(best, rows[best])
-            merged[best] = _Row(_insert_script(host.chars, small.chars), column=host.column)
+            head = _arrow_under(host, small)
+            if head is not None:
+                chars = _insert_label(host.chars, small.chars, head)
+            else:
+                chars = host.chars
+                # Degree signs set apart (E°cell = E°cathode - E°anode) are each a script of
+                # of their own, not one run.
+                degrees = len(small.ink) > 1 and all(c.c in _DEGREE_SIGNS for c in small.ink)
+                for part in [[c] for c in small.ink] if degrees else [small.chars]:
+                    chars = _insert_script(chars, part)
+            merged[best] = _Row(chars, column=host.column)
             dropped.add(i)
     return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
 
@@ -1947,10 +2062,28 @@ def _stack_position(
         prefix = following.x0 - end < min(c.x0 for c in cluster) - base.x1
     elif after_base or before_symbol:
         prefix = before_symbol and not after_base
+    elif _degree_over_label(script, first, at, last):
+        return last  # E°cell: the degree sign does not cut "cell" in two
     else:
         return at
     script_lower = mine > level
     return first if script_lower != prefix else last
+
+
+def _degree_over_label(script: Sequence[_Char], first: int, at: int, last: int) -> bool:
+    """Is `script` a lone degree sign that the x-order would put inside the word that is the
+    lowered label of a symbol (the `cell` of E°cell, `cathode`, `anode`)? TeX sets it over the
+    start of the label, so the text layer read `E c°ell`; the label stays whole, the degree
+    sign after it (the order of `E_{cell}^{°}`)."""
+    return (
+        len(script) == 1
+        and script[0].c in _DEGREE_SIGNS
+        and last - first >= 2
+        and first < at < last
+    )
+
+
+_DEGREE_SIGNS = frozenset("°∘")
 
 
 def _leading_script(frag: _Row, size: float) -> tuple[_Row | None, _Row | None]:
@@ -2887,6 +3020,8 @@ def _classify_row(row: _Row) -> None:
         row.kind = "frag"  # a lone "," or "." belongs to the maths it ends, if any
     elif _is_equation_number(text):
         row.kind = "frag"  # "(2.4)", "Eq. 2.4", "2.4": maths only beside an equation
+    elif _reaction_list_row(row):
+        row.kind = "text"  # "(a) A \u21cc B; (b) C \u21cc D": an item per reaction, inline
     elif _reaction_row(row, info):
         row.kind = "math"  # a chemical reaction on its own line
         row.reasons = [*row.reasons, REACTION_REASON]
@@ -2961,6 +3096,10 @@ def _inline_runs(
                 or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
             )
             accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
+            # The degree sign of E°cell or ΔG°, a raised glyph of the text font after a symbol.
+            accent = accent or (
+                c in _DEGREE_SIGNS and info.script[i] and i > start and info.mathy(i - 1)
+            )
             if chars[i].blank and (
                 _between_formulas(chars, i) or _word_space_between_operands(chars, info, i)
             ):
@@ -3082,11 +3221,15 @@ _CHEM_DASHES = frozenset("\u2212-\u2013")
 def _chem_words(row: _Row, kinds: Sequence[ScriptKind | None]) -> list[chem.Word]:
     """The row's words as `pipeline.chem` reads them: cut at a blank, at a gap (TeX sets no
     space after a script: "Cl-and"), and around an arrow glyph, which is a word of its own
-    with the dash that is its shaft ("\u2212\u2192")."""
+    with the dashes that are its shaft ("\u2212\u2192"). The space between the
+    lowered count and the raised charge of a stack ("SO4 2\u2212") is inside the word. The glyphs
+    of a label over or under an arrow are words of their own, marked `over_arrow`."""
     chars = row.chars
     words: list[chem.Word] = []
     current: list[int] = []
     right = 0.0
+    labels = _arrow_label_flags(chars)
+    kinds = list(kinds)
 
     def flush() -> None:
         if current:
@@ -3097,13 +3240,19 @@ def _chem_words(row: _Row, kinds: Sequence[ScriptKind | None]) -> list[chem.Word
                     last,
                     "".join(chars[k].c for k in range(first, last)),
                     tuple(kinds[first:last]),
+                    over_arrow=labels[first],
                 )
             )
             current.clear()
 
     for i, c in enumerate(chars):
         if c.blank:
-            flush()
+            if _charge_space(chars, kinds, i):
+                kinds[i] = "sup"  # the space the text layer puts in the stack of "SO4 2\u2212"
+                current.append(i)
+                right = c.x1
+            else:
+                flush()
             continue
         if c.c in chem.ARROW_HEADS:
             shaft = i
@@ -3111,7 +3260,7 @@ def _chem_words(row: _Row, kinds: Sequence[ScriptKind | None]) -> list[chem.Word
                 shaft - 1 in current
                 and chars[shaft - 1].c in _CHEM_DASHES
                 and kinds[shaft - 1] is None
-                and c.x0 - chars[shaft - 1].x1 <= CHEM_WORD_GAP * c.size
+                and chars[shaft].x0 - chars[shaft - 1].x1 <= CHEM_WORD_GAP * c.size
             ):
                 shaft -= 1
                 current.remove(shaft)
@@ -3126,7 +3275,11 @@ def _chem_words(row: _Row, kinds: Sequence[ScriptKind | None]) -> list[chem.Word
             )
             right = c.x1
             continue
-        if current and c.x0 - right >= CHEM_WORD_GAP * c.size:
+        if current and (
+            labels[i] != labels[current[-1]]
+            or (labels[i] and c.x0 < chars[current[-1]].x0)  # the label under the one over
+            or c.x0 - right >= CHEM_WORD_GAP * c.size
+        ):
             flush()
         if not current:
             right = c.x1
@@ -3134,6 +3287,12 @@ def _chem_words(row: _Row, kinds: Sequence[ScriptKind | None]) -> list[chem.Word
         right = max(right, c.x1)
     flush()
     return words
+
+
+def _charge_space(chars: list[_Char], kinds: Sequence[ScriptKind | None], i: int) -> bool:
+    """Is the blank at `i` the space between the lowered count and the raised charge of an ion
+    (`SO4 2\u2212`, set as a stack: the text layer has the two as lines of their own)?"""
+    return 0 < i < len(chars) - 1 and kinds[i - 1] == "sub" and kinds[i + 1] == "sup"
 
 
 def _has_chemistry(row: _Row, kinds: Sequence[ScriptKind | None]) -> bool:
@@ -3161,8 +3320,6 @@ def _with_chemistry(
     into it (the arrow of a reaction was a run by itself, a formula may sit inside a run
     that is maths for another reason)."""
     found = _chem_runs(row, kinds)
-    if not found:
-        return runs
     merged = list(runs)
     for start, end, reasons in found:
         touching = [r for r in merged if r[0] < end and start < r[1]]
@@ -3174,7 +3331,143 @@ def _with_chemistry(
         merged.append(
             (lo, hi, [*reasons, *(x for r in touching for x in r[2] if x not in reasons)])
         )
-    return sorted(merged)
+    return sorted(_split_chemistry_lists(row, merged))
+
+
+LIST_SEPARATORS = frozenset(",;")
+# One species as typeset text: an optional coefficient, an element symbol, then symbols, counts,
+# brackets, charges, hydrate dots and a state symbol ("2 Ag+", "CO3 2-", "[Al(H2O)6]3+", "Fe(s)").
+_SPECIES_PIECE = re.compile(r"^\d*[A-Z][a-z]?(?:[A-Za-z0-9()\[\]\u00b7.]|[+\u2212\u2013-])*$")
+
+
+def _species_piece(row: _Row, lo: int, hi: int) -> bool:
+    """Do `row.chars[lo:hi]` read as one chemical species with a count or a charge: its text
+    (letters in a maths font as their plain letters) fits `_SPECIES_PIECE` and at least one
+    glyph is raised or lowered? "F\u2212" and "H2O", not "Na", "x" or "CO3, F". Element symbols
+    are upright: an italic letter outside a state's brackets is a variable (`W1, W2`)."""
+    ink = [c for c in row.chars[lo:hi] if not c.blank]
+    depth = 0
+    for c in ink:
+        depth += c.c in "(["
+        depth -= c.c in ")]" and depth > 0
+        if depth == 0 and (c.italic or is_math_alphanumeric(c.c)):
+            return False
+    text = "".join(base_char(c.c) for c in ink)
+    return bool(ink) and any(row.is_script(c) for c in ink) and bool(_SPECIES_PIECE.match(text))
+
+
+def _split_chemistry_lists(
+    row: _Row, runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """`runs` with each list of chemical species cut into its items: "CO3 2\u2212, F\u2212" is two
+    ions, as the author wrote them, not one formula. A run is a list when its top-level commas
+    or semicolons cut it into two or more pieces that are each one species (`_species_piece`);
+    a run with a reaction, an `=` or any other maths in it keeps whole. Each item takes the
+    run's reasons and the formula reason."""
+    out: list[tuple[int, int, list[str]]] = []
+    for lo, hi, reasons in runs:
+        cuts, depth, start = [], 0, lo
+        for k in range(lo, hi):
+            c = row.chars[k].c
+            depth += c in _OPENING
+            depth -= c in ")]}" and depth > 0
+            if depth == 0 and c in LIST_SEPARATORS:
+                cuts.append((start, k))
+                start = k + 1
+        if not cuts:
+            out.append((lo, hi, reasons))
+            continue
+        cuts.append((start, hi))
+        pieces = []
+        for a, b in cuts:
+            while a < b and row.chars[a].blank:
+                a += 1
+            while b > a and row.chars[b - 1].blank:
+                b -= 1
+            pieces.append((a, b))
+        pieces = [_without_marker(row, a, b) for a, b in pieces]
+        if len(pieces) < 2 or not all(
+            a < b and (_species_piece(row, a, b) or _reaction_piece(row, a, b)) for a, b in pieces
+        ):
+            out.append((lo, hi, reasons))
+            continue
+        out.extend((a, b, _item_reasons(row, a, b, reasons)) for a, b in pieces)
+    return out
+
+
+def _item_reasons(row: _Row, lo: int, hi: int, reasons: list[str]) -> list[str]:
+    own = REACTION_REASON if _reaction_piece(row, lo, hi) else FORMULA_REASON
+    return [own, *(r for r in reasons if r not in (FORMULA_REASON, REACTION_REASON))]
+
+
+_LIST_MARKER = re.compile(r"^\(?[A-Za-z0-9]{1,2}[.)]")
+
+
+def _without_marker(row: _Row, lo: int, hi: int) -> tuple[int, int]:
+    """`(lo, hi)` without the list marker ("(a)", "b.") that starts a reaction of a list."""
+    ink = [k for k in range(lo, hi) if not row.chars[k].blank]
+    text = _piece_text([row.chars[k] for k in ink])
+    marker = _LIST_MARKER.match(text)
+    if marker and len(ink) > marker.end() and _reaction_piece(row, lo, hi, marked=True):
+        return ink[marker.end()], hi
+    return lo, hi
+
+
+def _reaction_piece(row: _Row, lo: int, hi: int, *, marked: bool = False) -> bool:
+    """Is `row.chars[lo:hi]` one reaction of a list: one arrow, species and operators only,
+    with a count, a charge or a state in it, and no italic letter outside a state's brackets?"""
+    ink = [c for c in row.chars[lo:hi] if not c.blank]
+    if marked:
+        marker = _LIST_MARKER.match(_piece_text(ink))
+        ink = ink[marker.end() :] if marker else ink
+    text = _piece_text(ink)
+    depth = 0
+    for c in ink:
+        depth += c.c in "(["
+        depth -= c.c in ")]" and depth > 0
+        if depth == 0 and (c.italic or is_math_alphanumeric(c.c)):
+            return False
+    evidence = any(row.is_script(c) for c in ink) or any(s in text for s in _STATES)
+    return (
+        sum(c.c in chem.ARROW_HEADS for c in ink) == 1
+        and evidence
+        and bool(_REACTION_PIECE.match(text))
+    )
+
+
+_STATES = ("(aq)", "(s)", "(l)", "(g)")
+
+
+def _reaction_list_row(row: _Row) -> bool:
+    """Is the row a list of reactions run together, `(a) A \u21cc B; (b) C \u21cc D`? Its top-level
+    semicolons cut it into two or more pieces that each hold one arrow and nothing but a
+    list marker, formulas, states and operators besides: no word. Such a line is not one
+    display equation: each reaction is an equation of its own (`_split_chemistry_lists`),
+    inside the sentence it numbers."""
+    chars = row.chars
+    if sum(c.c in chem.ARROW_HEADS for c in chars) < 2:
+        return False
+    pieces, start, depth = [], 0, 0
+    for k, c in enumerate(chars):
+        depth += c.c in _OPENING
+        depth -= c.c in ")]}" and depth > 0
+        if depth == 0 and c.c == ";":
+            pieces.append((start, k))
+            start = k + 1
+    pieces.append((start, len(chars)))
+    pieces = [(a, b) for a, b in pieces if any(not c.blank for c in chars[a:b])]
+    return len(pieces) >= 2 and all(_reaction_piece(row, a, b, marked=True) for a, b in pieces)
+
+
+def _piece_text(chars: Sequence[_Char]) -> str:
+    return "".join(base_char(c.c) for c in chars)
+
+
+# One reaction of a list: an optional marker "(a)" / "a." / "1)", then species, plus signs,
+# coefficients, states, charges and one arrow, with an optional label of letters over it.
+_REACTION_PIECE = re.compile(
+    r"^[A-Za-z0-9()\[\]\u00b7.,+\u2212\u2013\-\u21cc\u2192\u27f6\u2194\u21c4\u21cb]+$"
+)
 
 
 def _reaction_row(row: _Row, info: _CharInfo) -> bool:
