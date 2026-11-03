@@ -218,6 +218,9 @@ REASON_LIST_NUMBER = "list-style number"
 # A bold body-size label that repeats ("Solution" under every example): bold text, not a
 # heading (`_mark_run_in_labels`, `heading_step.heading_fixes`).
 REASON_RUN_IN_LABEL = "run-in label"
+# A plain numbered line found a heading only from its neighbours' numbers, in a sequence
+# that does not look like a document's sections (`_promote_numbered_lines`): a decision.
+REASON_NUMBERED_UNCONFIRMED = "numbered line, unconfirmed"
 # On a paragraph (or list item): its text goes on over a page break and the element holds
 # both parts, with the page and box of the first (`_join_page_splits`).
 REASON_JOINED_PAGES = "joined across pages"
@@ -653,7 +656,7 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
             raw = level_of[round(e.font_size or 0.0, 1)]
         else:
             raw = below + max(0, (depth[e.id] or shallowest) - shallowest)
-        levels[e.id] = max(1, min(6, tagged_level(e) or raw))
+        levels[e.id] = max(1, min(6, tagged_level(e) or outline.weak_level(e) or raw))
     return levels
 
 
@@ -7129,10 +7132,18 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     return _Block(Kind.PARAGRAPH, box, rows, font_size=size, bold=bold)
 
 
+# The style variants of a variable that a plain letter says as well: bold, italic and bold
+# italic Latin (U+1D400-1D49B), the sans-serif and monospace Latin and Greek, the digits
+# except the double-struck ones (U+1D7D8-1D7E1), and Planck's h (U+210E, the italic h).
+# Script, fraktur and double-struck letters (the number sets R C N Z Q, and the letterlike
+# symbols l and L) are names of things, not styles of a letter: they stay.
+_FLATTEN = ((0x1D400, 0x1D49B), (0x1D5A0, 0x1D7D7), (0x1D7E2, 0x1D7FF), (0x210E, 0x210E))
+
+
 def readable_math_letters(text: str) -> str:
-    """`text` with mathematical alphanumerics (math-italic letters, Planck's h, math-italic
-    Greek, bold letters, double-struck digits) as the plain letters and digits they style,
-    and nothing else changed.
+    """`text` with the italic and bold variable letters of the Mathematical Alphanumeric
+    Symbols block (and Planck's h) as the plain letters and digits they style; nothing else
+    changes, so the number sets and the letterlike symbols keep their meaning.
 
     A heading or a caption's plain text keeps no inline equation (a paragraph, and a
     figure's caption when it has maths, do), so a variable in a title such as "Free fall
@@ -7141,7 +7152,10 @@ def readable_math_letters(text: str) -> str:
     if text.isascii():
         return text
     return "".join(
-        unicodedata.normalize("NFKC", c) if unicodedata.decomposition(c).startswith("<font>") else c
+        unicodedata.normalize("NFKC", c)
+        if any(lo <= ord(c) <= hi for lo, hi in _FLATTEN)
+        and unicodedata.decomposition(c).startswith("<font>")
+        else c
         for c in text
     )
 
@@ -8471,9 +8485,74 @@ _NUMBERED_PLAIN = re.compile(r"^(?P<n>\d{1,2})\s+(?P<title>[A-Z]\S*(?:\s+\S+){0,
 _NO_TITLE_END = ".,;:!?"
 
 
-def _numbered_candidate(block: _Block, ctx: _Context) -> int | None:
-    """The integer of a plain body-size line that reads like "3 Forces" (one regular line,
-    a capital after the number, no closing punctuation, not a quantity), else None."""
+# A numbered line that starts with one of these is an exercise or a question ("1 Find the
+# final speed of the cart"), never a section title: problem sets are content.
+_EXERCISE_OPENERS = frozenset(
+    [
+        "find",
+        "calculate",
+        "determine",
+        "solve",
+        "compute",
+        "show",
+        "prove",
+        "explain",
+        "describe",
+        "write",
+        "draw",
+        "use",
+        "give",
+        "list",
+        "state",
+        "identify",
+        "estimate",
+        "evaluate",
+        "simplify",
+        "graph",
+        "plot",
+        "sketch",
+        "derive",
+        "verify",
+        "convert",
+        "express",
+        "compare",
+        "discuss",
+        "define",
+        "suppose",
+        "consider",
+        "let",
+        "choose",
+        "complete",
+        "answer",
+        "name",
+        "predict",
+        "measure",
+        "what",
+        "why",
+        "how",
+        "when",
+        "where",
+        "which",
+        "who",
+        "is",
+        "are",
+        "does",
+        "do",
+        "can",
+        "will",
+        "would",
+        "should",
+        "if",
+    ]
+)
+MAX_STRONG_TITLE_WORDS = 6  # a longer title is a decision
+MAX_FIRST_NUMBER = 2  # a sequence of section numbers starts at 1 (or 2: no section 0)
+
+
+def _numbered_candidate(block: _Block, ctx: _Context) -> tuple[int, int] | None:
+    """(integer, words in the title) of a plain body-size line that reads like "3 Forces"
+    (one regular line, a capital after the number, no closing punctuation, not a quantity,
+    not an exercise or a question), else None."""
     if (
         block.kind != Kind.PARAGRAPH
         or block.code
@@ -8493,9 +8572,11 @@ def _numbered_candidate(block: _Block, ctx: _Context) -> int | None:
     unit = stem in _QUANTITY_WORDS or stem.rstrip("s") in _QUANTITY_WORDS
     if unit and not (len(words) > 1 and words[1][:1].isupper()):
         return None
+    if stem in _EXERCISE_OPENERS:
+        return None
     if sum(c.isalpha() for c in match["title"]) < 3:
         return None
-    return int(match["n"])
+    return int(match["n"]), len(words)
 
 
 def _promote_numbered_lines(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
@@ -8503,34 +8584,50 @@ def _promote_numbered_lines(pages: Sequence[_PageBlocks], ctx: _Context) -> None
 
     At body size a bare integer before a word is too often a quantity or a list line to
     call a heading on its own (`section_heading_number`). Here it counts when the document
-    corroborates it: the next such line, in the same type, carries the next integer, with
-    at least one paragraph of two lines or more between them (so a run of short numbered
-    lines is a list, not headings). The evidence is the weak "standalone numbered line"
-    (an optional note), never "numbered section"."""
+    corroborates it: the next such line, in the same type and column, carries the next
+    integer, with at least one paragraph of two lines or more between them (so a run of
+    short numbered lines is a list, not headings). A line that opens like an exercise or a
+    question is never a candidate ("1 Find the final speed", "2 What is the mass"). The
+    evidence is the weak "standalone numbered line" (an optional note), never "numbered
+    section"; and where the sequence does not look like a document's sections (it does not
+    start at 1 or 2, or the title is longer than `MAX_STRONG_TITLE_WORDS`) the heading is
+    `REASON_NUMBERED_UNCONFIRMED`: a required decision."""
     flat = [block for page in pages for block in page.blocks]
-    found: list[tuple[int, int, tuple[float, str], _Block]] = []
+    found: list[tuple[int, int, int, tuple[float, str, str], _Block]] = []
     for position, block in enumerate(flat):
-        number = _numbered_candidate(block, ctx)
-        if number is not None:
-            style = (round((block.font_size or 0.0) * 2) / 2, block.rows[0].family)
-            found.append((position, number, style, block))
-    promoted: set[int] = set()
-    for (first_at, first_n, first_style, first), (next_at, next_n, next_style, second) in pairwise(
-        found
-    ):
+        candidate = _numbered_candidate(block, ctx)
+        if candidate is not None:
+            style = (
+                round((block.font_size or 0.0) * 2) / 2,
+                block.rows[0].family,
+                block.rows[0].column,
+            )
+            found.append((position, candidate[0], candidate[1], style, block))
+    start_of: dict[int, int] = {}  # a promoted block -> the integer its sequence starts at
+    for (first_at, first_n, _, first_style, first), (
+        next_at,
+        next_n,
+        _,
+        next_style,
+        second,
+    ) in pairwise(found):
         if next_n != first_n + 1 or next_style != first_style:
             continue
         if not any(
             b.kind == Kind.PARAGRAPH and len(b.rows) >= 2 for b in flat[first_at + 1 : next_at]
         ):
             continue
-        promoted.update((id(first), id(second)))
-    for _, _, _, block in found:
-        if id(block) in promoted:
-            block.text = (_text_of(block.pieces) or "").strip()
-            block.kind = Kind.HEADING
-            block.reasons = [REASON_NUMBERED_LINE]
-            block.pieces = []
+        start_of.setdefault(id(first), first_n)
+        start_of[id(second)] = start_of[id(first)]
+    for _, _, words, _, block in found:
+        if id(block) not in start_of:
+            continue
+        block.text = (_text_of(block.pieces) or "").strip()
+        block.kind = Kind.HEADING
+        block.reasons = [REASON_NUMBERED_LINE]
+        if start_of[id(block)] > MAX_FIRST_NUMBER or words > MAX_STRONG_TITLE_WORDS:
+            block.reasons.append(REASON_NUMBERED_UNCONFIRMED)
+        block.pieces = []
 
 
 def _body_sized(block: _Block, ctx: _Context) -> bool:
@@ -8549,7 +8646,7 @@ def _goes_on(last: _Block, first: _Block, limits: tuple[float, float]) -> bool:
     weight, the left edge of the second at the first's text edge with no first-line indent.
     Both must sit at the text area's edges (`limits`: its bottom and its top, with slack)."""
     if (
-        last.kind not in _TEXT_BLOCKS
+        last.kind != Kind.PARAGRAPH
         or last.code
         or first.kind != Kind.PARAGRAPH
         or first.code
@@ -8576,7 +8673,7 @@ def _goes_on(last: _Block, first: _Block, limits: tuple[float, float]) -> bool:
 
 
 def _join_page_splits(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
-    """A paragraph (or list item) that goes on over a page break is one block again.
+    """A paragraph that goes on over a page break is one block again.
 
     The top block of a page continues the lowest body block of the page before (footnotes
     below it, and the running header and footer, are not in the way: the margin filter has
@@ -9268,6 +9365,7 @@ def _to_elements(
                         if block.contents_level
                         else ([REASON_JOINED_PAGES] if block.parts else []),
                         script_runs=script_runs,
+                        last_page=block.parts[-1][0] if block.parts else None,
                     )
                 )
                 for child_id, inline in children:

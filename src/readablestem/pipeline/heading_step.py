@@ -78,6 +78,7 @@ from readablestem.pipeline.layout import (
     REASON_LARGER_FONT,
     REASON_LIST_NUMBER,
     REASON_NUMBERED,
+    REASON_NUMBERED_UNCONFIRMED,
     REASON_RUN_IN_LABEL,
     heading_levels,
     tagged_level,
@@ -308,7 +309,11 @@ def _fix(element: Element, raw_level: int, level: int) -> Fix:
     ]
     sentence = not evidence.strong and sentence_like(text)
     checks.append(_check("heading.sentence", not sentence, "heading.sentence_like"))
-    # Accepted either way, except a sentence-like line with weak evidence (a decision);
+    unconfirmed = REASON_NUMBERED_UNCONFIRMED in element.reasons and not evidence.strong
+    checks.append(_check("heading.numbered", not unconfirmed, "heading.numbered_unconfirmed"))
+    sentence = sentence or unconfirmed
+    # Accepted either way, except a sentence-like line with weak evidence or a numbered line
+    # that only its neighbours' numbers made a heading (a decision);
     # any other failed check is an optional note.
     return Fix(
         element_id=element.id,

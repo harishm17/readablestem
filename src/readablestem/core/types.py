@@ -508,6 +508,11 @@ class Element(BaseModel):
     page_status: Literal["span", "layout"] | None = Field(
         default=None, exclude_if=lambda v: v is None
     )
+    # A paragraph that goes on over page breaks is one element with the page and box of its
+    # first part (`page`, `bbox`); this is the 0-based page of its last part. None: it ends
+    # on its own page. A writer that marks page breaks writes the markers of the pages in
+    # between before or after the element, never inside it.
+    last_page: int | None = Field(default=None, exclude_if=lambda v: v is None)
     # Elements read from an image of a scanned or handwritten page (ADR 0007): how sure the
     # page reader said it was of this block. None for every element that came from a text
     # layer. The review tier of such an element's fix follows it (`pipeline.image_page`).

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "task": "headings",
   "date": "2026-11-02",
-  "pipeline_version": "0.5.0",
+  "pipeline_version": "0.5.1",
   "prompt_versions": {},
   "models": {
     "main": "claude-opus-5-5",

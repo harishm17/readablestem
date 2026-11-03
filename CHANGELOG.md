@@ -1,6 +1,8 @@
 # Changelog
 
-## Layout structure: bookmarks, numbered and run-in headings, joins (2026-11-02, branch fix/layout-structure)
+## Unreleased
+
+### Layout structure: bookmarks, numbered and run-in headings, joins (2026-11-02, branch fix/layout-structure)
 
 - The PDF's outline (bookmarks) is the first signal for headings when it matches the page text
   (`pipeline/outline.py`): a line that is a bookmark's title becomes a heading at the bookmark's level
@@ -11,14 +13,22 @@
   headings, as weak evidence; one alone stays a paragraph. Repeated bold run-in labels (`Solution`,
   `Answer`, `Discussion`, `Procedure`, `Proof`, `Hint`) set in from their column's edge are bold text,
   not headings: original gold set heading precision 0.850 to 0.914 at the same recall.
-- Math-italic letters in a heading or a caption's plain text are plain letters.
-- A paragraph that goes on over a page break is one element; inline maths that wraps at a relation
+  A paragraph that is a bookmark's title becomes a heading only if it is short, has no sentence end and is
+  bold, larger or set off by space; the plain ones are weak evidence (an optional note), and an outline
+  that bookmarks most of a document's paragraphs promotes none. Numbered exercises (`1 Find the final
+  speed`) are never headings; a numbered sequence that does not start at 1 or 2, or has a long title, is
+  a decision (new check text in `web/messages.py`).
+- Math-italic and bold variable letters in a heading or a caption's plain text are plain letters; the
+  number sets and letterlike symbols stay.
+- A paragraph (not a list item) that goes on over a page break is one element (`Element.last_page` is its
+  last page); inline maths that wraps at a relation
   sign is one equation; at a line break a hyphenated compound follows the document's own spelling
   (`eigen-vector` written elsewhere keeps its hyphen, `antiderivative` written whole elsewhere loses
   it). Details and what stays open: [docs/layout.md](docs/layout.md), "Known failure modes".
+- Pipeline version 0.5.0 to 0.5.1 (ids shift after a join; review carry matches by content, so revised
+  uploads still carry what is unchanged).
 - Offline heading, document and structure evals before and after: [docs/eval.md](docs/eval.md),
   "Structure fixes, 2026-11-02".
-## Unreleased
 
 ### Monitoring and recovery
 

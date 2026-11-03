@@ -161,7 +161,7 @@ Element conventions:
    two variables side by side and two formulas with a word between stay separate. The
    joined equation's box is the union of both lines, so its crop also shows the words
    either side of the break.
-   A paragraph (or list item) that goes on over a page break is one element
+   A paragraph that goes on over a page break is one element
    (`_join_page_splits`, `Element.reasons` "joined across pages"): the lowest body block of
    a page (footnotes in smaller type below it, and the running header and footer the margin
    filter dropped, are not in the way) does not end a sentence, the top block of the next
@@ -170,8 +170,20 @@ Element conventions:
    first part's page and box, so a link or a colour in the second part is not placed on the
    text (the text pass aligns against the first box), and an inline equation of the second
    part keeps its own page for its crop. A hyphen at the page break is repaired like one at
-   a line break. A paragraph that starts with maths, or a break between a column on one
-   page and a column on the next, is not joined.
+   a line break. A paragraph that starts with maths, a break between a column on one page
+   and a column on the next, and a list item (a lowercase paragraph after a list item at a
+   page foot is a new paragraph) are not joined. `Element.last_page` is the 0-based page of
+   the last part (None when it ends on its own page): a writer that marks page breaks writes
+   the markers of the pages between `page` and `last_page` before or after the element,
+   never inside it.
+   Pipeline 0.5.1: the joins shift element ids after them, and a heading's words change
+   where it had math-italic letters. The review carry (`web/carry.py`, `carry_edits.py`)
+   matches by content (a heading by its words, size and weight; an equation by its crop; a
+   paragraph's edits by what it said before them), never by id, so a revised upload is safe:
+   a decision on a heading whose words changed, and an edit to a paragraph that is now two
+   joined ones, are not carried and are shown as "decide again" or counted in
+   `EditsCarried.dropped`, which the instructor is told about. Results from 0.5.0 load
+   unchanged.
 
 ### Headings
 
@@ -196,7 +208,14 @@ Element conventions:
   is a heading, with the weak `"standalone numbered line"` evidence (an optional note,
   never `"numbered section"`), when the document corroborates it: the next such line in the
   same type carries the next integer, with a paragraph of two lines or more between them
-  (a run of short numbered lines is a list). One `3 Forces` alone stays a paragraph.
+  (a run of short numbered lines is a list), in the same column. One `3 Forces` alone stays
+  a paragraph. A line that opens like an exercise or a question (`1 Find the final speed of
+  the cart`, `2 What is the mass`: a verb from a fixed list of imperatives, or a question
+  word) is never a candidate, since problem sets are content. Where the sequence does not
+  look like a document's sections (it does not start at 1 or 2, or the title is longer than
+  six words) the heading carries `REASON_NUMBERED_UNCONFIRMED` and is a required decision
+  (check `heading.numbered_unconfirmed`, NEEDS_REVIEW, like a sentence-like line); a
+  sequence from 1 or 2 with short titles is the weak heading above (an optional note).
 - Section numbers are evidence: `2.3`, `2.3.1`, `Chapter 2`, `IV.` are
   `"numbered section"`; `1.` and `A)` are `"list-style number"` because lists start that way.
   In a larger font any section number counts (`3 Forces` is a chapter title); at body size
@@ -236,7 +255,9 @@ Element conventions:
 - **The PDF's outline** (bookmarks, "The PDF's outline" below) does the same, when it
   matches the page text; a tag wins over a bookmark.
 - **Maths in a heading** stays text: math-italic and other mathematical alphanumerics
-  become the plain letters they style (`readable_math_letters`: `𝑔` is `g`, `ℎ` is `h`),
+  become the plain letters they style (`readable_math_letters`: `𝑔` is `g`, `ℎ` is `h`;
+  only the bold, italic, sans and monospace variable ranges and Planck's h: `ℝ ℂ ℕ ℤ ℚ ℓ ℒ`,
+  script, fraktur and double-struck letters stay),
   so the heading and the outline read as words. A heading, unlike a paragraph or a
   figure's caption, has no inline equation element; the italics are lost, the letter is
   not.
@@ -1131,13 +1152,20 @@ bookmarks: a title, a level and a page each (`Document.get_toc`). `layout.analyz
 them once after the elements are made (`outline.apply`) and uses them before the font-based
 rules would guess:
 
-- a heading, or a paragraph that is only a short plain title (no list marker, code, glossary
-  term or inline maths, at most 200 characters), whose letters and digits equal a
-  bookmark's on that bookmark's page (a section number the other lacks aside: `3 Forces`
-  and `Forces`) gets the reason `outline heading h2`. `tagged_level` reads it as it reads a
-  tag (strong evidence, confidence 0.90, the bookmark's level as the raw level; the
-  outline repair still applies), and a paragraph becomes a heading. A tag wins over a
-  bookmark; each line serves one bookmark, in reading order;
+- a heading layout found, or a paragraph that is only a plain title (no list marker, code,
+  glossary term or inline maths), whose letters and digits equal a bookmark's on that
+  bookmark's page (a section number the other lacks aside: `3 Forces` and `Forces`). A
+  heading gets the reason `outline heading h2`: `tagged_level` reads it as it reads a tag
+  (strong evidence, confidence 0.90, the bookmark's level as the raw level; the outline
+  repair still applies). A tag wins over a bookmark; each line serves one bookmark, in
+  reading order;
+- a *paragraph* becomes a heading only if it looks like one (`outline._promotion`): at most
+  12 words and 100 characters, no sentence end (`. ? ! : ; ,`), and either bold or set at
+  1.1 x the body size or more (`outline heading h2`, as above), or set off by space above it
+  (0.8 x its own height, or first on its page): `outline candidate h2`, the bookmark's level
+  but weak evidence, so an optional note like any bold body-size line. Otherwise it stays a
+  paragraph. A tool that bookmarks every short paragraph is not believed: when more than 30 %
+  of the document's paragraphs (and more than two) would be promoted, none is;
 - the heading's text becomes the bookmark's title when the two are the same letters (a
   math-italic letter, a ligature, spacing) and the heading has no raised or lowered runs;
 - consistency: at least 60 % of the bookmarks that point into the analysed pages must name

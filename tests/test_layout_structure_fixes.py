@@ -121,33 +121,115 @@ def test_a_bookmark_only_names_the_line_that_is_its_whole_title():
     assert texts(layout, Kind.HEADING) == ["Overview"]  # not the sentence that starts with it
 
 
+def bold_outline_page(number, page):
+    y = para(page, 72)
+    y = one(page, y, "Overview", "hebo")
+    y = para(page, y)
+    y = one(page, y, "Cart on a ramp", "hebo")
+    para(page, y)
+
+
+BOLD_TOC = [[1, "Overview", 1], [2, "Cart on a ramp", 1]]
+
+
 def test_a_tag_still_wins_over_a_bookmark_level():
     from readablestem.pipeline.layout import REASON_TAGGED, tagged_level
 
-    layout = analyze(pdf_of(outline_page, [[1, "Overview", 1], [2, "Cart on a ramp", 1]]))
+    layout = analyze(pdf_of(bold_outline_page, BOLD_TOC))
     heading = next(e for e in layout.elements if e.kind == Kind.HEADING)
     tagged = heading.model_copy(update={"reasons": [*heading.reasons, f"{REASON_TAGGED}3"]})
     assert tagged_level(heading) == 1
     assert tagged_level(tagged) == 3
 
 
+def test_a_bold_short_bookmarked_line_is_certain_and_a_plain_one_is_a_note():
+    strong = heading_fixes(analyze(pdf_of(bold_outline_page, BOLD_TOC)).elements)
+    assert [(f.heading.level, f.review) for f in strong] == [(1, "none"), (2, "none")]
+    weak = heading_fixes(analyze(pdf_of(outline_page, BOLD_TOC)).elements)
+    assert [(f.heading.level, f.review) for f in weak] == [(1, "optional"), (2, "optional")]
+    assert all(f.failed_checks for f in weak)  # the weak-evidence note
+
+
+def test_a_bookmark_on_every_short_paragraph_makes_no_headings():
+    lines = ["Cart", "Ramp", "Speed", "Mass", "Force", "Time"]
+
+    def fill(number, page):
+        y = 72
+        for line in lines:
+            y = one(page, y, line)
+            y = para(page, y, lines=2)
+
+    toc = [[1, line, 1] for line in lines]
+    assert texts(analyze(pdf_of(fill, toc)), Kind.HEADING) == []
+
+
+def test_a_bookmarked_sentence_or_a_line_with_no_space_above_stays_a_paragraph():
+    def fill(number, page):
+        y = para(page, 72)
+        y = one(page, y, "Overview", "hebo")
+        y = para(page, y)
+        y = one(page, y, "The cart speeds up on the ramp.")
+        y = para(page, y)
+        para(page, y)
+
+    toc = [[1, "Overview", 1], [2, "The cart speeds up on the ramp.", 1]]
+    assert texts(analyze(pdf_of(fill, toc)), Kind.HEADING) == ["Overview"]
+
+
 # ------------------------------------------------- 2a. plain numbered headings, 2b. labels
 
 
-def numbered_page(number, page):
-    y = para(page, 72)
-    y = one(page, y, "3 Forces")
-    y = para(page, y)
-    y = one(page, y, "4 Energy and Work")
-    para(page, y)
+def numbered_page(first: int = 1, titles=("Forces", "Energy and Work")):
+    def fill(number, page):
+        y = para(page, 72)
+        y = one(page, y, f"{first} {titles[0]}")
+        y = para(page, y)
+        y = one(page, y, f"{first + 1} {titles[1]}")
+        para(page, y)
+
+    return fill
 
 
 def test_plain_body_size_numbered_lines_in_sequence_are_headings():
-    layout = analyze(pdf_of(numbered_page))
-    assert texts(layout, Kind.HEADING) == ["3 Forces", "4 Energy and Work"]
+    layout = analyze(pdf_of(numbered_page()))
+    assert texts(layout, Kind.HEADING) == ["1 Forces", "2 Energy and Work"]
     first = next(e for e in layout.elements if e.kind == Kind.HEADING)
     assert REASON_NUMBERED_LINE in first.reasons
-    assert all(f.review in ("optional", "required") for f in heading_fixes(layout.elements))
+    fixes = heading_fixes(layout.elements)
+    assert [(f.status, f.review) for f in fixes] == [(Status.ACCEPTED, "optional")] * 2
+
+
+def test_a_sequence_that_does_not_start_at_one_or_two_is_a_decision():
+    layout = analyze(pdf_of(numbered_page(first=3)))
+    assert texts(layout, Kind.HEADING) == ["3 Forces", "4 Energy and Work"]
+    fixes = heading_fixes(layout.elements)
+    assert [(f.status, f.review) for f in fixes] == [(Status.NEEDS_REVIEW, "required")] * 2
+    assert all("heading.numbered_unconfirmed" in {c.code for c in f.failed_checks} for f in fixes)
+
+
+def test_a_long_numbered_title_is_a_decision():
+    titles = ("Forces", "Energy and Work in a Closed System")
+    fixes = heading_fixes(analyze(pdf_of(numbered_page(titles=titles))).elements)
+    assert [f.review for f in fixes] == ["optional", "required"]
+
+
+def test_numbered_exercises_and_questions_are_paragraphs_not_headings():
+    layout = analyze(
+        pdf_of(numbered_page(titles=("Find the final speed of the cart", "What is the mass")))
+    )
+    assert texts(layout, Kind.HEADING) == []
+
+
+def test_numbered_lines_in_different_columns_are_not_a_sequence():
+    def fill(number, page):
+        y = para(page, 72)
+        y = one(page, y, "1 Forces")
+        para(page, y)
+        y = para(page, 72, SENTENCE[:38], x=330)
+        y = one(page, y, "2 Energy", x=330)
+        para(page, y, SENTENCE[:38], x=330)
+
+    assert texts(analyze(pdf_of(fill)), Kind.HEADING) == []
 
 
 def test_one_numbered_line_alone_stays_a_paragraph():
@@ -263,8 +345,20 @@ def test_math_italic_letters_in_a_heading_are_plain_letters():
 def test_math_italic_letters_fold_but_other_symbols_stay():
     from readablestem.pipeline.layout import readable_math_letters
 
-    assert readable_math_letters("\U0001d454 = ℎν, \U0001d7d9 − α") == ("g = hν, 1 − α")  # noqa: RUF001
+    assert readable_math_letters("\U0001d454 = \u210e\u03bd, \U0001d7d9 \u2212 \u03b1") == (
+        "g = h\u03bd, \U0001d7d9 \u2212 \u03b1"
+    )
+    assert readable_math_letters("\U0001d431 and \U0001d6fc and \U0001d7ce") == "x and \u03b1 and 0"
     assert readable_math_letters("plain text") == "plain text"
+
+
+def test_number_sets_and_letterlike_symbols_are_not_flattened():
+    from readablestem.pipeline.layout import readable_math_letters
+
+    text = (
+        "Functions on \u211d, \u2102, \u2115, \u2124, \u211a with \u2113 and \u2112 and \U0001d538"
+    )
+    assert readable_math_letters(text) == text
 
 
 # ---------------------------------------------- 4. paragraphs across a page break
@@ -306,6 +400,8 @@ def test_a_paragraph_cut_by_a_page_break_is_one_element():
     joined = [e for e in paragraphs(layout) if "continues to speed up" in (e.text or "")]
     assert len(joined) == 1
     assert joined[0].page == 0
+    assert joined[0].last_page == 1  # the pages it spans, for a writer that marks page breaks
+    assert all(e.last_page is None for e in layout.elements if e is not joined[0])
     assert joined[0].text.endswith("stays level for the whole trip.")
     assert [e.page for e in paragraphs(layout)].count(1) == 1  # only the paragraph after it
 
@@ -540,3 +636,25 @@ def test_a_repeated_label_at_its_own_columns_margin_stays_a_heading():
     layout = analyze(pdf_of(fill))
     assert texts(layout, Kind.HEADING) == ["Solution", "Solution"]
     assert not any(REASON_RUN_IN_LABEL in e.reasons for e in layout.elements)
+
+
+def test_a_list_item_at_a_page_foot_is_not_joined_to_the_next_page():
+    def fill(number, page):
+        page.insert_text((300, 760), str(number + 1), fontsize=9, fontname="helv")
+        if number == 0:
+            y = para(page, 72)
+            y = para(page, y)
+            y = para(page, y)
+            page.insert_text(
+                (72, 640), "1. Set the cart at the top of the ramp.", fontsize=BODY, fontname="helv"
+            )
+            page.insert_text(
+                (72, 654), "2. Check that the cart continues to", fontsize=BODY, fontname="helv"
+            )
+        else:
+            page.insert_text((72, 72), "speed up until the end.", fontsize=BODY, fontname="helv")
+            para(page, 120)
+
+    layout = analyze(pdf_of(fill, pages=2))
+    assert not any("continues to speed up" in (e.text or "") for e in layout.elements)
+    assert all(e.last_page is None for e in layout.elements)

@@ -1980,13 +1980,33 @@ held-out data was used.
   reading right: "... Aluminium" / "sulfate has the formula ..."), no wrapped inline
   equation (none occurs in them), and outline reasons on 35 headings in 6 PDFs. The unit
   tests (`tests/test_layout_structure_fixes.py`) pin each fix on PDFs drawn in the test.
-- `data/eval/baseline-headings.json` and `latest-headings.json` were replaced with the new
-  run on purpose, as on 2026-10-14 (the gate compares them with each other; both only gain,
-  precision 0.850 to 0.914, recall the same); their model fields are the earlier run's
-  because the task calls no model. `make reproduce-rerun` already failed before this change
-  on a clean checkout of main when run here with no key (its headings re-run exited with
-  status 2, and its tables numbers differ from `latest-tables-local.json`); `eval pipeline
-  --task headings --fake` reproduces the numbers above.
+- **The review-load flags moved the wrong way on the original set**, and this is not a
+  gain. Flag recall (the share of wrong headings that were in a required decision) fell
+  from 0.333 to 0.176 and flag precision from 0.833 to 0.750 (`review_load.flags`, not
+  gated). Why: the 8 repeated labels the run-in rule turned into bold text were wrong
+  headings that sat in required group decisions; they are now not headings at all, so wrong
+  headings fall from 42 to 34 and the wrong ones inside required decisions from 14 to 6,
+  but the 28 wrong headings that no decision asks about are unchanged, so the share asked
+  about is smaller. A person is asked about fewer headings (6 to 4 required decisions) and
+  fewer of them are wrong, which is the point of the rule; what it does not do is catch the
+  other wrong headings. On dev-v2 dev the same flags rose (precision 0.305 to 0.424, recall
+  0.248 to 0.393, 59 required decisions both times: the bookmarks put some headings right
+  that were wrong-level decisions). In the document task on the original set (fake client)
+  flag recall goes 0.611 to 0.562 and flag precision 0.972 to 0.971, the same effect.
+- `data/eval/latest-headings.json` is replaced with the new run (pipeline 0.5.1, fake
+  client; model fields kept from the earlier run because the task calls no model).
+  `baseline-headings.json` is **not** replaced: the gate (`heading_recall` -0.030 and
+  `heading_precision` -0.030 allowed) passes against the 2026-10-14 baseline (precision
+  0.850 to 0.914, recall the same; it notes the pipeline version change), and the ungated
+  flags above are the old baseline's to compare with. The document and equation baselines
+  and `latest-document.json` come from recorded model runs ($0.28 and up) that cannot be
+  made again offline: the document task's required decisions and flags with a real model
+  will be a little lower on heading decisions (2 of the original set's heading decisions
+  went; the fake run's 63 to 61 is that, not a model number), and are not re-recorded
+  here. `make reproduce-rerun` already failed on a clean checkout of main when run here
+  with no key (its headings re-run exited with status 2, and its tables numbers differ from
+  `latest-tables-local.json`); `eval pipeline --task headings --fake` reproduces the
+  numbers above.
 - Sample sizes are small and the gold is OpenStax Physics plus authored documents; none of
   this is a rate on other documents. The outline fix needs a PDF that has bookmarks, which
   no OpenStax page print has.

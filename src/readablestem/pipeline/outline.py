@@ -5,10 +5,16 @@ outline: titles with levels and a page each (`Document.get_toc`). The author or 
 wrote it from the document's real structure, so where it agrees with the page text it says
 more than font sizes can (docs/layout.md, "The PDF's outline"):
 
-- a line whose text is a bookmark's title, on that bookmark's page, is a heading even in
-  body-size regular type, and its level is the bookmark's (`REASON_OUTLINE`, "outline
-  heading h2"); the heading step treats it like a tagged heading (`layout.tagged_level`),
-  and a real tag wins over it;
+- a heading that layout found, whose text is a bookmark's title on that bookmark's page,
+  has the bookmark's level (`REASON_OUTLINE`, "outline heading h2"); the heading step treats
+  it like a tagged heading (`layout.tagged_level`), and a real tag wins over it;
+- a paragraph that is a bookmark's title becomes a heading only if it looks like one
+  (`_promotion`): short, no sentence end, and either bold or set larger than the body
+  text (`REASON_OUTLINE`, as above) or set off by space above it (`REASON_OUTLINE_WEAK`,
+  "outline candidate h2": the bookmark's level, but weak evidence, so an optional note
+  like any bold body-size line). A tool that bookmarks every short paragraph does not turn
+  them all into headings: if more than `MAX_PROMOTED_SHARE` of the document's paragraphs
+  (and more than `MIN_PROMOTED` of them) would be promoted, none is;
 - the heading's text becomes the bookmark's title when the two differ only in spacing,
   case, punctuation or the letter styles of maths (a math-italic letter in the page text);
 - no bookmark is used unless the outline is *consistent* with the pages: at least
@@ -28,6 +34,7 @@ from __future__ import annotations
 import math
 import re
 import unicodedata
+from collections import Counter
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
@@ -36,6 +43,14 @@ import pymupdf
 from readablestem.core.types import INLINE_MARKER_RE, Element, Kind
 
 REASON_OUTLINE = "outline heading h"
+REASON_OUTLINE_WEAK = "outline candidate h"
+MAX_PROMOTED_SHARE = 0.3  # of the paragraphs a document has
+MIN_PROMOTED = 2  # promotions that are always allowed, whatever the share
+MAX_PROMOTED_WORDS = 12
+MAX_PROMOTED_CHARS = 100
+LARGER = 1.1  # x the body size: set larger
+GAP_ABOVE = 0.8  # x the line's own height of space above, for a plain line
+_NOT_A_TITLE_END = ".?!:;,"
 MIN_MATCH_SHARE = 0.6  # of the bookmarks into the analysed pages that must name a line
 MAX_ENTRIES = 5000  # a hostile outline is not walked
 MAX_TITLE_CHARS = 200
@@ -151,9 +166,19 @@ def apply(
         sizes = {round((e.font_size or 0.0) * 2) for _, e in pairs if e.kind == Kind.HEADING}
         if len(sizes) > 1:
             return elements
-    updates: dict[str, dict] = {}
+    plan: list[tuple[Bookmark, Element, str]] = []
+    context = _Context(elements)
     for mark, element in pairs:
-        update: dict = {"reasons": [*element.reasons, f"{REASON_OUTLINE}{mark.level}"]}
+        if element.kind == Kind.HEADING:
+            plan.append((mark, element, REASON_OUTLINE))
+        elif (reason := _promotion(element, context)) is not None:
+            plan.append((mark, element, reason))
+    promoted = sum(e.kind == Kind.PARAGRAPH for _, e, _ in plan)
+    if promoted > max(MIN_PROMOTED, MAX_PROMOTED_SHARE * context.paragraphs):
+        plan = [(m, e, r) for m, e, r in plan if e.kind == Kind.HEADING]
+    updates: dict[str, dict] = {}
+    for mark, element, reason in plan:
+        update: dict = {"reasons": [*element.reasons, f"{reason}{mark.level}"]}
         if element.kind == Kind.PARAGRAPH:
             update["kind"] = Kind.HEADING
         if (
@@ -164,3 +189,55 @@ def apply(
             update["text"] = mark.title
         updates[element.id] = update
     return [e.model_copy(update=updates[e.id]) if e.id in updates else e for e in elements]
+
+
+def weak_level(element: Element) -> int | None:
+    """The level of a weak outline promotion (`REASON_OUTLINE_WEAK`), else None."""
+    for reason in element.reasons:
+        if reason.startswith(REASON_OUTLINE_WEAK) and reason[len(REASON_OUTLINE_WEAK) :].isdigit():
+            return int(reason[len(REASON_OUTLINE_WEAK) :])
+    return None
+
+
+class _Context:
+    """What a paragraph is set against: the body size, the line above it, the paragraph count."""
+
+    def __init__(self, elements: Sequence[Element]) -> None:
+        weights: Counter[float] = Counter()
+        self.paragraphs = 0
+        self.above: dict[str, Element | None] = {}
+        last: dict[int, Element] = {}
+        for element in sorted(elements, key=lambda e: e.order):
+            if element.parent_id is not None:
+                continue
+            self.above[element.id] = last.get(element.page)
+            last[element.page] = element
+            if element.kind == Kind.PARAGRAPH and element.text:
+                self.paragraphs += 1
+                if element.font_size:
+                    weights[round(element.font_size * 2) / 2] += len(element.text)
+        self.body = max(weights.items(), key=lambda kv: (kv[1], kv[0]))[0] if weights else 0.0
+
+
+def _promotion(element: Element, context: _Context) -> str | None:
+    """How a paragraph that is a bookmark's title may become a heading: `REASON_OUTLINE`
+    (short and bold or larger than the body text), `REASON_OUTLINE_WEAK` (short and set off by
+    space above), or None (it stays a paragraph)."""
+    text = (element.text or "").strip()
+    if (
+        not text
+        or len(text) > MAX_PROMOTED_CHARS
+        or len(text.split()) > MAX_PROMOTED_WORDS
+        or text[-1] in _NOT_A_TITLE_END
+    ):
+        return None
+    size = element.font_size or 0.0
+    if element.bold or (context.body and size >= LARGER * context.body):
+        return REASON_OUTLINE
+    above = context.above.get(element.id)
+    height = element.bbox[3] - element.bbox[1]
+    if above is None or above.page != element.page:
+        return REASON_OUTLINE_WEAK
+    if element.bbox[1] - above.bbox[3] >= GAP_ABOVE * height:
+        return REASON_OUTLINE_WEAK
+    return None
