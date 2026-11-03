@@ -49,6 +49,17 @@
   `max-age` instead of `no-store` or `no-cache`.
 ## Unreleased
 
+- Tables, structure (`pipeline/tables.py`; [docs/tables.md](docs/tables.md), "Known misses"): the rest of an unruled
+  table that a page break carried over is found by its repeated header and joined (a split row is merged, the
+  repeated header dropped); a booktabs table with text in only one column is kept; an unruled box that holds two
+  tables is split at a caption or a clear gap; a booktabs table read without the model file (a fallback: production has it, so production
+  grids are unchanged) no longer gets a column for a cell with a gap in it. A new "Table N" caption over a repeated
+  header is a new table, not a continuation. Maths in cells is unchanged: it needs the equation step's model calls.
+- Local table eval, gold (45 documents, 197 gold tables): with the model file TEDS 0.941 and detection recall and
+  precision 0.985 and 0.985, unchanged; without it TEDS 0.912 to 0.928. The continued-table, sparse-table and split-box fixes change nothing on any PDF
+  of the repository's fixtures, the three real-document sets and the eval's prints (128 PDFs, 245 tables); the
+  fixes are pinned by generated pages. Real-document sets unchanged (25, 39 and 58 labelled tables, precision 1.000).
+  `make fuzz-tables`: 300 of 300 mutants ok, as before.
 ### Navigation in the output, and combining the parts of a long source (branch feat/output-navigation)
 
 - The converted file now has a skip link, a contents list (`<nav aria-label="Contents">`, nested links to the
