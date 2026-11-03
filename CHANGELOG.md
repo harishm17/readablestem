@@ -64,6 +64,13 @@
 ### EPUB export
 
 - `readablestem export epub FILE.html OUT.epub`: an EPUB 3 from the finished HTML (`pipeline/export_epub.py`): XHTML with native MathML, images as files with their alt text, a contents list from the headings, a page list from page markers when present, language, title and accessibility metadata. No `conformsTo`; the summary makes no conformance claim; a feature is claimed only when every item has it. Scripts, frames, forms, remote pictures and `url()` styles are not carried. EPUBCheck and DAISY Ace run on it in `.github/workflows/epub.yml` and locally when installed ([docs/output.md](docs/output.md), "The EPUB export"). No route or button yet.
+### Documentation
+
+- `docs/screen-reader-test.md`: a 15-minute VoiceOver (Safari) protocol for the demo, a converted file and the review screen, with a results table that maps to WCAG 2.2 criteria.
+### Microsoft sign-in configuration
+
+- `.railway/railway.ts` declares `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and `MS_ALLOWED_TENANTS` on the web service as `preserve()`, so values set with `railway variable set` survive `railway config apply`. `docs/deploy-railway.md` has a "Microsoft sign-in on Railway" section with the app registration, the secret's expiry, the allowed directory ids and the exact commands.
+- `readablestem ops launch-check` also lists `MS_ALLOWED_TENANTS` set without a client id and secret (the sign-in would be quietly off). A client id or secret alone was already refused.
 
 ### Layout structure: bookmarks, numbered and run-in headings, joins (2026-11-02, branch fix/layout-structure)
 
