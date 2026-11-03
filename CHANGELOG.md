@@ -18,6 +18,75 @@
   says only "bold". Measured by replay of the recorded fresh4 run in docs/eval-equation-glyph-checks.md.
 - `scripts/realworld_run.py rs --glyph-checks` turns the setting on for a replay.
 
+## Unreleased: page witness (branch eq/page-witness)
+
+- Page witness (off: `FEATURE_PAGE_WITNESS`): one call per maths page to `PAGE_WITNESS_MODEL`
+  (`claude-opus-5-5`, output limit 12,288) reads every formula on the page, table cells, captions and
+  figure labels included, each anchored in the text layer (`pipeline/page_witness.py`, prompt
+  `page_witness.md`; dense pages in windows, a refusal recorded, budget reserved per call).
+  `pipeline/witness_reconcile.py` lays it against layout's equations by extent (within one glyph).
+  Agreement is a note only: it lifts no confidence and skips no second reading, because on pooled gold
+  (7,390 equations) P(correct | agree) was 94.8%, under the 97% needed. A disagreement is a required
+  decision with the reading nearer the extent's glyphs first and the other in `EquationFix.other_latex`;
+  a formula only the witness read, with maths-glyph evidence and clear of other elements, is a new
+  element and a required decision. New fields: `Element.witness_latex`, `witness_status`,
+  `EquationFix.other_latex`, `other_source`, `DocumentResult.page_witness`. The review card does not
+  show the other reading yet. Documented in docs/steps.md. Not measured (E1 is a later step).
+## Unreleased: pen strokes check handwritten vector pages (branch hw/stroke-checks)
+
+- `pipeline/image_page_vector.py` (new): on a page `page_type` calls handwritten and `ink_strokes`
+  analysed, the image page pass now (1) draws the picture of each display equation, prose block
+  and left-out stretch from the strokes alone (300 dpi, black on white, cut to the ink) for the
+  model, the review screen and the student file; (2) checks each equation's reading against the
+  strokes: a letter in the other case (c o s u v w x z), a script lost, added or moved; (3)
+  compares the page's stroke groups with the blocks' boxes, so ink the reading left out becomes
+  the existing omission decision, including pale ink. Checks add failed warnings
+  (`image_page.case_check`, `image_page.script_check`; sentences in `web/messages.py`) to the
+  equation's fix and never change its required decision. Pages with no strokes, and every scan,
+  are read as before.
+- Settings `IMAGE_PAGES_VECTOR_CROPS` and `IMAGE_PAGES_VECTOR_CHECKS`, `VECTOR_CROPS` off until measured, `VECTOR_CHECKS` on. `layout.page_ink`
+  reads a page's strokes under the document lock; `run.recrop` can take the pages' kinds so a stored
+  vector page is drawn the way it was converted.
+- `scripts/handwriting_vector_checks.py` measures the checks on built vector sets at no cost
+  (put-in errors in the gold readings). Held-out (318 expressions): raised scripts taken out are
+  named 27 of 65 times at 12 of 172 false alarms, a case flip 21 of 37 at 6 of 25, a dropped
+  block 314 of 318 at 0 of 54 pages (the raster check: 290 of 318 at 11 of 54, and 0 on pale ink).
+  Not measured: real iPad ink, or the reader on the drawn pictures (docs/eval-handwriting.md,
+  "Checks from strokes").
+
+## Unreleased: agreement oracle on the recorded chatbot answers (branch eq/agreement-oracle)
+
+- `scripts/eq_oracle_agreement.py` and a D2 section of docs/eval-equation-diagnostics.md: how often
+  a second whole-page reading (the recorded Opus chatbot answers) is right where ours is wrong, how
+  often our reading is right when the two agree under `math_canonical`, how well disagreement
+  flags our wrong readings, and how many of our undetected equations it found. Measurement only,
+  offline, no change to the product.
+
+## Unreleased: a second reader's reading and choices on the review card (branch hw/reconcile-and-chips)
+
+- `pipeline/image_page_reconcile.py`: with `IMAGE_PAGES_SECOND_READER` set (`local`, `claude` or
+  `openai`; default `off`, and the reader must also be enabled), the crop of each handwritten display
+  equation is read by that reader and compared with the page's reading. Agreement is a note and the
+  item stays a required decision; a difference is a note and, where it is a few symbols, fills
+  `Element.alternatives`; an unavailable reader, a spent time share (`IMAGE_PAGES_SECOND_READER_TIME_S`)
+  or a spent reader budget leaves the item as it was and adds one notice for the document
+  (`second_reader_unavailable`, `second_reader_budget`) instead of a line on every equation. A read
+  is not started unless it fits the share, which never outlasts the job's own time limit (it now
+  reaches the child). The reader's own spend limit is never a failed fix, so it cannot stop the job.
+  In the hosted conversion child only the local reader can run: a production start is refused with
+  `claude` or `openai`, or with `local` and no model files (also in `ops launch-check`). The child's
+  counts come back in `ImagePagesSummary.second_reader` and the worker logs `second_reader_job`.
+- Image-page equations and tables are explicitly never part of a bulk accept.
+- A chosen reading is recorded in the review record as a choice.
+- Review card: a handwritten equation whose second reading differed shows one-click choices
+  ("Use capital X") under the proposal; each posts an ordinary edit (checks, record, Undo), none is
+  chosen for the person, and nothing changes while there are no alternatives. Keyboard, 44 px targets,
+  forced-colors and axe are tested.
+- The two reader prompts moved under `models/prompts/` (`math_reader.md`, `math_reader_claude.md`),
+  text unchanged, so the eval guard sees them (mapped to `latest-image-pages.json`).
+- New check messages for the agree and differ notes (`image_page.second_reader`) and two notice messages.
+- Not measured: how often the choices contain the right reading, or whether decisions per page fall
+  (docs/eval-handwriting.md).
 ## Unreleased: a local handwriting reader (branch hw/local-reader)
 
 - New reader B, `local` (`models/math_readers/local_reader.py`): TexTeller on CPU with ONNX

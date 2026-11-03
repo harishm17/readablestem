@@ -92,7 +92,7 @@ import threading
 import time
 from bisect import bisect_left
 from collections import Counter, defaultdict
-from collections.abc import Callable, Generator, Iterable
+from collections.abc import Callable, Generator, Iterable, Mapping
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -119,6 +119,7 @@ from readablestem.core.types import (
     Notice,
     PageMathSummary,
     PageStats,
+    PageWitnessSummary,
     ProgressEvent,
     SourceFacts,
     Stage,
@@ -126,6 +127,7 @@ from readablestem.core.types import (
     inline_marker,
 )
 from readablestem.models.base import T, VisionClient, VisionRequest
+from readablestem.models.math_readers.base import MathReader
 from readablestem.models.pricing import UnknownModelError
 from readablestem.observability.tracing import NoopTracer, Tracer
 from readablestem.pipeline import (
@@ -137,14 +139,18 @@ from readablestem.pipeline import (
     html_checks,
     image_page,
     image_page_check,
+    image_page_reconcile,
+    image_page_vector,
     layout,
     page_labels,
     page_math,
     page_math_reconcile,
     page_type,
+    page_witness,
     table_step,
     tagged,
     text_pass,
+    witness_reconcile,
 )
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline import options as run_options
@@ -720,7 +726,9 @@ def _unit_scale(_element: Element) -> float:
     return 1.0
 
 
-def recrop(pdf: bytes, elements: list[Element]) -> dict[str, bytes]:
+def recrop(
+    pdf: bytes, elements: list[Element], kinds: dict[int, str] | None = None
+) -> dict[str, bytes]:
     """The pictures a conversion of `pdf` cuts for these elements, without converting
     anything: the crop of every equation, figure and table, an equation's cut sharp for the
     size it is shown at (T3-15), exactly as `_Run.crop_and_submit` does. For showing a
@@ -728,6 +736,12 @@ def recrop(pdf: bytes, elements: list[Element]) -> dict[str, bytes]:
     paid. An element whose crop fails has none."""
     scale = equation_scale.scaler(elements)
     crops: dict[str, bytes] = {}
+    vector: dict[int, image_page_vector.VectorPage] = {}
+    # `kinds` (each page's `page_type` kind) is given only by a caller whose conversion drew
+    # the pictures from strokes (`IMAGE_PAGES_VECTOR_CROPS`, off by default).
+    if kinds:
+        wanted = {e.page for e in elements if image_page_vector.wants_picture(e)}
+        vector = image_page_vector.analyse(pdf, wanted, kinds)
     try:
         for element in elements:
             if element.kind not in _MODEL_KINDS:
@@ -738,6 +752,17 @@ def recrop(pdf: bytes, elements: list[Element]) -> dict[str, bytes]:
                     png = layout.crop(
                         pdf, element, dpi=equation_scale.crop_dpi(scale(element)), tag_dpi=True
                     )
+                    png = (
+                        image_page_vector.element_picture(
+                            vector,
+                            element,
+                            dpi=equation_scale.crop_dpi(scale(element)),
+                            tag_dpi=True,
+                        )
+                        or png
+                    )
+                elif (drawn := image_page_vector.element_picture(vector, element)) is not None:
+                    png = drawn
             except Exception as exc:
                 log.warning("crop failed: %s", type(exc).__name__)
                 continue
@@ -793,6 +818,9 @@ class _Run:
     observer: Callable[[ModelCall], None] | None = None
     # The scale an equation's picture is shown at in the student file (T3-15).
     eq_scale: Callable[[Element], float] = field(default_factory=lambda: _unit_scale)
+    # Pen strokes of the handwritten vector pages read as images: the pictures of their lines
+    # are drawn from these (`image_page_vector`), by 0-based page.
+    vector: dict[int, image_page_vector.VectorPage] = field(default_factory=dict)
     # The paragraph (or list item, figure) each inline equation sits in, by id.
     parents: dict[str, Element] = field(default_factory=dict)
 
@@ -840,6 +868,13 @@ class _Run:
         failed: the ordinary crop is used then)."""
         if element.kind is not Kind.EQUATION:
             return None
+        if element.page in self.vector:
+            return image_page_vector.element_picture(
+                self.vector,
+                element,
+                dpi=equation_scale.crop_dpi(self.eq_scale(element)),
+                tag_dpi=True,
+            )
         try:
             return layout.crop(
                 self.pdf_bytes,
@@ -898,7 +933,11 @@ class _Run:
             return
         # The student file shows an unconverted equation at the size of its text, cut
         # sharp for that size (T3-15); the model is sent the same crop as ever, and the
-        # review screen shows this one. Any other crop is as it was.
+        # review screen shows this one. Any other crop is as it was. On a vector page of
+        # handwriting the picture is drawn from the strokes, for the model and the person alike.
+        drawn = image_page_vector.element_picture(self.vector, element)
+        if drawn is not None:
+            png = drawn
         self.crops[element.id] = self.sharp_equation(element) or png
         if element.id in self.fixes or image_page.is_original(element):
             return  # decided before any model work: a scanned page, a converted page's picture
@@ -981,11 +1020,9 @@ class _Run:
                 continue
             try:
                 done = future.result()
-            except BaseException as e:  # the failed step itself, or a worker that died
-                print("DBG exc", repr(e))
+            except BaseException:  # the failed step itself, or a worker that died
                 continue
             key = self.keys.get(element.id)
-            print("DBG", element.kind, key is not None, done.fix.status, done.fix.reason)
             if key and reusable(done.fix):
                 self.cache.store(element, key, done.fix)
             self.futures.pop(future, None)
@@ -1266,6 +1303,8 @@ def convert_pdf(
     stage_progress: StageProgressFn | None = None,
     step_cache: StepCache | None = None,
     call_observer: Callable[[ModelCall], None] | None = None,
+    readers: Mapping[str, MathReader] | None = None,
+    time_limit_s: float | None = None,
 ) -> ConversionOutput:
     """Convert one PDF (0-based `pages`, all by default) into a `PipelineOutput`.
 
@@ -1291,6 +1330,12 @@ def convert_pdf(
     `step_cache` keeps the answers of finished model steps and gives them back to a later
     run of the same document (module docstring); without one every step is asked.
     `call_observer` is told each model request's `ModelCall` when it ends (any thread).
+
+    `readers` are the second readers of handwriting (`models.math_readers.build_readers`) for
+    `Settings.image_pages_second_reader`; without them the local reader is built when it is
+    the chosen one (`image_page_reconcile.default_readers`), which is all the conversion child
+    can do (it has no keys and no network). `time_limit_s` is the job's own wall-clock limit when
+    the caller has one: the second readings are kept inside what it leaves.
     """
     if options is None:
         options = ConversionOptions.from_settings(settings)
@@ -1309,7 +1354,34 @@ def convert_pdf(
             stage_progress=stage_progress,
             step_cache=step_cache,
             call_observer=call_observer,
+            readers=readers,
+            time_limit_s=time_limit_s,
         )
+
+
+def _second_readings(
+    elements: list[Element],
+    run: _Run,
+    settings: Settings,
+    readers: Mapping[str, MathReader] | None,
+    *,
+    share_s: float,
+) -> image_page_reconcile.Summary | None:
+    """Compare each handwritten equation's reading with the second reader's, when one is
+    chosen and can be built. Optional: whatever goes wrong here leaves every item as it was."""
+    try:
+        pool = readers if readers is not None else image_page_reconcile.default_readers(settings)
+        reader = image_page_reconcile.chosen(settings, pool)
+        if reader is None:
+            # (a reader that only the parent can build, with no way to reach it from here)
+            log.warning("second_reader_not_built: %s", settings.image_pages_second_reader)
+            return None
+        return image_page_reconcile.reconcile(
+            elements, run.fixes, run.crops, reader, settings, share_s=share_s
+        )
+    except Exception as exc:
+        log.warning("second readings failed: %s", type(exc).__name__)
+        return None
 
 
 def _page_math_pass(
@@ -1382,10 +1454,87 @@ def _page_math_pass(
     return doc, summary
 
 
+def _page_witness_pass(
+    pdf_bytes: bytes,
+    doc: Any,
+    collector: page_math_reconcile.PageMathHook,
+    *,
+    client: VisionClient,
+    settings: Settings,
+    concurrency: int,
+    tracer: Tracer,
+) -> tuple[list[Element], PageWitnessSummary]:
+    """The page witness (`pipeline/page_witness.py`) over the document's maths pages and its
+    reconciliation with the elements layout found (`pipeline/witness_reconcile.py`): the
+    elements back, each equation with its witness reading and any formula only the witness
+    found as a new element. Fails open: a page the model could not answer, a cap that stopped
+    the pass, or a reconciliation that fails leaves the elements as layout has them.
+    `ConfigError` and `UnknownModelError` propagate like they do from every step."""
+    elements: list[Element] = list(doc.elements)
+    kept = set(getattr(doc, "kept_pages", None) or {})
+    equations = Counter(e.page for e in elements if e.kind is Kind.EQUATION)
+    offered = {
+        number: (collector.rows[number], partial(_witness_image, pdf_bytes, number))
+        for number in collector.rows
+        if number not in kept
+        and page_witness.is_maths_page(
+            collector.objects.get(number, {}), equations=equations.get(number, 0)
+        )
+    }
+    with _span(tracer, "page_witness", pages=len(offered)) as span:
+        result = page_witness.run(client, settings, offered, concurrency=concurrency)
+        plan = result.plan
+        calls = result.calls
+        reconciled = witness_reconcile.ReconcileStats()
+        try:
+            done = witness_reconcile.reconcile(elements, plan, collector.rows, collector.objects)
+            elements, reconciled = done.elements, done.stats
+        except Exception as exc:  # the elements as layout has them stand
+            log.warning("page witness: reconciliation failed: %s", type(exc).__name__)
+        stats = plan.stats
+        summary = PageWitnessSummary(
+            pages=len(plan.pages),
+            failed=sum(p.failed is not None for p in plan.pages.values()),
+            refused=stats.refused,
+            calls=len(calls),
+            split_pages=sum(p.stats.windows > 1 or p.stats.splits > 0 for p in plan.pages.values()),
+            unoffered_rows=stats.unoffered_rows,
+            cost_usd=round(sum(c.cost_usd for c in calls), 8),
+            proposed=stats.proposed,
+            verified=stats.verified,
+            dropped=stats.dropped + stats.overlapped,
+            matched=reconciled.matched,
+            extent_differs=reconciled.extent_differs,
+            added=reconciled.added,
+            no_glyph_evidence=reconciled.no_glyph_evidence,
+            inside_text=reconciled.inside_text,
+            stopped_by=result.stopped.scope if result.stopped is not None else None,
+        )
+        _annotate(
+            span,
+            cost_usd=summary.cost_usd,
+            calls=summary.calls,
+            verified=summary.verified,
+            added=summary.added,
+        )
+    return elements, summary
+
+
+def _witness_image(pdf_bytes: bytes, number: int) -> bytes:
+    """The page's picture for the witness: as large as the vision models read it."""
+    return layout.render_page(
+        pdf_bytes,
+        number,
+        dpi=page_witness.IMAGE_DPI,
+        max_side_px=page_witness.IMAGE_MAX_SIDE_PX,
+    )
+
+
 def _image_pages_pass(
     pdf_bytes: bytes,
     kept: dict[int, str],
     boxes: dict[int, BBox],
+    vector: dict[int, image_page_vector.VectorPage],
     *,
     client: VisionClient,
     settings: Settings,
@@ -1416,6 +1565,8 @@ def _image_pages_pass(
     }
     with _span(tracer, "image_pages", pages=len(pages)) as span:
         result = image_page.run(recording, settings, renders, concurrency=concurrency)
+        for number, read in result.reads.items():
+            read.vector = vector.get(number)  # (empty when both vector settings are off)
         if (
             settings.image_pages_omission_check
             and settings.image_pages_recover_omissions
@@ -1438,6 +1589,7 @@ def _image_pages_pass(
                     verdicts=read.verdicts,
                     accept_agreed=settings.image_pages_accept_agreed,
                     maths_required=settings.image_pages_maths_always_required,
+                    page_ink=read.vector if settings.image_pages_vector_checks else None,
                 )
             except Exception as exc:  # the page stays an image: a bad answer is not worth more
                 log.warning("image page build failed: %s", type(exc).__name__)
@@ -1470,6 +1622,8 @@ def _convert(
     stage_progress: StageProgressFn | None,
     step_cache: StepCache | None = None,
     call_observer: Callable[[ModelCall], None] | None = None,
+    readers: Mapping[str, MathReader] | None = None,
+    time_limit_s: float | None = None,
 ) -> ConversionOutput:
     """`convert_pdf`'s body, with its options already in force."""
     tracer = tracer or NoopTracer()
@@ -1478,7 +1632,11 @@ def _convert(
         cached = _CachedDocument(pdf_bytes)
         try:
             _send(stage_progress, "layout")
-            collector = page_math_reconcile.PageMathHook() if options.page_math else None
+            collector = (
+                page_math_reconcile.PageMathHook()
+                if options.page_math or options.page_witness
+                else None
+            )
             # (`page_math` only when asked for: stand-ins for `analyze` take no such argument)
             doc = layout.analyze(
                 pdf_bytes,
@@ -1487,7 +1645,9 @@ def _convert(
                 **({} if collector is None else {"page_math": collector}),
             )
             page_math_summary: PageMathSummary | None = None
-            if collector is not None:
+            witness_summary: PageWitnessSummary | None = None
+            witnessed: list[Element] | None = None
+            if collector is not None and options.page_math:
                 doc, page_math_summary = _page_math_pass(
                     pdf_bytes,
                     doc,
@@ -1498,12 +1658,25 @@ def _convert(
                     concurrency=concurrency,
                     tracer=tracer,
                 )
-            elements = sorted(doc.elements, key=lambda e: e.order)
+            if collector is not None and options.page_witness:
+                witnessed, witness_summary = _page_witness_pass(
+                    pdf_bytes,
+                    doc,
+                    collector,
+                    client=client,
+                    settings=settings,
+                    concurrency=concurrency,
+                    tracer=tracer,
+                )
+            elements = sorted(
+                doc.elements if witnessed is None else witnessed, key=lambda e: e.order
+            )
             kept: dict[int, str] = dict(getattr(doc, "kept_pages", None) or {})
             sizes = dict(zip(doc.pages, getattr(doc, "page_sizes", None) or [], strict=False))
             boxes = _page_boxes(pdf_bytes, kept, sizes)
             image_built: dict[int, image_page.Built] = {}
             image_summary: ImagePagesSummary | None = None
+            vector_pages: dict[int, image_page_vector.VectorPage] = {}
             if options.image_pages:
                 # (a picture under a text layer that does not cover it is kept as an
                 # unread page and read as a scan: `page_type.reads_image`)
@@ -1515,10 +1688,17 @@ def _convert(
                     else reason
                     for n, reason in kept.items()
                 }
+                if settings.image_pages_vector_crops or settings.image_pages_vector_checks:
+                    vector_pages = image_page_vector.analyse(
+                        pdf_bytes,
+                        to_read,
+                        {n: r.kind for n, r in (getattr(doc, "page_types", None) or {}).items()},
+                    )
                 image_built, image_summary = _image_pages_pass(
                     pdf_bytes,
                     to_read,
                     boxes,
+                    vector_pages,
                     client=client,
                     settings=settings,
                     concurrency=concurrency,
@@ -1565,6 +1745,7 @@ def _convert(
                 futures={},
                 cache=step_cache,
                 observer=call_observer,
+                vector=vector_pages if settings.image_pages_vector_crops else {},
             )
             # The text pass adds links, colour runs and passage languages to the elements
             # without touching their text or anything a step reads, and the heading
@@ -1583,6 +1764,28 @@ def _convert(
         finally:
             cached.release()  # also when analysis, a step or `progress` failed
 
+        if settings.image_pages_vector_checks and vector_pages and image_built:
+            image_page_vector.add_checks(elements, run.fixes, vector_pages)
+        reading_cost = 0.0
+        reading_notices: list[Notice] = []
+        if image_built and settings.image_pages_second_reader != "off":
+            with _span(tracer, "second_readings") as reading_span:
+                share = image_page_reconcile.share_s(
+                    settings, time_limit_s, time.perf_counter() - started
+                )
+                reconciled = _second_readings(elements, run, settings, readers, share_s=share)
+                if reconciled is not None:
+                    reading_cost = reconciled.cost_usd
+                    reading_notices = reconciled.notices()
+                    if image_summary is not None:
+                        image_summary.second_reader = reconciled.record()
+                    _annotate(
+                        reading_span,
+                        considered=reconciled.considered,
+                        agreed=reconciled.agreed,
+                        differed=reconciled.differed,
+                        cost_usd=reconciled.cost_usd,
+                    )
         if settings.image_pages_maths_always_required and image_built:
             image_page.enforce_maths_required(elements, run.fixes)
         ordered = _ordered_fixes(elements, run.fixes)
@@ -1614,6 +1817,15 @@ def _convert(
                     "model_calls": stats.model_calls + page_math_summary.calls,
                 }
             )
+        if witness_summary is not None:
+            stats = stats.model_copy(
+                update={
+                    "cost_usd": round(stats.cost_usd + witness_summary.cost_usd, 8),
+                    "model_calls": stats.model_calls + witness_summary.calls,
+                }
+            )
+        if reading_cost:
+            stats = stats.model_copy(update={"cost_usd": round(stats.cost_usd + reading_cost, 8)})
         if image_summary is not None:
             costs = {r.page: r.cost_usd for r in image_summary.per_page}
             stats = stats.model_copy(
@@ -1653,7 +1865,12 @@ def _convert(
     # each feature adds its notices here (the text pass's first); those that follow from
     # the fixes are derived once, then everything is merged (one notice per code and
     # element, or code and page) and ordered by page and reading order.
-    notices: list[Notice] = [*text.notices, *doc.notices, *image_page.notices(image_built)]
+    notices: list[Notice] = [
+        *text.notices,
+        *doc.notices,
+        *image_page.notices(image_built),
+        *reading_notices,
+    ]
     derived = notice_rules.from_fixes(
         elements, ordered, long_descriptions=options.long_descriptions
     )
@@ -1680,10 +1897,13 @@ def _convert(
             for page, kind in sorted((getattr(doc, "page_types", None) or {}).items())
         ],
         page_math=page_math_summary,
+        page_witness=witness_summary,
         image_pages=image_summary,
     )
     if page_math_summary is not None:
         result.prompt_versions["page_math"] = page_math.PROMPT_VERSION
+    if witness_summary is not None:
+        result.prompt_versions["page_witness"] = page_witness.PROMPT_VERSION
     if image_summary is not None:
         result.prompt_versions["image_page"] = image_page.PROMPT_VERSION
         if settings.image_pages_second_reading:

@@ -93,6 +93,8 @@ class Settings(BaseSettings):
     anthropic_effort_figure: Effort | None = None
     # Effort of the page math pass (ADR 0006). Unset: low.
     anthropic_effort_page_math: Effort | None = None
+    # Effort of the page witness pass (`pipeline/page_witness.py`). Unset: medium.
+    anthropic_effort_page_witness: Effort | None = None
     # Effort of the image page pass (ADR 0007). Unset: `pipeline.image_page.DEFAULT_EFFORT`.
     anthropic_effort_image_pages: Effort | None = None
     # The fixed untrusted-text notice rides in the cached system block instead of in every
@@ -338,7 +340,8 @@ class Settings(BaseSettings):
 
     # --- handwriting: reader B (models/math_readers, docs/math-readers.md). A second reading
     # of one handwritten expression, made to differ from the page pass's. Both readers are OFF
-    # and nothing in the pipeline calls one yet. Each sends the crop to a model provider, so a
+    # and the pipeline calls one only when `image_pages_second_reader` names it. Each sends the
+    # crop to a model provider, so a
     # production start is refused while one is on and the privacy notice does not name that
     # provider (`ops.launch.recipients_notice_problem`). Timeout and retries are
     # `model_timeout_s` and `model_max_retries`.
@@ -364,6 +367,16 @@ class Settings(BaseSettings):
     # second readings cannot starve the conversion (`BudgetExceeded("reader_usd")`: no second
     # reading, not a failed job).
     math_reader_max_usd_per_job: float = Field(default=0.5, gt=0, le=100)
+    # Which reader reads each handwritten expression's crop a second time, to compare with the
+    # page reading (`pipeline.image_page_reconcile`): "off", or the name of a reader that is
+    # also enabled above. Where the two differ the review card offers the other reading as a
+    # choice; where they agree the item is still a decision. Only "local" runs in the hosted
+    # conversion child (it has no keys and no network); the others run where a caller passes
+    # readers in (`convert_pdf(readers=...)`).
+    image_pages_second_reader: Literal["off", "local", "claude", "openai"] = "off"
+    # The most wall time all second readings of one job may take together; expressions past it
+    # are left with a note and no second reading (a read has its own time budget besides).
+    image_pages_second_reader_time_s: float = Field(default=120.0, gt=0, le=1800)
 
     # --- content features. Each is off until its eval
     # says it helps; ConversionOptions.from_settings reads them for every conversion.
@@ -395,6 +408,18 @@ class Settings(BaseSettings):
     # 1.0 (no change) because, on dev slice A, 16 aligned equations fell under the accept bar
     # for it and 14 of them were right (docs/eval-page-math.md); set below 1 to try it.
     page_math_unconfirmed_factor: float = Field(default=1.0, gt=0, le=1)
+    # A page witness (`pipeline/page_witness.py`, `witness_reconcile.py`): one call per maths page
+    # to a strong model with the page image and the numbered text-layer rows, which reads every
+    # formula on the page (table cells, captions and figure labels included) as LaTeX anchored
+    # in the text layer. Its readings are a second witness beside the crop's: agreement is a
+    # note only (errors are correlated: D2), a formula only the witness found becomes a new
+    # element, a disagreement is a decision showing both readings. Off until the registered dev
+    # run (E1) says it helps; nothing reads these settings while the flag is off.
+    feature_page_witness: bool = False
+    page_witness_model: str = "claude-opus-5-5"
+    # Output limit of one witness call (thinking is allowed on top of it): a dense page lists
+    # a hundred formulas or more, and a call that ends at the limit is split in two.
+    page_witness_max_output_tokens: int = Field(default=12288, ge=1024, le=32000)
     # Scanned and handwritten pages (`page_type`) can be read from an image of the page by one
     # vision call each and put into the document as elements that are all review items (ADR 0007,
     # pipeline/image_page.py). In the web app this flag only OFFERS the option: the upload form
@@ -423,6 +448,18 @@ class Settings(BaseSettings):
     # left out is converted (with its own decision) and not only flagged
     # (`image_page.recover_omissions`). Costs a request only for a page the check flags.
     image_pages_recover_omissions: bool = True
+    # OFF until measured. On a handwritten page whose ink is vector (`page_type` says
+    # handwritten and `ink_strokes` read strokes from it), draw the picture of each expression
+    # from the strokes alone, black on white at high resolution, for the model and the review
+    # screen (`pipeline.image_page_vector`). The earlier experiment found the model read clean
+    # vector renders no better than scans (0.595 against 0.662 exact, n=74), and the picture
+    # changes what the model and the student file see, so it needs a measurement on real ink
+    # first (docs/eval-handwriting.md, "Checks from strokes").
+    image_pages_vector_crops: bool = False
+    # ... and check the reading against the strokes: a letter in the other case, a script lost,
+    # added or moved, ink no block accounts for (`image_page_vector`). Each only adds a reason
+    # or an omission note; the maths stays a required decision.
+    image_pages_vector_checks: bool = True
     # Read each `medium` block that holds a formula a second time from a picture of that line
     # alone (`pipeline.image_page_check`) and record whether the two readings agree. Costs one
     # request for every few such lines. OFF until the measurement in docs/eval-handwriting.md
@@ -503,6 +540,16 @@ class Settings(BaseSettings):
             )
         self.main_model = self.anthropic_main_model
         self.cheap_model = self.anthropic_cheap_model
+        return self
+
+    @model_validator(mode="after")
+    def _second_reader_enabled(self) -> Settings:
+        """A second reader that is not enabled has no model files or key to read with."""
+        name = self.image_pages_second_reader
+        if name != "off" and not getattr(self, f"math_reader_{name}_enabled"):
+            raise ValueError(
+                f"IMAGE_PAGES_SECOND_READER={name} needs MATH_READER_{name.upper()}_ENABLED=true"
+            )
         return self
 
     @model_validator(mode="after")
@@ -679,6 +726,11 @@ class Settings(BaseSettings):
                     "Update the notice (web/templates/privacy.html) and the vendor sheet "
                     "(docs/vendor-information.md) first"
                 )
+        if self.image_pages_second_reader != "off":
+            from readablestem.ops.launch import second_reader_problem
+
+            if (problem := second_reader_problem(self)) is not None:
+                raise ConfigError(f"production start refused: {problem}")
         if self.dev_login_enabled:
             raise ConfigError("DEV_LOGIN_ENABLED must be false in production")
         if self.fake_models:

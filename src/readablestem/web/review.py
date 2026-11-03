@@ -428,6 +428,11 @@ ANYWAY_KEY = "anyway"
 # accepted in one action (T3-11), and a table cell the model read at the person's request.
 BULK_KEY = "bulk"
 MODEL_READ_KEY = "model_read"
+# `True` in `after` of an edit made by pressing one of a second reader's choices on the card
+# (`web.reading_chips`): the form says so (`CHOICE_ORIGIN`) and the LaTeX must be one the card
+# offered, so the mark is a fact about the edit and not a label a form can put on any text.
+CHOICE_KEY = "second_reader_choice"
+CHOICE_ORIGIN = "second_reader_choice"
 # A `before` that holds a structural snapshot instead of a fix's (`web.page_edits.capture`).
 STRUCTURE_KEY = "structure"
 
@@ -448,6 +453,19 @@ def describe_failed(checks: list[Check]) -> str:
     explained = [explain_check(c) for c in checks]
     sentences = " ".join(e.text for e in explained)
     return f"{sentences} ({'; '.join(e.code for e in explained)})"
+
+
+def offered_latex(element: Element | None, fix: Fix) -> set[str]:
+    """The whole LaTeX each of a second reader's choices on the card would give (none unless
+    the choices are for the fix's current reading: `ReadingAlternatives.latex`)."""
+    reading = element.alternatives if element is not None else None
+    if reading is None or fix.equation is None or fix.equation.latex != reading.latex:
+        return set()
+    return {
+        reading.apply(i, j)
+        for i, symbol in enumerate(reading.symbols)
+        for j in range(len(symbol.options))
+    }
 
 
 def apply_review(
@@ -478,6 +496,7 @@ def apply_review(
         raise ReviewInvalid([FieldError(field_id("actions", element_id), "Choose an action.")])
     element = next((e for e in result.elements if e.id == element_id), None)
     before = snapshot(fix)
+    offered = offered_latex(element, fix) if action == "edit" else set()
     warnings: list[Check] = []
     note = ""
     if action == "accept" and not has_proposal(fix):
@@ -518,6 +537,13 @@ def apply_review(
     after = snapshot(fix)
     if overridden:
         after[ANYWAY_KEY] = True  # the ReviewEdit records the explicit choice
+    if (
+        offered
+        and form.get("origin") == CHOICE_ORIGIN
+        and fix.equation is not None
+        and fix.equation.latex in offered
+    ):
+        after[CHOICE_KEY] = True
     return ReviewChange(
         fix=fix,
         action=action,
@@ -1525,6 +1551,14 @@ def _edit_cell(
 NO_CLEAN_TABLES = "No table is waiting with nothing wrong found in it."
 
 
+def is_image_page_item(element: Element | None) -> bool:
+    """Read from an image of a scanned or handwritten page (ADR 0007, point 12: every such
+    equation and table is a decision of its own, never part of a bulk accept)."""
+    from readablestem.core.types import IMAGE_PAGE_REASON
+
+    return element is not None and IMAGE_PAGE_REASON in element.reasons
+
+
 def is_clean_table(fix: Fix, element: Element | None = None) -> bool:
     """A table that waits for a decision although nothing was found wrong with it (the model
     was not sure enough of it to accept it): a data table with a proposal, no failed check
@@ -1535,6 +1569,8 @@ def is_clean_table(fix: Fix, element: Element | None = None) -> bool:
 
     if fix.kind is not Kind.TABLE or fix.status is not Status.NEEDS_REVIEW:
         return False
+    if is_image_page_item(element):
+        return False  # read from a picture of a page: every one is its own decision
     table = fix.table
     return (
         table is not None

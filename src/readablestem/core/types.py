@@ -134,7 +134,9 @@ class Check(BaseModel):
     code: str | None = None  # category when it fails, e.g. "unknown_command"
 
 
-Step = Literal["equation", "figure", "judge", "table", "check", "page_math", "image_page"]
+Step = Literal[
+    "equation", "figure", "judge", "table", "check", "page_math", "page_witness", "image_page"
+]
 
 Outcome = Literal[
     "ok", "refused", "invalid_output", "timeout", "api_error", "budget_exceeded", "skipped"
@@ -204,6 +206,13 @@ class EquationFix(BaseModel):
     mathml: str  # presentation MathML, <math> root, display attribute set
     speech: str  # plain-English reading, for the review screen and the report
     display: Literal["block", "inline"] = "block"
+    # The other reading of this formula when the crop's and the page witness's readings
+    # differ (`pipeline.witness_reconcile`): `latex` is the one the glyphs favour (or the
+    # crop's, on a tie) and this is the one that was not chosen. None: no disagreement.
+    other_latex: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    other_source: Literal["crop", "page_witness"] | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
 
 
 # --------------------------------------------------------------------------- tables
@@ -627,6 +636,14 @@ class Element(BaseModel):
     page_status: Literal["span", "layout"] | None = Field(
         default=None, exclude_if=lambda v: v is None
     )
+    # Equations, only with the page witness (`pipeline.witness_reconcile`): its LaTeX reading
+    # of this formula (a second witness, never output text) and how its extent stands
+    # against the element's: "match" (every edge within one glyph), "extent" (overlaps but
+    # reaches further or less), "added" (the witness found it and layout did not).
+    witness_latex: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    witness_status: Literal["match", "extent", "added"] | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
     # A paragraph that goes on over page breaks is one element with the page and box of its
     # first part (`page`, `bbox`); this is the 0-based page of its last part. None: it ends
     # on its own page. A writer that marks page breaks writes the markers of the pages in
@@ -804,6 +821,10 @@ NOTICE_CODES = frozenset(
         "page_omitted",
         # A scanned or handwritten page converted from an image of it (ADR 0007).
         "image_page_converted",
+        # A second reader of handwritten equations (pipeline.image_page_reconcile) that gave
+        # no reading for some equations: `count` of them, one notice for the document.
+        "second_reader_unavailable",
+        "second_reader_budget",
     }
 )
 
@@ -943,6 +964,28 @@ class PageMathSummary(BaseModel):
     stopped_by: str | None = None  # a spend cap that ended the pass early
 
 
+class PageWitnessSummary(BaseModel):
+    """What the page witness did for one document. Content-free: counts and cost only.
+    `cost_usd` is also in `DocumentStats.cost_usd`."""
+
+    pages: int = 0  # maths pages the model was asked about
+    failed: int = 0  # pages with no usable answer (refused, invalid, budget)
+    refused: int = 0  # ... of them refused
+    calls: int = 0
+    split_pages: int = 0  # dense pages asked in more than one window
+    unoffered_rows: int = 0  # rows left out of every window of a very dense page
+    cost_usd: float = 0.0
+    proposed: int = 0  # formulas the model proposed
+    verified: int = 0  # ... whose quotes held
+    dropped: int = 0  # ... dropped, a quote that held nowhere or an overlap
+    matched: int = 0  # formulas whose extent is within one glyph of an element's
+    extent_differs: int = 0  # overlapping an element, extent differs by more
+    added: int = 0  # witness-only formulas made new elements (glyph evidence)
+    no_glyph_evidence: int = 0  # witness-only formulas without maths glyphs: left out
+    inside_text: int = 0  # witness-only formulas inside another element: left to it
+    stopped_by: str | None = None  # a spend cap that ended the pass early
+
+
 class ImagePageRecord(BaseModel):
     """What the image page pass did for one page (ADR 0007). Content-free: a code, counts,
     cost. `outcome` is "converted" or why the page stayed an image: a `ModelCall.outcome`
@@ -969,6 +1012,22 @@ class ImagePageRecord(BaseModel):
     optional: int = 0  # optional notes the page's blocks start with
 
 
+class SecondReaderSummary(BaseModel):
+    """What the second reader of handwritten equations did in one job (`pipeline.image_page_
+    reconcile`). Counts and seconds only, so the parent process can log it for an operator."""
+
+    reader: str
+    considered: int = 0  # handwritten display equations it could have read
+    read: int = 0  # reads that gave a reading
+    agreed: int = 0
+    differed: int = 0
+    with_choices: int = 0  # differed, and the difference became choices on the card
+    unavailable: int = 0  # no reading: an error, a timeout, an unusable answer, or no time left
+    over_budget: int = 0  # not asked: the readers' own dollar share was spent
+    seconds: float = 0.0
+    cost_usd: float = 0.0
+
+
 class ImagePagesSummary(BaseModel):
     """The image page pass for a document (ADR 0007). Content-free; `cost_usd` is also in
     `DocumentStats.cost_usd`."""
@@ -981,6 +1040,7 @@ class ImagePagesSummary(BaseModel):
     blocks: int = 0
     stopped_by: str | None = None  # a spend cap that ended the pass early
     per_page: list[ImagePageRecord] = Field(default_factory=list)
+    second_reader: SecondReaderSummary | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class DocumentResult(BaseModel):
@@ -1033,6 +1093,8 @@ class DocumentResult(BaseModel):
     source_pages: list[int] = Field(default_factory=list, exclude_if=lambda v: not v)
     # The page math pass (ADR 0006); None when the flag was off, and left out of the JSON.
     page_math: PageMathSummary | None = Field(default=None, exclude_if=lambda v: v is None)
+    # The page witness (`pipeline.page_witness`); None when the flag was off.
+    page_witness: PageWitnessSummary | None = Field(default=None, exclude_if=lambda v: v is None)
     # The image page pass (ADR 0007); None when the flag was off, and left out of the JSON.
     image_pages: ImagePagesSummary | None = Field(default=None, exclude_if=lambda v: v is None)
 
@@ -1099,6 +1161,8 @@ class ConversionOptions(BaseModel):
     notation_memory: bool = False
     # A page math pass places each page's equations (ADR 0006).
     page_math: bool = False
+    # A page witness reads every formula of a maths page (`pipeline.page_witness`).
+    page_witness: bool = False
     # Scanned and handwritten pages are read from an image of the page (ADR 0007).
     image_pages: bool = False
     # The document is an exam or graded assessment: figure alt text describes what is
@@ -1117,6 +1181,7 @@ class ConversionOptions(BaseModel):
             colour=settings.feature_colour,
             notation_memory=settings.feature_notation_memory,
             page_math=settings.feature_page_math,
+            page_witness=settings.feature_page_witness,
             image_pages=settings.feature_image_pages,
         )
 

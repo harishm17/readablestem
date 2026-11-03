@@ -606,6 +606,50 @@ always and then compares the two readings as symbol streams (letter weight left 
 Agreement never overrides a text-layer check. The pass fails open: a page it cannot answer is
 layout's. Measurements: [eval-page-math.md](eval-page-math.md).
 
+## Page witness and the glyph-checked second reading (equations; `FEATURE_PAGE_WITNESS`, off)
+
+With the flag on, one call per maths page (`pipeline/page_witness.py`, prompt `page_witness`, model
+`PAGE_WITNESS_MODEL`, default `claude-opus-5-5`, output limit `PAGE_WITNESS_MAX_OUTPUT_TOKENS` 12,288, effort
+`ANTHROPIC_EFFORT_PAGE_WITNESS`, default medium) reads every formula on the page from the page image and the
+numbered text-layer rows, table cells, captions and figure labels included. Each formula is anchored by a quote
+of its text-layer row(s); `page_math.locate` and `page_math.verify` decide whether the quote holds, so a formula
+with an anchor that holds nowhere, or that overlaps one kept before it, is dropped. A maths page is one on which
+layout found an equation or the text layer has at least three maths glyphs (maths fonts, Greek letters,
+operators); pages of prose are not asked. The call is reserved against the job budget like any other step
+(worst case about $0.3 on Opus: the 12,288-token limit plus the thinking allowance, priced at the output rate).
+
+- Dense page: rows are offered in windows that each fit the fence (7,600 characters), at most three calls with
+  the same image; rows past the last window are counted (`PageWitnessSummary.unoffered_rows`), not offered. A
+  window whose answer was invalid (it ran into the output limit) is asked again once as two halves.
+- Refusal: recorded (`PageWitnessSummary.refused`), not retried; the page keeps what layout and the crops read.
+- Budget: `BudgetExceeded` stops the pass; pages answered before it keep their formulas.
+
+`pipeline/witness_reconcile.py` runs once after layout (a hook in `pipeline/run.py`). The extent of a witness
+formula is the box of the characters it quotes. An equation element gets `Element.witness_latex` and
+`witness_status`: `match` (every edge within one glyph of the witness's extent) or `extent` (overlapping, edges
+further apart). A formula no element took becomes a new equation element (`added`, reason `witness_added`) only
+with glyph evidence (at least 40% of its characters are maths glyphs) and only when it lies clear of every other
+element: a formula inside a paragraph, a table, a caption or a figure is left to that element (counted as
+`inside_text`; table cells are the table step's), and one with no maths glyphs (a page number, a year) is left
+out. The equation step then compares its crop reading with the witness's:
+
+- **agree** (equal after `math_canonical` notation folding, extents a `match`): a passed note
+  `equation.witness_reading`. Nothing else: no confidence lift, no lower review level, and the main model's
+  second reading is still asked for as it was. The oracle on pooled gold (PR 95, 7,390 equations) found the
+  union of the two readings +9.3 points better than ours alone, but P(ours correct | agree and span) = 94.8%
+  [92.9, 96.5], below the 97% needed to trust agreement: the two readers' errors are correlated.
+- **disagree**: a required decision. The reading whose symbols are closer to the glyphs of the extent (Dice
+  similarity of the symbol bags of the text layer and the reading) is proposed; the other is kept as
+  `EquationFix.other_latex` with `other_source` (`crop` or `page_witness`); within 0.05 it is a tie and the crop's
+  reading stays. Check `equation.witness_reading`, code `witness_mismatch`.
+- **extent differs** and the readings are not equal: a required decision (`witness_extent_differs`), the
+  witness's reading as the other reading.
+- **witness-only**: a new element is always a required decision (`witness_added`).
+
+The review card does not show `other_latex` yet. Without the flag nothing here runs and the output is as before.
+The prompt is not used by default; the first measurement is the registered dev run (E1), a later, separately
+approved step.
+
 ## Course notation (equations)
 
 With `FEATURE_NOTATION_MEMORY` on and a job converted for a course with notation entries

@@ -53,6 +53,7 @@ ANSWER_SETTINGS = frozenset(
         "claude_check_model",
         "claude_check_effort",
         "page_math_model",
+        "page_witness_model",
         "image_pages_model",
         "figure_model_max_edge_px",
     }
@@ -88,6 +89,10 @@ PROMPT_REPORTS: dict[str, tuple[str, ...]] = {
     "image_page": ("latest-image-pages.json",),
     "image_page_crops": ("latest-image-pages.json",),
     "image_page_notation": ("latest-image-pages.json",),
+    # The two handwritten-expression readers (`pipeline.image_page_reconcile` reads each crop
+    # with one of them): measured with the same practice-set run.
+    "math_reader": ("latest-image-pages.json",),
+    "math_reader_claude": ("latest-image-pages.json",),
 }
 DEFAULT_PROMPT_REPORTS = ("latest-document.json",)
 # Model constant (name, lower case) -> the reports that record those models. The OpenAI

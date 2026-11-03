@@ -119,6 +119,7 @@ _SCHEMA_MODULES = frozenset(
         "figure_step",
         "table_step",
         "page_math",
+        "page_witness",
         "image_page",
         "image_page_check",
     )
@@ -202,9 +203,8 @@ def child_command(fd: int, memory_bytes: int, cpu_seconds: int) -> list[str]:
 def child_environment() -> dict[str, str]:
     env = child_env()
     env.update({name: os.environ[name] for name in _EXTRA_ENV if name in os.environ})
-    # glibc gives every thread its own 64 MB arena of address space; with a dozen threads
-    # that is most of what the address-space cap counts. Two arenas cost nothing measurable.
-    env["MALLOC_ARENA_MAX"] = "2"
+    # child_env() already caps BLAS/OpenMP threads and glibc arenas (MALLOC_ARENA_MAX=2) for
+    # every capped child; see core/childenv.py.
     return env
 
 
@@ -378,6 +378,7 @@ class _Conversion:
             "settings": settings_for_child(self.settings),
             "pages": self.pages,
             "concurrency": self.concurrency,
+            "limit_s": self.limit_s,  # the job's time: second readings stay inside what it leaves
             "notice": self.notice,
             "source_note": self.source_note,
             "options": self.options,

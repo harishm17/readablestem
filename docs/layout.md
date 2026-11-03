@@ -1663,9 +1663,9 @@ which keeps some `vector_no_text` pages of dense ink as images, is not counted.
 
 A handwritten page that a notes app exported as vector paths still holds the pen's trace.
 `ink_strokes.extract_ink(page)` reads it into ordered strokes (pure PyMuPDF and numpy, no model
-call, no network). Nothing in the pipeline calls it yet: such pages are still kept as their
-image, or read from it on request, as above. It exists so a later step can give a recogniser
-strokes, or a sharp re-render of only the ink, instead of a pixel crop.
+call, no network). The image page pass uses it beside the page picture, for pictures drawn from
+the ink and for checks on the reading ("Strokes in the image page pass", below); `page_type`
+shares its rule for a stroke drawn as samples.
 
 **What is extracted**, from `page.get_cdrawings()` in paint order and in display space (the page
 rotation applied):
@@ -1736,6 +1736,64 @@ GoodNotes, Notability, OneNote or Xournal++ export has been read yet.
 - Strokes wholly off the page are dropped (`off_page`), and a region's box is clipped to the page.
 - On the seeded outline writer (150 strokes, 7 pt writing), the centre-line lies a median 0.4 pt
   (at most 1.4 pt) from the pen path; its ends can fall up to 2 pt short.
+
+### Strokes in the image page pass (`pipeline/image_page_vector.py`)
+
+A handwritten page whose ink `ink_strokes` can read is read from its picture as before (one
+vision call, ADR 0007); the strokes are used beside it, never instead of it. A page qualifies
+when `page_type` calls it `handwritten` (or `handwritten_ocr`) and `extract_ink` analysed it
+within the document's ink budget with at least 3 strokes (`image_page_vector.analyse`, through
+`layout.page_ink`). A scan, a photo, a typed page and a page over the caps go through the pass
+exactly as before. Measured on the vector dev set, a clean re-render of the ink does not make the
+reader read better than a scan (docs/eval-handwriting.md), so the strokes serve pictures a person
+compares against and checks, not re-reading. Four uses, none calling a model:
+
+- **Sharp pictures** (`IMAGE_PAGES_VECTOR_CROPS`, default off). The picture of a display equation,
+  of a prose block or list item that needs a decision, and of a stretch of ink the reading left
+  out is drawn from the strokes that sit in its box (centre within the box grown by a fifth of its
+  height and 4 pt): black on white at 300 dpi (long side at most 2,048 px), cut to the ink with
+  6 pt of paper round it, with no ruling, template or pen colour. The model's equation request, the
+  review screen and the student file get this picture; the student file's is drawn at the size its
+  text is shown at and tagged with its resolution (`equation_scale.png_dpi`). A box with no stroke
+  in it keeps the ordinary crop. The second reading's and the recovery's line pictures
+  (`image_page._picture`) are drawn the same way, and `run.recrop` draws a stored page the way the
+  conversion did when it is given the pages' kinds. The page picture the first call reads is still
+  the 200 dpi render of the page.
+- **Case check** (`IMAGE_PAGES_VECTOR_CHECKS`, default on). In a display equation's reading, a
+  plain letter among c, o, s, u, v, w, x, z is compared with the line's own letters: the x-height
+  from a, e, m, n, r and the capital height from digits, capitals nothing else is written like and
+  ascenders, each read off the glyph of that symbol. k is not measured (its small form is as tall
+  as K), nor are p and y (the tail hides the height). The ink must be nearer the other case than
+  `CASE_UP_AT` and `CASE_LOW_AT` allow (0.62 and 0.38 of the way from x-height to capital height).
+  A line with only one of the two heights takes the other as 1.55 times it; a line with neither
+  uses the hand's heights on the page when two other equations on it showed both. The symbols and
+  the glyphs must pair one to one, or nothing is said.
+- **Script check.** The reading's symbols (`reading`: LaTeX as symbols with the level each is
+  written at; fractions, roots, sums, matrices and accents over several symbols are not read) are
+  lined up with the glyphs (strokes whose x-ranges overlap and that are close in height) in writing
+  order. The baseline is fitted through the glyphs the reading puts on it (repeated medians, so a
+  stray script does not move it; a slope up to 0.25 is allowed); a glyph is raised or lowered when
+  it is no taller than 0.9 of the line's letters and its bottom is 0.45 above or 0.3 below the
+  baseline. A raised or lowered glyph that the reading has on the baseline or leaves out is "script
+  lost"; a script of the reading over a glyph as tall as the letters is "script added"; one raised
+  in the reading and lowered in the ink, or the reverse, is "script moved". A line whose baseline
+  scatters by more than 0.2 of a letter height, and a base with a subscript and a superscript
+  written one over the other, are not judged.
+- **Leftover ink.** Every glyph on the page must be near a block's box: within 1.2 glyph heights
+  of it (the reader's boxes sit off handwriting by up to a line). Leftover glyphs within 3 glyph
+  heights sideways and 1.5 vertically are one stretch; a stretch of 3 or more glyphs, outside the
+  strips (5% of the page) where a short header, footer or page number sits, becomes the same figure
+  element and required decision that the raster check makes (`image_page.omitted_region`), and
+  `recover_omissions` reads it from a picture drawn from the strokes. It replaces the raster
+  comparison on such a page, and sees pale ink, which the raster threshold does not. It is off with
+  `IMAGE_PAGES_VECTOR_CHECKS` or `IMAGE_PAGES_OMISSION_CHECK`.
+
+The checks only add a failed warning to the equation's fix (`image_page.case_check` and
+`image_page.script_check`, sentences in `web/messages.py`); the fix stays a required decision with
+its status unchanged. What each finds, and how the thresholds were set, is in
+docs/eval-handwriting.md, "Checks from strokes". Inline formulas in a paragraph have no box of
+their own and are not checked. The thresholds are in `image_page_vector.py`; they were set on
+MathWriting ink drawn as paths and no real GoodNotes ink has been tried.
 
 ## The text pass (`pipeline/text_pass.py`, pipeline 0.4.0)
 

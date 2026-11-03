@@ -92,7 +92,13 @@ from readablestem.core.types import Check, Element, EquationFix, Fix, Kind, Mode
 from readablestem.models import router
 from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.models.prompts import load_prompt
-from readablestem.pipeline import equation_images, layout, notation_memory, page_math
+from readablestem.pipeline import (
+    equation_images,
+    layout,
+    notation_memory,
+    page_math,
+    witness_reconcile,
+)
 from readablestem.pipeline.chem import expand_ce as chem_expand_ce
 from readablestem.pipeline.chem_check import compare_species
 from readablestem.pipeline.signs import compare_signs
@@ -146,6 +152,17 @@ PAGE_READING = "equation.page_reading"
 PAGE_READING_OVERRULED = "equation.page_reading_overruled"
 PAGE_READING_CODE = "page_reading_mismatch"
 FLAG_MAIN_DISAGREES = True
+# The page witness's reading (`pipeline.witness_reconcile`, `FEATURE_PAGE_WITNESS`). Agreement
+# of a usable cheap answer with it (equal after notation folding, extents within one glyph)
+# spares the main model's second reading when no check but a note failed; the review rules are
+# not changed. A disagreement, a witness extent that is not the element's, and a formula only
+# the witness found are required decisions that show both readings.
+WITNESS_READING = "equation.witness_reading"
+WITNESS_MISMATCH_CODE = "witness_mismatch"
+WITNESS_EXTENT = "equation.witness_extent"
+WITNESS_EXTENT_CODE = "witness_extent_differs"
+WITNESS_ADDED = "equation.witness_added"
+WITNESS_ADDED_CODE = "witness_added"
 SHORT_INLINE_CHARS = 25  # inline candidates up to this many text-layer chars start cheap
 MAX_OUTPUT_TOKENS = 2048  # LaTeX up to 2000 chars plus reasoning tokens
 # A model that thinks within its own allowance (claude: `pricing.Price.thinking_tokens`)
@@ -1140,6 +1157,73 @@ def _compare_readings(
     )
 
 
+def _settle_witness(
+    element: Element,
+    candidate: _Candidate,
+    display: Display,
+    *,
+    course_bold: frozenset[str],
+    spoken: dict[str, str] | None,
+) -> tuple[_Candidate, tuple[str, Literal["crop", "page_witness"]] | None]:
+    """Record how the final reading stands against the page witness's, and settle a
+    disagreement: the candidate whose symbols are closer to the glyphs of the extent is the
+    proposal, the other is returned as `(latex, source)` for `EquationFix.other_latex`, and
+    the fix is a required decision (a failed warning). Agreement adds a passed note."""
+    witness = witness_reconcile.reading(element)
+    other: tuple[str, Literal["crop", "page_witness"]] | None = None
+    usable = (
+        candidate.usable
+        and candidate.mathml is not None
+        and candidate.output is not None
+        and candidate.output.is_equation
+    )
+    if element.witness_status == "added":
+        candidate.checks.append(
+            Check(name=WITNESS_ADDED, passed=False, severity="warning", code=WITNESS_ADDED_CODE)
+        )
+    if element.witness_latex is None or not usable or candidate.mathml is None:
+        return candidate, other
+    if witness is None:  # the extents differ: the readings are of different stretches
+        if not witness_reconcile.agrees(element.witness_latex, candidate.mathml, display=display):
+            candidate.checks.append(
+                Check(
+                    name=WITNESS_EXTENT,
+                    passed=False,
+                    severity="warning",
+                    code=WITNESS_EXTENT_CODE,
+                )
+            )
+            other = (element.witness_latex, "page_witness")
+        return candidate, other
+    if witness_reconcile.agrees(witness, candidate.mathml, display=display):
+        candidate.checks.append(Check(name=WITNESS_READING, passed=True))
+        return candidate, other
+    rival = _evaluate(
+        EquationOutput(is_equation=True, latex=witness, confidence=candidate.confidence or 0.5),
+        [],
+        element,
+        display,
+        course_bold=course_bold,
+        spoken=spoken,
+    )
+    winner = (
+        witness_reconcile.adjudicate(element.text, candidate.mathml, rival.mathml)
+        if rival.usable and rival.mathml is not None
+        else "crop"
+    )
+    if winner == "witness":
+        other = (candidate.latex, "crop")
+        rival.calls = candidate.calls
+        rival.confidence = candidate.confidence
+        candidate = rival
+    else:
+        other = (witness, "page_witness")
+    candidate.checks.append(
+        Check(name=WITNESS_READING, passed=False, severity="warning", code=WITNESS_MISMATCH_CODE)
+    )
+    return candidate, other
+
+
 def _prefer(main: _Candidate, cheap: _Candidate) -> _Candidate:
     """The main model's answer wins unless only the cheap one is usable (or the main
     call produced nothing, for example during an outage)."""
@@ -1315,6 +1399,11 @@ def transcribe(
         # Layout found this span by its geometry rules and the page pass, which read the
         # page, did not: a little less sure (`Settings.page_math_unconfirmed_factor`).
         candidate.confidence *= settings.page_math_unconfirmed_factor
+    other: tuple[str, Literal["crop", "page_witness"]] | None = None
+    if element.witness_latex is not None or element.witness_status is not None:
+        candidate, other = _settle_witness(
+            element, candidate, display, course_bold=course_bold, spoken=spoken
+        )
     if layout.REASON_HALF_FRACTION in element.reasons:
         candidate.checks.append(
             Check(
@@ -1330,6 +1419,14 @@ def transcribe(
     outcome = _escalation_outcome(first, reread, skipped)
     if outcome is not None:
         fix = fix.model_copy(update={"escalation": outcome})
+    if other is not None and fix.equation is not None:
+        fix = fix.model_copy(
+            update={
+                "equation": fix.equation.model_copy(
+                    update={"other_latex": other[0], "other_source": other[1]}
+                )
+            }
+        )
     # Second automated check, shadow mode (ADR 0005): records P(meaning_changing) for the
     # final proposal and the cheap answer before escalation; changes nothing else.
     from readablestem.pipeline import equation_shadow
