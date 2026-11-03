@@ -19,6 +19,7 @@ arrived at; read them by question, not front to back.
 | How are formulas, ions and reactions found, written (`\ce`) and read aloud? | [chemistry.md](chemistry.md) |
 | Can scanned and handwritten pages be converted, how well, and at what cost? | [eval-image-pages.md](eval-image-pages.md); [decisions/0007-image-pages.md](decisions/0007-image-pages.md) |
 | How well does it read real human handwriting (an answer key of ink with known LaTeX), and may the app advertise it? | [eval-handwriting.md](eval-handwriting.md) |
+| How are volunteers' hand copies of OpenStax examples collected, with answer keys from the source, and published only with consent? | [data/handwriting-copy/README.md](../data/handwriting-copy/README.md) |
 | How does it do on real LaTeX PDFs from arXiv (not Chromium prints), against the chatbot recipe? | [eval-realworld.md](eval-realworld.md) |
 | Why did it lose equations to the chatbot recipe on real papers, what was fixed, and what did a fresh set of papers say? | [eval-equation-rootcause.md](eval-equation-rootcause.md) |
 | What did the second round of equation fixes do, on a third registered set of papers? | [eval-equation-round2.md](eval-equation-round2.md) |

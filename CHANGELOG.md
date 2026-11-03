@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: a kit for collecting hand-copied OpenStax examples (branch hw/copy-set-kit)
+
+- `scripts/handwriting_copy_set.py` and `data/handwriting-copy/README.md`: a kit for a small set of
+  real iPad handwriting whose answer key nobody types. It draws OpenStax worked examples with a
+  written, seeded rule behind a CC BY licence gate (the committed table, then the live archive and CMS
+  records), writes each volunteer a brief, matches the PDFs they return to passages (counts only in
+  reports; a folder inside the repository is refused), builds the gold from the passage's published
+  MathML, and writes a manifest in which a page is published only if its writer's yes is recorded; the
+  other pages are counts. Published PDFs lose their file metadata. Tests in
+  `tests/test_handwriting_copy_set.py`; no page has been collected yet, so there is no result.
+
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)
 
 - The whole conversion (`convert_pdf`) now runs in a child process the worker can kill
