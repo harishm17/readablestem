@@ -1,5 +1,42 @@
 # Changelog
 
+## Unreleased: reader B adapters for handwritten expressions (branch hw/math-readers)
+
+- `models/math_readers/`: one small `MathReader` protocol (a PNG crop in, LaTeX candidates with
+  reported confidences out) and two adapters, a Claude reader built to differ from the page pass
+  (another model, its own instructions, one high-resolution crop, no page text) and an OpenAI
+  vision reader (`store: false`). Worst-case reservation before every send, timeout, retries,
+  refusal and error mapping as in the step clients, no content in logs. Settings
+  `MATH_READER_CLAUDE_*` and `MATH_READER_OPENAI_*`, all off; nothing in the pipeline calls them
+  yet (`docs/math-readers.md`).
+- One list of who receives what (`web/recipients.py`) now writes the privacy page (its provider
+  items, "Where it is processed" and the account deletion notes), so a reader's company is named as
+  soon as the reader is on, whichever `MODEL_PROVIDER` is set. A production start is refused while a
+  reader is on and the rendered page does not name every company that receives pictures; the
+  launch checks (model provider, analytics, tables, notation, Microsoft, sign-up) now read the
+  rendered page, not the template source. `MATH_READER_MAX_USD_PER_JOB` caps all readers of a job
+  together. The vendor sheet and `docs/security.md` are updated to match.
+## Unreleased: handwriting harness for private handwritten notes
+
+- `scripts/handwriting_own.py`: intake of PDFs from a folder outside the repo, a hash-based dev and
+  held-out split registered privately, a blank answer-key form served on 127.0.0.1
+  (`scripts/handwriting_gold_form.html`, no model draft) and a `run` command capped by `--max-usd`
+  (at most 2.00 in total across restarts). `run` sends the PDFs to the model provider. Every command
+  refuses a path inside a git repository; `.gitignore` guards the usual private folder names.
+  Use: [docs/eval-handwriting.md](docs/eval-handwriting.md), "Your own handwritten notes".
+## Unreleased: canonical comparator for two readings (branch eq/math-canonical)
+
+- `pipeline/math_canonical.py`: one comparator for "is this the same formula" (tree, notation-neutral,
+  spoken-equal, symbols) with a reason when it is not. The registered scorer scripts are untouched;
+  tests check the library agrees with them. `tests/test_realworld_registration.py` runs
+  `realworld_register.py --check` for every registered set. No product behaviour changes yet
+  ([docs/steps.md](docs/steps.md), "Comparing two readings").
+## Unreleased
+
+- Equation diagnostics on the recorded real-world runs, no model and no cost: `scripts/eq_diag_tables.py` (why maths in
+  table cells is missed), `scripts/eq_diag_glyphs.py` (glyph evidence of undetected and span-wrong equations),
+  `scripts/eq_diag_unflagged.py` (why wrong equations with other symbols were not flagged). Counts and sample sizes in
+  [docs/eval-equation-diagnostics.md](docs/eval-equation-diagnostics.md). No product behaviour changes.
 ## Unreleased: finished steps are kept when a configuration error ends the run
 
 - When a configuration error (a model that is not set up) ended a conversion while other
@@ -81,6 +118,9 @@
   chart. `gold/figures_v2_table.py` scores table cells against a reference table.
 - [docs/eval-figures-long.md](docs/eval-figures-long.md): the set, and a draft pre-registration (arms, bars,
   budget cap, judge calibration with human labels) awaiting sign-off.
+### EPUB export
+
+- `readablestem export epub FILE.html OUT.epub`: an EPUB 3 from the finished HTML (`pipeline/export_epub.py`): XHTML with native MathML, images as files with their alt text, a contents list from the headings, a page list from page markers when present, language, title and accessibility metadata. No `conformsTo`; the summary makes no conformance claim; a feature is claimed only when every item has it. Scripts, frames, forms, remote pictures and `url()` styles are not carried. EPUBCheck and DAISY Ace run on it in `.github/workflows/epub.yml` and locally when installed ([docs/output.md](docs/output.md), "The EPUB export"). No route or button yet.
 ### Documentation
 
 - `docs/screen-reader-test.md`: a 15-minute VoiceOver (Safari) protocol for the demo, a converted file and the review screen, with a results table that maps to WCAG 2.2 criteria.
