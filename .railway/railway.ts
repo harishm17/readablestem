@@ -20,6 +20,80 @@ import { defineRailway, image, postgres, preserve, project, service, volume } fr
 
 const preserved = (...names: string[]) => Object.fromEntries(names.map((name) => [name, preserve()]));
 
+// The backup service's start command, kept readable here and passed to `bash -c` (the image
+// postgres:18 cannot see files of this repository). Rules for editing it: no dollar-brace and
+// no backtick (this is a template literal). tests/test_railway_config.py extracts it, runs
+// `bash -n` and shellcheck on it, and runs it against stub pg_dump and psql programs.
+//
+// A dump is moved into /backups only after it has been proved: gzip reads it back, it ends
+// with pg_dump's completion line, it restores into the scratch database restore_check with
+// errors fatal, every public table of the live database exists in the restore, and the
+// alembic version matches. Any failure removes the half-made file, prints
+// backup_failed reason=..., and exits 1 (the run shows as failed). Only then does the backup
+// record its heartbeat (ops_heartbeat, read by /healthz/ops).
+const backupScript = String.raw`set -euo pipefail
+d=$(date -u +%Y-%m-%d)
+f=/backups/readablestem-$d.sql.gz
+part=$f.part
+
+fail() {
+  echo "backup_failed reason=$1"
+  rm -f "$part"
+  # Best effort: do not leave a full copy of the data in the scratch database.
+  psql -q "$admin" -c "DROP DATABASE IF EXISTS restore_check" > /dev/null 2>&1 || true
+  exit 1
+}
+
+# The same server and options as $PGURL, another database name.
+# shellcheck disable=SC2001
+db_url() { echo "$PGURL" | sed "s#/[^/?]*\([?].*\)\{0,1\}\$#/$1\1#"; }
+public_tables() { psql -tA "$1" -c "select tablename from pg_tables where schemaname='public' order by 1"; }
+alembic_version() { psql -tA "$1" -c "select version_num from alembic_version"; }
+admin=$(db_url postgres)
+check=$(db_url restore_check)
+
+# 1. Dump to a .part file; pipefail makes a failing pg_dump fail the pipeline.
+pg_dump --no-owner --no-privileges "$PGURL" | gzip > "$part" || fail dump
+# 2. The file reads back as gzip.
+gzip -t "$part" || fail gzip_test
+# 3. pg_dump finished: its last lines say so (newer versions add a line after it).
+tail_lines=$(gunzip -c "$part" | tail -n 10) || fail dump_read
+case "$tail_lines" in
+  *"-- PostgreSQL database dump complete"*) ;;
+  *) fail dump_incomplete ;;
+esac
+# 4. It restores into a scratch database without a single error.
+psql -q "$admin" -c "DROP DATABASE IF EXISTS restore_check" || fail restore_prepare
+psql -q "$admin" -c "CREATE DATABASE restore_check" || fail restore_prepare
+gunzip -c "$part" | psql -q -v ON_ERROR_STOP=1 "$check" > /dev/null || fail restore
+# 5. Every public table of the live database is in the restore, at the same schema version.
+live_tables=$(public_tables "$PGURL") || fail read_live
+restored_tables=$(public_tables "$check") || fail read_restore
+[ -n "$live_tables" ] || fail no_tables
+missing=$(printf '%s\n' "$live_tables" | grep -vxF -f <(printf '%s\n' "$restored_tables") || true)
+[ -z "$missing" ] || fail missing_tables
+live_version=$(alembic_version "$PGURL") || fail read_live
+restored_version=$(alembic_version "$check") || fail read_restore
+if [ -z "$live_version" ] || [ "$live_version" != "$restored_version" ]; then fail alembic_mismatch; fi
+tables=$(printf '%s\n' "$live_tables" | wc -l)
+
+# Proved: put the dump in place.
+mv "$part" "$f" || fail move
+# Cleanup is not a reason to lose a verified dump: warn and go on (the next run drops it).
+psql -q "$admin" -c "DROP DATABASE IF EXISTS restore_check" || echo "backup_warning reason=restore_cleanup"
+echo "backup_ok file=$f tables=$tables alembic=$live_version"
+
+# Tell /healthz/ops. The dump stays; a failure here is a failed run.
+psql -q "$PGURL" -c "insert into ops_heartbeat (name, last_ok_at, detail) values ('backup', now(), 'tables=$tables alembic=$live_version') on conflict (name) do update set last_ok_at = excluded.last_ok_at, detail = excluded.detail" || { echo "backup_failed reason=heartbeat"; exit 1; }
+
+# Keep five days; remove leftovers of runs that died before they could clean up.
+find /backups -name 'readablestem-*.sql.gz' -mtime +5 -delete
+find /backups -name 'readablestem-*.sql.gz.part' -mtime +1 -delete
+ls -l /backups
+`;
+
+const shellQuote = (text: string) => "'" + text.replace(/'/g, "'\\''") + "'";
+
 // Settings shared by the web and cron services (cron has no PORT).
 // DECISIONS_CANARY, DECISIONS_EQUATION_SHADOW and DECISIONS_FIGURE_VERIFY do nothing while
 // MODEL_PROVIDER=anthropic: they only control OpenAI's Decisions API check, which is skipped
@@ -107,12 +181,13 @@ export default defineRailway(() => {
     env: preserved(...appVariables),
   });
 
-  // Daily at 08:17 UTC: pg_dump to /backups, restore into a scratch database to prove it,
+  // Daily at 08:17 UTC: pg_dump to /backups, restore into a scratch database to prove it, keep
+  // the dump only if the proof holds, record the heartbeat (`backupScript` above),
   // delete dumps older than 5 days. PGURL is a reference to the Postgres service.
   const backup = service("backup", {
     source: image("postgres:18"),
     build: { buildEnvironment: "V3", builder: "RAILPACK" },
-    start: "sh -c 'set -eu\nd=$(date -u +%Y-%m-%d)\nf=/backups/readablestem-$d.sql.gz\npg_dump --no-owner --no-privileges \"$PGURL\" | gzip > \"$f.part\"\nmv \"$f.part\" \"$f\"\nadmin=$(echo \"$PGURL\" | sed '\\''s#/[^/?]*\\([?].*\\)\\{0,1\\}$#/postgres\\1#'\\'')\ncheck=$(echo \"$PGURL\" | sed '\\''s#/[^/?]*\\([?].*\\)\\{0,1\\}$#/restore_check\\1#'\\'')\npsql -q \"$admin\" -c \"DROP DATABASE IF EXISTS restore_check\"\npsql -q \"$admin\" -c \"CREATE DATABASE restore_check\"\ngunzip -c \"$f\" | psql -q -v ON_ERROR_STOP=1 \"$check\" > /dev/null\ntables=$(psql -tA \"$check\" -c \"select count(*) from information_schema.tables where table_schema='\\''public'\\''\")\nversion=$(psql -tA \"$check\" -c \"select version_num from alembic_version\")\npsql -q \"$admin\" -c \"DROP DATABASE restore_check\"\necho \"backup_ok file=$f tables=$tables alembic=$version\"\nfind /backups -name '\\''readablestem-*.sql.gz'\\'' -mtime +5 -delete\nls -l /backups\n'",
+    start: "bash -c " + shellQuote(backupScript),
     replicas: { iad: 1 },
     deploy: { cronSchedule: "17 8 * * *", restartPolicyType: "NEVER" },
     volumeMounts: { "/backups": backupVolume },
