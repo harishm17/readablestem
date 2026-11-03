@@ -112,7 +112,10 @@ def test_every_page_has_the_shared_accessible_layout(pages):
         for link in ('href="/privacy"', 'href="/terms"', 'href="/limits"', 'href="/status"'):
             assert link in html, (name, link)
         assert 'href="https://github.com/harishm17/readablestem">Source code</a>' in html, name
-        assert "offered under AGPL-3.0 terms" in html, name
+        # The licence sentence is on the Terms page; every footer has a plain link to it.
+        assert "offered under AGPL-3.0 terms" not in html or name == "/terms", name
+        assert 'href="/terms#open-source">Open source</a>' in html, name
+        assert 'href="/for-accessibility-offices">For accessibility offices</a>' in html, name
 
 
 def test_every_form_control_has_a_label(pages):
@@ -146,13 +149,14 @@ def test_privacy_and_terms_describe_real_behaviour(pages):
     assert "<strong>7 days</strong>" in privacy and "<strong>30 days</strong>" in privacy
     assert "Both boxes are unticked unless you tick them" in privacy
     assert "We do not use your uploads to train models, sell them or share them" in privacy
-    operator = "Harish Manoharan, an individual developer (an independent project, not a company"
-    assert operator in privacy and "student project" not in privacy
+    assert "beta built and maintained by Harish Manoharan" in privacy
+    assert "an individual developer" not in privacy and "not a company" not in privacy
     assert "student records" in privacy
     assert "never contain document text" in privacy
     terms = " ".join(pages["/terms"].split())
     assert "student records" in terms and "assists" in terms
-    assert operator in terms and "student project" not in terms
+    assert "beta built and maintained by Harish Manoharan" in terms
+    assert "an individual developer" not in terms and "not a company" not in terms
     assert "governed by the law of the State of Texas, USA" in terms
     assert "does not certify" in terms
 

@@ -83,7 +83,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let the developer look (`web/retention.py`) |
 | `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`, compared in constant time. Required in production, at least 32 characters, or the purge would never run; the route also guards the daily paid canaries. Every call counts against the cron rate limit, wrong tokens included |
 | `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval |
-| `SOURCE_URL`, `CONTACT_EMAIL` | Footer source link (AGPL notice); contact on the 403, privacy and terms pages |
+| `SOURCE_URL`, `CONTACT_EMAIL` | Footer "Source code" link (the AGPL source offer; the licence sentence is on /terms, ADR 0003 addendum); contact on the 403, privacy and terms pages |
 
 ## Routes
 
@@ -93,6 +93,8 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET `/demo` | anyone | `web/static/demo/index.html` if present (served with the sandbox CSP, an `ETag` and `Cache-Control: public, max-age=3600`, and a 304 for a matching `If-None-Match`: "Security headers"), else a "being prepared" page |
 | GET `/guides` | anyone | The list of the guides below it, each with its summary and date (`seo.GUIDES`); in the sitemap, `llms.txt` and the footer |
 | GET `/privacy`, `/terms` | anyone | The beta wording, describing the real behaviour (hourly purge, Railway's daily backups kept about 6 days, Langfuse only when tracing is on). `readablestem ops launch-check` lists any unfinished wording left on the public pages |
+| GET `/for-accessibility-offices` | anyone | The page for an accessibility or procurement office (`web/offices.py`, `offices.html`): data flow (an SVG with a described list as its text equivalent), the companies that receive data (one row per entry of `web/recipients.py`, the list `/privacy` uses, so tracing and analytics appear only when on), retention from the settings, no training and the `store` setting (OpenAI path only), student records (FERPA), what the tool does not do, an eight-step pilot checklist. It makes no conformance claim (`tests/test_web_offices.py`). Linked from every footer, in the sitemap and `llms.txt` |
+| GET `/for-accessibility-offices/summary` | anyone | The same facts on one printable page, a self-contained HTML file sent as a download (`offices_summary.html`, inline style, no script, `VIEW_CSP`); not indexed |
 | GET `/limits` | anyone | Known limits: the facts that hold today (including tables, links, colour, language and file types, as this server is set up) and the measured accuracy |
 | GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make the HTML the main version and keep the PDF only as a labelled print copy (28 CFR 35.202, the DOJ fact sheet); check with your accessibility office; guidance, not legal advice |
 | GET `/status` | anyone | Service status: up, conversions open or paused for today, whether the AI service is answering (from this server's own last requests), documents waiting and converting (numbers only; 503 when the database does not answer) |
@@ -976,7 +978,8 @@ starts with a byte order mark so Excel reads non-English letters right. Its colu
 `section, item, page, tool_had, decision, by, when_utc, detail`, with the sections `document`,
 `summary`, `decision`, `open`, `not_converted`, `check` and `not_checked`.
 `docs/vendor-information.md` is the matching one-page sheet for a procurement office: what the
-tool does, what happens to a document, and where it falls short.
+tool does, what happens to a document, and where it falls short. The site's own page for such an
+office is `/for-accessibility-offices`; change the sheet and that page together.
 
 ## Spend cap (`web/spend.py`)
 

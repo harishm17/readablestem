@@ -831,3 +831,8 @@ input[type="number"].input-short { width: 6rem; }
   .bulk-offers, .decision-filter { border: 2px solid CanvasText; }
   .notify-box [aria-disabled="true"] { color: GrayText; border-color: GrayText; }
 }
+
+/* The data-flow diagram on /for-accessibility-offices: one column, scaled to the screen. */
+.data-flow-figure { margin: 0.5rem 0 1rem; max-width: 26rem; }
+.data-flow { display: block; width: 100%; height: auto; }
+.data-flow-figure figcaption { color: var(--muted); font-size: 0.95rem; margin-top: 0.25rem; }

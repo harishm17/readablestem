@@ -26,6 +26,7 @@ STALE_WHEN_OPEN = (
 )
 PUBLIC_PAGES = (
     "/",
+    "/for-accessibility-offices",
     "/login",
     "/privacy",
     "/terms",
@@ -76,7 +77,7 @@ def test_the_login_page_says_a_first_sign_in_makes_the_account_and_links_the_dem
     env = WebEnv(tmp_path, signup_mode="open", open_tier_daily_page_quota=17, **GOOGLE)
     text = page(env, "/login")
     assert "If you do not have an account yet, signing in makes one." in text
-    assert "free beta run by Harish Manoharan, open to anyone" in text
+    assert "free beta built and maintained by Harish Manoharan, open to anyone" in text
     assert "daily limits (17 pages a day)" in text
     assert 'href="/demo"' in text and "needs no sign-in" in text
     assert "Not invited yet" not in text
@@ -85,7 +86,9 @@ def test_the_login_page_says_a_first_sign_in_makes_the_account_and_links_the_dem
 def test_the_landing_page_describes_a_free_beta_anyone_can_try(tmp_path):
     env = WebEnv(tmp_path, signup_mode="open", open_tier_daily_page_quota=20, **GOOGLE)
     text = page(env, "/")
-    assert "free beta run by Harish Manoharan" in text
+    assert "ReadableSTEM is a free beta." in text
+    assert "Built and maintained by Harish Manoharan. The code is open source" in text
+    assert "an individual developer" not in text
     assert "Anyone with a Google account can sign in and try it" in text
     assert "New accounts have daily limits: 20 pages a day" in text
     assert "The example conversion needs no sign-in" in text
