@@ -1602,13 +1602,17 @@ def _group_action(
             # open: the reviewer stays on it to choose a level for them.
             from readablestem.web.routes.split import review_url
 
-            return RedirectResponse(review_url(owned_id, item=group_key), status_code=303)
+            # The group's key as the stored fixes carry it, not the path's.
+            kept_key = outcome.left[0].group_key
+            return RedirectResponse(review_url(owned_id, item=kept_key), status_code=303)
         return _split_redirect(owned_id, result, group_key)
     landing = None
     if not outcome.left and outcome.changes:
         landing = next_to_review(result, outcome.changes[-1].fix.element_id)
     if outcome.left or not outcome.changes:
-        anchor = group_anchor(group_key) if outcome.left else "review-progress"
+        anchor = (
+            group_anchor(outcome.left[0].group_key or "") if outcome.left else "review-progress"
+        )
     else:
         anchor = review_anchor(result, landing) if landing else "review-progress"
     return RedirectResponse(list_url(owned_id, anchor), status_code=303)
