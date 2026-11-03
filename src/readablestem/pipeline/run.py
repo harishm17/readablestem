@@ -962,11 +962,9 @@ class _Run:
                 continue
             try:
                 done = future.result()
-            except BaseException as e:  # the failed step itself, or a worker that died
-                print("DBG exc", repr(e))
+            except BaseException:  # the failed step itself, or a worker that died
                 continue
             key = self.keys.get(element.id)
-            print("DBG", element.kind, key is not None, done.fix.status, done.fix.reason)
             if key and reusable(done.fix):
                 self.cache.store(element, key, done.fix)
             self.futures.pop(future, None)

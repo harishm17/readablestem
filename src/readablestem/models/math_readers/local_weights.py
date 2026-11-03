@@ -204,9 +204,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         path = prepare(args.dir, source_dir=args.source, int8=not args.fp32)
     except (WeightsError, OSError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(f"error: {exc}", file=sys.stderr)  # noqa: T201 (command-line output)
         return 1
-    print(f"{path} ({(path / MARKER).read_text().strip()})")
+    print(f"{path} ({(path / MARKER).read_text().strip()})")  # noqa: T201 (command-line output)
     return 0
 
 

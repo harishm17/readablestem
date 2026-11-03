@@ -84,11 +84,21 @@ select = [
     "UP",  # pyupgrade
     "SIM", # simplify
     "RUF", # ruff-specific
+    "T20", # no print() in library code (debug prints once reached main); CLIs and tools are exempt below
 ]
 # Maths text legitimately uses these (U+2212 minus sign, U+2032 prime, U+0394 Delta).
 allowed-confusables = ["\u2212", "\u2032", "\u0394"]
 
 [tool.ruff.lint.per-file-ignores]
+# Command-line tools, evaluation, ops scripts and tests print on purpose.
+"src/readablestem/cli/**" = ["T20"]
+"src/readablestem/eval/**" = ["T20"]
+"src/readablestem/ops/**" = ["T20"]
+"scripts/**" = ["T20"]
+"tests/**" = ["T20"]
+"proof/**" = ["T20"]
+"data/**" = ["T20"]
+"site/**" = ["T20"]
 # Registered file, kept as registered (apart from the name): its import block is not sorted and the new name made a line longer.
 "proof/interim/report.py" = ["I001", "E501"]
 # Hand-written LaTeX of the registered scorer-readiness sample: long lines and Unicode on purpose.
