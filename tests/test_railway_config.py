@@ -137,3 +137,14 @@ def test_services_keep_their_variables_out_of_the_file(name):
     block = service_block(name)
     assert "preserved(" in block
     assert not re.search(r'"[A-Za-z0-9+/=_-]{32,}"', block)
+
+
+def test_microsoft_sign_in_variables_are_declared_on_web_only():
+    """The project is managed: an MS_* variable set later is deleted by the next apply unless
+    railway.ts names it (as preserve(), so its value stays out of the repository)."""
+    match = re.search(r"const webOnlyVariables = \[(.*?)\];", IAC.read_text(), re.DOTALL)
+    assert match
+    names = set(re.findall(r'"([A-Z_]+)"', match.group(1)))
+    assert {"MS_CLIENT_ID", "MS_CLIENT_SECRET", "MS_ALLOWED_TENANTS"} <= names
+    assert "...webOnlyVariables" in service_block("web")
+    assert "MS_" not in service_block("cron")
