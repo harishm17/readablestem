@@ -15,14 +15,14 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import func, select, tuple_
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from readablestem.core import triage
 from readablestem.core.types import DocumentResult, Fix, Kind, Status
 from readablestem.web import carry as carry_rules
 from readablestem.web import combine as combine_rules
-from readablestem.web import job_page, titles
+from readablestem.web import fair_queue, job_page, titles
 from readablestem.web import retry as retry_rules
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus, ReviewEdit, User, utcnow
@@ -365,23 +365,40 @@ def _first_open_by_kind(result: DocumentResult) -> dict[str, str]:
 
 
 def queue_ahead(session: Session, job: Job) -> int:
-    """Queued jobs the worker will claim before this one: the same order as
-    `Worker.claim` (fewest attempts, then oldest, then id), and like it only jobs whose
-    owner is still allowed."""
-    return int(
-        session.scalar(
-            select(func.count())
-            .select_from(Job)
-            .join(User, User.id == Job.user_id)
-            .where(
-                Job.status == JobStatus.QUEUED,
-                User.is_allowed.is_(True),
-                tuple_(Job.attempts, Job.created_at, Job.id)
-                < tuple_(job.attempts, job.created_at, job.id),
-            )
+    """Queued jobs the worker will claim before this one."""
+    return len(_jobs_ahead(session, job))
+
+
+def _jobs_ahead(session: Session, job: Job) -> list[fair_queue.Queued]:
+    """The queued jobs the worker claims before this one: the same order as `Worker.claim`
+    (`fair_queue`: fewest attempts, people taking turns, then oldest), replayed claim by
+    claim, and like it only jobs whose owner is still allowed."""
+    rows = session.execute(
+        select(Job.id, Job.user_id, Job.attempts, Job.created_at, Job.page_count)
+        .join(User, User.id == Job.user_id)
+        .where(Job.status == JobStatus.QUEUED, User.is_allowed.is_(True))
+    ).all()
+    queued = {
+        row.id: fair_queue.Queued(
+            row.id,
+            row.user_id,
+            int(row.attempts or 0),
+            as_utc(row.created_at) or utcnow(),
+            int(row.page_count or 0),
         )
-        or 0
-    )
+        for row in rows
+    }
+    if job.id not in queued:  # the owner is no longer allowed: still say where it would be
+        queued[job.id] = fair_queue.Queued(
+            job.id,
+            job.user_id,
+            int(job.attempts or 0),
+            as_utc(job.created_at) or utcnow(),
+            int(job.page_count or 0),
+        )
+    served = fair_queue.last_started(session, {q.user_id for q in queued.values()})
+    ordered = fair_queue.queue_order(list(queued.values()), served)
+    return ordered[: [q.id for q in ordered].index(job.id)]
 
 
 # Estimates of the wait use the last few finished jobs (seconds per page, start to end);
@@ -417,16 +434,7 @@ def queue_wait(session: Session, job: Job) -> tuple[int, float]:
     """(jobs ahead that are this user's, estimated seconds until this one is done) for a
     queued job: the pages ahead (in `Worker.claim` order, like `queue_ahead`), what is
     left of the jobs converting now, and its own pages, at the recent pace."""
-    ahead = session.execute(
-        select(Job.user_id, Job.page_count)
-        .join(User, User.id == Job.user_id)
-        .where(
-            Job.status == JobStatus.QUEUED,
-            User.is_allowed.is_(True),
-            tuple_(Job.attempts, Job.created_at, Job.id)
-            < tuple_(job.attempts, job.created_at, job.id),
-        )
-    ).all()
+    ahead = [(q.user_id, q.page_count) for q in _jobs_ahead(session, job)]
     running = session.execute(
         select(Job.page_count, Job.pages_done).where(Job.status == JobStatus.RUNNING)
     ).all()

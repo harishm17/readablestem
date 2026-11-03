@@ -30,7 +30,13 @@ from sqlalchemy.orm import Session
 
 from readablestem.core import sandbox
 from readablestem.core.types import DocumentResult
-from readablestem.pipeline import export_canvas, export_cartridge, export_docx, text_pass
+from readablestem.pipeline import (
+    export_canvas,
+    export_cartridge,
+    export_docx,
+    export_epub,
+    text_pass,
+)
 from readablestem.pipeline import language as languages
 from readablestem.source import envelope as source_envelope
 from readablestem.source import intake as source_intake
@@ -446,6 +452,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "ready_documents": sum(
             1 for row in listing.rows if row.status == JobStatus.DONE and not row.open_decisions
         ),
+        "word_export": export_docx.available(),  # "Download all as Word" needs pandoc
         # Word (.docx) and PowerPoint (.pptx) files are taken (T3-30): the kinds installed.
         "office_kinds": kinds,
         # "Convert scanned or handwritten pages" is offered (ADR 0007, FEATURE_IMAGE_PAGES).
@@ -1486,13 +1493,18 @@ def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response
 
 
 @router.get("/jobs/{job_id}/combine")
-def combine_parts(request: Request, job_id: str, user: UserDep) -> Response:
+def combine_parts(request: Request, job_id: str, user: UserDep, format: str = "html") -> Response:
     """One HTML file from the finished parts of this document's source that the owner still
     keeps (`web.combine`, `pipeline.combine`). A GET like the other downloads, for the owner
     only, so it needs no CSRF token. It follows "Download all" (`web.routes.bundle`): a part
     with a decision still open is held back, each part that is in the file restarts its
     deletion clock and counts as downloaded. A part the person deleted (or that expired) is
-    not in it either, and the file names the pages that are missing."""
+    not in it either, and the file names the pages that are missing. `?format=docx` or
+    `?format=epub` gives the same file as Word or EPUB (`routes.exports.make_file`), recorded
+    in that file type."""
+    from readablestem.web.routes import exports  # exports imports this module
+
+    file_type = exports.checked_format(format)
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user)
@@ -1521,16 +1533,44 @@ def combine_parts(request: Request, job_id: str, user: UserDep) -> Response:
                 context={"job_id": job.id},
             ) from None
         name = download_filename(f"{title} combined", job.part_group or job.id)
+        body: str | bytes = html
+        media = "text/html; charset=utf-8"
+        if file_type != "html":
+            try:
+                body = exports.make_file(file_type, html, title)
+            except exports.Busy:
+                raise exports.busy_page() from None
+            except (export_docx.DocxExportError, export_epub.CanvasExportError) as exc:
+                log_event(
+                    logger,
+                    "combine_export_failed",
+                    file_type=file_type,
+                    code=getattr(exc, "code", "image_type"),
+                )
+                raise PageError(
+                    409,
+                    "These parts cannot be made as that file type",
+                    "The joined file could not be made as Word or EPUB. The HTML file is still "
+                    "available, and each part is its own document.",
+                    context={"job_id": job.id},
+                ) from None
+            name = name.removesuffix(".html") + "." + file_type
+            media = exports.media_type(file_type)
         taken = [k.job.id for k in kept]
         for item in kept:
             retention.restart_clock(item.job, ctx.settings)
     for part_id in taken:
         events.record_download(
-            ctx.factory, ctx.settings, user_id=user.id, job_id=part_id, open_decisions=0
+            ctx.factory,
+            ctx.settings,
+            user_id=user.id,
+            job_id=part_id,
+            open_decisions=0,
+            file_type=file_type,
         )
     return Response(
-        html,
-        media_type="text/html; charset=utf-8",
+        body,
+        media_type=media,
         headers={
             "Content-Disposition": content_disposition(name),
             "Content-Security-Policy": VIEW_CSP,
