@@ -73,6 +73,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `PER_USER_DAILY_PAGE_QUOTA` | Pages per invited user per UTC day (`quota_days`); open-tier accounts have `OPEN_TIER_DAILY_PAGE_QUOTA` instead |
 | `MAX_UPLOAD_MB`, `MAX_PAGES_PER_JOB`, `MAX_CONCURRENT_UPLOADS` | Upload limits (the last: uploads taken in at once per instance, one per user) |
 | `MAX_LARGE_UPLOAD_MB` (30), `MAX_SOURCE_PAGES` (300) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (30 was sized for Cloud Run's 32 MiB request limit; Railway documents none). Equal to the limits above, they turn the feature off: such files are refused |
+| `FEATURE_BEAMER_SOURCE` | Takes Beamer decks within LaTeX source ("LaTeX source" below). Off by default; needs `FEATURE_LATEX_SOURCE` |
 | `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project ("LaTeX source" below, ADR 0008). Off by default; needs the image built with `INSTALL_LATEXML` and a PASS from `readablestem ops sandbox-probe` |
 | `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
@@ -569,6 +570,23 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   paragraphs, lists, tables, exact equations (LaTeXML's MathML through the sanitiser, accepted),
   and figures with the project's own picture through the ordinary figure step. A formula
   LaTeXML could not read, and a figure with no picture, are required decisions.
+- **Beamer** (`FEATURE_BEAMER_SOURCE`, off by default, needs `FEATURE_LATEX_SOURCE`): a deck is
+  read through LaTeXML's `beamer.cls` binding, which writes one `ltx_slide` per overlay step. A
+  frame is a heading (its title) and its content: sections are the top level, frames sit one level
+  below the section they are in (the title page's title is the document title). Of a frame's
+  steps only the last is written, plus any earlier step that shows something the last one does
+  not (`\\only`, `\\alt`, a formula or picture that changes), headed "(step 2 of 3)": the rule of
+  the PDF path's slide decks (docs/layout.md, "Slide decks"). Text a step covers (`\\pause`,
+  `\\uncover`, `\\visible`) is not written for that step, and a list item a pause reveals is an
+  item of its own. LaTeXML 0.8.8's binding has no `block`, `alertblock`, `exampleblock`,
+  `columns`, `column` or `\\institute`: `source/beamer_compat.tex` gives them as plain text and is
+  read first for a deck (`--preload`, mounted read-only in the sandbox). A deck counts one page
+  per frame (or per figure), not by characters; `DocumentResult.origin` is `beamer` and the student
+  note says "a slide deck". The spike behind it (E2) used five decks written for the purpose
+  (`tests/fixtures/source/beamer/`: 20 frames, 3 to 5 overlay steps in two of them): with the
+  compat file none of the 20 frames hit an unknown command (without it 3 did, 15 percent: a
+  block, a column and a block with `\\institute`); **no real decks were tried**, which is why the
+  switch stays off.
 - **Review.** A source has no pages to show, so its review is the list view; the split view
   redirects to it. `DocumentResult.origin` is `latex`; the student note says "a LaTeX document".
 - **Failure.** A source that cannot be converted fails the job with `source_failed`,

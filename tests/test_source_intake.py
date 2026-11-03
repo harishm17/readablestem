@@ -96,11 +96,10 @@ def test_too_many_pages_is_refused_with_the_limit_given():
     assert intake.inspect("a.tex", long.encode(), max_pages=6).pages == 6
 
 
-def test_beamer_is_refused_until_it_is_switched_on(monkeypatch):
+def test_beamer_is_refused_until_it_is_switched_on():
     deck = "\\documentclass[aspectratio=169]{beamer}\n\\begin{document}\\end{document}"
     assert refusal("a.tex", deck.encode()) == "source_beamer"
-    monkeypatch.setattr(intake, "BEAMER_ENABLED", True)
-    assert intake.inspect("a.tex", deck.encode()).beamer is True
+    assert intake.inspect("a.tex", deck.encode(), beamer_ok=True).beamer is True
 
 
 @pytest.mark.parametrize(

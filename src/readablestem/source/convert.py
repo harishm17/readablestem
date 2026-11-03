@@ -27,7 +27,7 @@ from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from readablestem.config import Settings
 from readablestem.core import sandbox
@@ -119,9 +119,10 @@ class _SourceRun(pipeline._Run):
         self.pages.submitted(page)
 
 
-def _project(blob: bytes, tmp: Path) -> tuple[Path, str]:
-    """Unpack the upload under `tmp/project` and return it and the main file's path. The same
-    checks as the web process made: the zip limits, the lint, the main file."""
+def _project(blob: bytes, tmp: Path, *, beamer_ok: bool) -> tuple[Path, str, bool]:
+    """Unpack the upload under `tmp/project` and return it, the main file's path and whether it
+    is a Beamer deck. The same checks as the web process made: the zip limits, the lint, the
+    main file."""
     try:
         kind, hint, data = intake.unwrap(blob)
     except intake.EnvelopeError:
@@ -136,7 +137,8 @@ def _project(blob: bytes, tmp: Path) -> tuple[Path, str]:
             if lint.problem(text) is not None:
                 raise SourceFailed("source_refused")
         main = intake.find_main(texts, hint)
-        if intake._is_beamer(texts[main]) and not intake.BEAMER_ENABLED:
+        beamer = intake._is_beamer(texts[main])
+        if beamer and not beamer_ok:
             raise SourceFailed("source_refused")
         if kind == "tex":
             (project / "main.tex").write_bytes(data)
@@ -146,15 +148,15 @@ def _project(blob: bytes, tmp: Path) -> tuple[Path, str]:
         raise SourceFailed("source_refused") from None
     except arc.ArchiveRefused:
         raise SourceFailed("source_refused") from None
-    return project, main
+    return project, main, beamer
 
 
-def run_latexml(project: Path, main: str, out: Path) -> bytes:
+def run_latexml(project: Path, main: str, out: Path, *, beamer: bool = False) -> bytes:
     """LaTeXML on the project in the sandbox; the XHTML it wrote. `SourceFailed` otherwise."""
     if not latexml.installed():
         raise SourceFailed("source_unavailable")
     try:
-        outcome = latexml.convert(project, main, out)
+        outcome = latexml.convert(project, main, out, beamer=beamer)
     except (sandbox.SandboxUnavailable, OSError):
         raise SourceFailed("source_unavailable") from None
     if outcome.timed_out:
@@ -227,13 +229,13 @@ def _convert(
     pipeline._send(stage_progress, "layout")
     with tempfile.TemporaryDirectory(prefix="rs-source-") as scratch:
         tmp = Path(scratch)
-        project, main = _project(blob, tmp)
+        project, main, beamer = _project(blob, tmp, beamer_ok=settings.feature_beamer_source)
         out = tmp / "out"
-        xhtml = run_latexml(project, main, out)
+        xhtml = run_latexml(project, main, out, beamer=beamer)
         try:
             xml = out / latexml.XML_PATH
             graphics = ltx_reader.graphics_of(xml.read_bytes()) if xml.is_file() else {}
-            reading = ltx_reader.read(xhtml, project, graphics)
+            reading = ltx_reader.read(xhtml, project, graphics, beamer=beamer)
         except ltx_reader.ReadError:
             raise SourceFailed("source_unreadable") from None
     return _finish(
@@ -250,6 +252,7 @@ def _convert(
         stage_progress=stage_progress,
         step_cache=step_cache,
         call_observer=call_observer,
+        origin="beamer" if beamer else "latex",
     )
 
 
@@ -268,6 +271,7 @@ def _finish(
     stage_progress: pipeline.StageProgressFn | None,
     step_cache: pipeline.StepCache | None,
     call_observer: Callable[[ModelCall], None] | None,
+    origin: Literal["latex", "beamer"] = "latex",
 ) -> ConversionOutput:
     """From a reading to a stored result: the figure steps, the assembler, the checks."""
     elements = sorted(reading.elements, key=lambda e: e.order)
@@ -312,7 +316,7 @@ def _finish(
         source_note=source_note,
         notice=notice,
         math_alttext=settings.mathml_alttext,
-        origin="latex",
+        origin=origin,
     )
     pipeline._send(stage_progress, "checks")
     checks = html_checks.static_checks(html)
@@ -337,7 +341,7 @@ def _finish(
         html_checks=checks,
         notices=notices,
         lang_source="default",
-        origin="latex",
+        origin=origin,
     )
     log.info(
         "convert_source done: elements=%d fixes=%d calls=%d cost_usd=%.4f",

@@ -71,8 +71,17 @@ def _env(extra: dict[str, str]) -> dict[str, str]:
     return {"HOME": "/tmp", "LANG": "C.UTF-8", "TZ": "UTC", "SOURCE_DATE_EPOCH": "1", **extra}
 
 
+BEAMER_COMPAT = Path(__file__).with_name("beamer_compat.tex")
+_BEAMER_MOUNT = "/opt/beamer_compat.tex"
+
+
 def convert(
-    src: Path, main: str, out: Path, *, limits: sandbox.Limits | None = None
+    src: Path,
+    main: str,
+    out: Path,
+    *,
+    limits: sandbox.Limits | None = None,
+    beamer: bool = False,
 ) -> sandbox.Outcome:
     """Convert `src/main` (a path relative to `src`, no `..`): the XML at `out/XML_PATH`, then
     the XHTML at `out/DOC_PATH`.
@@ -89,9 +98,13 @@ def convert(
     ro = ((src, "/work"),)
 
     prefix, extra, mounts = _program("latexml")
+    preload: list[str] = []
+    if beamer:  # definitions for the Beamer parts LaTeXML's binding lacks (the file's header)
+        preload = [f"--preload={_BEAMER_MOUNT}"]
+        mounts += ((BEAMER_COMPAT, _BEAMER_MOUNT),)
     first = sandbox.run(
         [
-            *prefix, "--nocomments", "--path=/work", f"--destination=/out/{XML_NAME}",
+            *prefix, "--nocomments", "--path=/work", *preload, f"--destination=/out/{XML_NAME}",
             "--log=/out/latexml.log", f"/work/{main}",
         ],
         ro=ro + mounts, rw=((xml_dir, "/out"),), env=_env(extra), cwd="/work", limits=limits,

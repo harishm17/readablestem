@@ -118,6 +118,10 @@ ABOUT_WORDING_SOURCE = (
     "This is a web version of a LaTeX document from your course, made with ReadableSTEM, "
     "a tool that assists with accessibility."
 )
+ABOUT_WORDING_BEAMER = (
+    "This is a web version of a slide deck from your course, made with ReadableSTEM, "
+    "a tool that assists with accessibility."
+)
 MATHS_NOTE = "Its equations are written so that screen readers can read them aloud."
 NOT_CHECKED_YET = (
     "Some parts were made by the tool and have not been checked by your instructor yet."
@@ -1306,7 +1310,9 @@ def _about_section(
     and no review vocabulary ("needs review", "rejected"): the instructor's numbers are
     on the job page. `kept_pages`: 0-based pages kept whole as an image."""
     maths = any(f.kind is Kind.EQUATION and f.status not in NOT_CONVERTED for f in fixes)
-    opening = ABOUT_WORDING if origin == "pdf" else ABOUT_WORDING_SOURCE
+    opening = {"latex": ABOUT_WORDING_SOURCE, "beamer": ABOUT_WORDING_BEAMER}.get(
+        origin, ABOUT_WORDING
+    )
     what = f"{opening} {MATHS_NOTE}" if maths else opening
     flagged_note = f"<p>{FLAGGED_NOTE}</p>\n" if flagged else ""
     if pages_line := kept_pages_note(kept_pages or []):

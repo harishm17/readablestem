@@ -30,9 +30,6 @@ from readablestem.web import archive_intake as arc
 CHARS_PER_PAGE = 3000
 MAX_TEXT_FILE_BYTES = 4 * 1024 * 1024  # a larger .tex is refused: no paper has one
 MAX_TEXT_TOTAL_BYTES = 24 * 1024 * 1024
-# Beamer is read in a later step (docs/web.md, "LaTeX source"); until its switch is on, a
-# deck is refused with the answer "upload the PDF".
-BEAMER_ENABLED = False
 
 _ZIP_CODES = {
     "not_zip": "source_bad_zip",
@@ -52,6 +49,7 @@ _BEGIN_DOCUMENT = re.compile(r"\\begin\s*\{document\}")
 _INCLUDE = re.compile(
     r"\\(?:input|include|subfile|subimport)\b\s*(?:\{[^}]*\}\s*)?\{?([^\s{}]+)\}?"
 )
+_FRAMES = re.compile(r"\\begin\s*\{frame\}|\\frame\s*\{")
 _FIGURES = re.compile(r"\\includegraphics\b|\\begin\s*\{tikzpicture\}")
 PREFERRED_MAINS = ("main", "ms", "paper", "article", "document", "slides", "thesis", "report")
 
@@ -167,15 +165,21 @@ def find_main(texts: dict[str, str], hint: str | None = None) -> str:
     raise SourceRefused("source_many_mains")
 
 
-def estimate_pages(texts: dict[str, str]) -> int:
+def estimate_pages(texts: dict[str, str], *, beamer: bool = False) -> int:
+    """The pages a source counts as (module docstring). A Beamer deck counts one per frame (a frame
+    is a slide as it is read: its last step, and any step that differs) or per figure."""
     chars = 0
     figures = 0
+    frames = 0
     for path, text in texts.items():
         if not path.lower().endswith((".tex", ".ltx")):
             continue
         clean = lint.strip_comments(text)
         chars += len(clean)
         figures += len(_FIGURES.findall(clean))
+        frames += len(_FRAMES.findall(clean))
+    if beamer:
+        return max(1, frames, figures)
     return max(1, math.ceil(chars / CHARS_PER_PAGE), figures)
 
 
@@ -186,8 +190,10 @@ def inspect(
     main: str | None = None,
     limits: arc.ArchiveLimits = arc.DEFAULT_LIMITS,
     max_pages: int | None = None,
+    beamer_ok: bool = False,
 ) -> SourceInfo:
-    """Check an upload that `kind_of` called a source. Raises `SourceRefused`."""
+    """Check an upload that `kind_of` called a source. Raises `SourceRefused`. `beamer_ok`: a
+    Beamer deck is taken (`FEATURE_BEAMER_SOURCE`); without it, it is refused ("upload the PDF")."""
     kind = kind_of(filename, data)
     if kind is None:
         raise SourceRefused("source_bad_zip")
@@ -199,9 +205,9 @@ def inspect(
             raise SourceRefused("source_unsafe")
     chosen = find_main(texts, main)
     beamer = _is_beamer(texts[chosen])
-    if beamer and not BEAMER_ENABLED:
+    if beamer and not beamer_ok:
         raise SourceRefused("source_beamer")
-    pages = estimate_pages(texts)
+    pages = estimate_pages(texts, beamer=beamer)
     if max_pages is not None and pages > max_pages:
         raise SourceRefused("source_too_many_pages")
     return SourceInfo(kind=kind, main=chosen, pages=pages, beamer=beamer, files=len(texts))

@@ -215,6 +215,19 @@ def zip_with_attr(name: str, data: bytes, attr: int) -> bytes:
         (make_zip({f"f{i}.tex": "x" for i in range(501)}), "too many files"),
         (make_zip({"main.tex": ARTICLE, "big.txt": "\0" * (30 * 1024 * 1024)}), "too big"),
     ],
+    # ids by name: the zips carry the time they were made, and every worker must see the same ids
+    ids=[
+        "traversal",
+        "absolute",
+        "symlink",
+        "eps",
+        "nested-zip",
+        "shell-script",
+        "not-a-zip",
+        "no-main",
+        "too-many-entries",
+        "unpacked-too-big",
+    ],  # fmt: skip
 )
 def test_a_bad_zip_is_refused_with_a_plain_message(web, data, words):
     text = refused(web, data, "project.zip")
@@ -233,6 +246,20 @@ def test_a_beamer_deck_is_refused_until_it_is_switched_on(web):
     deck = "\\documentclass{beamer}\n\\begin{document}\\begin{frame}x\\end{frame}\\end{document}"
     text = refused(web, deck.encode(), "slides.tex")
     assert "Beamer" in text and "Upload the compiled PDF" in text
+
+
+def test_a_beamer_deck_is_taken_with_its_own_switch_and_counted_by_frame(tmp_path, available):
+    env = WebEnv(tmp_path, feature_latex_source=True, feature_beamer_source=True)
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        frames = "".join(f"\\begin{{frame}}{{T{i}}}x\\end{{frame}}" for i in range(4))
+        deck = f"\\documentclass{{beamer}}\\begin{{document}}{frames}\\end{{document}}"
+        response = send(client, deck.encode(), "slides.tex")
+        assert response.status_code == 303
+        [job] = jobs(env)
+        assert job.page_count == 4
+        assert envelope.unwrap(bytes(stored(env, job.id).content))[0] == "tex"
 
 
 def test_a_source_over_the_page_limit_is_refused(web):

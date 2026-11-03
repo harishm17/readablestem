@@ -444,6 +444,10 @@ class Settings(BaseSettings):
     # passes on the deployed image and the image was built with INSTALL_LATEXML (docs/security.md,
     # "Running uploaded TeX").
     feature_latex_source: bool = False
+    # Beamer decks within LaTeX source: frames become sections, overlay steps follow the slide-deck
+    # rules (docs/web.md, "LaTeX source"). Only with FEATURE_LATEX_SOURCE; off until real decks
+    # have been looked at (the spike used decks written for it).
+    feature_beamer_source: bool = False
     image_pages_model: str | None = None
     # Seconds the model may take to write one page (a dense page is a few thousand tokens;
     # `model_timeout_s` is for a crop's short answer).
