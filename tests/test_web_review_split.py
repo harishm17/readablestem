@@ -529,22 +529,25 @@ def _contrast(a: str, b: str) -> float:
 def test_the_review_colours_have_enough_contrast():
     from pathlib import Path
 
-    css = (Path(__file__).parents[1] / "src/readablestem/web/static/app.css").read_text()
-    colours = dict(re.findall(r"(--[\w-]+):\s*(#[0-9a-fA-F]{6})", css))
+    static = Path(__file__).parents[1] / "src/readablestem/web/static"
+    css = (static / "tokens.css").read_text() + (static / "app.css").read_text()
+    colours: dict[str, str] = {}
+    for name, value in re.findall(r"(--[\w-]+):\s*(#[0-9a-fA-F]{6})", css):
+        colours.setdefault(name, value)  # the light theme is declared first
     white = "#ffffff"
     # Marks are graphics on the white page image: 3:1 (WCAG 1.4.11).
-    for mark in ("--mark-required", "--mark-current", "--mark-optional", "--mark-accepted"):
+    for mark in ("--pmark-required", "--pmark-current", "--pmark-optional", "--pmark-accepted"):
         assert _contrast(colours[mark], white) >= 3, mark
     # The numbers on the discs and the page counts are white text: 4.5:1.
-    for disc in ("--mark-required", "--mark-current", "--ok"):
+    for disc in ("--pmark-required", "--pmark-current", "--ok"):
         assert _contrast(white, colours[disc]) >= 4.5, disc
     # Text on the review screen's tinted backgrounds.
     pairs = [
-        ("--mark-required", "--tint-required"),
-        ("--text", "--desk"),
-        ("--muted", "--desk"),
-        ("--link", "--desk"),
-        ("--mark-optional", "--panel"),
+        ("--pmark-required", "--tint-required"),
+        ("--ink", "--desk"),
+        ("--ink-muted", "--desk"),
+        ("--accent", "--desk"),
+        ("--mark-optional", "--surface"),
     ]
     for text, background in pairs:
         assert _contrast(colours[text], colours[background]) >= 4.5, (text, background)

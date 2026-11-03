@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: design system (branch design/d1-tokens-components)
+
+- Site design tokens and components (`static/tokens.css`, `static/app.css`, `DESIGN.md`,
+  `PRODUCT.md`): self-hosted Source Sans 3, Source Serif 4 and Source Code Pro, one accent
+  (`#1c46ad`), all text at least 7:1 in light and in dark (follows the browser's setting),
+  nothing under 14px, a 4px grid, 4px and 8px radii (no pills), a 75rem page and a 68ch reading
+  column on pages people read. The header has a Sign in button and folds into a Menu disclosure on
+  a narrow screen; the footer is four columns (Product, Trust, Guides, Source) with the same
+  links as before. Forced-colours and reduced-motion rules cover the new components. The app's
+  side-stripe notices and cards became full borders. `/style` (noindex, not in the sitemap) shows
+  every component. Docs: `docs/site.md` "Design system", `static/vendor/README.md`.
+
 ## Unreleased: slide decks (branch layout/beamer-slides)
 
 - Slide decks (`pipeline/slides.py`, docs/layout.md "Slide decks"): a Beamer file, or a slide-shaped

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 import pytest
 from sqlalchemy.exc import InterfaceError, OperationalError
@@ -34,7 +35,9 @@ def test_404_page_is_calm_and_leads_home(env):
     response = env.browser.get("/no-such-page")
     assert response.status_code == 404
     assert "Page not found" in response.text and 'href="/"' in response.text
-    assert "Traceback" not in response.text and "detail" not in response.text.lower()
+    # (the header's menu is a <details>: look for the word outside tags)
+    assert "Traceback" not in response.text
+    assert "detail" not in re.sub(r"<[^>]*>", "", response.text).lower()
     assert response.headers["content-security-policy"] == APP_CSP
 
 

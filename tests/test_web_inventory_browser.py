@@ -149,7 +149,7 @@ def test_every_control_is_a_44px_target_and_nothing_scrolls_sideways(site, brows
     open_screen(page, site, job, unfold=True)
     selectors = [
         "select",
-        "summary",
+        "main summary",
         "button[data-role=relabel]",
         ".place-keep",
         ".place-where a",

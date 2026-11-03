@@ -698,3 +698,16 @@
     }
   });
 })();
+
+/* The main navigation is a <details> ("Menu") that is open in the markup, so the links are
+ * all shown without JavaScript. On a narrow screen this closes it; widening the window opens
+ * it again (the Menu button is hidden there). */
+(function () {
+  "use strict";
+  var menu = document.querySelector(".nav-menu");
+  if (!menu || !window.matchMedia) return;
+  var narrow = window.matchMedia("(max-width: 39.99rem)");
+  function sync() { menu.open = !narrow.matches; }
+  sync();
+  if (narrow.addEventListener) narrow.addEventListener("change", sync);
+})();
