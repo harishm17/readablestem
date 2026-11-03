@@ -32,6 +32,18 @@
   reads; everything else is accepted for you and listed, so you can look it over. Dense
   maths means more decisions: on textbook sections in our held-out test it asked about
   one or two per page.</p>
+{# Same numbers and hedging as /limits ("Decisions it asked for: about 1.8 per page", the
+   15 held-out sections, "Real course PDFs ... may do worse"). The daily quota is read from
+   the settings, not written here. #}
+<p>What that adds up to: in that test it asked for about 1.8 decisions per page, and real
+  course PDFs may need more. A document of {{ max_pages }} pages, the most one upload can
+  hold, is then about {{ (max_pages * 1.8)|round|int }} decisions.{% if signup_open %} A new
+  account can convert {{ open_page_quota }} pages a day, about
+  {{ (open_page_quota * 1.8)|round|int }} decisions.{% endif %} Your document and your
+  decisions are deleted {{ retention_hours }} hours after you last work on them, so plan to
+  finish the review and download the file within that time. Where the checks found nothing
+  wrong, you can accept all the equations, or all the figures with alt text, in one step
+  after seeing the list.</p>
 
 <h2>How accurate it is</h2>
 <p>It makes mistakes, so look over the equations your students rely on. In a

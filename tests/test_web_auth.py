@@ -300,6 +300,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/dev-login",
         "/internal/cron/aggregate-and-purge",  # token-authenticated, no session
         "/jobs",
+        "/jobs/{job_id}/accept/{slug}",  # many accepts at once, after a preview
         "/jobs/{job_id}/contact",  # the student file's contact line (T1-17)
         "/jobs/{job_id}/delete",
         "/jobs/{job_id}/edit/{element_id}",  # the words of a paragraph; a heading made (T3-5)
@@ -328,7 +329,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
     for path in posts:
         url = path.replace("{job_id}", JOB).replace("{element_id}", "p1-e1")
         url = url.replace("{course_id}", JOB).replace("{entry_id}", JOB).replace("{number}", "1")
-        url = url.replace("{upload_id}", JOB)
+        url = url.replace("{upload_id}", JOB).replace("{slug}", "equations")
         if path == "/jobs":
             response = web.browser.post(
                 url, data={"csrf_token": "forged"}, files={"pdf": ("a.pdf", b"%PDF-1.4", "x")}

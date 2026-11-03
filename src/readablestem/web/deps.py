@@ -22,7 +22,7 @@ from starlette.responses import Response
 
 from readablestem.config import Settings
 from readablestem.observability.tracing import Tracer
-from readablestem.web import analytics, seo
+from readablestem.web import analytics, report_item, seo
 from readablestem.web.abuse import RateLimiter, client_ip
 from readablestem.web.db import User, session_scope
 from readablestem.web.logsafe import log_event
@@ -293,6 +293,8 @@ def render(
         "source_url": ctx.settings.source_url,
         "contact_email": ctx.settings.contact_email,
         "feedback_url": ctx.settings.feedback_url,  # the footer's Feedback link
+        # "Report this item" on a review card: that path, with the job and item ids.
+        "report_url": lambda job_id, item_id: report_item.item_url(ctx.settings, job_id, item_id),
         "google_login": ctx.sign_in_client("google") is not None,
         "microsoft_login": ctx.sign_in_client("microsoft") is not None,
         "dev_login": ctx.dev_login_enabled,

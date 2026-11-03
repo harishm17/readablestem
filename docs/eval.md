@@ -2,14 +2,41 @@
 
 How ReadableSTEM measures its own output, on what data, and what the numbers leave out.
 
-Status (2026-10-13): the harness is built and tested offline, and real-model runs on the
-sample are committed as `data/eval/latest-<task>.json` (pipeline 0.4.0; see "Results"
-below). All of them come from three sections of one OpenStax book, the same sample the
-checks were developed on. They are development numbers: none of them
-is a held-out result, and they should not be read as an estimate for documents in general.
+Status (2026-11-02): the harness is built and tested offline, and real-model runs on the
+sample are committed as `data/eval/latest-<task>.json` (pipeline 0.5.0, Claude; see "Versions
+of the committed reports" and "Baselines and the gate" below). All of them come from three
+sections of one OpenStax book, the same sample the checks were developed on. They are
+development numbers: none of them is a held-out result, and they should not be read as an
+estimate for documents in general. The sections "Results (pipeline 0.4.0, ...)" and the
+held-out and real-paper sections that follow it describe runs of older pipeline versions and
+say which; they are kept as they were.
 
 The invented-content rate (how much of an output the PDF does not support, for ReadableSTEM
 and for other systems) has its own page: [eval-invented.md](eval-invented.md).
+
+## Versions of the committed reports
+
+Two version numbers exist and they are not the same thing. `__version__` in
+`src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
+pipeline changes. The version a result is measured under is the **pipeline version**,
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.0 today; its comment lists what
+each bump changed). Every report records it as `pipeline_version`, and so does a converted
+document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
+table. A number in these docs is quoted with the pipeline version that produced it, and a
+report from an older version is not edited to look current: it stays labelled with the
+version it was made under.
+
+The committed development-set reports (checked against the files by `tests/test_eval_docs.py`):
+
+| File | Run date | Pipeline | Models |
+|---|---|---|---|
+| `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
+| `latest-figures.json`, `latest-headings.json` | 2026-10-14 | 0.5.0 | same |
+| `latest-equations.json`, `latest-document.json`, `latest-tables-local.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`) |
+
+The dates are when the runs were made, not when the code was last changed: what keeps a
+latest report from going stale is the gate's `--require-current` check on prompt versions and
+model ids, the eval guard on pull requests, and the weekly live run below.
 
 ## The idea
 
@@ -591,7 +618,9 @@ After a prompt or model change, re-run the task, promote the new report `--as la
 and commit it with the change; CI's gate fails (exit 2) until you do.
 
 Baselines (2026-10-14, pipeline 0.5.0). `data/eval/baseline-<task>.json` and
-`latest-<task>.json` are the same run, one per task, made once on Claude
+`latest-<task>.json` were the same run, one per task (since then `latest-equations`,
+`latest-document` and `latest-tables-local` were re-run on 2026-10-21, also 0.5.0; "Versions
+of the committed reports"), made once on Claude
 (`MODEL_PROVIDER=anthropic`, `claude-opus-5-5` main, `claude-haiku-5-5` cheap, Opus as the
 figure judge) on the original development set (`data/gold`), and promoted with
 `eval promote ... --out-dir data/eval`. CI's eval-gate job therefore runs; it compares each
@@ -663,9 +692,8 @@ uv run readablestem eval sample --task equations --max-usd 0.10
 uv run readablestem eval sample --task figures --fraction 0.05 --week 2026-W41 --max-usd 0.10
 ```
 
-TODO(Harish): decide whether to schedule it (it spends money; `eval-live.yml` is
-manual-only on purpose), and whether opted-in production pages should join the sample
-once their review labels exist as gold.
+The scheduled run of `eval-live.yml` (below) does not use this sample. Whether opted-in
+production pages should join a sample once their review labels exist as gold is not decided.
 
 Public demo:
 
@@ -692,13 +720,73 @@ and a link to the original), `report.json` (the `DocumentResult` without the HTM
 `source.pdf` (the exact input) to `src/readablestem/web/static/demo/`. Pages outside the
 gold set are looked up live and pass the same license gate as `gold fetch`.
 
+### Weekly live run (`eval-live.yml`)
+
+The CI `eval-gate` job only compares the committed `latest-<task>.json` with its baseline, so
+on its own it cannot fail on a prompt or model change: nothing re-measures. `eval-live.yml`
+does. Every Monday at 06:17 UTC (and on demand, "Run workflow", with a choice of one task or
+all) it runs the full development sets against the production provider (Claude,
+`MODEL_PROVIDER=anthropic` in `.railway/railway.ts`), one job per task, then
+`readablestem eval gate --require-current` against the committed baseline. A regression, a
+changed judge, a stale prompt or model, or a partial run (the cap stopped it) fails the job
+and GitHub emails the owner. The reports are uploaded as artifacts (30 days) and never
+committed; to move a baseline, re-run locally and `eval promote` it.
+
+| Task | Run | Hard `--max-usd` | Baseline run cost (2026-10) |
+|---|---|---|---|
+| equations | 30 equations | $0.50 | $0.08 to $0.10 |
+| headings | 3 pages, no model call | $0.25 | $0.00 |
+| figures | 13 figures, Opus judge | $0.75 | $0.12 |
+| document | 3 sections, 43 PDF pages | $1.00 | $0.24 |
+| tables | `--mode model --styles grid` (no model-mode baseline: gated on its floors alone) | $0.45 | about $0.26 (see "Tables") |
+
+The caps add up to $2.95, under the $3.00 weekly ceiling the workflow checks before it runs
+anything; the expected spend is about $0.70 a week (the right column, same sets). Every cap
+is above one worst-case reservation of the main model (about $0.29), which is why the caps
+are not lower.
+
+The workflow needs the repository secret `ANTHROPIC_API_KEY`. Without it a scheduled run
+ends with a notice ("the weekly live eval is skipped") and spends nothing; a manual run fails
+with an error, so a missing key is never silent. Adding the secret is what turns the weekly
+spend on. The full development sets are used so that a report has the same items as its
+baseline (the gate refuses reports of other selections); Chromium and the fonts are
+installed as in `ci.yml`, and the OpenStax pages are fetched on the run.
+
+### Eval guard (`eval-guard.yml`)
+
+A pull request that changes a setting in `src/readablestem/config.py` that decides what a
+model answers (the model ids such as `ANTHROPIC_MAIN_MODEL` or `claude_check_model`, the
+`*_effort*` settings, `*max_output_tokens`, thinking and reasoning settings; an explicit list
+in `scripts/eval_guard.py`, compared by parsed value, so reformatting is not a change;
+timeouts, retries, concurrency and call limits are not on it) or a prompt (a `.md` file under
+`src/readablestem/models/prompts/`, subfolders included; a file moved with its content
+unchanged is not a change) fails unless it also changes the matching
+`data/eval/latest-*.json` report(s). The message points to "How to rerun". The mapping is in
+`scripts/eval_guard.py` (tests: `tests/test_eval_guard.py`): a prompt needs the reports of
+the tasks that use it (`equation*.md`: equations and document; `figure*.md`: figures and
+document; `judge_*`: figures; `check_equation` and `check_figure`: that task; `table.md`:
+tables local and document; any other prompt: document); a change to the Claude model pair
+needs all four Claude reports (equations, headings, figures, document); the OpenAI pair
+needs the tables report, which records it; any other model setting needs the document
+report.
+
+Opt-out, for a change that does not alter what a model is asked or which model answers (a
+renamed constant, a comment): add the label `eval-unchanged` to the pull request, or put a
+trailer `Eval-Unchanged: <reason>` in the last paragraph of any of its commit messages (the reason is required). The guard
+prints the waiver and the reports it did not need, so a reviewer sees it. Prompt text a
+model reads is never a refactor: change it and re-run.
+
 ## Results (pipeline 0.4.0, 2026-10-12, gpt-6.1-sol and gpt-6-luna)
 
-Reports: `data/eval/latest-<task>.json`. Sample: 3 sections of OpenStax *Physics* ch. 2 (CC
-BY 4.0). Small: read the confidence intervals before reading the point estimates.
+Historical: these are the runs of 2026-10-12 on pipeline 0.4.0 with the OpenAI models. They
+were committed as `data/eval/latest-<task>.json` then and were replaced on 2026-10-14 and
+2026-10-21 by the pipeline 0.5.0 runs on Claude ("Versions of the committed reports"); the
+numbers below are not those of the files now committed. Sample: 3 sections of OpenStax
+*Physics* ch. 2 (CC BY 4.0). Small: read the confidence intervals before reading the point
+estimates.
 
-Pipeline 0.4.0 (the content features, every flag off, as in production): all the
-committed reports are 0.4.0 runs. Equations, figures and document were re-run with the
+Pipeline 0.4.0 (the content features, every flag off, as in production): at the time all the
+committed reports were 0.4.0 runs. Equations, figures and document were re-run with the
 real models on 2026-10-12 (equations $0.052, figures $0.090 with the judge, document
 $0.145) and promoted with `eval promote --as latest`; tables is the local run of the
 same day (no model, `latest-tables-local.json`); headings is the 0.4.0 re-run of

@@ -40,6 +40,9 @@
           {% elif row.action == "download" %}
           <a id="act-{{ row.id }}" href="/jobs/{{ row.id }}/download">Download<span class="visually-hidden"> {{ row.title }}</span></a>
           {% endif %}
+          {% if row.status == "done" and not row.is_sample %}
+          <a id="rev-{{ row.id }}" class="row-link" href="/app?revises={{ row.id }}#upload-heading">Upload a revised version<span class="visually-hidden"> of {{ row.title }}</span></a>
+          {% endif %}
         </td>
         <td role="cell" data-label="Deleted automatically">{{ row.retain_until|utc }}</td>
         <td role="cell"><a id="del-{{ row.id }}" href="/jobs/{{ row.id }}/delete?from=app">Delete<span class="visually-hidden"> {{ row.title }}</span></a></td>

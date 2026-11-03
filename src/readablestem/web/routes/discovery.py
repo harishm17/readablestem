@@ -8,17 +8,18 @@ import re
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 
 from readablestem.web import seo
-from readablestem.web.assets import STATIC_DIR, static_url
+from readablestem.web.assets import STATIC_DIR, cached_html, static_url
 from readablestem.web.deps import get_ctx
 from readablestem.web.security import VIEW_CSP
 
 router = APIRouter()
 
 # Crawl files change only with a deploy.
-CRAWL_CACHE = "public, max-age=3600"
+CRAWL_MAX_AGE = 3600
+CRAWL_CACHE = f"public, max-age={CRAWL_MAX_AGE}"
 
 
 def _site(request: Request) -> str:
@@ -68,15 +69,15 @@ def showcase_root() -> Response:
 @router.get("/showcase/{rel:path}")
 def showcase(request: Request, rel: str) -> Response:
     path = _showcase_file(seo.SHOWCASE_DIR, rel)
-    headers = {"Cache-Control": CRAWL_CACHE}
     if path.suffix != ".html":
-        return FileResponse(path, headers=headers)
+        return FileResponse(path, headers={"Cache-Control": CRAWL_CACHE})
     name = path.relative_to(seo.SHOWCASE_DIR.resolve()).as_posix()
     page = _with_head_tags(path.read_text(encoding="utf-8"), _site(request), name)
+    headers = {}
     if path.name in seo.SHOWCASE_NOINDEX:
         # A stored conversion carries inline styles and data: images: sandboxed, as /demo.
         headers["Content-Security-Policy"] = VIEW_CSP
-    return HTMLResponse(page, headers=headers)
+    return cached_html(request, page, max_age=CRAWL_MAX_AGE, headers=headers)
 
 
 def _showcase_file(root: Path, rel: str) -> Path:
@@ -104,7 +105,7 @@ def _with_head_tags(page: str, site: str, name: str) -> str:
     title = html.unescape(title_match.group(1).strip()) if title_match else seo.SITE_NAME
     desc_match = re.search(r'<meta name="description" content="([^"]*)"', page)
     description = html.unescape(desc_match.group(1)) if desc_match else seo.DESCRIPTION
-    path = seo.SHOWCASE_PREFIX + name
+    path = seo.showcase_canonical(seo.SHOWCASE_PREFIX + name)
     canonical = SHOWCASE_CANONICAL.get(name, path)
     image = f"{site}{static_url('social-card.png')}"
     tags = [f'<link rel="canonical" href="{html.escape(site + canonical, quote=True)}">']
