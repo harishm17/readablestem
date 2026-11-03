@@ -115,11 +115,8 @@ main:focus { outline: none; }
   .account { order: 3; }
   .nav-menu > summary { display: inline-flex; }
   .nav-menu[open] > summary { background: var(--surface-2); }
-  .nav-menu > nav {
-    position: absolute; left: 0; right: 0; top: 100%; z-index: 5;
-    background: var(--bg); border-bottom: 1px solid var(--border-subtle);
-    padding: var(--space-2) var(--space-5) var(--space-4);
-  }
+  .nav-menu[open] { order: 4; flex-basis: 100%; }
+  .nav-menu > nav { padding: var(--space-2) 0 var(--space-2); }
   .nav-menu .nav-list { flex-direction: column; align-items: stretch; gap: 0; }
   .nav-menu .nav-list a { width: 100%; border-bottom: 1px solid var(--border-subtle); }
   .signed-in { display: none; }
