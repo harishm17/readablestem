@@ -127,3 +127,41 @@ Drafted from what the repository shows; the author confirms or edits.
   fuzz check and the timings), and before turning `FEATURE_TABLES` on (the private
   real-document check in `docs/eval.md`, "Tables").
 
+
+## Addendum (2026-11-03): where the licence sentence appears
+
+| Field | Value |
+|---|---|
+| Status | **Accepted** (Harish, 2026-11-03) |
+| Date | 2026-11-03 |
+| Decider | Harish |
+
+### Context
+
+The footer of every page carried a paragraph explaining that the hosted service links
+PyMuPDF and is therefore offered under AGPL-3.0 terms. On a page meant for accessibility and
+procurement offices that paragraph reads as a warning about the product, and it repeated on
+every screen, including the review screen.
+
+### Decision
+
+The licence stays as decided above: the code is MIT, and the hosted service is offered under
+AGPL-3.0 terms because it links PyMuPDF (option A; a commercial licence from Artifex or a
+replacement library were not chosen). Only where the words appear changes:
+
+- The sentence ("The code is MIT. The hosted service links PyMuPDF, which is AGPL-3.0, so the
+  service is offered under AGPL-3.0 terms and its complete source code is published at ...")
+  is in the Terms, under "Open source" (`/terms#open-source`), and in the README and
+  `THIRD_PARTY_NOTICES.md`.
+- Every page's footer keeps the "Source code" link to the complete source (`SOURCE_URL`), which
+  is the network-use source offer, and gains an "Open source" link to that Terms section.
+- The notes above the demo and the showcase examples link the source without the sentence.
+
+### Consequences
+
+- **Easier.** One place to keep the licence wording true; the footer is short.
+- **Harder.** A visitor sees the licence only by following the "Open source" link. The source
+  offer itself is unchanged and still on every page, which a test checks
+  (`tests/test_web_pages.py`).
+- **When to revisit.** If the "Source code" link is ever removed from a footer, or if the
+  licence terms change.

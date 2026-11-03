@@ -36,8 +36,8 @@ the repository (LaTeX, HTML, python-docx or a script) with invented text; the on
 OpenStax PDF is the demo's `source.pdf`.
 
 The hosted service links PyMuPDF (AGPL-3.0), so the combined work, when run as a network
-service, is offered under the AGPL-3.0 terms through the source link in every page
-footer. The code in this repository stays MIT. See
+service, is offered under the AGPL-3.0 terms through the "Source code" link in every page
+footer, and the Terms page says so (`/terms#open-source`). The code in this repository stays MIT. See
 `docs/decisions/0003-pdf-library-agpl.md`.
 
 ## Third-party packages

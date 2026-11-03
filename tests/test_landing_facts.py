@@ -83,15 +83,21 @@ def test_landing_remeasurement_matches_readme_and_says_not_blind(pages):
 
 def test_licence_is_worded_the_same_way_everywhere(pages):
     assert "The code is MIT (" in README and "the service is offered under AGPL-3.0 terms" in README
+    # The sentence is on the Terms page only; every footer carries a plain "Open source" link
+    # to it, and the demo notes link the source without repeating it (ADR 0003, addendum).
     footer = squash(pages["/"].split("<footer", 1)[1])
-    assert LICENCE_SENTENCE in footer
+    assert "AGPL" not in footer
+    assert '<a href="/terms#open-source">Open source</a>' in pages["/"]
     assert LICENCE_SENTENCE in squash(pages["/terms"])
+    assert 'id="open-source"' in pages["/terms"]
     for committed in (
         "src/readablestem/web/static/demo/index.html",
         "site/examples/physics-2-1/converted.html",
         "site/examples/physics-2-2/converted.html",
     ):
-        assert LICENCE_SENTENCE in squash((ROOT / committed).read_text(encoding="utf-8")), committed
+        note = squash((ROOT / committed).read_text(encoding="utf-8"))
+        assert "The code is open source: source code on GitHub" in note, committed
+        assert "AGPL" not in note, committed
     seo = (ROOT / "src/readablestem/web/seo.py").read_text(encoding="utf-8")
     assert "the code is MIT; the hosted service is offered" in seo
     assert '"under AGPL-3.0 terms"' in seo

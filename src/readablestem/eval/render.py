@@ -990,9 +990,8 @@ def demo_note_html(
     """Short accessible note placed above the converted page in the public demo.
 
     It links back to the app and, when `source_url` is given, to the source code (the
-    licence notice every page of the service carries: code MIT, service offered under
-    AGPL-3.0 terms). A `placeholder` demo (built with the
-    offline client) says so in a marked paragraph.
+    service's pages all link it; the licence wording is on the Terms page). A `placeholder`
+    demo (built with the offline client) says so in a marked paragraph.
     """
     esc = html.escape
     authors = ", ".join(page.authors) if page.authors else "OpenStax authors"
@@ -1004,9 +1003,8 @@ def demo_note_html(
         else ""
     )
     source = (
-        " The code is MIT. The hosted service links PyMuPDF, which is AGPL-3.0, so the service "
-        "is offered under AGPL-3.0 terms and its complete "
-        f'<a href="{esc(source_url, quote=True)}">source code is on GitHub</a>.'
+        " The code is open source: "
+        f'<a href="{esc(source_url, quote=True)}">source code on GitHub</a>.'
         if source_url
         else ""
     )
