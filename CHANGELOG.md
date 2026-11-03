@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: a vector-ink handwriting dev set (branch hw/vector-devset)
+
+- `scripts/handwriting_accuracy.py build-vector` and `eval/handwriting_vector.py` build a dev set of
+  MathWriting expressions drawn into PDFs as vector ink (stroked paths, filled per-sample shapes,
+  filled pen outlines), on plain and ruled paper, some with a typed header, with gold LaTeX per
+  expression and a manifest with a rebuild hash. The pages stay in `~/.cache/readablestem`; the
+  ink is CC BY-NC-SA. No model is called. Documented in docs/eval-handwriting.md.
+
 ## Unreleased: the MathML shape for screen readers (branch mathml/screenreader-shape)
 
 - Chemistry MathML is shaped for MathCAT (NVDA, JAWS) at the one place MathML is made from LaTeX

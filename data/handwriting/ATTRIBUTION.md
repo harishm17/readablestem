@@ -16,3 +16,7 @@ sample identifiers and SHA-256 hashes. The pages are rebuilt locally from the da
 pages and degraded like a scan, which is a change to the material; any short excerpt of a label in
 docs/eval-handwriting.md is quoted with this attribution, under the same licence. The MIT licence
 of this repository does not apply to the dataset.
+
+The vector-ink dev set (`scripts/handwriting_accuracy.py build-vector`) draws the same ink as
+paths into PDFs, which is also a change to the material. It stays in
+`~/.cache/readablestem/handwriting-vector`, under the same licence, and nothing of it is committed.
