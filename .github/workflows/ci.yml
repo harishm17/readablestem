@@ -324,14 +324,16 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Install gitleaks 8.24.3 (checksum-verified)
+      - name: Install gitleaks 8.30.1 (checksum-verified)
         run: |
           set -euo pipefail
-          V=8.24.3
+          V=8.30.1
           base="https://github.com/gitleaks/gitleaks/releases/download/v$V"
           curl -sSfL -o gitleaks.tgz "$base/gitleaks_${V}_linux_x64.tar.gz"
           curl -sSfL -o checksums.txt "$base/gitleaks_${V}_checksums.txt"
           grep "gitleaks_${V}_linux_x64.tar.gz" checksums.txt | sed "s/gitleaks_${V}_linux_x64.tar.gz/gitleaks.tgz/" | sha256sum -c -
           tar -xzf gitleaks.tgz gitleaks
       - name: Scan full git history
-        run: ./gitleaks git --redact --verbose --exit-code 1 .
+        # Only the history of the commit under test: with fetch-depth 0 the checkout also has
+        # every other branch, and their findings must not fail this one.
+        run: ./gitleaks git --redact --verbose --exit-code 1 --log-opts="--full-history HEAD" .
