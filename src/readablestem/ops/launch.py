@@ -8,7 +8,9 @@ sign-up, which makes an account at the first sign-in, and the privacy notice tha
 so and how to delete it; a handwriting reader, which sends crops to a model provider, and the
 notice that must name that provider), and whether the production settings are complete and
 the spend limits fit the model provider
-(`ops.limits`: the same errors that stop a production start, plus warnings).
+(`ops.limits`: the same errors that stop a production start, plus warnings). A Microsoft
+sign-in left half set is listed too: a client id or secret alone is refused, tenants alone
+would leave the button quietly off.
 `readablestem ops launch-check` prints the list and exits 1 while it is not empty; the web
 app logs `launch_blockers` with the count at a production start.
 
@@ -209,4 +211,19 @@ def _settings_items(settings: Settings) -> list[str]:
         for finding in spend_findings(settings)
         if finding.text not in refused  # already named by the refusal above
     )
+    # A client id without its secret (or the reverse) is refused above. Tenants alone are
+    # not refused: the sign-in is simply off, which looks like a working deploy.
+    if settings.ms_allowed_tenants and not (
+        _set(settings.ms_client_id) or _set(settings.ms_client_secret)
+    ):
+        items.append(
+            "settings: MS_ALLOWED_TENANTS is set but MS_CLIENT_ID and MS_CLIENT_SECRET are "
+            "not, so Microsoft sign-in is off"
+        )
     return items
+
+
+def _set(value: object) -> bool:
+    from readablestem.config import _blank
+
+    return not _blank(value)
