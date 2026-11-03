@@ -62,6 +62,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.mathml is None and not (args.pairs or (args.items and args.gold)):
         parser.error("give --mathml, --pairs, or --items with --gold")
+    # Held-out and sealed sets are never read item by item (the rule of eval pipeline --set
+    # heldout): refuse their gold, and rows or pairs kept with them.
+    for path in (args.gold, args.items, args.pairs):
+        if path is not None and (message := so.protected_gold(path)):
+            print(f"error: {message}", file=sys.stderr)
+            return 2
     note = so.skip_message()
     engines = so.available_engines()
     if note:

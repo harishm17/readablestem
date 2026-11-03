@@ -49,7 +49,7 @@ any subdirectory. Outside a checkout they fall back to the working directory. Ba
 ## Speech oracles (optional)
 
 `scripts/speech_oracles/build.sh` builds MathCAT (NVDA, JAWS) and installs Speech Rule Engine
-(MathJax, ChromeVox) under `.local/speech-oracles/`, with rustup into `~/.cargo` and no sudo.
+(MathJax, ChromeVox) under `.local/speech-oracles/`, with rustup into `~/.cargo` and no sudo (pinned toolchain, pinned and checksummed rustup-init).
 `scripts/screenreader_speech.py` and `eval pipeline --speech` use them to compare how our MathML
 and the gold's are spoken (`docs/eval.md`, "Speech under screen-reader engines"). The tests in
 `tests/test_speech_oracle.py` that speak MathML skip when the build is absent; CI does not build it.

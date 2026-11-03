@@ -1,23 +1,48 @@
 #!/usr/bin/env bash
 # Build the two screen-reader speech oracles used by scripts/screenreader_speech.py.
 #
-#   MathCAT 0.7.7 (the speech engine in NVDA 2026.1 and JAWS), from the tagged source release,
-#   with rustup into ~/.cargo (no sudo), plus the small batch tool in ./mathcat_batch.
-#   Speech Rule Engine 4.1.5 (the engine in MathJax and ChromeVox), from npm.
+#   MathCAT (the speech engine in NVDA 2026.1 and JAWS), from the tagged source release, plus
+#   the small batch tool in ./mathcat_batch, built with the Rust toolchain pinned in
+#   mathcat_batch/rust-toolchain.toml.
+#   Speech Rule Engine (the engine in MathJax and ChromeVox), from npm, installed from the
+#   committed sre/package-lock.json with `npm ci --ignore-scripts`.
 #
-# Everything lands in .local/speech-oracles/ (git-ignored), or in $SPEECH_ORACLES_DIR. Re-running
-# is safe: finished parts are skipped. Needs git, curl or rustup, node and npm.
+# Versions and checksums live in versions.env (read by the Python side too). Everything lands in
+# .local/speech-oracles/ (git-ignored), or in $SPEECH_ORACLES_DIR. Re-running is safe: finished
+# parts are skipped. Needs git, node and npm; Rust comes from an existing rustup or cargo, or is
+# installed into ~/.cargo (no sudo) from a rustup-init whose SHA-256 is pinned in versions.env.
 set -euo pipefail
 
-MATHCAT_TAG=v0.7.7
-MATHCAT_SHA=764d24d1241b20c0973e9dbcee62d022c1f99a4a # also pinned in mathcat_batch/Cargo.toml
-SRE_VERSION=4.1.5
-
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=versions.env
+. "$here/versions.env"
 root="$(cd "$here/../.." && pwd)"
 out="${SPEECH_ORACLES_DIR:-$root/.local/speech-oracles}"
 mkdir -p "$out"
 export PATH="$HOME/.cargo/bin:$PATH"
+
+install_rustup() {
+  local arch triple expected tmp
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64) triple=x86_64-unknown-linux-gnu; expected="$RUSTUP_SHA256_x86_64" ;;
+    aarch64 | arm64) triple=aarch64-unknown-linux-gnu; expected="$RUSTUP_SHA256_aarch64" ;;
+    *)
+      echo "No pinned rustup-init for $arch; install Rust yourself, then re-run" >&2
+      exit 1
+      ;;
+  esac
+  tmp="$(mktemp -d)"
+  curl --proto '=https' --tlsv1.2 -sSfL -o "$tmp/rustup-init" \
+    "https://static.rust-lang.org/rustup/archive/$RUSTUP_VERSION/$triple/rustup-init"
+  echo "$expected  $tmp/rustup-init" | sha256sum -c - >/dev/null \
+    || { echo "rustup-init checksum mismatch; refusing to run it" >&2; exit 1; }
+  chmod +x "$tmp/rustup-init"
+  echo "Installing rustup $RUSTUP_VERSION into ~/.cargo (no sudo)"
+  "$tmp/rustup-init" -y --profile minimal --no-modify-path --default-toolchain none
+  rm -f "$tmp/rustup-init"
+  rmdir "$tmp"
+}
 
 build_mathcat() {
   if [ -x "$out/mathcat-batch" ] && [ -d "$out/MathCAT/Rules" ]; then
@@ -25,13 +50,7 @@ build_mathcat() {
     return
   fi
   if ! command -v cargo >/dev/null 2>&1; then
-    if command -v rustup >/dev/null 2>&1; then
-      rustup default stable
-    else
-      echo "Installing rustup into ~/.cargo (no sudo)"
-      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
-      export PATH="$HOME/.cargo/bin:$PATH"
-    fi
+    command -v rustup >/dev/null 2>&1 || install_rustup
   fi
   if [ ! -d "$out/MathCAT/.git" ]; then
     git clone --depth 1 --branch "$MATHCAT_TAG" https://github.com/NSoiffer/MathCAT "$out/MathCAT"
@@ -41,6 +60,7 @@ build_mathcat() {
     echo "MathCAT $MATHCAT_TAG is $got, expected $MATHCAT_SHA; refusing to build" >&2
     exit 1
   fi
+  # rust-toolchain.toml in mathcat_batch pins the compiler; rustup fetches it if missing.
   CARGO_TARGET_DIR="$out/cargo-target" cargo build --release --locked \
     --manifest-path "$here/mathcat_batch/Cargo.toml"
   cp "$out/cargo-target/release/mathcat-batch" "$out/mathcat-batch"
@@ -53,7 +73,8 @@ build_sre() {
     return
   fi
   mkdir -p "$out/sre"
-  npm install --prefix "$out/sre" --no-audit --no-fund --save-exact "speech-rule-engine@$SRE_VERSION"
+  cp "$here/sre/package.json" "$here/sre/package-lock.json" "$out/sre/"
+  (cd "$out/sre" && npm ci --ignore-scripts --no-audit --no-fund)
   echo "SRE: installed $SRE_VERSION in $out/sre"
 }
 

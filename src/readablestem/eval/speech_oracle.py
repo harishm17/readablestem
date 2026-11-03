@@ -31,6 +31,22 @@ from readablestem.eval.pipeline_eval import wilson_interval
 
 REPO = Path(__file__).resolve().parents[3]
 BUILD_SCRIPT = "scripts/speech_oracles/build.sh"
+# Seconds one engine process may take for a whole batch before it is killed.
+RUN_TIMEOUT = 900
+
+
+def pinned_versions() -> dict[str, str]:
+    """KEY=value lines of `scripts/speech_oracles/versions.env`, the one place `build.sh` and
+    this module read the engine versions from."""
+    path = REPO / "scripts" / "speech_oracles" / "versions.env"
+    out = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        key, sep, value = line.partition("=")
+        if sep and not key.startswith("#"):
+            out[key.strip()] = value.strip()
+    return out
+
+
 MATHCAT_STYLES = ("ClearSpeak", "SimpleSpeak")
 SRE_STYLES = ("clearspeak", "mathspeak")
 ENGINES = tuple(f"mathcat:{s}" for s in MATHCAT_STYLES) + tuple(f"sre:{s}" for s in SRE_STYLES)
@@ -88,11 +104,22 @@ def skip_message() -> str | None:
 
 def _run(cmd: Sequence[str], rows: Sequence[Mapping[str, str]]) -> list[dict]:
     payload = "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
-    proc = subprocess.run(
-        list(cmd), input=payload, capture_output=True, text=True, encoding="utf-8", check=False
-    )
+    name = Path(cmd[0]).name
+    try:
+        proc = subprocess.run(
+            list(cmd),
+            input=payload,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+            timeout=RUN_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"{name} timed out after {RUN_TIMEOUT} s") from None
     if proc.returncode != 0:
-        raise RuntimeError(f"{Path(cmd[0]).name} failed ({proc.returncode}): {proc.stderr[-300:]}")
+        # stderr can quote the input, and the input is document content: say only what failed.
+        raise RuntimeError(f"{name} failed with exit code {proc.returncode}")
     return [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
 
 
@@ -153,7 +180,10 @@ def read_all(mathml: Iterable[str], engines: Sequence[str] | None = None) -> dic
 
 
 def _first_line(text: str) -> str:
-    return text.strip().splitlines()[0][:160] if text.strip() else "error"
+    """An engine's error message without the input it quotes (the MathML, from its first `<`)."""
+    lines = text.strip().splitlines()
+    head = lines[0].split("<", 1)[0].strip() if lines else ""
+    return head[:80] or "error"
 
 
 # ============================================================================== comparison
@@ -403,8 +433,11 @@ def format_markdown(summary: Mapping, *, title: str = "Speech under screen-reade
 
 
 def report_block(results: Sequence[PairResult], engines: Sequence[str]) -> dict:
-    """The `speech` block an eval report carries: aggregates only (no ids or speech strings)."""
+    """The `speech` block an eval report carries: aggregates only. No ids, no speech strings and
+    no per-source numbers (a source is a book or document name, which a held-out or sealed set
+    must not list)."""
     s = summarize(results, engines)
+    s.pop("by_source", None)
     s["oracles"] = oracle_versions()
     s["note"] = (
         "share of equations whose speech equals the gold's under each engine; no proposal counts "
@@ -415,7 +448,30 @@ def report_block(results: Sequence[PairResult], engines: Sequence[str]) -> dict:
 
 
 def oracle_versions() -> dict[str, str]:
-    return {"mathcat": "0.7.7 (NVDA 2026.1, JAWS)", "sre": "4.1.5 (MathJax, ChromeVox)"}
+    v = pinned_versions()
+    return {
+        "mathcat": f"{v['MATHCAT_VERSION']} (NVDA 2026.1, JAWS)",
+        "sre": f"{v['SRE_VERSION']} (MathJax, ChromeVox)",
+    }
+
+
+def protected_gold(path: Path) -> str | None:
+    """A refusal message when `path` is held-out or sealed material, else None.
+
+    Same rule as `eval pipeline --set heldout`: the registered held-out gold must be reached
+    through its own command, and anything under the cache home (where the sealed check part and
+    the held-out sets are extracted and their runs kept) is never listed item by item.
+    """
+    from readablestem.cli import heldout as heldout_cli
+    from readablestem.core.paths import cache_dir
+
+    if message := heldout_cli.unselected(path):
+        return message
+    resolved = path.resolve()
+    protected = cache_dir().resolve()
+    if resolved == protected or protected in resolved.parents:
+        return f"{path} is under the cache home, where held-out and sealed sets live; refused"
+    return None
 
 
 # =================================================================================== inputs

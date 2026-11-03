@@ -418,12 +418,16 @@ defaults) and SRE 4.1.5 (`clearspeak` and `mathspeak` domains). Build them once;
 installed system-wide:
 
 ```
-scripts/speech_oracles/build.sh      # rustup into ~/.cargo if needed, MathCAT at tag v0.7.7
-                                     # (commit checked), a small batch tool, SRE from npm;
-                                     # all under .local/speech-oracles/ (SPEECH_ORACLES_DIR moves it)
+scripts/speech_oracles/build.sh      # MathCAT at tag v0.7.7 (commit checked), a small batch tool
+                                     # built with the toolchain pinned in rust-toolchain.toml,
+                                     # SRE from the committed package-lock.json (npm ci
+                                     # --ignore-scripts); all under .local/speech-oracles/
+                                     # (SPEECH_ORACLES_DIR moves it); versions: versions.env
 ```
 
-It needs git, node and npm, and about a minute of compile time. Without the build, the script
+It needs git, node and npm, and about a minute of compile time. Rust comes from an existing
+rustup or cargo; if there is none, `build.sh` downloads a pinned `rustup-init`, checks its
+SHA-256 against `versions.env`, and installs into `~/.cargo` (no sudo). Without the build, the script
 and `--speech` say so (`speech oracles skipped: ... run scripts/speech_oracles/build.sh`) and
 produce nothing; the tests that speak MathML skip.
 
@@ -447,7 +451,10 @@ MathML) on each side, a word diff, and a class (`chemistry`, `table or matrix`, 
 engine (case, pauses and spacing ignored) with a 95% Wilson interval and n, once counting an
 equation with no proposal as different and once over proposals only, the worst classes over
 proposals (at least 3 equations), and the most common word-level differences. The report's
-`speech` block holds these aggregates only: no ids and no speech strings.
+`speech` block holds aggregates only: no ids, no speech strings and no per-book numbers. The
+script refuses held-out and sealed gold (and rows kept under the cache home), as
+`eval pipeline --set heldout` does. An engine that fails reports only its exit code, and each
+engine process is killed after 15 minutes.
 
 What it does not show. Equal speech means two markups read the same under that engine; it is
 not a listening test and not a statement that the reading is right. The gold's own markup can

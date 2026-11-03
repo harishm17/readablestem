@@ -279,3 +279,66 @@ def test_eval_hook_is_for_equations_and_documents_and_skips_without_engines(
     block = eval_cli._speech_block("document", [], tmp_path)
     assert block is not None and "run scripts/speech_oracles/build.sh" in block["skipped"]
     assert eval_cli._speech_lines(block) == ""
+
+
+def test_versions_come_from_the_file_build_sh_reads() -> None:
+    v = so.pinned_versions()
+    assert so.oracle_versions()["mathcat"].startswith(v["MATHCAT_VERSION"])
+    assert so.oracle_versions()["sre"].startswith(v["SRE_VERSION"])
+    build = (ROOT / "scripts/speech_oracles/build.sh").read_text()
+    assert "versions.env" in build and "MATHCAT_SHA=" not in build
+    # the Cargo dependency and the npm lock agree with the pin
+    assert (
+        v["MATHCAT_SHA"] in (ROOT / "scripts/speech_oracles/mathcat_batch/Cargo.toml").read_text()
+    )
+    lock = json.loads((ROOT / "scripts/speech_oracles/sre/package-lock.json").read_text())
+    assert lock["packages"]["node_modules/speech-rule-engine"]["version"] == v["SRE_VERSION"]
+
+
+def test_held_out_and_sealed_gold_are_refused(monkeypatch, tmp_path: Path, capsys) -> None:
+    from readablestem.core.paths import cache_dir
+
+    sealed = cache_dir("dev-v2", "check-abc")
+    assert so.protected_gold(sealed)
+    assert so.protected_gold(tmp_path) is None
+    spec = importlib.util.spec_from_file_location(
+        "screenreader_speech", ROOT / "scripts" / "screenreader_speech.py"
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    items = tmp_path / "items.jsonl"
+    items.write_text("")
+    assert module.main(["--items", str(items), "--gold", str(sealed)]) == 2
+    assert "error:" in capsys.readouterr().err
+
+
+def test_report_block_has_no_sources_and_errors_do_not_quote_input() -> None:
+    pair = so.Pair("x", HALF, HALF, source="a-book")
+    result = so.PairResult(
+        pair, "fraction", so.Reading({"mathcat:ClearSpeak": "1 half"}), so.Reading(), {}, {}
+    )
+    assert "by_source" not in so.report_block([result], ("mathcat:ClearSpeak",))
+    assert so._first_line("Processing error for expression <math><mi>secret</mi></math>") == (
+        "Processing error for expression"
+    )
+
+
+def test_a_failing_engine_names_no_input(monkeypatch) -> None:
+    import subprocess
+
+    def fake_run(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, 3, "", "bad <math>secret</math>")
+
+    monkeypatch.setattr(so.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError) as err:
+        so._run(["/x/engine"], [{"id": "0", "mathml": "<math>secret</math>"}])
+    assert "secret" not in str(err.value) and "exit code 3" in str(err.value)
+
+    def slow(cmd, **kwargs):
+        assert kwargs["timeout"] == so.RUN_TIMEOUT
+        raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
+    monkeypatch.setattr(so.subprocess, "run", slow)
+    with pytest.raises(RuntimeError, match="timed out"):
+        so._run(["/x/engine"], [])
