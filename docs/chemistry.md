@@ -70,6 +70,46 @@ lecture slide whose reaction line was a heading and is now an equation, and a sp
 "Simplify:" in the two prints of an algebra section. No physics, algebra, statistics, slide or
 Word text gained a formula that is not one.
 
+### Spans: lists, half-reactions, `E°cell` and arrow labels (2026-11-03)
+
+The span errors of the development run (18 gold equations: 4 extra, 13 partial, 1 split; "Outcome
+classes" below) had four layout causes, fixed in `pipeline/layout.py` (the chemistry functions) and
+the detection half of `pipeline/chem.py`; the rules are in docs/layout.md ("Chemistry in running
+text and on display lines").
+
+| Cause | What the layout did | Now |
+|---|---|---|
+| `CO3 2−, F−` and `(a) A ⇌ B; (b) C ⇌ D` | one inline run, or one display line, for the whole list | one equation per ion; one inline equation per reaction, list marker left out |
+| `E°cell`, `E°cathode`, `ΔS°298` | the degree sign sat inside the lowered label in the text layer (`E c°ell`), the inline equation was cut in two (`E c`, `ell`), and two degree signs of one row were inserted as one block (`E c° °athode`) | the label is whole and the degree sign follows it; the sign is part of the inline run after a symbol |
+| `anode (oxidation):` set apart from its reaction | the block was cut after the label | the label joins its reaction (12 glyph sizes, labels that name a half-reaction only) |
+| a label over an arrow (`\xrightarrow{high temperature}`, one over and one under, a long arrow) | only a label of 12 characters or less, and only with a one-dash arrow, was joined; the label counted in the row's size and made the subscripts of the formulas "text" | any script-size label over or under an arrow is part of the reaction, read after the arrow in words of its own (`chem.Word.over_arrow`); the arrow word may have up to 12 dashes |
+
+What was left: the rule under a half-reaction block (`Overall:` is below a `¯` row; the gold has
+one equation, the layout two: 16.3 and 16.4, 5 equations), `x = …` lines cut at the edge and the
+cut of `H2O(g) → H2O(l)` (the crop, equations plan T4), the degree sign of `ΔG°` set at full size,
+and the equations in the table cells.
+
+Measured, no model call (2026-11-03, branch `chem/layout-spans`; the recording of the
+2026-10-26 development run, `--answers` with `--answers-offline`, `FEATURE_TABLES` and
+`EQUATION_LINE_CONTEXT` on, the 12 chemistry documents, 443 gold):
+
+- **Identity** (`scripts/layout_identity.py`, 143 PDFs): 135 are identical and 8 differ: the two
+  prints each of 12.3, 14.1, 16.3 and 16.4 of OpenStax Chemistry. Nothing that is not chemistry
+  changes (a first version split `W1, W2` of a paper into two equations; letters in an italic
+  face are variables, not element symbols).
+- **Replay**: before the change the recording answers 760 of 812 requests and reproduces the
+  recorded classes (291 chemically right against the recording's 293; the 52 unanswered
+  requests are 2 equations); after it 690 of 812, because the 90 requests of a changed crop or
+  line have no answer. Span errors (extra / partial / split) on what is answered: 18 (4 / 13 / 1) to 9
+  (1 / 8 / 0). 24 gold equations moved to "not read" for the missing answer: 10 were span errors
+  or "undetected: other", 14 were right before and are the equations whose text hint changed
+  (`E c°ell` to `E cell°`). They are read again by the paid re-record (equations plan C10), not
+  by this change.
+- **At the layout level** (the element's text layer against the gold, no reading needed): of the
+  23 gold equations that were a span error or "undetected: other", 6 now have an element with
+  the gold's symbols (`E°cell` twice, `ΔS°298`, `CO3 2−`, the two reactions of 14.1) and 4 more
+  are closer (the `Anode … Overall` blocks of 16.4: text similarity 0.73 to 0.96, 0.97 to 0.99).
+
 ## Writing it: `\ce`
 
 The equation prompt asks for mhchem for chemical species (`\ce{H2O}`, `\ce{SO4^2-}`,
