@@ -195,3 +195,4 @@ answers allow, not what any product reads.
 - Any rule built from these tables cannot be validated on these same splits: they were looked at here, so only a fresh,
   never-used set can show whether a rule works.
 - Nothing here was tuned: no threshold was chosen on a split, and none of the numbers is a claim about a system.
+- The calibrated flag policy that D6 asked for (features of the recorded runs, a fit on development, a replay on fresh2 to fresh4) is in [eval-flag-policy.md](eval-flag-policy.md).

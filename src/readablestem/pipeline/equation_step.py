@@ -94,6 +94,7 @@ from readablestem.models.base import T, VisionClient, VisionRequest
 from readablestem.models.prompts import load_prompt
 from readablestem.pipeline import (
     equation_images,
+    flag_policy,
     layout,
     notation_memory,
     page_math,
@@ -1419,6 +1420,8 @@ def transcribe(
     outcome = _escalation_outcome(first, reread, skipped)
     if outcome is not None:
         fix = fix.model_copy(update={"escalation": outcome})
+    if settings.flag_policy:
+        fix = flag_policy.apply(fix, text=element.text)
     if other is not None and fix.equation is not None:
         fix = fix.model_copy(
             update={

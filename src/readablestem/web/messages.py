@@ -118,6 +118,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "marks this formula's boundaries differently, so check where the formula starts and ends.",
     ("equation.witness_reading", "witness_mismatch"): "A second reading of the page reads "
     "this formula differently, so compare both readings with the image.",
+    ("equation.flag_policy", "flag_policy"): "Readings of this kind are wrong more often than "
+    "others, though no check found a problem here, so compare it with the image symbol by "
+    "symbol.",
     ("equation.no_text_layer", "no_text_layer"): "This equation is a picture, so the PDF holds "
     "no text to check the transcription against: compare it with the picture symbol by "
     "symbol.",
