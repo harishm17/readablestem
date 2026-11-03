@@ -176,7 +176,7 @@ class PageInk:
 
 
 @dataclass
-class _Prim:
+class Prim:
     """A subpath that may be ink, in paint order."""
 
     kind: str  # "stroked", "short" or "outline"
@@ -376,12 +376,12 @@ def _primitives(
     drawings: Sequence[dict[str, Any]],
     dropped: Counter,
     budget: InkBudget | None = None,
-) -> list[_Prim]:
+) -> list[Prim]:
     """Every subpath that might be ink, in paint order, in display space."""
     rotated = page.rotation % 360 != 0
     m = page.rotation_matrix
     frame = page.rect
-    out: list[_Prim] = []
+    out: list[Prim] = []
     order = 0
     for di, d in enumerate(drawings):
         if not di & 255:
@@ -412,9 +412,9 @@ def _primitives(
             pts = _dedupe(pts)
             order += 1
             if fill is not None:
-                prim = _filled(pts, _colour(fill), opacity, order, di, frame, dropped)
+                prim = filled_prim(pts, _colour(fill), opacity, order, di, frame, dropped)
             else:
-                prim = _Prim("stroked", pts, _colour(stroke), opacity, width, order, di, closed)
+                prim = Prim("stroked", pts, _colour(stroke), opacity, width, order, di, closed)
                 if dashed and _axis_aligned(pts):
                     dropped["dashed"] += 1
                     continue
@@ -423,7 +423,7 @@ def _primitives(
     return out
 
 
-def _filled(
+def filled_prim(
     pts: list[Point],
     colour: str,
     opacity: float,
@@ -431,7 +431,7 @@ def _filled(
     di: int,
     frame: pymupdf.Rect,
     dropped: Counter,
-) -> _Prim | None:
+) -> Prim | None:
     """Classify a filled subpath: a short shape (a pen sample or tick), a whole-stroke
     outline, or something that is not ink."""
     if len(pts) < 3:
@@ -445,10 +445,10 @@ def _filled(
         dropped["background"] += 1  # rules drawn as filled bars, shaded areas, paper
         return None
     if longest <= SHORT_MAX and perimeter <= SHORT_PERIMETER * longest:
-        return _Prim("short", pts, colour, opacity, mean_width, order, di, True, longest, elong,
+        return Prim("short", pts, colour, opacity, mean_width, order, di, True, longest, elong,
                      elong <= RIBBON_MAX_RATIO)  # fmt: skip
     if elong <= RIBBON_MAX_RATIO and (len(pts) >= RIBBON_MIN_POINTS or _exact_rect(pts)):
-        return _Prim("outline", pts, colour, opacity, mean_width, order, di, True, longest, elong)
+        return Prim("outline", pts, colour, opacity, mean_width, order, di, True, longest, elong)
     dropped["blob"] += 1  # a disc, a region, a shaded shape: not a pen outline
     return None
 
@@ -468,8 +468,8 @@ def _lattice(points: Sequence[Point]) -> bool:
 
 
 def _drop_furniture(
-    prims: list[_Prim], page: pymupdf.Rect, dropped: Counter, budget: InkBudget | None = None
-) -> list[_Prim]:
+    prims: list[Prim], page: pymupdf.Rect, dropped: Counter, budget: InkBudget | None = None
+) -> list[Prim]:
     _tick(budget)
     gone: set[int] = set()
     lines: dict[tuple[str, str, float], list[tuple[float, float, int]]] = {}
@@ -520,18 +520,32 @@ def _drop_furniture(
             run = [cur]
         _mark_run([i for c in run for i in by_coord[c]], len(run), gone, dropped)
     _tick(budget)
-    # dot grids: short shapes on a lattice, by drawing and by colour and size
+    gone |= dot_grid_members(prims, gone, dropped)
+    return [p for i, p in enumerate(prims) if i not in gone]
+
+
+def dot_grid_members(
+    prims: Sequence[Prim | None],
+    gone: set[int] | frozenset[int] = frozenset(),
+    dropped: Counter | None = None,
+) -> set[int]:
+    """Indexes of the short shapes that sit on a lattice (a dot grid), by drawing and by
+    colour and size. Not ink: shared with the page-type probe."""
     by_key: dict[tuple, list[int]] = {}
+    centres: dict[int, Point] = {}
     for i, p in enumerate(prims):
-        if p.kind == "short" and i not in gone:
+        if p is not None and p.kind == "short" and i not in gone:
+            centres[i] = centre(p.pts)
             by_key.setdefault(("d", p.drawing), []).append(i)
             by_key.setdefault(("c", p.colour, round(p.size, 1)), []).append(i)
+    found: set[int] = set()
     for members in by_key.values():
-        live = [i for i in members if i not in gone]
-        if _lattice([_centre(prims[i].pts) for i in live]):
-            gone.update(live)
-            dropped["dot_grid"] += len(live)
-    return [p for i, p in enumerate(prims) if i not in gone]
+        live = [i for i in members if i not in found]
+        if _lattice([centres[i] for i in live]):
+            found.update(live)
+            if dropped is not None:
+                dropped["dot_grid"] += len(live)
+    return found
 
 
 def _mark_run(members: list[int], rows: int, gone: set[int], dropped: Counter) -> None:
@@ -543,19 +557,48 @@ def _mark_run(members: list[int], rows: int, gone: set[int], dropped: Counter) -
 # ---------------------------------------------------------------------------- strokes
 
 
-def _centre(pts: Sequence[Point]) -> Point:
+def centre(pts: Sequence[Point]) -> Point:
     x0, y0, x1, y1 = _bbox(pts)
     return ((x0 + x1) / 2, (y0 + y1) / 2)
 
 
-def _touch(a: _Prim, b: _Prim) -> bool:
+def _touch(a: Prim, b: Prim) -> bool:
     ax0, ay0, ax1, ay1 = _bbox(a.pts)
     bx0, by0, bx1, by1 = _bbox(b.pts)
     gap = max(JOIN_TOL, RUN_GAP * min(a.size, b.size))
     return ax0 - gap <= bx1 and bx0 - gap <= ax1 and ay0 - gap <= by1 and by0 - gap <= ay1
 
 
-def _strokes(prims: list[_Prim], dropped: Counter, budget: InkBudget | None = None) -> list[Stroke]:
+def sample_run_end(prims: Sequence[Prim | None], i: int) -> int:
+    """End (exclusive) of the run of per-sample pen shapes that starts at `prims[i]`: short
+    shapes in paint order, not ticks, in one colour and opacity, each touching the last.
+    `len >= RUN_MIN` makes a sampled stroke (`is_sample_stroke`). None separates shapes of
+    other kinds. The one definition of a pen stroke drawn as filled samples."""
+    p = prims[i]
+    j = i + 1
+    if p is None or p.kind != "short" or p.elong <= TICK_RATIO:
+        return j
+    last = p
+    while j < len(prims):
+        q = prims[j]
+        if (
+            q is None
+            or q.kind != "short"
+            or q.elong <= TICK_RATIO
+            or (q.colour, q.opacity) != (p.colour, p.opacity)
+            or not _touch(last, q)
+        ):
+            break
+        last = q
+        j += 1
+    return j
+
+
+def is_sample_stroke(run: Sequence[Prim]) -> bool:
+    return len(run) >= RUN_MIN
+
+
+def _strokes(prims: list[Prim], dropped: Counter, budget: InkBudget | None = None) -> list[Stroke]:
     out: list[Stroke] = []
     i = 0
     n = len(prims)
@@ -579,20 +622,10 @@ def _strokes(prims: list[_Prim], dropped: Counter, budget: InkBudget | None = No
             out.append(Stroke(tuple(pts), p.colour, p.opacity, p.width, p.order, "path"))
             i = j
         elif p.kind == "short":
-            run = [p]
-            j = i + 1
-            while (
-                j < n
-                and p.elong > TICK_RATIO
-                and prims[j].kind == "short"
-                and prims[j].elong > TICK_RATIO
-                and (prims[j].colour, prims[j].opacity) == (p.colour, p.opacity)
-                and _touch(run[-1], prims[j])
-            ):
-                run.append(prims[j])
-                j += 1
+            j = sample_run_end(prims, i)
+            run = prims[i:j]
             if len(run) >= RUN_MIN:
-                pts = _dedupe([_centre(q.pts) for q in run])
+                pts = _dedupe([centre(q.pts) for q in run])
                 width = float(np.median([q.width for q in run]))
                 out.append(Stroke(tuple(pts), p.colour, p.opacity, width, p.order, "samples"))
             else:
@@ -609,13 +642,13 @@ def _strokes(prims: list[_Prim], dropped: Counter, budget: InkBudget | None = No
     return out
 
 
-def _single(p: _Prim) -> Stroke:
+def _single(p: Prim) -> Stroke:
     """A short shape on its own: a thin one is a tick, anything else a dot."""
     if p.outline_ok:
         s = _outline(p)
         if s is not None:
             return s
-    return Stroke((_centre(p.pts),), p.colour, p.opacity, p.size, p.order, "samples")
+    return Stroke((centre(p.pts),), p.colour, p.opacity, p.size, p.order, "samples")
 
 
 def _resample(pts: np.ndarray, n: int, closed: bool) -> np.ndarray:
@@ -629,7 +662,7 @@ def _resample(pts: np.ndarray, n: int, closed: bool) -> np.ndarray:
     return np.column_stack([np.interp(u, t, loop[:, 0]), np.interp(u, t, loop[:, 1])])
 
 
-def _outline(p: _Prim) -> Stroke | None:
+def _outline(p: Prim) -> Stroke | None:
     """Centre-line of a filled pen outline. The outline runs along one edge and back the
     other; the two caps are where the loop folds. The cap is the point whose mirror pairs
     (k steps on one side, k on the other) stay closest, and the other cap is half the loop

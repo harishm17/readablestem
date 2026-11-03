@@ -1673,6 +1673,18 @@ stroke (a dot) or, when thin, a short tick. Wide see-through strokes (width at l
 opacity at most 0.85: a highlighter) are returned apart, in `PageInk.highlights`. Fully
 transparent paint is not read.
 
+**One rule for "is this a pen stroke drawn as samples".** The page type's ink analysis
+(`page_type._ink_candidates`) does not test small filled shapes on its own (a disc has no wiggle:
+it was a dot, so a page drawn as one disc per pen sample was `vector_no_text`). It asks this
+module: `dot_grid_members` takes the shapes on a lattice out (dot-grid paper), `sample_run_end`
+finds the run of touching short shapes of one colour in paint order, and `is_sample_stroke`
+(three or more) makes it one stroke, which replaces the shapes' own candidates. The page-level
+tests are unchanged (40 strokes in 3 rows, no exact repeats, one pen width), so scatter-plot
+markers (equal discs that repeat, rarely touch in paint order), stippled shading (rows of
+identical dots, no writing rows) and dot-grid paper stay what they were. Measured on the
+846-page corpus: no page changes its kind; the added cost is about 55 microseconds per small
+filled shape (a 3,000-marker scatter page: 0.37 s to 0.54 s).
+
 **What is dropped as page furniture**, counted by reason in `PageInk.dropped`, never by colour
 (pastel ink on a pastel template stays): `rule` (an exactly axis-aligned line at least half the
 page across), `grid` (four or more evenly spaced parallel axis-aligned lines, or four or more

@@ -16,6 +16,14 @@
   0.649); as a flag against the page pass it catches 18 of 21 wrong readings with 15 right ones
   flagged (the page pass's required review: 10 and 17). The weights are Apache-2.0; the training
   data and the practice set overlap in ways `docs/math-readers.md` lists.
+## Unreleased: page type reads per-sample pen ink (branch hw/page-type-dotted-ink)
+
+- `page_type` now calls vector handwriting drawn as one small filled disc per pen sample
+  `handwritten` (it was `vector_no_text`). Its ink analysis uses `ink_strokes`'s own rule for a
+  stroke made of samples (`sample_run_end`, `dot_grid_members`) instead of a second one. Dot-grid
+  paper, scatter-plot markers and stippled shading are still not handwriting. On the 846-page
+  labelled corpus no page changes its kind. Documented in docs/layout.md.
+
 ## Unreleased: other readings of a formula as choices on its symbols (branch hw/schema-prompt)
 
 - `Element.alternatives` (`ReadingAlternatives`, `SymbolAlternative` in `core/types.py`): the doubtful

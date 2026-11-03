@@ -172,17 +172,8 @@ def test_page_type_calls_built_pages_handwritten(built, style: str) -> None:
     assert len(kinds) == 4 and set(kinds) == {"handwritten"}, kinds
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="page_type does not take per-sample filled discs for pen strokes: such a page is "
-    "vector_no_text. Remove the marker when it does (the P0 probe settles what real exports are).",
-)
 def test_page_type_calls_per_sample_pages_handwritten(built) -> None:
     assert set(_kinds(*built, "samples")) == {"handwritten"}
-
-
-def test_per_sample_pages_are_at_least_not_taken_for_typed_or_scanned(built) -> None:
-    assert set(_kinds(*built, "samples")) <= {"handwritten", "vector_no_text"}
 
 
 # ------------------------------------------------------------------------------ ink_strokes
