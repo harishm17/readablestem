@@ -11,7 +11,7 @@ Evidence and confidence (also in docs/layout.md):
 |---------------------------------------------------|------|---------|
 | larger font (>= 1.15 x body text)                 | 0.90 | yes     |
 | ... plus a section number ("2.3", "Chapter 2")    | 0.95 | yes     |
-| tagged heading (the PDF's own tags: H1-H6)       | 0.90 | yes     |
+| tagged heading (the PDF's own tags: H1-H6), or a bookmark | 0.90 | yes     |
 | ... plus a section number                         | 0.95 | yes     |
 | bold body-size line, or a standalone numbered line | 0.60 | no      |
 | ... plus a section number                         | 0.88 | yes     |
@@ -51,9 +51,11 @@ must decide:
   tiers" has the measurements.)
 
 Bold run-in labels ("Solution", "Discussion", "Procedure" in an OpenStax worked example)
-are not headings in OpenStax's gold outline, but no structural rule separated them from
-real box headings reliably (docs/layout.md, "Run-in labels"), so they are not guessed
-at: on their own they are optional notes, repeated they form a group like any label.
+are not headings in OpenStax's gold outline. No geometric rule separated them from real
+box headings (docs/layout.md, "Run-in labels"), but a narrow one is used: a bold line at
+body size whose text is one of a few label words and which repeats in the document gets
+`layout.REASON_RUN_IN_LABEL` and is written as bold text (`run_in_labels`). Any other bold
+line is not guessed at: on its own it is an optional note, repeated it forms a group.
 """
 
 from __future__ import annotations
@@ -76,6 +78,8 @@ from readablestem.pipeline.layout import (
     REASON_LARGER_FONT,
     REASON_LIST_NUMBER,
     REASON_NUMBERED,
+    REASON_NUMBERED_UNCONFIRMED,
+    REASON_RUN_IN_LABEL,
     heading_levels,
     tagged_level,
 )
@@ -97,8 +101,11 @@ def heading_fixes(elements: list[Element]) -> list[Fix]:
     text (`repeated_above`), and takes no part in the outline, the levels or the groups.
     OpenStax prints a box's label and its title as two lines ("Teacher Support" twice);
     a screen-reader user who navigates by headings should hear it once. The same text
-    with content between the two copies is a real second heading and stays one."""
-    repeats = repeated_above(elements)
+    with content between the two copies is a real second heading and stays one.
+
+    A bold run-in label that layout found repeating ("Solution" under every example,
+    `layout.REASON_RUN_IN_LABEL`) is written the same way: bold text, not a heading."""
+    repeats = repeated_above(elements) | run_in_labels(elements)
     headings = sorted(
         (e for e in elements if e.kind == Kind.HEADING and e.id not in repeats),
         key=lambda e: e.order,
@@ -133,8 +140,21 @@ def repeated_above(elements: Sequence[Element]) -> set[str]:
     return found
 
 
+def run_in_labels(elements: Sequence[Element]) -> set[str]:
+    """Ids of the headings that are bold run-in labels (`layout.REASON_RUN_IN_LABEL`).
+
+    The PDF's own word wins: a label that the tags or the bookmarks call a heading
+    (`tagged_level`) stays one."""
+    return {
+        e.id
+        for e in elements
+        if e.kind == Kind.HEADING and REASON_RUN_IN_LABEL in e.reasons and tagged_level(e) is None
+    }
+
+
 def _bold_text_fix(element: Element) -> Fix:
-    """Accepted, with no heading: the assembler writes the text bold, in a paragraph."""
+    """Accepted, with no heading: the assembler writes the text bold, in a paragraph (the
+    reason is the one it looks for, `HEADING_REPEATS_ABOVE`, whatever made the choice)."""
     return Fix(
         element_id=element.id,
         kind=Kind.HEADING,
@@ -289,7 +309,12 @@ def _fix(element: Element, raw_level: int, level: int) -> Fix:
     ]
     sentence = not evidence.strong and sentence_like(text)
     checks.append(_check("heading.sentence", not sentence, "heading.sentence_like"))
-    # Accepted either way, except a sentence-like line with weak evidence (a decision);
+    unconfirmed = REASON_NUMBERED_UNCONFIRMED in element.reasons and not evidence.strong
+    if unconfirmed:  # only when it fails: every stored heading fix keeps exactly its checks
+        checks.append(_check("heading.numbered", False, "heading.numbered_unconfirmed"))
+    sentence = sentence or unconfirmed
+    # Accepted either way, except a sentence-like line with weak evidence or a numbered line
+    # that only its neighbours' numbers made a heading (a decision);
     # any other failed check is an optional note.
     return Fix(
         element_id=element.id,

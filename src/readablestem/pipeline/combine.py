@@ -118,6 +118,10 @@ def _element(element: Element, map_id: Callable[[str], str], pages: Sequence[int
         "order": element.order + shift,
         "parent_id": map_id(element.parent_id) if element.parent_id else None,
     }
+    if element.last_page is not None:  # a paragraph that goes on over page breaks
+        if element.last_page >= len(pages):
+            raise CombineError("page_outside_part")
+        update["last_page"] = pages[element.last_page]
     move: Callable[[int], int] = lambda offset: offset  # noqa: E731
     if element.text:
         update["text"], move = _text_map(element.text, map_id)

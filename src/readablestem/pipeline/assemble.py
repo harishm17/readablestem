@@ -719,9 +719,28 @@ class _Renderer:
         text: callers ask only between blocks, or at the start of a list item."""
         if not self.mark_pages or element.page == self.last_page:
             return ""
-        self.last_page = element.page
-        position = self.pdf_pages.get(element.page, element.page) + 1
-        printed = self.page_labels.get(element.page)
+        return self.mark_for(element.page)
+
+    def marks_after(self, element: Element) -> str:
+        """The markers of the pages a paragraph goes on over (`Element.last_page`), to write
+        right after it: it is one element on the page it starts, so the pages it runs into
+        have no element of their own to carry their marker, and a marker inside the text
+        would cut it. Written in page order, so the markers stay continuous (Page 1, Page 2,
+        Page 3) and the next element on the last of those pages gets none."""
+        if not self.mark_pages or element.last_page is None:
+            return ""
+        start = (element.page if self.last_page is None else self.last_page) + 1
+        return "".join(
+            self.mark_for(page)
+            for page in range(start, element.last_page + 1)
+            if not self.pdf_pages or page in self.pdf_pages  # a page that is not in the file
+        )
+
+    def mark_for(self, page: int) -> str:
+        """The marker for `page`, which becomes the last page written."""
+        self.last_page = page
+        position = self.pdf_pages.get(page, page) + 1
+        printed = self.page_labels.get(page)
         if printed:
             said = f"Page {printed}"
         elif self.page_labels:  # others have printed labels: never let this one read as one
@@ -812,6 +831,8 @@ class _Renderer:
                 if mark := self.page_mark(ordered[i]):
                     chunks.append(mark)
                 chunks.append(chunk)
+                if after := self.marks_after(ordered[i]):
+                    chunks.append(after)
             i += 1
         return chunks
 
@@ -1545,7 +1566,7 @@ def render_html(
         scale_of=equation_scale.scaler(ordered),
         page_labels=page_labels or {},
         pdf_pages=pdf_pages or {},
-        mark_pages=len({e.page for e in ordered}) >= 2,
+        mark_pages=len({p for e in ordered for p in (e.page, e.last_page or e.page)}) >= 2,
         footnote_ids=set(footnote_ids),
     )
     renderer.placed = _placed_equations(ordered, renderer, set(equations))

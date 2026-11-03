@@ -151,6 +151,42 @@ Element conventions:
    the hyphen goes. Soft hyphens disappear. Whitespace is collapsed and zero-width
    and control characters removed. A paragraph cut by a column break (first part does not
    end a sentence, second part starts lowercase at the top of the next column) is rejoined.
+   The document's own spelling overrules the list (`hyphens.document_spellings`, 2026-11-02):
+   when the same two pieces are written with a hyphen inside a line elsewhere in the
+   document (`eigen-vector`), the hyphen stays; when the joined word is written whole
+   elsewhere (`antiderivative`), a break inside it is soft hyphenation and the hyphen
+   goes, even for two words whose join the list lacks. A word cut at a line end is not
+   counted, so a break never vouches for itself.
+   Inline maths that wraps from one line to the next is one equation (`_wrapped_inline`): a
+   relation sign ends the first line or starts the second (`x + y =` / `z + w`), or a plus,
+   minus or product does and its half is longer than one token. Two ions (`Na+` / `Cl-`),
+   two variables side by side and two formulas with a word between stay separate. The
+   joined equation's box is the union of both lines, so its crop also shows the words
+   either side of the break.
+   A paragraph that goes on over a page break is one element
+   (`_join_page_splits`, `Element.reasons` "joined across pages"): the lowest body block of
+   a page (footnotes in smaller type below it, and the running header and footer the margin
+   filter dropped, are not in the way) does not end a sentence, the top block of the next
+   page starts with a lower-case letter, and the two share size, typeface, weight and left
+   edge with no first-line indent, both at the text area's edges. The element keeps the
+   first part's page and box, so a link or a colour in the second part is not placed on the
+   text (the text pass aligns against the first box), and an inline equation of the second
+   part keeps its own page for its crop. A hyphen at the page break is repaired like one at
+   a line break. A paragraph that starts with maths, a break between a column on one page
+   and a column on the next, and a list item (a lowercase paragraph after a list item at a
+   page foot is a new paragraph) are not joined. `Element.last_page` is the 0-based page of
+   the last part (None when it ends on its own page). The assembler writes the page markers
+   of the pages after `page` up to `last_page` right after the joined paragraph (`marks_after`),
+   never inside it, so the markers stay in order and continuous (Page 1, Page 2, Page 3) and the
+   next element on the last page gets none; `pipeline/combine.py` maps `last_page` with `page`.
+   Pipeline 0.5.1: the joins shift element ids after them, and a heading's words change
+   where it had math-italic letters. The review carry (`web/carry.py`, `carry_edits.py`)
+   matches by content (a heading by its words, size and weight; an equation by its crop; a
+   paragraph's edits by what it said before them), never by id, so a revised upload is safe:
+   a decision on a heading whose words changed, and an edit to a paragraph that is now two
+   joined ones, are not carried and are shown as "decide again" or counted in
+   `EditsCarried.dropped`, which the instructor is told about. Results from 0.5.0 load
+   unchanged.
 
 ### Headings
 
@@ -168,6 +204,21 @@ Element conventions:
   is not a unit or a month. `12 Metres`, `2 kg`, `2.5 Kilograms`, `0.5 s`, `10 October
   2026`, `9.8 metres per second`, a bare `2.4` and numeric table cells are paragraphs. A
   title starts with a capital letter after any number, so a bold `2 kg` is not one either.
+- **Plain numbered lines in sequence** (`_promote_numbered_lines`, 2026-11-02). A regular
+  body-size line that reads `3 Forces` (a bare integer of one or two digits, a capital
+  after it, up to eight words, no closing punctuation, not a quantity) is a paragraph on
+  its own, because a bare integer at body size is too often a quantity or a list line. It
+  is a heading, with the weak `"standalone numbered line"` evidence (an optional note,
+  never `"numbered section"`), when the document corroborates it: the next such line in the
+  same type carries the next integer, with a paragraph of two lines or more between them
+  (a run of short numbered lines is a list), in the same column. One `3 Forces` alone stays
+  a paragraph. A line that opens like an exercise or a question (`1 Find the final speed of
+  the cart`, `2 What is the mass`: a verb from a fixed list of imperatives, or a question
+  word) is never a candidate, since problem sets are content. Where the sequence does not
+  look like a document's sections (it does not start at 1 or 2, or the title is longer than
+  six words) the heading carries `REASON_NUMBERED_UNCONFIRMED` and is a required decision
+  (check `heading.numbered_unconfirmed`, NEEDS_REVIEW, like a sentence-like line); a
+  sequence from 1 or 2 with short titles is the weak heading above (an optional note).
 - Section numbers are evidence: `2.3`, `2.3.1`, `Chapter 2`, `IV.` are
   `"numbered section"`; `1.` and `A)` are `"list-style number"` because lists start that way.
   In a larger font any section number counts (`3 Forces` is a chapter title); at body size
@@ -204,6 +255,15 @@ Element conventions:
   set); the second line starts a block of its own.
 - **The PDF's own tags** (T2-18, "Tagged PDFs" below) can make a line a heading, and give
   its level.
+- **The PDF's outline** (bookmarks, "The PDF's outline" below) does the same, when it
+  matches the page text; a tag wins over a bookmark.
+- **Maths in a heading** stays text: math-italic and other mathematical alphanumerics
+  become the plain letters they style (`readable_math_letters`: `𝑔` is `g`, `ℎ` is `h`;
+  only the bold, italic, sans and monospace variable ranges and Planck's h: `ℝ ℂ ℕ ℤ ℚ ℓ ℒ`,
+  script, fraktur and double-struck letters stay),
+  so the heading and the outline read as words. A heading, unlike a paragraph or a
+  figure's caption, has no inline equation element; the italics are lost, the letter is
+  not.
 
 **Levels** (`heading_levels`): the sizes of size-based headings are clustered (within 5 %),
 largest = level 1. Bold body-size and standalone numbered headings sit one level below the
@@ -305,10 +365,31 @@ page is mostly boxes, and both signals (font size equal to the body, the box's p
 come from `eval/render.py`'s CSS, not from the book, and none of our fixtures has a
 run-in label to test them on. Real documents set labels and headings in many other ways
 (LaTeX `\subsubsection*` is bold at body size at the margin; Word users bold a paragraph
-as a heading), so neither rule is used. Labels stay headings: alone they are
-optional notes, repeated they are one group decision ("Solution" x4 on page 2.2). A real
-OpenStax PDF, or a course PDF with worked examples, is the evidence that could change
-this.
+as a heading), so neither rule is used on any bold line. Other bold lines stay headings:
+alone they are optional notes, repeated they are one group decision.
+
+*The narrow rule* (2026-11-02, `_mark_run_in_labels`, `heading_step.run_in_labels`). A
+heading found only by the bold body-size rule (no larger font, no number, no tag), one
+line, at body size (within 5 %), whose text is one of `solution`, `answer`, `discussion`,
+`procedure`, `proof`, `hint` (a trailing full stop or colon aside), **set in more than 3 pt
+from its column's text edge** (`_text_edges`: inside a box; a section heading sits at the
+margin), and which occurs at least twice in the document, is a label:
+`REASON_RUN_IN_LABEL`, no `HeadingFix`, review `none`, written as `<p><strong>` (the fix is
+the one `repeated_above` gives, reason `repeats_heading_above`, which the assembler writes
+as bold text). It stays out of the outline and the repeated-label groups. A bookmark or tag
+that calls the line a heading wins.
+
+The inset test is there because the first version, without it, was measured and
+rejected: the authored dev-v2 documents set "Solution" and "Example" as real headings
+(LaTeX `\subsubsection*{Solution}`, a Word heading style), at the margin of their column,
+and the rule removed 10 gold headings from them (dev-v2 recall 0.9165 to 0.9019, F1 0.9192
+to 0.9112). The edge is the column's, not the page's: on a two-column page measured against
+the page, the right column's whole text looked indented and two Word headings were lost.
+With the inset against the column the authored documents are untouched. What is left: a
+label that sits at the margin of a page mostly set in boxes (the two "Procedure" labels
+of OpenStax 2.1), and a document that really indents a repeated "Solution" heading, which
+loses those headings from the outline; the word list is closed and short for that reason
+(`Example`, `Strategy`, `Teacher Support` and the like are not in it).
 
 **Known-plain letters** (`Element.regular_letters`, equations only). The letters of an
 equation's text that the PDF draws, not bold, in a font known to have a bold face
@@ -1068,6 +1149,41 @@ Fixture: `tests/fixtures/tagged/` (HTML exported by LibreOffice as a tagged PDF,
 edits to look like Word's export; `make_tagged_pdf.py`). The eval documents are printed
 untagged on purpose (`eval/render.py`), so the dev-v2 numbers do not move with this.
 
+### The PDF's outline (bookmarks, `pipeline/outline.py`, 2026-11-02)
+
+Word, LaTeX with hyperref, InDesign and browsers write the document's real structure as
+bookmarks: a title, a level and a page each (`Document.get_toc`). `layout.analyze` reads
+them once after the elements are made (`outline.apply`) and uses them before the font-based
+rules would guess:
+
+- a heading layout found, or a paragraph that is only a plain title (no list marker, code,
+  glossary term or inline maths), whose letters and digits equal a bookmark's on that
+  bookmark's page (a section number the other lacks aside: `3 Forces` and `Forces`). A
+  heading gets the reason `outline heading h2`: `tagged_level` reads it as it reads a tag
+  (strong evidence, confidence 0.90, the bookmark's level as the raw level; the outline
+  repair still applies). A tag wins over a bookmark; each line serves one bookmark, in
+  reading order;
+- a *paragraph* becomes a heading only if it looks like one (`outline._promotion`): at most
+  12 words and 100 characters, no sentence end (`. ? ! : ; ,`), and either bold or set at
+  1.1 x the body size or more (`outline heading h2`, as above), or set off by space above it
+  (0.8 x its own height, or first on its page): `outline candidate h2`, the bookmark's level
+  but weak evidence, so an optional note like any bold body-size line. Otherwise it stays a
+  paragraph. A tool that bookmarks every short paragraph is not believed: when more than 30 %
+  of the document's paragraphs (and more than two) would be promoted, none is;
+- the heading's text becomes the bookmark's title when the two are the same letters (a
+  math-italic letter, a ligature, spacing) and the heading has no raised or lowered runs;
+- consistency: at least 60 % of the bookmarks that point into the analysed pages must name
+  such a line on their page, or the whole outline is ignored (an outline of another
+  edition, or one a tool generated per page). An outline with one level only is ignored
+  when the headings it names are set in two or more sizes, because the sizes then say more
+  about depth. Headings the outline does not name keep their font-based levels;
+- reading is bounded (5,000 bookmarks, titles of at most 200 characters) and an outline
+  that cannot be read gives none.
+
+The headings and document evals print the gold pages from HTML with Chromium, which writes
+no outline by default, so their numbers do not move with this; on the authored dev-v2 PDFs
+that have one (Word and LaTeX exports) it is measured below ("Structure fixes, 2026-11-02").
+
 ## Hidden text and page types (`pipeline/page_type.py`, pipeline 0.4.0)
 
 **Why.** A PDF can carry text nobody sees. An iPad notes app writes an invisible layer of
@@ -1767,10 +1883,17 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
 - **Very short documents** learn the "typical line pitch" from very few lines; with one
   two-line paragraph the paragraph gap itself becomes the typical pitch and separate
   paragraphs can merge.
-- **Maths inside headings and captions** stays as characters in their text (for example a
-  math-italic `𝑔`); only paragraphs get inline equation elements.
-- **Paragraphs split across pages** stay two elements (an element has one page and box).
-- **Inline maths that wraps across lines** becomes two inline equations.
+- **Maths inside headings and captions** is text: a heading's, and a caption's plain text,
+  has math-italic letters folded to plain letters (`readable_math_letters`), but only
+  paragraphs (and a figure's caption that holds maths) get inline equation elements, so a
+  fraction or a script in a heading is not typeset.
+- **Paragraphs split across pages** are joined into one element when they pass the tests
+  in "Paragraph text" above; otherwise (a column break from one page to the next, a
+  paragraph that starts or ends in maths, a different size or indent) they stay two. The
+  joined element has the first part's page and box only.
+- **Inline maths that wraps across lines** is one equation when a relation sign, or a plus,
+  minus or product after a longer expression, sits at the break; other wraps (a break
+  inside a fraction, no operator at the break) still become two.
 - **A lone bold letter** in running text (`for some nonzero vector x`, `\mathbf{x}` in
   CMBX) is not recognised as maths: one upright letter with nothing around it is too
   ambiguous.
@@ -1799,16 +1922,20 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   decision, not a loss). One drawn inside a line of text is held by the paragraph and
   lost.
 - **Drop caps** (a huge first letter) become a one-letter paragraph.
-- **Hyphenated compounds across lines** (`well-` / `known`) lose the hyphen: without a
-  dictionary they look like a broken word.
+- **Hyphenated compounds across lines**: `well-` / `known` keeps its hyphen (the word
+  list, then the document's own spelling, "Paragraph text" above). A compound of technical
+  words that is neither in the list nor written whole or hyphenated elsewhere in the
+  document (`eigen-` / `vector`, written nowhere else) still loses its hyphen.
 - **Plain body-size numbered headings with a bare integer** (`3 Forces` in body text,
-  not bold) are paragraphs: at body size a bare integer is too often a quantity. They
-  are found when bold (as weak evidence) or in a larger font.
+  not bold) are headings only in a sequence (`3 Forces`, `4 Energy` with text between);
+  one alone, a sequence with a gap, and any run with no paragraph between are paragraphs.
+  They are found when bold (as weak evidence) or in a larger font.
 - **Bold table header cells** (`Time`, `Distance`) of a table the detector missed can
   still become weak headings (an optional note; a group decision if the same header
   repeats); numeric cells no longer do. In a detected table they are header cells.
-- **Bold run-in labels** ("Solution", "Discussion", "Procedure") become weak headings;
-  see "Run-in labels" above for why no rule removes them.
+- **Bold run-in labels**: the six words of the narrow rule, repeated, are bold text; any
+  other label ("Example", "Strategy", a single "Solution") is still a weak heading; see
+  "Run-in labels" above.
 - **Repeated margin logos drawn as vectors** are recognised only from drawings that lie
   inside the header/footer band; a logo that extends into the body is a figure on every
   page.
@@ -1837,6 +1964,11 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   headings, equation numbers, two-column order, Symbol bullets, logos, watermarks, text
   over images and panels, fake markers, MuPDF's stdout, margin headings, and the cost of
   a dense fragment page.
+- `tests/test_layout_structure_fixes.py` pins the 2026-11-02 structure fixes with PDFs drawn
+  in the test: bookmarks (levels, text, consistency, a tag winning), plain numbered lines
+  in sequence, run-in labels, math-italic in a heading, paragraphs over a page break (a
+  footnote and a running header between, a hyphen at the break, each reason not to join),
+  the document's spelling of compounds and inline maths that wraps.
 - `tests/test_layout_lists.py` (bullets, ordered markers, siblings, nesting, false lists),
   `tests/test_layout_equations.py` (display-equation regions and equation numbers) and
   `tests/test_layout_fragments.py` (inline fragments and the punctuation after inline

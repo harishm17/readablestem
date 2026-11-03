@@ -164,7 +164,12 @@ log = logging.getLogger(__name__)
 # layout and structure rules, the Claude second check, speech readings, review rules for
 # equations as pictures and half fractions, and the model-cost settings. Results from 0.4.0
 # load unchanged; their numbers were made under the old rules.
-PIPELINE_VERSION = "0.5.0"
+# 0.5.1 (2026-11-02): layout structure fixes (docs/layout.md, "Known failure modes"):
+# bookmarks as heading evidence, numbered and run-in headings, paragraphs joined over page
+# breaks (element ids after the first join shift), inline maths joined over a line break.
+# Heading fingerprints of the review carry change where a heading had math-italic letters.
+# Results from 0.5.0 load unchanged; their numbers were made under the old rules.
+PIPELINE_VERSION = "0.5.1"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
