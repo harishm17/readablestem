@@ -170,7 +170,7 @@ AT_TAG_CACHE = $(or $(XDG_CACHE_HOME),$(HOME)/.cache)/readablestem/at-tag
 heldout-gold-at-tag:  ## fetch the held-out answer key with the tag's own code (for tests/test_proof_interim.py)
 	@dir=$$(mktemp -d) && git archive $(PROOF_TAG) | tar -x -C "$$dir" && \
 	pkg=$$(ls "$$dir/src") && \
-	XDG_CACHE_HOME="$(AT_TAG_CACHE)" PYTHONPATH="$$dir/src" uv run python -m "$$pkg.cli.main" \
+	uv run env XDG_CACHE_HOME="$(AT_TAG_CACHE)" PYTHONPATH="$$dir/src" python -m "$$pkg.cli.main" \
 		gold fetch --set heldout --allow-retired --date 2026-10-13
 
 proof-add-parsers:  ## record the open parsers (hours, resumable; run `make -C proof/parsers setup` once)

@@ -54,6 +54,8 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
+      # A uv.lock change that shifts this report's output is meant to fail this check: the
+      # registered record must stay reproducible with the locked dependencies.
       - name: Install (locked)
         run: uv sync --locked --all-extras
       # The key is rebuilt byte for byte from OpenStax's pinned archive and checked against the
