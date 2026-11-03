@@ -7,15 +7,22 @@
   equation is read by that reader and compared with the page's reading. Agreement is a note and the
   item stays a required decision; a difference is a note and, where it is a few symbols, fills
   `Element.alternatives`; an unavailable reader, a spent time share (`IMAGE_PAGES_SECOND_READER_TIME_S`)
-  or a spent reader budget is a note only. The reader's own spend limit is never a failed fix, so it
-  cannot stop the job. In the hosted conversion child only the local reader can run.
+  or a spent reader budget leaves the item as it was and adds one notice for the document
+  (`second_reader_unavailable`, `second_reader_budget`) instead of a line on every equation. A read
+  is not started unless it fits the share, which never outlasts the job's own time limit (it now
+  reaches the child). The reader's own spend limit is never a failed fix, so it cannot stop the job.
+  In the hosted conversion child only the local reader can run: a production start is refused with
+  `claude` or `openai`, or with `local` and no model files (also in `ops launch-check`). The child's
+  counts come back in `ImagePagesSummary.second_reader` and the worker logs `second_reader_job`.
+- Image-page equations and tables are explicitly never part of a bulk accept.
+- A chosen reading is recorded in the review record as a choice.
 - Review card: a handwritten equation whose second reading differed shows one-click choices
   ("Use capital X") under the proposal; each posts an ordinary edit (checks, record, Undo), none is
   chosen for the person, and nothing changes while there are no alternatives. Keyboard, 44 px targets,
   forced-colors and axe are tested.
 - The two reader prompts moved under `models/prompts/` (`math_reader.md`, `math_reader_claude.md`),
   text unchanged, so the eval guard sees them (mapped to `latest-image-pages.json`).
-- New check messages for the four notes (`image_page.second_reader`).
+- New check messages for the agree and differ notes (`image_page.second_reader`) and two notice messages.
 - Not measured: how often the choices contain the right reading, or whether decisions per page fall
   (docs/eval-handwriting.md).
 ## Unreleased: a local handwriting reader (branch hw/local-reader)

@@ -378,6 +378,7 @@ class _Conversion:
             "settings": settings_for_child(self.settings),
             "pages": self.pages,
             "concurrency": self.concurrency,
+            "limit_s": self.limit_s,  # the job's time: second readings stay inside what it leaves
             "notice": self.notice,
             "source_note": self.source_note,
             "options": self.options,

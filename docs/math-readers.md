@@ -54,8 +54,9 @@ The send loop (`engine.py`) follows `models/openai_client.py`:
   together, inside the job's own caps (`engine.ReaderBudget`, shared by the readers
   `build_readers` makes). Past it a read raises `BudgetExceeded("reader_usd")` before the job's
   budget is touched: the caller treats that as "no second reading for this expression", never
-  as a failed job (the message code is `budget_reader_usd`, `web/messages.py`; it is only ever a note
-  on a fix that stands: a failed fix with a `budget_` reason stops the whole job in `pipeline/run.py`),
+  as a failed job (the message code is `budget_reader_usd`, `web/messages.py`; the pipeline shows it as a
+  notice for the document and never as a failed fix: a failed fix with a `budget_` reason stops the
+  whole job in `pipeline/run.py`),
   so second readings cannot use up the dollars the conversion needs.
 - Each send is bounded by `MODEL_TIMEOUT_S`. Connection errors, timeouts and HTTP 408, 409,
   429 and 5xx are resent up to `MODEL_MAX_RETRIES` times, each resend reserving and settling on
@@ -206,14 +207,14 @@ note on the fix, a `Check` named `image_page.second_reader`:
 
 | Code | When | Shown to the reviewer | Else |
 |---|---|---|---|
-| `second_reader_agrees` | the two readings agree | no (a passed check; the record keeps it) | the item stays a required decision: handwritten maths is always asked (`enforce_maths_required`), and two readers of the same ink can be wrong the same way, so agreement is not acceptance |
-| `second_reader_differs` | they differ | yes: "A second reader looked at the picture of this equation and read it differently ..." | where the difference is at most 3 stretches of at most 6 LaTeX tokens, `Element.alternatives` is filled from `reading_alternatives.from_reading` (only options that convert, at most 3 each): the review card's choices (docs/web.md) |
-| `second_reader_unavailable` | no answer: timeout, refusal, invalid output, an error, a reading that does not pass the LaTeX checks, the job's time share for second readings spent, or a spend limit of the job's own | yes | nothing else changes |
-| `budget_reader_usd` | the readers' own dollar share (`MATH_READER_MAX_USD_PER_JOB`) is spent | yes | nothing else changes; no more reads are made |
+| `second_reader_agrees` (a check on the fix) | the two readings agree | no (a passed check; the record keeps it) | the item stays a required decision: handwritten maths is always asked (`enforce_maths_required`), and two readers of the same ink can be wrong the same way, so agreement is not acceptance |
+| `second_reader_differs` (a check on the fix) | they differ | yes: "A second reader looked at the picture of this equation and read it differently ..." | where the difference is at most 3 stretches of at most 6 LaTeX tokens, `Element.alternatives` is filled from `reading_alternatives.from_reading` (only options that convert, at most 3 each): the review card's choices (docs/web.md) |
+| `second_reader_unavailable` (a notice for the document, with a count) | no reading for some equations: timeout, refusal, invalid output, an error, a reading that does not pass the LaTeX checks, no time left in the share, or a spend limit of the job's own | once on the job page, not on each equation | nothing else changes |
+| `second_reader_budget` (a notice for the document, with a count) | the readers' own dollar share (`MATH_READER_MAX_USD_PER_JOB`) is spent | once on the job page | nothing else changes; no more reads are made |
 
-**A reader's spend limit never stops the job.** The notes are checks on a fix that stands. A failed
-fix whose reason starts `budget_` is read by `pipeline.run._budget_scope` as "the job's money is
-gone" and stops every other step, so `budget_reader_usd` is only ever a check code and never a
+**A reader's spend limit never stops the job.** Nothing is ever a failed fix: a fix
+whose reason starts `budget_` is read by `pipeline.run._budget_scope` as "the job's money is
+gone" and stops every other step, so the reader's own limit is only ever a notice and never a
 `Fix.reason` (`tests/test_image_page_reconcile.py`, the sub-cap test, runs a real `ClaudeReader`
 over a sub-cap too small for one read and checks the job goes on). A reader that raises, for any
 reason, costs that one expression its second reading; a `ConfigError` (a missing key or model file)
@@ -226,10 +227,27 @@ not read. The choices are made against the fix's own LaTeX, which is the string
 
 **Which reader runs where.** The conversion child has no keys and no network, so only `local` is
 built there (`image_page_reconcile.default_readers`). `claude` and `openai` are used where a
-caller passes `convert_pdf(readers=build_readers(...))` (the CLI, the evals, tests): in the hosted
-service they would need the parent to read the crop for the child, which is not built, so with
-them chosen and no readers passed nothing is read. Their dollars go through the job's budget
-(`ReaderBudget`) and are added to the document's cost, not to its call count.
+caller passes `convert_pdf(readers=build_readers(...))` (nothing in this repository does: the
+CLI, the evals and the worker do not). In the hosted service they would need the parent to read
+the crop for the child, which is not built, so **a production start is refused** with
+`IMAGE_PAGES_SECOND_READER=claude` or `openai` (`Settings.check_production`,
+`ops.launch.second_reader_problem`), and elsewhere a job logs `second_reader_not_built` and reads
+nothing. Their dollars would go through the job's budget (`ReaderBudget`) and be added to the
+document's cost, not to its call count.
 
-The counts are logged without content (`second_reader_done`: reader, agreed, differed, with
-choices, unavailable, over budget, dollars) and traced as a `second_readings` span.
+**Ready before it runs.** A production start is also refused with `IMAGE_PAGES_SECOND_READER=local`
+unless `MATH_READER_LOCAL_DIR` is set and holds the model files (`LocalReader.available()`), and
+`readablestem ops launch-check` lists the same, so a deploy without the build argument cannot
+quietly give every equation a "no second reading" notice.
+
+**Time.** The share is `IMAGE_PAGES_SECOND_READER_TIME_S`, and never more than what the job's own
+time limit leaves after 20% of it is kept for the output and the checks (`share_s`; the worker's
+limit travels to the child, `convert_pdf(time_limit_s=)`). A read is not started unless its worst
+case (`max_read_s`: the local reader's `MATH_READER_LOCAL_TIME_S`, else `MODEL_TIMEOUT_S`) fits in
+what is left, so a finished job is never turned into a timeout by its second readings.
+
+The counts are logged without content (`second_reader_done`) and traced as a `second_readings`
+span, but the conversion child's logs and traces do not reach the operator. So they also travel
+in the result (`ImagePagesSummary.second_reader`: reader, considered, read, agreed, differed, with
+choices, unavailable, over budget, seconds, dollars) and the worker logs them from there as
+`second_reader_job` (a warning when equations were considered and none could be read).

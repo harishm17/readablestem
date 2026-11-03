@@ -1047,6 +1047,27 @@ class Worker:
             cost_usd=round(result.stats.cost_usd, 6),
             seconds=round(seconds, 2),
         )
+        reading = result.image_pages.second_reader if result.image_pages is not None else None
+        if reading is not None:
+            # The conversion child's own logs do not reach the operator: its counts come back
+            # in the result and are logged here (content-free: counts, seconds, dollars).
+            log_event(
+                logger,
+                "second_reader_job",
+                # no reading at all out of some equations: the operator should see it
+                logging.WARNING if reading.considered and not reading.read else logging.INFO,
+                job_id=job_id,
+                reader=reading.reader,
+                considered=reading.considered,
+                read=reading.read,
+                agreed=reading.agreed,
+                differed=reading.differed,
+                with_choices=reading.with_choices,
+                unavailable=reading.unavailable,
+                over_budget=reading.over_budget,
+                seconds=reading.seconds,
+                cost_usd=reading.cost_usd,
+            )
         return JobStatus.DONE
 
     def _write_result_retrying(self, attempt: _Attempt, output: ConversionOutput) -> bool:

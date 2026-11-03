@@ -155,6 +155,12 @@ class LocalReader:
         self._lock = threading.Lock()
         self._loaded: _Model | None = None
 
+    @property
+    def max_read_s(self) -> float:
+        """The longest one read can take (its own time budget): a caller that must stay inside
+        a share of time starts no read that would not fit."""
+        return self._budget_s
+
     @classmethod
     def from_settings(cls, settings: Settings) -> LocalReader:
         if settings.math_reader_local_dir is None:
