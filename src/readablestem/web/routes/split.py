@@ -89,7 +89,7 @@ from readablestem.web.page_edits import (
     MAX_HEADING_CHARS,
     friendly_text,
 )
-from readablestem.web.reading_chips import Chips, chips_for
+from readablestem.web.reading_chips import Chips, OtherReading, chips_for, other_reading_for
 from readablestem.web.review import (
     GROUP_KINDS,
     MAX_LATEX_CHARS,
@@ -348,6 +348,9 @@ class Panel:
     # A second reader's other readings of a doubtful symbol, as one-click choices
     # (`web.reading_chips`); None when there are none, so nothing changes without them.
     chips: Chips | None = None
+    # The other reading of a typed equation the page witness read differently, beside the
+    # proposal (`web.reading_chips.other_reading_for`); None without it (and with the flag off).
+    other: OtherReading | None = None
     region_url: str | None = None  # the item with the page around it
     region_alt: str = ""
     # Text read from an image of a page: the page tools with this paragraph open to change.
@@ -789,6 +792,9 @@ class SplitBuilder:
             compare = compare_equation(element, fix)
             panel.compare = compare
             panel.chips = chips_for(element, fix)
+            panel.other = other_reading_for(
+                fix, enabled=get_ctx(self.request).settings.feature_page_witness
+            )
             if fix.pending and compare.meaning:
                 panel.changes_meaning = True
                 panel.suggestion = suggest_fix(element, fix, compare)
