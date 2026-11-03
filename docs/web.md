@@ -2475,6 +2475,18 @@ which is 400% zoom, where a heading-level error alone wraps to 170 px) the focus
 control stays in view with as much of the field as fits above it. Without JavaScript,
 `scroll-margin-top: 8rem` on form controls keeps the label in view on wider screens.
 
+`tests/test_web_keyboard_browser.py` is the keyboard-only walk (helpers in
+`tests/fixtures/web/keyboard.py`): it presses Tab and Shift+Tab through every page of the app
+at 1280, 390 and 320 CSS px and checks the skip link, that every stop is in the window, shows a
+focus ring, is not covered and has a name, that Tab reaches every control with no trap and does
+not change the page, and that the header, main and footer are visited in that order; then it
+does the main flows with keys alone (sign in, upload, downloads, the review with Undo, an edit
+and a refused one, the page tools, the Symbols screen, deleting a document and an account) and
+checks where focus lands after each redirect. A redirect that names a fragment must name a
+focusable element: the browser skips `autofocus` when the address has a fragment, which is why
+the page tools redirect to `#page-tools-summary`. `tests/test_web_focus_style.py` checks the
+ring's colours from the stylesheet. What they cover and do not is in `docs/acr/`.
+
 `tests/test_web_browser.py` runs axe-core on every page (zero serious or critical
 violations), including an unfinished job page with JavaScript on and as a no-JS browser
 parses it; runs the WCAG 2.2 AA and best-practice rules at moderate and above; checks

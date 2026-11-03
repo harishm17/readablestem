@@ -43,6 +43,7 @@ arrived at; read them by question, not front to back.
 | What is in the EPUB export? | [output.md](output.md), "The EPUB export" |
 | How do I test the Canvas export in a real Canvas? | [canvas-sandbox-test.md](canvas-sandbox-test.md) |
 | How do I check what a screen reader says (VoiceOver in Safari) on the demo, a converted file and the review screen? | [screen-reader-test.md](screen-reader-test.md) |
+| What has been tested for keyboard use and WCAG 2.2 on the web app, and what has not (the draft accessibility conformance report)? | [acr/README.md](acr/README.md) and [acr/acr-draft.md](acr/acr-draft.md) |
 
 ## If you want to know why a choice was made
 
