@@ -152,18 +152,20 @@ def _page_action(
     action: str,
     after: str = "",
     view: str = "",
+    flt: str = "",
 ) -> Response:
     """`after` "review": the form is on a decision's card (the pages kept as images), so
     the reviewer goes on to the next decision, in the view the form was on, instead of to
     the page tools."""
-    from readablestem.web.routes.review import LIST_VIEW, list_url
+    from readablestem.web.routes.review import LIST_VIEW, keep_filter, list_url
     from readablestem.web.routes.split import _owned_page_count, review_url
 
     def back(page_number_: int, result: DocumentResult | None = None) -> Response:
         if after != "review":
             return back_to_page(job_id, page_number_)
         if view == LIST_VIEW:
-            return RedirectResponse(list_url(job_id, "needs-decision"), status_code=303)
+            where = RedirectResponse(list_url(job_id, "needs-decision"), status_code=303)
+            return keep_filter(where, flt)
         if result is None:
             return RedirectResponse(review_url(job_id), status_code=303)
         return _split_redirect(job_id, result, None)
@@ -201,10 +203,11 @@ def omit_page(
     version: Annotated[str, Form()] = "",
     after: Annotated[str, Form()] = "",
     view: Annotated[str, Form()] = "",
+    flt: Annotated[str, Form()] = "",
 ) -> Response:
     """Leave a page out of review and of the student file (a blank page, a cover). From a
     kept-image card (`after=review`) the reviewer goes on to the next decision."""
-    return _page_action(request, job_id, number, user, version, "omit", after, view)
+    return _page_action(request, job_id, number, user, version, "omit", after, view, flt)
 
 
 @router.post("/jobs/{job_id}/pages/{number}/restore", dependencies=[Depends(require_csrf)])

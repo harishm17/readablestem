@@ -95,13 +95,17 @@ def cached_html(
     max_age: int,
     headers: dict[str, str] | None = None,
     background: BackgroundTask | None = None,
+    revalidate: bool = False,
 ) -> Response:
     """A public page that is the same for everyone (the demo, the showcase): an `ETag` (a
     hash of the body), `Cache-Control: public, max-age=<max_age>`, and a 304 with no body
-    when the visitor's `If-None-Match` names the ETag. Pages of a signed-in person never
+    when the visitor's `If-None-Match` names the ETag. `revalidate`: asked again every time (the
+    ETag still makes it a 304), for a page whose visit is counted by the server. Pages of a
+    signed-in person never
     come through here: they stay `no-store` (`web.security`)."""
     etag = '"' + hashlib.sha256(body.encode("utf-8")).hexdigest()[:32] + '"'
-    sent = {**(headers or {}), "ETag": etag, "Cache-Control": f"public, max-age={max_age}"}
+    control = "public, no-cache" if revalidate else f"public, max-age={max_age}"
+    sent = {**(headers or {}), "ETag": etag, "Cache-Control": control}
     sent_tags = request.headers.get("if-none-match", "").split(",")
     wanted = [tag.strip().removeprefix("W/") for tag in sent_tags]
     if etag in wanted or "*" in wanted:

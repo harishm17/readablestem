@@ -68,8 +68,11 @@ BULK_KINDS = {
 
 
 def _flagged(fix: Fix) -> bool:
-    """The second automated check found a possible mismatch (kept as a note or a flag)."""
-    return any(v.flagged for v in fix.verifications)
+    """The second automated check found a possible mismatch, or did not give an answer
+    (`flagged` None: it failed open or was not judged). Only "ran, found nothing" counts as
+    passed, so neither is accepted in bulk. A fix the check never looked at (no entry) has
+    no second-check result to doubt."""
+    return any(v.flagged is not False for v in fix.verifications)
 
 
 def is_bulk_candidate(fix: Fix, slug: str) -> bool:

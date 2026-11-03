@@ -261,7 +261,9 @@ def test_finish_notice_opt_in_title_and_announcement(site, browser):
     page.wait_for_function("(t) => document.title === t", arg=wanted, timeout=5000)
     assert job_id not in page.title()
     region = page.locator("#job-status-region")
-    expect(region).to_contain_text("The conversion has finished.")
+    expect(region).to_contain_text(finished.get_attribute("data-title").split(":")[0])
+    # The button had focus; it is hidden now, so focus moved to the status box.
+    assert page.evaluate("document.activeElement.id") == "job-status-region"
     assert region.get_attribute("role") == "status"
     notes = page.evaluate("window.__notes")
     assert len(notes) == 1 and notes[0]["title"] == "ReadableSTEM"

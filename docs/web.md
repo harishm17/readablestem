@@ -1487,7 +1487,8 @@ the results".
   the HTML" for each page when there are several; `templates/_leave_out.html`). It posts to
   the page tools' omit route (`POST /jobs/{id}/pages/{n}/omit`, T3-16) with `after=review`: the
   page, its fixes and its notices move into `result.omitted`, the file says the page is not
-  there, and the reviewer goes on to the next decision. It is recorded like any structural
+  there, and the reviewer goes on to the next decision. The hint says that decisions still waiting on the
+  page go with it, and each button says how many. It is recorded like any structural
   edit, so the notice after it has Undo, and "Put it back" in the page tools works as before.
   The last page of a document cannot be left out.
 
@@ -2097,8 +2098,10 @@ The measured load is about 1.8 decisions per page (the 15 held-out sections; `/l
 because the model was not sure enough to accept them itself:
 
 - **Accept all remaining equations whose checks passed**: equations still undecided
-  (`needs_review`) with a usable proposal, no failed check of any kind, no reason code, not
-  flagged by the second automated check, and on their own (not in a group);
+  (`needs_review`) with a usable proposal, no failed check of any kind, no reason code, no
+  second-check answer other than "ran and found nothing" (a possible mismatch, or an answer that
+  failed open or was not judged, `flagged` not false, keeps it for a person; a fix the check never
+  looked at has nothing to doubt), and on their own (not in a group);
 - **Accept all figures that have generated alt text**: figures in the same state with a
   non-empty alt text that are not marked decorative.
 
@@ -2109,8 +2112,8 @@ for the reviewer.
 *Where.* Links (with the count) at the top of "Needs your decision" in the list view and under
 "All items as a list" on the review screen, only while there is something to accept. A link
 opens `GET /jobs/{id}/accept/{equations|figures}`: the count, a sentence saying what is and is
-not included, the whole list (each item's label, page, the proposal as the card shows it, and a
-link to decide it on its own), the **Accept all N equations** button and **Cancel**. Nothing is
+not included, the whole list (each item's label, page, the original crop beside the proposal as the card shows
+it, and a link to decide it on its own), the **Accept all N equations** button and **Cancel**. Nothing is
 written by looking.
 
 *The decision.* `POST /jobs/{id}/accept/{kind}` is CSRF-checked and owner-only like every review
@@ -2118,7 +2121,8 @@ route, and goes through the same path as a clean-tables accept (`routes/edits.wr
 lock the job, apply an ordinary Accept to each item (`web.review.apply_review`, so every rule of
 a single accept holds), one `ReviewEdit` per item with the kind under `bulk` in its record (the review record says "Accepted, together with the other equations whose checks passed, in one action"), one write
 (`result_version` + 1), one re-render, the usage event `decision_made` with `kind=group`. The
-form carries the review version the list was drawn at: a document changed since (another tab, an
+form must carry the review version the list was drawn at (a blank one is refused like a stale
+one): a document changed since (another tab, an
 Undo) is refused with a 409 and nothing is accepted, so exactly what was listed is what is
 accepted. With nothing left to accept the answer is a notice and no write. The notice names the
 count ("Accepted 12 equations whose checks passed. Undo takes them all back in one step.").
@@ -2133,7 +2137,9 @@ waiting): **Kind** (a select of the kinds that still have decisions, with their 
 that kind on that page; a repeated-heading group and a group of pages kept as images match
 every page they are on. The form returns to `#filter-result`, a `role="status"` line that takes
 focus ("Showing 4 of 11 decisions: figures on page 2." or "No decision matches: ..."), with a
-"Show all decisions" link. A kind that is not one of the list's groups and a page outside the
+"Show all decisions" link. A decision made in the filtered list comes back to the same filtered
+list (hidden `flt` field; `routes/review.keep_filter`). "Accept all N clean tables" is not
+filtered: with a filter on, its note says it covers all N. A kind that is not one of the list's groups and a page outside the
 document are ignored (the list is shown whole). Filtering only hides cards; it decides nothing,
 and the accept-many actions always list everything that qualifies.
 
@@ -2230,7 +2236,8 @@ for `/static/app.<12 hex>.css` and `.js` (`web/assets.py`, `static_url`; the has
 file's SHA-256, read again only when the file changes), `vendor/` files carry their version
 in the name, and anything else is kept for an hour and then checked with its ETag (304, no
 body, when nothing changed). The demo (688 KB) and the showcase pages are the same for
-everyone, so they carry an ETag (a hash of the body) and `max-age=3600` too (`assets.cached_html`);
+everyone, so they carry an ETag (a hash of the body) and `max-age=3600` too (`assets.cached_html`; a visit the server counts, `/demo?hm_id=`, is
+revalidated every time with `no-cache`, still a 304, so cached hits are not lost);
 only pages of a signed-in person stay `no-store`. The math font is sent as
 WOFF2 (392 KB, against 733 KB for the OpenType file kept beside it). Our own script, `web/static/app.js`, places error summary links (below), shows times in
 the reader's time zone ("Times"), checks a chosen upload before it is sent ("Uploads and
@@ -2248,9 +2255,7 @@ box is a polite live region that changes per step, not per element; the counts a
 the list of steps outside it. When the job finishes the status box says so and links to
 the first decision and to the results ("Start the review or show the results", "Show
 the results", or "Show why it stopped"); the page is not reloaded under the reader, which
-would send a screen reader back to the top. The fragment of a finished job starts, inside the live
-region, with a line only a screen reader gets ("The conversion has finished." or "has stopped.")
-and carries `data-finished`, `data-state`, `data-title` and `data-summary`. `app.js` ("When a job
+would send a screen reader back to the top. The fragment of a finished job carries `data-finished`, `data-state`, `data-title` and `data-summary`. `app.js` ("When a job
 finishes") sets the tab title from `data-title` and, if the person chose "Notify me when it
 finishes" (a button shown only where the `Notification` API exists and is not blocked; the
 browser's permission question is asked only when it is used, by Enter or a click), shows one browser

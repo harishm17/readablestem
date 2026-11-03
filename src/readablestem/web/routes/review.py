@@ -46,6 +46,7 @@ import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import Annotated, Any
+from urllib.parse import parse_qsl, urlencode
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
@@ -102,6 +103,7 @@ from readablestem.web.review import (
     ADD_DATA_TABLE,
     DESCRIBE,
     GROUP_SLUGS,
+    KEPT_IMAGES_SLUG,
     NOT_CONVERTED,
     STATUS_FOR_ACTION,
     TABLE_CHANGES,
@@ -558,6 +560,8 @@ class PageGroupView:
     # one button each (`web.page_edits.omit_page`): whole pages kept as images, not
     # handwriting on a typed page, whose text was converted.
     leave_out: list[int] = field(default_factory=list)
+    # Decisions still waiting on each of those pages (this one included): they go with it.
+    leave_drops: dict[int, int] = field(default_factory=dict)
 
     @property
     def waiting(self) -> int:
@@ -687,6 +691,11 @@ def page_group_view(
             if many or len(members) > 1
             else "Kept as an image, marked “Not converted”."
         )
+    leave_out = [] if region else sorted({m.page for m in waiting if m.page})
+    waiting_on: dict[int, int] = {}
+    for fix in result.fixes:
+        if fix.pending and fix.element_id in page_of:
+            waiting_on[page_of[fix.element_id]] = waiting_on.get(page_of[fix.element_id], 0) + 1
     return PageGroupView(
         key=key,
         anchor=group_anchor(key),
@@ -702,7 +711,8 @@ def page_group_view(
         size=len(members),
         state=state,
         describe=[items[f.element_id] for f in members if f.element_id in items],
-        leave_out=[] if region else sorted({m.page for m in waiting if m.page}),
+        leave_out=leave_out,
+        leave_drops={p: waiting_on.get(p, 0) for p in leave_out},
     )
 
 
@@ -1098,6 +1108,12 @@ class DecisionFilter:
         return bool(self.kind or self.page)
 
     @property
+    def query(self) -> str:
+        """The filter as a query string (the hidden `flt` field of every decision form)."""
+        found = {"kind": self.kind, "page": str(self.page) if self.page else ""}
+        return urlencode({k: v for k, v in found.items() if v})
+
+    @property
     def summary(self) -> str:
         """ "Showing 3 of 41 decisions: equations on page 5."""
         n = "decision" if self.total == 1 else "decisions"
@@ -1343,6 +1359,7 @@ def review_action(
     remove_data_table: Annotated[str | None, Form()] = None,
     description: Annotated[str | None, Form()] = None,
     version: Annotated[str, Form()] = "",
+    flt: Annotated[str, Form()] = "",
 ) -> Response:
     """One decision on one fix; when it is a heading group's key ("hg-p1-e7"), one
     decision for every heading of that group still waiting (with `scope=all`, for every
@@ -1368,11 +1385,16 @@ def review_action(
         raise PageError(404, *NOT_FOUND)
     if is_group_key(element_id):
         every = scope == "all"
-        return _group_action(
-            request, job_id, element_id, user, action, level or "", view, every, version
+        return keep_filter(
+            _group_action(
+                request, job_id, element_id, user, action, level or "", view, every, version
+            ),
+            flt,
         )
     if is_page_group_key(element_id):
-        return _page_group_action(request, job_id, element_id, user, action, view, version)
+        return keep_filter(
+            _page_group_action(request, job_id, element_id, user, action, view, version), flt
+        )
     sent = {
         "latex": latex,
         "alt": alt,
@@ -1444,7 +1466,31 @@ def review_action(
 
             return RedirectResponse(review_url(job_id, item=element_id), status_code=303)
         return _split_redirect(job_id, result, element_id)
-    return RedirectResponse(_landing(job_id, result, element_id), status_code=303)
+    response = RedirectResponse(_landing(job_id, result, element_id), status_code=303)
+    return keep_filter(response, flt)
+
+
+def list_query(raw: str) -> str:
+    """The `kind` and `page` of a filter, as a query string, from the hidden `flt` field of
+    a list-view form: only a kind of this list and a page number are kept."""
+    found = dict(parse_qsl(raw))
+    slugs = {*GROUP_SLUGS.values(), KEPT_IMAGES_SLUG}
+    query = {}
+    if found.get("kind") in slugs:
+        query["kind"] = found["kind"]
+    if found.get("page", "").isascii() and found.get("page", "").isdigit():
+        query["page"] = found["page"]
+    return urlencode(query)
+
+
+def keep_filter(response: Response, flt: str) -> Response:
+    """A redirect back to the list view keeps the decision filter the form was drawn with."""
+    query = list_query(flt) if flt else ""
+    location = response.headers.get("location", "")
+    marker = "/review/list#"
+    if query and response.status_code == 303 and marker in location:
+        response.headers["location"] = location.replace(marker, f"/review/list?{query}#", 1)
+    return response
 
 
 def _landing(job_id: str, result: DocumentResult, element_id: str) -> str:
@@ -1728,6 +1774,7 @@ def undo(
     user: UserDep,
     version: Annotated[str, Form()] = "",
     view: Annotated[str, Form()] = "",
+    flt: Annotated[str, Form()] = "",
 ) -> Response:
     """Undo the job's last review write: every fix it changed goes back to what its
     ReviewEdit's `before` recorded, the HTML is rendered again, and the undo is a write
@@ -1791,7 +1838,8 @@ def undo(
         target, flashed = slug, GROUP_FLASH + slug
     flash(request, message, element_id=flashed)
     if view == LIST_VIEW:
-        return RedirectResponse(list_url(job_id, _stale_anchor(result, target)), status_code=303)
+        where = RedirectResponse(list_url(job_id, _stale_anchor(result, target)), status_code=303)
+        return keep_filter(where, flt)
     item = target if target and kind_for_slug(target) is None else None
     return RedirectResponse(review_url(job_id, item=item), status_code=303)
 

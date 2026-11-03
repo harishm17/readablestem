@@ -35,7 +35,7 @@ from readablestem.web.review import BULK_KEY, WRITE_KEY, ReviewInvalid
 
 BOX = (50.0, 600.0, 200.0, 620.0)
 EQUATION_CANDIDATES = ["p1-e2", "p2-e7"]
-FIGURE_CANDIDATES = ["p1-e6", "p2-e12"]
+FIGURE_CANDIDATES = ["p1-e6", "p2-e12"]  # p2-e12: its second check ran and passed
 
 
 def _equation(eid: str, page: int, order: int, **fix) -> tuple[Element, Fix]:
@@ -79,7 +79,14 @@ def scaled_output() -> ConversionOutput:
             status=needs,
             checks=[Check(name="equation.text_layer_style", passed=False, severity="warning")],
         ),
-        _figure("p2-e12", 1, 75, chart, status=needs, confidence=0.6),
+        _figure(
+            "p2-e12",
+            1,
+            75,
+            chart,
+            status=needs,
+            verifications=[Verification(check="figure_alt", flagged=False)],
+        ),
         _figure(
             "p2-e13", 1, 76, FigureFix(figure_type="photo", alt="", decorative=True), status=needs
         ),
@@ -93,6 +100,10 @@ def scaled_output() -> ConversionOutput:
             checks=[Check(name="alt.length", passed=False, severity="warning", code="alt_long")],
         ),
         _figure("p2-e16", 1, 79, chart, status=Status.ACCEPTED),
+        # The second check gave no answer (it failed open): not "every check passed".
+        _equation(
+            "p2-e17", 1, 80, status=needs, verifications=[Verification(check="equation_match")]
+        ),
     ]
     for element, fix in added:
         result.elements.append(element)
@@ -498,10 +509,7 @@ def test_a_scanned_page_card_has_a_leave_this_page_out_button_on_both_screens(ke
         page = kept.browser.get(url).text
         assert "Leave this page out of the HTML" in page, url
         assert f'action="/jobs/{kept.job_id}/pages/2/omit"' in page
-        assert (
-            'data-role="omit-page-card"' in page
-            and 'aria-describedby="leave-hint-pg-p2-e9"' in page
-        )
+        assert 'data-role="omit-page-card"' in page and "leave-hint-pg-p2-e9" in page
 
 
 def test_the_button_leaves_the_page_out_goes_on_and_undo_puts_it_back(kept):
@@ -545,3 +553,87 @@ def test_handwriting_on_a_typed_page_has_no_leave_out_button(tmp_path):
         env.run_worker()
         page = client.get(f"/jobs/{job_id}/review?item=pg-p2-e9").text
         assert "omit-page-card" not in page and "leave-hint" not in page
+
+
+# --------------------------------------------------------------------------- review fixes
+
+
+def test_the_preview_shows_the_original_crop_beside_each_proposal(scaled):
+    page = confirm_page(scaled, "equations").text
+    assert f"/jobs/{scaled.job_id}/crops/p1-e2.png" in page
+    assert "Original in the PDF" in page
+    figures = confirm_page(scaled, "figures").text
+    assert f"/jobs/{scaled.job_id}/crops/p1-e6.png" in figures
+
+
+def test_a_blank_or_missing_version_is_refused_and_nothing_is_accepted(scaled):
+    before = statuses(scaled)
+    blank = accept(scaled, "equations", version="")
+    assert blank.status_code == 409
+    token_ = token(scaled.browser, f"/jobs/{scaled.job_id}/review")
+    missing = scaled.browser.post(
+        f"/jobs/{scaled.job_id}/accept/equations", data={"csrf_token": token_, "view": "list"}
+    )
+    assert missing.status_code == 409
+    assert statuses(scaled) == before and edits(scaled) == []
+
+
+def test_an_answer_that_failed_open_is_not_a_passed_check():
+    result = scaled_output().result
+    ids = [f.element_id for f in bulk_accept.candidates(result, "equations")]
+    assert "p2-e17" not in ids and "p2-e8" not in ids  # no answer, and flagged
+    assert "p2-e12" in [f.element_id for f in bulk_accept.candidates(result, "figures")]
+
+
+def test_a_decision_in_a_filtered_list_comes_back_to_the_filtered_list(scaled):
+    page = scaled.browser.get(f"/jobs/{scaled.job_id}/review/list?kind=equations&page=2").text
+    assert 'name="flt" value="kind=equations&amp;page=2"' in page
+    response = scaled.browser.post(
+        f"/jobs/{scaled.job_id}/review/p2-e7",
+        data={
+            "csrf_token": token(scaled.browser, f"/jobs/{scaled.job_id}/review"),
+            "view": "list",
+            "action": "accept",
+            "version": version(scaled),
+            "flt": "kind=equations&page=2&evil=1",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert "/review/list?kind=equations&page=2#" in response.headers["location"]
+    assert "evil" not in response.headers["location"]
+    plain = scaled.browser.post(
+        f"/jobs/{scaled.job_id}/review/p2-e8",
+        data={
+            "csrf_token": token(scaled.browser, f"/jobs/{scaled.job_id}/review"),
+            "view": "list",
+            "action": "reject",
+            "version": version(scaled),
+        },
+        follow_redirects=False,
+    )
+    assert "?" not in plain.headers["location"].split("#")[0]
+
+
+def test_leave_out_says_how_many_decisions_go_with_the_page(kept):
+    page = unescape(kept.browser.get(f"/jobs/{kept.job_id}/review?item=pg-p2-e9").text)
+    assert "Any decisions still waiting on it are dropped with it." in page
+    found = re.search(r"(\d+) decisions? waiting on it (?:goes|go) with it\.", page)
+    assert found and int(found.group(1)) >= 1
+
+
+def test_demo_hits_that_are_counted_are_revalidated_and_others_cached(tmp_path, monkeypatch):
+    from readablestem.web import analytics
+
+    async def nothing(*args, **kwargs) -> None:
+        return None
+
+    monkeypatch.setattr(analytics, "capture", nothing)
+    with WebEnv(tmp_path, analytics_enabled=True).running() as client:
+        counted = client.get("/demo?hm_id=abcdefgh1234")
+        assert counted.headers["cache-control"] == "public, no-cache"
+        again = client.get(
+            "/demo?hm_id=abcdefgh1234", headers={"If-None-Match": counted.headers["etag"]}
+        )
+        assert again.status_code == 304
+        assert client.get("/demo").headers["cache-control"] == "public, max-age=3600"

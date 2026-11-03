@@ -56,12 +56,12 @@ def confirm_page(
 ) -> Response:
     """The list of what the action would accept, and the button that does it."""
     spec = _spec(slug)
-    job, result, _, version = _load_versioned(request, job_id, user)
+    job, result, crop_ids, version = _load_versioned(request, job_id, user)
     elements = {e.id: e for e in result.elements}
     numbers = item_numbers(result)
     labels = item_labels(result)
     items = [
-        _item(fix, elements.get(fix.element_id), numbers[fix.element_id], job.id, set(), None,
+        _item(fix, elements.get(fix.element_id), numbers[fix.element_id], job.id, crop_ids, None,
               labels.get(fix.element_id))
         for fix in bulk_accept.candidates(result, slug)
     ]  # fmt: skip
@@ -92,6 +92,8 @@ def accept(
     """Accept every item the page listed, in one write (one Undo takes all back)."""
     spec = _spec(slug)
     view = _view(view)
+    if not version.strip():  # a form without the version it was drawn at proves nothing
+        return _stale_page(request, job_id, user, view, slug)
     try:
         changes, result = write_review(
             request,

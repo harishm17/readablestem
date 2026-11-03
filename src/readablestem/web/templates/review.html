@@ -16,7 +16,7 @@
 {# Every decision form: the CSRF token, the view to come back to, and the review version
    the page was drawn at (a form from an out-of-date tab is refused, not applied). #}
 {% macro hidden_fields() -%}
-<input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="list"><input type="hidden" name="version" value="{{ result_version }}">
+<input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="list"><input type="hidden" name="version" value="{{ result_version }}">{% if decision_filter.query %}<input type="hidden" name="flt" value="{{ decision_filter.query }}">{% endif %}
 {%- endmacro %}
 
 {% macro group_counts(g) %}

@@ -7,8 +7,6 @@
 {% endif %}
 {% set counts = job.summary.counts if job.summary else none %}
 <div id="job-status" class="job-status"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/status?v={{ status_version|default(job.version) }}" hx-trigger="every 3s" hx-swap="outerHTML"{% else %} data-finished="{{ job.status }}" data-state="{{ headline.state }}" data-title="{{ headline.label }}: {{ job.title }}" data-summary="{{ headline.label }}. {{ headline.message }}"{% endif %}>
-  {# Inside the live region, so it is read first when the polled fragment swaps in. #}
-  {% if results_link|default(false) %}<p class="visually-hidden">{{ "The conversion has stopped." if job.status == "failed" else "The conversion has finished." }}</p>{% endif %}
   <p><span class="status-badge status-{{ headline.badge }}">{{ headline.label }}</span>
     {{ headline.message }}</p>
   {% if counts and counts.decisions and headline.state != "decisions" %}

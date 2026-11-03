@@ -207,10 +207,10 @@ def test_the_status_fragment_of_a_finished_job_says_so_in_the_live_region(tmp_pa
         assert "data-finished" not in running.text and "has finished" not in running.text
         env.run_worker()
         done = client.get(f"/jobs/{job_id}/status", headers={"HX-Request": "true"})
-        assert "data-finished=" in done.text and "The conversion has finished." in done.text
+        assert "data-finished=" in done.text and "has finished" not in done.text
         assert re.search(r'data-title="[^"]+: ', done.text)
         full = client.get(f"/jobs/{job_id}").text
-        assert "The conversion has finished." not in full  # the full page is not announced
+        assert "data-finished=" in full  # a page opened later says nothing more
 
 
 # --------------------------------------------------------------------------- targets

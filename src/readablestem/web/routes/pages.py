@@ -56,6 +56,7 @@ def demo(request: Request) -> Response:
             request,
             _with_preview_tags(DEMO_PAGE.read_text(encoding="utf-8"), site),
             max_age=DEMO_MAX_AGE,
+            revalidate=noted is not None,  # a counted visit (hm_id) must reach the server
             headers={"Content-Security-Policy": VIEW_CSP},
             background=noted,
         )

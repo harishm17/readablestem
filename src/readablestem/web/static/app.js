@@ -607,7 +607,7 @@
  *   already in front, nothing else happens. Nothing is sent to the server.
  *
  * The announcement itself is the polite live region the status box sits in
- * (#job-status-region): it reads "The conversion has finished." with the new status. A page
+ * (#job-status-region): it reads the new status. A page
  * opened after the job finished says nothing more. Without this file the page is the same,
  * only without the title change and the notice.
  */
@@ -674,7 +674,14 @@
     finished = true;
     var title = now.getAttribute("data-title");
     if (title) document.title = title + " | ReadableSTEM";
-    if (box) box.hidden = true;
+    if (box) {
+      // Keep the keyboard's place: focus on the button moves to the status box.
+      if (box.contains(document.activeElement)) {
+        region.setAttribute("tabindex", "-1");
+        region.focus();
+      }
+      box.hidden = true;
+    }
     if (!supported || window.Notification.permission !== "granted") return;
     if (!document.hidden && document.hasFocus()) return; // the page is in front: it shows
     try {
