@@ -181,7 +181,8 @@ def site(tmp_path):
         job_id = job_id_from(upload(alice, pdf(2)))
         assert env.run_worker() == job_id
         course = alice.post(
-            "/courses", data={"csrf_token": csrf_from(alice.get("/courses").text), "name": "P1"}
+            "/courses",
+            data={"csrf_token": csrf_from(alice.get("/courses").text), "name": "SECRET-COURSE"},
         )
         course_id = course.headers["location"].rsplit("/", 1)[-1]
         entry_page = f"/courses/{course_id}"
@@ -335,7 +336,9 @@ def test_a_second_user_gets_the_same_404_for_someone_elses_ids_as_for_ids_that_d
         nothing = send(site.bob, method, absent, token)
         assert theirs.status_code == nothing.status_code, (method, template)
         assert theirs.status_code in {400, 404}, (method, template, theirs.status_code)
-        assert "SECRET" not in theirs.text and "P1" not in theirs.text, (method, template)
+        # The course is named SECRET-COURSE: a short marker like "P1" also turns up by chance in
+        # random tokens (the sign-out form's CSRF token) and made this test flaky.
+        assert "SECRET" not in theirs.text, (method, template)
         seen += 1
     assert seen >= 25
     assert counts(site) == before
