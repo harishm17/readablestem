@@ -1534,6 +1534,25 @@ the results".
   outlined on the picture. A chosen reading is recorded as such in the review record
   (`ReviewEdit.after["second_reader_choice"]`, "Edited: chose the reading a second reader gave for
   one symbol"), only when the form says it was a choice and the LaTeX is one the card offered.
+  **The other reading** (a typed equation whose page witness read it differently,
+  `FEATURE_PAGE_WITNESS`; `EquationFix.other_latex`, `web/reading_chips.py` `other_reading_for`, docs/steps.md "Page
+  witness"): under the proposal, "The other reading" says why the item is asked (a second reading of the whole
+  page read the formula differently; which one is the proposal; when the check is `witness_extent_differs`, that
+  its boundaries differ too), shows the other reading's formula in the same framed row as the proposal ("Other
+  reading of equation 3", focusable, scrolls sideways), how it is read aloud, and **Use the other reading**. Where
+  it differs from the proposal in a few symbols (`reading_alternatives.from_reading`) the same chips as above
+  follow, "Where the proposal above has `x` (said "x"), the other reading had:", the same
+  `_chips` code, so typed and handwritten cards behave alike (one differing symbol is the whole reading: no
+  chip repeats the button). Same rules as the chips: submit buttons of small forms (`action=edit`, the whole LaTeX
+  the choice gives, form `origin=page_witness_choice`), nothing selected, before the edit box in tab order, 44 CSS px
+  targets, forced-colors border, ordinary checks. A choice the PDF's own text contradicts is refused like a typed
+  edit, with the usual "Use my edit anyway". Shown only while the decision is open, only when the other reading
+  converts and differs from the proposal, and never with the flag off. The reading belongs to the proposal it
+  was made against: an edit replaces the equation (it is gone), an Undo brings both back. Recorded as
+  `ReviewEdit.after["page_witness_choice"]` ("Edited: chose the other reading of this equation") only when
+  the form says so and the LaTeX is one the card offered (`review.offered_latex`). A formula only the page witness
+  read (`witness_added`) has no other reading, so it shows its check's sentence and nothing more. Tests:
+  `tests/test_web_review_other_reading.py`, `tests/test_web_review_other_reading_browser.py`.
   Items read from an image of a page (`IMAGE_PAGE_REASON`) are never part of a bulk accept
   ("Accept all equations ...", "Accept all clean tables"): `bulk_accept.is_bulk_candidate` and
   `review.is_clean_table` leave them out whatever their checks say (ADR 0007, point 12). Tests: `tests/test_web_review_chips.py`,

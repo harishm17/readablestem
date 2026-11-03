@@ -41,7 +41,14 @@ from readablestem.core.types import (
 from readablestem.web import job_page
 from readablestem.web.database import as_utc
 from readablestem.web.messages import explain_check, explain_reason, severity_label
-from readablestem.web.review import BULK_KEY, CHOICE_KEY, MODEL_READ_KEY, UNDO_ACTION, item_labels
+from readablestem.web.review import (
+    BULK_KEY,
+    CHOICE_KEY,
+    MODEL_READ_KEY,
+    UNDO_ACTION,
+    WITNESS_KEY,
+    item_labels,
+)
 from readablestem.web.views import KIND_LABELS
 
 STATEMENT = (
@@ -73,6 +80,7 @@ ACTION_WORDS = {
 }
 # A decision with a mark in its `after` (web.review.BULK_KEY, MODEL_READ_KEY) says more.
 CHOICE_WORDS = "Edited: chose the reading a second reader gave for one symbol"
+WITNESS_WORDS = "Edited: chose the other reading of this equation"
 BULK_WORDS = "Accepted, together with the other clean tables, in one action"
 # The bulk accepts of equations and figures (web.bulk_accept) keep their kind under BULK_KEY.
 BULK_KIND_WORDS = {
@@ -196,6 +204,8 @@ def _decision_words(edit: Any) -> str:
         return MODEL_READ_WORDS
     if action == "edit" and after.get(CHOICE_KEY):
         return CHOICE_WORDS
+    if action == "edit" and after.get(WITNESS_KEY):
+        return WITNESS_WORDS
     if action == "carried" and after.get("carried_edit") in CARRIED_EDIT_WORDS:
         return f"Carried over from the earlier version: {CARRIED_EDIT_WORDS[after['carried_edit']]}"
     return ACTION_WORDS.get(action, "Changed")
