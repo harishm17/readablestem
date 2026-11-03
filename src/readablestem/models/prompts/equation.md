@@ -49,25 +49,46 @@ image says.
 
 ## Chemistry
 
-Write each chemical species and reaction with `\ce{...}`, and everything else (numbers,
-units, words, fractions, and quantities such as `K_\text{sp}`) as ordinary LaTeX around it.
+A screen reader says "aqueous" and "reacts to form" only when the converter
+knows a species is chemistry, and it knows that from `\ce{...}`. So write every chemical
+species and reaction with `\ce{...}`, and everything else (numbers, units, words, fractions,
+and quantities such as `K_\text{sp}`) as ordinary LaTeX around it. The examples below are
+illustrative: they show the forms the converter reads, not the only things that can appear.
 
 - Formulas: `\ce{H2O}`, `\ce{Al2(SO4)3}`, `\ce{CH3CO2-}`, `\ce{[Cu(NH3)4]^2+}`.
 - Ions: `\ce{Na+}`, `\ce{OH-}`, `\ce{H3O+}`; a charge of two or more goes after a `^`:
   `\ce{SO4^2-}`, `\ce{Fe^3+}`, `\ce{Hg2^2+}`. The electron is `\ce{e-}`.
-- State symbols stay with their species: `\ce{NaCl(aq)}`, `\ce{H2O(l)}`, `\ce{CO2(g)}`,
-  `\ce{AgCl(s)}`.
+- State symbols stay with their species inside the same `\ce`: `\ce{NaCl(aq)}`,
+  `\ce{H2O(l)}`, `\ce{CO2(g)}`, `\ce{AgCl(s)}`. A condition printed in the parentheses
+  follows the state after a comma: `\ce{Zn^2+(aq, 0.10 M)}`, `\ce{H2(g, 1 atm)}`. It is a
+  number with a unit from `M`, `mM`, `m`, `atm`, `bar`, `kPa`, `Pa`, `mmHg` or `torr`, or
+  a bare number. A formula set in `\mathrm{...}` is read letter by letter as a variable
+  ("a q"), so keep the formula, its state and its condition inside `\ce`.
 - A reaction is one `\ce` for the whole line, coefficients in front of their species:
   `\ce{2 H2 + O2 -> 2 H2O}`. Arrows are `->`, `<-`, `<->`, and `<=>` for an equilibrium; a
   condition on an arrow goes in brackets: `\ce{CaCO3(s) ->[\Delta] CaO(s) + CO2(g)}`.
-- Nuclides: `\ce{^{14}_{6}C}`, `\ce{^{0}_{-1}e}`.
+  A gas or a precipitate mark printed after a species goes after a space:
+  `\ce{BaSO4 v}`, `\ce{CO2 ^}`.
+- Half-reactions: one `\ce` per reaction with its own arrow, and the label as `\text{...}`
+  beside it, not inside it: `\text{Anode: } \ce{Zn(s) -> Zn^2+(aq) + 2 e-}`. For labelled
+  rows, use an `array` with the label in the first column and the whole `\ce` in the second:
+  `\begin{array}{rl} \text{Anode:} & \ce{Zn(s) -> Zn^2+(aq) + 2 e-} \\
+  \text{Cathode:} & \ce{Cu^2+(aq) + 2 e- -> Cu(s)} \end{array}`. A potential printed beside
+  a reaction is maths: `\ce{Zn^2+(aq) + 2 e- -> Zn(s)}\quad E^\circ = -0.76\ \text{V}`.
+- A redox couple is two species with a slash: `E^\circ_{\ce{Cu^2+}/\ce{Cu}}` or
+  `E^\circ(\ce{Cu^2+}/\ce{Cu})`, one `\ce` per species. Cell notation puts each species in
+  its own `\ce` and the bars between them as maths:
+  `\ce{Zn(s)} \mid \ce{Zn^2+(aq, 1 M)} \parallel \ce{Cu^2+(aq, 1 M)} \mid \ce{Cu(s)}`.
+- Nuclides: `\ce{^{14}_{6}C}`, `\ce{^{0}_{-1}e}`; an excited nuclide carries its star:
+  `\ce{^{60}_{28}Ni^*}`.
 - A concentration keeps its brackets outside the `\ce`: `[\ce{H3O+}]`, and a script after
   the bracket goes outside too: `[\ce{NH3}]^2`. A generic letter that is not an element
   (A, B, X) is not chemistry: `[A]_0`.
-- Whatever `\ce` cannot hold goes in ordinary LaTeX, with `\ce` only for the species inside
-  it: `K = \frac{[\ce{NH3}]^2}{[\ce{N2}][\ce{H2}]^3}`, `\text{rate} = k[\ce{NO}]^2`, and a
-  state symbol with a concentration, `\mathrm{Zn^{2+}(aq,\ 0.10\ M)}`. Never put `\text`,
-  `$` or other LaTeX commands inside `\ce`.
+- Quantities and expressions stay maths, with `\ce` only for the species inside them:
+  `K = \frac{[\ce{NH3}]^2}{[\ce{N2}][\ce{H2}]^3}`, `\text{rate} = k[\ce{NO}]^2`,
+  `\Delta H^\circ_\text{rxn} = -285.8\ \text{kJ/mol}`, `E^\circ_\text{cell}`. Inside `\ce`
+  write only species, coefficients, charges, states, arrows and marks: no `\text`, no `$`
+  and no other LaTeX commands.
 - Write only what is drawn: do not balance, complete or correct a reaction.
 
 ## Confidence
