@@ -10,6 +10,14 @@
   hostile page cannot stall a worker. Nothing in the pipeline calls it yet, so conversions are
   unchanged. What is read and the limits:
   [docs/layout.md](docs/layout.md), "Vector ink and strokes" (`tests/test_ink_strokes.py`).
+## Unreleased: finished steps are kept when a configuration error ends the run
+
+- When a configuration error (a model that is not set up) ended a conversion while other
+  steps were still being answered, those steps were not kept for "Try again" if the error
+  reached the scheduler first; they are now (`pipeline/run.py`, `_Run.collect`). The tests
+  for this and for the worker and child-process suites no longer depend on timing luck, and
+  the end-to-end content test renders from the stored result the way the review screen does
+  (page markers included).
 
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)
 
