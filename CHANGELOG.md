@@ -7,6 +7,14 @@
   Tectonic), `gold/course_corpus.py`, and the registration as an unsigned draft
   (`data/realworld/PREREGISTRATION-FRESH5.md`). `arxiv_gold.analyse` takes `min_equations` (default unchanged, 5).
   [docs/eval-realworld.md](docs/eval-realworld.md).
+### Monitoring and recovery
+
+- The daily backup keeps a dump only after it has been proved: gzip reads it back, it ends with pg_dump's completion line, it restores with errors fatal, every live table is in the restore and `alembic_version` matches. A failure prints `backup_failed reason=...`, removes the file and fails the run. The command is a readable bash script (`set -euo pipefail`) with tests (`tests/test_railway_backup_script.py`). `railway config apply` is needed to put it live.
+- Alerts without a new vendor: `ops_heartbeat` (migration `e1a7c3b95d24`), written by the backup and by `readablestem ops cron`; public content-free `GET /healthz/ops` (503 naming the late task); `uptime.yml` now checks `/readyz` every 5 minutes and `/healthz/ops` every 3 hours. GitHub disables scheduled workflows after 60 days with no commit to a public repository.
+- Erasing an account writes a content-free line to `erasure_ledger` (hash of the user id, time); `readablestem ops replay-erasures [--ledger-csv FILE]` erases again whatever a restored backup brought back.
+- Per-person daily spend: `quota_days.spent_usd`, shown by pseudonym on `/admin`.
+- The day's cap on new accounts logs `signup_cap_reached` once a day and shows a notice on `/admin`.
+- Database pool: 5 plus 5 connections per process (was 3 plus 2).
 
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 

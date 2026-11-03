@@ -250,7 +250,7 @@ def test_erasure_does_not_rely_on_the_database_cascading(tmp_path):
         erase_user(session, ids["user"])
     with engine.connect() as conn:
         for name in inspect(engine).get_table_names():
-            if name in {"error_aggregates", "spend_days"}:
+            if name in {"error_aggregates", "spend_days", "erasure_ledger"}:
                 continue
             count = conn.execute(select(func.count()).select_from(db.Base.metadata.tables[name]))
             assert count.scalar() == 0, name
