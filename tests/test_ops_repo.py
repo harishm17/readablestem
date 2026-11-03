@@ -54,7 +54,17 @@ def test_workflows_are_least_privilege_on_a_fixed_runner(path):
 
 def test_ci_runs_type_checks_and_the_marked_suites():
     jobs = workflow(ROOT / ".github" / "workflows" / "ci.yml")["jobs"]
-    assert {"lint-test", "secret-scan", "postgres", "browser", "docker", "eval-gate"} <= set(jobs)
+    assert {
+        "static",
+        "pytest",
+        "shard-coverage",
+        "ci-passed",
+        "secret-scan",
+        "postgres",
+        "browser",
+        "docker",
+        "eval-gate",
+    } <= set(jobs)
     runs = "\n".join(s.get("run", "") for job in jobs.values() for s in job["steps"])
     for command in (
         "uv run ty check src",
@@ -64,16 +74,17 @@ def test_ci_runs_type_checks_and_the_marked_suites():
         "docker build",
     ):
         assert command in runs
-    assert jobs["lint-test"]["strategy"]["matrix"]["python-version"] == ["3.12", "3.14"]
+    assert jobs["static"]["strategy"]["matrix"]["python-version"] == ["3.12", "3.14"]
 
 
-def test_lint_test_installs_what_the_type_check_imports():
+def test_ci_installs_what_the_type_check_imports():
     """`ty check src` resolves `playwright.sync_api` (eval/render.py, html_checks.py). Without
     the browser group it reports unresolved imports and the job fails on both legs."""
-    steps = workflow(ROOT / ".github" / "workflows" / "ci.yml")["jobs"]["lint-test"]["steps"]
-    install = next(s["run"] for s in steps if s.get("name") == "Install (locked)")
-    assert "--locked" in install
-    assert "--group browser" in install or "--all-groups" in install
+    jobs = workflow(ROOT / ".github" / "workflows" / "ci.yml")["jobs"]
+    for name in ("static", "pytest"):
+        install = next(s["run"] for s in jobs[name]["steps"] if s.get("name") == "Install (locked)")
+        assert "--locked" in install, name
+        assert "--group browser" in install or "--all-groups" in install, name
 
 
 @pytest.mark.parametrize("path", WORKFLOWS, ids=lambda p: p.name)
@@ -164,7 +175,7 @@ def test_dockerfile_builds_without_buildkit():
 
 
 def test_type_check_gate_is_green():
-    """CI's lint-test job fails on any ty diagnostic, warnings included."""
+    """CI's static job fails on any ty diagnostic, warnings included."""
     ty = shutil.which("ty")
     if ty is None:
         pytest.skip("ty is not installed (dev group)")
@@ -210,3 +221,59 @@ def test_ci_does_not_turn_no_tests_collected_into_a_pass_and_audits_the_lock():
     assert jobs["postgres"]["services"]["postgres"]["image"] == "postgres:18"
     audit = "\n".join(s.get("run", "") for s in jobs["dependency-audit"]["steps"])
     assert "uv export" in audit and "pip-audit" in audit
+
+
+CI = ROOT / ".github" / "workflows" / "ci.yml"
+
+
+def test_pull_request_runs_are_cancelled_when_superseded_but_main_runs_are_not():
+    """Every workflow that runs on pull requests and on main cancels only the pull request
+    runs, so each main commit keeps its result."""
+    for path in WORKFLOWS:
+        group = workflow(path).get("concurrency")
+        if group is None or path.name == "eval-guard.yml":  # eval-guard is pull-request only
+            continue
+        cancel = group["cancel-in-progress"]
+        assert cancel in (False, "${{ github.event_name == 'pull_request' }}"), path.name
+    assert workflow(CI)["concurrency"] == {
+        "group": "ci-${{ github.workflow }}-${{ github.ref }}",
+        "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
+    }
+
+
+def test_python_314_runs_in_full_on_main_nightly_and_dependency_changes():
+    """docs/development.md ("CI") states the rule; the plan step is where it lives."""
+    data = workflow(CI)
+    assert "schedule" in data[True]  # PyYAML reads the key `on` as True
+    assert data[True]["push"]["branches"] == ["main"]
+    plan = next(s["run"] for s in data["jobs"]["changes"]["steps"] if s.get("id") == "plan")
+    for name in ("pyproject", "uv", ".python-version", "ci"):
+        assert name in plan
+    assert "full=true" in plan and "full=false" in plan
+    assert 'if [ "$EVENT" = "pull_request" ]' in plan  # every other event runs in full
+    matrix = data["jobs"]["pytest"]["strategy"]["matrix"]
+    assert matrix == "${{ fromJSON(needs.changes.outputs.matrix) }}"
+
+
+def test_every_shard_runs_and_the_union_is_checked():
+    data = workflow(CI)
+    run = next(s["run"] for s in data["jobs"]["pytest"]["steps"] if "pytest" in s.get("run", ""))
+    assert '--shard "$SHARD"' in run and "--shard-report" in run
+    assert (
+        data["jobs"]["changes"]["env"]["SHARDS"] == data["jobs"]["shard-coverage"]["env"]["SHARDS"]
+    )
+    runs = "\n".join(s.get("run", "") for s in data["jobs"]["shard-coverage"]["steps"])
+    assert "scripts/check_shards.py" in runs
+
+
+def test_ci_passed_waits_for_every_other_job():
+    jobs = workflow(CI)["jobs"]
+    assert set(jobs["ci-passed"]["needs"]) == set(jobs) - {"ci-passed"}
+
+
+def test_browser_job_caches_what_it_downloads_and_runs_in_parallel():
+    steps = workflow(CI)["jobs"]["browser"]["steps"]
+    cached = {s["with"]["path"] for s in steps if s.get("uses", "").startswith("actions/cache@")}
+    assert {"~/.cache/ms-playwright", ".cache/axe-core"} <= cached
+    run = next(s["run"] for s in steps if "pytest -m browser" in s.get("run", ""))
+    assert "-n 3" in run and "--dist loadfile" in run

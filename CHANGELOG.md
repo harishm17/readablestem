@@ -12,6 +12,17 @@
   accounting and the database writes are as before. Results are unchanged
   (`tests/test_web_isolated_convert.py`). `PRELOAD_TABLE_MODELS` no longer loads models in the web
   process. Details and measurements: [docs/web.md](docs/web.md), "The conversion runs in a child process".
+## Unreleased: faster CI
+
+- The pytest job is split into four shards balanced by recorded durations (`--shard i/4`,
+  `tests/shard_durations.json`), with a check that every test ran in exactly one shard. Python
+  3.14 runs the full suite on main, nightly and on dependency or workflow changes, and a smoke
+  (ruff, ty, import of every module, one shard in eight) on other pull requests. The browser job
+  runs with three xdist workers and caches Chromium and axe-core; the axe-core download is written
+  atomically. Pull request runs cancel when superseded, main runs do not. Job names changed:
+  `ruff + ty + pytest (Python 3.x)` is now `ruff + ty (Python 3.x)` plus `pytest (...)` shards; a
+  `CI passed` job summarises them. See [docs/development.md](docs/development.md), "CI".
+
 ## Unreleased: dependency and CI hardening
 
 - Locked dependencies upgraded for known advisories: pillow 12.3.0 to 13.0.0 (floor now `>=13.0`),
