@@ -161,6 +161,7 @@ production if a required one is missing, and logs the reason):
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | Defaults 24 hours and 30 days. | Leave unset. If you set them, the cron service needs the same values (reference the web service's). |
 | `CLAUDE_CANARY` | Daily drift check of the Claude second check. Only the HTTP cron route runs it, so with the cron service it never runs and this variable does nothing. | Leave unset. |
 | `INSTALL_LIBREOFFICE` | Build argument, see decision 4. | Unset. |
+| `INSTALL_LATEXML` | Build argument: adds LaTeXML, TeX Live's base and ImageMagick (about 270 MB; see "LaTeXML" below). Needed for LaTeX source uploads, which also need the sandbox to pass `readablestem ops sandbox-probe` on this image. Declared on `web` in `.railway/railway.ts` so that `railway config apply` keeps it. | Unset until the probe has passed. |
 | `INSTALL_MATH_READER` | Build argument: adds the local handwriting reader's model files (0.6 GB; `docs/math-readers.md`, "The local reader"). Only `IMAGE_PAGES_SECOND_READER=local` makes the pipeline call it, and both it and `MATH_READER_LOCAL_ENABLED` are off. With it, allow 2 GB of memory. | Unset. |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | How long Railway waits between SIGTERM and SIGKILL for the old deployment (its documented default is 0). The worker stops claiming at once on SIGTERM and gives its running job back; uvicorn waits up to 5 s for open connections, then the worker stop up to 3 s. | `10`, set as `deploy.drainingSeconds` on `web` in `.railway/railway.ts` |
 | `TRACING_ENABLED` and the Langfuse keys | Off. | Leave off. |
@@ -449,6 +450,24 @@ with `ARG`. So setting the service variable `INSTALL_LIBREOFFICE=true` and redep
 LibreOffice Writer and Impress. Check the build log for the `apt-get install` step, and that the
 upload form then offers Word and PowerPoint. Unset it to go back. (On Cloud Run this needed a code
 change because `gcloud builds submit --tag` cannot pass build arguments.)
+
+**LaTeXML.** The Dockerfile declares `ARG INSTALL_LATEXML=false` in its final stage. Setting the
+service variable `INSTALL_LATEXML=true` (declared in `railway.ts`, so an apply keeps it) and
+redeploying installs the distribution's `latexml` package (0.8.8) with `--no-install-recommends`; it
+depends on TeX Live's base (`texlive-latex-base`), ImageMagick and their Perl bindings. Right after
+the install the build replaces ImageMagick's `policy.xml` with `src/readablestem/source/imagemagick-policy.xml`:
+nothing is allowed except PNG, JPEG and GIF, and PS, EPS, PDF, XPS, URL, HTTP(S), FTP, MVG, MSL, TEXT,
+LABEL, SVG and `@file` paths are named as denied. The build fails if no policy file was replaced or
+`identify -list policy` does not show the PDF denial. **Size:** measured with `podman build` of the
+same `apt-get` steps on the pinned `python:3.12-slim-trixie` (pandoc already in it): 324.3 MB before,
+594.4 MB after (+270.1 MB, one layer of 270 MB; the plan's estimate of 0.6 GB was too high for this
+base). The first Railway build prints the real image size; write it here. Check the build log for the
+two `LaTeXML version 0.8.8` lines and the `1` printed by the policy check. Nothing in the app uses
+LaTeXML until the LaTeX-source switch (`FEATURE_LATEX_SOURCE`) is on, and that switch stays off
+until `readablestem ops sandbox-probe --require-latexml` prints PASS on the deployed image
+(docs/operations.md, "Sandbox probe"). CI builds the image with the argument once and checks the
+versions and the policy (job `docker build (no push)`); the sandbox itself cannot be probed inside CI's
+Docker, which does not allow user namespaces.
 
 **pandoc.** The Dockerfile installs pandoc from the distribution in every build (no build argument):
 it makes the Word download (docs/output.md, "The Word export"). It adds about 200 MB to the image (the
