@@ -388,3 +388,335 @@ def test_section_rank_depends_on_the_seed_only(sel):
     sections = [("physics", f"{i}-1-x") for i in range(10)]
     assert sel.order_sections(sections, "a") == sel.order_sections(reversed(sections), "a")
     assert sel.order_sections(sections, "a") != sel.order_sections(sections, "b")
+
+
+# ------------------------------------------------------------- stratum D: chemistry
+
+
+class FakeFetcher:
+    """Serves a CMS list and one archive book JSON per slug; no network."""
+
+    def __init__(self, books: dict[str, tuple[str, str]]):
+        self.books = books  # slug -> (licence name, licence url)
+
+    def get_json(self, url: str):
+        from readablestem.gold import openstax as ox
+
+        if url == ox.CMS_BOOKS_URL:
+            return {
+                "items": [
+                    {
+                        "title": slug,
+                        "meta": {"slug": slug},
+                        "cnx_id": f"uuid-{slug}",
+                        "book_state": "retired",
+                        "license_name": name,
+                        "license_url": link,
+                    }
+                    for slug, (name, link) in self.books.items()
+                ]
+            }
+        if url == ox.RELEASE_URL:
+            return {
+                "archiveUrl": "/apps/archive/20260604.144757",
+                "books": {f"uuid-{s}": {"defaultVersion": "v1"} for s in self.books},
+            }
+        slug = url.rsplit("uuid-", 1)[1].split("@", 1)[0]
+        name, link = self.books[slug]
+        return {"title": slug, "license": {"name": name, "url": link}, "tree": {}}
+
+
+CC_BY = ("Creative Commons Attribution License", "https://creativecommons.org/licenses/by/4.0/")
+CC_BY_NC_SA = (
+    "Creative Commons Attribution-NonCommercial-ShareAlike License",
+    "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+)
+
+
+def test_chemistry_licence_gate_takes_the_cc_by_editions_and_refuses_nc_sa():
+    from readablestem.gold import openstax as ox
+
+    fetcher = FakeFetcher(
+        {
+            "chemistry": CC_BY,
+            "chemistry-atoms-first": CC_BY,
+            "chemistry-2e": CC_BY_NC_SA,
+            "chemistry-atoms-first-2e": CC_BY_NC_SA,
+            "organic-chemistry": CC_BY_NC_SA,
+        }
+    )
+    passed, refused = [], []
+    for slug in fetcher.books:
+        book = ox.resolve_book(slug, fetcher)
+        try:
+            ox.check_public_license(book)
+            passed.append(slug)
+        except ox.LicenseError:
+            refused.append(slug)
+    assert passed == ["chemistry", "chemistry-atoms-first"]
+    assert refused == ["chemistry-2e", "chemistry-atoms-first-2e", "organic-chemistry"]
+
+
+def test_chemistry_licence_gate_refuses_a_cms_that_disagrees_with_the_archive():
+    from readablestem.gold import openstax as ox
+
+    fetcher = FakeFetcher({"chemistry": CC_BY})
+    book = ox.resolve_book("chemistry", fetcher)
+    book.cms_license_url = CC_BY_NC_SA[1]  # the CMS changed its mind after the archive was cut
+    with pytest.raises(ox.LicenseError):
+        ox.check_public_license(book)
+
+
+def _book(slug, licence, cms=None):
+    from readablestem.gold import openstax as ox
+
+    fetcher = FakeFetcher({slug: licence})
+    book = ox.resolve_book(slug, fetcher)
+    if cms is not None:
+        book.cms_license_url = cms
+    return book
+
+
+def test_licence_tier_public_private_and_refused(sel):
+    from readablestem.gold import openstax as ox
+
+    assert sel.licence_tier(_book("chemistry", CC_BY)) == "public"
+    for slug in ("chemistry-2e", "chemistry-atoms-first-2e", "organic-chemistry"):
+        assert sel.licence_tier(_book(slug, CC_BY_NC_SA)) == "private"
+    # an NC-SA book that is not on the allowed list, a CMS that disagrees, other NC licences
+    with pytest.raises(ox.LicenseError):
+        sel.licence_tier(_book("chemistry-other", CC_BY_NC_SA))
+    with pytest.raises(ox.LicenseError):
+        sel.licence_tier(_book("chemistry-2e", CC_BY_NC_SA, cms=CC_BY[1]))
+    nd = ("CC BY-NC-ND", "https://creativecommons.org/licenses/by-nc-nd/4.0/")
+    with pytest.raises(ox.LicenseError):
+        sel.licence_tier(_book("chemistry-2e", nd))
+    sa = ("CC BY-SA", "https://creativecommons.org/licenses/by-sa/4.0/")
+    with pytest.raises(ox.LicenseError):
+        sel.licence_tier(_book("chemistry-2e", sa))
+
+
+def test_public_sections_come_before_private_and_organic_last(sel):
+    sections = [
+        ("organic-chemistry", "1-1-a"),
+        ("chemistry-2e", "1-1-a"),
+        ("chemistry", "1-1-a"),
+        ("chemistry-atoms-first-2e", "1-1-b"),
+        ("chemistry-atoms-first", "1-1-b"),
+    ]
+    order = sel.order_d(sections)
+    books = [b for b, _ in order]
+    assert set(books[:2]) == {"chemistry", "chemistry-atoms-first"}
+    assert set(books[2:4]) == {"chemistry-2e", "chemistry-atoms-first-2e"}
+    assert books[4] == "organic-chemistry"
+
+
+def test_chemistry_walk_stops_when_enough_and_not_before(sel):
+    order = [("chemistry", f"{i}-1-s") for i in range(1, 9)]
+    got = sel.pick_chemistry(order, lambda b, s: None, target=8, done=lambda taken: len(taken) >= 3)
+    assert len(got) == 3
+    # `done` never true: the walk takes what passes, up to the cap, and no more
+    assert len(sel.pick_chemistry(order, lambda b, s: None, target=5, done=lambda t: False)) == 5
+
+
+def test_private_gold_refuses_a_folder_inside_the_repository(sel, tmp_path):
+    from readablestem.gold import openstax as ox
+
+    book = _book("chemistry-2e", CC_BY_NC_SA)
+    page = ox.PageRef(uuid="u", slug="1-1-x", title="1.1 X", chapter=1, section=1)
+    with pytest.raises(ValueError, match="inside the repository"):
+        sel.write_private_gold(book, page, [], sel.REPO / "data" / "gold-private")
+    path = sel.write_private_gold(book, page, [{"kind": "equation"}], tmp_path / "gold")
+    assert path.is_file()
+    attribution = (tmp_path / "gold" / "ATTRIBUTION.md").read_text(encoding="utf-8")
+    assert "CC BY-NC-SA" in attribution and "Not redistributed" in attribution
+
+
+def test_the_recorded_chemistry_selection_licences_and_gates():
+    import json
+
+    data = Path(__file__).resolve().parent.parent / "data" / "realworld"
+    selection = json.loads((data / "selection-fresh5-D.json").read_text(encoding="utf-8"))
+    sections = selection["sections"]
+    assert sections and sections[0]["licence_tier"] == "public"
+    for section in sections:
+        url = section["licence_url"].split("://")[1]
+        if section["licence_tier"] == "public":
+            assert url == "creativecommons.org/licenses/by/4.0/"
+            assert section["book"] in {"chemistry", "chemistry-atoms-first"}
+        else:
+            assert url == "creativecommons.org/licenses/by-nc-sa/4.0/"
+            assert section["book"] in {
+                "chemistry-2e",
+                "chemistry-atoms-first-2e",
+                "organic-chemistry",
+            }
+        assert section["pdf_pages"] <= 15
+        assert section["overlap_8gram"] <= 0.2
+        assert section["equations"] >= 25 and section["chemistry"] >= 0.4 * section["equations"]
+    assert selection["n_chemistry_equations"] >= 100
+    assert selection["n_chemistry_equations"] == sum(x["chemistry"] for x in sections)
+
+
+def test_nothing_non_commercial_lands_in_the_repository(sel):
+    """The selection file holds ids, counts and hashes only; the private gold and PDFs are in
+    the cache, which is outside the repository."""
+    import json
+
+    root = Path(__file__).resolve().parent.parent
+    selection = json.loads((root / "data/realworld/selection-fresh5-D.json").read_text("utf-8"))
+    allowed = {
+        "book", "book_title", "book_state", "section", "title", "licence", "licence_url",
+        "licence_tier", "archive_version", "book_version", "equations", "chemistry",
+        "lone_times", "overlap_8gram", "records_by_kind", "pdf_pages", "pdf_paper",
+        "pdf_sha256", "gold_sha256",
+    }  # fmt: skip
+    private = [x for x in selection["sections"] if x["licence_tier"] == "private"]
+    assert private, "the recorded selection has no private section to check"
+    for section in selection["sections"]:
+        assert set(section) <= allowed
+        for key, value in section.items():
+            if key == "records_by_kind":
+                assert all(isinstance(v, int) for v in value.values())
+            else:
+                assert isinstance(value, str | int | float | None) and len(str(value)) < 120
+    visit_keys = {"book", "section", "gate", "tier", "equations", "chemistry", "lone_times"}
+    visit_keys |= {"overlap_8gram", "records_by_kind", "pdf_pages"}
+    for visit in selection["visits"]:
+        assert set(visit) <= visit_keys
+    # the gold and PDFs go to the cache, outside the repository
+    assert root not in (sel.ROOT, *sel.ROOT.parents)
+    assert sel.REPO not in sel.ROOT.parents
+    # and no gold file or PDF of a private section is anywhere under the repository
+    names = {f"{x['book']}-{x['section']}.pdf" for x in private} | {
+        f"{x['section']}.jsonl" for x in private
+    }
+    for path in root.rglob("*"):
+        if ".git" in path.parts or ".venv" in path.parts or not path.is_file():
+            continue
+        assert path.name not in names, path
+
+
+def test_chemistry_order_is_seeded_and_ignores_input_order(sel):
+    import hashlib
+
+    sections = [("chemistry", f"{i}-1-a{i}") for i in range(1, 12)]
+    sections += [("chemistry-atoms-first", f"{i}-1-a{i}") for i in range(1, 12)]
+    first = sel.order_d(sections)
+    assert first == sel.order_d(list(reversed(sections)))
+    assert sel.rank_key_d("chemistry", "1-1-a1") != sel.rank_key_d(
+        "chemistry-atoms-first", "1-1-a1"
+    )
+    assert (
+        sel.rank_key_d("chemistry", "2-6-x")
+        == hashlib.sha256(b"fresh5-D|chemistry|2-6-x").hexdigest()
+    )
+    ranks = [sel.rank_key_d(*s) for s in first]
+    assert ranks == sorted(ranks)
+
+
+def test_chemistry_pick_walks_the_order_and_logs_failures_without_swapping(sel):
+    order = [("chemistry", f"{i}-1-s") for i in range(1, 9)]
+    failing = {"2-1-s": "overlap", "3-1-s": "equations"}
+    log: list[dict] = []
+    got = sel.pick_chemistry(order, lambda b, s: failing.get(s), target=3, log=log)
+    assert got == [("chemistry", "1-1-s"), ("chemistry", "4-1-s"), ("chemistry", "5-1-s")]
+    assert [v["gate"] for v in log] == ["pass", "overlap", "equations", "pass", "pass"]
+    # fewer eligible than the target: take what passes, do not fill up by choice
+    assert sel.pick_chemistry(order, lambda b, s: "pages", target=3) == []
+
+
+def test_chemistry_gate_names_the_first_failed_rule(sel):
+    ok = {"equations": 30, "chemistry": 20, "lone_times": 3}
+    assert sel.chemistry_gate(ok, 0.05, 10) is None
+    assert sel.chemistry_gate({**ok, "equations": 24}, 0.0) == "equations"
+    assert sel.chemistry_gate({**ok, "chemistry": 11}, 0.0) == "chemistry_share"
+    assert sel.chemistry_gate({**ok, "chemistry": 12}, 0.0) is None  # 40% of 30
+    assert sel.chemistry_gate(ok, 0.2001) == "overlap"
+    assert sel.chemistry_gate(ok, 0.2) is None
+    assert sel.chemistry_gate(ok, 0.0, 16) == "pages"
+    assert sel.chemistry_gate(ok, 0.0, 15) is None
+
+
+def test_chemistry_topics_and_overlap(sel):
+    assert sel.topic_hit("17-2-galvanic-cells") == "galvanic"
+    assert sel.topic_hit("4-1-writing-and-balancing-chemical-equations") == "balanc"
+    assert sel.topic_hit("7-3-lewis-symbols-and-structures") == "lewis"
+    assert sel.topic_hit("2-6-molecular-and-ionic-compounds") is None
+    words = list("abcdefghij")
+    reference = {tuple(words[i : i + 8]) for i in range(len(words) - 7)}
+    assert sel.overlap_share(words, reference) == 1.0
+    assert sel.overlap_share(list("qrstuvwxyz"), reference) == 0.0
+    assert sel.overlap_share(list("abcdefghxy"), reference) == pytest.approx(1 / 3)
+
+
+def test_the_sealed_check_part_is_a_superset_by_the_registered_hash_rule(sel):
+    from readablestem.gold import devset
+    from readablestem.gold import openstax as ox
+
+    tree = {
+        "contents": [
+            {"id": f"u{i}@1", "slug": f"{i}-1-s{i}", "title": f"<span>{i}.1</span> S{i}"}
+            for i in range(1, 61)
+        ]
+    }
+    book = ox.Book(
+        slug="chemistry-atoms-first",
+        title="t",
+        uuid="u",
+        version="v",
+        archive_path="/apps/archive/x",
+        state="retired",
+        license_name=None,
+        license_url=None,
+        cms_license_name=None,
+        cms_license_url=None,
+        tree=tree,
+    )
+    pages = [p for p in ox.iter_pages(book.tree) if p.section is not None]
+    sealed = sel.sealed_check_sections({"chemistry-atoms-first": book}, "salt")
+    assert sealed == {
+        ("chemistry-atoms-first", p.slug)
+        for p in pages
+        if devset.hash_fraction("salt", f"chemistry-atoms-first/{p.slug}") < devset.CHECK_SHARE
+    }
+
+
+# the chemistry test: arrows, state symbols, formulas and ions, not a lone variable or sign
+M = '<math xmlns="http://www.w3.org/1998/Math/MathML">{}</math>'
+
+
+@pytest.mark.parametrize(
+    ("body", "chem"),
+    [
+        ("<mi>x</mi><mo>=</mo><mn>2</mn>", False),
+        ("<mi>K</mi><mo>=</mo><mn>3</mn>", False),
+        ("<msub><mtext>H</mtext><mn>2</mn></msub><mtext>O</mtext>", True),
+        ("<mtext>NaCl</mtext>", True),
+        ("<msup><mtext>Cu</mtext><mrow><mn>2</mn><mo>+</mo></mrow></msup>", True),
+        ("<mtext>C</mtext><mo>→</mo><mtext>D</mtext>", True),
+    ],
+)
+def test_chemistry_equation_tells_chemistry_from_plain_maths(sel, body, chem):
+    assert sel.chemistry_equation(M.format(body)) is chem
+
+
+def test_the_lone_multiplication_sign_is_not_counted(sel):
+    times = M.format("<mo>\u00d7</mo>")
+    salt = M.format("<mtext>NaCl</mtext>")
+    assert sel.chemistry_counts([times, salt, times]) == {
+        "equations": 1,
+        "chemistry": 1,
+        "lone_times": 2,
+    }
+
+
+def test_selection_scan_skips_the_named_selection_files(sel, tmp_path):
+    (tmp_path / "data").mkdir()
+    (tmp_path / "proof").mkdir()
+    (tmp_path / "data" / "selection-fresh5-D.json").write_text('"openstax/chemistry/2-6-x"')
+    (tmp_path / "data" / "other.json").write_text('"openstax/chemistry/3-1-y"')
+    used: set[tuple[str, str]] = set()
+    for path in sel.iter_scanned(tmp_path, sel.SELECTION_FILES):
+        used |= sel.used_from_text(path.read_text())
+    assert used == {("chemistry", "3-1-y")}
