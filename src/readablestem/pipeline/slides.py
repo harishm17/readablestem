@@ -64,6 +64,16 @@ class RowView:
 
 
 @dataclass(frozen=True)
+class Mark:
+    """A picture or a drawing on a slide: what it is (`kind`: "image" or "drawing"), a digest of
+    its content or shape and colour (`key`), and where it is."""
+
+    kind: str
+    key: str
+    bbox: BBox
+
+
+@dataclass(frozen=True)
 class PageView:
     """What `detect` needs to know of one page."""
 
@@ -72,7 +82,7 @@ class PageView:
     height: float
     label: str | None  # the page label the PDF gives it, if any
     rows: Sequence[RowView]
-    pictures: frozenset[int] = frozenset()  # xrefs of the images on it
+    marks: Sequence[Mark] = ()  # every image, and the drawings in the body of the slide
 
 
 @dataclass(frozen=True)
@@ -89,6 +99,8 @@ class Deck:
     beamer: bool
     # Dropped page -> the last page of its frame, which holds everything it had.
     dropped: dict[int, int] = field(default_factory=dict)
+    # Each page's label, for the slide numbers that are furniture.
+    labels: dict[int, str] = field(default_factory=dict)
     # Kept page -> (its place among the frame's kept pages, how many) when there are several.
     steps: dict[int, tuple[int, int]] = field(default_factory=dict)
     titles: dict[int, Title] = field(default_factory=dict)
@@ -112,6 +124,51 @@ def slide_shaped(width: float, height: float) -> bool:
 
 def _norm(text: str) -> str:
     return "".join(text.split())
+
+
+ROW_SHIFT = 0.1  # share of the page a row may move between steps and still be the same row
+MARK_SHIFT = 3.0  # pt a picture or drawing may move between steps
+
+
+def _order(rows: Sequence[RowView]) -> list[RowView]:
+    return sorted(rows, key=lambda r: (round(r.bbox[1] / 4), r.bbox[0]))
+
+
+def _repeats(step: PageView, last: PageView) -> bool:
+    """Everything on `step` is on `last`: each row of it is a whole row of `last` (the same
+    text exactly, in the same order, about where it was), and each picture and drawing is on
+    `last` (the same content, about where it was). A row that is only part of a longer one
+    ("a" in "Example: b"), a number inside another ("5" in "x=15") or a reordering is not."""
+    if not step.rows:
+        return False
+    rows = _order(last.rows)
+    at = 0
+    for row in _order(step.rows):
+        text = _norm(row.text)
+        while at < len(rows) and not (
+            _norm(rows[at].text) == text
+            and abs(rows[at].bbox[1] - row.bbox[1]) <= ROW_SHIFT * step.height
+            and abs(rows[at].bbox[0] - row.bbox[0]) <= ROW_SHIFT * step.width
+        ):
+            at += 1
+        if at == len(rows):
+            return False
+        at += 1
+    free = list(last.marks)
+    for mark in step.marks:
+        for i, other in enumerate(free):
+            if (
+                other.kind == mark.kind
+                and other.key == mark.key
+                and all(
+                    abs(a - b) <= MARK_SHIFT for a, b in zip(other.bbox, mark.bbox, strict=True)
+                )
+            ):
+                del free[i]
+                break
+        else:
+            return False
+    return True
 
 
 def _frames(views: Sequence[PageView], titles: dict[int, Title]) -> list[list[PageView]]:
@@ -176,19 +233,21 @@ def detect(creator: str | None, views: Sequence[PageView]) -> Deck | None:
     titles = {v.number: t for v in views if (t := _title(v, body)) is not None}
     frames = _frames(views, titles)
     overlaid = any(len(frame) > 1 for frame in frames)
-    if not beamer and not (overlaid and any(v.label for v in views)):
+    # Not Beamer: the pages must have at least two different labels, and the labels must group
+    # some pages and not all (a label tree with a prefix and no numbers labels every page alike).
+    labelled = len({v.label for v in views if v.label}) >= 2 and len(frames) >= 2
+    if not beamer and not (overlaid and labelled):
         return None
-    deck = Deck(beamer=beamer, frames=[tuple(v.number for v in frame) for frame in frames])
+    deck = Deck(
+        beamer=beamer,
+        frames=[tuple(v.number for v in frame) for frame in frames],
+        labels={v.number: v.label for v in views if v.label},
+    )
     for frame in frames:
         last = frame[-1]
-        held = _norm("".join(row.text for row in last.rows))
         kept = [last]
         for view in frame[:-1]:
-            if (
-                view.rows
-                and view.pictures <= last.pictures
-                and all(_norm(row.text) in held for row in view.rows)
-            ):
+            if _repeats(view, last):
                 deck.dropped[view.number] = last.number
             else:
                 kept.insert(len(kept) - 1, view)
@@ -224,6 +283,42 @@ def _is_title(element: Element, title: Title) -> bool:
     return _inside(title.bbox, element.bbox) >= 0.5 and tall <= 3 * (title.bbox[3] - title.bbox[1])
 
 
+def _place(e: Element) -> tuple[int, int]:
+    """Where a number stands, to 6 pt: its left edge and whether it is in the top or the bottom."""
+    return round(e.bbox[0] / 6), round(e.bbox[1] / 6)
+
+
+def _number_places(
+    elements: list[Element], sizes: dict[int, tuple[float, float]]
+) -> dict[tuple[int, int], int]:
+    """How many pages have a bare number paragraph in each place near the top or bottom."""
+    pages: dict[tuple[int, int], set[int]] = {}
+    for e in elements:
+        height = sizes.get(e.page, (0.0, 0.0))[1]
+        if (
+            e.kind == Kind.PARAGRAPH
+            and height
+            and _SLIDE_NUMBER.match((e.text or "").strip())
+            and (e.bbox[3] <= NUMBER_BAND * height or e.bbox[1] >= (1 - NUMBER_BAND) * height)
+        ):
+            pages.setdefault(_place(e), set()).add(e.page)
+    return {place: len(found) for place, found in pages.items()}
+
+
+def _is_slide_number(
+    e: Element, deck: Deck, places: dict[tuple[int, int], int], total: int
+) -> bool:
+    """A bare number near an edge is furniture when it is the page's own number ("3" or "3 / 20"
+    on the slide labelled 3) or when most pages carry a number in that very place. Any other
+    number there ("2" over a figure's axis) is content."""
+    label = deck.labels.get(e.page)
+    first = re.match(r"\s*(\d+)", e.text or "")
+    if label and first and label.lstrip("0") == first.group(1).lstrip("0"):
+        return True
+    count = places.get(_place(e), 0)
+    return count >= 2 and 2 * count > total
+
+
 def finish(
     elements: list[Element],
     deck: Deck,
@@ -247,13 +342,14 @@ def finish(
         and (t := deck.titles.get(e.page)) is not None
         and _is_title(e, t)
     }
+    numbered = _number_places(elements, sizes)
     for e in elements:
         title = deck.titles.get(e.page)
         width, height = sizes.get(e.page, (0.0, 0.0))
         text = (e.text or "").strip()
         if e.kind == Kind.PARAGRAPH and height and _SLIDE_NUMBER.match(text):
             near = e.bbox[3] <= NUMBER_BAND * height or e.bbox[1] >= (1 - NUMBER_BAND) * height
-            if near:
+            if near and _is_slide_number(e, deck, numbered, len(sizes)):
                 gone.add(e.id)
                 continue
         if title is None or e.kind not in (Kind.PARAGRAPH, Kind.FIGURE, Kind.HEADING):

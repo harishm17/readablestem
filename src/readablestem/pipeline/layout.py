@@ -9441,7 +9441,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any
             # strokes must not stay in memory as objects.
             height = doc[number].rect.height
             paths[number] = [p for p in paths[number] if _box_zone(p.bbox, height) is not None]
-    deck = _read_deck(doc, selected, frags, types)
+    deck = _read_deck(doc, selected, frags, types, paths)
     global _SLIDE_DECK
     _SLIDE_DECK = deck is not None
     if deck is not None and deck.dropped:
@@ -9587,6 +9587,7 @@ def _read_deck(
     selected: list[int],
     frags: dict[int, list[_Row]],
     types: dict[int, page_type.PageTypeResult],
+    paths: dict[int, list[_Path]],
 ) -> slides.Deck | None:
     """The slide deck the selected pages make up (`slides.detect`), or None. A page kept whole
     as its image is shown to it with no text, so it is never taken for an earlier step."""
@@ -9611,11 +9612,41 @@ def _read_deck(
                 rect.height,
                 page_labels.pdf_label(page),
                 rows,
-                frozenset(_page_pictures(page)),
+                _slide_marks(page, paths.get(number, []), rect.height),
             )
         )
     creator = doc.metadata.get("creator") if doc.metadata else None
     return slides.detect(creator, views)
+
+
+def _slide_marks(page: pymupdf.Page, paths: list[_Path], height: float) -> list[slides.Mark]:
+    """Every raster image on the slide (by a digest of its pixels) and every vector drawing
+    in its body (by its kind, colour and size), for the test that a step's pictures are all on
+    the frame's last page. The headline and the footline are left out: they are the margin
+    filter's and `slides.finish`'s."""
+    marks: list[slides.Mark] = []
+    display = _Display.of(page)
+    for info in page.get_image_info(hashes=True):
+        if info["bbox"][2] - info["bbox"][0] <= 0 or info["bbox"][3] - info["bbox"][1] <= 0:
+            continue  # an image with no area shows nothing (an overlay's hidden item)
+        digest = info.get("digest")
+        key = (
+            digest.hex()
+            if isinstance(digest, bytes)
+            else f"{info.get('width')}x{info.get('height')}"
+        )
+        marks.append(slides.Mark("image", key, display.box(info["bbox"])))
+    for path in paths:
+        centre = (path.bbox[1] + path.bbox[3]) / 2
+        if 0.2 * height <= centre <= (1 - NUMBER_BODY_BAND) * height:
+            key = f"{path.kind}{int(path.curved)}{int(path.filled)}" + "".join(
+                f"{round(c, 2)}" for c in path.colour
+            )
+            marks.append(slides.Mark("drawing", key, path.bbox))
+    return marks
+
+
+NUMBER_BODY_BAND = 0.12  # the footline's share of a slide, left out of the drawings compared
 
 
 def _kept_whole(kind: page_type.PageTypeResult) -> bool:

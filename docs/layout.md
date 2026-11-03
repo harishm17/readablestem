@@ -642,23 +642,29 @@ after the page rows are read, before the margin filter) shows `slides.detect` ev
 page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
 
 - **Detect.** At least 80 % of the pages are slide-shaped (landscape 4:3, 16:9 or 16:10, within
-  2 %; a landscape Letter or A4 sheet is not), and either `/Creator` says Beamer or the file has
-  consecutive pages that share a page label. Anything else is read as before (`_SLIDE_DECK`
-  False: no rule below applies). A page kept whole as its image (a photographed slide) has no
-  text, is never dropped, and never makes the pages beside it a frame.
+  2 %; a landscape Letter or A4 sheet is not), and either `/Creator` says Beamer or, for any other
+  file, the pages have at least two different labels and the labels group some pages and not all
+  (a label tree with a prefix and no numbers labels every page alike and is not evidence). Anything
+  else is read as before (`_SLIDE_DECK` False: no rule below applies). A page kept whole as its
+  image (a photographed slide) has no text, is never dropped, and never makes the pages beside it a
+  frame.
 - **Frames.** Consecutive pages with the same label are one frame (hyperref gives every overlay
   step of a Beamer frame its number); without labels, the same title text. The labels are read
   by `page_labels.pdf_label`, which decodes the UTF-16 form PyMuPDF returns for xdvipdfmx files
   (`<FEFF0031>`): `clean_label` refused it, so no Tectonic deck's own labels were used before
   (the page markers fell back to the number printed in the footline).
-- **Overlay steps.** A page of a frame is dropped when every row on it (compared with spaces
-  removed, as a substring of the last page's text, so a line that wraps differently still
-  counts) and every big picture is also on the frame's last page: `\pause`, `\item<n->` and
-  `\uncover` only add, so the last page has it all and no line is lost. A dropped page is removed
+- **Overlay steps.** A page of a frame is dropped only when everything on it is on the frame's
+  last page (`slides._repeats`): each row is a whole row there (the same text exactly, not a part
+  of a longer row), the rows are in the same order and within 10 % of the page of where they were,
+  and every picture and drawing is there too. Pictures are every raster image (a digest of its
+  pixels, `get_image_info(hashes=True)`, empty ones skipped) and the vector drawings in the body
+  (kind, colour and box; the top fifth and bottom 12 % are the headline and footline), each within
+  3 pt of where it was. So `\pause`, `\item<n->` and `\uncover`, which only add, collapse, and a
+  step with a different picture, a changed row or a reordering stays. A dropped page is removed
   before margins, page types, tables and rows are read, so it costs no crop and no model call, and
   it is not in `Layout.pages`, `page_sizes` or `page_types` (as if the user had not selected it).
-  A page that has something the last page lacks (`\only<1>{A}\only<2>{B}`) stays, and the
-  kept pages of the frame are numbered: the title heading says "(step 1 of 2)". Measured on the
+  A page that has something the last page lacks (`\only<1>{A}\only<2>{B}`) stays, and the kept
+  pages of the frame are numbered: the title heading says "(step 1 of 2)". Measured on the
   fixtures: `beamer_overlay` 6 pages to 2 (67 % fewer), `slides_steps` 13 to 6 (54 % fewer).
 - **Frame titles.** A page's title is its largest text in the top third, at least 1.15 x the
   deck's body size. It is always a heading (reason `slide_title`, plus `larger font` so the
@@ -672,7 +678,8 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
 - **Furniture.** After the blocks are made, `slides.finish` drops, with their inline equations:
   paragraphs above the title that are at most 0.8 x its size, in the top fifth (the headline's
   section and subsection names); a drawn bar across the page (at least 60 % of the width, at most
-  18 % of the height, in the top fifth); and a number or "3 / 20" alone in the top or bottom 12 %.
+  18 % of the height, in the top fifth); and a bare number or "3 / 20" in the top or bottom 12 % that is furniture: the page's own label
+  ("3" on slide 3) or a number in the same place on most slides. Any other number there is content.
   The footline text, the navigation symbols and other repeated bands are the margin filter's, as
   before. The headline's text is kept on `Deck.context` (page to names, top to bottom) and is not
   in the output.

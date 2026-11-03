@@ -75,9 +75,9 @@ def view(
     label: str | None = None,
     *,
     size: tuple[float, float] = (363.0, 272.0),
-    pictures: frozenset[int] = frozenset(),
+    marks: list[slides.Mark] | None = None,
 ) -> slides.PageView:
-    return slides.PageView(number, size[0], size[1], label, rows, pictures)
+    return slides.PageView(number, size[0], size[1], label, rows, marks or [])
 
 
 def title_row(text: str) -> slides.RowView:
@@ -139,7 +139,12 @@ def test_a_step_with_text_the_last_page_lacks_is_kept_as_a_step():
 
 def test_a_page_with_a_picture_the_last_page_lacks_is_kept():
     views = [
-        view(0, [title_row("Plot"), row("text")], "1", pictures=frozenset({7})),
+        view(
+            0,
+            [title_row("Plot"), row("text")],
+            "1",
+            marks=[slides.Mark("image", "red", (100, 160, 400, 360))],
+        ),
         view(1, [title_row("Plot"), row("text")], "1"),
         view(2, [title_row("Next"), row("x")], "2"),
     ]
@@ -175,10 +180,61 @@ def test_without_page_labels_the_same_title_makes_a_frame():
     assert deck is not None and deck.dropped == {0: 1}
 
 
-def test_a_line_may_wrap_differently_and_still_be_on_the_last_page():
+def test_a_row_that_is_only_part_of_a_row_of_the_last_page_is_not_on_it():
+    """Whole rows, not substrings: "a" is not in "Example: b", "5" is not in "x=15"."""
+    for step_text, last_text in (("a", "Example: b"), ("5", "x=15"), ("a b c", "a b")):
+        views = [
+            view(0, [title_row("Frame"), row(step_text)], "1"),
+            view(1, [title_row("Frame"), row(last_text)], "1"),
+            view(2, [title_row("Next"), row("x")], "2"),
+        ]
+        deck = slides.detect("LaTeX with Beamer class", views)
+        assert deck is not None and deck.dropped == {}, (step_text, last_text)
+
+
+def test_the_same_rows_in_another_order_are_not_the_same_slide():
+    alpha, beta = row("Alpha", 100), row("Beta", 140)
+    swapped_alpha, swapped_beta = row("Alpha", 140), row("Beta", 100)
     views = [
-        view(0, [title_row("Frame"), row("a b c")], "1"),
-        view(1, [title_row("Frame"), row("a b"), row("c", 112)], "1"),
+        view(0, [title_row("Frame"), alpha, beta], "1"),
+        view(1, [title_row("Frame"), swapped_alpha, swapped_beta], "1"),
+        view(2, [title_row("Next"), row("x")], "2"),
+    ]
+    deck = slides.detect("LaTeX with Beamer class", views)
+    assert deck is not None and deck.dropped == {}
+
+
+def test_a_row_that_moved_across_the_slide_is_not_the_same_row():
+    views = [
+        view(0, [title_row("Frame"), row("a fact", 100)], "1"),
+        view(1, [title_row("Frame"), row("a fact", 220)], "1"),
+        view(2, [title_row("Next"), row("x")], "2"),
+    ]
+    deck = slides.detect("LaTeX with Beamer class", views)
+    assert deck is not None and deck.dropped == {}
+
+
+def test_a_picture_or_drawing_the_last_page_lacks_keeps_the_step():
+    red = slides.Mark("image", "red", (100, 160, 400, 360))
+    blue = slides.Mark("image", "blue", (100, 160, 400, 360))
+    box = slides.Mark("drawing", "shape10", (50, 150, 90, 190))
+    for first, last in (([red], [blue]), ([box], []), ([red], [red, box])):
+        pair = [
+            view(0, [title_row("Frame"), row("same words")], "1", marks=first),
+            view(1, [title_row("Frame"), row("same words")], "1", marks=last),
+            view(2, [title_row("Next"), row("x")], "2"),
+        ]
+        deck = slides.detect("LaTeX with Beamer class", pair)
+        assert deck is not None
+        assert (deck.dropped == {0: 1}) == (first == [red] and last == [red, box]), (first, last)
+
+
+def test_a_picture_that_moved_a_little_is_the_same_picture():
+    here = slides.Mark("image", "red", (100, 160, 400, 360))
+    near = slides.Mark("image", "red", (101, 161, 401, 361))
+    views = [
+        view(0, [title_row("Frame"), row("same words")], "1", marks=[here]),
+        view(1, [title_row("Frame"), row("same words")], "1", marks=[near]),
         view(2, [title_row("Next"), row("x")], "2"),
     ]
     deck = slides.detect("LaTeX with Beamer class", views)
@@ -186,27 +242,31 @@ def test_a_line_may_wrap_differently_and_still_be_on_the_last_page():
 
 
 def test_files_that_are_not_decks_are_not_touched():
-    steps = [
-        [title_row("Frame"), row("one line of body text goes here")],
-        [
-            title_row("Frame"),
-            row("one line of body text goes here"),
-            row("two lines of body text go here too", 120),
-        ],
-    ]
+    one = [title_row("Frame"), row("one line of body text goes here")]
+    two = [*one, row("two lines of body text go here too", 120)]
+    other = [title_row("Next"), row("another slide with its own words")]
     paper = (792.0, 612.0)
+    pages = [one, two, other]
+    labels = ["1", "1", "2"]
     assert (
         slides.detect(
-            "LaTeX with Beamer class", [view(i, r, "1", size=paper) for i, r in enumerate(steps)]
+            "LaTeX with Beamer class",
+            [
+                view(i, r, lab, size=paper)
+                for i, (r, lab) in enumerate(zip(pages, labels, strict=True))
+            ],
         )
         is None
     )
-    assert slides.detect("pdfTeX", [view(i, r, "1") for i, r in enumerate(steps)]) is not None
-    # Slide-shaped, repeated labels, not Beamer: a deck (a PowerPoint export with steps)...
-    assert slides.detect(None, [view(i, r, "1") for i, r in enumerate(steps)]) is not None
-    # ... but with no repeated label and no Beamer there is nothing to say it is one.
-    assert slides.detect("Word", [view(0, steps[0], "1"), view(1, steps[1], "2")]) is None
-    assert slides.detect("Beamer", [view(0, steps[0])]) is None  # one page
+    # Slide-shaped, shared labels, not Beamer: a deck (a PowerPoint export with steps) ...
+    assert slides.detect(
+        None, [view(i, r, lab) for i, (r, lab) in enumerate(zip(pages, labels, strict=True))]
+    )
+    # ... but one label for every page (a prefix-only label tree) groups nothing ...
+    assert slides.detect(None, [view(i, r, "A") for i, r in enumerate(pages)]) is None
+    # ... and with no shared label and no Beamer there is nothing to say it is one.
+    assert slides.detect("Word", [view(i, r, str(i)) for i, r in enumerate(pages)]) is None
+    assert slides.detect("Beamer", [view(0, one)]) is None  # one page
 
 
 def test_the_title_is_the_largest_text_in_the_top_third():
@@ -237,6 +297,7 @@ def test_finish_drops_the_headline_and_slide_numbers_and_makes_the_title_a_headi
         beamer=True,
         titles={0: slides.Title("Frame", (9.0, 22.0, 80.0, 36.0), 14.5)},
         steps={0: (1, 2)},
+        labels={0: "3"},
     )
     elements = [
         element("p1-e0", Kind.FIGURE, 0, (0, 2, 363, 39), "Waves"),  # a bar holding the title
@@ -548,3 +609,59 @@ def test_a_mark_drawn_over_a_letter_is_not_a_ligature():
         before = [dict(c) for c in line]
         layout._spread_ligatures(line, (1.0, 0.0))
         assert line == before, hex(ord(mark))
+
+
+def test_a_bare_number_at_the_edge_is_dropped_only_when_it_is_furniture():
+    deck = slides.Deck(beamer=True, labels={0: "3", 1: "4", 2: "5"})
+    sizes = {0: (363.0, 272.0), 1: (363.0, 272.0), 2: (363.0, 272.0)}
+
+    def number(page: int, text: str, x: float = 345.0, y: float = 262.0) -> Element:
+        return element(f"p{page + 1}-e9", Kind.PARAGRAPH, page, (x, y, x + 12, y + 8), text)
+
+    # the page's own number, alone or as "n / m": furniture
+    out = slides.finish([number(0, "3"), number(1, "4 / 20")], deck, sizes)
+    assert out == []
+    # another number near the bottom of one slide (a count in a figure): content
+    out = slides.finish([number(0, "7", x=100.0)], deck, sizes)
+    assert [e.text for e in out] == ["7"]
+    # the same place on most slides: furniture whatever it says
+    out = slides.finish([number(0, "9"), number(1, "9"), number(2, "9")], deck, sizes)
+    assert out == []
+
+
+def landscape_deck(
+    pictures: list[str], *, creator: str = "LaTeX with beamer class", labels: bool = True
+) -> bytes:
+    """Slides 720 x 405 with one title and sentence, and a coloured picture on each page."""
+    import io
+
+    from PIL import Image
+
+    doc = pymupdf.open()
+    for colour in pictures:
+        page = doc.new_page(width=720, height=405)
+        page.insert_text((50, 50), "Frame Title", fontsize=28)
+        page.insert_text((50, 120), "The plot below shows the result of the run", fontsize=14)
+        buffer = io.BytesIO()
+        Image.new("RGB", (200, 150), colour).save(buffer, "PNG")
+        page.insert_image(pymupdf.Rect(100, 160, 400, 360), stream=buffer.getvalue())
+    doc.set_metadata({"creator": creator})
+    if labels:
+        doc.set_page_labels([{"startpage": 0, "prefix": "A", "style": "", "firstpagenum": 1}])
+    return doc.tobytes()
+
+
+def test_a_step_with_another_picture_is_not_dropped_and_its_picture_is_kept():
+    result = analyze(landscape_deck(["red", "blue"]))
+    assert result.pages == [0, 1]
+
+
+def test_a_step_with_the_same_picture_is_dropped():
+    result = analyze(landscape_deck(["red", "red"]))
+    assert result.pages == [1]
+
+
+def test_a_constant_page_label_does_not_make_a_landscape_file_a_deck():
+    # One prefix and no numbers labels every page "A"; not Beamer: nothing says these are slides
+    result = analyze(landscape_deck(["red", "red"], creator="Word"))
+    assert result.pages == [0, 1]
