@@ -59,6 +59,7 @@ from readablestem.web.return_to import decision_link, remember_return, signed_ou
 from readablestem.web.routes import (
     account,
     admin,
+    bulk,
     bundle,
     courses,
     cron,
@@ -467,6 +468,7 @@ def create_app(
         jobs,
         parts,
         bundle,
+        bulk,
         sample,
         job_settings,
         split,

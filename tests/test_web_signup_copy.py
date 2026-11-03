@@ -31,6 +31,7 @@ PUBLIC_PAGES = (
     "/terms",
     "/limits",
     "/help/posting",
+    "/guides",
     "/guides/ada-title-ii-stem-course-materials",
     "/guides/readablestem-mathpix-latexml",
     "/status",
