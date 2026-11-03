@@ -73,6 +73,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `PER_USER_DAILY_PAGE_QUOTA` | Pages per invited user per UTC day (`quota_days`); open-tier accounts have `OPEN_TIER_DAILY_PAGE_QUOTA` instead |
 | `MAX_UPLOAD_MB`, `MAX_PAGES_PER_JOB`, `MAX_CONCURRENT_UPLOADS` | Upload limits (the last: uploads taken in at once per instance, one per user) |
 | `MAX_LARGE_UPLOAD_MB` (30), `MAX_SOURCE_PAGES` (300) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (30 was sized for Cloud Run's 32 MiB request limit; Railway documents none). Equal to the limits above, they turn the feature off: such files are refused |
+| `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project ("LaTeX source" below, ADR 0008). Off by default; needs the image built with `INSTALL_LATEXML` and a PASS from `readablestem ops sandbox-probe` |
 | `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
 | `FEATURE_IMAGE_PAGES`, `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE` ($0.25), `IMAGE_PAGES_MAX_USD_PER_JOB` ($7.50), `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`, `IMAGE_PAGES_OMISSION_CHECK` (default on), `IMAGE_PAGES_RECOVER_OMISSIONS` (default on), `IMAGE_PAGES_VECTOR_CROPS` (default off, unmeasured: on a handwritten page whose ink is vector, the pictures of expressions are drawn from the pen strokes) and `IMAGE_PAGES_VECTOR_CHECKS` (default on: a letter in the other case, a power lost, added or moved, and ink no block accounts for are flagged by comparing the reading with the strokes, docs/layout.md), `IMAGE_PAGES_SECOND_READING` (default off), `IMAGE_PAGES_ACCEPT_AGREED` (default off), `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED` (default on), `IMAGE_PAGES_SECOND_READER` (`off`, `local`, `claude`, `openai`; default `off`), `IMAGE_PAGES_SECOND_READER_TIME_S` (120) | Scanned and handwritten pages read from an image of the page (ADR 0007, "Scanned and handwritten pages on request" below); the omission check makes writing the reading left out a required decision, and the recovery reads such a stretch from a picture of just that part so it is converted instead; the second reading reads each `medium` block with a formula again from a picture of its line and records whether the two agree, and acceptance lets a block whose two readings agree, the second sure of every symbol, be an optional note (off: docs/eval-handwriting.md, "Root causes and fixes"); the last makes every block of a page read from an image that holds maths (a display equation, or a paragraph, list item or heading with a formula) a required decision whatever the reader's confidence (ADR 0007, point 12; typed pages and prose-only blocks are not affected); the second reader (`docs/math-readers.md`, "Using a reader in the pipeline") reads the crop of each handwritten display equation and compares it with the page's reading, so the review card can offer the differences as choices (it must also be enabled with its `MATH_READER_*_ENABLED`). The flag only offers the upload option; the model is the main one unless `IMAGE_PAGES_MODEL` says otherwise; a job that asked may spend `IMAGE_PAGES_USD_PER_PAGE` a page, at most `IMAGE_PAGES_MAX_USD_PER_JOB`, when that is more than `MAX_USD_PER_JOB` and `MAX_USD_PER_PAGE` allow |
@@ -535,6 +536,45 @@ that would send the whole file to be refused (UX review MF20). The same goes for
 person's daily page limit once no page is left ("You have converted all 20 pages you can
 today. Uploads open again at ..."); before that, the hint under the file field says how
 many pages are left and when the count starts again.
+
+### LaTeX source (`FEATURE_LATEX_SOURCE`, ADR 0008)
+
+With the switch on, the upload form also takes a `.tex` file or a `.zip` of a LaTeX project (the
+"Main file" field names the main file of a zip that has more than one). Not a PDF, so none of the
+PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
+
+- **Zip rules.** At most 20 MB zipped (the upload limit), 100 MB unpacked, 500 entries (folders
+  count), 50 MB a file, a member may expand at most 200 times (over 1 MB), depth 8. Refused:
+  absolute paths, `..`, drive letters, backslashes, control characters, a name used twice,
+  symlinks, devices, encrypted members, nested zips, EPS and SVG, and any extension off the
+  allowlist (`.tex .sty .cls .bib .bbl ...`, `.png .jpg .gif .pdf` for figures). Build leftovers
+  (`.aux`, `.log`, `__MACOSX`, ...) are skipped. A header that lies about its size is caught
+  while the bytes are read.
+- **Main file.** The `.tex` files with a document class and a document body that no other file
+  includes; one is the answer, several are narrowed by folder depth and a usual name (`main`,
+  `paper`, ...), else the person names it.
+- **Lint** (defence in depth, `source/lint.py`): `\write18` and its spellings, `\openout`, a
+  pipe in `\input`, `\directlua`, shell-escape packages, and a file argument that is absolute,
+  goes up, names a home folder or is a URL.
+- **Pages** (for the quota, counted at upload as an estimate): one per 3,000 characters of TeX or
+  per figure (`\includegraphics`, a `tikzpicture`), whichever is larger, at least 1; more than
+  `MAX_PAGES_PER_JOB` is refused. Beamer decks are refused ("Upload the compiled PDF") until their
+  switch (`source.intake.BEAMER_ENABLED`) is on.
+- **The job.** The upload is stored as an envelope (`source/envelope.py`, media type
+  `application/x-readablestem-tex` or `-zip`); the worker hands it to the converter like a PDF and
+  `pipeline.run.convert_pdf` passes it to `source.convert`, in the same conversion child
+  (`web/isolated_convert.py`). The child checks everything again, unpacks into a private temporary
+  folder, runs LaTeXML in the sandbox (`core/sandbox.py`, `source/latexml.py`; docs/security.md,
+  "Running uploaded TeX"), and `source/ltx_reader.py` turns its XHTML into elements: headings,
+  paragraphs, lists, tables, exact equations (LaTeXML's MathML through the sanitiser, accepted),
+  and figures with the project's own picture through the ordinary figure step. A formula
+  LaTeXML could not read, and a figure with no picture, are required decisions.
+- **Review.** A source has no pages to show, so its review is the list view; the split view
+  redirects to it. `DocumentResult.origin` is `latex`; the student note says "a LaTeX document".
+- **Failure.** A source that cannot be converted fails the job with `source_failed`,
+  `source_unreadable`, `source_refused`, `source_unavailable` or `timeout` and the message "Upload
+  the PDF instead"; nothing half-made is kept. If LaTeXML or the sandbox is missing, the upload
+  itself is refused at once.
 
 ### Several files in one upload
 

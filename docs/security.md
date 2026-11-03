@@ -168,6 +168,7 @@ script injected into an app page is refused by the policy.
 | Uploads in progress | 3 per instance, 1 per person | `UploadGate` |
 | Files in one upload | 10; the request, files together, at most `MAX_LARGE_UPLOAD_MB` (30); each file after the first counts as an upload for `upload_user`; the probes of one request share 120 s | `web/uploads.py`, `routes/jobs.py` |
 | Large files kept for choosing their pages | 2 per person, up to 30 MB and 300 pages, deleted after `RETENTION_HOURS`; their parts are held to the page quota and the caps below | `web/pending.py`, `web/intake.py` |
+| LaTeX source (`FEATURE_LATEX_SOURCE`) | A `.tex` file or a zip of at most 20 MB, 100 MB unpacked, 500 entries, 50 MB a file, expansion at most 200 times, depth 8; no symlinks, absolute or `..` paths, encrypted members, nested zips, EPS or SVG; an extension allowlist; the lint; checked again in the conversion child; LaTeXML in the sandbox below | `web/archive_intake.py`, `source/intake.py`, `source/lint.py`, `source/convert.py` |
 | Zip of ready documents | 25 documents and 80 MB, in memory | `web/bundle.py` |
 | Answers to an upload of several files | one row per upload, names and numbers only, kept 1 hour, deleted with the person; readable by its owner only (404 for anyone else) | `web/upload_result.py`, `ops.retention.purge_upload_results` |
 | Word and PowerPoint files of one upload | their conversions share 180 s (`OFFICE_BUDGET_S`); the rest are refused with a reason | `routes/jobs.py` (`_place_files`) |
@@ -219,6 +220,24 @@ refused; there is no unsandboxed fallback (a plain child of the web process shar
 it could read the web process's files). Whether the platform allows it is checked on the deployed
 image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"); a FAIL there means
 LaTeX upload must stay off.
+
+What each layer is for, and what is tested (`tests/test_source_escapes.py` runs these through the
+real sandbox with the lint switched off):
+
+| Layer | Stops | Not relied on for |
+|---|---|---|
+| Zip rules (`web/archive_intake.py`) | a bomb, a path that leaves the folder, a link, a device, a nested zip, a file kind that is not on the list | what is in a `.tex` file |
+| Lint (`source/lint.py`) | the plain forms: `\write18`, `\openout`, `\input{|...}`, `\directlua`, absolute and `..` paths | anything: `\catcode` and `\csname` rebuild any command |
+| The conversion child (`web/conversion_child.py`) | keys and database address (not in its environment), runaway memory and CPU of the reader | TeX: it runs below the child, in the sandbox |
+| The sandbox (`core/sandbox.py`) | reading a file of this machine (`/etc/passwd`, `/proc/1/environ`, a file of the web app, a link out of the project), writing outside its folders, running a program, the network, running for ever, using all memory or disk | a platform that forbids user namespaces: then the probe fails and the switch stays off |
+
+Tested closed: `\input` of an absolute path, of `/etc/passwd`, of `/proc/1/environ` and of a
+relative path out of the project; a symlink in the project; a `\catcode` and a `\csname` rebuild
+of `\input`; `\write18`; `\openout` outside the output folders and into the read-only project; a
+document writing a forged `doc.xhtml` into step one's output; `\input` of a URL with a local server
+listening; an infinite loop and an `\openin` loop (the time cap); a runaway macro (the memory
+cap); runaway output (the output cap). Each step's output folder is separate: step two reads
+step one's read-only.
 
 ### Rotating the session secret
 
@@ -422,6 +441,10 @@ Triage of what the scanners reported:
   the recipient's mail provider hold it until it expires or is used, and anyone who reads the
   mailbox can sign in.
 - Rate limits and the upload gate are per instance and in memory.
+- LaTeX source (when `FEATURE_LATEX_SOURCE` is on) puts LaTeXML, a Perl program, in front of files from the
+  internet. The sandbox contains it; a flaw in bubblewrap or in the kernel's namespaces is not
+  prevented by anything here. The lint is not a defence. The image has the distribution's LaTeXML, so
+  a security update of it arrives with the next build (`apt`, not pinned).
 - `/healthz/ops` is public and has no rate limit: it reads two rows and answers with at most the
   words `backup`, `cron` or `database`. Scheduled-task failures are found by a GitHub Actions job
   that stops after 60 days without a commit to the public repository, unless re-enabled.

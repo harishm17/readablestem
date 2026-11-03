@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: LaTeX source upload (branch latex/e1-source-intake)
+
+- LaTeX source (`FEATURE_LATEX_SOURCE`, off by default; ADR 0008): a `.tex` file or a `.zip` of a project is
+  converted by LaTeXML in the bubblewrap sandbox of the sandbox probe change, into the document a PDF becomes. Equations
+  come from the source (LaTeXML's MathML through the sanitiser, the source's own LaTeX), figures use the
+  project's pictures and the ordinary figure step, tables become grids, headings, lists and links are read as
+  written. A formula LaTeXML cannot read and a figure with no picture are required decisions; a source that cannot be
+  converted fails the job with "Upload the PDF instead" and keeps nothing. The review is the list view. New
+  `web/archive_intake.py` (zip limits: 20 MB, 100 MB unpacked, 500 entries, no links, absolute or `..` paths,
+  nested zips, EPS or SVG; a header that lies is caught), `source/` (`intake`, `lint`, `envelope`, `latexml`,
+  `ltx_reader`, `figures`, `convert`), a one-line hook in `pipeline/run.py` (`convert_pdf`), `DocumentResult.origin`,
+  `render_html(origin=)` (the student note says "a LaTeX document"), `INSTALL_LATEXML` and `FEATURE_LATEX_SOURCE` in
+  `railway.ts`. Beamer decks are refused until their own change. Docs: docs/web.md "LaTeX source",
+  docs/security.md "Running uploaded TeX", docs/development.md. Tests: `tests/test_archive_intake.py`,
+  `test_source_intake.py`, `test_source_reader.py`, `test_source_convert.py`, `test_source_escapes.py` (hostile
+  files through the real sandbox), `test_source_child.py`, `test_web_source.py`.
+
 ## Unreleased: sandbox probe (branch latex/x0-sandbox-probe)
 
 - `readablestem ops sandbox-probe`: checks on the running image that the sandbox for uploaded TeX

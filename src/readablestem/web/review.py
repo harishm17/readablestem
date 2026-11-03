@@ -1720,6 +1720,7 @@ def rerender_html(
     if contact:
         chosen |= {"contact": contact}
     html = assemble.render_html(
+        origin=result.origin,
         title=title_override or result.title,
         **chosen,
         lang=result.lang,

@@ -31,8 +31,11 @@ LIMITS = sandbox.Limits(
     wall_s=120, cpu_s=120, memory_bytes=1_500_000_000, file_bytes=50_000_000, out_bytes=200_000_000
 )
 
-DOC_NAME = "doc.html"
+DOC_NAME = "doc.xhtml"
 XML_NAME = "doc.xml"
+# Where `convert` leaves them, relative to its `out` folder.
+XML_PATH = f"xml/{XML_NAME}"
+DOC_PATH = f"html/{DOC_NAME}"
 
 
 def _dev_root() -> Path | None:
@@ -68,15 +71,22 @@ def _env(extra: dict[str, str]) -> dict[str, str]:
     return {"HOME": "/tmp", "LANG": "C.UTF-8", "TZ": "UTC", "SOURCE_DATE_EPOCH": "1", **extra}
 
 
-def convert(src: Path, main: str, out: Path, *, limits: sandbox.Limits = LIMITS) -> sandbox.Outcome:
-    """Convert `src/main` (a path relative to `src`, no `..`) into `out/doc.html`.
+def convert(
+    src: Path, main: str, out: Path, *, limits: sandbox.Limits | None = None
+) -> sandbox.Outcome:
+    """Convert `src/main` (a path relative to `src`, no `..`): the XML at `out/XML_PATH`, then
+    the XHTML at `out/DOC_PATH`.
 
+    Each step writes into a folder of its own and the second reads the first's read-only, so
+    what a hostile document writes in the first step cannot stand in for the second's answer.
     Raises `sandbox.SandboxUnavailable` when the sandbox cannot start. The two steps share the
     wall-clock budget."""
-    out.mkdir(parents=True, exist_ok=True)
+    limits = limits or LIMITS  # read now, so a test can lower the module's limits
+    xml_dir, html_dir = out / "xml", out / "html"
+    xml_dir.mkdir(parents=True, exist_ok=True)
+    html_dir.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
     ro = ((src, "/work"),)
-    rw = ((out, "/out"),)
 
     prefix, extra, mounts = _program("latexml")
     first = sandbox.run(
@@ -84,11 +94,11 @@ def convert(src: Path, main: str, out: Path, *, limits: sandbox.Limits = LIMITS)
             *prefix, "--nocomments", "--path=/work", f"--destination=/out/{XML_NAME}",
             "--log=/out/latexml.log", f"/work/{main}",
         ],
-        ro=ro + mounts, rw=rw, env=_env(extra), cwd="/work", limits=limits,
+        ro=ro + mounts, rw=((xml_dir, "/out"),), env=_env(extra), cwd="/work", limits=limits,
         log=out / "latexml.out",
     )  # fmt: skip
     # latexml exits 0 for "no obvious problems" and for warnings; 10 or more means fatal.
-    if not first.ok or not (out / XML_NAME).is_file():
+    if not first.ok or not (xml_dir / XML_NAME).is_file():
         return first if not first.ok else sandbox.Outcome(1)
 
     prefix, extra, mounts = _program("latexmlpost")
@@ -102,11 +112,11 @@ def convert(src: Path, main: str, out: Path, *, limits: sandbox.Limits = LIMITS)
     )
     return sandbox.run(
         [
-            *prefix, "--format=html5", "--pmml", "--nomathimages", "--nographicimages",
-            "--nopictureimages", "--nodefaultresources",
+            *prefix, "--format=xhtml", "--omitdoctype", "--pmml", "--nomathimages",
+            "--nographicimages", "--nopictureimages", "--nodefaultresources",
             "--sourcedirectory=/work", f"--destination=/out/{DOC_NAME}",
-            "--log=/out/post.log", f"/out/{XML_NAME}",
+            "--log=/out/post.log", f"/xml/{XML_NAME}",
         ],
-        ro=ro + mounts, rw=rw, env=_env(extra), cwd="/out", limits=second_limits,
-        log=out / "post.out",
+        ro=ro + mounts + ((xml_dir, "/xml"),), rw=((html_dir, "/out"),), env=_env(extra),
+        cwd="/out", limits=second_limits, log=out / "post.out",
     )  # fmt: skip

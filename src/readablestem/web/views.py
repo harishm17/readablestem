@@ -88,6 +88,13 @@ JOB_ERROR_MESSAGES = {
     "store_failed": "The conversion finished but its results could not be saved. Use "
     "“Try again”: what was already converted is kept.",
     "upload_missing": "The uploaded file was no longer available.",
+    # LaTeX source (readablestem.source): nothing partial is kept.
+    "source_failed": "This LaTeX source could not be converted. Upload the PDF instead.",
+    "source_unreadable": "This LaTeX source could not be converted. Upload the PDF instead.",
+    "source_refused": "This LaTeX source uses something this tool will not run. Remove it, "
+    "or upload the PDF instead.",
+    "source_unavailable": "LaTeX source cannot be converted on this server right now. "
+    "Upload the PDF instead.",
     "internal_error": "Something went wrong on our side. The error was recorded without any "
     "of your document's content. You can use “Try again”: what was already converted is kept.",
     # Codes with a longer explanation of what to do next (scanned PDFs, no model key,

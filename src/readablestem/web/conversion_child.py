@@ -391,6 +391,10 @@ def _classify(exc: BaseException) -> dict[str, Any]:
         return {"kind": "budget", "scope": str(exc.scope), "message": str(exc)}
     if isinstance(exc, ConfigError):
         return {"kind": "config", "message": str(exc)}
+    from readablestem.source.convert import SourceFailed
+
+    if isinstance(exc, SourceFailed):  # a category code, never the source's own words
+        return {"kind": "source", "code": exc.code}
     if isinstance(exc, UnknownModelError):
         return {"kind": "unknown_model", "message": str(exc)}
     text = str(exc).lower()

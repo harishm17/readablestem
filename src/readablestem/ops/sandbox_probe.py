@@ -214,7 +214,7 @@ def _check_latexml(report: Report, tmp: Path, *, require: bool) -> None:
     start = time.monotonic()
     result = latexml.convert(work, "main.tex", out)
     elapsed = time.monotonic() - start
-    html = out / latexml.DOC_NAME
+    html = out / latexml.DOC_PATH
     good = result.ok and html.is_file() and "<math" in html.read_text(errors="replace")
     report.add("latexml", "ok" if good else "fail")
     report.add("latexml_seconds", f"{elapsed:.1f}", required=False)
@@ -277,15 +277,18 @@ def _readable_environ(dumpable: bool) -> bool:
 def _plain_child_can_unshare_net() -> str:
     """Whether a child of this process, with no bubblewrap, can give itself a new network
     namespace. If it can, a plain child could be cut off the network; it still sees every file."""
-    pid = os.fork()
-    if pid == 0:
-        try:
-            libc = ctypes.CDLL(None, use_errno=True)
-            os._exit(0 if libc.unshare(_CLONE_NEWUSER | _CLONE_NEWNET) == 0 else 1)
-        except BaseException:
-            os._exit(2)
-    _, status = os.waitpid(pid, 0)
-    return "yes" if os.waitstatus_to_exitcode(status) == 0 else "no"
+    code = (
+        "import ctypes, sys\n"
+        f"sys.exit(0 if ctypes.CDLL(None).unshare({_CLONE_NEWUSER | _CLONE_NEWNET}) == 0 else 1)\n"
+    )
+    try:
+        run = subprocess.run(
+            [sys.executable, "-I", "-c", code], stdin=subprocess.DEVNULL, capture_output=True,
+            timeout=20, env={"PATH": os.environ.get("PATH", "/usr/bin")},
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired):
+        return "no"
+    return "yes" if run.returncode == 0 else "no"
 
 
 def _information(report: Report) -> None:
