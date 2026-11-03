@@ -49,6 +49,7 @@ Alt text (`check_alt`)
 
 from __future__ import annotations
 
+import itertools
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
@@ -721,12 +722,33 @@ ALT_MAX_CHARS = 300
 _REDUNDANT_PREFIX = re.compile(
     r"^\s*(an?\s+|the\s+)?(image|picture|graphic|photo|photograph)\s+of\b", re.I
 )
-# A name starts where a run of name characters starts (the lookbehind), so a long run with no
-# extension is scanned once, not once per position in it (linear, CodeQL py/polynomial-redos).
-_FILE_EXTENSION = re.compile(
-    r"(?<![\w\-])[\w\-]+\.(png|jpe?g|gif|svg|bmp|tiff?|webp|heic|pdf|eps|emf|wmf|ai|psd)\b",
-    re.I,
+# Picture and document extensions that make alt text a file name ("diagram.png").
+_FILE_EXTENSIONS = frozenset(
+    {"png", "jpg", "jpeg", "gif", "svg", "bmp", "tif", "tiff", "webp", "heic"}
+    | {"pdf", "eps", "emf", "wmf", "ai", "psd"}
 )
+# A run of name characters and dots: one pass over the text, no backtracking.
+_NAME_RUN = re.compile(r"[\w.\-]+")
+_LETTERS = re.compile(r"[A-Za-z]+")
+
+
+def _has_file_name(text: str) -> bool:
+    """A name, a dot, then a picture or document extension that ends there ("fig-2.PNG",
+    "scan.jpeg, page 3"). Read token by token instead of with one pattern, so a long run
+    of name characters costs linear time (CodeQL py/polynomial-redos)."""
+    for run in _NAME_RUN.finditer(text):
+        parts = run.group(0).split(".")
+        for stem, after in itertools.pairwise(parts):
+            letters = _LETTERS.match(after)
+            named = any(c.isalnum() or c == "_" for c in stem)  # not "-" alone, as before
+            if not named or letters is None or letters.group(0).lower() not in _FILE_EXTENSIONS:
+                continue
+            rest = after[letters.end() :]
+            if not rest or not (rest[0].isalnum() or rest[0] == "_"):
+                return True
+    return False
+
+
 # Single-token camera, scan and export names: IMG_2041, DSC0042, figure_3_2, scan-0001.
 _FILE_STEM = re.compile(
     r"^(img|dsc|dscn|dcim|pxl|image|fig|figure|scan|screenshot|pic|photo)[\W_]*\d[\w\-]*$"
@@ -822,9 +844,7 @@ def check_alt(alt: str, *, decorative: bool, caption: str | None = None) -> list
         length = _check("alt.length", "too_long", "warning")
     else:
         length = _check("alt.length", None)
-    is_filename = bool(_FILE_EXTENSION.search(text)) or (
-        " " not in text and bool(_FILE_STEM.match(text))
-    )
+    is_filename = _has_file_name(text) or (" " not in text and bool(_FILE_STEM.match(text)))
     is_placeholder = _is_placeholder(text, plain)
     is_caption_copy = bool(caption and caption.strip()) and _plain(
         _without_figure_label(text)

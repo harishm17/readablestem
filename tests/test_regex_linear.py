@@ -3,6 +3,8 @@ py/polynomial-redos): a long run that never completes a match must not take quad
 
 from __future__ import annotations
 
+import random
+import re
 import time
 
 import pytest
@@ -23,7 +25,7 @@ def _fast(fn) -> None:
     ["a-" * N, "<a" * N, "x" * N],
 )
 def test_alt_text_checks_are_linear(text: str) -> None:
-    _fast(lambda: validate._FILE_EXTENSION.search(text))
+    _fast(lambda: validate._has_file_name(text))
     _fast(lambda: validate._URL_OR_MARKUP.search(text))
 
 
@@ -50,9 +52,23 @@ def test_flag_policy_tags_are_linear() -> None:
     ],
 )
 def test_alt_text_checks_keep_their_answers(alt: str, filename: bool, markup: bool) -> None:
-    assert bool(validate._FILE_EXTENSION.search(alt)) is filename
+    assert validate._has_file_name(alt) is filename
     assert bool(validate._URL_OR_MARKUP.search(alt)) is markup
 
 
 def test_ce_arrow_label_with_maths_still_reads() -> None:
     assert chem.ce_to_latex(r"N2 <=>[$\Delta$] NO")
+
+
+# The pattern `_has_file_name` replaced; it must give the same answer on any text.
+_OLD_FILE_EXTENSION = re.compile(
+    r"\b[\w\-]+\.(png|jpe?g|gif|svg|bmp|tiff?|webp|heic|pdf|eps|emf|wmf|ai|psd)\b", re.I
+)
+
+
+def test_file_name_scan_agrees_with_the_old_pattern() -> None:
+    rng = random.Random(110)
+    alphabet = ["a", "Z", "7", "_", "-", ".", " ", ",", "é", "png", "JPEG", "jpe", "tif", "ai", "x"]
+    for _ in range(200_000):
+        text = "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 12)))
+        assert validate._has_file_name(text) is bool(_OLD_FILE_EXTENSION.search(text)), text
