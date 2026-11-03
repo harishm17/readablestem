@@ -1,5 +1,5 @@
 # Common tasks. Everything runs through uv; no global installs needed.
-.PHONY: site sync test test-network lint fmt check ci-local gold gold-licenses eval-plumbing eval-latex-check \
+.PHONY: site sync test test-fast test-network lint fmt check ci-local gold gold-licenses eval-plumbing eval-latex-check \
 	table-model fuzz-tables proof proof-check proof-list proof-sources proof-live proof-add-chatbot proof-add-parsers proof-interim reproduce reproduce-rerun
 
 # Sample gold set: 3 numbered sections of chapter 2 of OpenStax Physics (CC BY 4.0).
@@ -26,6 +26,11 @@ reproduce-rerun:
 
 test:
 	uv run pytest
+
+# Unit tests only, in parallel (pytest-xdist): no Postgres, browser, network, live-model or
+# slow tests. Much faster than `make test`; CI still runs everything.
+test-fast:
+	uv run pytest -n auto -m 'not postgres and not browser and not network and not live_model and not slow'
 
 test-network:  ## live OpenStax API check (skipped by default)
 	uv run pytest -m network
@@ -156,8 +161,22 @@ proof-add-chatbot:  ## record the chatbot arms into a recorded run: make proof-a
 	uv run $(if $(ENV_FILE),--env-file $(ENV_FILE)) --group browser readablestem proof --add-systems chatbot \
 		--max-usd $(MAX_USD) $(PROOF_ARGS)
 
-proof-interim:  ## the held-out results that need no model (headings, parsers): needs `make heldout-gold`
-	uv run python proof/interim/report.py --gold "$${HELDOUT_GOLD:-$$(uv run python -c 'from readablestem.cli.heldout import default_root; print(default_root() / "gold")')}"
+# The committed INTERIM-heldout-2026-10.md is a registered record (Addendum 5 pins its hash)
+# and is reproduced at the tag (heldout-gold-at-tag, tests/test_proof_interim.py), so this
+# target writes a separate file and never the registered one: this checkout's scorer gives
+# other numbers (docs/proof.md, "The part of the held-out run that needs no model").
+proof-interim:  ## re-score the interim held-out results here into proof/interim/rebuilt-here.md (needs `make heldout-gold`)
+	uv run python proof/interim/report.py --out proof/interim/rebuilt-here.md --gold "$${HELDOUT_GOLD:-$$(uv run python -c 'from readablestem.cli.heldout import default_root; print(default_root() / "gold")')}"
+
+# The answer key as the code at the tag fetches it (network to OpenStax only, no model), into
+# $(AT_TAG_CACHE). tests/test_proof_interim.py replays the registered interim report with it.
+AT_TAG_CACHE = $(or $(XDG_CACHE_HOME),$(HOME)/.cache)/readablestem/at-tag
+.PHONY: heldout-gold-at-tag
+heldout-gold-at-tag:  ## fetch the held-out answer key with the tag's own code (for tests/test_proof_interim.py)
+	@dir=$$(mktemp -d) && git archive $(PROOF_TAG) | tar -x -C "$$dir" && \
+	pkg=$$(ls "$$dir/src") && \
+	uv run env XDG_CACHE_HOME="$(AT_TAG_CACHE)" PYTHONPATH="$$dir/src" python -m "$$pkg.cli.main" \
+		gold fetch --set heldout --allow-retired --date 2026-10-13
 
 proof-add-parsers:  ## record the open parsers (hours, resumable; run `make -C proof/parsers setup` once)
 	uv run readablestem proof --add-systems parsers $(PROOF_ARGS)

@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from readablestem.core import triage
 from readablestem.core.types import DocumentResult, Fix, Kind, Status
 from readablestem.web import carry as carry_rules
+from readablestem.web import combine as combine_rules
 from readablestem.web import job_page, titles
 from readablestem.web import retry as retry_rules
 from readablestem.web.database import as_utc
@@ -180,6 +181,9 @@ class JobView:
     # parts of the same file still kept (this one included), in page order.
     part_label: str = ""
     parts: list[PartLink] = field(default_factory=list)
+    # How many parts "Combine parts" would join (`web.combine.kept_parts`: finished, kept,
+    # no decision open, none overlapping); the link is offered from two.
+    combinable: int = 0
     # The recorded sample document (T3-9, `web.sample`) and, for its page, where it comes from.
     is_sample: bool = False
     sample: SampleView | None = None
@@ -486,6 +490,7 @@ def job_view(
         is_sample=bool(job.is_sample),
         sample=sample_view() if job.is_sample and with_page else None,
         parts=part_links(session, job) if with_page and job.part_group else [],
+        combinable=len(combine_rules.kept_parts(session, job)) if with_page else 0,
     )
 
 
