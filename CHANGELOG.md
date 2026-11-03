@@ -177,6 +177,17 @@
   accounting and the database writes are as before. Results are unchanged
   (`tests/test_web_isolated_convert.py`). `PRELOAD_TABLE_MODELS` no longer loads models in the web
   process. Details and measurements: [docs/web.md](docs/web.md), "The conversion runs in a child process".
+## Unreleased: faster CI
+
+- The pytest job is split into four shards balanced by recorded durations (`--shard i/4`,
+  `tests/shard_durations.json`), with a check that every test ran in exactly one shard. Python
+  3.14 runs the full suite on main, nightly and on dependency or workflow changes, and a smoke
+  (ruff, ty, import of every module, one shard in eight) on other pull requests. The browser job
+  runs in two shards of three xdist workers each and caches Chromium and axe-core; the axe-core download is written
+  atomically. Pull request runs cancel when superseded, main runs do not. Job names changed:
+  `ruff + ty + pytest (Python 3.x)` is now `ruff + ty (Python 3.x)` plus `pytest (...)` shards; a
+  `CI passed` job summarises them. See [docs/development.md](docs/development.md), "CI".
+
 ## Unreleased: dependency and CI hardening
 
 - Locked dependencies upgraded for known advisories: pillow 12.3.0 to 13.0.0 (floor now `>=13.0`),
@@ -226,6 +237,14 @@
   `max-age` instead of `no-store` or `no-cache`.
 ## Unreleased
 
+- Fifth fresh real-world split, builder only (no system run): `scripts/fresh5_select.py` (arXiv continuation, OpenStax
+  sections never used and printed to PDF, course-style LaTeX incl. Beamer decks from GitHub under CC BY, CC BY-SA
+  or MIT, compiled with a user-level TeX Live and Tectonic as fallback inside a bubblewrap sandbox), `gold/course_corpus.py`, and the registration as an unsigned draft
+  (`data/realworld/PREREGISTRATION-FRESH5.md`). `arxiv_gold.analyse` takes `min_equations` (default unchanged, 5). New `gold/safe_tex.py`: the one place that unpacks
+  (no links or unsafe paths, size and file caps, atomic) and compiles downloaded TeX (sandbox, `-norc`, no network or shell
+  escape, no environment from the parent, a cap on what a compile writes); `realworld_build.py` and
+  `figures_v2_arxiv.py` unpack and compile through it too.
+  [docs/eval-realworld.md](docs/eval-realworld.md).
 ### Figure gold v2 and a draft pre-registration for long descriptions
 
 - `data/gold-figures-v2/`: 50 figures (14 data charts, 14 diagrams, 10 photos and illustrations, 12 chemistry

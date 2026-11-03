@@ -1,0 +1,1686 @@
+{
+ "seed": "realworld-fresh5-2026-11-02",
+ "rule": {
+  "licence": "CC BY in both the archive book JSON and the CMS (plain CC BY, any version)",
+  "retired_editions": "allowed (proof/DECISION-retired-editions-2026-10-13.md)",
+  "unused": "section not named by any earlier set; sibling editions folded together; a section whose title (its slug without numbers) an earlier set or pick has is out",
+  "sealed_families": [
+   "chemistry-atoms-first",
+   "elementary-algebra",
+   "physics",
+   "prealgebra",
+   "precalculus"
+  ],
+  "min_equations": 10,
+  "per_book": 2,
+  "order": "SHA-256 of seed, book and section; books in turn, in the seeded order"
+ },
+ "n_used_sections": 53,
+ "books_with_free_sections": {
+  "american-government": 77,
+  "american-government-2e": 77,
+  "american-government-3e": 77,
+  "anatomy-and-physiology": 169,
+  "astronomy": 155,
+  "biology": 206,
+  "chemistry": 96,
+  "college-physics": 239,
+  "college-physics-ap-courses": 239,
+  "física-universitaria-volumen-1": 99,
+  "intermediate-algebra": 65,
+  "introduction-business": 134,
+  "introduction-intellectual-property": 47,
+  "introduction-sociology-2e": 74,
+  "introductory-business-statistics": 59,
+  "introductory-statistics": 73,
+  "principles-economics": 138,
+  "principles-economics-2e": 142,
+  "principles-macroeconomics": 94,
+  "principles-macroeconomics-2e": 94,
+  "principles-macroeconomics-ap-courses": 82,
+  "principles-macroeconomics-ap-courses-2e": 82,
+  "principles-microeconomics": 72,
+  "principles-microeconomics-2e": 76,
+  "principles-microeconomics-ap-courses": 72,
+  "principles-microeconomics-ap-courses-2e": 74,
+  "psychology": 88,
+  "statistics": 73
+ },
+ "books_refused": [
+  {
+   "book": "algebra-and-trigonometry",
+   "reason": "sealed_family"
+  },
+  {
+   "book": "chemistry-atoms-first",
+   "reason": "sealed_family"
+  },
+  {
+   "book": "college-algebra",
+   "reason": "sealed_family"
+  },
+  {
+   "book": "college-algebra-corequisite-support",
+   "reason": "sealed_family"
+  },
+  {
+   "book": "elementary-algebra",
+   "reason": "sealed_family"
+  },
+  {
+   "book": "introduction-sociology",
+   "reason": "GoldError"
+  },
+  {
+   "book": "physics",
+   "reason": "sealed_family"
+  },
+  {
+   "book": "prealgebra",
+   "reason": "sealed_family"
+  },
+  {
+   "book": "precalculus",
+   "reason": "sealed_family"
+  }
+ ],
+ "visits": [
+  {
+   "book": "introduction-sociology-2e",
+   "section": "16-1-education-around-the-world",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "10-3-theoretical-perspectives-on-global-stratification",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "14-2-variations-in-family-life",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "5-1-theories-of-self-development",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "4-3-social-constructions-of-reality",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "9-3-global-stratification-and-inequality",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "19-1-the-social-construction-of-health",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "17-4-theoretical-perspectives-on-government-and-power",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "8-4-theoretical-perspectives-on-media-and-technology",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "15-3-religion-in-the-united-states",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "9-2-social-stratification-and-mobility-in-the-united-states",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "13-4-theoretical-perspectives-on-aging",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "2-3-ethical-concerns",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "15-2-world-religions",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "18-2-globalization-and-the-economy",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "3-2-elements-of-culture",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "14-3-challenges-families-face",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "15-1-the-sociological-approach-to-religion",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "2-2-research-methods",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "10-1-global-stratification-and-classification",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "1-3-theoretical-perspectives",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "4-1-types-of-societies",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "20-1-demography-and-population",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "1-2-the-history-of-sociology",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "11-2-stereotypes-prejudice-and-discrimination",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "13-3-challenges-facing-the-elderly",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "10-2-global-wealth-and-poverty",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "18-1-economic-systems",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "19-2-global-health",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "14-1-what-is-marriage-what-is-a-family",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "12-2-gender",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "2-1-approaches-to-sociological-research",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "20-2-urbanization",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "3-1-what-is-culture",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "18-3-work-in-the-united-states",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "7-2-theoretical-perspectives-on-deviance",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "6-1-types-of-groups",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "12-3-sex-and-sexuality",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "21-3-social-change",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "19-3-health-in-the-united-states",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "5-3-agents-of-socialization",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "11-3-theories-of-race-and-ethnicity",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "19-5-theoretical-perspectives-on-health-and-medicine",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "16-3-issues-in-education",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "6-3-formal-organizations",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "9-1-what-is-social-stratification",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "9-4-theoretical-perspectives-on-social-stratification",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "11-1-racial-ethnic-and-minority-groups",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "7-3-crime-and-the-law",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "21-2-social-movements",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "1-1-what-is-sociology",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "8-1-technology-today",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "5-2-why-socialization-matters",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "19-4-comparative-health-and-medicine",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "20-3-the-environment-and-society",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "13-2-the-process-of-aging",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "16-2-theoretical-perspectives-on-education",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "3-4-theoretical-perspectives-on-culture",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "8-3-global-implications-of-media-and-technology",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "11-4-intergroup-relationships",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "1-4-why-study-sociology",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "21-1-collective-behavior",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "5-4-socialization-across-the-life-course",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "4-2-theoretical-perspectives-on-society",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "6-2-group-size-and-structure",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "3-3-pop-culture-subculture-and-cultural-change",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "12-1-sex-and-gender",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "11-5-race-and-ethnicity-in-the-united-states",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "17-2-forms-of-government",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "17-1-power-and-authority",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "8-2-media-and-technology-in-society",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "13-1-who-are-the-elderly-aging-in-society",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "7-1-deviance-and-control",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-sociology-2e",
+   "section": "17-3-politics-in-the-united-states",
+   "gate": "fail"
+  },
+  {
+   "book": "introductory-business-statistics",
+   "section": "13-7-how-to-use-microsoft-excel-r-for-regression-analysis",
+   "gate": "fail"
+  },
+  {
+   "book": "introductory-business-statistics",
+   "section": "12-4-facts-about-the-f-distribution",
+   "gate": "fail"
+  },
+  {
+   "book": "introductory-business-statistics",
+   "section": "5-2-the-uniform-distribution",
+   "gate": "pass"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "1-1-what-is-economics-and-why-is-it-important",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "16-1-the-problem-of-imperfect-information-and-asymmetric-information",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "11-1-corporate-mergers",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "1-3-how-economists-use-theories-and-models-to-understand-economic-issues",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "3-1-demand-supply-and-equilibrium-in-markets-for-goods-and-services",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "1-4-how-economies-can-be-organized-an-overview-of-economic-systems",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "14-5-government-policies-to-reduce-income-inequality",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "10-2-oligopoly",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "13-1-why-the-private-sector-under-invests-in-innovation",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "12-5-international-environmental-issues",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "8-3-entry-and-exit-decisions-in-the-long-run",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "15-3-immigration",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "7-2-the-structure-of-costs-in-the-short-run",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "17-3-how-to-accumulate-personal-wealth",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "1-2-microeconomics-and-macroeconomics",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "5-2-polar-cases-of-elasticity-and-constant-elasticity",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "6-2-how-changes-in-income-and-prices-affect-consumption-choices",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "15-1-unions",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "3-4-price-ceilings-and-price-floors",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "12-1-the-economics-of-pollution",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "section": "5-1-price-elasticity-of-demand-and-price-elasticity-of-supply",
+   "gate": "pass"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "17-2-how-households-supply-financial-capital",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "4-1-demand-and-supply-at-work-in-labor-markets",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "29-2-demand-and-supply-shifts-in-foreign-exchange-markets",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "8-4-efficiency-in-perfectly-competitive-markets",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "18-2-special-interest-politics",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "25-3-the-phillips-curve",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "34-5-the-tradeoffs-of-trade-policy",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "28-1-the-federal-reserve-banking-system-and-central-banks",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "30-6-practical-problems-with-discretionary-fiscal-policy",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "22-3-how-the-u-s-and-other-countries-experience-inflation",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "28-4-monetary-policy-and-economic-outcomes",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "32-1-the-diversity-of-countries-and-economies-across-the-world",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "3-1-demand-supply-and-equilibrium-in-markets-for-goods-and-services",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "3-2-shifts-in-demand-and-supply-for-goods-and-services",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "8-1-perfect-competition-and-why-it-matters",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "25-4-the-keynesian-perspective-on-market-forces",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "12-5-international-environmental-issues",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "7-4-production-in-the-long-run",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "6-3-behavioral-economics-an-alternative-framework-for-consumer-choice",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "21-4-what-causes-changes-in-unemployment-over-the-long-run",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "4-3-the-market-system-as-an-efficient-mechanism-for-information",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "33-2-what-happens-when-a-country-has-an-absolute-advantage-in-all-goods",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "2-3-confronting-objections-to-the-economic-approach",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "15-2-the-poverty-trap",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "11-4-the-great-deregulation-experiment",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "23-3-trade-balances-and-flows-of-financial-capital",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "26-2-the-policy-implications-of-the-neoclassical-perspective",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "8-3-entry-and-exit-decisions-in-the-long-run",
+   "gate": "fail"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "5-1-price-elasticity-of-demand-and-price-elasticity-of-supply",
+   "gate": "duplicate_title"
+  },
+  {
+   "book": "principles-economics-2e",
+   "section": "5-4-elasticity-in-areas-other-than-price",
+   "gate": "pass"
+  },
+  {
+   "book": "statistics",
+   "section": "9-2-outcomes-and-the-type-i-and-type-ii-errors",
+   "gate": "fail"
+  },
+  {
+   "book": "statistics",
+   "section": "1-6-sampling-experiment",
+   "gate": "fail"
+  },
+  {
+   "book": "statistics",
+   "section": "12-2-the-regression-equation",
+   "gate": "pass"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "2-1-the-right-to-enforce-patents",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "1-9-the-patenting-process",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "2-9-litigation-alternatives",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "3-5-rights-and-term",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "2-10-patent-trolls-and-efforts-to-thwart-them",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "4-7-bars-to-trademark",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "3-2-early-copyright-systems",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "5-5-misappropriation-of-trade-secrets",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "5-4-the-secrecy-requirement",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "3-3-copyright-in-america",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "1-1-the-foundations-of-patent-protection",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "4-6-the-spectrum-of-distinctiveness",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "4-1-core-concepts",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "2-8-appeals",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "3-4-eligible-works",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "5-3-elements-of-a-trade-secret",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "3-7-the-fair-use-defense",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "1-8-other-types-of-patents",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "4-5-the-subject-matter-of-trademarks",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "2-4-getting-started",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "1-3-americas-uniquely-democratic-patent-system",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "4-9-trademark-infringement",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "5-6-remedies-available-for-the-misappropriation-of-trade-secrets",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "3-8-changes-in-copyright-law",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "1-4-the-role-of-the-u-s-legal-system",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "2-5-pretrial-procedures",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "3-1-the-basics-of-copyright",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "2-2-deciding-whether-and-how-to-enforce-a-patent",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "3-11-copyright-in-a-changing-world",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "3-6-infringement-and-remedies",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "1-6-patent-eligible-inventions",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "2-3-patent-litigation",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "3-10-alternative-forms-of-copyright",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "4-11-fair-use-of-trademarks",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "4-2-early-trademark-systems",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "5-1-trade-secret-protection",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "1-5-what-the-u-s-patent-system-wrought",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "2-7-post-trial-procedures",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "2-6-trial",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "4-10-trademark-remedies",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "1-7-criteria-for-patenting",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "4-8-establishing-trademark-protection",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "3-9-new-technology-challenges-to-copyright",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "1-2-the-weakness-of-early-patent-systems",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "5-2-the-foundations-of-trade-secrets-law",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "4-4-the-four-types-of-trademarks",
+   "gate": "fail"
+  },
+  {
+   "book": "introduction-intellectual-property",
+   "section": "4-3-u-s-trademark-law",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "4-5-substance-use-and-abuse",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "6-1-what-is-learning",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "15-10-personality-disorders",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "12-6-aggression",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "11-6-biological-approaches",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "12-3-attitudes-and-persuasion",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "12-4-conformity-compliance-and-obedience",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "15-11-disorders-in-childhood",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "16-3-treatment-modalities",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "14-3-stress-and-illness",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "8-2-parts-of-the-brain-involved-with-memory",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "6-2-classical-conditioning",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "15-5-obsessive-compulsive-and-related-disorders",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "6-3-operant-conditioning",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "7-5-measures-of-intelligence",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "16-2-types-of-treatment",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "6-4-observational-learning-modeling",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "15-1-what-are-psychological-disorders",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "16-5-the-sociocultural-model-and-therapy-utilization",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "8-1-how-memory-functions",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "3-5-the-endocrine-system",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "2-3-analyzing-findings",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "5-6-gestalt-principles-of-perception",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "7-4-what-are-intelligence-and-creativity",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "4-4-sleep-problems-and-disorders",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "4-3-stages-of-sleep",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "13-2-industrial-psychology-selecting-and-evaluating-employees",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "10-4-emotion",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "7-3-problem-solving",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "8-3-problems-with-memory",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "3-2-cells-of-the-nervous-system",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "15-2-diagnosing-and-classifying-psychological-disorders",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "9-1-what-is-lifespan-development",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "15-4-anxiety-disorders",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "16-4-substance-related-and-addictive-disorders-a-special-case",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "3-4-the-brain-and-spinal-cord",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "12-2-self-presentation",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "15-8-schizophrenia",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "11-5-humanistic-approaches",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "9-2-lifespan-theories",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "4-1-what-is-consciousness",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "11-2-freud-and-the-psychodynamic-perspective",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "13-3-organizational-psychology-the-social-dimension-of-work",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "11-3-neo-freudians-adler-erikson-jung-and-horney",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "1-2-history-of-psychology",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "3-3-parts-of-the-nervous-system",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "15-9-dissociative-disorders",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "3-1-human-genetics",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "12-1-what-is-social-psychology",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "5-1-sensation-versus-perception",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "9-4-death-and-dying",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "4-2-sleep-and-why-we-sleep",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "14-4-regulation-of-stress",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "12-7-prosocial-behavior",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "8-4-ways-to-enhance-memory",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "9-3-stages-of-development",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "15-3-perspectives-on-psychological-disorders",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "11-1-what-is-personality",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "7-1-what-is-cognition",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "12-5-prejudice-and-discrimination",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "7-6-the-source-of-intelligence",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "14-2-stressors",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "2-1-why-is-research-important",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "4-6-other-states-of-consciousness",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "13-1-what-is-industrial-and-organizational-psychology",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "5-4-hearing",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "14-5-the-pursuit-of-happiness",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "11-4-learning-approaches",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "1-1-what-is-psychology",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "5-2-waves-and-wavelengths",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "2-2-approaches-to-research",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "10-3-sexual-behavior",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "1-4-careers-in-psychology",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "15-6-posttraumatic-stress-disorder",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "11-9-personality-assessment",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "16-1-mental-health-treatment-past-and-present",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "1-3-contemporary-psychology",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "13-4-human-factors-psychology-and-workplace-design",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "14-1-what-is-stress",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "10-1-motivation",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "15-7-mood-disorders",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "11-7-trait-theorists",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "10-2-hunger-and-eating",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "5-3-vision",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "5-5-the-other-senses",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "7-2-language",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "11-8-cultural-understandings-of-personality",
+   "gate": "fail"
+  },
+  {
+   "book": "psychology",
+   "section": "2-4-ethics",
+   "gate": "fail"
+  },
+  {
+   "book": "college-physics",
+   "section": "31-4-nuclear-decay-and-conservation-laws",
+   "gate": "pass"
+  },
+  {
+   "book": "biology",
+   "section": "35-4-the-peripheral-nervous-system",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "44-2-biogeography",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "30-6-plant-sensory-systems-and-responses",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "7-6-connections-of-carbohydrate-protein-and-lipid-metabolic-pathways",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "8-1-overview-of-photosynthesis",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "30-4-leaves",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "44-4-aquatic-biomes",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "21-2-virus-infections-and-hosts",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "4-5-the-cytoskeleton",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "29-6-mammals",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "5-3-active-transport",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "26-4-the-role-of-seed-plants",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "9-2-propagation-of-the-signal",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "43-3-human-reproductive-anatomy-and-gametogenesis",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "25-2-green-algae-precursors-of-land-plants",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "7-2-glycolysis",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "15-1-the-genetic-code",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "40-2-components-of-the-blood",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "28-3-superphylum-lophotrochozoa",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "4-2-prokaryotic-cells",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "34-4-digestive-system-regulation",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "10-3-control-of-the-cell-cycle",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "47-2-the-importance-of-biodiversity-to-human-life",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "37-5-endocrine-glands",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "16-5-eukaryotic-post-transcriptional-gene-regulation",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "3-5-nucleic-acids",
+   "gate": "fail"
+  },
+  {
+   "book": "biology",
+   "section": "39-2-gas-exchange-across-respiratory-surfaces",
+   "gate": "pass"
+  }
+ ],
+ "sections": [
+  {
+   "book": "introductory-business-statistics",
+   "book_title": "Introductory Business Statistics",
+   "book_state": "retired",
+   "section": "5-2-the-uniform-distribution",
+   "title": "5.2 The Uniform Distribution",
+   "licence": "Creative Commons Attribution License",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "archive_version": "20260604.144757",
+   "book_version": "1d23970",
+   "records_by_kind": {
+    "equation": 12,
+    "figure": 2,
+    "table": 1,
+    "heading": 11
+   },
+   "gold_sha256": "a9bb2a5f59771cdbb6c2442d1f269d17278f6e99e6aa5aff01b1e19181dd3c34",
+   "pdf_pages": 5,
+   "pdf_sha256": "25e26c9553e1badde16c6ba31893497a1057a3a0f134691318343c6d43b975bb",
+   "pdf_paper": "Letter"
+  },
+  {
+   "book": "principles-microeconomics-ap-courses",
+   "book_title": "Principles of Microeconomics for AP® Courses",
+   "book_state": "retired",
+   "section": "5-1-price-elasticity-of-demand-and-price-elasticity-of-supply",
+   "title": "5.1 Price Elasticity of Demand and Price Elasticity of Supply",
+   "licence": "Creative Commons Attribution License",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "archive_version": "20260604.144757",
+   "book_version": "444e84e",
+   "records_by_kind": {
+    "equation": 14,
+    "figure": 2,
+    "table": 1,
+    "heading": 9
+   },
+   "gold_sha256": "6a38c0fea13255d05c86577e5db70fdc9572021f2df6e6b2b08eecc5add63d0b",
+   "pdf_pages": 5,
+   "pdf_sha256": "94eb206ef96d1b45578cc476d160b79e461188ec99ae31785df35730161d0313",
+   "pdf_paper": "Letter"
+  },
+  {
+   "book": "principles-economics-2e",
+   "book_title": "Principles of Economics 2e",
+   "book_state": "retired",
+   "section": "5-4-elasticity-in-areas-other-than-price",
+   "title": "5.4 Elasticity in Areas Other Than Price",
+   "licence": "Creative Commons Attribution License",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "archive_version": "20260604.144757",
+   "book_version": "a6dd6c5",
+   "records_by_kind": {
+    "equation": 11,
+    "table": 1,
+    "heading": 8
+   },
+   "gold_sha256": "417621609f867c7230e04ac3d59afb417a613873ab411cb85cde879066eb5ab6",
+   "pdf_pages": 5,
+   "pdf_sha256": "f5f42fce43a92d01f669cae9d685ecc714db46397df55890d11decf53b9028ca",
+   "pdf_paper": "Letter"
+  },
+  {
+   "book": "statistics",
+   "book_title": "Statistics",
+   "book_state": "live",
+   "section": "12-2-the-regression-equation",
+   "title": "12.2 The Regression Equation",
+   "licence": "Creative Commons Attribution License",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "archive_version": "20260604.144757",
+   "book_version": "7dea80a",
+   "records_by_kind": {
+    "equation": 20,
+    "figure": 6,
+    "table": 5,
+    "heading": 13
+   },
+   "gold_sha256": "33fff0a2e054d593ef0b3b95b7d86337bc0e3534aaa35d51c4f84c8d5b9cbb5b",
+   "pdf_pages": 12,
+   "pdf_sha256": "9915b788a71554a1a48dfe5421c020b08a4827de6f87dbc6ddcd5c73ebc5e911",
+   "pdf_paper": "Letter"
+  },
+  {
+   "book": "college-physics",
+   "book_title": "College Physics",
+   "book_state": "retired",
+   "section": "31-4-nuclear-decay-and-conservation-laws",
+   "title": "31.4 Nuclear Decay and Conservation Laws",
+   "licence": "Creative Commons Attribution License",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "archive_version": "20260604.144757",
+   "book_version": "1aa3e7a",
+   "records_by_kind": {
+    "equation": 183,
+    "figure": 5,
+    "heading": 14
+   },
+   "gold_sha256": "b1fd5cd7a79b6bb4b57e0d8c5ab552784f116bca83fba13e5765abf917982cf7",
+   "pdf_pages": 10,
+   "pdf_sha256": "5250fc39936b2d77c3f5a7ca017a5fa2fed94b52f7c3a5793a0c28b5ac645455",
+   "pdf_paper": "Letter"
+  },
+  {
+   "book": "biology",
+   "book_title": "Biology",
+   "book_state": "retired",
+   "section": "39-2-gas-exchange-across-respiratory-surfaces",
+   "title": "39.2 Gas Exchange across Respiratory Surfaces",
+   "licence": "Creative Commons Attribution License",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "archive_version": "20260604.144757",
+   "book_version": "e989ec3",
+   "records_by_kind": {
+    "equation": 30,
+    "figure": 2,
+    "table": 1,
+    "heading": 10
+   },
+   "gold_sha256": "760aa70e7e61cbceeec79a5480dc2470a48de35e85ce0d7f5dd09cb64d2c8186",
+   "pdf_pages": 6,
+   "pdf_sha256": "868570d65545b75cd77116e07b12a71909b296d79c7287b5c103a9673e2ea374",
+   "pdf_paper": "Letter"
+  }
+ ],
+ "n_pdf_pages": 43
+}

@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import io
+import os
 import re
 import socket
 import tarfile
@@ -52,8 +53,12 @@ def axe_source() -> str:
         member = archive.extractfile("package/axe.min.js")
         assert member is not None
         source = member.read().decode("utf-8")
+    # Write beside the target, then rename: with pytest-xdist several workers reach this at
+    # once, and a plain write lets another worker read a half-written script.
     AXE_CACHE.parent.mkdir(parents=True, exist_ok=True)
-    AXE_CACHE.write_text(source, encoding="utf-8")
+    partial = AXE_CACHE.with_name(f"{AXE_CACHE.name}.{os.getpid()}.part")
+    partial.write_text(source, encoding="utf-8")
+    os.replace(partial, AXE_CACHE)
     return source
 
 

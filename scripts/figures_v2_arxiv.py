@@ -9,28 +9,26 @@ downloads each e-print into its own folder under CACHE, reads the TeX files and 
 `data/gold-figures-v2/pool-arxiv.json`: one row per chart that passes the gates of
 `gold/figures_v2_arxiv.py`, with the plotted data. Downloads wait 3 seconds. `render` compiles
 each hit
-with tectonic and rasterises it with pdftoppm into `data/gold-figures-v2/arxiv/<id>/`. No model
-is called.
+with tectonic (through `safe_tex`, sandboxed) and rasterises it with pdftoppm into
+`data/gold-figures-v2/arxiv/<id>/`. No model is called.
 """
 
 from __future__ import annotations
 
 import argparse
-import contextlib
-import gzip
 import hashlib
-import io
 import json
 import re
+import shutil
 import subprocess
 import sys
-import tarfile
 import time
 import urllib.request
 from pathlib import Path
 
 from readablestem.gold import figures_v2 as fv
 from readablestem.gold import figures_v2_arxiv as fa
+from readablestem.gold import safe_tex
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "gold-figures-v2"
@@ -52,9 +50,9 @@ def ordered_papers() -> list[dict]:
 
 
 def fetch_eprint(paper_id: str, folder: Path) -> list[Path]:
-    """Download one e-print into `folder` and return the TeX files in it. A tar is extracted
-    with the `data` filter (no links, no absolute paths); a plain gzip is one TeX file."""
-    folder.mkdir(parents=True, exist_ok=True)
+    """Download one e-print into `folder` and return the TeX files in it. The archive is unpacked
+    by `safe_tex.extract_tar` (no links or unsafe paths, size and entry caps, renamed into place
+    only when complete), keeping the `.tex` files; a plain gzip is one TeX file, read with a cap."""
     marker = folder / ".done"
     if not marker.exists():
         request = urllib.request.Request(
@@ -64,14 +62,14 @@ def fetch_eprint(paper_id: str, folder: Path) -> list[Path]:
             body = response.read(MAX_BYTES + 1)
         if len(body) > MAX_BYTES:
             raise ValueError("e-print over the size cap")
+        if folder.exists():  # a folder without the marker is a partly finished earlier try
+            shutil.rmtree(folder)
         try:
-            with tarfile.open(fileobj=io.BytesIO(body), mode="r:*") as tar:
-                members = [m for m in tar.getmembers() if m.name.endswith(".tex") and m.isfile()]
-                for member in members:
-                    tar.extract(member, folder, filter="data")
-        except tarfile.TarError:
-            with contextlib.suppress(OSError):
-                (folder / "main.tex").write_bytes(gzip.decompress(body))
+            safe_tex.extract_tar(body, folder, suffixes=(".tex",))
+        except safe_tex.UnsafeArchive as exc:
+            if exc.code != "bad_archive":
+                raise
+            safe_tex.extract_single_file(body, folder, "main.tex")
         marker.write_text("ok")
     return sorted(folder.rglob("*.tex"))
 
@@ -141,22 +139,21 @@ def cmd_render(args: argparse.Namespace) -> int:
         stem = row["id"].rsplit("/", 1)[1]
         tex_file = target / f"{stem}.tex"
         tex_file.write_text(figure.standalone(), encoding="utf-8")
-        result = subprocess.run(
-            ["tectonic", "--untrusted", "--outdir", str(target), str(tex_file)],
-            capture_output=True,
-            timeout=120,
-            check=False,
-        )
-        pdf = target / f"{stem}.pdf"
+        # compiled in the sandbox (no network, no host files, cached packages only): the
+        # downloaded preamble and TikZ are untrusted
+        build = target / "build"
+        result = safe_tex.compile_tex(target, tex_file.name, build, "tectonic", timeout=120)
+        pdf = build / f"{stem}.pdf"
         if result.returncode != 0 or not pdf.exists():
             print(f"{row['id']}: does not compile", file=sys.stderr)
             tex_file.unlink(missing_ok=True)
+            shutil.rmtree(build, ignore_errors=True)
             continue
         subprocess.run(
             ["pdftoppm", "-r", "150", "-png", "-singlefile", str(pdf), str(target / stem)],
             check=True,
         )
-        pdf.unlink()
+        shutil.rmtree(build, ignore_errors=True)
         png = target / f"{stem}.png"
         row["image_sha256"] = hashlib.sha256(png.read_bytes()).hexdigest()
         kept.append(row)
