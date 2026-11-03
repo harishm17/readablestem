@@ -39,6 +39,8 @@ part=$f.part
 fail() {
   echo "backup_failed reason=$1"
   rm -f "$part"
+  # Best effort: do not leave a full copy of the data in the scratch database.
+  psql -q "$admin" -c "DROP DATABASE IF EXISTS restore_check" > /dev/null 2>&1 || true
   exit 1
 }
 
@@ -73,11 +75,12 @@ missing=$(printf '%s\n' "$live_tables" | grep -vxF -f <(printf '%s\n' "$restored
 live_version=$(alembic_version "$PGURL") || fail read_live
 restored_version=$(alembic_version "$check") || fail read_restore
 [ -n "$live_version" ] && [ "$live_version" = "$restored_version" ] || fail alembic_mismatch
-psql -q "$admin" -c "DROP DATABASE restore_check" || fail restore_cleanup
 tables=$(printf '%s\n' "$live_tables" | wc -l)
 
 # Proved: put the dump in place.
 mv "$part" "$f" || fail move
+# Cleanup is not a reason to lose a verified dump: warn and go on (the next run drops it).
+psql -q "$admin" -c "DROP DATABASE IF EXISTS restore_check" || echo "backup_warning reason=restore_cleanup"
 echo "backup_ok file=$f tables=$tables alembic=$live_version"
 
 # Tell /healthz/ops. The dump stays; a failure here is a failed run.

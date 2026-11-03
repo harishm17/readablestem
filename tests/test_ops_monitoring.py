@@ -65,13 +65,13 @@ def test_nothing_has_run_yet_so_both_tasks_are_stale(factory):
         assert heartbeat.stale_names(session, NOW) == ["backup", "cron"]
 
 
-def test_the_limits_are_26_hours_for_the_backup_and_2_for_the_cron(factory):
+def test_the_limits_are_26_hours_for_the_backup_and_150_minutes_for_the_cron(factory):
     with session_scope(factory) as session:
         heartbeat.beat(session, heartbeat.BACKUP, "tables=3", NOW - timedelta(hours=25, minutes=50))
         heartbeat.beat(session, heartbeat.CRON, None, NOW - timedelta(hours=1, minutes=50))
     with session_scope(factory) as session:
         assert heartbeat.stale_names(session, NOW) == []
-        assert heartbeat.stale_names(session, NOW + timedelta(minutes=20)) == ["backup", "cron"]
+        assert heartbeat.stale_names(session, NOW + timedelta(minutes=50)) == ["backup", "cron"]
 
 
 def test_a_beat_replaces_the_row_instead_of_adding_one(factory):
@@ -383,3 +383,22 @@ def test_the_postgres_pool_is_five_plus_five():
         assert engine.pool._max_overflow == 5  # type: ignore[attr-defined]
     finally:
         engine.dispose()
+
+
+def test_the_migration_seeds_both_heartbeats_so_the_first_deploy_is_healthy(tmp_path):
+    from sqlalchemy import create_engine, text
+
+    from test_web_migrations import migrate
+
+    url = f"sqlite:///{tmp_path}/seed.db"
+    migrate(url, "head")
+    engine = create_engine(url)
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text("select name, detail from ops_heartbeat order by name")).all()
+    finally:
+        engine.dispose()
+    assert [tuple(r) for r in rows] == [
+        ("backup", "seeded at migration"),
+        ("cron", "seeded at migration"),
+    ]

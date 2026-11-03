@@ -15,7 +15,7 @@ cover.
 | Claude canary | Not run in production | Only the HTTP cron route runs it (`ops.claude_canary.maybe_run_daily`); `ops cron` does not. By hand: `readablestem ops claude-canary --max-usd 0.25`. See docs/steps.md "Second check on Claude" |
 | Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the cron is late |
 | Database backup | Daily at 08:17 UTC, the Railway `backup` service | `pg_dump` to a `.part` file, checked (gzip, completion line, restore into a scratch database, every table and the schema version present), then moved into the `/backups` volume; dumps older than 5 days are deleted (the last 6 are kept); logs `backup_ok file=... tables=... alembic=...`, or `backup_failed reason=...` and exit 1. Records the `backup` heartbeat. See "Backups and restore" |
-| Failed cron or backup run | `/healthz/ops`, checked from outside by GitHub Actions `uptime.yml` every 3 hours | The backup and the cron each write a row of `ops_heartbeat` when they finish well; `/healthz/ops` answers 503 when the backup is older than 26 hours or the cron older than 2, and the failed workflow run is emailed by GitHub. See "Health, readiness and shutdown". Railway's own deployments list still shows the failed run, and its project notifications can mail it (deploy-railway.md, "Logs and monitoring") |
+| Failed cron or backup run | `/healthz/ops`, checked from outside by GitHub Actions `uptime.yml` every 3 hours | The backup and the cron each write a row of `ops_heartbeat` when they finish well; `/healthz/ops` answers 503 when the backup is older than 26 hours or the cron older than 150 minutes, and the failed workflow run is emailed by GitHub. See "Health, readiness and shutdown". Railway's own deployments list still shows the failed run, and its project notifications can mail it (deploy-railway.md, "Logs and monitoring") |
 | Deploy health check of `/healthz` | On every deploy, Railway | A new deployment takes traffic only once `/healthz` answers (timeout 300 s) |
 | Outside-in check of `/readyz` | Every 5 minutes, GitHub Actions `uptime.yml` | Skips unless the repo variable `LIVE_URL` is set; a failed run is emailed by GitHub. This is the only check of `/readyz` |
 | Outside-in check of `/healthz/ops` and `/demo` | Every 3 hours, GitHub Actions `uptime.yml` | Same variable and the same email. GitHub turns scheduled workflows off after 60 days with no commit to a public repository ("Health, readiness and shutdown") |
@@ -38,7 +38,7 @@ uv run readablestem ops restore-drill     # pg_dump, restore into a scratch data
 
 `ops cron` exits 1 if aggregation failed, but only after the purge has run. After a run in which
 both worked it records the `cron` heartbeat (`ops_heartbeat`); a run that failed records nothing,
-so `/healthz/ops` goes stale two hours after the last good one.
+so `/healthz/ops` goes stale 150 minutes after the last good one.
 `readablestem ops replay-erasures` is for restoring a backup ("Backups and restore").
 
 ## Retention
@@ -359,15 +359,15 @@ and says so on `/status`.
 `/healthz/ops` says the scheduled tasks ran. The `backup` service and `readablestem ops cron`
 each upsert one row of `ops_heartbeat` (name, `last_ok_at`, a short note of counts) when they
 finish well; the endpoint answers 200 while the backup is fresher than 26 hours (a day and two
-hours of slack) and the cron fresher than 2 hours (one missed run). A task that has never reported
-counts as late, so the endpoint is 503 after the first deploy of this table until both have run
-once (the next hourly cron, the next 08:17 UTC backup); do not switch the check on before then or
-the first run mails you. It is public and content-free like `/readyz`, with no rate limit of its
+hours of slack) and the cron fresher than 150 minutes (two missed runs). The migration that makes the table
+seeds both names with the time it ran, so the first deploy does not start with the check failing;
+a task that never reports goes stale on schedule. A task with no row at all counts as late. It is public and content-free like `/readyz`, with no rate limit of its
 own (a read of two rows), and it is not in the access log (`logging._QUIET_ROUTES`).
 
 **Alerts without a vendor** (`.github/workflows/uptime.yml`, needs the repository variable
-`LIVE_URL`). GitHub emails the repository owner when a scheduled run fails (Settings >
-Notifications > Actions). Every 5 minutes one job calls `/readyz` (with two retries), so an outage
+`LIVE_URL`). GitHub emails a failed scheduled run to the user who last edited the cron lines of
+`uptime.yml` (not necessarily the repository owner; Settings > Notifications > Actions, for that
+account). Whoever should get the mail should be the one who commits any change to those lines. Every 5 minutes one job calls `/readyz` (with two retries), so an outage
 is mailed within about ten minutes, then once per failed run until it is fixed. Every 3 hours a
 second job calls `/healthz/ops` and `/demo` and prints the 503 body, which names the stale task;
 three hours keeps a late backup or cron to a few mails a day instead of one per five minutes, and

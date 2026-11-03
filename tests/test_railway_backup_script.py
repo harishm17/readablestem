@@ -37,7 +37,11 @@ scratch=live
 if [[ "$args" == *ON_ERROR_STOP* ]]; then
   cat > /dev/null
   [ "${RESTORE_FAIL:-0}" = 1 ] && exit 3
+  touch "$STUB_LOG.restored"
   exit 0
+fi
+if [[ "$args" == *"DROP DATABASE"* && "${DROP_FAIL_LATE:-0}" = 1 && -e "$STUB_LOG.restored" ]]; then
+  exit 5
 fi
 case "$args" in
   *pg_tables*)
@@ -151,3 +155,11 @@ def test_a_failed_heartbeat_fails_the_run_but_keeps_the_proved_dump(run_backup):
     assert result.returncode == 1
     assert "backup_failed reason=heartbeat" in result.stdout
     assert len(list(run_backup.volume.glob("readablestem-*.sql.gz"))) == 1
+
+
+def test_a_failed_cleanup_of_the_scratch_database_does_not_lose_the_proved_dump(run_backup):
+    result = run_backup(DROP_FAIL_LATE="1")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "backup_warning reason=restore_cleanup" in result.stdout
+    assert len(list(run_backup.volume.glob("readablestem-*.sql.gz"))) == 1
+    assert "'backup'" in run_backup.heartbeat_log.read_text()

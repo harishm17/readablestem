@@ -25,8 +25,8 @@ BACKUP = "backup"
 CRON = "cron"
 
 # The backup runs daily (08:17 UTC): 26 hours is one day and two of slack. The cron runs
-# hourly (minute 7): two hours is one missed run.
-MAX_AGE: dict[str, timedelta] = {BACKUP: timedelta(hours=26), CRON: timedelta(hours=2)}
+# hourly (minute 7): 150 minutes is two missed runs.
+MAX_AGE: dict[str, timedelta] = {BACKUP: timedelta(hours=26), CRON: timedelta(minutes=150)}
 
 
 def beat(

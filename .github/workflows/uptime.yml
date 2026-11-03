@@ -5,14 +5,14 @@ name: Uptime
 # - Every 5 minutes: GET /readyz (database, worker, model provider). A failed run is emailed
 #   by GitHub, so a real outage sends an email per failed run until it is fixed.
 # - Every 3 hours (minute 3): GET /healthz/ops (the daily backup finished well in the last 26
-#   hours, the hourly cron in the last 2) and GET /demo. Three hours keeps a stale backup or
+#   hours, the hourly cron in the last 150 minutes) and GET /demo. Three hours keeps a stale backup or
 #   cron to a few emails a day instead of one per run; it still finds a missed cron within five
 #   hours and a missed backup within 29.
 #
 # Set the repository variable LIVE_URL (Settings > Secrets and variables > Actions >
 # Variables), e.g. https://readablestem.com. Unset: the jobs pass and do nothing.
-# Emails: Settings > Notifications > Actions (failed workflows), for the account that owns the
-# repository.
+# Emails: GitHub mails a failed scheduled run to the user who last edited the cron lines of
+# this file (not necessarily the owner). Settings > Notifications > Actions, for that account.
 #
 # GitHub disables scheduled workflows in a public repository after 60 days without a commit
 # (the repository's Actions tab shows a banner and sends an email when it does). A commit, or

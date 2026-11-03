@@ -4,7 +4,8 @@ All additive, each new column with a server default, so a release from before th
 working on the migrated schema:
 
 - `ops_heartbeat`: when the daily backup and the hourly cron last finished well
-  (`/healthz/ops`). Empty at the start, so the check stays unhealthy until both have run once.
+  (`/healthz/ops`). Seeded with both names at the time of the migration, so the first deploy
+  does not start with the check failing; a task that then never runs goes stale on schedule.
 - `erasure_ledger`: a hash of each erased user id and when, so a restored backup can have the
   erasure repeated (`readablestem ops replay-erasures`). Empty at the start.
 - `quota_days.spent_usd`: what a person's jobs cost that day, added when a model call settles.
@@ -39,6 +40,11 @@ def upgrade() -> None:
         sa.Column("last_ok_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("detail", sa.Text(), nullable=True),
         sa.PrimaryKeyConstraint("name"),
+    )
+    op.execute(
+        "INSERT INTO ops_heartbeat (name, last_ok_at, detail) VALUES "
+        "('backup', CURRENT_TIMESTAMP, 'seeded at migration'), "
+        "('cron', CURRENT_TIMESTAMP, 'seeded at migration')"
     )
     op.create_table(
         "erasure_ledger",
