@@ -42,6 +42,7 @@ SKIP = {
     ("POST", "/jobs"),
     ("POST", "/internal/cron/aggregate-and-purge"),
     ("GET", "/readyz"),
+    ("GET", "/healthz/ops"),  # 503 until the backup and cron have reported
 }
 
 
