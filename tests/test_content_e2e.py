@@ -151,6 +151,7 @@ def test_every_fixture_converts_with_every_feature_on(name):
         elements=stored.elements,
         fixes=stored.fixes,
         crops=output.crops,
+        page_labels=stored.page_labels,
     )
     assert again == html
     # Notices: known codes with a sentence each; they never add a decision.
