@@ -51,6 +51,7 @@ Content-free: kinds, reason codes and counts, never text (`to_record`).
 
 from __future__ import annotations
 
+import itertools
 import math
 import re
 import statistics
@@ -58,11 +59,14 @@ import time
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pymupdf
 
 from readablestem.core.types import PageType
+
+if TYPE_CHECKING:  # ink_strokes imports this module; the helpers are imported where used
+    from readablestem.pipeline import ink_strokes
 
 # detect v4 plus the design review's C1 changes (v5); v5.1 after fresh set 4: a cover over
 # part of a line is looked for, and a page of paper rules alone is blank; v5.2 after the
@@ -1226,6 +1230,17 @@ def _ink_candidates(
     chain_colour: tuple = ()
     chain_width = 0.0
     chain_sources: list[int] = []
+    # Per-sample ink (one small filled shape per pen sample): the short filled shapes in
+    # paint order, None where another kind of subpath was painted, and the candidate made
+    # from each. `ink_strokes` decides which runs of them are pen strokes.
+    seq: list[ink_strokes.Prim | None] = []
+    owners: list[_Candidate | None] = []
+    tones: dict[str, tuple] = {}
+
+    def other() -> None:
+        if seq and seq[-1] is not None:
+            seq.append(None)
+            owners.append(None)
 
     def flush() -> None:
         nonlocal chain, chain_sources
@@ -1247,6 +1262,14 @@ def _ink_candidates(
         if rect[2] < 0 or rect[3] < 0 or rect[0] > frame.width or rect[1] > frame.height:
             continue
         if rect[2] - rect[0] < STROKE_MIN_SIDE and rect[3] - rect[1] < STROKE_MIN_SIDE and filled:
+            for sub in _subpaths(d.get("items") or []):  # a dot is a sample of a stroke still
+                pts = _flatten(sub)[0]
+                prim = _sample_prim(pts, d, index, page, tones) if filled else None
+                if prim is None:
+                    other()
+                else:
+                    seq.append(prim)
+                    owners.append(None)
             continue  # a dot; a stroked tiny segment may still be part of a chain
         width = float(d.get("width") or 0.0)
         for sub in _subpaths(d.get("items") or []):
@@ -1281,18 +1304,100 @@ def _ink_candidates(
                 chain_sources.append(index)
                 counts[0] += curves
                 counts[1] += lines
+                other()
                 continue
             flush()
             box = _box(pts)
             if max(box[2] - box[0], box[3] - box[1]) > STROKE_MAX_SIDE:
+                other()
                 continue
             paint = d.get("fill") if filled else d.get("color")
             colour = tuple(round(v, 2) for v in paint or ())
             c = _candidate(pts, curves, lines, True, filled, width, display, (index,), colour)
             if c:
                 cands.append(c)
+            prim = _sample_prim(pts, d, index, page, tones) if filled else None
+            if prim is None:
+                other()
+            else:
+                seq.append(prim)
+                owners.append(c)
     flush()
-    return cands
+    return _with_sample_strokes(cands, seq, owners, display, tones)
+
+
+def _sample_prim(
+    pts: list[tuple[float, float]],
+    d: dict[str, Any],
+    index: int,
+    page: pymupdf.Page,
+    tones: dict[str, tuple],
+) -> ink_strokes.Prim | None:
+    """The filled subpath as `ink_strokes` reads it, when that is a short pen-sample shape."""
+    from readablestem.pipeline import ink_strokes
+
+    if d.get("fill") is None or len(pts) < 3:
+        return None
+    xs = [x for x, _ in pts]
+    ys = [y for _, y in pts]
+    if max(max(xs) - min(xs), max(ys) - min(ys)) > ink_strokes.SHORT_MAX:
+        return None  # not a pen sample: skips the shape measures
+    colour = tuple(round(v, 2) for v in d["fill"])
+    opacity = d.get("fill_opacity")
+    key = repr(colour)
+    tones[key] = colour
+    prim = ink_strokes.filled_prim(
+        pts, key, 1.0 if opacity is None else float(opacity), index, index, page.rect, Counter()
+    )
+    return prim if prim is not None and prim.kind == "short" else None
+
+
+def _with_sample_strokes(
+    cands: list[_Candidate],
+    seq: list[ink_strokes.Prim | None],
+    owners: list[_Candidate | None],
+    display: _Display,
+    tones: dict[str, tuple],
+) -> list[_Candidate]:
+    """Pen strokes drawn as one small filled shape per sample: the runs `ink_strokes`
+    takes for strokes (`sample_run_end`, dot grids left out) replace the candidates of
+    their shapes, which are discs to `_candidate`, with one candidate each."""
+    if not any(p is not None for p in seq):
+        return cands
+    from readablestem.pipeline import ink_strokes
+
+    grid = ink_strokes.dot_grid_members(seq)
+    live = [(p, c) for i, (p, c) in enumerate(zip(seq, owners, strict=True)) if i not in grid]
+    shapes = [p for p, _ in live]
+    gone: set[int] = set()
+    runs: list[_Candidate] = []
+    i = 0
+    while i < len(live):
+        j = ink_strokes.sample_run_end(shapes, i)
+        run = [p for p, _ in live[i:j] if p is not None]
+        if ink_strokes.is_sample_stroke(run):
+            gone.update(id(c) for _, c in live[i:j] if c is not None)
+            pts = [ink_strokes.centre(p.pts) for p in run]
+            xs = [x for p in run for x, _ in p.pts]
+            ys = [y for p in run for _, y in p.pts]
+            x0, y0, x1, y1 = min(xs), min(ys), max(xs), max(ys)
+            if STROKE_MIN_SIDE <= max(x1 - x0, y1 - y0) <= STROKE_MAX_SIDE:
+                length = sum(math.dist(a, b) for a, b in itertools.pairwise(pts))
+                sig = (
+                    False,
+                    0,
+                    len(pts),
+                    round(length / SIG_GRID),
+                    round(math.dist(pts[0], pts[-1]) / SIG_GRID),
+                    0,
+                )
+                width = statistics.median(p.width for p in run)
+                runs.append(
+                    _Candidate(display.box((x0, y0, x1, y1)), sig, True, True, width,
+                               (run[0].drawing,), tones[run[0].colour])
+                )  # fmt: skip
+        i = max(j, i + 1)
+    return [c for c in cands if id(c) not in gone] + runs
 
 
 def _summarise(page: pymupdf.Page, stats: InkStats, cands: list[_Candidate]) -> InkStats:
