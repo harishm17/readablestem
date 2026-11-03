@@ -2,14 +2,42 @@
 
 How ReadableSTEM measures its own output, on what data, and what the numbers leave out.
 
-Status (2026-10-13): the harness is built and tested offline, and real-model runs on the
-sample are committed as `data/eval/latest-<task>.json` (pipeline 0.4.0; see "Results"
-below). All of them come from three sections of one OpenStax book, the same sample the
-checks were developed on. They are development numbers: none of them
-is a held-out result, and they should not be read as an estimate for documents in general.
+Status (2026-11-02): the harness is built and tested offline, and real-model runs on the
+sample are committed as `data/eval/latest-<task>.json` (pipeline 0.5.0, Claude; see "Versions
+of the committed reports" and "Baselines and the gate" below). All of them come from three
+sections of one OpenStax book, the same sample the checks were developed on. They are
+development numbers: none of them is a held-out result, and they should not be read as an
+estimate for documents in general. The sections "Results (pipeline 0.4.0, ...)" and the
+held-out and real-paper sections that follow it describe runs of older pipeline versions and
+say which; they are kept as they were.
 
 The invented-content rate (how much of an output the PDF does not support, for ReadableSTEM
 and for other systems) has its own page: [eval-invented.md](eval-invented.md).
+
+## Versions of the committed reports
+
+Two version numbers exist and they are not the same thing. `__version__` in
+`src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
+pipeline changes. The version a result is measured under is the **pipeline version**,
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.1 today; its comment lists what
+each bump changed). Every report records it as `pipeline_version`, and so does a converted
+document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
+table. A number in these docs is quoted with the pipeline version that produced it, and a
+report from an older version is not edited to look current: it stays labelled with the
+version it was made under.
+
+The committed development-set reports (checked against the files by `tests/test_eval_docs.py`):
+
+| File | Run date | Pipeline | Models |
+|---|---|---|---|
+| `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
+| `latest-figures.json` | 2026-10-14 | 0.5.0 | same |
+| `latest-headings.json` | 2026-11-02 | 0.5.1 | same (the task calls no model; run with the fake client, model fields kept from the earlier run; `baseline-headings.json` stays the 2026-10-14 file) |
+| `latest-equations.json`, `latest-document.json`, `latest-tables-local.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`) |
+
+The dates are when the runs were made, not when the code was last changed: what keeps a
+latest report from going stale is the gate's `--require-current` check on prompt versions and
+model ids, the eval guard on pull requests, and the weekly live run below.
 
 ## The idea
 
@@ -591,7 +619,9 @@ After a prompt or model change, re-run the task, promote the new report `--as la
 and commit it with the change; CI's gate fails (exit 2) until you do.
 
 Baselines (2026-10-14, pipeline 0.5.0). `data/eval/baseline-<task>.json` and
-`latest-<task>.json` are the same run, one per task, made once on Claude
+`latest-<task>.json` were the same run, one per task (since then `latest-equations`,
+`latest-document` and `latest-tables-local` were re-run on 2026-10-21, also 0.5.0; "Versions
+of the committed reports"), made once on Claude
 (`MODEL_PROVIDER=anthropic`, `claude-opus-5-5` main, `claude-haiku-5-5` cheap, Opus as the
 figure judge) on the original development set (`data/gold`), and promoted with
 `eval promote ... --out-dir data/eval`. CI's eval-gate job therefore runs; it compares each
@@ -663,9 +693,8 @@ uv run readablestem eval sample --task equations --max-usd 0.10
 uv run readablestem eval sample --task figures --fraction 0.05 --week 2026-W41 --max-usd 0.10
 ```
 
-TODO(Harish): decide whether to schedule it (it spends money; `eval-live.yml` is
-manual-only on purpose), and whether opted-in production pages should join the sample
-once their review labels exist as gold.
+The scheduled run of `eval-live.yml` (below) does not use this sample. Whether opted-in
+production pages should join a sample once their review labels exist as gold is not decided.
 
 Public demo:
 
@@ -692,13 +721,73 @@ and a link to the original), `report.json` (the `DocumentResult` without the HTM
 `source.pdf` (the exact input) to `src/readablestem/web/static/demo/`. Pages outside the
 gold set are looked up live and pass the same license gate as `gold fetch`.
 
+### Weekly live run (`eval-live.yml`)
+
+The CI `eval-gate` job only compares the committed `latest-<task>.json` with its baseline, so
+on its own it cannot fail on a prompt or model change: nothing re-measures. `eval-live.yml`
+does. Every Monday at 06:17 UTC (and on demand, "Run workflow", with a choice of one task or
+all) it runs the full development sets against the production provider (Claude,
+`MODEL_PROVIDER=anthropic` in `.railway/railway.ts`), one job per task, then
+`readablestem eval gate --require-current` against the committed baseline. A regression, a
+changed judge, a stale prompt or model, or a partial run (the cap stopped it) fails the job
+and GitHub emails the owner. The reports are uploaded as artifacts (30 days) and never
+committed; to move a baseline, re-run locally and `eval promote` it.
+
+| Task | Run | Hard `--max-usd` | Baseline run cost (2026-10) |
+|---|---|---|---|
+| equations | 30 equations | $0.50 | $0.08 to $0.10 |
+| headings | 3 pages, no model call | $0.25 | $0.00 |
+| figures | 13 figures, Opus judge | $0.75 | $0.12 |
+| document | 3 sections, 43 PDF pages | $1.00 | $0.24 |
+| tables | `--mode model --styles grid` (no model-mode baseline: gated on its floors alone) | $0.45 | about $0.26 (see "Tables") |
+
+The caps add up to $2.95, under the $3.00 weekly ceiling the workflow checks before it runs
+anything; the expected spend is about $0.70 a week (the right column, same sets). Every cap
+is above one worst-case reservation of the main model (about $0.29), which is why the caps
+are not lower.
+
+The workflow needs the repository secret `ANTHROPIC_API_KEY`. Without it a scheduled run
+ends with a notice ("the weekly live eval is skipped") and spends nothing; a manual run fails
+with an error, so a missing key is never silent. Adding the secret is what turns the weekly
+spend on. The full development sets are used so that a report has the same items as its
+baseline (the gate refuses reports of other selections); Chromium and the fonts are
+installed as in `ci.yml`, and the OpenStax pages are fetched on the run.
+
+### Eval guard (`eval-guard.yml`)
+
+A pull request that changes a setting in `src/readablestem/config.py` that decides what a
+model answers (the model ids such as `ANTHROPIC_MAIN_MODEL` or `claude_check_model`, the
+`*_effort*` settings, `*max_output_tokens`, thinking and reasoning settings; an explicit list
+in `scripts/eval_guard.py`, compared by parsed value, so reformatting is not a change;
+timeouts, retries, concurrency and call limits are not on it) or a prompt (a `.md` file under
+`src/readablestem/models/prompts/`, subfolders included; a file moved with its content
+unchanged is not a change) fails unless it also changes the matching
+`data/eval/latest-*.json` report(s). The message points to "How to rerun". The mapping is in
+`scripts/eval_guard.py` (tests: `tests/test_eval_guard.py`): a prompt needs the reports of
+the tasks that use it (`equation*.md`: equations and document; `figure*.md`: figures and
+document; `judge_*`: figures; `check_equation` and `check_figure`: that task; `table.md`:
+tables local and document; any other prompt: document); a change to the Claude model pair
+needs all four Claude reports (equations, headings, figures, document); the OpenAI pair
+needs the tables report, which records it; any other model setting needs the document
+report.
+
+Opt-out, for a change that does not alter what a model is asked or which model answers (a
+renamed constant, a comment): add the label `eval-unchanged` to the pull request, or put a
+trailer `Eval-Unchanged: <reason>` in the last paragraph of any of its commit messages (the reason is required). The guard
+prints the waiver and the reports it did not need, so a reviewer sees it. Prompt text a
+model reads is never a refactor: change it and re-run.
+
 ## Results (pipeline 0.4.0, 2026-10-12, gpt-6.1-sol and gpt-6-luna)
 
-Reports: `data/eval/latest-<task>.json`. Sample: 3 sections of OpenStax *Physics* ch. 2 (CC
-BY 4.0). Small: read the confidence intervals before reading the point estimates.
+Historical: these are the runs of 2026-10-12 on pipeline 0.4.0 with the OpenAI models. They
+were committed as `data/eval/latest-<task>.json` then and were replaced on 2026-10-14 and
+2026-10-21 by the pipeline 0.5.0 runs on Claude ("Versions of the committed reports"); the
+numbers below are not those of the files now committed. Sample: 3 sections of OpenStax
+*Physics* ch. 2 (CC BY 4.0). Small: read the confidence intervals before reading the point
+estimates.
 
-Pipeline 0.4.0 (the content features, every flag off, as in production): all the
-committed reports are 0.4.0 runs. Equations, figures and document were re-run with the
+Pipeline 0.4.0 (the content features, every flag off, as in production): at the time all the
+committed reports were 0.4.0 runs. Equations, figures and document were re-run with the
 real models on 2026-10-12 (equations $0.052, figures $0.090 with the judge, document
 $0.145) and promoted with `eval promote --as latest`; tables is the local run of the
 same day (no model, `latest-tables-local.json`); headings is the 0.4.0 re-run of
@@ -1417,10 +1506,9 @@ decision, so "wrong cells not flagged" is 0 by construction; the floor matters f
 runs, which were not repeated. The wrapped last row of the orders-of-magnitude table is
 joined in the `grid` print (17 rows, "the known universe", "(current upper limit)");
 in the `booktabs` print the page break falls between rows; in the `norules` print the
-next page's part (one row under a repeated header, no rules) is not detected, so the
-row ends "(current" and the rest is read as headings and paragraphs (a detection miss of
-unruled tables, docs/tables.md "Known misses"; not fixed: tables get no further work
-for now).
+next page's part (one row under a repeated header, no rules) was not detected when this
+was measured, so the row ended "(current" and the rest was read as headings and
+paragraphs; `tables.find_continued` now finds it (docs/tables.md, "Continued tables").
 
 ## Page types (2026-10-09, no model)
 
@@ -1933,6 +2021,83 @@ development set (`data/gold`, 3 sections of Physics) F1 is unchanged, 0.9344 (pr
 0.877, recall 1.000, level accuracy 0.992) and the 9 group decisions are unchanged. Whether
 repeated-label groups should stay decisions was measured in four variants on both sets:
 docs/layout.md "Review tiers" has the table and the choice (one decision per group).
+
+### Structure fixes (2026-11-02)
+
+Six layout fixes (docs/layout.md: "The PDF's outline", plain numbered lines, run-in labels,
+maths in headings, page and line joins, the document's spelling of compounds), measured with
+the offline tasks only: `eval pipeline --task headings --fake`, `--task document --fake` (no
+model call; every call is refused, so its equation numbers are 0 and only layout, headings
+and the HTML checks mean anything) and `eval.structure_check`, before (3e2b7cd, a clean
+checkout of main) and after (this branch). Gold: the original development set (3 OpenStax
+Physics sections, 43 PDF pages, 121 gold headings) and the dev part of dev-v2 (28
+documents, 338 PDF pages, 683 gold headings; nothing from the sealed check part). No
+held-out data was used.
+
+| | Original set, before | after | dev-v2 dev, before | after |
+|---|---|---|---|---|
+| heading precision | 0.850 | 0.914 | 0.922 | 0.922 |
+| heading recall | 0.793 | 0.793 | 0.917 | 0.917 |
+| F1 | 0.821 | 0.850 | 0.919 | 0.919 |
+| level accuracy | 0.740 | 0.740 | 0.898 | 0.914 |
+| predicted headings | 113 | 105 | 679 | 679 |
+| required decisions (headings) | 6 | 4 | 59 | 59 |
+
+- Precision on the original set: the 8 fewer predicted headings are repeated "Solution",
+  "Discussion" and "Procedure" labels inside boxes on sections 2.2 and 2.3 (the gold counts
+  them as not headings); the 9 other predicted headings the gold lacks stay, among them the
+  labels on 2.1, a page set mostly in boxes. Recall does not move. 2 fewer required
+  decisions (their groups), and the document task's required decisions go 63 to 61 for the
+  same reason.
+- Level accuracy on dev-v2: the bookmarks of the authored Word and LaTeX documents
+  (`word-lecture`: 17 of its headings, `word-eq-images`: 6) give the author's own levels. The
+  OpenStax pages are printed by Chromium without an outline, so the original set cannot
+  move from this fix.
+- Document task: detection precision, detection recall, split gold equations, static and
+  axe violations are identical on both sets (0.732 / 1.000 on 3 sections; 0.672 / 0.870 on 28
+  documents). Structure check: identical (40 of 40 code blocks exact, 112 of 126 glossary
+  terms found).
+- A first version of the label rule (no inset test) lost 10 gold headings of the authored
+  documents and cost dev-v2 recall 0.9165 to 0.9019 (F1 0.9192 to 0.9112), and a second
+  (inset against the page's edge, not the column's) 2 of them (recall 0.9136). Both were
+  dropped for the inset against the column's edge, which loses none: docs/layout.md "Run-in
+  labels".
+- Not measured by these tasks: page joins, wrapped inline maths and compounds (no gold of
+  their own). A survey of the 67 PDFs in the repository (authored dev-v2 documents and test
+  fixtures, 1 to 8 pages) changed 8 of them: 2 paragraphs joined over a page break (both
+  reading right: "... Aluminium" / "sulfate has the formula ..."), no wrapped inline
+  equation (none occurs in them), and outline reasons on 35 headings in 6 PDFs. The unit
+  tests (`tests/test_layout_structure_fixes.py`) pin each fix on PDFs drawn in the test.
+- **The review-load flags moved the wrong way on the original set**, and this is not a
+  gain. Flag recall (the share of wrong headings that were in a required decision) fell
+  from 0.333 to 0.176 and flag precision from 0.833 to 0.750 (`review_load.flags`, not
+  gated). Why: the 8 repeated labels the run-in rule turned into bold text were wrong
+  headings that sat in required group decisions; they are now not headings at all, so wrong
+  headings fall from 42 to 34 and the wrong ones inside required decisions from 14 to 6,
+  but the 28 wrong headings that no decision asks about are unchanged, so the share asked
+  about is smaller. A person is asked about fewer headings (6 to 4 required decisions) and
+  fewer of them are wrong, which is the point of the rule; what it does not do is catch the
+  other wrong headings. On dev-v2 dev the same flags rose (precision 0.305 to 0.424, recall
+  0.248 to 0.393, 59 required decisions both times: the bookmarks put some headings right
+  that were wrong-level decisions). In the document task on the original set (fake client)
+  flag recall goes 0.611 to 0.562 and flag precision 0.972 to 0.971, the same effect.
+- `data/eval/latest-headings.json` is replaced with the new run (pipeline 0.5.1, fake
+  client; model fields kept from the earlier run because the task calls no model).
+  `baseline-headings.json` is **not** replaced: the gate (`heading_recall` -0.030 and
+  `heading_precision` -0.030 allowed) passes against the 2026-10-14 baseline (precision
+  0.850 to 0.914, recall the same; it notes the pipeline version change), and the ungated
+  flags above are the old baseline's to compare with. The document and equation baselines
+  and `latest-document.json` come from recorded model runs ($0.28 and up) that cannot be
+  made again offline: the document task's required decisions and flags with a real model
+  will be a little lower on heading decisions (2 of the original set's heading decisions
+  went; the fake run's 63 to 61 is that, not a model number), and are not re-recorded
+  here. `make reproduce-rerun` already failed on a clean checkout of main when run here
+  with no key (its headings re-run exited with status 2, and its tables numbers differ from
+  `latest-tables-local.json`); `eval pipeline --task headings --fake` reproduces the
+  numbers above.
+- Sample sizes are small and the gold is OpenStax Physics plus authored documents; none of
+  this is a rate on other documents. The outline fix needs a PDF that has bookmarks, which
+  no OpenStax page print has.
 
 ### Prose scripts, nuclides and pictures of equations (T2-3, T2-4, T2-5, 2026-10-14)
 

@@ -44,9 +44,10 @@ The review screen uses the same child, with the same memory cap, for two more th
   0-based pages (comma-separated, in that order) to stdout, for converting a large file in
   parts (`web.routes.parts`); with SHRINK `1` the pictures sharper than `SHRINK_ABOVE_DPI`
   are saved at `SHRINK_TO_DPI` first (`Document.rewrite_images`), which is what makes a part
-  of a heavy file small enough to convert. Unused objects of the pages left out are dropped,
-  so the part is smaller than the file in proportion. On any failure it writes nothing and
-  exits with status 2.
+  of a heavy file small enough to convert. A page's own label ("iv", "12") is kept on its
+  page of the part, so the output's page markers can say it. Unused objects of the pages
+  left out are dropped, so the part is smaller than the file in proportion. On any failure
+  it writes nothing and exits with status 2.
 - `python -m readablestem.web.pdf_probe sizes` prints {"ok": true, "sizes": [[W, H], ...]}:
   every page's size in points (for results stored before they recorded it).
 - `python -m readablestem.web.pdf_probe text PAGE X0,Y0,X1,Y1` prints {"ok": true, "text": "..."}:
@@ -422,7 +423,15 @@ def extract(data: bytes, pages: list[int], *, shrink: bool = False) -> bytes:
             raise ProbeRejected("no_such_page")
         if any(p < 0 or p >= doc.page_count for p in pages):
             raise ProbeRejected("no_such_page")
+        labels = [doc[p].get_label() for p in pages]  # `select` drops them
         doc.select(pages)
+        if any(labels):  # keep the printed page numbers: the part is read as pages of the file
+            doc.set_page_labels(
+                [
+                    {"startpage": i, "prefix": label, "style": "", "firstpagenum": 1}
+                    for i, label in enumerate(labels)
+                ]
+            )
         if shrink:
             doc.rewrite_images(
                 dpi_threshold=SHRINK_ABOVE_DPI, dpi_target=SHRINK_TO_DPI, quality=SHRINK_QUALITY

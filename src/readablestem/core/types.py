@@ -508,6 +508,11 @@ class Element(BaseModel):
     page_status: Literal["span", "layout"] | None = Field(
         default=None, exclude_if=lambda v: v is None
     )
+    # A paragraph that goes on over page breaks is one element with the page and box of its
+    # first part (`page`, `bbox`); this is the 0-based page of its last part. None: it ends
+    # on its own page. A writer that marks page breaks writes the markers of the pages in
+    # between before or after the element, never inside it.
+    last_page: int | None = Field(default=None, exclude_if=lambda v: v is None)
     # Elements read from an image of a scanned or handwritten page (ADR 0007): how sure the
     # page reader said it was of this block. None for every element that came from a text
     # layer. The review tier of such an element's fix follows it (`pipeline.image_page`).
@@ -894,6 +899,15 @@ class DocumentResult(BaseModel):
     # Pages the reviewer left out (`OmittedPage`); empty for every result before the
     # option existed, and left out of the JSON then.
     omitted: list[OmittedPage] = Field(default_factory=list, exclude_if=lambda v: not v)
+    # 0-based page -> the page's printed label ("iv", "12"): the PDF's own page label, else
+    # the number printed in the margin (`pipeline.page_labels`). Only pages that have one;
+    # the output's page markers say the PDF position for the rest. Left out of the JSON when
+    # empty, so a result stored before it existed reads the same.
+    page_labels: dict[int, str] = Field(default_factory=dict, exclude_if=lambda v: not v)
+    # A part of a longer file: the 0-based page of that file each of this result's pages is
+    # (index = this result's page), so the page markers can say "PDF page 31" for a page
+    # without a printed label. Empty for a document that is not a part.
+    source_pages: list[int] = Field(default_factory=list, exclude_if=lambda v: not v)
     # The page math pass (ADR 0006); None when the flag was off, and left out of the JSON.
     page_math: PageMathSummary | None = Field(default=None, exclude_if=lambda v: v is None)
     # The image page pass (ADR 0007); None when the flag was off, and left out of the JSON.

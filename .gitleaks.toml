@@ -1,10 +1,17 @@
-# Keep gitleaks' default rules and allow the one value they flag on purpose: PostHog's
-# project token (phc_...), which PostHog ships to every browser and which the analytics
-# loader (web/static/analytics.js, web/analytics.py) must contain. It can only add events
-# to the project; it reads nothing.
+# Keep gitleaks' default rules and allow two values they flag on purpose.
 [extend]
 useDefault = true
 
-[allowlist]
+# PostHog's project token (phc_...), which PostHog ships to every browser and which the
+# analytics loader (web/static/analytics.js, web/analytics.py) must contain. It can only add
+# events to the project; it reads nothing.
+[[allowlists]]
 description = "PostHog public project token"
 regexes = ['''phc_nT2JxCxLcAiSQGP4d4iJ2mWef6k3gNa6ptFaEJmz5cJ9''']
+
+# OpenStax page slugs in the figure gold ("page_key": "46-3-biogeochemical-cycles") trip the
+# generic-api-key rule because of the word "key". They are public section names.
+[[allowlists]]
+description = "OpenStax page slugs in figure gold"
+regexTarget = "line"
+regexes = ['''"page_key": "[a-z0-9-]+"''']

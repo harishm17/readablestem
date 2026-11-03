@@ -596,3 +596,104 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();
 })();
+
+/* When a job finishes (job.html, _job_status.html). The status box is polled by htmx; the
+ * server's answer for a finished job carries data-finished, and this:
+ *
+ * - sets the tab's title to the new status ("Converted: notes.pdf"), so a tab left in the
+ *   background shows it;
+ * - offers an opt-in browser notice ("Notify me when it finishes"). The Notification API is
+ *   asked only after the button is used; where it is missing, blocked, or the page is
+ *   already in front, nothing else happens. Nothing is sent to the server.
+ *
+ * The announcement itself is the polite live region the status box sits in
+ * (#job-status-region): it reads the new status. A page
+ * opened after the job finished says nothing more. Without this file the page is the same,
+ * only without the title change and the notice.
+ */
+(function () {
+  "use strict";
+
+  var region = document.getElementById("job-status-region");
+  if (!region) return;
+  var first = document.getElementById("job-status");
+  if (!first || first.hasAttribute("data-finished")) return;
+
+  var box = document.getElementById("notify-box");
+  var button = document.getElementById("notify-button");
+  var state = document.getElementById("notify-state");
+  var supported = typeof window.Notification === "function";
+
+  function say(text) {
+    if (state) state.textContent = text;
+  }
+
+  function showState() {
+    if (!supported || !box || !button) return;
+    var permission = window.Notification.permission;
+    if (permission === "denied") {
+      box.hidden = true; // blocked in the browser: nothing to offer
+      return;
+    }
+    box.hidden = false;
+    if (permission === "granted") {
+      button.setAttribute("aria-disabled", "true");
+      button.textContent = "Notice is on";
+      say("You will get a notice when it finishes, if this tab is in the background.");
+    }
+  }
+
+  if (supported && button) {
+    button.addEventListener("click", function () {
+      if (button.getAttribute("aria-disabled") === "true") return;
+      var done = function () {
+        var permission = window.Notification.permission;
+        if (permission === "granted") {
+          showState();
+        } else if (permission === "denied") {
+          say("Your browser blocked notices. This page's title still changes when it finishes.");
+          button.setAttribute("aria-disabled", "true");
+        } else {
+          say("No notice: you did not allow it.");
+        }
+      };
+      try {
+        var asked = window.Notification.requestPermission(done);
+        if (asked && typeof asked.then === "function") asked.then(done, done);
+      } catch (e) {
+        say("Your browser could not ask for notices.");
+      }
+    });
+    showState();
+  }
+
+  var finished = false;
+  document.addEventListener("htmx:afterSettle", function () {
+    var now = document.getElementById("job-status");
+    if (finished || !now || !now.hasAttribute("data-finished")) return;
+    finished = true;
+    var title = now.getAttribute("data-title");
+    if (title) document.title = title + " | ReadableSTEM";
+    if (box) {
+      // Keep the keyboard's place: focus on the button moves to the status box.
+      if (box.contains(document.activeElement)) {
+        region.setAttribute("tabindex", "-1");
+        region.focus();
+      }
+      box.hidden = true;
+    }
+    if (!supported || window.Notification.permission !== "granted") return;
+    if (!document.hidden && document.hasFocus()) return; // the page is in front: it shows
+    try {
+      var note = new window.Notification("ReadableSTEM", {
+        body: now.getAttribute("data-summary") || "Your document has finished.",
+      });
+      note.onclick = function () {
+        window.focus();
+        note.close();
+      };
+    } catch (e) {
+      /* some browsers allow notices only from a service worker: the title still changed */
+    }
+  });
+})();

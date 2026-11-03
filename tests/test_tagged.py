@@ -86,7 +86,8 @@ def test_a_tag_over_other_text_changes_nothing(pdf, layout):
     )
     elements = tagged.apply(layout.elements, wrong)
     assert [e.kind for e in elements if e.text] == [e.kind for e in layout.elements if e.text]
-    assert all(tagged_level(e) is None for e in elements)
+    # the heading tag matched nothing, so no reasons changed (the bookmarks are already on them)
+    assert [e.reasons for e in elements] == [e.reasons for e in layout.elements]
 
 
 def test_only_alt_text_that_says_something_is_kept(pdf, layout):
