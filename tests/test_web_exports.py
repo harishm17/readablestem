@@ -283,7 +283,109 @@ def test_download_all_counts_the_html_file_type(web):  # noqa: F811
     assert response.status_code == 200
     assert formats_of(web, job_id) == ["html"]
     names = zipfile.ZipFile(io.BytesIO(response.content)).namelist()
-    assert [n for n in names if n.endswith((".docx", ".epub"))] == []
+    assert [n for n in names if n.endswith((".docx", ".epub"))] == []  # the default is HTML
+
+
+@pytest.mark.parametrize(("kind", "media"), PARAMS)
+def test_download_all_can_make_the_zip_in_this_file_type(web, kind, media):  # noqa: F811
+    job_id = ready_job(web)
+    set_job(web, job_id, retain_until=utcnow() + timedelta(hours=2))
+    response = web.browser.get(f"/app/download?format={kind}")
+    assert response.status_code == 200 and response.headers["content-type"] == "application/zip"
+    word = "word" if kind == "docx" else kind
+    assert response.headers["content-disposition"].startswith(
+        f'attachment; filename="my-{word}-documents.zip"'
+    )
+    assert response.headers["content-security-policy"] == VIEW_CSP
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    assert archive.namelist() == [f"{folder_of(job_id)}.{kind}", "contents.txt"]
+    inner = archive.read(f"{folder_of(job_id)}.{kind}")
+    if kind == "docx":
+        words = " ".join(p.text for p in docx.Document(io.BytesIO(inner)).paragraphs)
+        assert "SECRET-DOC-TEXT" in words
+        assert "Word files (.docx)" in archive.read("contents.txt").decode()
+    else:
+        assert b"SECRET-DOC-TEXT" in zipfile.ZipFile(io.BytesIO(inner)).read("EPUB/content.xhtml")
+        assert "EPUB files" in archive.read("contents.txt").decode()
+    # recorded and the clock restarted, as for the single download
+    assert formats_of(web, job_id) == [kind]
+    left = as_utc(web.job(job_id).retain_until) - utcnow()
+    assert timedelta(hours=23, minutes=55) < left <= timedelta(hours=24)
+
+
+def test_download_all_in_another_file_type_leaves_a_draft_out(web):  # noqa: F811
+    finished_job(web)  # decisions open: a draft
+    response = web.browser.get("/app/download?format=epub")
+    assert response.status_code == 409 and "Nothing to download yet" in response.text
+
+
+def test_download_all_knows_only_its_file_types(web):  # noqa: F811
+    ready_job(web)
+    for bad in ("pdf", "", "HTML ", "docx.epub"):
+        response = web.browser.get("/app/download", params={"format": bad})
+        assert response.status_code == 400 and "Unknown file type" in response.text
+
+
+def test_download_all_without_pandoc_has_no_word_zip(web, monkeypatch):  # noqa: F811
+    ready_job(web)
+    monkeypatch.setattr(export_docx, "available", lambda *a, **k: False)
+    response = web.browser.get("/app/download?format=docx")
+    assert response.status_code == 503 and "not available here" in response.text
+    page = web.browser.get("/app").text
+    assert "format=docx" not in page and "/app/download?format=epub" in page
+    assert web.browser.get("/app/download?format=epub").status_code == 200
+
+
+def test_a_document_that_cannot_be_made_is_left_out_and_said(web, monkeypatch):  # noqa: F811
+    job_id = ready_job(web)
+    set_job(
+        web,
+        job_id,
+        html='<html lang="en"><body><img src="data:image/svg+xml;base64,PHN2Zz4="></body></html>',
+    )
+    response = web.browser.get("/app/download?format=epub")
+    assert response.status_code == 409 and "cannot be made in that file type" in response.text
+    assert formats_of(web, job_id) == []
+    assert web.browser.get("/app/download").status_code == 200  # the HTML zip is unaffected
+
+
+def test_when_all_turns_are_taken_a_word_zip_is_told_to_wait(web, monkeypatch):  # noqa: F811
+    ready_job(web)
+    monkeypatch.setattr(export_docx, "available", lambda *a, **k: True)
+    monkeypatch.setattr(exports, "_turns", threading.BoundedSemaphore(1))
+    monkeypatch.setattr(exports, "WAIT_S", 0.05)
+    assert exports._turns.acquire(timeout=1)
+    response = web.browser.get("/app/download?format=docx")
+    assert response.status_code == 503 and response.headers["retry-after"] == "60"
+
+
+def test_a_word_zip_holds_fewer_documents():
+    from readablestem.web import bundle
+
+    assert bundle.limit("docx") == 10 and bundle.limit("epub") == bundle.limit("html") == 25
+    made = bundle.build(
+        [(f"T{n}", f"t{n}.docx", b"x") for n in range(12)], left_out=2, file_type="docx"
+    )
+    assert len(made.included) == 10 and made.left_out_size == 4
+    contents = zipfile.ZipFile(io.BytesIO(made.data)).read("contents.txt").decode()
+    assert "4 more documents" in contents and "at most 10 documents" in contents
+
+
+def test_the_documents_page_offers_download_all_in_each_file_type(web):  # noqa: F811
+    ready_job(web)
+    page = web.browser.get("/app").text
+    assert 'id="download-all" href="/app/download"' in page  # the HTML zip stays first
+    assert (
+        '<a class="button-secondary" href="/app/download?format=epub">Download all as EPUB</a>'
+        in page
+    )
+    if export_docx.available():
+        assert "/app/download?format=docx" in page and "Download all as Word (.docx)" in page
+
+
+def test_the_one_zip_page_has_no_format_links_without_ready_documents(web):  # noqa: F811
+    finished_job(web)
+    assert "Download all as" not in web.browser.get("/app").text
 
 
 def test_an_unknown_file_type_is_a_bug(web):  # noqa: F811

@@ -557,7 +557,7 @@
   <p>For the words of a paragraph or a heading, a line that should be a heading, a picture or an equation the tool did not find, or a blank or cover page. They are on the review screen, beside the page.</p>
   <ul class="check-list">
     {% for number, out in tool_pages %}
-    <li><a href="/jobs/{{ job.id }}/review?page={{ number }}&amp;tools=1#page-tools">Page {{ number }}<span class="visually-hidden">: change its text, add something, or leave it out</span></a>{% if out %} (left out of the student file){% endif %}</li>
+    <li><a href="/jobs/{{ job.id }}/review?page={{ number }}&amp;tools=1#page-tools-summary">Page {{ number }}<span class="visually-hidden">: change its text, add something, or leave it out</span></a>{% if out %} (left out of the student file){% endif %}</li>
     {% endfor %}
   </ul>
 </section>
