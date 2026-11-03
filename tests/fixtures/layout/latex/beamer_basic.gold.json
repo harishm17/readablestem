@@ -1,0 +1,73 @@
+{
+  "source": "beamer_basic.tex",
+  "frames": [
+    {
+      "title": "Harmonic Motion",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "title": "The Equation of Motion",
+      "pages": [
+        1
+      ]
+    },
+    {
+      "title": "Energy",
+      "pages": [
+        2
+      ]
+    }
+  ],
+  "equations": [
+    {
+      "latex": "m",
+      "display": false,
+      "env": "$",
+      "frame": 0
+    },
+    {
+      "latex": "k",
+      "display": false,
+      "env": "$",
+      "frame": 0
+    },
+    {
+      "latex": "\\omega = \\sqrt{k/m}",
+      "display": false,
+      "env": "$",
+      "frame": 0
+    },
+    {
+      "latex": "T = 2\\pi/\\omega",
+      "display": false,
+      "env": "$",
+      "frame": 0
+    },
+    {
+      "latex": "m \\ddot{x} = -k x .",
+      "display": true,
+      "env": "equation",
+      "frame": 1
+    },
+    {
+      "latex": "x(t) = A \\cos(\\omega t + \\phi).",
+      "display": true,
+      "env": "equation",
+      "frame": 1
+    },
+    {
+      "latex": "\\begin{aligned} K &= \\tfrac{1}{2} m v^2, \\\\ U &= \\tfrac{1}{2} k x^2, \\end{aligned}",
+      "display": true,
+      "env": "align",
+      "frame": 2
+    },
+    {
+      "latex": "E = K + U",
+      "display": false,
+      "env": "$",
+      "frame": 2
+    }
+  ]
+}
