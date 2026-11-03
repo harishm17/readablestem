@@ -550,6 +550,7 @@ class PageGroupView:
     pages: list[int]  # 1-based, of every member
     size: int
     state: str = ""  # once decided: what they are now
+    reading: str = ""  # when they were tried from an image (the option): why they stayed images
     values: dict[str, str] = field(default_factory=dict)
     error: str | None = None
     notices: list[str] = field(default_factory=list)
@@ -643,6 +644,37 @@ PAGE_GROUP_HINTS = {
 }
 
 
+# Why a page asked to be read from an image stayed an image (`ImagePageRecord.outcome`).
+READING_FAILED = {
+    "refused": "the model did not give an answer",
+    "invalid_output": "the answer could not be used",
+    "empty": "nothing readable came back",
+    "timeout": "it took too long",
+    "api_error": "the model service had an error",
+    "budget_exceeded": "the spending limit for this document was reached",
+    "no_image": "the page could not be drawn",
+}
+READING_FAILED_OTHER = "it did not work"
+
+
+def reading_note(result: DocumentResult, pages: list[int]) -> str:
+    """When "Convert scanned or handwritten pages" was on and these pages were tried and
+    stayed images, say so and why (1-based `pages`); "" when the option was off or a page
+    was not tried. Content-free: a code from `READING_FAILED` per page."""
+    summary = result.image_pages
+    if summary is None:
+        return ""
+    why: dict[str, list[int]] = {}
+    for record in summary.per_page:
+        if record.outcome != "converted" and record.page + 1 in pages:
+            reason = READING_FAILED.get(record.outcome, READING_FAILED_OTHER)
+            why.setdefault(reason, []).append(record.page + 1)
+    return " ".join(
+        f"The tool tried to read {pages_phrase(found).lower()} from an image, but {reason}."
+        for reason, found in why.items()
+    )
+
+
 def pages_phrase(pages: list[int]) -> str:
     """ "Page 2" or "Pages 2, 3 and 5" (1-based)."""
     pages = sorted(set(pages))
@@ -705,6 +737,7 @@ def page_group_view(
         explain=words["explain"][1 if len(members) > 1 else 0],
         hint=hint,
         hidden=hidden,
+        reading=reading_note(result, pages) if not region else "",
         button=button,
         members=waiting,
         pages=pages,

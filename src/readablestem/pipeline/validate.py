@@ -16,7 +16,8 @@ LaTeX (`check_latex`)
     the argument of `\text`-like commands into its XML output unescaped, so `<`, `>` or
     `&` there become markup. Codes: `empty`, `too_long`, `unbalanced_braces`,
     `unbalanced_env`, `math_delimiter`, `comment`, `forbidden_command`,
-    `unknown_command`, `unknown_environment`, `bad_argument`, `markup_in_text`.
+    `unknown_command`, `unsupported_ce` (a `\\ce{...}` the chemistry subset could not write out,
+    alone; `pipeline/chem.py`), `unknown_environment`, `bad_argument`, `markup_in_text`.
 
 Conversion (`safe_latex_to_mathml`)
     latex2mathml 3.81.1 renders `aligned` and `gathered` as one flat row with literal
@@ -281,7 +282,9 @@ def check_latex(latex: str) -> list[Check]:
     braces_ok = True
     env_stack: list[str] = []
     env_code: str | None = None
-    forbidden = unknown = unknown_env = dollar = comment = bad_argument = markup = False
+    unknown_ce = forbidden = unknown = unknown_env = dollar = comment = bad_argument = markup = (
+        False
+    )
     for kind, value, end in _tokens(latex):
         if kind == "open":
             depth += 1
@@ -297,6 +300,8 @@ def check_latex(latex: str) -> list[Check]:
         elif kind == "word":
             if value in FORBIDDEN_COMMANDS:
                 forbidden = True
+            elif value == "ce":
+                unknown_ce = True  # a \ce that `chem.expand_ce` could not write out
             elif value not in ALLOWED_COMMANDS:
                 unknown = True
             elif value in TEXT_MODE_COMMANDS:
@@ -316,13 +321,14 @@ def check_latex(latex: str) -> list[Check]:
                     env_code = "unbalanced_env"
     if env_stack:
         env_code = "unbalanced_env"
+    unknown_code = "unknown_command" if unknown else "unsupported_ce" if unknown_ce else None
     checks += [
         _check("latex.balanced_braces", None if braces_ok and depth == 0 else "unbalanced_braces"),
         _check("latex.balanced_environments", env_code),
         _check("latex.no_math_delimiters", "math_delimiter" if dollar else None),
         _check("latex.no_comments", "comment" if comment else None),
         _check("latex.no_forbidden_commands", "forbidden_command" if forbidden else None),
-        _check("latex.allowed_commands", "unknown_command" if unknown else None),
+        _check("latex.allowed_commands", unknown_code),
         _check("latex.allowed_environments", "unknown_environment" if unknown_env else None),
         _check("latex.command_arguments", "bad_argument" if bad_argument else None),
         _check("latex.plain_text_arguments", "markup_in_text" if markup else None),

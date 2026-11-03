@@ -122,7 +122,7 @@ def _letters(text: str) -> str:
 
 
 def _stream(latex: str) -> tuple[str, ...] | None:
-    cleaned = equation_step.strip_trailing_punctuation(equation_step.clean_latex(latex))
+    cleaned = equation_step.strip_trailing_punctuation(equation_step.read_latex(latex))
     if not cleaned.strip():
         return None
     mathml, _ = equation_step._convert(cleaned, "inline")
