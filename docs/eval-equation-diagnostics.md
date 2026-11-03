@@ -18,6 +18,9 @@ of the product.
 
 ## Method
 
+- **Inputs.** The scripts need the real-world cache at `~/.cache/readablestem/realworld` (recorded runs under `runs/`,
+  gold and cut PDFs under `gold/`, source papers under `papers/`). It is not in the repository; without it they stop.
+
 - **Splits and runs** (gold equations): dev 2,350 (`rs-allow`), dev2 2,350 (`main0`), held-out 1,826 (`rs`), fresh 1,836
   (`fresh-on`), fresh2 1,639, fresh3 1,779, fresh4 1,600 (`after`). dev and dev2 are the same 25 papers with the gold made
   again, so sums leave dev out (11,030 gold in the sums). The table reading is reading B (the maths cells of a rebuilt
@@ -125,4 +128,6 @@ against script style 56, bold against plain 28, a script glyph against double-st
   line of a page can be another occurrence of the same text.
 - A lone `\pm` is a symbol in a table cell; whether the gold should count it as an equation is a scoring question this
   report does not settle.
+- Any rule built from these tables cannot be validated on these same splits: they were looked at here, so only a fresh,
+  never-used set can show whether a rule works.
 - Nothing here was tuned: no threshold was chosen on a split, and none of the numbers is a claim about a system.

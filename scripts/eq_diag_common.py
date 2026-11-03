@@ -89,7 +89,7 @@ class Split:
 
 def load_split(part: str, run: str | None = None, reading: str = "cells") -> Split:
     """The split's gold and the recorded items of `run`. `reading` is `cells` (table maths cells
-    count as equations, the reading the plan's numbers use) or `registered`."""
+    count as equations, as a reader of the output HTML counts them) or `registered`."""
     report = _load_script("realworld_report")
     run = run or DEFAULT_RUN[part]
     gold = {r["id"]: r for r in pe.load_gold(ROOT / "gold" / part) if r.get("kind") == "equation"}
@@ -291,7 +291,7 @@ def locate_in_order(
 # ============================================================================ glyph evidence
 
 # Fonts that carry maths only (parse.MATH_FONT is the layout's own list), by the family the
-# plan names; anything else the layout's list matches is "other maths font".
+# the diagnostics report; anything else the layout's list matches is "other maths font".
 TEX_FAMILIES = ("CMMI", "CMSY", "CMEX", "MSBM")
 
 
