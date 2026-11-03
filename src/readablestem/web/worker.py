@@ -6,7 +6,9 @@ queue is safe with several workers or instances:
 - Claiming is atomic. Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` (two workers never
   wait on, or take, the same row). SQLite: a conditional UPDATE (`... WHERE status =
   'queued'`) whose rowcount says who won. Fresh jobs go before retried ones (fewest
-  attempts first, then oldest), so a PDF that keeps killing the process cannot jump
+  attempts first); within that people take turns (the owner served least recently first,
+  then oldest: `web.fair_queue`), so one person's ten documents never keep another
+  person's one waiting behind all of them. A PDF that keeps killing the process cannot jump
   ahead of everyone else's work after each restart. Jobs of someone removed from the
   allowlist are never claimed (removal also stops the ones already queued or running;
   see `web.auth.set_allowed`).
@@ -102,6 +104,7 @@ from readablestem.web import combine as combine_rules
 from readablestem.web import retry as retry_rules
 from readablestem.web.database import as_utc, rowcount
 from readablestem.web.db import Blob, Job, JobStatus, ReviewEdit, User, session_scope, utcnow
+from readablestem.web.fair_queue import claim_order_by
 from readablestem.web.isolated_convert import ConversionFailed, convert_isolated, self_check
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.provider_health import HEALTH
@@ -519,7 +522,8 @@ class Worker:
         return bool(row[0]), bool(row[1])
 
     def claim(self, now: datetime | None = None) -> Claim | None:
-        """Take the next queued job (fewest attempts, then oldest), or None.
+        """Take the next queued job (`fair_queue`: fewest attempts, then the person served
+        least recently, then oldest), or None.
 
         Only jobs whose owner is still on the allowlist are taken."""
         now = now or self.clock()
@@ -537,7 +541,7 @@ class Worker:
             select(Job.id)
             .join(User, User.id == Job.user_id)
             .where(Job.status == JobStatus.QUEUED, *owners)
-            .order_by(Job.attempts, Job.created_at, Job.id)
+            .order_by(*claim_order_by(Job))
             .limit(1)
         )
         for _ in range(5):  # SQLite: lose a race, try the next job

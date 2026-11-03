@@ -21,7 +21,7 @@
   </form>
   {% else %}
 
-  <section class="tool-section" id="page-tools-edit" aria-labelledby="edit-title">
+  <section class="tool-section" id="page-tools-edit" aria-labelledby="edit-title" tabindex="-1">
     <h3 id="edit-title" class="part-label">Change the words, or make a line a heading</h3>
     {% if tools.lines %}
     <p class="hint" id="edit-hint">Choose a paragraph, a list item or a heading on this page. The tool's own mistakes are changed here; an equation, a figure or a table is changed in its own decision.</p>
@@ -74,7 +74,7 @@
     {% endif %}
   </section>
 
-  <section class="tool-section" id="page-tools-add" aria-labelledby="add-title">
+  <section class="tool-section" id="page-tools-add" aria-labelledby="add-title" tabindex="-1">
     <h3 id="add-title" class="part-label">Add something the tool missed</h3>
     {% set add = tools.add %}
     {% if add.confirming %}
@@ -131,7 +131,7 @@
     {% endif %}
   </section>
 
-  <section class="tool-section" id="page-tools-omit" aria-labelledby="omit-title">
+  <section class="tool-section" id="page-tools-omit" aria-labelledby="omit-title" tabindex="-1">
     <h3 id="omit-title" class="part-label">Leave this page out</h3>
     {% if tools.blank %}<p>This page looks blank.</p>{% endif %}
     <p class="hint" id="omit-hint">For a blank page or a cover. The page is left out of the student file and of this review, and the file says that it is not there. You can put it back.</p>

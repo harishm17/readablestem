@@ -2,8 +2,8 @@
 
 A protocol you can run alone, on a Mac, with VoiceOver in Safari (Chrome is optional, see
 the end). It checks what the automated tests cannot: what a screen reader says. The
-results will feed the accessibility conformance report that is being drafted (there is
-none yet) and the testing line in [vendor-information.md](vendor-information.md), which
+results will feed the draft accessibility conformance report ([acr/acr-draft.md](acr/acr-draft.md);
+it is not published) and the testing line in [vendor-information.md](vendor-information.md), which
 today says nobody has tested with a screen reader. Until a session is recorded, rows that
 depend on screen reader behaviour are not claimed as supported.
 
