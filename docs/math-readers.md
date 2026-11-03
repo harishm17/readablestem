@@ -49,7 +49,9 @@ The send loop (`engine.py`) follows `models/openai_client.py`:
   together, inside the job's own caps (`engine.ReaderBudget`, shared by the readers
   `build_readers` makes). Past it a read raises `BudgetExceeded("reader_usd")` before the job's
   budget is touched: the caller treats that as "no second reading for this expression", never
-  as a failed job, so second readings cannot use up the dollars the conversion needs.
+  as a failed job (the message code is `budget_reader_usd`, `web/messages.py`; it is only ever a note
+  on a fix that stands: a failed fix with a `budget_` reason stops the whole job in `pipeline/run.py`),
+  so second readings cannot use up the dollars the conversion needs.
 - Each send is bounded by `MODEL_TIMEOUT_S`. Connection errors, timeouts and HTTP 408, 409,
   429 and 5xx are resent up to `MODEL_MAX_RETRIES` times, each resend reserving and settling on
   its own, with the same backoff and `retry-after` rule; a 429 pauses the gate of the provider ("anthropic"
