@@ -1332,9 +1332,10 @@ def review_list(
     return response
 
 
-def _split_redirect(job_id: str, result: DocumentResult, after: str | None) -> Response:
+def _split_redirect(owned_id: str, result: DocumentResult, after: str | None) -> Response:
     """To the review screen's next decision still open after `after` (an element id or a
-    group key; None: the first one still open), or to its done state."""
+    group key; None: the first one still open), or to its done state. `owned_id` is the id
+    of the owned job row, never the request's."""
     from readablestem.web import queue
     from readablestem.web.routes.split import review_url
 
@@ -1342,7 +1343,7 @@ def _split_redirect(job_id: str, result: DocumentResult, after: str | None) -> R
     current = queue.find(decisions, after) if after else None
     landing = queue.next_open(decisions, current)
     item = landing.key if landing is not None else None
-    return RedirectResponse(review_url(job_id, item=item), status_code=303)
+    return RedirectResponse(review_url(owned_id, item=item), status_code=303)
 
 
 def _invalid_page(
@@ -1386,7 +1387,7 @@ def _stale_page(
 def _refuse_stale(job: Job, version: str) -> None:
     """Raise ReviewStale when the form was drawn before the job's last review write."""
     if is_stale(job.result_version, version):
-        raise ReviewStale()
+        raise ReviewStale(job.id)
 
 
 @router.post("/jobs/{job_id}/review/{element_id}", dependencies=[Depends(require_csrf)])
@@ -1478,6 +1479,7 @@ def review_action(
             notation.in_force(ctx.factory, ctx.settings, job_id),
         ):
             job = owned_job(session, job_id, user, lock=True)
+            owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
             _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
@@ -1527,9 +1529,10 @@ def review_action(
             # sees it as it is now.
             from readablestem.web.routes.split import review_url
 
-            return RedirectResponse(review_url(job_id, item=element_id), status_code=303)
-        return _split_redirect(job_id, result, element_id)
-    response = RedirectResponse(_landing(job_id, result, element_id), status_code=303)
+            item = change_made.fix.element_id  # the stored fix's id, not the path's
+            return RedirectResponse(review_url(owned_id, item=item), status_code=303)
+        return _split_redirect(owned_id, result, element_id)
+    response = RedirectResponse(_landing(owned_id, result, element_id), status_code=303)
     return keep_filter(response, flt)
 
 
@@ -1556,10 +1559,10 @@ def keep_filter(response: Response, flt: str) -> Response:
     return response
 
 
-def _landing(job_id: str, result: DocumentResult, element_id: str) -> str:
+def _landing(owned_id: str, result: DocumentResult, element_id: str) -> str:
     landing = next_to_review(result, element_id)
     anchor = review_anchor(result, landing) if landing else "review-progress"
-    return list_url(job_id, anchor)
+    return list_url(owned_id, anchor)
 
 
 GROUP_DONE = {
@@ -1583,6 +1586,7 @@ def _group_action(
     try:
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
+            owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
             _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
@@ -1619,16 +1623,20 @@ def _group_action(
             # open: the reviewer stays on it to choose a level for them.
             from readablestem.web.routes.split import review_url
 
-            return RedirectResponse(review_url(job_id, item=group_key), status_code=303)
-        return _split_redirect(job_id, result, group_key)
+            # The group's key as the stored fixes carry it, not the path's.
+            kept_key = outcome.left[0].group_key
+            return RedirectResponse(review_url(owned_id, item=kept_key), status_code=303)
+        return _split_redirect(owned_id, result, group_key)
     landing = None
     if not outcome.left and outcome.changes:
         landing = next_to_review(result, outcome.changes[-1].fix.element_id)
     if outcome.left or not outcome.changes:
-        anchor = group_anchor(group_key) if outcome.left else "review-progress"
+        anchor = (
+            group_anchor(outcome.left[0].group_key or "") if outcome.left else "review-progress"
+        )
     else:
         anchor = review_anchor(result, landing) if landing else "review-progress"
-    return RedirectResponse(list_url(job_id, anchor), status_code=303)
+    return RedirectResponse(list_url(owned_id, anchor), status_code=303)
 
 
 def _page_group_action(
@@ -1649,6 +1657,7 @@ def _page_group_action(
             raise ReviewInvalid([FieldError(f"group-actions-{group_key}", message)])
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
+            owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
             _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
@@ -1677,10 +1686,10 @@ def _page_group_action(
         message = "Nothing changed: none of these were waiting for a decision."
     flash(request, message, element_id=HEADING_GROUP_FLASH + group_key)
     if view != LIST_VIEW:
-        return _split_redirect(job_id, result, group_key)
+        return _split_redirect(owned_id, result, group_key)
     landing = next_to_review(result, outcome.changes[-1].fix.element_id) if n else None
     anchor = review_anchor(result, landing) if landing else "review-progress"
-    return RedirectResponse(list_url(job_id, anchor), status_code=303)
+    return RedirectResponse(list_url(owned_id, anchor), status_code=303)
 
 
 # A decided group decided again ("Change all 11" on the review screen).
@@ -1848,15 +1857,19 @@ def undo(
     try:
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
+            owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
             if not version.strip():
-                raise ReviewStale()
+                raise ReviewStale(owned_id)
             _refuse_stale(job, version)
             edits = last_write(session, job.id, job.result_version or 0)
             if not can_undo(edits):
-                raise LookupError("nothing to undo")
+                raise _NothingToUndo(owned_id)
             result = DocumentResult.model_validate(job.result_json or {})
-            changes = undo_last(result, [(e.element_id, e.before or {}) for e in edits])
+            try:
+                changes = undo_last(result, [(e.element_id, e.before or {}) for e in edits])
+            except LookupError:  # a fix is gone, or a snapshot cannot be put back
+                raise _NothingToUndo(owned_id) from None
             for change in changes:
                 if isinstance(change, StructureChange) and change.removed:
                     drop_crops(session, job.id, change.removed)
@@ -1865,13 +1878,13 @@ def undo(
             written = bump_result_version(job)
             retention.restart_clock(job, get_ctx(request).settings)
             session.add_all(_review_edit(job.id, user, c, written) for c in changes)
-    except ReviewStale:
+    except ReviewStale as exc:
         log_event(logger, "review_stale", job_id=job_id)
         flash(request, "Nothing was undone: this document changed after this page was opened.")
-        return _back(job_id, view)
-    except LookupError:
+        return _back(exc.job_id, view)
+    except _NothingToUndo as exc:
         flash(request, "There is nothing to undo here.")
-        return _back(job_id, view)
+        return _back(exc.job_id, view)
     log_event(logger, "review_undo", job_id=job_id, changed=len(changes))
     from readablestem.web.routes.split import review_url
 
@@ -1881,10 +1894,10 @@ def undo(
         flash(request, "Undone. The document is as it was before.", element_id=None)
         page = structural[0].page
         where = review_url(
-            job_id, page=page + 1 if page is not None else None, anchor="page-tools", tools=True
+            owned_id, page=page + 1 if page is not None else None, anchor="page-tools", tools=True
         )
         if view == LIST_VIEW:
-            where = list_url(job_id, "review-progress")
+            where = list_url(owned_id, "review-progress")
         return RedirectResponse(where, status_code=303)
     fixes = [c.fix for c in changes if isinstance(c, ReviewChange)]
     many = len(fixes) > 1
@@ -1892,7 +1905,7 @@ def undo(
     message = (UNDO_PENDING if any(f.pending for f in fixes) else UNDO_BACK).format(**words)
     if view == SYMBOLS_VIEW:  # the Symbols screen: back on it, no Undo under an Undo
         flash(request, message, element_id=SYMBOLS_FLASH, undo=False)
-        return RedirectResponse(symbols_url(job_id, "split"), status_code=303)
+        return RedirectResponse(symbols_url(owned_id, "split"), status_code=303)
     keys = {f.group_key for f in fixes}
     if len(fixes) == 1:
         target, flashed = fixes[0].element_id, fixes[0].element_id
@@ -1904,17 +1917,26 @@ def undo(
         target, flashed = slug, GROUP_FLASH + slug
     flash(request, message, element_id=flashed)
     if view == LIST_VIEW:
-        where = RedirectResponse(list_url(job_id, _stale_anchor(result, target)), status_code=303)
+        where = RedirectResponse(list_url(owned_id, _stale_anchor(result, target)), status_code=303)
         return keep_filter(where, flt)
     item = target if target and kind_for_slug(target) is None else None
-    return RedirectResponse(review_url(job_id, item=item), status_code=303)
+    return RedirectResponse(review_url(owned_id, item=item), status_code=303)
 
 
-def _back(job_id: str, view: str) -> Response:
+class _NothingToUndo(Exception):
+    """The last write cannot be undone; carries the owned job row's id for the redirect."""
+
+    def __init__(self, job_id: str) -> None:
+        super().__init__("nothing to undo")
+        self.job_id = job_id
+
+
+def _back(owned_id: str, view: str) -> Response:
+    """Back to the view the Undo form was on, for the owned job."""
     if view == SYMBOLS_VIEW:
-        return RedirectResponse(symbols_url(job_id, "split"), status_code=303)
+        return RedirectResponse(symbols_url(owned_id, "split"), status_code=303)
     if view == LIST_VIEW:
-        return RedirectResponse(list_url(job_id, "review-progress"), status_code=303)
+        return RedirectResponse(list_url(owned_id, "review-progress"), status_code=303)
     from readablestem.web.routes.split import review_url
 
-    return RedirectResponse(review_url(job_id), status_code=303)
+    return RedirectResponse(review_url(owned_id), status_code=303)

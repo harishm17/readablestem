@@ -83,6 +83,7 @@ def save_feedback(
         return _page(request, job_id, user, values=values, errors=errors, status_code=422)
     with session_scope(get_ctx(request).factory) as session:
         job = owned_job(session, job_id, user)
+        owned_id = job.id  # the redirect is built from the owned row, not the request
         if events.answered(session, user.id, job.id):
             message = "You had already answered for this document, so your first answers are kept."
         elif answers.empty:
@@ -98,4 +99,4 @@ def save_feedback(
         minutes=answers.minutes is not None,
     )
     flash(request, message)
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+    return RedirectResponse(f"/jobs/{owned_id}", status_code=303)

@@ -116,7 +116,7 @@ def relabel(
         return done.changes
 
     try:
-        changes, _ = write_review(request, job_id, user, version, make, kind="group")
+        changes, _, owned_id = write_review(request, job_id, user, version, make, kind="group")
     except ReviewStale:
         log_event(logger, "review_stale", job_id=job_id)
         return _page(request, job_id, user, view=view, stale=True, status_code=409)
@@ -134,4 +134,4 @@ def relabel(
         left_out=len(left_out),
     )
     flash(request, inventory.done_message(done), element_id=SYMBOLS_FLASH)
-    return RedirectResponse(symbols_url(job_id, view), status_code=303)
+    return RedirectResponse(symbols_url(owned_id, view), status_code=303)

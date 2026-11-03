@@ -20,6 +20,14 @@
   PDF; six of the strict xfails of `tests/test_layout_beamer_math.py` now pass (one test was reworded: a frame's title is a heading once).
 - Pipeline version 0.5.2 to 0.5.3: deck output and ligature text change; results from 0.5.2 load
   unchanged.
+## Unreleased: redirects built from owned rows (branch sec/redirects-from-owned-job)
+
+- Every redirect in the review, edit, bulk, course, job-settings, feedback and job routes takes its job or course id
+  from the row the ownership check returned, never from the request's path or form. `write_review` and
+  `write_structure` return that id, and the `ReviewStale` and `ReviewInvalid` they raise carry it. The item a form
+  names is looked up in the stored result before it is put in an address. No change for a visitor; it removes the
+  CodeQL `py/url-redirection` alerts at the root. Test: `tests/test_web_redirects_owned.py`.
+
 ## Unreleased: symbol inventory (branch hw/symbol-inventory)
 
 - Symbols screen (`GET/POST /jobs/{id}/symbols`, `web/inventory.py`, `routes/inventory.py`): for a document
