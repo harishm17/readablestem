@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased: slide decks (branch layout/beamer-slides)
+
+- Slide decks (`pipeline/slides.py`, docs/layout.md "Slide decks"): a Beamer file, or a slide-shaped
+  file whose pages share labels, is read frame by frame. An overlay step whose every line and
+  picture is also on the frame's last page is not read at all (no crop, no model call, not in the
+  output); a step that differs (`\only`) stays and its heading says "(step 1 of 2)". Frame titles
+  are headings again (they were dropped as running headers), a theme's headline text and bar and a
+  lone slide number are dropped, two-column frames are read left then right, and a bullet that
+  wraps onto a line of maths ("... zero at" / "x = 0.") is not a display equation. On the Beamer
+  fixtures: `beamer_overlay` 6 pages to 2, the new `slides_steps` 13 to 6; no line of a last step is lost.
+- Fix (every PDF): a ligature's characters (`ff`, `fi`, `ffi`) come out in order. MuPDF boxes the second
+  letter with no width, and everything that sorts by position put it after the next letter ("Stifnf ess",
+  "Ofcfi e", "Specifci"). Found on the repo's PDFs: table cells of five files.
+- Fix: a PDF page label that the PDF writes as UTF-16 (xdvipdfmx, so every Tectonic deck) is read
+  (`page_labels.pdf_label`); it was refused as "<FEFF0031>" and the page markers fell back to the
+  footline number.
+- Tests: `tests/test_layout_slides.py` and `tests/fixtures/layout/latex/slides_steps.tex` with its
+  PDF; six of the strict xfails of `tests/test_layout_beamer_math.py` now pass (one test was reworded: a frame's title is a heading once). The pipeline
+  version is not bumped here.
+
 ## Unreleased: page witness dev run (branch eq/e1-witness-dev)
 
 - `scripts/eq_dev_run.py` (new): the page witness on or off over twelve development papers, crop answers

@@ -98,13 +98,14 @@ def test_only_the_pages_asked_for_are_labelled_and_a_bad_pdf_gives_none():
     assert read(b"not a pdf", range(3)) == {}
 
 
-def test_the_page_numbers_of_latex_documents_are_found_and_slides_print_none():
+def test_the_page_numbers_of_latex_documents_are_found_and_slides_have_their_frame_numbers():
     def found(name: str, pages: int) -> dict[int, str]:
         return read((LATEX / name).read_bytes(), range(pages))
 
     assert found("tables.pdf", 4) == {0: "1", 1: "2", 2: "3", 3: "4"}
     assert found("calculus_notes.pdf", 2) == {0: "1", 1: "2"}
-    assert found("kinematics_slides.pdf", 3) == {}
+    # a Beamer deck's own labels (hyperref: one per frame, written as UTF-16) are its slide numbers
+    assert found("kinematics_slides.pdf", 3) == {0: "1", 1: "2", 2: "3"}
 
 
 def test_a_part_cut_from_a_file_keeps_its_pages_labels():

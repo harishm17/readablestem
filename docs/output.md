@@ -306,7 +306,9 @@ document in another language marks it `lang="en"`).
   "Page 12" for a printed label; "PDF page 5" for a page without one, when any page of the
   document has one (so two different pages never both read "Page 5"); "Page 5" (the position
   in the PDF) when no page has a printed label. The printed label of a page is, in order:
-  1. the PDF's own page label (`/PageLabels`: "iv", "12"; `Page.get_label`);
+  1. the PDF's own page label (`/PageLabels`: "iv", "12"; `Page.get_label`; a Beamer deck's is
+     its frame number, so the steps of one frame that are all kept share it, and the steps that
+     are not read at all (`docs/layout.md`, "Slide decks") have no marker);
   2. the number printed alone in the top or bottom 7 % of the page ("7", "Page 7", "- 7 -",
      "7 of 30", "7 / 30", a roman numeral), when at least two pages show a number at the same offset
      from the PDF's position (so one figure number in a margin is not taken for a page

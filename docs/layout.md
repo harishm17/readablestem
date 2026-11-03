@@ -635,6 +635,69 @@ Modern Sans):
   letters, or has a relation sign and no longer italic run: "at" in `v = v₀ + at` is
   not the English word. Beamer captions have no number ("Figure: ...") and still attach.
 
+### Slide decks (`pipeline/slides.py`, 2026-11-03)
+
+A deck is read as a sequence of slides, not of pages. `_read_deck` (in `_analyze_document`,
+after the page rows are read, before the margin filter) shows `slides.detect` every selected
+page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
+
+- **Detect.** At least 80 % of the pages are slide-shaped (landscape 4:3, 16:9 or 16:10, within
+  2 %; a landscape Letter or A4 sheet is not), and either `/Creator` says Beamer or the file has
+  consecutive pages that share a page label. Anything else is read as before (`_SLIDE_DECK`
+  False: no rule below applies). A page kept whole as its image (a photographed slide) has no
+  text, is never dropped, and never makes the pages beside it a frame.
+- **Frames.** Consecutive pages with the same label are one frame (hyperref gives every overlay
+  step of a Beamer frame its number); without labels, the same title text. The labels are read
+  by `page_labels.pdf_label`, which decodes the UTF-16 form PyMuPDF returns for xdvipdfmx files
+  (`<FEFF0031>`): `clean_label` refused it, so no Tectonic deck's own labels were used before
+  (the page markers fell back to the number printed in the footline).
+- **Overlay steps.** A page of a frame is dropped when every row on it (compared with spaces
+  removed, as a substring of the last page's text, so a line that wraps differently still
+  counts) and every big picture is also on the frame's last page: `\pause`, `\item<n->` and
+  `\uncover` only add, so the last page has it all and no line is lost. A dropped page is removed
+  before margins, page types, tables and rows are read, so it costs no crop and no model call, and
+  it is not in `Layout.pages`, `page_sizes` or `page_types` (as if the user had not selected it).
+  A page that has something the last page lacks (`\only<1>{A}\only<2>{B}`) stays, and the
+  kept pages of the frame are numbered: the title heading says "(step 1 of 2)". Measured on the
+  fixtures: `beamer_overlay` 6 pages to 2 (67 % fewer), `slides_steps` 13 to 6 (54 % fewer).
+- **Frame titles.** A page's title is its largest text in the top third, at least 1.15 x the
+  deck's body size. It is always a heading (reason `slide_title`, plus `larger font` so the
+  levels group the titles): a title the heading rules read as a paragraph is promoted, and a
+  title that a theme's headline picture took as its label (Warsaw: the figure's text is "Waves
+  Superposition Cases") becomes the heading in place of that figure. Every frame is therefore a
+  section, and the assembler writes one `<h2>` a frame (docs/output.md "One h1"). Frame titles
+  used to vanish on overlay decks because they repeat on the pages of one frame, which made them a
+  running header; the dropped steps are no longer reference pages for the margin filter
+  (`_reference_pages(skip=)`).
+- **Furniture.** After the blocks are made, `slides.finish` drops, with their inline equations:
+  paragraphs above the title that are at most 0.8 x its size, in the top fifth (the headline's
+  section and subsection names); a drawn bar across the page (at least 60 % of the width, at most
+  18 % of the height, in the top fifth); and a number or "3 / 20" alone in the top or bottom 12 %.
+  The footline text, the navigation symbols and other repeated bands are the margin filter's, as
+  before. The headline's text is kept on `Deck.context` (page to names, top to bottom) and is not
+  in the output.
+- **Columns** (`_find_gutter(slide=True)`, tried only when the strict rule finds none): four rows
+  are enough, a side needs two rows whose left edges line up and a median row width of 15 % of
+  the text width, and both sides must have a word of three letters (`_words_both_sides`), so the
+  brace and the cases of a piecewise function are not two columns. Left column, then right.
+- **A bullet that wraps onto a line of maths** ("The energy is zero at" / "x = 0.") was a display
+  equation: `_wrapped_maths` compared the line with the paragraph's left margin, and a list
+  item's text starts after its marker. In a deck the marker's x counts; elsewhere the rule is
+  unchanged.
+- **Ligatures** (every file): MuPDF gives the "ff" of "Stiffness" the whole glyph box and the
+  second f a box of no width at its end, so everything that sorts characters by x put it after
+  the next letter ("Stifnf ess", "Ofcfi e", "Specifci"). `_text_blocks` shares the glyph box
+  among its characters (`_spread_ligatures`) wherever layout reads characters from the PDF: the
+  rows (so tables, whose cells come from them), `line_glyphs` and `page_glyphs`. Text running down
+  the page is shared along y; other angles are left as MuPDF has them.
+
+Known gaps: Beamer's ball and circle bullets (Warsaw, Madrid and the other infolines themes) are
+small pictures, not drawn shapes, so a list in those themes is one paragraph (the default theme's
+triangles are glyphs and work); sidebar themes (Berkeley, Goettingen) put the outline in a column
+beside the frame, which is read as a column of text; a deck that is neither Beamer nor has
+repeated labels (a PowerPoint export) gets none of this, and its steps, if any, stay pages; `\only`
+steps are kept whole (one page each, labelled) rather than merged.
+
 ### Inline formulas in LaTeX papers (2026-10-21)
 
 Found by the error analysis of the real-world set ([eval-equation-rootcause.md](eval-equation-rootcause.md)):
@@ -2170,6 +2233,10 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   in sequence, run-in labels, math-italic in a heading, paragraphs over a page break (a
   footnote and a running header between, a hyphen at the break, each reason not to join),
   the document's spelling of compounds and inline maths that wraps.
+- `tests/test_layout_slides.py` (the slide rules on made-up pages, the four Beamer decks and
+  `slides_steps.pdf`: steps dropped or kept, titles, headline and footline, columns, no line
+  of the last step lost, non-slide files read exactly as before, ligatures, UTF-16 page
+  labels, and the pipeline making no call for a dropped page).
 - `tests/test_ink_strokes.py` draws ink in each export style (stroked paths, filled shapes per
   pen sample, filled outlines) on ruled, squared and dotted paper and in pastel ink, and
   checks the recovered strokes against the drawn paths, in pen order; it also reads the two

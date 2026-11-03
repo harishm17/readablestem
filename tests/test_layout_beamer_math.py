@@ -73,35 +73,22 @@ def test_the_gold_matches_the_decks():
 # ---------------------------------------------------------------- what works today
 
 
-@pytest.mark.parametrize(
-    "name",
-    cases(
-        {
-            "beamer_overlay": (
-                "the frame title repeats on every overlay page, so the running-header rule "
-                "drops it: no heading is produced"
-            )
-        }
-    ),
-)
-def test_each_frame_title_is_a_heading_on_its_first_page(name):
+@pytest.mark.parametrize("name", cases())
+def test_each_frame_title_is_a_heading_once(name):
+    """On the frame's first page, or, when its earlier overlay steps are not read again
+    (`pipeline.slides`), on its last: one heading with the title, on one page."""
     layout = load(name)
     for frame in gold(name)["frames"]:
-        headings = [e.text for e in on_page(layout, frame["pages"][0]) if e.kind == Kind.HEADING]
-        assert frame["title"] in headings
+        found = [
+            e.page
+            for p in frame["pages"]
+            for e in on_page(layout, p)
+            if e.kind == Kind.HEADING and e.text == frame["title"]
+        ]
+        assert len(found) == 1, frame["title"]
 
 
-@pytest.mark.parametrize(
-    "name",
-    cases(
-        {
-            "beamer_columns_table": (
-                "'x = 0' at the end of a column's line is read as a display equation, so one "
-                "more block comes out than the gold has"
-            )
-        }
-    ),
-)
+@pytest.mark.parametrize("name", cases())
 def test_display_equations_on_the_last_page_of_a_frame_match_the_gold_count(name):
     layout = load(name)
     for k, frame in enumerate(gold(name)["frames"]):
@@ -119,8 +106,8 @@ def test_display_equations_on_the_last_page_of_a_frame_match_the_gold_count(name
     cases(
         {
             "beamer_columns_table": (
-                "the table's maths cells are not equation elements, and 'x = 0' in the second "
-                "column is a display equation, so the inline counts differ from gold"
+                "the table's maths cells are not equation elements, so the inline count of the "
+                "table's frame differs from gold"
             )
         }
     ),
@@ -146,17 +133,7 @@ def test_a_slide_number_or_footer_bar_is_not_read_as_text(name):
 # ---------------------------------------------------------------- known failures
 
 
-@pytest.mark.parametrize(
-    "name",
-    cases(
-        {
-            "beamer_overlay": (
-                "each overlay step is a page of its own and repeats the earlier steps, so "
-                "the same paragraph, list items and equations come out two to three times"
-            )
-        }
-    ),
-)
+@pytest.mark.parametrize("name", cases())
 def test_overlay_steps_do_not_repeat_content(name):
     layout = load(name)
     shown = [
@@ -171,13 +148,6 @@ def test_overlay_steps_do_not_repeat_content(name):
     assert not duplicates
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "the theme's header bar (section and subsection names) is not removed: the sections "
-        "come out as a figure and the subsection as a paragraph on every slide"
-    ),
-)
 def test_a_theme_header_bar_is_not_content():
     layout = load("beamer_theme_bars")
     bar = re.compile(r"Superposition|Basics|Beats|^Waves$")
@@ -188,14 +158,6 @@ def test_a_theme_header_bar_is_not_content():
     ]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "the two columns are not read one after the other: the column headings come first, "
-        "then the list items interleave and the second item of each column is cut at the "
-        "line end"
-    ),
-)
 def test_two_columns_are_read_left_then_right():
     layout = load("beamer_columns_table")
     texts = [(e.text or "") for e in on_page(layout, 0)]
@@ -217,10 +179,6 @@ def test_table_cell_maths_has_latex():
     assert cells and all(c.latex or c.mathml for c in cells)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="the 'ff' in 'Stiffness' is a ligature and the cell text comes out 'Stifnf ess'",
-)
 def test_table_text_with_a_ligature_is_intact():
     layout = load("beamer_columns_table")
     table = next(e for e in layout.elements if e.kind == Kind.TABLE)
