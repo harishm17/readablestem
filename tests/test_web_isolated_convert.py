@@ -849,3 +849,52 @@ def test_a_failed_start_still_cleans_up(monkeypatch):
     client, _ = offline_client(settings)
     with pytest.raises(OSError, match="no processes"):
         convert_isolated(b"x", settings=settings, client=client)
+
+
+class FatalAfter:
+    """The offline client until its Nth request, then a configuration error."""
+
+    def __init__(self, inner, n: int) -> None:
+        self.inner, self.n, self.asked = inner, n, 0
+        self.lock = threading.Lock()
+
+    def run(self, request, schema, **kwargs):
+        from readablestem.config import ConfigError
+
+        with self.lock:
+            self.asked += 1
+            late = self.asked > self.n
+        if late:
+            raise ConfigError("the model is not set up")
+        return self.inner.run(request, schema, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+
+@pytest.mark.parametrize("convert", [convert_pdf, convert_isolated], ids=["in-process", "child"])
+@pytest.mark.parametrize("attempt", range(3))
+def test_steps_that_finished_before_a_configuration_error_are_kept_for_the_next_try(
+    convert, attempt
+):
+    from readablestem.config import ConfigError
+
+    stored: list[str] = []
+
+    class Cache:
+        def lookup(self, element, key):
+            return None
+
+        def store(self, element, key, fix):
+            stored.append(element.id)
+
+    settings = offline_settings()
+    client, _ = offline_client(settings)
+    with pytest.raises(ConfigError):
+        convert(
+            LECTURE_NOTES.read_bytes(),
+            settings=settings,
+            client=FatalAfter(client, 2),
+            step_cache=Cache(),
+        )
+    assert stored  # what was answered (and paid for) before the error is kept
