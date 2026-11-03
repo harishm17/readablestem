@@ -18,6 +18,29 @@
 - New check messages for the four notes (`image_page.second_reader`).
 - Not measured: how often the choices contain the right reading, or whether decisions per page fall
   (docs/eval-handwriting.md).
+## Unreleased: a local handwriting reader (branch hw/local-reader)
+
+- New reader B, `local` (`models/math_readers/local_reader.py`): TexTeller on CPU with ONNX
+  Runtime, no key, no network, nothing leaves the server, so it is not a recipient and the
+  privacy page and production check are unchanged. Off (`MATH_READER_LOCAL_ENABLED=false`),
+  not called by the pipeline, built by `build_readers` like the Claude and OpenAI readers.
+  Settings: `MATH_READER_LOCAL_DIR`, `_THREADS` (2), `_TIME_S` (20, a read past it returns no
+  candidates with the outcome `timeout`).
+- Model files by `python -m readablestem.models.math_readers.local_weights` and, in the image,
+  by `--build-arg INSTALL_MATH_READER=true` (default off): five files at a pinned revision, each
+  refused unless its SHA-256 matches, the three ONNX files rewritten with int8 weights (0.6 GB
+  instead of 2.1 GB; about 1.1 GB resident in the conversion child, address space 2.1 GB under
+  the 3 GB cap). Measured on 74 expressions: 1.07 s a crop on two threads, exact 0.554 (float32
+  0.649); as a flag against the page pass it catches 18 of 21 wrong readings with 15 right ones
+  flagged (the page pass's required review: 10 and 17). The weights are Apache-2.0; the training
+  data and the practice set overlap in ways `docs/math-readers.md` lists.
+## Unreleased: page type reads per-sample pen ink (branch hw/page-type-dotted-ink)
+
+- `page_type` now calls vector handwriting drawn as one small filled disc per pen sample
+  `handwritten` (it was `vector_no_text`). Its ink analysis uses `ink_strokes`'s own rule for a
+  stroke made of samples (`sample_run_end`, `dot_grid_members`) instead of a second one. Dot-grid
+  paper, scatter-plot markers and stippled shading are still not handwriting. On the 846-page
+  labelled corpus no page changes its kind. Documented in docs/layout.md.
 
 ## Unreleased: other readings of a formula as choices on its symbols (branch hw/schema-prompt)
 
@@ -41,22 +64,6 @@
   filled pen outlines), on plain and ruled paper, some with a typed header, with gold LaTeX per
   expression and a manifest with a rebuild hash. The pages stay in `~/.cache/readablestem`; the
   ink is CC BY-NC-SA. No model is called. Documented in docs/eval-handwriting.md.
-## Unreleased: a local handwriting reader (branch hw/local-reader)
-
-- New reader B, `local` (`models/math_readers/local_reader.py`): TexTeller on CPU with ONNX
-  Runtime, no key, no network, nothing leaves the server, so it is not a recipient and the
-  privacy page and production check are unchanged. Off (`MATH_READER_LOCAL_ENABLED=false`),
-  not called by the pipeline, built by `build_readers` like the Claude and OpenAI readers.
-  Settings: `MATH_READER_LOCAL_DIR`, `_THREADS` (2), `_TIME_S` (20, a read past it returns no
-  candidates with the outcome `timeout`).
-- Model files by `python -m readablestem.models.math_readers.local_weights` and, in the image,
-  by `--build-arg INSTALL_MATH_READER=true` (default off): five files at a pinned revision, each
-  refused unless its SHA-256 matches, the three ONNX files rewritten with int8 weights (0.6 GB
-  instead of 2.1 GB; about 1.1 GB resident in the conversion child, address space 2.1 GB under
-  the 3 GB cap). Measured on 74 expressions: 1.07 s a crop on two threads, exact 0.554 (float32
-  0.649); as a flag against the page pass it catches 18 of 21 wrong readings with 15 right ones
-  flagged (the page pass's required review: 10 and 17). The weights are Apache-2.0; the training
-  data and the practice set overlap in ways `docs/math-readers.md` lists.
 
 ## Unreleased: the MathML shape for screen readers (branch mathml/screenreader-shape)
 
