@@ -1405,6 +1405,48 @@ def final_counts(
         record.optional = sum(1 for f in mine if f.review == "optional")
 
 
+def maths_unasked(elements: Sequence[Element], fixes: Mapping[str, Fix]) -> list[str]:
+    """Ids of the elements read from an image whose maths no person is asked about. The
+    owner's rule (ADR 0007, point 12): maths read from handwriting or a scan is always a
+    required decision. An equation is asked about through its own fix, an inline one
+    through its paragraph's, list item's or heading's; a table (its cells may hold
+    formulas) through its own. Asked means the governing fix waits (`pending`) and is
+    "required". A governing fix that is missing counts as not asked."""
+    found = []
+    for element in elements:
+        if IMAGE_PAGE_REASON not in element.reasons or element.kind not in {
+            Kind.EQUATION,
+            Kind.TABLE,
+        }:
+            continue
+        fix = fixes.get(element.parent_id or element.id)
+        if fix is None or not (fix.pending and fix.review == "required"):
+            found.append(element.id)
+    return found
+
+
+def enforce_maths_required(elements: Sequence[Element], fixes: dict[str, Fix]) -> int:
+    """The last word on the rule above, after every step (the page reader's tiers, the
+    equation step, the heading step, a second reading, a cached answer): a governing fix that
+    was accepted without a person becomes a required decision that says why (in place).
+    Returns how many it lifted; 0 is the normal case, this is the guard for a path that
+    forgot the rule."""
+    by_id = {e.id: e for e in elements}
+    lifted = 0
+    for element_id in maths_unasked(elements, fixes):
+        element = by_id[element_id]
+        fix = fixes.get(element.parent_id or element.id)
+        if fix is None:
+            continue
+        if fix.status is Status.ACCEPTED and not fix.reviewed:
+            fix.status = Status.NEEDS_REVIEW
+        fix.review = "required"
+        if not any(c.code == "maths_checked" for c in fix.checks):
+            fix.checks = [*fix.checks, _maths_check()]
+        lifted += 1
+    return lifted
+
+
 def notices(built: Mapping[int, Built]) -> list[Notice]:
     """One content-free notice per converted page: how many blocks were read from the image."""
     return [

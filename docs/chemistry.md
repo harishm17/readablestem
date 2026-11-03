@@ -136,6 +136,9 @@ are read: the converter's and OpenStax's (`mtext` for `HSO` or `2e`, an empty-ba
 | 2 H₂ + O₂ ⇌ 2 H₂O | 2 H 2 plus O 2 is in equilibrium with 2 H 2 O |
 | CaCO₃(s) →(Δ) CaO(s) + CO₂(g) | C a C O 3 solid, reacts, with heat, to form C a O solid, plus C O 2 gas |
 | [H₃O⁺] = [OH⁻] | the concentration of H 3 O plus equals the concentration of O H minus |
+| Zn²⁺(aq, 0.10 M) | Z n 2 plus aqueous, 0.10 molar |
+| E°(Cu²⁺/Cu) | capital E degrees open parenthesis C u 2 plus slash C u close parenthesis |
+| ⁶⁰₂₈Ni* → ⁶⁰₂₈Ni + γ | nickel 60, atomic number 28, excited state reacts to form nickel 60, atomic number 28 plus gamma |
 | [Cu(NH₃)₄]²⁺ | open bracket C u open parenthesis N H 3 close parenthesis 4 close bracket 2 plus |
 | ¹⁴₆C | carbon 14, atomic number 6 |
 
@@ -231,6 +234,25 @@ uv run python scripts/dev_chem.py --gold data/dev-v2/dev before=before.jsonl aft
 uv run python scripts/dev_buckets.py --gold data/dev-v2/dev before=before.jsonl after=after.jsonl
 ```
 
+Four readings added after listening to what the review screen said for the development
+chemistry set (`tests/test_speech_chem_fixes.py`):
+
+- A state with conditions, `(aq, 0.10 M)` or `(g, 1 atm, 298 K)`, reads the state and then each
+  condition: "aqueous, 0.10 molar", "gas, 1 atmosphere, 298 kelvin". Only a number with a unit
+  is read this way; any other condition leaves the markup read as it was. `M` is "molar" only
+  here, inside a state.
+- A `/` between two species (`Cu²⁺/Cu`, `Cl₂/Cl⁻`) is a redox couple and reads "slash". A `/`
+  after a bracket or a closing parenthesis, or between italic letters, is still "divided by".
+- A half-reaction table (species, an arrow in a cell of its own, species) reads each row with
+  the arrow between the species ("reacts to form"), not "right arrow" in a cell alone.
+- `↑` after a species in a reaction reads "gas given off" and `↓` "precipitate" (elsewhere "up
+  arrow", "down arrow").
+- An asterisk after a nuclide (`⁶⁰₂₈Ni*`) reads ", excited state". An asterisk after another
+  species is not guessed at.
+- In a chemistry row, a unit after a decimal number reads as a unit (`0.0592 V`: V is also
+  vanadium), and `mol`, `L⁻¹`, `s⁻¹` side by side read as one rate unit ("moles per liter
+  second"). A whole number before a symbol stays a coefficient (`2 K`).
+
 ## Speech, checked by hand
 
 24 chemistry equations of the development gold (a seeded draw: 8 OpenStax-shaped MathML of every
@@ -242,10 +264,6 @@ an empty base); a concentration in brackets read "open bracket N O close bracket
 "the concentration of C l 2"; `2e⁻` read "2e to the power minus"; the cell-notation bars read
 "box drawings light vertical". All are in `tests/test_speech_chem.py`. Left as they are:
 
-- a state symbol with conditions, `(aq, 1 M)`, reads "open parenthesis a q comma 1 capital M
-  close parenthesis" (the state is not picked out of it);
-- a standard potential `E°(Cu²⁺/Cu)` reads as maths with a chemical subscript ("capital E sub
-  C u 2 plus /Cu end sub degrees"), clumsy and correct;
 - an aligned block of half-reactions reads "row 1: row 1:" (a label row of the table reading,
   not chemistry);
 - two-letter symbols are spelled "C u"; the ion names ("sulfate") are never said.

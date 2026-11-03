@@ -1418,6 +1418,12 @@ def document_page_item(
                 # The chemistry scorer (eval.equations_chem): meaningful for chemistry gold only.
                 "exact_chem": chem.exact,
                 "chem_similarity": chem.similarity,
+                "silent_harm": chem_score.is_chemistry_id(gold[gi]["id"])
+                and chem_score.silent_harm(
+                    proposal.mathml if proposal is not None else None,
+                    gold[gi]["mathml"],
+                    fix.review if fix is not None else None,
+                ),
                 **_page_pass_fields(element, fix),
                 # How far the predicted span's own text layer is from the gold equation (span
                 # fidelity, whatever the model then read), and that text, for examples.
@@ -1477,6 +1483,11 @@ def document_page_item(
             reason: sum(u["reason"] == reason for u in unmatched) for reason in UNMATCHED_REASONS
         },
         "split_gold_ids": split,
+        "chem_lone_times_gold_ids": [
+            g["id"]
+            for g in gold
+            if chem_score.is_chemistry_id(g["id"]) and chem_score.is_lone_times(g["mathml"])
+        ],
         "stream_credited": credited,
         "symbols_credited": symbols_credited,
         "static_violations": _failed_codes(static),
@@ -1738,8 +1749,10 @@ def document_metrics(items: Sequence[dict]) -> dict:
     }
     classes = prose_classes.summarize([i["prose_classes"] for i in items if "prose_classes" in i])
     cells = [i["table_maths"] for i in items if "table_maths" in i]
+    chemistry = chem_score.document_metrics(items)
     return {
         **({"prose_classes": classes} if classes else {}),
+        **({"chemistry": chemistry} if chemistry else {}),
         **({"table_cell_maths": table_maths.summarize(cells)} if cells else {}),
         "gold_equations": gold,
         "predicted_equations": pred,

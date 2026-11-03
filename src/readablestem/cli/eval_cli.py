@@ -17,6 +17,8 @@ import datetime as dt
 import json
 import math
 import sys
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -186,7 +188,9 @@ def _cached(args: argparse.Namespace, settings: Any, client: Any) -> Any:
         cached = CachedClient(staging, path, settings)
         staging.owner = cached
         return cached
-    cached = CachedClient(None if args.answers_offline else client, path, settings)
+    cached = CachedClient(
+        None if getattr(args, "answers_offline", False) else client, path, settings
+    )
     _keep_second_check_answers(args, client, cached)
     return cached
 
@@ -203,7 +207,9 @@ def _keep_second_check_answers(args: argparse.Namespace, client: Any, cached: An
         return
 
     def wrap(inner: Any) -> Any:
-        check = CachedClient(None if args.answers_offline else inner, args.answers, inner.settings)
+        check = CachedClient(
+            None if getattr(args, "answers_offline", False) else inner, args.answers, inner.settings
+        )
         cached.second_check = check
         return check
 
@@ -266,6 +272,66 @@ def _settings_for(args: argparse.Namespace) -> Any:
         return f"invalid model settings: {reasons}"
 
 
+# ================================================================== kept recordings
+
+
+@contextmanager
+def _recording(
+    args: argparse.Namespace, keep: tuple[Path, str] | None, *, model_run: bool = True
+) -> Generator[Any]:
+    """Make the run's folder (eval/run_record.py) when the run calls a real model.
+
+    `keep` is (the set's root folder, the set's name), or None for a run that keeps nothing
+    (the sealed check part). Unless the run was given its own files, `--answers` and `--items`
+    point into the folder, so a live run always leaves its answers and rows behind. A fake
+    run, a replay and a run with no model keep nothing. A folder that stayed empty (the run
+    stopped on an error before it asked anything) is taken away again.
+    """
+    if keep is None or args.fake or getattr(args, "answers_offline", False) or not model_run:
+        yield None
+        return
+    from readablestem.cli.main import project_root
+    from readablestem.eval import run_record
+
+    root, name = keep
+    rec = run_record.start(root, name, repo=project_root(), task=getattr(args, "task", None))
+    if getattr(args, "answers", None) is None:
+        args.answers = rec.answers
+    if getattr(args, "items", None) is None:
+        args.items = rec.items
+    try:
+        yield rec
+    finally:
+        if run_record.holds_nothing(rec.directory):
+            run_record.discard(rec.directory)
+
+
+def _finish_recording(rec: Any, args: argparse.Namespace, report: dict) -> None:
+    """Name the folder and the commit in the report (before it is written)."""
+    if rec is not None:
+        report["recording"] = rec.describe(
+            answers=getattr(args, "answers", None) == rec.answers,
+            items=getattr(args, "items", None) == rec.items,
+        )
+
+
+def _copy_report(rec: Any, report: dict) -> None:
+    """The report beside its answers and rows; says where the folder is."""
+    if rec is None:
+        return
+    from readablestem.eval import pipeline_eval as pe
+
+    pe.write_report(report, rec.report)
+    print(f"kept: {rec.directory}")
+
+
+def _gold_keep() -> tuple[Path, str]:
+    """Where a run on the repository's own gold (`data/gold`) keeps its recording."""
+    from readablestem.eval import run_record
+
+    return run_record.set_root("gold"), "gold"
+
+
 # ======================================================================== pipeline
 
 
@@ -291,7 +357,7 @@ def _cmd_pipeline(args: argparse.Namespace) -> int:
     if args.gold_set:
         return _run_heldout(args)
     if args.task == TABLES_TASK:
-        return _run_tables(args)
+        return _run_tables(args, keep=_gold_keep())
     gold_dir = args.gold or _default(GOLD_DIR)
     if not gold_dir.is_dir():
         return _error(f"gold dir not found: {gold_dir}")
@@ -300,7 +366,7 @@ def _cmd_pipeline(args: argparse.Namespace) -> int:
     out = args.out or _default(EVAL_DIR / f"latest-{args.task}.json")
     if getattr(args, "notation", None):
         return _run_with_notation(args, gold_dir, out)
-    return _run_pipeline(args, gold_dir, out, gold_label=_shown(gold_dir))
+    return _run_pipeline(args, gold_dir, out, gold_label=_shown(gold_dir), keep=_gold_keep())
 
 
 def _run_heldout(args: argparse.Namespace) -> int:
@@ -343,6 +409,7 @@ def _run_heldout(args: argparse.Namespace) -> int:
         },
         cache_dir=cache_dir,
         openstax_cache=loc.openstax,
+        keep=(loc.root, loc.root.name),
     )
 
 
@@ -373,7 +440,10 @@ def _run_devset(args: argparse.Namespace) -> int:
     if args.task == TABLES_TASK:
         # The authored documents' tables sit beside the OpenStax pages' (authored/index.json).
         authored = gold_dir / "authored"
-        return _run_tables(args, devset=(gold_dir, authored, cache_dir, openstax_cache, out, extra))
+        keep = None if args.part == "check" else (devset_cli.cache_home(), "dev-v2")
+        return _run_tables(
+            args, devset=(gold_dir, authored, cache_dir, openstax_cache, out, extra), keep=keep
+        )
     return _run_pipeline(
         args,
         gold_dir,
@@ -383,6 +453,7 @@ def _run_devset(args: argparse.Namespace) -> int:
         cache_dir=cache_dir,
         openstax_cache=openstax_cache,
         media_cls=DevSetMedia,
+        keep=None if args.part == "check" else (devset_cli.cache_home(), "dev-v2"),
     )
 
 
@@ -410,7 +481,9 @@ def _run_with_notation(args: argparse.Namespace, gold_dir: Path, out: Path) -> i
     )
     extra = {"notation": [{"canonical": e.canonical, "meaning": e.meaning} for e in entries]}
     with run_options.using(options):
-        return _run_pipeline(args, gold_dir, out, gold_label=_shown(gold_dir), extra=extra)
+        return _run_pipeline(
+            args, gold_dir, out, gold_label=_shown(gold_dir), extra=extra, keep=_gold_keep()
+        )
 
 
 def _cmd_sample(args: argparse.Namespace) -> int:
@@ -440,7 +513,9 @@ def _cmd_sample(args: argparse.Namespace) -> int:
             f"{args.task} units ({args.fraction:.0%})"
         )
         label = f"{_shown(gold_dir)} (sample {week}, {args.fraction:.0%})"
-        return _run_pipeline(args, Path(tmp), out, gold_label=label, extra={"sample": sample})
+        return _run_pipeline(
+            args, Path(tmp), out, gold_label=label, extra={"sample": sample}, keep=_gold_keep()
+        )
 
 
 def _run_pipeline(
@@ -453,6 +528,34 @@ def _run_pipeline(
     cache_dir: Path | None = None,
     openstax_cache: Path | None = None,
     media_cls: type | None = None,
+    keep: tuple[Path, str] | None = None,
+) -> int:
+    """One pipeline task. `keep` is where a live run leaves its recording (`_recording`)."""
+    with _recording(args, keep) as rec:
+        return _run_pipeline_in(
+            args,
+            gold_dir,
+            out,
+            gold_label=gold_label,
+            extra=extra,
+            cache_dir=cache_dir,
+            openstax_cache=openstax_cache,
+            media_cls=media_cls,
+            rec=rec,
+        )
+
+
+def _run_pipeline_in(
+    args: argparse.Namespace,
+    gold_dir: Path,
+    out: Path,
+    *,
+    gold_label: str,
+    extra: dict | None,
+    cache_dir: Path | None,
+    openstax_cache: Path | None,
+    media_cls: type | None,
+    rec: Any,
 ) -> int:
     from readablestem.eval import pipeline_eval as pe
     from readablestem.eval.render import RenderError
@@ -523,11 +626,13 @@ def _run_pipeline(
     run.report.update(extra or {})
     if hasattr(client, "summary"):
         run.report["answers_file"] = client.summary()
+    _finish_recording(rec, args, run.report)
     pe.write_report(run.report, out)
     if args.items:
         pe.write_items(run.items, args.items)
     print(pe.format_markdown(run.report), end="")
     print(f"\nwrote {_shown(out)}" + (f" and {_shown(args.items)}" if args.items else ""))
+    _copy_report(rec, run.report)
     if hasattr(client, "summary"):
         print(f"answers file: {dict(client.summary())}")
     return 0
@@ -543,11 +648,21 @@ def _run_tables(
     args: argparse.Namespace,
     *,
     devset: tuple[Path, Path, Path | None, Path | None, Path, dict] | None = None,
+    keep: tuple[Path, str] | None = None,
 ) -> int:
     """`eval pipeline --task tables`: local mode needs no model and no spend cap; model
     mode needs `--max-usd` (or `--fake`) like every task that calls a model. `devset` is
     (gold dir, authored dir, render cache, archive cache, report, report extras) of
-    `--set dev-v2`."""
+    `--set dev-v2`. `keep`: where a model-mode run leaves its recording (`_recording`)."""
+    with _recording(args, keep, model_run=args.mode == "model") as rec:
+        return _run_tables_in(args, devset, rec)
+
+
+def _run_tables_in(
+    args: argparse.Namespace,
+    devset: tuple[Path, Path, Path | None, Path | None, Path, dict] | None,
+    rec: Any,
+) -> int:
     from readablestem.eval import tables
     from readablestem.eval.render import RenderError
     from readablestem.gold.openstax import HttpFetcher
@@ -609,11 +724,13 @@ def _run_tables(
     from readablestem.eval import pipeline_eval as pe
 
     run.report.update(extra)
+    _finish_recording(rec, args, run.report)
     pe.write_report(run.report, out)
     if args.items:
         pe.write_items(run.items, args.items)
     print(tables.format_markdown(run.report), end="")
     print(f"\nwrote {_shown(out)}" + (f" and {_shown(args.items)}" if args.items else ""))
+    _copy_report(rec, run.report)
     return 0
 
 
@@ -654,6 +771,42 @@ def _cmd_classes(args: argparse.Namespace) -> int:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0
+
+
+# =========================================================================== prune
+
+
+def _cmd_prune(args: argparse.Namespace) -> int:
+    """`eval prune --older-than DAYS`: delete kept runs (eval/run_record.py) older than the age,
+    except a run a committed report names under `recording.run`."""
+    from readablestem.cli.main import project_root
+    from readablestem.core.paths import cache_dir
+    from readablestem.eval import run_record
+
+    base = cache_dir()
+    names = (
+        args.set or sorted(p.name for p in base.iterdir() if (p / run_record.RUNS).is_dir())
+        if base.is_dir()
+        else []
+    )
+    referenced = run_record.referenced_runs(project_root())
+    total = 0
+    for name in names:
+        deleted, kept = run_record.prune(
+            run_record.set_root(name),
+            name,
+            older_than_days=args.older_than,
+            keep=referenced,
+            dry_run=args.dry_run,
+        )
+        total += len(deleted)
+        verb = "would delete" if args.dry_run else "deleted"
+        for path in deleted:
+            print(f"{verb} {path}")
+        for path in kept:
+            print(f"kept (a committed report names it) {path}")
+    print(f"{'would delete' if args.dry_run else 'deleted'} {total} run(s)")
     return 0
 
 
@@ -769,6 +922,11 @@ def _cmd_calibrate(args: argparse.Namespace) -> int:
 
 
 def _calibrate_probes(args: argparse.Namespace) -> int:
+    with _recording(args, _gold_keep()) as rec:
+        return _calibrate_probes_in(args, rec)
+
+
+def _calibrate_probes_in(args: argparse.Namespace, rec: Any) -> int:
     from readablestem.eval import calibration as cal
     from readablestem.eval.pipeline_eval import load_gold, write_items
 
@@ -808,11 +966,13 @@ def _calibrate_probes(args: argparse.Namespace) -> int:
         images=images,
     )
     report["judge"] = judge.describe()
+    _finish_recording(rec, args, report)
     if args.out:
         _write_json(report, args.out)
     if args.items:
         write_items(items, args.items)
     print(cal.format_probes(report), end="")
+    _copy_report(rec, report)
     return 0
 
 
@@ -1309,6 +1469,21 @@ def register(
     )
     classes.add_argument("--report", type=Path, help="also write the summary as JSON")
     classes.set_defaults(func=_cmd_classes)
+
+    prune = group.add_parser(
+        "prune",
+        help="delete kept run recordings older than an age (not those a committed report names)",
+    )
+    prune.add_argument("--older-than", type=_positive_float, required=True, metavar="DAYS")
+    prune.add_argument(
+        "--set",
+        action="append",
+        metavar="NAME",
+        help="a set's cache folder under ~/.cache/readablestem (repeatable; default: every one "
+        "that has runs)",
+    )
+    prune.add_argument("--dry-run", action="store_true", help="list, delete nothing")
+    prune.set_defaults(func=_cmd_prune)
 
     gate = group.add_parser(
         "gate", help="fail when a tracked metric regressed vs a baseline, or is below a floor"
