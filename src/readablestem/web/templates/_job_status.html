@@ -6,7 +6,7 @@
 {% if page_title|default("") %}<title>{{ page_title }} | ReadableSTEM</title>
 {% endif %}
 {% set counts = job.summary.counts if job.summary else none %}
-<div id="job-status" class="job-status"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/status?v={{ status_version|default(job.version) }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+<div id="job-status" class="job-status"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/status?v={{ status_version|default(job.version) }}" hx-trigger="every 3s" hx-swap="outerHTML"{% else %} data-finished="{{ job.status }}" data-state="{{ headline.state }}" data-title="{{ headline.label }}: {{ job.title }}" data-summary="{{ headline.label }}. {{ headline.message }}"{% endif %}>
   <p><span class="status-badge status-{{ headline.badge }}">{{ headline.label }}</span>
     {{ headline.message }}</p>
   {% if counts and counts.decisions and headline.state != "decisions" %}

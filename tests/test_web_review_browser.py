@@ -348,8 +348,9 @@ def test_every_control_has_a_visible_label(site, browser, job):
     )
     context.close()
     # 6 LaTeX boxes, 4 alt text boxes, 4 "decorative" boxes, 5 heading levels and the
-    # "Describe it in words" box of the one equation kept as an image (T3-16).
-    assert (controls, unlabelled) == (20, 0)
+    # "Describe it in words" box of the one equation kept as an image (T3-16), and the two
+    # fields of the decision filter (kind, page).
+    assert (controls, unlabelled) == (22, 0)
 
 
 def test_status_is_written_in_words_not_only_colour(site, browser, job):

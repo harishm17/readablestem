@@ -622,5 +622,9 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 | `secret-scan` | gitleaks over the full history |
 
 Every action is pinned to a commit SHA with its tag in a comment; Dependabot proposes
-updates weekly. `eval-live.yml` (manual, costs money) runs the equations eval against
-the live models with a `max_usd` cap and uploads the report as an artifact.
+updates weekly. `eval-guard.yml` fails a pull request that changes a model constant or a
+prompt without the matching `data/eval/latest-*.json` (label `eval-unchanged` or trailer
+`Eval-Unchanged: <reason>` to opt out). `eval-live.yml` (costs money; weekly and by hand)
+runs every eval task against the production provider with a hard cap per task (at most
+$2.95 a week), gates each report against its baseline and uploads it as an artifact; it
+skips with a notice while `ANTHROPIC_API_KEY` is not set. Both: `docs/eval.md`.

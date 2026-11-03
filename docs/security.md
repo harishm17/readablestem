@@ -141,7 +141,8 @@ with `script-src 'self'` and `style-src 'self'` and no `unsafe-inline`; `frame-a
 same-origin`; a Permissions-Policy that turns off camera, microphone, geolocation and payment;
 Cross-Origin-Opener-Policy and Cross-Origin-Resource-Policy `same-origin`; `Cache-Control:
 no-store` except for `/static/` (public files: a year for names that carry a hash or a version,
-`no-cache` for the rest, `web/assets.py`); and, in production, HSTS. That includes error pages, the 413
+an hour with an ETag for the rest, `web/assets.py`) and the demo and showcase pages (an hour with an
+ETag, the same for everyone); and, in production, HSTS. That includes error pages, the 413
 for an oversized body, the 500 page, redirects, `HEAD`, 404s from the static route and the
 sandboxed document.
 

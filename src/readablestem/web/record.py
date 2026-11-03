@@ -73,6 +73,11 @@ ACTION_WORDS = {
 }
 # A decision with a mark in its `after` (web.review.BULK_KEY, MODEL_READ_KEY) says more.
 BULK_WORDS = "Accepted, together with the other clean tables, in one action"
+# The bulk accepts of equations and figures (web.bulk_accept) keep their kind under BULK_KEY.
+BULK_KIND_WORDS = {
+    "equations": "Accepted, together with the other equations whose checks passed, in one action",
+    "figures": "Accepted, together with the other figures with generated alt text, in one action",
+}
 MODEL_READ_WORDS = "Table cell read by the AI service at the person's request, then saved"
 # What a carried edit was (web.carry_edits.CARRIED_KEY).
 CARRIED_EDIT_WORDS = {
@@ -184,7 +189,8 @@ def _decision_words(edit: Any) -> str:
     action = str(edit.action)
     after = edit.after if isinstance(edit.after, dict) else {}
     if action == "accept" and after.get(BULK_KEY):
-        return BULK_WORDS
+        kind = after[BULK_KEY]
+        return BULK_KIND_WORDS.get(kind, BULK_WORDS) if isinstance(kind, str) else BULK_WORDS
     if action == "edit" and after.get(MODEL_READ_KEY):
         return MODEL_READ_WORDS
     if action == "carried" and after.get("carried_edit") in CARRIED_EDIT_WORDS:
