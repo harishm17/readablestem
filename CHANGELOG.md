@@ -8,6 +8,14 @@
   (at most 2.00 in total across restarts). `run` sends the PDFs to the model provider. Every command
   refuses a path inside a git repository; `.gitignore` guards the usual private folder names.
   Use: [docs/eval-handwriting.md](docs/eval-handwriting.md), "Your own handwritten notes".
+## Unreleased: finished steps are kept when a configuration error ends the run
+
+- When a configuration error (a model that is not set up) ended a conversion while other
+  steps were still being answered, those steps were not kept for "Try again" if the error
+  reached the scheduler first; they are now (`pipeline/run.py`, `_Run.collect`). The tests
+  for this and for the worker and child-process suites no longer depend on timing luck, and
+  the end-to-end content test renders from the stored result the way the review screen does
+  (page markers included).
 
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)
 
@@ -69,6 +77,14 @@
 - `/demo`, the showcase pages and unhashed static files are served with an ETag and a one hour
   `max-age` instead of `no-store` or `no-cache`.
 ## Unreleased
+
+### Documentation
+
+- `docs/screen-reader-test.md`: a 15-minute VoiceOver (Safari) protocol for the demo, a converted file and the review screen, with a results table that maps to WCAG 2.2 criteria.
+### Microsoft sign-in configuration
+
+- `.railway/railway.ts` declares `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and `MS_ALLOWED_TENANTS` on the web service as `preserve()`, so values set with `railway variable set` survive `railway config apply`. `docs/deploy-railway.md` has a "Microsoft sign-in on Railway" section with the app registration, the secret's expiry, the allowed directory ids and the exact commands.
+- `readablestem ops launch-check` also lists `MS_ALLOWED_TENANTS` set without a client id and secret (the sign-in would be quietly off). A client id or secret alone was already refused.
 
 ### Layout structure: bookmarks, numbered and run-in headings, joins (2026-11-02, branch fix/layout-structure)
 
