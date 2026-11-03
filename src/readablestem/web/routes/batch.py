@@ -186,4 +186,4 @@ def batch_download(request: Request, result_id: str, user: UserDep) -> Response:
     _, ids = _batch(request, result_id, user)
     if not ids:
         raise PageError(404, *UPLOAD_RESULT_GONE)
-    return _zip_response(request, user, None, "batch", ids)
+    return _zip_response(request, user, None, "batch", job_ids=ids)

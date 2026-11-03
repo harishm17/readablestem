@@ -390,6 +390,30 @@ def test_the_zip_is_bounded(monkeypatch):
     assert [n for _, n in made.included] == ["a.html"] and made.left_out_size == 1
 
 
+def test_a_course_zip_can_be_epub_files(web):
+    course = make_course(web)
+    send(web.alice, [("in.pdf", make_pdf(1))], course=course)
+    send(web.alice, [("out.pdf", make_pdf(1))])
+    web.converter.output = fake_output()
+    finish_all(web)
+    for job in jobs_of(web):
+        for element_id, action in (("p1-e3", "accept"), ("p1-e4", "accept"), ("p1-e5", "reject")):
+            page = f"/jobs/{job.id}/review"
+            web.alice.post(
+                f"{page}/{element_id}",
+                data={"csrf_token": token(web.alice, page), "view": "list", "action": action},
+            )
+    response = web.alice.get(f"/courses/{course}/download?format=epub")
+    only = open_zip(response)
+    assert len(only.namelist()) == 2 and only.namelist()[0].endswith(".epub")
+    assert "physics-1-epub-documents.zip" in response.headers["content-disposition"]
+    page = web.alice.get(f"/courses/{course}").text
+    assert f"/courses/{course}/download?format=epub" in page
+    assert web.alice.get(f"/courses/{course}/download?format=zip").status_code == 400
+    # someone else's course is still a 404, in every file type
+    assert web.bob.get(f"/courses/{course}/download?format=epub").status_code == 404
+
+
 def test_with_courses_off_the_course_zip_is_a_404(tmp_path):
     env = WebEnv(tmp_path)  # FEATURE_NOTATION_MEMORY off
     with env.running() as client:

@@ -879,3 +879,17 @@ def test_signing_up_again_after_deleting_takes_no_new_place_with_20_threads(fact
     with db.session_scope(factory) as session:
         assert session.scalar(select(db.SignupDay.accounts)) == 1  # her place, used once
         assert session.scalar(select(func.count()).select_from(db.User)) == 1
+
+
+def test_claims_take_turns_between_people_on_postgres(factory, tmp_path):
+    """The round-robin ORDER BY (a correlated MAX(started_at) per owner) under
+    FOR UPDATE SKIP LOCKED, and the job page's replay of it."""
+    from readablestem.web.views import queue_ahead
+
+    many = queue_jobs(factory, 4)  # one person, oldest
+    [single] = queue_jobs(factory, 1)  # another person, queued after all four
+    worker = make_worker(factory, tmp_path)
+    with db.session_scope(factory) as session:
+        assert queue_ahead(session, session.get(db.Job, single)) == 1  # type: ignore[arg-type]
+    claimed = [worker.claim() for _ in range(5)]
+    assert [c.job_id for c in claimed if c] == [many[0], single, *many[1:]]

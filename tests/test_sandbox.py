@@ -166,7 +166,8 @@ def test_cpu_cap_kills_a_busy_loop_before_the_wall_clock(tmp_path):
 @needs_sandbox
 def test_runaway_output_is_killed_at_the_budget(tmp_path):
     outcome, _ = perl(
-        'open(W, ">", "/out/big"); while (1) { print W "x" x 100000; }',
+        'open(W, ">", "/out/big");'
+        'while (1) { print W "x" x 100000; select(undef, undef, undef, 0.02); }',
         tmp_path,
         limits=sandbox.Limits(wall_s=30, out_bytes=500_000, file_bytes=100_000_000),
     )
