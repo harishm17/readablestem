@@ -198,7 +198,7 @@ def read_budget(request: Request, job: Job) -> ReadBudget:
     with session_scope(ctx.factory) as session:
         pool = access.spend_pool(access.tier_of(session, job.user_id))
     return ReadBudget(
-        guard=ctx.guard.scoped(pool, job.id),
+        guard=ctx.guard.scoped(pool, job.id, job.user_id),
         max_usd=max(0.0, max_usd - float(job.cost_usd or 0.0)),
         max_calls=max(0, max_calls - int(job.model_calls or 0)),
         factory=ctx.factory,
