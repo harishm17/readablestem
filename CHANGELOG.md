@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: agreement oracle on the recorded chatbot answers (branch eq/agreement-oracle)
+
+- `scripts/eq_oracle_agreement.py` and a D2 section of docs/eval-equation-diagnostics.md: how often
+  a second whole-page reading (the recorded Opus chatbot answers) is right where ours is wrong, how
+  often our reading is right when the two agree under `math_canonical`, how well disagreement
+  flags our wrong readings, and how many of our undetected equations it found. Measurement only,
+  offline, no change to the product.
+
 ## Unreleased: a second reader's reading and choices on the review card (branch hw/reconcile-and-chips)
 
 - `pipeline/image_page_reconcile.py`: with `IMAGE_PAGES_SECOND_READER` set (`local`, `claude` or

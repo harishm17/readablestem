@@ -1,6 +1,6 @@
 # Equations on real papers: three diagnostics on the recorded runs (2026-11-02)
 
-Three measurements on what is already recorded: why maths typed in a table cell is missed, whether the equations
+Four measurements on what is already recorded (the fourth, D2, is the last section): why maths typed in a table cell is missed, whether the equations
 the pipeline misses or cuts wrongly carry glyph evidence its rules do not use, and why wrong equations with other
 symbols were not flagged for review. They read the recorded items of the real-world runs
 ([eval-realworld.md](eval-realworld.md), [eval-equation-round3.md](eval-equation-round3.md)), the cached gold and the
@@ -12,6 +12,7 @@ of the product.
 | `scripts/eq_diag_tables.py` | A gold equation typed in a table was not aligned to a prediction: was the table not found, rotated, its cell kept as text, or the equation placed elsewhere in the order? |
 | `scripts/eq_diag_glyphs.py` | Do undetected and span-wrong equations carry maths-font, italic-text-font or raised/lowered glyphs, and how common is each in the rest of the page? |
 | `scripts/eq_diag_unflagged.py` | A wrong equation with other symbols was not a required decision: no text layer, no Unicode, or symbols the bag check does not count? |
+| `scripts/eq_oracle_agreement.py` | Would a second, independent whole-page reading (the recorded Opus chatbot answers) fix, flag or find our errors? See [D2](#d2-an-independent-whole-page-reading-the-recorded-chatbot-answers). |
 
 `scripts/eq_diag_common.py` holds what they share. Tests: `tests/test_eq_diag.py` (one fixture paper,
 `tests/fixtures/layout/latex/calculus_notes.pdf`, and small generated PDFs).
@@ -119,6 +120,69 @@ By split (gold, silent errors, other symbols): dev 2,350, 266, 106; dev2 2,350, 
 275, 164; fresh2 1,639, 144, 56; fresh3 1,779, 183, 109; fresh4 1,600, 116, 63. The style differences, token by token
 (the prediction's style against the gold's): plain against upright text 173, bold against bold italic 74, a script glyph
 against script style 56, bold against plain 28, a script glyph against double-struck 27.
+
+## D2: an independent whole-page reading (the recorded chatbot answers)
+
+The Opus chatbot arm of the real-world reports (the whole PDF in, LaTeX out, no checks; [eval-realworld.md](eval-realworld.md))
+is a second reading of every page it was run on. Scored by the document task's scorer like our runs, its answers align to
+the same gold, so for each gold equation both readings can be compared with `pipeline/math_canonical.py`. Chatbot answers
+were recorded for 6 of dev's 25 papers (the same 6 for dev2) and for 15 papers each of held-out, fresh2, fresh3 and fresh4;
+the numbers below are on those papers only, with our run as in the other sections, and the chatbot items made again from
+the recorded answers with the current converter. Pooled: dev2, held-out, fresh2-4, 66 papers, 7,390 gold equations (dev is not
+added up with dev2). Intervals are 95% cluster bootstraps over papers; with 6 to 15 papers a split, the split columns are wide.
+
+`uv run python scripts/eq_oracle_agreement.py [--at tree|notation|spoken] [--json OUT.json]`
+
+Definitions. Right is `exact_lenient`. **Agree**: the two readings are the same under canonical comparison
+(`Kind.NOTATION`: canonical LaTeX or one MathML tree) and the spans are within one glyph. The chatbot gives no extent, so the
+span test is a stand-in: our span's text layer and the chatbot's reading, reduced to symbols, differ in at most one symbol;
+a span with no text layer cannot be checked and does not pass. Both readings aligning to one gold equation already means
+their extents overlap it.
+
+| | dev | dev2 | held-out | fresh2 | fresh3 | fresh4 | pooled |
+|---|---|---|---|---|---|---|---|
+| papers | 6 | 6 | 15 | 15 | 15 | 15 | 66 |
+| gold equations | 546 | 546 | 1,826 | 1,639 | 1,779 | 1,600 | 7,390 |
+| (a) ours right | 59.5% | 74.9% | 58.3% | 64.2% | 65.4% | 61.3% | 63.2% [55.7, 70.2] |
+| chatbot right | 78.4% | 79.9% | 63.6% | 68.1% | 67.8% | 63.6% | 66.8% [58.5, 74.4] |
+| union (right in either) | 80.4% | 82.4% | 70.9% | 76.1% | 71.5% | 68.1% | 72.4% [64.3, 79.8] |
+| union minus ours, points | +20.9 | +7.5 | +12.5 | +11.9 | +6.1 | +6.9 | +9.3 [+7.4, +11.2] |
+| (b) agree and span (n of ours read) | 318 of 394 | 394 of 455 | 903 of 1,425 | 913 of 1,293 | 1,004 of 1,407 | 877 of 1,129 | 4,091 of 5,709 |
+| P(ours right given agree) | 96.5% | 96.4% | 93.8% | 93.4% | 94.9% | 96.5% | 94.8% [92.9, 96.5] |
+| same, canonical agreement only | 96.0% | 95.4% | 93.2% | 93.0% | 94.3% | 95.4% | 94.1% [92.1, 95.9] |
+| (c) our wrong readings (n) | 69 | 46 | 360 | 241 | 244 | 149 | 1,040 |
+| disagreements, both read (n) | 69 | 44 | 346 | 267 | 353 | 207 | 1,217 |
+| recall of "disagree" | 73.9% | 50.0% | 60.0% | 61.8% | 66.4% | 69.1% | 62.8% [54.5, 71.0] |
+| precision of "disagree" | 73.9% | 52.3% | 62.4% | 55.8% | 45.9% | 49.8% | 53.7% [47.2, 60.7] |
+| our silent errors (n) | 52 | 32 | 183 | 144 | 183 | 116 | 658 |
+| silent errors a disagreement would flag | 73.1% | 50.0% | 57.4% | 54.2% | 65.6% | 65.5% | 60.0% [51.2, 69.1] |
+| (d) our undetected gold (n) | 152 | 91 | 401 | 346 | 372 | 471 | 1,681 |
+| of those, found by the chatbot | 61.2% | 46.2% | 32.7% | 46.5% | 12.1% | 20.6% | 28.3% [17.5, 44.2] |
+| of those, found and right | 47.4% | 29.7% | 22.7% | 31.2% | 9.4% | 11.3% | 18.7% [11.4, 29.9] |
+
+- **(a)** Picking the right one of the two readings for every equation (an oracle: nobody knows which that is) would
+  add 9.3 points on the pooled papers (95% interval 7.4 to 11.2), and at least 6 points on every split. The chatbot alone
+  reads 66.8% right to our 63.2% on these papers (the intervals overlap widely; they are the same papers read by both).
+  About a third (35.6%) of our wrong readings are read right by the chatbot.
+- **(b)** When the two agree, ours is right 94.8% of the time (92.9 to 96.5), 93.4% to 96.5% on each split. The same with
+  agreement at `Kind.TREE` only (one MathML tree, no folding of LaTeX): 96.0% (94.3 to 97.5), 4,022 of 5,709 read; 94.7% to
+  97.4% on the splits other than dev. The 4 to 5 in 100 agreed readings that are wrong are errors both readers make (the
+  same wrong reading on the same page), so agreement is not independent evidence for every equation. The chatbot's own
+  readings are right 94.8% of the time under the same agreement.
+- **(c)** "The two readings differ, so ask" catches 62.8% of our wrong readings (54.5 to 71.0), and 53.7% of the
+  disagreements are our wrong readings (47.2 to 60.7); counting a missing chatbot reading as a disagreement raises recall
+  to 79.6% and lowers precision to 51.2%. Of our 658 silent errors (wrong, no required decision), 60.0% would have been
+  flagged (70.5% with a missing reading counted).
+- **(d)** Of the 1,681 gold equations we did not detect, the chatbot found 28.3% (17.5 to 44.2) and read 18.7% right. This
+  varies from 61% (dev) to 12% (fresh3): the cause (pages the chatbot skipped, equations it wrote as prose, or
+  alignment) is not split here.
+
+Limits. The chatbot's page-level answers are one model with no span of their own, so "within one glyph" is tested against
+our text layer and is the weakest part: it removes few cases (4,309 canonical agreements, 4,091 with the span test). The
+6 dev papers are 24% of the 25 papers of dev. A disagreement is worth as much as the chatbot is independent of our
+readers; an equation both get wrong the same way shows no sign. Whether a page witness read with the span anchored by a
+quote would do better is not measured here. The union and the flag numbers are ceilings of what the recorded chatbot
+answers allow, not what any product reads.
 
 ## Limits
 
