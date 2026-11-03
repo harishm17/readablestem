@@ -12,6 +12,14 @@
   of the repository's fixtures, the three real-document sets and the eval's prints (128 PDFs, 245 tables); the
   fixes are pinned by generated pages. Real-document sets unchanged (25, 39 and 58 labelled tables, precision 1.000).
   `make fuzz-tables`: 300 of 300 mutants ok, as before.
+### Monitoring and recovery
+
+- The daily backup keeps a dump only after it has been proved: gzip reads it back, it ends with pg_dump's completion line, it restores with errors fatal, every live table is in the restore and `alembic_version` matches. A failure prints `backup_failed reason=...`, removes the file and fails the run. The command is a readable bash script (`set -euo pipefail`) with tests (`tests/test_railway_backup_script.py`). `railway config apply` is needed to put it live.
+- Alerts without a new vendor: `ops_heartbeat` (migration `e1a7c3b95d24`), written by the backup and by `readablestem ops cron`; public content-free `GET /healthz/ops` (503 naming the late task); `uptime.yml` now checks `/readyz` every 5 minutes and `/healthz/ops` every 3 hours. GitHub disables scheduled workflows after 60 days with no commit to a public repository.
+- Erasing an account writes a content-free line to `erasure_ledger` (hash of the user id, time); `readablestem ops replay-erasures [--ledger-csv FILE]` erases again whatever a restored backup brought back.
+- Per-person daily spend: `quota_days.spent_usd`, shown by pseudonym on `/admin`.
+- The day's cap on new accounts logs `signup_cap_reached` once a day and shows a notice on `/admin`.
+- Database pool: 5 plus 5 connections per process (was 3 plus 2).
 
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 
