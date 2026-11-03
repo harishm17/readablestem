@@ -37,7 +37,6 @@ from test_web_review_split_browser import site as site  # fixture, re-exported f
 
 # A hung browser fails this test after 120 s instead of holding the job to its timeout.
 pytestmark = [pytest.mark.browser, pytest.mark.timeout(120)]
-expect = pytest.importorskip("playwright.sync_api").expect
 sync_api = pytest.importorskip("playwright.sync_api")
 expect = sync_api.expect
 

@@ -249,7 +249,7 @@ jobs:
           )
           uv export --frozen --all-groups --all-extras --no-emit-project --no-hashes \
             --output-file "$RUNNER_TEMP/audit-requirements.txt"
-          uvx pip-audit --no-deps --disable-pip --strict \
+          uvx pip-audit==2.10.1 --no-deps --disable-pip --strict \
             -r "$RUNNER_TEMP/audit-requirements.txt" "${IGNORE[@]}"
 
   docker:
