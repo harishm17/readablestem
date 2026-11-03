@@ -1,23 +1,42 @@
-name: Uptime (weekly)
+name: Uptime
 
 # A second, outside-in check of the live app, independent of the host's own monitoring.
+#
+# - Every 5 minutes: GET /readyz (database, worker, model provider). A failed run is emailed
+#   by GitHub, so a real outage sends an email per failed run until it is fixed.
+# - Every 3 hours (minute 3): GET /healthz/ops (the daily backup finished well in the last 26
+#   hours, the hourly cron in the last 2) and GET /demo. Three hours keeps a stale backup or
+#   cron to a few emails a day instead of one per run; it still finds a missed cron within five
+#   hours and a missed backup within 29.
+#
 # Set the repository variable LIVE_URL (Settings > Secrets and variables > Actions >
-# Variables), e.g. https://readablestem.com. Unset: the job passes and does nothing.
-# A failed scheduled run is emailed by GitHub (Settings > Notifications > Actions).
+# Variables), e.g. https://readablestem.com. Unset: the jobs pass and do nothing.
+# Emails: Settings > Notifications > Actions (failed workflows), for the account that owns the
+# repository.
+#
+# GitHub disables scheduled workflows in a public repository after 60 days without a commit
+# (the repository's Actions tab shows a banner and sends an email when it does). A commit, or
+# "Enable workflow" on the Actions page, starts the schedule again. Check the Actions page now
+# and then; docs/operations.md says what to do.
+#
+# Scheduled runs can start late when GitHub is busy; the schedule decides which check runs,
+# not the clock inside the job.
 
 on:
   schedule:
-    - cron: "17 14 * * 1" # Mondays 14:17 UTC
+    - cron: "*/5 * * * *"
+    - cron: "3 */3 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  check:
-    name: GET /readyz and /demo
+  ready:
+    name: GET /readyz
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/5 * * * *'
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 4
     steps:
       - name: Check the live app
         env:
@@ -28,7 +47,31 @@ jobs:
             exit 0
           fi
           base="${LIVE_URL%/}"
-          for path in /readyz /demo; do
-            curl -fsS --max-time 30 --retry 2 --retry-delay 10 -o /dev/null \
-              -w "$path %{http_code} in %{time_total}s\n" "$base$path"
-          done
+          curl -fsS --max-time 30 --retry 2 --retry-delay 10 -o /dev/null \
+            -w "/readyz %{http_code} in %{time_total}s\n" "$base/readyz"
+
+  ops:
+    name: GET /healthz/ops and /demo
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '3 */3 * * *'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Check the backup, the cron and the demo page
+        env:
+          LIVE_URL: ${{ vars.LIVE_URL }}
+        run: |
+          if [ -z "$LIVE_URL" ]; then
+            echo "::notice::repository variable LIVE_URL is not set; nothing to check"
+            exit 0
+          fi
+          base="${LIVE_URL%/}"
+          status=0
+          # A 503 body names the stale tasks (backup, cron); print it so the email's log shows it.
+          if ! curl -sS --max-time 30 --retry 2 --retry-delay 10 --fail-with-body \
+            -w "\n/healthz/ops %{http_code} in %{time_total}s\n" "$base/healthz/ops"; then
+            echo "::error::/healthz/ops is not ok: the daily backup or the hourly cron did not finish lately"
+            status=1
+          fi
+          curl -fsS --max-time 30 --retry 2 --retry-delay 10 -o /dev/null \
+            -w "/demo %{http_code} in %{time_total}s\n" "$base/demo" || status=1
+          exit "$status"
