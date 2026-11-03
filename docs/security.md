@@ -142,9 +142,15 @@ with real ids, and compares the answer with the one for a made-up id.
 An owner can give one document to named people (`web/shares.py`, `routes/sharing.py`,
 the `job_shares` table). It adds a way in, so it is described in full here.
 
-- **Who.** Only a person signed in with the exact address the owner entered. The address is
-  compared in lower case and whole: no domain rule, no `+tag` folding, and an admin-linked
-  second address does not count. Signing in is still the service's own gate (`users.is_allowed`,
+- **Who.** Only a person signed in with the exact address the owner entered, and only when
+  that sign-in *proved* it: Google's verified email, or the Microsoft directory's own
+  verification of the `email` claim (`xms_edov`). Microsoft's `preferred_username` (a sign-in
+  name, which `email_claims` still offers the allowlist as a fallback) never matches a share,
+  and neither does an email-link sign-in or an admin-linked second address. The session records
+  this (`CurrentUser.email_verified`, set at sign-in only when the proved address is the
+  account's own), so no migration is needed; a session from before this release has no proof
+  and must sign in again to use a share. The address is compared in lower case and whole: no
+  domain rule, no `+tag` folding. Signing in is still the service's own gate (`users.is_allowed`,
   or open sign-up), so a share does not let anyone in who could not sign in. Nothing is emailed
   and there are no links that work without signing in.
 - **What.** Two rights. `view`: the job page, `/view` preview, the downloads, the crops and the
@@ -158,14 +164,22 @@ the `job_shares` table). It adds a way in, so it is described in full here.
   403 page. The share is read from the database on every request, so removing it works on the
   next click; the session holds no copy. A document past its retention time is refused to
   everyone before any share is read, and `ops.retention.delete_jobs` deletes its shares (and
-  `erase_user` those that name the erased person's address).
+  `erase_user` those that name the erased person's address). Erasing a reviewer's account also
+  deletes their `ReviewEdit` rows on other people's documents (as for any erased account), so
+  the owner's record loses those rows and the reviewer's decisions stay in the stored result.
 - **Who did what.** `ReviewEdit.user_id` is the person who made the edit, and the review
-  record's "Decided by" column names them. Their address is shown to everyone who can open the
-  record, so the owner sees who edited and a viewer sees who the reviewers are.
+  record's "Decided by" column names them. Only the owner sees email addresses: the owner gets
+  "Name (address)", everyone else gets names only ("the owner" or "a reviewer" when a person
+  has no name). The banner on a shared document and the "Shared with you" list name the owner
+  the same way. The sharing page, which lists addresses, is owner-only.
+- **Undo.** Undo takes back the last write only if the person asking made it; nobody undoes
+  another person's write (the owner does not undo a reviewer's, nor the reverse).
 - **Money and limits.** A re-read a reviewer asks for uses the owner's daily allowance, spend
-  pool and the document's caps (`reread.read_equation`); a reviewer's own rate limits and
-  one-read-at-a-time still apply to them. A viewer's download does not restart the owner's
-  deletion clock; a reviewer's decisions do, as the owner's own would.
+  pool and the document's caps (`reread.read_equation`), and its rate limit is keyed by the
+  owner (`enforce(..., "reread", job.user_id)`), so any number of reviewers share one budget
+  and sharing never raises what a document can spend or how fast. One read at a time per
+  person still applies to each asker. Only the owner's own actions restart the deletion clock
+  (`routes.jobs.restart_owner_clock`): not a viewer's download, nor a reviewer's decision.
 - **Logs.** `share_set`, `share_revoked` and `share_refused` carry the job id, the right and a
   category; never an address. The flash notices on the sharing page are text without addresses,
   because they live in the session cookie.

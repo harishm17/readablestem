@@ -132,7 +132,11 @@ def test_keep_7_more_days_works_without_javascript(site, browser, job):
     page.goto(f"{site.base}/jobs/{job}")
     page.get_by_role("button", name="Keep 7 more days").click()
     expect(page.locator("[role=status], .notice").first).to_contain_text("7 more days")
-    expect(page.get_by_text("kept for 7 days, and only you can see it")).to_be_visible()
+    expect(
+        page.get_by_text(
+            "kept for 7 days, and only you and the people you share it with can see it"
+        )
+    ).to_be_visible()
     context.close()
 
 

@@ -683,7 +683,9 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
   for everyone. The share is read on every request, so removing it works on the next click.
 - **Who did what.** A review edit is stored with the person who made it
   (`ReviewEdit.user_id`, as before), and the review record's "Decided by" column and its CSV
-  name them (their name and address), for the owner and for everyone who can open the record.
+  name them: name and address for the owner, names only for everyone else. Undo only takes
+  back a write the person made themselves. A share applies only to a sign-in that proved the
+  address (Google's verified email, Microsoft's `xms_edov`), see docs/security.md.
 - **Limits and cost stay the owner's.** A model re-read a reviewer asks for (marking an
   equation, reading a table cell) counts against the owner's day allowance, spend pool and the
   document's caps, as if the owner had asked; the reviewer's own rate limits still apply.

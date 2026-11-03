@@ -8,8 +8,9 @@ document counts as downloaded for the usage events. A document with decisions st
 a draft and is left out, with the count in the zip's `contents.txt` and on the page that
 offered the link.
 
-Owner only, in every format (G1): the zip is built from the person's own rows (`documents._live(user.id, ...)`),
-never from a document shared with them, so there is no `job_access` call to make.
+Owner only, in every format (G1): the zip is built from the person's own rows
+(`documents._live(user.id, ...)`), never from a document shared with them, so there is no
+`job_access` call to make.
 
 `?format=docx` or `?format=epub` makes the zip of Word or EPUB files instead of HTML, with the
 same rules and limits plus the Word export's (`web.bundle`, `routes.exports.make_file`); each

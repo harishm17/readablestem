@@ -293,7 +293,9 @@ def test_a_reviewer_decides_and_is_recorded(site):
     # The record, read by the owner and by a viewer, names who decided.
     for actor in (OWNER, VIEWER, REVIEWER):
         record = site.who[actor].get(f"/jobs/{site.job_id}/record")
-        assert record.status_code == 200 and DAVE in record.text, actor
+        assert record.status_code == 200 and ("a reviewer" in record.text or DAVE in record.text), (
+            actor
+        )
     csv_text = site.who[OWNER].get(f"/jobs/{site.job_id}/record.csv").text
     assert DAVE in csv_text
 
@@ -509,3 +511,125 @@ def test_the_migration_adds_the_table_and_the_downgrade_removes_it(tmp_path):
         assert "jobs" in inspect(engine).get_table_names()  # the documents are untouched
     finally:
         engine.dispose()
+
+
+# --------------------------------------------------------------------------- security review
+
+
+def decide(env, actor: str, element: str = "p1-e3", action: str = "accept"):
+    client = env.who[actor]
+    page = f"/jobs/{env.job_id}/review"
+    return client.post(
+        f"{page}/{element}",
+        data={"csrf_token": page_token(client, page), "view": "list", "action": action},
+    )
+
+
+def test_only_the_owner_sees_email_addresses_in_the_record(site):
+    assert decide(site, REVIEWER).status_code == 303
+    owner_page = site.who[OWNER].get(f"/jobs/{site.job_id}/record").text
+    assert DAVE in owner_page and ALICE in owner_page
+    for actor in (VIEWER, REVIEWER):
+        page = site.who[actor].get(f"/jobs/{site.job_id}/record")
+        csv_text = site.who[actor].get(f"/jobs/{site.job_id}/record.csv").text
+        for text in (page.text, csv_text):
+            assert ALICE not in text, actor
+            if actor == VIEWER:  # a reviewer sees their own address in the page header
+                assert DAVE not in text
+            assert "a reviewer" in text and "the owner" in text, actor
+    # the banner and the list name the owner without an address
+    assert ALICE not in site.who[VIEWER].get(f"/jobs/{site.job_id}").text
+    assert ALICE not in site.who[VIEWER].get("/app").text
+    assert "shared by The owner" in site.who[VIEWER].get("/app").text
+
+
+def test_a_name_is_shown_when_there_is_one(site):
+    with session_scope(site.ctx.factory) as session:
+        session.scalar(select(User).where(User.email == DAVE)).name = "Dave Reviewer"
+    decide(site, REVIEWER)
+    page = site.who[VIEWER].get(f"/jobs/{site.job_id}/record").text
+    assert "Dave Reviewer" in page and DAVE not in page
+    owner = site.who[OWNER].get(f"/jobs/{site.job_id}/record").text
+    assert f"Dave Reviewer ({DAVE})" in owner
+
+
+def test_a_reviewer_s_decision_does_not_restart_the_deletion_clock(site):
+    soon = utcnow() + timedelta(hours=2)
+    with session_scope(site.ctx.factory) as session:
+        session.get(Job, site.job_id).retain_until = soon
+    assert decide(site, REVIEWER).status_code == 303
+    assert as_utc(site.job(site.job_id).retain_until) == as_utc(soon)
+    assert decide(site, OWNER, "p1-e4").status_code == 303
+    assert as_utc(site.job(site.job_id).retain_until) > as_utc(soon)
+
+
+def test_no_restart_of_the_clock_is_reachable_without_the_owner_check():
+    """Every restart in a route that a reviewer can reach goes through `restart_owner_clock`;
+    the ones left are owner-only routes (`job_access(..., "owner")`) or check the owner."""
+    import pathlib
+
+    import readablestem
+
+    root = pathlib.Path(readablestem.__file__).parent / "web" / "routes"
+    for name in ("review.py", "edits.py", "split.py", "inventory.py", "bulk.py"):
+        assert "retention.restart_clock" not in (root / name).read_text(), name
+
+
+def test_a_reread_is_rate_limited_by_the_owner_not_the_reviewer(site, monkeypatch):
+    from readablestem.web.routes import edits
+
+    keys: list[str] = []
+    monkeypatch.setattr(edits, "enforce", lambda request, rule, key=None: keys.append((rule, key)))
+    path = f"/jobs/{site.job_id}/tables/p1-e3/read-cell"
+    reviewer = site.who[REVIEWER]
+    reviewer.post(path, data={"csrf_token": page_token(reviewer), "row": "0", "col": "0"})
+    owner_id = site.job(site.job_id).user_id
+    assert keys and all(key == owner_id for rule, key in keys if rule == "reread")
+    assert any(rule == "reread" for rule, _ in keys)
+
+
+def test_undo_takes_back_only_a_write_the_person_made(site):
+    assert decide(site, REVIEWER).status_code == 303
+    version = site.job(site.job_id).result_version
+    before = snapshot(site)
+    owner = site.who[OWNER]
+    response = owner.post(
+        f"/jobs/{site.job_id}/undo",
+        data={"csrf_token": page_token(owner), "version": str(version), "view": "list"},
+    )
+    assert response.status_code == 303
+    assert snapshot(site) == before  # nothing was undone: it was the reviewer's write
+    assert "nothing to undo" in owner.get(f"/jobs/{site.job_id}/review/list").text.lower()
+    # the reviewer can undo their own
+    reviewer = site.who[REVIEWER]
+    response = reviewer.post(
+        f"/jobs/{site.job_id}/undo",
+        data={"csrf_token": page_token(reviewer), "version": str(version), "view": "list"},
+    )
+    assert response.status_code == 303
+    assert snapshot(site) != before
+
+
+def test_the_undo_offer_is_for_the_writer_only(site):
+    from readablestem.web.routes import review
+
+    assert decide(site, REVIEWER).status_code == 303
+    version = site.job(site.job_id).result_version
+    with session_scope(site.ctx.factory) as session:
+        edits = review.last_write(session, site.job_id, version)
+        dave = session.scalar(select(User.id).where(User.email == DAVE))
+        alice = session.scalar(select(User.id).where(User.email == ALICE))
+    assert review.can_undo(edits, dave) and not review.can_undo(edits, alice)
+
+
+def test_a_share_needs_a_proved_address(site):
+    from types import SimpleNamespace
+
+    with session_scope(site.ctx.factory) as session:
+        job = session.get(Job, site.job_id)
+        proved = SimpleNamespace(id="x", email=CAROL, email_verified=True)
+        unproved = SimpleNamespace(id="x", email=CAROL, email_verified=False)
+        assert shares.role_of(session, job, proved) == "view"
+        assert shares.role_of(session, job, unproved) is None
+        assert shares.shared_with(session, unproved, utcnow()) == []
+        assert len(shares.shared_with(session, proved, utcnow())) == 1

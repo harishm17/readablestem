@@ -26,7 +26,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult, Element, Kind
-from readablestem.web import events, notation, page_edits, page_images, retention
+from readablestem.web import events, notation, page_edits, page_images
 from readablestem.web.db import Blob, Job, session_scope
 from readablestem.web.deps import (
     ELEMENT_ID,
@@ -54,7 +54,7 @@ from readablestem.web.review import (
     is_stale,
 )
 from readablestem.web.review import accept_clean_tables as accept_clean_tables_rule
-from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done
+from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done, restart_owner_clock
 from readablestem.web.routes.review import (
     _landing,
     _review_edit,
@@ -116,7 +116,7 @@ def write_structure(
         # Text the reviewer typed: NUL (which Postgres refuses in JSON) is taken out.
         job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
         written = bump_result_version(job)
-        retention.restart_clock(job, ctx.settings)
+        restart_owner_clock(job, user, ctx.settings)
         session.add(_review_edit(job.id, user, change, written))
         events.add_decision(
             session,
@@ -454,7 +454,8 @@ def add_region(
             layer = page_images.region_text(pdf, page, region_clip(box)) if kind == EQUATION else ""
         read = None
         if kind == EQUATION:
-            enforce(request, "reread", user.id)
+            # One budget per document's owner, so sharing never raises how fast it can spend.
+            enforce(request, "reread", job.user_id)
             read = _read_new_equation(request, job, user, result, page, box, layer, png)
 
         def make(result: DocumentResult, job: Job, session: Session) -> StructureChange:
@@ -555,7 +556,7 @@ def write_review(
         job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
         job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
         written = bump_result_version(job)
-        retention.restart_clock(job, ctx.settings)
+        restart_owner_clock(job, user, ctx.settings)
         session.add_all(_review_edit(job.id, user, c, written) for c in changes)
         events.add_decision(
             session,
@@ -638,10 +639,11 @@ def read_cell(
 
     if not ELEMENT_ID.match(element_id):
         raise PageError(404, *NOT_FOUND)
-    enforce(request, "reread", user.id)
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, REVIEW)
+        # One budget per document's owner, so sharing never raises how fast it can spend.
+        enforce(request, "reread", job.user_id)
         require_done(job)
         stale = is_stale(job.result_version, version)
         result = DocumentResult.model_validate(job.result_json or {})

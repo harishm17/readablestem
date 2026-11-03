@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -67,13 +68,17 @@ def sign_in_address(user_email: str) -> str:
     return user_email.strip().lower()
 
 
-def role_of(session: Session, job: Job, user_id: str, user_email: str) -> str | None:
-    """What this person is to this document: `OWNER`, a shared right, or None (a stranger)."""
-    if job.user_id == user_id:
+def role_of(session: Session, job: Job, user: Any) -> str | None:
+    """What this person is to this document: `OWNER`, a shared right, or None (a stranger).
+    A share applies only when this sign-in proved the address it names (`user.email_verified`:
+    Google's verified email, or Microsoft's `xms_edov`), never on a sign-in name alone."""
+    if job.user_id == user.id:
         return OWNER
+    if not user.email_verified:
+        return None
     return session.scalar(
         select(JobShare.role).where(
-            JobShare.job_id == job.id, JobShare.email == sign_in_address(user_email)
+            JobShare.job_id == job.id, JobShare.email == sign_in_address(user.email)
         )
     )
 
@@ -135,12 +140,14 @@ class SharedDocument:
     title_override: str | None
     result_title: str | None
     role: str
-    owner: str  # the owner's name or address, for the list
+    owner: str  # the owner's name, else "The owner": never their address
 
 
-def shared_with(session: Session, user_email: str, now) -> list[SharedDocument]:
+def shared_with(session: Session, user: Any, now) -> list[SharedDocument]:
     """The finished documents others have shared with this person and that are still kept,
     newest first. Only the columns the list needs: never the result or the HTML."""
+    if not user.email_verified:
+        return []
     rows = session.execute(
         select(
             Job.id,
@@ -149,15 +156,14 @@ def shared_with(session: Session, user_email: str, now) -> list[SharedDocument]:
             Job.result_title,
             JobShare.role,
             User.name,
-            User.email,
         )
         .join(JobShare, JobShare.job_id == Job.id)
         .join(User, User.id == Job.user_id)
         .where(
-            JobShare.email == sign_in_address(user_email),
+            JobShare.email == sign_in_address(user.email),
             Job.retain_until > now,
             Job.status == JobStatus.DONE,
         )
         .order_by(Job.created_at.desc(), Job.id)
     ).all()
-    return [SharedDocument(r[0], r[1], r[2], r[3], r[4], r[5] or r[6]) for r in rows]
+    return [SharedDocument(r[0], r[1], r[2], r[3], r[4], r[5] or "The owner") for r in rows]

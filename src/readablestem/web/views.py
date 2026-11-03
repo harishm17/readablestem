@@ -523,9 +523,10 @@ def job_view(
 
 
 def _owner_name(session: Session, job: Job) -> str:
-    """Who owns the document, for the person it was shared with: their name, else address."""
+    """Who owns the document, for the person it was shared with: their name only (an address
+    is for the owner to see), else "The owner"."""
     person = session.get(User, job.user_id)
-    return (person.name or person.email) if person is not None else ""
+    return (person.name if person is not None and person.name else None) or "The owner"
 
 
 def carry_view(job: Job, result: DocumentResult) -> CarryView | None:

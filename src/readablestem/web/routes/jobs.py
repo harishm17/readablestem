@@ -315,7 +315,7 @@ def job_access(
     job = session.get(Job, job_id, with_for_update=lock or None)
     if job is None:
         raise _missing(session, job_id, user, job)
-    role = shares.role_of(session, job, user.id, user.email)
+    role = shares.role_of(session, job, user)
     if role is None or expired(job):
         raise _missing(session, job_id, user, job)
     if shares.RANK[role] < shares.RANK[need]:
@@ -339,6 +339,14 @@ _TOO_LITTLE = {
 
 def is_owner(job: Job, user: CurrentUser) -> bool:
     return job.user_id == user.id
+
+
+def restart_owner_clock(job: Job, user: CurrentUser, settings) -> None:
+    """Restart the deletion clock (`retention.restart_clock`) when the owner acted. What a
+    person the document was shared with does never keeps it longer (G1): retention is the
+    owner's choice."""
+    if is_owner(job, user):
+        retention.restart_clock(job, settings)
 
 
 def _missing(session: Session, job_id: str, user: CurrentUser, job: Job | None) -> PageError:
@@ -433,7 +441,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
                 "role": shares.ROLE_WORDS.get(item.role, item.role),
                 "owner": item.owner,
             }
-            for item in shares.shared_with(session, user.email, now)
+            for item in shares.shared_with(session, user, now)
         ]
         # Large files waiting for their pages to be chosen (T3-3).
         waiting = [
@@ -1078,7 +1086,7 @@ def load_job_status(
             session,
             job,
             with_page=True,
-            role=shares.role_of(session, job, user.id, user.email) or VIEW,
+            role=shares.role_of(session, job, user) or VIEW,
         )
         status, error_code, result_json = str(job.status), job.error_code, job.result_json
     budget_closed = status == JobStatus.QUEUED and conversions_closed(ctx, user) is not None
