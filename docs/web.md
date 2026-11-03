@@ -111,7 +111,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET `/app?revises=` | signed in | My documents as a to-do list (below; each finished row has "Upload a revised version"), then the upload form; with `revises=<job id>` of the person's own finished document, the form for a revised version of it ("Revised versions" below) |
 | GET `/app/documents?v=&course=` | signed in | The documents list alone, polled by htmx while a document is waiting or converting (204 while unchanged); with `course=` only that course's documents (the course page polls it) |
 | POST `/jobs` | signed in | Upload of one file or up to 10: checks, quota, queue, one job each; 303 to `/jobs/{id}` for one file, to `/uploads/{id}` when it is kept for choosing its pages, 303 to `/app/upload/{id}` (the results page) for several ("Uploads and limits") |
-| GET `/app/download` | signed in | One zip of the person's ready documents ("Several files, courses and download all") |
+| GET `/app/download` | signed in | One zip of the person's ready documents ("Several files, courses and download all"); `?format=docx` or `?format=epub` makes the zip of Word or EPUB files (400 for any other value, 503 for Word without pandoc) |
 | POST `/sample` | signed in | Opens the person's sample document, made from the recorded conversion; 303 to its job page ("The sample document") |
 | GET `/uploads/{id}` | owner | A large file kept for choosing its pages: the suggested parts, the box to change them, "Shrink large pictures first" ("Large files in parts") |
 | POST `/uploads/{id}` | owner | Convert the chosen parts: each is cut out, checked, counted against the quota and queued as a document of its own; rate limited like an upload. 400 for pages that cannot be used, 413 for a part over the size limit, 429 for the quota or the caps |
@@ -123,7 +123,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | POST `/jobs/{id}/language` | owner | Confirm or change the document language (`lang`, one the control offers); lang_source becomes "user" and the HTML is made again |
 | POST `/jobs/{id}/retry` | owner | "Try again" / "Convert the missing parts" on a stopped or partly converted document (below): the same job goes back in the queue; 409 when it is not stopped or has had its 3 tries, 429 with 10 documents already waiting or converting; rate limited per address and per person |
 | GET `/jobs/{id}/download` | owner | The HTML as an attachment |
-| GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back); 409 with fewer than two such parts, 404 for another person's or an expired document |
+| GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back; `?format=docx` or `?format=epub` gives the joined file as Word or EPUB, recorded in that file type); 409 with fewer than two such parts, 404 for another person's or an expired document |
 | GET `/jobs/{id}/download/canvas` | owner | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
 | GET `/jobs/{id}/download/cartridge` | owner | The same page as an IMS Common Cartridge 1.3 package, `.imscc` (`pipeline/export_cartridge.py`, docs/output.md "The Common Cartridge export"). Same errors and recording as the Canvas zip; a plain link on the job page |
 | GET `/jobs/{id}/download.docx` | owner | The document as a Word file with native equations (`pipeline/export_docx.py`, docs/output.md "The Word export"). The same rules as `/download`: another user's or an expired job is 404, one that is not done 409, the file is made again first when a review write left it out of date, the deletion clock restarts, and it is recorded as a download (code `open` when decisions were still open) with the file type `docx`. 503 when pandoc is not installed or two Word files are already being made; 409 with a plain page when the file cannot be made (the HTML stays available). A plain link under "Other file types" on the finish line, shown only when pandoc is installed |
@@ -151,7 +151,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <title>? This cannot be undone" confirmation page (the file, its upload time, the decisions made on it); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list |
 | GET, POST `/jobs/{id}/feedback` | owner | The two optional questions after a download, on a page of their own; POST stores them as usage events, once per document (404 when the questions are off) |
 | GET, POST `/courses` | signed in | Courses (with `FEATURE_NOTATION_MEMORY` only, else 404): the user's courses; add one ("Courses and notation" below) |
-| GET `/courses/{id}/download` | owner | One zip of the ready documents converted for the course ("Several files, courses and download all") |
+| GET `/courses/{id}/download` | owner | One zip of the ready documents converted for the course ("Several files, courses and download all"); `?format=` as for `/app/download` |
 | GET `/courses/{id}`; POST `/courses/{id}/rename`, `/courses/{id}/entries` | owner | A course's notation; rename; add a symbol |
 | GET, POST `/courses/{id}/entries/{entry}`; POST `.../delete` | owner | Edit or remove one symbol |
 | GET, POST `/courses/{id}/delete` | owner | "Delete <course>?" confirmation; only a POST with `confirm=yes` deletes |
@@ -635,6 +635,12 @@ documents (zip)". My documents offers the same for everything the person has
 - It is built in memory, at most 25 documents and 80 MB of files (the rest are listed in
   `contents.txt` as not included), and with fixed timestamps so the same documents give
   the same bytes.
+- Beside the HTML link, "Download all as Word (.docx)" (only where pandoc is installed) and
+  "Download all as EPUB" make the same zip of those files (`?format=docx`, `?format=epub`;
+  `web/routes/exports.py` `make_file`, "The Word export" in docs/output.md). A Word zip holds
+  at most 10 documents, because each is a pandoc run; a document that cannot be made in the
+  file type is left out and counted in `contents.txt`. Each is recorded as downloaded in that
+  file type.
 - It is a plain GET for the owner, like the single download: the deletion clock of the
   documents in it restarts, each counts as downloaded, a stranger gets a 404 for someone
   else's course, and with courses switched off the course route is a 404.
@@ -1055,9 +1061,13 @@ conservative. A model call now costs one more INSERT to hold and a SELECT and a 
 
 A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
 
-- **Claiming.** Fewest attempts first, then oldest (then id), so a retried job goes
-  behind fresh ones. The queue position on the job page ("2 documents ahead of yours",
-  `views.queue_ahead`) counts in the same order, also skipping the jobs of people no
+- **Claiming.** Fewest attempts first, so a retried job goes behind fresh ones; within
+  that, people take turns (`web/fair_queue.py`): the owner whose latest job started
+  longest ago goes first (someone never served, first of all), then oldest, then id. One
+  person's ten documents never keep another person's one waiting behind all ten, and a
+  person alone is served oldest first as before. The caps, retries and attempt limits are
+  untouched. The queue position on the job page ("2 documents ahead of yours",
+  `views.queue_ahead`) replays the same claims, also skipping the jobs of people no
   longer allowed. Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` then an UPDATE in the same
   transaction. SQLite: a conditional UPDATE (`WHERE status = 'queued'`) whose rowcount
   says who won. Jobs of people no longer on the allowlist are not claimed; removing
