@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- `eval-live.yml` runs weekly (Monday 06:17 UTC) and by hand, for the production provider (Claude):
+  equations, headings, figures, document and tables, each with its own hard `--max-usd` (total at most
+  $2.95 a week, about $0.70 expected), each report gated with `eval gate --require-current` against its
+  committed baseline (tables: floors), reports uploaded as artifacts and never committed. It needs the
+  secret `ANTHROPIC_API_KEY` (was `OPENAI_API_KEY`, equations only); a scheduled run without it skips
+  with a notice. Chromium fonts are installed as in `ci.yml`.
+- `eval-guard.yml` and `scripts/eval_guard.py`: a pull request that changes a model constant in
+  `config.py` or a prompt under `models/prompts/` fails without the matching `data/eval/latest-*.json`.
+  Opt-out: label `eval-unchanged` or commit trailer `Eval-Unchanged: <reason>`.
+- Docs: `docs/eval.md` says which pipeline version and date made each committed report (0.5.0, Claude,
+  2026-10-14 and 2026-10-21; it said 0.4.0) and tells `PIPELINE_VERSION` (`pipeline/run.py`, what reports
+  record) from the package `__version__` (0.1.0); `tests/test_eval_docs.py` keeps the table true. The 0.4.0
+  results sections are labelled as historical and are not rewritten.
+
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 
 - `ANALYTICS_ENABLED` (default false): PostHog loaded from and reporting to the app's own `/m/` proxy
