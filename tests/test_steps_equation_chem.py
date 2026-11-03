@@ -79,7 +79,7 @@ def test_ce_outside_the_subset_is_refused_and_never_accepted():
     client = by_model(cheap=out(r"\ce{N2 + 3H2 <=>> 2NH3}"), main=out(r"\ce{N2 + 3H2 <=>> 2NH3}"))
     fix = run(client, equation_element(display="inline", text="N2 + 3H2"))
     assert fix.status == Status.FAILED and fix.reason == "invalid_latex"
-    assert "unknown_command" in codes(fix)
+    assert "unsupported_ce" in codes(fix)
     assert fix.equation is None
     # The cheap model's refused answer sent the crop to the main model.
     assert [r.model for r in client.requests] == [CHEAP_MODEL, MAIN_MODEL]

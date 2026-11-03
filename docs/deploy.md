@@ -188,7 +188,8 @@ assembled with the originals kept, and the fixes that could not run are flagged.
 `MODEL_PROVIDER=anthropic` answers every model request with the Claude API instead
 (`models/anthropic_client.py`); OpenAI is then not called at all. Anthropic becomes a data
 processor for the app, so the privacy page changes with the setting and
-`readablestem ops launch-check` flags a deployment whose page does not name Anthropic.
+`readablestem ops launch-check` flags a deployment whose rendered page does not name Anthropic
+(a handwriting reader from the other company adds that company the same way, `docs/math-readers.md`).
 
 1. In the Anthropic Console, create a workspace for the app (for example "ReadableSTEM prod")
    and an API key inside it. **Use a workspace-scoped key.** A key that is not scoped to a

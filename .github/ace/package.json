@@ -1,0 +1,8 @@
+{
+  "name": "ace-for-ci",
+  "private": true,
+  "description": "Pins DAISY Ace and its dependencies for .github/workflows/epub.yml (npm ci).",
+  "dependencies": {
+    "@daisy/ace": "1.4.6"
+  }
+}

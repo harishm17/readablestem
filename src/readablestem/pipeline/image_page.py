@@ -664,7 +664,7 @@ def _inline_equation(
 ) -> Element | None:
     """The inline equation element and its fix for one formula run, or None when the LaTeX
     does not validate (the formula then stays in the text)."""
-    cleaned = equation_step.strip_trailing_punctuation(equation_step.clean_latex(latex))
+    cleaned = equation_step.strip_trailing_punctuation(equation_step.read_latex(latex))
     if not cleaned.strip():
         return None
     mathml, checks = equation_step._convert(cleaned, "inline")
@@ -891,7 +891,7 @@ def lone_formula(block: Block) -> Block | None:
     words = "".join(r.value for r in block.runs if r.kind == "text")
     if len(formulas) != 1 or any(c.isalnum() for c in words):
         return None
-    latex = equation_step.clean_latex(formulas[0])
+    latex = equation_step.read_latex(formulas[0])
     mathml, checks = equation_step._convert(latex, "block")
     if not latex.strip() or mathml is None or has_errors(checks):
         return None
@@ -908,7 +908,7 @@ def lone_formula(block: Block) -> Block | None:
 
 
 def _add_equation(block: Block, builder: _Builder, *, skip_marker: bool = False) -> None:
-    latex = equation_step.clean_latex(block.latex)
+    latex = equation_step.read_latex(block.latex)
     if not latex.strip():
         return
     box, usable = builder.bbox(block, skip_marker=skip_marker)
@@ -1403,6 +1403,48 @@ def final_counts(
         mine = [f for f in fixes if page_of.get(f.element_id) == record.page]
         record.required = len(triage.units(f for f in mine if f.review == "required"))
         record.optional = sum(1 for f in mine if f.review == "optional")
+
+
+def maths_unasked(elements: Sequence[Element], fixes: Mapping[str, Fix]) -> list[str]:
+    """Ids of the elements read from an image whose maths no person is asked about. The
+    owner's rule (ADR 0007, point 12): maths read from handwriting or a scan is always a
+    required decision. An equation is asked about through its own fix, an inline one
+    through its paragraph's, list item's or heading's; a table (its cells may hold
+    formulas) through its own. Asked means the governing fix waits (`pending`) and is
+    "required". A governing fix that is missing counts as not asked."""
+    found = []
+    for element in elements:
+        if IMAGE_PAGE_REASON not in element.reasons or element.kind not in {
+            Kind.EQUATION,
+            Kind.TABLE,
+        }:
+            continue
+        fix = fixes.get(element.parent_id or element.id)
+        if fix is None or not (fix.pending and fix.review == "required"):
+            found.append(element.id)
+    return found
+
+
+def enforce_maths_required(elements: Sequence[Element], fixes: dict[str, Fix]) -> int:
+    """The last word on the rule above, after every step (the page reader's tiers, the
+    equation step, the heading step, a second reading, a cached answer): a governing fix that
+    was accepted without a person becomes a required decision that says why (in place).
+    Returns how many it lifted; 0 is the normal case, this is the guard for a path that
+    forgot the rule."""
+    by_id = {e.id: e for e in elements}
+    lifted = 0
+    for element_id in maths_unasked(elements, fixes):
+        element = by_id[element_id]
+        fix = fixes.get(element.parent_id or element.id)
+        if fix is None:
+            continue
+        if fix.status is Status.ACCEPTED and not fix.reviewed:
+            fix.status = Status.NEEDS_REVIEW
+        fix.review = "required"
+        if not any(c.code == "maths_checked" for c in fix.checks):
+            fix.checks = [*fix.checks, _maths_check()]
+        lifted += 1
+    return lifted
 
 
 def notices(built: Mapping[int, Built]) -> list[Notice]:

@@ -4,7 +4,7 @@ How formulas, ions, state symbols, reactions and concentrations are found in a P
 as MathML, and read aloud; what it did on the development sets, and what it does not do yet.
 Code: `pipeline/chem.py` (detection and `\ce`), `pipeline/layout.py` (`_chem_words`,
 `_with_chemistry`, `_reaction_row`), `pipeline/speech_chem.py`, `core/latex_groups.py`,
-`pipeline/equation_step.py` (`expand_ce`), `models/prompts/equation.md` ("Chemistry").
+`pipeline/equation_step.py` (`expand_ce`, `read_latex`), `models/prompts/equation.md` ("Chemistry").
 Development sets only: the registered held-out sections were not run or tuned on (the recorded
 held-out results were read to describe the problem, below).
 
@@ -32,7 +32,7 @@ that are about what the output says and not about the answer key:
 | Part | Where |
 |---|---|
 | Detection of formulas, ions, state symbols, reactions in running text and on display lines | `pipeline/chem.py` (pure string rules), `layout._chem_words`, `_chem_runs`, `_with_chemistry`, `_reaction_row` |
-| `\ce{...}` to plain LaTeX, a tested subset, the rest refused | `chem.ce_to_latex`, `chem.convert_ce_commands`, `equation_step.expand_ce` |
+| `\ce{...}` to plain LaTeX, a tested subset, the rest refused | `chem.ce_to_latex`, `chem.convert_ce_commands`, `chem.expand_ce`, `equation_step.read_latex` |
 | The equation prompt asks for `\ce` | `models/prompts/equation.md` and `equation_notation.md`, section "Chemistry" |
 | Subscripts and superscripts after `(...)` and `[...]` belong to the group | `core/latex_groups.group_delimited_scripts`, called by `validate.safe_latex_to_mathml` |
 | A charge or a count hangs on the whole element symbol; a long arrow is an operator | `chem.group_element_symbols`, `chem.arrows_as_operators`, called by `safe_latex_to_mathml` |
@@ -70,21 +70,75 @@ lecture slide whose reaction line was a heading and is now an equation, and a sp
 "Simplify:" in the two prints of an algebra section. No physics, algebra, statistics, slide or
 Word text gained a formula that is not one.
 
+### Spans: lists, half-reactions, `E°cell` and arrow labels (2026-11-03)
+
+The span errors of the development run (18 gold equations: 4 extra, 13 partial, 1 split; "Outcome
+classes" below) had four layout causes, fixed in `pipeline/layout.py` (the chemistry functions) and
+the detection half of `pipeline/chem.py`; the rules are in docs/layout.md ("Chemistry in running
+text and on display lines").
+
+| Cause | What the layout did | Now |
+|---|---|---|
+| `CO3 2−, F−` and `(a) A ⇌ B; (b) C ⇌ D` | one inline run, or one display line, for the whole list | one equation per ion; one inline equation per reaction, list marker left out |
+| `E°cell`, `E°cathode`, `ΔS°298` | the degree sign sat inside the lowered label in the text layer (`E c°ell`), the inline equation was cut in two (`E c`, `ell`), and two degree signs of one row were inserted as one block (`E c° °athode`) | the label is whole and the degree sign follows it; the sign is part of the inline run after a symbol |
+| `anode (oxidation):` set apart from its reaction | the block was cut after the label | the label joins its reaction (12 glyph sizes, labels that name a half-reaction only) |
+| a label over an arrow (`\xrightarrow{high temperature}`, one over and one under, a long arrow) | only a label of 12 characters or less, and only with a one-dash arrow, was joined; the label counted in the row's size and made the subscripts of the formulas "text" | any script-size label over or under an arrow is part of the reaction, read after the arrow in words of its own (`chem.Word.over_arrow`); the arrow word may have up to 12 dashes |
+
+What was left: the rule under a half-reaction block (`Overall:` is below a `¯` row; the gold has
+one equation, the layout two: 16.3 and 16.4, 5 equations), `x = …` lines cut at the edge and the
+cut of `H2O(g) → H2O(l)` (the crop, equations plan T4), the degree sign of `ΔG°` set at full size,
+and the equations in the table cells.
+
+Measured, no model call (2026-11-03, branch `chem/layout-spans`; the recording of the
+2026-10-26 development run, `--answers` with `--answers-offline`, `FEATURE_TABLES` and
+`EQUATION_LINE_CONTEXT` on, the 12 chemistry documents, 443 gold):
+
+- **Identity** (`scripts/layout_identity.py`, 143 PDFs): 135 are identical and 8 differ: the two
+  prints each of 12.3, 14.1, 16.3 and 16.4 of OpenStax Chemistry. Nothing that is not chemistry
+  changes (a first version split `W1, W2` of a paper into two equations; letters in an italic
+  face are variables, not element symbols).
+- **Replay**: before the change the recording answers 760 of 812 requests and reproduces the
+  recorded classes (291 chemically right against the recording's 293; the 52 unanswered
+  requests are 2 equations); after it 690 of 812, because the 90 requests of a changed crop or
+  line have no answer. Span errors (extra / partial / split) on what is answered: 18 (4 / 13 / 1) to 9
+  (1 / 8 / 0). 24 gold equations moved to "not read" for the missing answer: 10 were span errors
+  or "undetected: other", 14 were right before and are the equations whose text hint changed
+  (`E c°ell` to `E cell°`). They are read again by the paid re-record (equations plan C10), not
+  by this change.
+- **At the layout level** (the element's text layer against the gold, no reading needed): of the
+  23 gold equations that were a span error or "undetected: other", 6 now have an element with
+  the gold's symbols (`E°cell` twice, `ΔS°298`, `CO3 2−`, the two reactions of 14.1) and 4 more
+  are closer (the `Anode … Overall` blocks of 16.4: text similarity 0.73 to 0.96, 0.97 to 0.99).
+
 ## Writing it: `\ce`
 
 The equation prompt asks for mhchem for chemical species (`\ce{H2O}`, `\ce{SO4^2-}`,
 `\ce{2 H2 + O2 <=> 2 H2O}`) and for ordinary LaTeX around it. The model's answer is written out
-as plain LaTeX before any check (`equation_step.expand_ce`, then `clean_latex`); the LaTeX
-allowlist, the converter, the MathML checks and the text-layer cross-check all see the converted
-reading. `clean_latex` itself does not convert: the proof applies it to the chatbot arms'
-recorded LaTeX, whose numbers must not move.
+as plain LaTeX before any check (`equation_step.read_latex`: `expand_ce`, then `clean_latex`); the
+LaTeX allowlist, the converter, the MathML checks and the text-layer cross-check all see the
+converted reading. `clean_latex` itself does not convert: the proof applies it to the chatbot
+arms' recorded LaTeX, whose numbers must not move.
+
+`read_latex` is the one entry on every path that takes LaTeX from a model or a person: the
+equation step, the table step (cells), the image-page reader and its second reading
+(`image_page`, `image_page_check`), the page-math spans (`page_math`, mathematics only), the
+table HTML's words-and-formulas cells, and the review screen's edit box for an equation and for a
+table cell (`web.edit_check`). Each stores the converted LaTeX, so an edited `\ce{H2O}` is
+saved, shown and exported as `\text{H}_2\text{O}`. A `\ce` outside the subset stays as it is and
+fails the LaTeX check with the code `unsupported_ce` (check `latex.allowed_commands`; any other
+unknown command is still `unknown_command`). The edit box says "The chemistry in \ce{...} is
+outside what this tool can read: write the formula with ordinary LaTeX, or check it for a typo."
+and nothing is saved. The proof's arms (`proof/systems.py`) and the gold side of the eval
+(`gold/arxiv_gold.py`) do not expand it, on purpose (recorded numbers must not move).
 
 | Supported | Examples |
 |---|---|
 | species of element symbols with counts | `H2O`, `C6H12O6`, `CuSO4.5H2O` |
 | brackets and parentheses with counts | `Ca(OH)2`, `Al2(SO4)3`, `[Cu(NH3)4]^2+` |
 | charges | `Na+`, `OH-`, `SO4^2-`, `Fe^3+`, `Fe^{3+}`, `Fe+++`, `e-` |
-| state symbols | `(aq)`, `(s)`, `(l)`, `(g)` |
+| state symbols | `(aq)`, `(s)`, `(l)`, `(g)`, with a condition: `(aq, 0.10 M)`, `(g, 1 atm)` (a number, then `M mM m atm bar kPa Pa mmHg torr` or no unit) |
+| the excited state, on a nuclide only | `^{60}_{28}Ni^*` (a bare `Ni^*` is refused: speech reads the star only on a nuclide) |
+| gas and precipitate marks | `CO2 ^`, `AgCl v` (after a species, set apart by a space; written `\uparrow`, `\downarrow`) |
 | coefficients | `2`, `0.5`, `1/2` |
 | arrows | `->`, `-->`, `<-`, `<--`, `<->`, `<=>`, with a label `->[\Delta]`, `->[heat]`, or two (`->[above][below]`; text, numbers, `\text{...}`, `^\circ`) |
 | bonds | `-` (between atoms), `=`, `#` |
@@ -93,8 +147,9 @@ recorded LaTeX, whose numbers must not move.
 
 Not supported, and refused (`CeError`, then the LaTeX check says `unknown_command`, the cheap
 model's answer goes to the main model, and a reading that still has it is a failed fix with a
-required decision, the picture kept): `<=>>` and `<<=>`, a gas or precipitate mark `^` / `v`,
-`$...$` in the body, a concentration inside a state symbol `(aq, 0.10 M)`, a three-part arrow label,
+required decision, the picture kept): `<=>>` and `<<=>`, a mark that does not follow a species
+(on a coefficient, an arrow, or two in a row, glued to the formula, or followed by a number), a star on a bare species, `$...$` in the body, a
+condition with a unit that is not listed or a second condition, a three-part arrow label,
 anything that is not a species (words, a generic letter such as `A`). The prompt says what to do
 instead: ordinary LaTeX with `\ce` only around the species inside it.
 
@@ -121,6 +176,9 @@ are read: the converter's and OpenStax's (`mtext` for `HSO` or `2e`, an empty-ba
 | 2 H₂ + O₂ ⇌ 2 H₂O | 2 H 2 plus O 2 is in equilibrium with 2 H 2 O |
 | CaCO₃(s) →(Δ) CaO(s) + CO₂(g) | C a C O 3 solid, reacts, with heat, to form C a O solid, plus C O 2 gas |
 | [H₃O⁺] = [OH⁻] | the concentration of H 3 O plus equals the concentration of O H minus |
+| Zn²⁺(aq, 0.10 M) | Z n 2 plus aqueous, 0.10 molar |
+| E°(Cu²⁺/Cu) | capital E degrees open parenthesis C u 2 plus slash C u close parenthesis |
+| ⁶⁰₂₈Ni* → ⁶⁰₂₈Ni + γ | nickel 60, atomic number 28, excited state reacts to form nickel 60, atomic number 28 plus gamma |
 | [Cu(NH₃)₄]²⁺ | open bracket C u open parenthesis N H 3 close parenthesis 4 close bracket 2 plus |
 | ¹⁴₆C | carbon 14, atomic number 6 |
 
@@ -216,6 +274,25 @@ uv run python scripts/dev_chem.py --gold data/dev-v2/dev before=before.jsonl aft
 uv run python scripts/dev_buckets.py --gold data/dev-v2/dev before=before.jsonl after=after.jsonl
 ```
 
+Four readings added after listening to what the review screen said for the development
+chemistry set (`tests/test_speech_chem_fixes.py`):
+
+- A state with conditions, `(aq, 0.10 M)` or `(g, 1 atm, 298 K)`, reads the state and then each
+  condition: "aqueous, 0.10 molar", "gas, 1 atmosphere, 298 kelvin". Only a number with a unit
+  is read this way; any other condition leaves the markup read as it was. `M` is "molar" only
+  here, inside a state.
+- A `/` between two species (`Cu²⁺/Cu`, `Cl₂/Cl⁻`) is a redox couple and reads "slash". A `/`
+  after a bracket or a closing parenthesis, or between italic letters, is still "divided by".
+- A half-reaction table (species, an arrow in a cell of its own, species) reads each row with
+  the arrow between the species ("reacts to form"), not "right arrow" in a cell alone.
+- `↑` after a species in a reaction reads "gas given off" and `↓` "precipitate" (elsewhere "up
+  arrow", "down arrow").
+- An asterisk after a nuclide (`⁶⁰₂₈Ni*`) reads ", excited state". An asterisk after another
+  species is not guessed at.
+- In a chemistry row, a unit after a decimal number reads as a unit (`0.0592 V`: V is also
+  vanadium), and `mol`, `L⁻¹`, `s⁻¹` side by side read as one rate unit ("moles per liter
+  second"). A whole number before a symbol stays a coefficient (`2 K`).
+
 ## Speech, checked by hand
 
 24 chemistry equations of the development gold (a seeded draw: 8 OpenStax-shaped MathML of every
@@ -227,10 +304,6 @@ an empty base); a concentration in brackets read "open bracket N O close bracket
 "the concentration of C l 2"; `2e⁻` read "2e to the power minus"; the cell-notation bars read
 "box drawings light vertical". All are in `tests/test_speech_chem.py`. Left as they are:
 
-- a state symbol with conditions, `(aq, 1 M)`, reads "open parenthesis a q comma 1 capital M
-  close parenthesis" (the state is not picked out of it);
-- a standard potential `E°(Cu²⁺/Cu)` reads as maths with a chemical subscript ("capital E sub
-  C u 2 plus /Cu end sub degrees"), clumsy and correct;
 - an aligned block of half-reactions reads "row 1: row 1:" (a label row of the table reading,
   not chemistry);
 - two-letter symbols are spelled "C u"; the ion names ("sulfate") are never said.
@@ -257,6 +330,32 @@ Twenty of the 24, as read (the rest are in the tests):
 | Pt(s) \| H₂(g, 1 atm) \| H⁺(aq, 1 M) ‖ Ag⁺(aq, 1 M) \| Ag(s) | P t solid, vertical bar H 2 open parenthesis g comma 1 atm close parenthesis vertical bar H plus open parenthesis a q comma 1 capital M close parenthesis double vertical bar … |
 | [Cu(NH₃)₄]²⁺ | open bracket C u open parenthesis N H 3 close parenthesis 4 close bracket 2 plus |
 | Na⁺ + Cl⁻ → NaCl | N a plus, plus C l minus reacts to form N a C l |
+
+## What a screen reader says (MathCAT and SRE)
+
+The speech above is ours. A student's screen reader reads the MathML in the page: NVDA 2026.1
+and JAWS with MathCAT, MathJax and ChromeVox with Speech Rule Engine. `scripts/screenreader_speech.py`
+runs our MathML and the gold's through both and reports where they differ, with a flag for
+whether MathCAT recognised the input as chemistry (it marks `data-chem-formula` or
+`data-chem-equation`; `docs/eval.md`, "Speech under screen-reader engines", has the commands and
+what the numbers do not show). Build the engines once:
+
+```
+scripts/speech_oracles/build.sh     # MathCAT v0.7.7 from source (rustup into ~/.cargo, no sudo),
+                                    # SRE 4.1.5 from npm; into .local/speech-oracles/
+uv run python scripts/screenreader_speech.py --items after.jsonl --gold data/dev-v2/dev \
+  --sections chemistry-atoms-first latex-chemistry
+```
+
+What it found on the development chemistry rows of the recorded run of 2026-10-26 (443 gold
+equations, 318 with a proposal; `--items` of that run, no model call): MathCAT recognises 114
+of the 443 gold equations as chemistry (the authored document's one-`mi`-per-letter shape, not
+OpenStax's `mtext`), and 90 of our 94 proposals for those. A formula MathCAT recognises is still
+spelled letter by letter ("cap h, sub 2 cap o") unless the MathML carries `intent`
+(`:chemical-formula`), which the validator does not allow yet. A state written `<mtext>(aq)</mtext>`
+is spoken "(aq)", not "aqueous": 63 of our 318 proposals have it, and none of the 16 gold readings
+that say "aqueous" is matched by ours. That is the shape, not the symbols, and the scorers do not
+see it.
 
 ## Side effect on maths that is not chemistry
 
@@ -510,8 +609,7 @@ scorers as the existing secondary ones.
   document.
 - **Formulas that the PDF set at one size** and **formulas in a table cell** (the cell text is
   flat; docs/tables.md).
-- **Three-part arrow labels**, `<=>>`, a precipitate mark, a state symbol with a concentration in
-  `\ce`: refused, the picture stays with a decision. A two-part label is read aloud as "right arrow
+- **Three-part arrow labels** and `<=>>`: refused, the picture stays with a decision. A two-part label is read aloud as "right arrow
   with 600 degrees Celsius below and electrolysis above", not as "reacts, with ..., to form".
 - **The primary and symbols scorers reward the spelling of the gold**, so a change that is right
   for a reader (the group a bracket's script belongs to, an arrow as an operator) can lower them
@@ -520,7 +618,7 @@ scorers as the existing secondary ones.
 - **The prompt's one `\mathrm` example** (a state symbol with a concentration) is older than the
   `\text` shape the converter now writes; changing it changes the prompt's version and with it
   every recorded answer, so it waits for the next re-recording. The table prompt
-  (`models/prompts/table.md`) does not teach `\ce` either, and `table_step` does not expand it.
+  (`models/prompts/table.md`) does not teach `\ce` either, though `table_step` expands it.
 - **Real screen readers were not run.** The reading is the review screen's string; what NVDA with
   MathCAT or VoiceOver says about this MathML (`mtext` element symbols in OpenStax's shape,
   grouped scripts) is the manual test of docs/mathml-alttext.md and was not done.

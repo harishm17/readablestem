@@ -1,0 +1,9 @@
+{
+  "name": "speech-oracles-sre",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Speech Rule Engine for scripts/screenreader_speech.py (dev tool only)",
+  "dependencies": {
+    "speech-rule-engine": "4.1.5"
+  }
+}

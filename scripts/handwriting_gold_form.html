@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Answer key for my handwritten notes</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+  body { margin: 0; }
+  header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: .75rem; align-items: center;
+           padding: .5rem 1rem; background: Canvas; border-bottom: 1px solid GrayText; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(22rem, 30rem); gap: 1rem; padding: 1rem; }
+  @media (max-width: 60rem) { main { grid-template-columns: 1fr; } }
+  #stage { position: relative; display: inline-block; max-width: 100%; touch-action: none; }
+  #page { display: block; max-width: 100%; height: auto; border: 1px solid GrayText; }
+  .box { position: absolute; border: 2px solid #c2410c; background: rgb(194 65 12 / .12); pointer-events: none; }
+  .box.current { border-color: #1d4ed8; background: rgb(29 78 216 / .15); }
+  .box.uncertain { border-style: dashed; }
+  .row { border: 1px solid GrayText; border-radius: .4rem; padding: .5rem; margin-bottom: .75rem; }
+  .row.current { outline: 2px solid #1d4ed8; }
+  .row canvas { max-width: 100%; display: block; background: #fff; border: 1px solid #ccc; }
+  textarea { width: 100%; box-sizing: border-box; font: 1rem ui-monospace, monospace; margin-top: .4rem; }
+  .preview { min-height: 2rem; padding: .25rem; font-size: 1.2rem; }
+  .err { color: #b91c1c; font-size: .9rem; }
+  .controls { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-top: .4rem; }
+  details { margin: .5rem 1rem; }
+  #status { font-size: .9rem; }
+  :focus-visible { outline: 3px solid #1d4ed8; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<header>
+  <label>PDF <select id="unit"></select></label>
+  <button id="prev" type="button">Previous page</button>
+  <span id="where" aria-live="polite"></span>
+  <button id="next" type="button">Next page</button>
+  <label><input id="complete" type="checkbox"> This PDF is finished</label>
+  <span id="status" role="status" aria-live="polite"></span>
+</header>
+<details>
+  <summary>How to fill this in</summary>
+  <ol>
+    <li>Drag a rectangle around one handwritten expression on the page. A box appears on the right.</li>
+    <li>Type the LaTeX for it yourself, from what you see. There is no draft. The preview is only a check that it parses.</li>
+    <li>Pick "display" for an equation on its own line, "inline" for one inside a sentence.</li>
+    <li>If you cannot tell what the ink says, tick "can't tell" and type your best guess. These are left out of the main score.</li>
+    <li>Conventions: <code>\bar{x}</code> for a bar over one letter; <code>\text{...}</code> for words inside maths; <code>\left( \right)</code> for brackets that grow; <code>\begin{pmatrix}</code> for matrices.</li>
+    <li>Everything is saved on this computer as you type. When every expression on every page of a PDF is boxed and typed, tick "This PDF is finished".</li>
+  </ol>
+</details>
+<main>
+  <section aria-label="Page">
+    <div id="stage"><img id="page" alt="Page of handwritten notes. Drag to box an expression." draggable="false"></div>
+  </section>
+  <section aria-label="Expressions on this page">
+    <h2 id="count">Expressions on this page</h2>
+    <div id="rows"></div>
+  </section>
+</main>
+<script>
+"use strict";
+const MATHML_NS = "http://www.w3.org/1998/Math/MathML";
+const ALLOWED = new Set("math mrow mi mn mo msup msub msubsup mfrac msqrt mroot mtext mspace mover munder munderover mtable mtr mtd mstyle mpadded mphantom menclose mfenced mmultiscripts mprescripts none semantics annotation".split(" "));
+const state = { units: [], unit: null, page: 1, current: -1, timer: null };
+const $ = (id) => document.getElementById(id);
+const img = $("page"), stage = $("stage");
+
+function setStatus(text) { $("status").textContent = text; }
+
+function gold() { return state.unit.gold; }
+function onPage() { return gold().expressions.map((e, i) => [e, i]).filter(([e]) => e.page === state.page); }
+
+function save() {
+  clearTimeout(state.timer);
+  setStatus("Saving...");
+  state.timer = setTimeout(async () => {
+    const g = gold();
+    try {
+      const r = await fetch("/api/gold/" + state.unit.unit, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ complete: g.complete, expressions: g.expressions }),
+      });
+      setStatus(r.ok ? "Saved" : "Not saved: " + (await r.json()).error);
+    } catch (e) { setStatus("Not saved (is the form's server still running?)"); }
+  }, 300);
+}
+
+function safeMathML(xml) {
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  if (doc.querySelector("parsererror")) return null;
+  const build = (node) => {
+    if (node.nodeType === 3) return document.createTextNode(node.nodeValue);
+    if (node.nodeType !== 1) return null;
+    const name = node.localName;
+    if (!ALLOWED.has(name)) throw new Error("element");
+    const el = document.createElementNS(MATHML_NS, name);
+    for (const a of ["display", "mathvariant", "stretchy", "fence", "separator", "columnalign", "rowspan", "columnspan"]) {
+      if (node.hasAttribute(a)) el.setAttribute(a, node.getAttribute(a));
+    }
+    for (const c of node.childNodes) { const k = build(c); if (k) el.appendChild(k); }
+    return el;
+  };
+  try { return build(doc.documentElement); } catch (e) { return null; }
+}
+
+async function preview(expr, target, errBox) {
+  const seq = (preview.seq = (preview.seq || 0) + 1);
+  target.dataset.seq = seq;
+  target.replaceChildren(); errBox.textContent = "";
+  if (!expr.latex.trim()) return;
+  const q = new URLSearchParams({ latex: expr.latex, display: expr.display });
+  let data;
+  try { data = await (await fetch("/api/mathml?" + q)).json(); } catch (e) { return; }
+  if (target.dataset.seq !== String(seq)) return;  // a newer request for this row is in flight
+  if (data.error) { errBox.textContent = data.error; return; }
+  const node = safeMathML(data.mathml);
+  if (node) target.appendChild(node); else errBox.textContent = "no preview";
+}
+
+function drawCrop(canvas, expr) {
+  const [x0, y0, x1, y1] = expr.box, W = img.naturalWidth, H = img.naturalHeight;
+  const sw = (x1 - x0) * W, sh = (y1 - y0) * H, scale = Math.min(1, 420 / sw);
+  canvas.width = Math.max(1, Math.round(sw * scale)); canvas.height = Math.max(1, Math.round(sh * scale));
+  canvas.getContext("2d").drawImage(img, x0 * W, y0 * H, sw, sh, 0, 0, canvas.width, canvas.height);
+}
+
+function render() {
+  const g = gold(), items = onPage();
+  $("complete").checked = g.complete;
+  $("where").textContent = `Page ${state.page} of ${state.unit.pages}`;
+  $("prev").disabled = state.page <= 1; $("next").disabled = state.page >= state.unit.pages;
+  $("count").textContent = `Expressions on this page: ${items.length}`;
+  stage.querySelectorAll(".box").forEach((b) => b.remove());
+  const rows = $("rows"); rows.replaceChildren();
+  items.forEach(([expr, index], n) => {
+    const [x0, y0, x1, y1] = expr.box;
+    const box = document.createElement("div");
+    box.className = "box" + (index === state.current ? " current" : "") + (expr.uncertain ? " uncertain" : "");
+    Object.assign(box.style, { left: x0 * 100 + "%", top: y0 * 100 + "%", width: (x1 - x0) * 100 + "%", height: (y1 - y0) * 100 + "%" });
+    stage.appendChild(box);
+
+    const row = document.createElement("div");
+    row.className = "row" + (index === state.current ? " current" : "");
+    const head = document.createElement("strong"); head.textContent = `Expression ${n + 1}`;
+    const canvas = document.createElement("canvas"); canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", `Crop of expression ${n + 1}`);
+    drawCrop(canvas, expr);
+    const label = document.createElement("label"); label.textContent = "LaTeX, typed by you";
+    const ta = document.createElement("textarea"); ta.rows = 2; ta.value = expr.latex; ta.spellcheck = false;
+    label.appendChild(ta);
+    const pv = document.createElement("div"); pv.className = "preview";
+    const err = document.createElement("div"); err.className = "err";
+    const controls = document.createElement("div"); controls.className = "controls";
+    const role = document.createElement("select"); role.setAttribute("aria-label", "Role");
+    for (const v of ["inline", "display"]) { const o = new Option(v, v); role.add(o); }
+    role.value = expr.display;
+    const unc = document.createElement("input"); unc.type = "checkbox"; unc.checked = expr.uncertain;
+    const uncLabel = document.createElement("label"); uncLabel.append(unc, " can't tell");
+    const del = document.createElement("button"); del.type = "button"; del.textContent = "Delete";
+    controls.append(role, uncLabel, del);
+    row.append(head, canvas, label, pv, err, controls);
+    rows.appendChild(row);
+
+    const refresh = () => preview(expr, pv, err);
+    ta.addEventListener("input", () => { expr.latex = ta.value; refresh(); save(); });
+    ta.addEventListener("focus", () => { state.current = index; stage.querySelectorAll(".box").forEach((b, k) => b.classList.toggle("current", k === n)); });
+    role.addEventListener("change", () => { expr.display = role.value; refresh(); save(); });
+    unc.addEventListener("change", () => { expr.uncertain = unc.checked; box.classList.toggle("uncertain", unc.checked); save(); });
+    del.addEventListener("click", () => { g.expressions.splice(index, 1); state.current = -1; render(); save(); });
+    refresh();
+  });
+}
+
+// Drag a rectangle on the page to add an expression.
+let drag = null;
+stage.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  const r = img.getBoundingClientRect();
+  drag = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, el: document.createElement("div") };
+  drag.el.className = "box current"; stage.appendChild(drag.el); stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const r = img.getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+  Object.assign(drag.el.style, { left: Math.min(x, drag.x) * 100 + "%", top: Math.min(y, drag.y) * 100 + "%", width: Math.abs(x - drag.x) * 100 + "%", height: Math.abs(y - drag.y) * 100 + "%" });
+  drag.x1 = x; drag.y1 = y;
+});
+stage.addEventListener("pointerup", () => {
+  if (!drag) return;
+  const d = drag; drag = null; d.el.remove();
+  if (d.x1 === undefined) return;
+  const box = [Math.min(d.x, d.x1), Math.min(d.y, d.y1), Math.max(d.x, d.x1), Math.max(d.y, d.y1)];
+  if ((box[2] - box[0]) * img.naturalWidth < 12 || (box[3] - box[1]) * img.naturalHeight < 12) return;
+  const g = gold();
+  g.expressions.push({ page: state.page, box, latex: "", display: "inline", uncertain: false });
+  state.current = g.expressions.length - 1;
+  render(); save();
+  const tas = $("rows").querySelectorAll("textarea"); if (tas.length) tas[tas.length - 1].focus();
+});
+
+function showPage() {
+  img.onload = render;
+  img.src = `/page/${state.unit.unit}/${state.page}.png`;
+  if (img.complete && img.naturalWidth) render();
+}
+
+function pick(unitId) {
+  state.unit = state.units.find((u) => u.unit === unitId); state.page = 1; state.current = -1;
+  if (!state.unit.gold) state.unit.gold = { complete: false, expressions: [] };
+  showPage();
+}
+
+$("unit").addEventListener("change", (e) => pick(e.target.value));
+$("prev").addEventListener("click", () => { state.page -= 1; state.current = -1; showPage(); });
+$("next").addEventListener("click", () => { state.page += 1; state.current = -1; showPage(); });
+$("complete").addEventListener("change", (e) => { gold().complete = e.target.checked; save(); });
+
+(async () => {
+  state.units = (await (await fetch("/api/state")).json()).units;
+  const sel = $("unit");
+  state.units.forEach((u, i) => sel.add(new Option(`PDF ${i + 1} of ${state.units.length} (${u.part})`, u.unit)));
+  if (state.units.length) pick(state.units[0].unit); else setStatus("No PDFs are registered.");
+})();
+</script>
+</body>
+</html>
