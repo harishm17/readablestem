@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: eval runs keep their recordings; chemistry report fields (branch chem/eval-metric)
+
+- Every eval run that calls a real model (`eval pipeline` on any set and task, `eval sample`,
+  `eval calibrate --probes`) now writes `answers.jsonl`, `items.jsonl`, `report.json` and `run.json`
+  (the commit) under `~/.cache/readablestem/<set>/runs/<timestamp>/`, and the report names the folder
+  and the commit under `recording`. `--answers` and `--items` still override. Fake runs, replays and
+  the sealed check part keep nothing. `scripts/dev_chatbot.py score` always writes its items.
+- `scripts/dev_chem_classes.py`: reads a run folder, prints how many gold equations harm a listener,
+  and with `--speech` the spoken comparison and the silent harm per 100 gold.
+- Document reports with chemistry gold gain a `chemistry` block: `chem_right_excl_times` (lone `×`
+  left out, reported beside the count that keeps it) and `silent_harm` (wrong, not asked, heard
+  differently), counts only. Report fields only; the primary scorer, the gate and committed reports
+  are unchanged, and no gate reads them.
+- Recordings are private (folders 0700, files 0600). `eval prune --older-than DAYS [--set NAME] [--dry-run]`
+  deletes old runs and keeps any a committed report names. `scripts/dev_chem_classes.py` refuses
+  held-out and sealed run folders.
 ## Unreleased: a kit for collecting hand-copied OpenStax examples (branch hw/copy-set-kit)
 
 - `scripts/handwriting_copy_set.py` and `data/handwriting-copy/README.md`: a kit for a small set of
