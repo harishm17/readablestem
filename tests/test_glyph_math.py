@@ -282,7 +282,7 @@ def test_a_word_in_brackets_after_an_indexed_variable_stays_prose():
 
 
 def test_the_edge_rules_do_not_touch_a_document_not_made_by_tex():
-    """Index comma, percent sign and unit rules are TeX conventions: a browser print is read as before."""
+    """Index comma, percent sign and unit rules are TeX conventions: a browser print is as before."""
 
     def comma(page):
         sentence(

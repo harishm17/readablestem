@@ -3373,7 +3373,7 @@ def _inline_runs(
                 or (c == "," and (depth > 0 or _ellipsis_comma(chars, i)))
                 or (c in _ELLIPSIS_CHARS and _in_ellipsis(chars, i))
                 or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
-                or (_TEX_MADE and glyph_math.script_punctuation(chars, info.script, i))  # m,q of rho_{m,q}
+                or (_TEX_MADE and glyph_math.script_punctuation(chars, info.script, i))
                 or (_TEX_MADE and glyph_math.percent_of_number(chars, i))  # the 5% of "phi = 5%"
             )
             accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
