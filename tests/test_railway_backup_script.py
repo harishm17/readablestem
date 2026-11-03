@@ -41,7 +41,8 @@ if [[ "$args" == *ON_ERROR_STOP* ]]; then
 fi
 case "$args" in
   *pg_tables*)
-    if [ "$scratch" = restored ]; then printf '%s\n' $RESTORED_TABLES; else printf '%s\n' $LIVE_TABLES; fi ;;
+    if [ "$scratch" = restored ]; then printf '%s\n' $RESTORED_TABLES
+    else printf '%s\n' $LIVE_TABLES; fi ;;
   *version_num*)
     if [ "$scratch" = restored ]; then echo "$RESTORED_VERSION"; else echo "$LIVE_VERSION"; fi ;;
   *ops_heartbeat*)
