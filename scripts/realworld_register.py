@@ -24,6 +24,7 @@ FRESH5_FILES = (  # hashed when the owner signs PREREGISTRATION-FRESH5.md, not b
     "candidates-fresh5-A.json",
     "order-realworld-fresh5-2026-11-02-A.json",
     "selection-fresh5-B.json",
+    "selection-fresh5-D.json",
     "pool-fresh5-course.json",
     "candidates-fresh5-C.json",
     "manifest-fresh5c.json",
