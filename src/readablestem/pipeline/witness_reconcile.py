@@ -30,7 +30,11 @@ always a required decision (`equation_step`).
 - disagreement: whichever reading's symbols are closer to the glyphs of the extent (the
   Dice similarity of the symbol bags of the text layer and the reading) is kept, the other is
   recorded as `EquationFix.other_latex`, and the formula is a required decision either way. A
-  difference of less than `TIE_BELOW` is a tie and the crop's reading stays.
+  difference of less than `TIE_BELOW` is a tie and the crop's reading stays. That bag holds
+  letters, digits and Greek letters only, and two readings of one formula nearly always have
+  the same ones (E1 dev: 23 of 24 disagreements were exact ties on it, so the crop always
+  stayed), so a tie on the letters is broken by the marks the text layer shows and the bag
+  cannot (`MARKS`: a slash in the glyphs against a drawn fraction), with the same `TIE_BELOW`.
 
 Nothing here changes what text the document says; the witness is a second reading only.
 """
@@ -39,9 +43,13 @@ from __future__ import annotations
 
 import logging
 import statistics
+import unicodedata
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
+
+import defusedxml.ElementTree as DET
 
 from readablestem.core.types import BBox, Element, Kind
 from readablestem.pipeline import layout, math_canonical
@@ -60,6 +68,12 @@ OVERLAP_SHARE = 0.5
 MIN_GLYPH = 1.0
 # Two readings whose similarity to the glyphs differs by less than this are tied.
 TIE_BELOW = 0.05
+# The one mark the letter-and-digit similarity cannot see and the text layer does show: a
+# slash. A written "a/b" has one, a drawn fraction bar is a line and never in the text, so
+# `-2/3` against `-\frac{2}{3}` differs here and nowhere else. It decides only when the
+# letters tie (`adjudicate`). Brackets are left out: the text of an element often holds the
+# bracket of its neighbour, which the crop's reading drops on purpose.
+MARKS = frozenset("/")
 # The sameness agreement needs (`math_canonical`): equal normalised trees, or equal once
 # notation that says the same is written alike. Looser kinds (the same words when spoken, the
 # same symbol bag) are not agreement.
@@ -337,5 +351,26 @@ def adjudicate(text_layer: str | None, crop_mathml: str, witness_mathml: str) ->
     except Exception:
         return "tie"
     if abs(crop - witness) < TIE_BELOW:
-        return "tie"
+        try:
+            crop, witness = (
+                marks_dice(text_layer, crop_mathml),
+                marks_dice(text_layer, witness_mathml),
+            )
+        except Exception:
+            return "tie"
+        if abs(crop - witness) < TIE_BELOW:
+            return "tie"
     return "crop" if crop > witness else "witness"
+
+
+def _marks(text: str) -> Counter[str]:
+    return Counter(ch for ch in unicodedata.normalize("NFKC", text) if ch in MARKS)
+
+
+def marks_dice(text: str, mathml: str) -> float:
+    """Dice similarity of the `MARKS` of the text layer and of a MathML (1.0 when neither
+    has one)."""
+    expected = _marks(text)
+    got = _marks(" ".join(DET.fromstring(mathml, forbid_dtd=True).itertext()))
+    total = sum(expected.values()) + sum(got.values())
+    return 2 * sum((expected & got).values()) / total if total else 1.0
