@@ -18,6 +18,19 @@ import sys
 from pathlib import Path
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "realworld"
+FRESH5_FILES = (  # hashed when Harish signs PREREGISTRATION-FRESH5.md, not before
+    "PREREGISTRATION-FRESH5.md",
+    "manifest-fresh5a.json",
+    "candidates-fresh5-A.json",
+    "order-realworld-fresh5-2026-11-02-A.json",
+    "selection-fresh5-B.json",
+    "pool-fresh5-course.json",
+    "candidates-fresh5-C.json",
+    "manifest-fresh5c.json",
+    "pool.json",
+    "../../scripts/fresh5_select.py",
+    "../../scripts/rw_notation_neutral.py",
+)
 FRESH4_FILES = (
     "PREREGISTRATION-FRESH4.md",
     "manifest-fresh4.json",
@@ -73,7 +86,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--check", action="store_true")
     parser.add_argument(
-        "--set", choices=["heldout", "fresh", "fresh2", "fresh3", "fresh4"], default="heldout"
+        "--set",
+        choices=["heldout", "fresh", "fresh2", "fresh3", "fresh4", "fresh5"],
+        default="heldout",
     )
     args = parser.parse_args()
     targets = {
@@ -82,6 +97,7 @@ def main() -> int:
         "fresh2": ("REGISTRATION-fresh2.sha256", FRESH2_FILES),
         "fresh3": ("REGISTRATION-fresh3.sha256", FRESH3_FILES),
         "fresh4": ("REGISTRATION-fresh4.sha256", FRESH4_FILES),
+        "fresh5": ("REGISTRATION-fresh5.sha256", FRESH5_FILES),
     }
     name, files = targets[args.set]
     target = DATA / name

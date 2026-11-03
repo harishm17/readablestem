@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Fifth fresh real-world split, builder only (no system run): `scripts/fresh5_select.py` (arXiv continuation, OpenStax
+  sections never used, course-style LaTeX incl. Beamer decks from GitHub under CC BY, CC BY-SA or MIT, compiled with
+  Tectonic), `gold/course_corpus.py`, and the registration as an unsigned draft
+  (`data/realworld/PREREGISTRATION-FRESH5.md`). `arxiv_gold.analyse` takes `min_equations` (default unchanged, 5).
+  [docs/eval-realworld.md](docs/eval-realworld.md).
+
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 
 - `ANALYTICS_ENABLED` (default false): PostHog loaded from and reporting to the app's own `/m/` proxy

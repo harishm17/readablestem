@@ -27,6 +27,11 @@ printed pages read differently.
 | `make eval-latex-check` | Scorer check: known-correct LaTeX for every sample equation (`tests/fixtures/sample_latex_predictions.jsonl`) must match leniently; also runs in CI via `pytest` |
 | `make proof` | Replay the recorded run in `proof/bundles/` and write `PROOF.md` (no key, no network, no cost). `proof-check`, `proof-sources`, `proof-live`: see docs/proof.md |
 
+The course-style stratum of the fifth real-world split compiles LaTeX sources with
+[Tectonic](https://tectonic-typesetting.github.io/) (`scripts/fresh5_select.py course-draw`). Install the official release binary
+into `~/.local/bin` (no root): download `tectonic-<version>-x86_64-unknown-linux-musl.tar.gz` from the project's GitHub
+releases and put `tectonic` on `PATH`. It is not needed for tests or for anything else.
+
 CLI:
 
 ```

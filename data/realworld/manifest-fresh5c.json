@@ -1,0 +1,131 @@
+{
+ "part": "fresh5c",
+ "seed": "realworld-fresh5-2026-11-02",
+ "papers": [
+  {
+   "id": "course/agormp/evolintro/evolintro",
+   "title": "agormp/evolintro: evolintro.tex",
+   "licence": "CC BY-SA 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "set": "github",
+   "style": "course",
+   "repo": "agormp/evolintro",
+   "repo_commit": "14c2864dd2f1593a8214a17c37da8ceeeba9cc2d",
+   "source_url": "https://github.com/agormp/evolintro/blob/14c2864dd2f1593a8214a17c37da8ceeeba9cc2d/evolintro.tex",
+   "pages_chosen": [
+    11,
+    14,
+    18,
+    29
+   ],
+   "equations": 46,
+   "display": 2,
+   "pdf_sha256": "0de41bffc8ca4b9f9e61fa105c85773e094c5d70624a52ecafd2f9b141abf8a0",
+   "source_sha256": "14c2864dd2f1593a8214a17c37da8ceeeba9cc2d",
+   "extract_pdf_sha256": "ebfde9eea618b40ef28d4f4c202e354d8e107444e6042134ba81cca34d9cdbd5",
+   "gold_sha256": "481df632b1aa334cbf8f37ab1c6d1702ba405e5e9c0fcb25d98a50cb7577c081"
+  },
+  {
+   "id": "course/gmarciani/research/computer-security/main",
+   "title": "gmarciani/research: computer-security/main.tex",
+   "licence": "MIT",
+   "licence_url": "https://opensource.org/license/mit",
+   "set": "github",
+   "style": "course",
+   "repo": "gmarciani/research",
+   "repo_commit": "20847e0559f065089f30a0d895d568004a0d1b4c",
+   "source_url": "https://github.com/gmarciani/research/blob/20847e0559f065089f30a0d895d568004a0d1b4c/computer-security/main.tex",
+   "pages_chosen": [
+    9,
+    16,
+    21,
+    22
+   ],
+   "equations": 87,
+   "display": 4,
+   "pdf_sha256": "bd2ba963b12859c20b9a80525cb4734e9bbbb81ba6ed5151aff79578a4e309e7",
+   "source_sha256": "20847e0559f065089f30a0d895d568004a0d1b4c",
+   "extract_pdf_sha256": "c42497a2ab1f4743185875eab318ab195ec95d0dfd950af59658d8b6b6be1cfc",
+   "gold_sha256": "5ad3b184e1841149bf39c9fd4e0356889f5eadeccd10266fc80c9ad55e99df7d"
+  },
+  {
+   "id": "course/qubd/SN1_Notes/201-SN1_Notes",
+   "title": "qubd/SN1_Notes: 201-SN1_Notes.tex",
+   "licence": "CC BY-SA 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "set": "github",
+   "style": "course",
+   "repo": "qubd/SN1_Notes",
+   "repo_commit": "7c876c213d90fc2f395d768f449611d1746657b4",
+   "source_url": "https://github.com/qubd/SN1_Notes/blob/7c876c213d90fc2f395d768f449611d1746657b4/201-SN1_Notes.tex",
+   "pages_chosen": [
+    5,
+    11,
+    13,
+    16,
+    82,
+    119
+   ],
+   "equations": 95,
+   "display": 7,
+   "pdf_sha256": "bef8d4253c68635139e186a7df90ffeb0a56640ddd4654d6b0c8a670aea8c08b",
+   "source_sha256": "7c876c213d90fc2f395d768f449611d1746657b4",
+   "extract_pdf_sha256": "1e2156bdd7f0e80a1660d1c8d3555319abdad893f899b2c7ef5586db64cb0b64",
+   "gold_sha256": "2645b1be357deec0181841930a9a05e2c57f042f182c939939f9afc7a85ed016"
+  },
+  {
+   "id": "course/robmelfi/PatternRecognitionLectureNotes/book",
+   "title": "robmelfi/PatternRecognitionLectureNotes: book.tex",
+   "licence": "CC BY 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+   "set": "github",
+   "style": "course",
+   "repo": "robmelfi/PatternRecognitionLectureNotes",
+   "repo_commit": "e5ccb888741ed14019024c78746bc4f3830df2f3",
+   "source_url": "https://github.com/robmelfi/PatternRecognitionLectureNotes/blob/e5ccb888741ed14019024c78746bc4f3830df2f3/book.tex",
+   "pages_chosen": [
+    20,
+    21,
+    23,
+    39,
+    94,
+    102
+   ],
+   "equations": 105,
+   "display": 20,
+   "pdf_sha256": "ab710139613827500f6c46a3d183fdc80cf3cfef3b9eda198ddc6737986d85dc",
+   "source_sha256": "e5ccb888741ed14019024c78746bc4f3830df2f3",
+   "extract_pdf_sha256": "545f536328f5804f19c8b4300eaf757fa8e4dcdd713ea9725b9362879b976fab",
+   "gold_sha256": "302d80d88ee2fefbb445e3738792d2fa429e113feabd88c4e3e3d6e71de625af"
+  },
+  {
+   "id": "course/sim1-99/medical-physics-notes/main",
+   "title": "sim1-99/medical-physics-notes: main.tex",
+   "licence": "CC BY-SA 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "set": "github",
+   "style": "course",
+   "repo": "sim1-99/medical-physics-notes",
+   "repo_commit": "a55044430aa8e99972c334d7946f16a6fca72492",
+   "source_url": "https://github.com/sim1-99/medical-physics-notes/blob/a55044430aa8e99972c334d7946f16a6fca72492/main.tex",
+   "pages_chosen": [
+    25,
+    51,
+    60,
+    69,
+    102,
+    104
+   ],
+   "equations": 39,
+   "display": 5,
+   "pdf_sha256": "061f673a457b6849115dc658cc8655aac7c0d2091374ab914703e0d8741782d0",
+   "source_sha256": "a55044430aa8e99972c334d7946f16a6fca72492",
+   "extract_pdf_sha256": "912e876e3138f1546323217fe3d1330fe7babbe00661fe76abf95108f38b8d0e",
+   "gold_sha256": "916aa65745d3b936ea611d4df5c7a61758a3431d4575f3089afacb4cf58c6f71"
+  }
+ ],
+ "n_papers": 5,
+ "n_beamer": 0,
+ "n_equations": 372,
+ "n_pages": 26
+}

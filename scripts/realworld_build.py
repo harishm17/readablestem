@@ -195,6 +195,8 @@ def cmd_verify(args: argparse.Namespace) -> int:
         manifest = json.loads(path.read_text())
         seed = manifest["seed"]
         for paper in manifest["papers"]:
+            if paper["id"] not in pool:  # a course document (scripts/fresh5_select.py course-draw)
+                continue
             record = pool[paper["id"]]
             with httpx.Client() as client:  # unused: every file is cached
                 analysis, pages, info = process(record, args.root, client, 0.0, seed)

@@ -123,8 +123,12 @@ class Analysis:
         return len(self.bad) / len(self.equations) if self.equations else 1.0
 
 
-def analyse(sources: dict[str, str], page_texts: list[str]) -> Analysis | str:
-    """The analysis of a paper, or the reason it cannot be used (a short code)."""
+def analyse(
+    sources: dict[str, str], page_texts: list[str], *, min_equations: int = 5
+) -> Analysis | str:
+    """The analysis of a paper, or the reason it cannot be used (a short code). A page is usable
+    with at least `min_equations` equations (5 for papers; the course corpus uses fewer for slides).
+    """
     main = tex.find_main(sources)
     if main is None:
         return "no_main_tex"
@@ -146,7 +150,11 @@ def analyse(sources: dict[str, str], page_texts: list[str]) -> Analysis | str:
             bad[k] = str(exc)
     mapping = tex.page_map(extraction, page_texts)
     usable = tex.usable_pages(
-        equations, mapping.placements, mapping.coverage, unconvertible=set(bad)
+        equations,
+        mapping.placements,
+        mapping.coverage,
+        min_equations=min_equations,
+        unconvertible=set(bad),
     )
     return Analysis(
         equations=equations,

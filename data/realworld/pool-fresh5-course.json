@@ -1,0 +1,3172 @@
+{
+ "seed": "realworld-fresh5-2026-11-02",
+ "harvested": "2026-11-02",
+ "queries": [
+  {
+   "label": "lecture notes|cc-by-4.0",
+   "q": "\"lecture notes\" license:cc-by-4.0 language:TeX fork:false archived:false"
+  },
+  {
+   "label": "lecture notes|cc-by-sa-4.0",
+   "q": "\"lecture notes\" license:cc-by-sa-4.0 language:TeX fork:false archived:false"
+  },
+  {
+   "label": "lecture notes|mit",
+   "q": "\"lecture notes\" license:mit language:TeX fork:false archived:false"
+  },
+  {
+   "label": "lecture slides|cc-by-4.0",
+   "q": "\"lecture slides\" license:cc-by-4.0 language:TeX fork:false archived:false"
+  },
+  {
+   "label": "lecture slides|cc-by-sa-4.0",
+   "q": "\"lecture slides\" license:cc-by-sa-4.0 language:TeX fork:false archived:false"
+  },
+  {
+   "label": "lecture slides|mit",
+   "q": "\"lecture slides\" license:mit language:TeX fork:false archived:false"
+  },
+  {
+   "label": "beamer slides|cc-by-4.0",
+   "q": "\"beamer slides\" license:cc-by-4.0 language:TeX fork:false archived:false"
+  },
+  {
+   "label": "beamer slides|cc-by-sa-4.0",
+   "q": "\"beamer slides\" license:cc-by-sa-4.0 language:TeX fork:false archived:false"
+  },
+  {
+   "label": "beamer slides|mit",
+   "q": "\"beamer slides\" license:mit language:TeX fork:false archived:false"
+  },
+  {
+   "label": "beamer lecture|cc-by-4.0",
+   "q": "\"beamer lecture\" license:cc-by-4.0 language:TeX fork:false archived:false"
+  },
+  {
+   "label": "beamer lecture|cc-by-sa-4.0",
+   "q": "\"beamer lecture\" license:cc-by-sa-4.0 language:TeX fork:false archived:false"
+  },
+  {
+   "label": "beamer lecture|mit",
+   "q": "\"beamer lecture\" license:mit language:TeX fork:false archived:false"
+  },
+  {
+   "label": "beamer presentation|cc-by-4.0",
+   "q": "\"beamer presentation\" license:cc-by-4.0 language:TeX fork:false archived:false"
+  },
+  {
+   "label": "beamer presentation|cc-by-sa-4.0",
+   "q": "\"beamer presentation\" license:cc-by-sa-4.0 language:TeX fork:false archived:false"
+  },
+  {
+   "label": "beamer presentation|mit",
+   "q": "\"beamer presentation\" license:mit language:TeX fork:false archived:false"
+  },
+  {
+   "label": "problem set|cc-by-4.0",
+   "q": "\"problem set\" license:cc-by-4.0 language:TeX fork:false archived:false"
+  },
+  {
+   "label": "problem set|cc-by-sa-4.0",
+   "q": "\"problem set\" license:cc-by-sa-4.0 language:TeX fork:false archived:false"
+  },
+  {
+   "label": "problem set|mit",
+   "q": "\"problem set\" license:mit language:TeX fork:false archived:false"
+  }
+ ],
+ "kept_per_query": {
+  "lecture notes|cc-by-4.0": 15,
+  "lecture notes|cc-by-sa-4.0": 23,
+  "lecture notes|mit": 44,
+  "lecture slides|cc-by-4.0": 3,
+  "lecture slides|cc-by-sa-4.0": 1,
+  "lecture slides|mit": 14,
+  "beamer slides|cc-by-4.0": 3,
+  "beamer slides|cc-by-sa-4.0": 2,
+  "beamer slides|mit": 42,
+  "beamer lecture|cc-by-4.0": 0,
+  "beamer lecture|cc-by-sa-4.0": 0,
+  "beamer lecture|mit": 2,
+  "beamer presentation|cc-by-4.0": 6,
+  "beamer presentation|cc-by-sa-4.0": 2,
+  "beamer presentation|mit": 50,
+  "problem set|cc-by-4.0": 2,
+  "problem set|cc-by-sa-4.0": 1,
+  "problem set|mit": 49
+ },
+ "accepted_licences": {
+  "CC-BY-4.0": "CC BY 4.0",
+  "CC-BY-3.0": "CC BY 3.0",
+  "CC-BY-SA-4.0": "CC BY-SA 4.0",
+  "CC-BY-SA-3.0": "CC BY-SA 3.0",
+  "MIT": "MIT"
+ },
+ "n_repos": 255,
+ "repos": [
+  {
+   "full_name": "A-PachecoT/uni-beamer-claude",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1667,
+   "stars": 0,
+   "pushed_at": "2026-01-25T23:39:30Z",
+   "html_url": "https://github.com/A-PachecoT/uni-beamer-claude",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "abhmul/openai-results-notes",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 967,
+   "stars": 0,
+   "pushed_at": "2026-10-29T20:34:05Z",
+   "html_url": "https://github.com/abhmul/openai-results-notes",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "AbolfazlMohammadi2005/Exercise-Template",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "master",
+   "size_kb": 155,
+   "stars": 1,
+   "pushed_at": "2025-12-31T14:27:59Z",
+   "html_url": "https://github.com/AbolfazlMohammadi2005/Exercise-Template",
+   "queries": [
+    "problem set|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "adamtopaz/UAlberta-412-512-lecture-notes",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 168,
+   "stars": 4,
+   "pushed_at": "2023-04-25T09:52:14Z",
+   "html_url": "https://github.com/adamtopaz/UAlberta-412-512-lecture-notes",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "Adarsh-Barik/SimpleBeamerTheme",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 12109,
+   "stars": 46,
+   "pushed_at": "2017-11-17T15:41:17Z",
+   "html_url": "https://github.com/Adarsh-Barik/SimpleBeamerTheme",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "AddisonHowe/beamer-slides-template",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 956,
+   "stars": 1,
+   "pushed_at": "2023-11-04T15:30:50Z",
+   "html_url": "https://github.com/AddisonHowe/beamer-slides-template",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "adebray/latex_style_files",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 1313,
+   "stars": 4,
+   "pushed_at": "2020-07-16T00:29:55Z",
+   "html_url": "https://github.com/adebray/latex_style_files",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "AdolfoBanchio/famaf_slides_template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 8,
+   "stars": 0,
+   "pushed_at": "2026-10-17T17:29:41Z",
+   "html_url": "https://github.com/AdolfoBanchio/famaf_slides_template",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "AdrianTseng/beamer-seed",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 184,
+   "stars": 2,
+   "pushed_at": "2015-04-01T01:58:25Z",
+   "html_url": "https://github.com/AdrianTseng/beamer-seed",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "Advanced-Systems/lecture-notes",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "master",
+   "size_kb": 814,
+   "stars": 0,
+   "pushed_at": "2023-06-09T08:33:16Z",
+   "html_url": "https://github.com/Advanced-Systems/lecture-notes",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "agormp/evolintro",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 25902,
+   "stars": 4,
+   "pushed_at": "2022-02-20T10:08:44Z",
+   "html_url": "https://github.com/agormp/evolintro",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "ahmetuysal/KU-LaTeX-Beamer-Template",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 344,
+   "stars": 8,
+   "pushed_at": "2019-02-18T21:16:00Z",
+   "html_url": "https://github.com/ahmetuysal/KU-LaTeX-Beamer-Template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "aianniezhou-0529/COMPSCI-ECON206_Problem-Set-1-2_Ai-Zhou",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 6613,
+   "stars": 1,
+   "pushed_at": "2025-09-21T14:49:24Z",
+   "html_url": "https://github.com/aianniezhou-0529/COMPSCI-ECON206_Problem-Set-1-2_Ai-Zhou",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "aig-hagen/aig-templates",
+   "licence": "CC-BY-4.0",
+   "default_branch": "master",
+   "size_kb": 606,
+   "stars": 11,
+   "pushed_at": "2026-10-14T12:11:34Z",
+   "html_url": "https://github.com/aig-hagen/aig-templates",
+   "queries": [
+    "beamer presentation|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "akaszynski/pyvista-nasa-ames-presentation",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 23557,
+   "stars": 2,
+   "pushed_at": "2025-03-24T15:51:20Z",
+   "html_url": "https://github.com/akaszynski/pyvista-nasa-ames-presentation",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "alg-nju/lada",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 15045,
+   "stars": 9,
+   "pushed_at": "2026-10-30T13:48:08Z",
+   "html_url": "https://github.com/alg-nju/lada",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "alltootechnical/csci30notes",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "master",
+   "size_kb": 939,
+   "stars": 2,
+   "pushed_at": "2019-10-16T06:27:52Z",
+   "html_url": "https://github.com/alltootechnical/csci30notes",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "alxshine/lecture-notes",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 12349,
+   "stars": 5,
+   "pushed_at": "2019-01-23T14:43:11Z",
+   "html_url": "https://github.com/alxshine/lecture-notes",
+   "queries": [
+    "lecture notes|mit",
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "ami-null/beamer_moloch-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 79,
+   "stars": 0,
+   "pushed_at": "2025-07-11T10:07:48Z",
+   "html_url": "https://github.com/ami-null/beamer_moloch-template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "ami-null/beamer_seahorse-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 86,
+   "stars": 0,
+   "pushed_at": "2024-11-06T07:49:51Z",
+   "html_url": "https://github.com/ami-null/beamer_seahorse-template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "ami-null/qmd_beamer-moloch",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 24,
+   "stars": 1,
+   "pushed_at": "2025-07-11T10:07:33Z",
+   "html_url": "https://github.com/ami-null/qmd_beamer-moloch",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "ami-null/qmd_beamer-seahorse",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 184,
+   "stars": 1,
+   "pushed_at": "2025-07-11T10:08:08Z",
+   "html_url": "https://github.com/ami-null/qmd_beamer-seahorse",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "AmirrezaFarnamTaheri/beamer-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 535,
+   "stars": 0,
+   "pushed_at": "2024-11-02T09:02:33Z",
+   "html_url": "https://github.com/AmirrezaFarnamTaheri/beamer-template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "amjack0/presentation",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 26693,
+   "stars": 0,
+   "pushed_at": "2021-05-18T11:07:15Z",
+   "html_url": "https://github.com/amjack0/presentation",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "anish-sk/MIT-6006-PS1",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 105,
+   "stars": 0,
+   "pushed_at": "2019-09-29T08:05:00Z",
+   "html_url": "https://github.com/anish-sk/MIT-6006-PS1",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "anish-sk/MIT-6006-PS2",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 10,
+   "stars": 0,
+   "pushed_at": "2019-09-30T17:59:37Z",
+   "html_url": "https://github.com/anish-sk/MIT-6006-PS2",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "anish-sk/MIT-6006-PS3",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 11,
+   "stars": 0,
+   "pushed_at": "2019-10-07T15:11:29Z",
+   "html_url": "https://github.com/anish-sk/MIT-6006-PS3",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "anish-sk/MIT-6006-PS5",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 9,
+   "stars": 0,
+   "pushed_at": "2019-10-14T18:25:05Z",
+   "html_url": "https://github.com/anish-sk/MIT-6006-PS5",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "anish-sk/MIT-6006-PS6",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 10,
+   "stars": 0,
+   "pushed_at": "2019-10-31T19:53:26Z",
+   "html_url": "https://github.com/anish-sk/MIT-6006-PS6",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "anish-sk/MIT-6006-PS7",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 82,
+   "stars": 0,
+   "pushed_at": "2019-11-07T12:35:56Z",
+   "html_url": "https://github.com/anish-sk/MIT-6006-PS7",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "anish-sk/MIT-6006-PS8",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 14,
+   "stars": 0,
+   "pushed_at": "2019-11-25T14:08:25Z",
+   "html_url": "https://github.com/anish-sk/MIT-6006-PS8",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "anish-sk/MIT-6006-PS9",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 9,
+   "stars": 1,
+   "pushed_at": "2019-11-26T17:39:28Z",
+   "html_url": "https://github.com/anish-sk/MIT-6006-PS9",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "anishathalye/auriga",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 10,
+   "stars": 406,
+   "pushed_at": "2025-02-01T17:40:02Z",
+   "html_url": "https://github.com/anishathalye/auriga",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "ashcat2005/RCM",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 14290,
+   "stars": 0,
+   "pushed_at": "2026-09-12T20:28:24Z",
+   "html_url": "https://github.com/ashcat2005/RCM",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "Atlanta53/TemplateBeamer",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1080,
+   "stars": 5,
+   "pushed_at": "2021-03-16T13:59:10Z",
+   "html_url": "https://github.com/Atlanta53/TemplateBeamer",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "bacTlink/PkuCampusTemplate",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 81,
+   "stars": 0,
+   "pushed_at": "2019-04-25T12:27:36Z",
+   "html_url": "https://github.com/bacTlink/PkuCampusTemplate",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "Bagehu/Ensicaen_Beamer",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 721,
+   "stars": 0,
+   "pushed_at": "2021-01-16T18:47:01Z",
+   "html_url": "https://github.com/Bagehu/Ensicaen_Beamer",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "bensteffan/algebraic-topology-1-notes-bonn-ws23",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 17914,
+   "stars": 5,
+   "pushed_at": "2025-05-24T20:48:57Z",
+   "html_url": "https://github.com/bensteffan/algebraic-topology-1-notes-bonn-ws23",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "Bili-Sakura/Latex-Slides-Template-GenAI",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 7030,
+   "stars": 17,
+   "pushed_at": "2025-10-21T14:29:19Z",
+   "html_url": "https://github.com/Bili-Sakura/Latex-Slides-Template-GenAI",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "breiting/beamer-template",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 235,
+   "stars": 1,
+   "pushed_at": "2019-02-12T19:13:32Z",
+   "html_url": "https://github.com/breiting/beamer-template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "BruceZhao0728/SJTU-NIS3329-Notes",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 829,
+   "stars": 1,
+   "pushed_at": "2026-07-16T11:02:52Z",
+   "html_url": "https://github.com/BruceZhao0728/SJTU-NIS3329-Notes",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "BU-Intro-Stats/MA214-applied-statistics-materials",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 18337,
+   "stars": 0,
+   "pushed_at": "2026-09-18T18:42:47Z",
+   "html_url": "https://github.com/BU-Intro-Stats/MA214-applied-statistics-materials",
+   "queries": [
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "canxin121/xdu-beamer-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 2328,
+   "stars": 6,
+   "pushed_at": "2026-05-14T14:31:48Z",
+   "html_url": "https://github.com/canxin121/xdu-beamer-template",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "captainobvious62/git-tutorial",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 2119,
+   "stars": 0,
+   "pushed_at": "2018-02-07T23:23:07Z",
+   "html_url": "https://github.com/captainobvious62/git-tutorial",
+   "queries": [
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "cmainov/uiuc-beamer-theme",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 182,
+   "stars": 2,
+   "pushed_at": "2023-02-15T15:47:04Z",
+   "html_url": "https://github.com/cmainov/uiuc-beamer-theme",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "codekyha/MBLP131",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 15240,
+   "stars": 1,
+   "pushed_at": "2026-10-29T20:28:10Z",
+   "html_url": "https://github.com/codekyha/MBLP131",
+   "queries": [
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "corentinartaud/lboro-beamer-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 162,
+   "stars": 0,
+   "pushed_at": "2023-05-14T00:14:39Z",
+   "html_url": "https://github.com/corentinartaud/lboro-beamer-template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "courses-at-hnu-by-hfwei/math4cs-problem-sets",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 16000,
+   "stars": 4,
+   "pushed_at": "2026-06-19T11:58:09Z",
+   "html_url": "https://github.com/courses-at-hnu-by-hfwei/math4cs-problem-sets",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "courses-at-hnu-by-hfwei/math4cs-problem-sets-plus",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 134,
+   "stars": 0,
+   "pushed_at": "2026-04-24T01:54:20Z",
+   "html_url": "https://github.com/courses-at-hnu-by-hfwei/math4cs-problem-sets-plus",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "courses-at-nju-by-hfwei/compilers-problem-set",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 46300,
+   "stars": 42,
+   "pushed_at": "2024-06-20T04:30:07Z",
+   "html_url": "https://github.com/courses-at-nju-by-hfwei/compilers-problem-set",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "courses-at-nju-by-hfwei/discrete-math-problem-sets",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 20407,
+   "stars": 13,
+   "pushed_at": "2021-06-24T01:32:52Z",
+   "html_url": "https://github.com/courses-at-nju-by-hfwei/discrete-math-problem-sets",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "courses-at-nju-by-hfwei/problem-solving-class-problems",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 11492,
+   "stars": 15,
+   "pushed_at": "2020-06-14T13:37:51Z",
+   "html_url": "https://github.com/courses-at-nju-by-hfwei/problem-solving-class-problems",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "CraigOpie/uhm-beamer",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 813,
+   "stars": 0,
+   "pushed_at": "2022-09-05T10:32:39Z",
+   "html_url": "https://github.com/CraigOpie/uhm-beamer",
+   "queries": [
+    "beamer presentation|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "cs2043-sp16/lecture-slides",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 8608,
+   "stars": 8,
+   "pushed_at": "2016-12-26T16:43:56Z",
+   "html_url": "https://github.com/cs2043-sp16/lecture-slides",
+   "queries": [
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "davidlpgomes/devedeamer",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 115,
+   "stars": 1,
+   "pushed_at": "2023-08-01T19:07:13Z",
+   "html_url": "https://github.com/davidlpgomes/devedeamer",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "dekeract01/sotonlatex",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 4639,
+   "stars": 0,
+   "pushed_at": "2026-07-19T20:19:37Z",
+   "html_url": "https://github.com/dekeract01/sotonlatex",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "Desperadus/mff-ml-exam-prep",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 3276,
+   "stars": 3,
+   "pushed_at": "2026-01-12T16:47:49Z",
+   "html_url": "https://github.com/Desperadus/mff-ml-exam-prep",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "dettanym/SPISE-Camp-Lecture-Slides",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 894,
+   "stars": 0,
+   "pushed_at": "2026-07-29T05:27:37Z",
+   "html_url": "https://github.com/dettanym/SPISE-Camp-Lecture-Slides",
+   "queries": [
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "dlfivefifty/M3M6AppliedComplexAnalysis",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 47369,
+   "stars": 40,
+   "pushed_at": "2020-05-18T07:14:49Z",
+   "html_url": "https://github.com/dlfivefifty/M3M6AppliedComplexAnalysis",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "dwil2444/Beamer-Scaffold",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 464,
+   "stars": 1,
+   "pushed_at": "2026-01-08T18:44:00Z",
+   "html_url": "https://github.com/dwil2444/Beamer-Scaffold",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "ECUTMathematicalModelingAssociation/ECUT-Beamer-Presentation-Template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 520,
+   "stars": 2,
+   "pushed_at": "2026-05-28T08:17:39Z",
+   "html_url": "https://github.com/ECUTMathematicalModelingAssociation/ECUT-Beamer-Presentation-Template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "eduardotlc/IqUSPtex",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 8608,
+   "stars": 5,
+   "pushed_at": "2023-08-05T20:06:33Z",
+   "html_url": "https://github.com/eduardotlc/IqUSPtex",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "efrubin/ast301",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 1201,
+   "stars": 0,
+   "pushed_at": "2016-01-21T17:51:37Z",
+   "html_url": "https://github.com/efrubin/ast301",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "eggplantbren/STATS331",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 27248,
+   "stars": 53,
+   "pushed_at": "2026-07-30T21:37:17Z",
+   "html_url": "https://github.com/eggplantbren/STATS331",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "eladn/236610-Distributed-Graph-Algorithms",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 24,
+   "stars": 5,
+   "pushed_at": "2018-04-12T15:48:35Z",
+   "html_url": "https://github.com/eladn/236610-Distributed-Graph-Algorithms",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "Eran-Rehani/77605-Quantum-Theory-2-",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 6954,
+   "stars": 0,
+   "pushed_at": "2026-08-09T10:38:43Z",
+   "html_url": "https://github.com/Eran-Rehani/77605-Quantum-Theory-2-",
+   "queries": [
+    "problem set|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "Eran-Rehani/lecture-notes-huji",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 95508,
+   "stars": 0,
+   "pushed_at": "2026-10-20T12:01:51Z",
+   "html_url": "https://github.com/Eran-Rehani/lecture-notes-huji",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "erfanhamdi/beamer_template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 9276,
+   "stars": 0,
+   "pushed_at": "2022-10-05T07:09:54Z",
+   "html_url": "https://github.com/erfanhamdi/beamer_template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "erick-beamers/bp_brasil",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 76673,
+   "stars": 0,
+   "pushed_at": "2022-04-20T17:44:44Z",
+   "html_url": "https://github.com/erick-beamers/bp_brasil",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "eriqande/eca-bioinf-handbook",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 84959,
+   "stars": 41,
+   "pushed_at": "2024-01-29T01:34:43Z",
+   "html_url": "https://github.com/eriqande/eca-bioinf-handbook",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "fairyflies9/Fluid-Dynamics-and-IBM-Theory",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 68443,
+   "stars": 5,
+   "pushed_at": "2026-10-15T17:17:15Z",
+   "html_url": "https://github.com/fairyflies9/Fluid-Dynamics-and-IBM-Theory",
+   "queries": [
+    "lecture slides|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "FAU-AMMN/fau-book",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1043,
+   "stars": 18,
+   "pushed_at": "2025-11-12T09:53:24Z",
+   "html_url": "https://github.com/FAU-AMMN/fau-book",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "fditraglia/beamer-examples",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 208,
+   "stars": 1,
+   "pushed_at": "2025-06-13T07:53:12Z",
+   "html_url": "https://github.com/fditraglia/beamer-examples",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "fenggeorgeyu/markdown_beamer_template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 292,
+   "stars": 0,
+   "pushed_at": "2023-11-16T03:43:04Z",
+   "html_url": "https://github.com/fenggeorgeyu/markdown_beamer_template",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "fileds/dawr-lecture-notes",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 562,
+   "stars": 0,
+   "pushed_at": "2026-09-04T11:13:04Z",
+   "html_url": "https://github.com/fileds/dawr-lecture-notes",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "FormalLanguageConstrainedPathQuerying/FormalLanguageConstrainedReachability-LectureNotes",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 4866,
+   "stars": 7,
+   "pushed_at": "2026-09-04T06:16:52Z",
+   "html_url": "https://github.com/FormalLanguageConstrainedPathQuerying/FormalLanguageConstrainedReachability-LectureNotes",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "freemty/beamer-style",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 607,
+   "stars": 0,
+   "pushed_at": "2026-09-05T13:03:03Z",
+   "html_url": "https://github.com/freemty/beamer-style",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "Frigus27/lwwnote",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 31607,
+   "stars": 0,
+   "pushed_at": "2026-07-10T13:48:23Z",
+   "html_url": "https://github.com/Frigus27/lwwnote",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "fwilhelmy/ift6135-representationlearning-coursenotes",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 19901,
+   "stars": 5,
+   "pushed_at": "2025-04-22T01:31:33Z",
+   "html_url": "https://github.com/fwilhelmy/ift6135-representationlearning-coursenotes",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "g-rocket/gsypset",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 6,
+   "stars": 0,
+   "pushed_at": "2017-05-02T08:33:15Z",
+   "html_url": "https://github.com/g-rocket/gsypset",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "g-w1/math-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 6,
+   "stars": 0,
+   "pushed_at": "2024-11-16T17:56:17Z",
+   "html_url": "https://github.com/g-w1/math-template",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "Gabriel-98/Problem-Set",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1728,
+   "stars": 0,
+   "pushed_at": "2025-01-15T03:10:22Z",
+   "html_url": "https://github.com/Gabriel-98/Problem-Set",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "GauravJain28/TOC-Problem-Sets",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 15194,
+   "stars": 6,
+   "pushed_at": "2022-06-03T17:21:40Z",
+   "html_url": "https://github.com/GauravJain28/TOC-Problem-Sets",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "gevartrix/msu-numbertheory-conspect",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 860,
+   "stars": 4,
+   "pushed_at": "2021-03-26T11:50:30Z",
+   "html_url": "https://github.com/gevartrix/msu-numbertheory-conspect",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "gharib85/lie-grp",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "master",
+   "size_kb": 3198,
+   "stars": 0,
+   "pushed_at": "2019-05-04T20:57:39Z",
+   "html_url": "https://github.com/gharib85/lie-grp",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "gianluca-tisci/Latex_Template_Economics_ProblemSet",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1859,
+   "stars": 0,
+   "pushed_at": "2026-08-07T15:22:09Z",
+   "html_url": "https://github.com/gianluca-tisci/Latex_Template_Economics_ProblemSet",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "GitHubAvailable/math-analysis-ii-grad",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 79,
+   "stars": 0,
+   "pushed_at": "2025-05-12T01:29:27Z",
+   "html_url": "https://github.com/GitHubAvailable/math-analysis-ii-grad",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "gmarciani/research",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 35858,
+   "stars": 3,
+   "pushed_at": "2026-10-16T04:18:41Z",
+   "html_url": "https://github.com/gmarciani/research",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "grussorusso/markdown-slides",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 5,
+   "stars": 0,
+   "pushed_at": "2019-11-14T09:07:52Z",
+   "html_url": "https://github.com/grussorusso/markdown-slides",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "GUC-Fractals/problem-sets",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 314,
+   "stars": 4,
+   "pushed_at": "2021-10-06T15:16:48Z",
+   "html_url": "https://github.com/GUC-Fractals/problem-sets",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "GUC-Notes/discrete-math",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 261,
+   "stars": 4,
+   "pushed_at": "2021-10-22T19:19:48Z",
+   "html_url": "https://github.com/GUC-Notes/discrete-math",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "harsh-404-404/6.1200_pset_Solution",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 16690,
+   "stars": 0,
+   "pushed_at": "2026-11-01T06:36:06Z",
+   "html_url": "https://github.com/harsh-404-404/6.1200_pset_Solution",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "hayashi-workshop/multiFlowKobe",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 13324,
+   "stars": 0,
+   "pushed_at": "2026-07-13T03:35:41Z",
+   "html_url": "https://github.com/hayashi-workshop/multiFlowKobe",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "hilinxinhui/NEU_Beamer_Slide",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1965,
+   "stars": 6,
+   "pushed_at": "2024-05-20T12:26:34Z",
+   "html_url": "https://github.com/hilinxinhui/NEU_Beamer_Slide",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "hjalti/md-lecture",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 156,
+   "stars": 1,
+   "pushed_at": "2019-08-28T12:34:14Z",
+   "html_url": "https://github.com/hjalti/md-lecture",
+   "queries": [
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "hmastaneh/finite-frame-theory-geometry-and-computation",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 2105,
+   "stars": 3,
+   "pushed_at": "2026-07-20T08:49:21Z",
+   "html_url": "https://github.com/hmastaneh/finite-frame-theory-geometry-and-computation",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "holevasdimitrios/computational-learning-theory",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 2376,
+   "stars": 0,
+   "pushed_at": "2026-05-31T16:48:48Z",
+   "html_url": "https://github.com/holevasdimitrios/computational-learning-theory",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "iadisirza-bkk/general-slide-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 38,
+   "stars": 0,
+   "pushed_at": "2026-08-19T02:53:35Z",
+   "html_url": "https://github.com/iadisirza-bkk/general-slide-template",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "inbrainlab/BeamerInbrain",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 232,
+   "stars": 0,
+   "pushed_at": "2020-08-25T21:17:30Z",
+   "html_url": "https://github.com/inbrainlab/BeamerInbrain",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "int28t/hse-se-lecture-notes",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 51064,
+   "stars": 4,
+   "pushed_at": "2026-10-18T18:33:33Z",
+   "html_url": "https://github.com/int28t/hse-se-lecture-notes",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "ishanpranav/finc-2-foundations-of-finance",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 3113,
+   "stars": 0,
+   "pushed_at": "2024-02-28T19:33:36Z",
+   "html_url": "https://github.com/ishanpranav/finc-2-foundations-of-finance",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "ivanmurashko/courseragalois",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 84567,
+   "stars": 16,
+   "pushed_at": "2023-07-15T10:33:19Z",
+   "html_url": "https://github.com/ivanmurashko/courseragalois",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "jachoo/pg-beamer",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 509,
+   "stars": 14,
+   "pushed_at": "2020-04-16T00:52:47Z",
+   "html_url": "https://github.com/jachoo/pg-beamer",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "Jad-srifi/regional-quant-circle",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1566,
+   "stars": 1,
+   "pushed_at": "2026-09-03T23:32:01Z",
+   "html_url": "https://github.com/Jad-srifi/regional-quant-circle",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "jankapunkt/latex-presentation-with-handouts",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 360,
+   "stars": 1,
+   "pushed_at": "2017-02-11T15:41:19Z",
+   "html_url": "https://github.com/jankapunkt/latex-presentation-with-handouts",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "jcbopit/talks-and-notes",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 308,
+   "stars": 0,
+   "pushed_at": "2025-04-23T16:30:33Z",
+   "html_url": "https://github.com/jcbopit/talks-and-notes",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "jgaltidor/twelf_slides",
+   "licence": "CC-BY-4.0",
+   "default_branch": "master",
+   "size_kb": 276,
+   "stars": 0,
+   "pushed_at": "2026-11-01T00:25:23Z",
+   "html_url": "https://github.com/jgaltidor/twelf_slides",
+   "queries": [
+    "beamer slides|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "jgaltidor/typetheory_slides",
+   "licence": "CC-BY-4.0",
+   "default_branch": "master",
+   "size_kb": 56,
+   "stars": 0,
+   "pushed_at": "2026-11-01T09:37:53Z",
+   "html_url": "https://github.com/jgaltidor/typetheory_slides",
+   "queries": [
+    "beamer slides|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "jjmccollum/nmf-ps-talk",
+   "licence": "CC-BY-4.0",
+   "default_branch": "master",
+   "size_kb": 2476,
+   "stars": 0,
+   "pushed_at": "2021-02-13T21:57:48Z",
+   "html_url": "https://github.com/jjmccollum/nmf-ps-talk",
+   "queries": [
+    "beamer presentation|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "jjmccollum/open-cbgm-sbl-talk",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 966,
+   "stars": 1,
+   "pushed_at": "2021-02-13T21:58:03Z",
+   "html_url": "https://github.com/jjmccollum/open-cbgm-sbl-talk",
+   "queries": [
+    "beamer presentation|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "jkperin/DSP",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 36909,
+   "stars": 59,
+   "pushed_at": "2019-12-16T15:50:42Z",
+   "html_url": "https://github.com/jkperin/DSP",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "jmoldow/errorhandling",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 1344,
+   "stars": 1,
+   "pushed_at": "2014-10-10T04:23:35Z",
+   "html_url": "https://github.com/jmoldow/errorhandling",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "jo4nymj/TFG-presentation",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 5219,
+   "stars": 0,
+   "pushed_at": "2020-09-29T00:18:51Z",
+   "html_url": "https://github.com/jo4nymj/TFG-presentation",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "joaobuibergen/geof211_lectures",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 5872,
+   "stars": 0,
+   "pushed_at": "2023-02-04T16:48:37Z",
+   "html_url": "https://github.com/joaobuibergen/geof211_lectures",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "Joaquim-mph/beamer_nanolab_template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 878,
+   "stars": 0,
+   "pushed_at": "2025-10-20T04:05:48Z",
+   "html_url": "https://github.com/Joaquim-mph/beamer_nanolab_template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "jopetty/coursework-latex",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 2124,
+   "stars": 14,
+   "pushed_at": "2023-08-18T14:34:28Z",
+   "html_url": "https://github.com/jopetty/coursework-latex",
+   "queries": [
+    "lecture notes|mit",
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "Jose-luis-echemendia/latex-projects",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 99862,
+   "stars": 0,
+   "pushed_at": "2026-06-07T18:35:11Z",
+   "html_url": "https://github.com/Jose-luis-echemendia/latex-projects",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "joseph-nagel/latex-slides",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 17,
+   "stars": 0,
+   "pushed_at": "2026-01-10T17:01:17Z",
+   "html_url": "https://github.com/joseph-nagel/latex-slides",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "joshmaglione/CS4102-Notes",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 40089,
+   "stars": 1,
+   "pushed_at": "2026-10-12T15:22:00Z",
+   "html_url": "https://github.com/joshmaglione/CS4102-Notes",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "joshmaglione/MA437-Notes",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 1922,
+   "stars": 0,
+   "pushed_at": "2024-10-17T22:24:49Z",
+   "html_url": "https://github.com/joshmaglione/MA437-Notes",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "jstrieb/homework-template",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 832,
+   "stars": 44,
+   "pushed_at": "2020-10-19T21:42:58Z",
+   "html_url": "https://github.com/jstrieb/homework-template",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "juliapath/representation-theory",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "master",
+   "size_kb": 77,
+   "stars": 1,
+   "pushed_at": "2024-08-02T12:41:37Z",
+   "html_url": "https://github.com/juliapath/representation-theory",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "Junwei-Lao/TAMU_ECEN325-326_extra_practice_schematics",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 31624,
+   "stars": 0,
+   "pushed_at": "2026-10-18T21:59:39Z",
+   "html_url": "https://github.com/Junwei-Lao/TAMU_ECEN325-326_extra_practice_schematics",
+   "queries": [
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "jzenn/beamer-minima-slides",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 3108,
+   "stars": 5,
+   "pushed_at": "2025-12-02T12:41:32Z",
+   "html_url": "https://github.com/jzenn/beamer-minima-slides",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "karlstroetmann/Lineare-Algebra",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 48841,
+   "stars": 11,
+   "pushed_at": "2026-08-23T11:19:14Z",
+   "html_url": "https://github.com/karlstroetmann/Lineare-Algebra",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "KevinGuo1007/GDUE-Beamer-Slides-Theme",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 5989,
+   "stars": 4,
+   "pushed_at": "2026-03-26T14:04:52Z",
+   "html_url": "https://github.com/KevinGuo1007/GDUE-Beamer-Slides-Theme",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "kevinnie2003/study-notes-builder",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 16,
+   "stars": 1,
+   "pushed_at": "2026-06-12T09:43:30Z",
+   "html_url": "https://github.com/kevinnie2003/study-notes-builder",
+   "queries": [
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "KevinyWu/math-reu-2021",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 3091,
+   "stars": 4,
+   "pushed_at": "2025-08-28T15:35:33Z",
+   "html_url": "https://github.com/KevinyWu/math-reu-2021",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "klubFITpp/OSS",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 377,
+   "stars": 0,
+   "pushed_at": "2026-06-01T23:31:31Z",
+   "html_url": "https://github.com/klubFITpp/OSS",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "kmi-ne/Math-LectureNotes",
+   "licence": "CC-BY-4.0",
+   "default_branch": "master",
+   "size_kb": 766,
+   "stars": 0,
+   "pushed_at": "2025-05-08T06:57:20Z",
+   "html_url": "https://github.com/kmi-ne/Math-LectureNotes",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "KyleAMoore/CS-4260-Lecture-Slides",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 86941,
+   "stars": 1,
+   "pushed_at": "2026-08-10T17:08:47Z",
+   "html_url": "https://github.com/KyleAMoore/CS-4260-Lecture-Slides",
+   "queries": [
+    "lecture slides|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "LabCidades/Beamer-UNINOVE",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "master",
+   "size_kb": 2031,
+   "stars": 0,
+   "pushed_at": "2021-05-19T23:11:07Z",
+   "html_url": "https://github.com/LabCidades/Beamer-UNINOVE",
+   "queries": [
+    "beamer presentation|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "lacker/MIT-18-405j",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 2002,
+   "stars": 1,
+   "pushed_at": "2020-06-02T22:02:21Z",
+   "html_url": "https://github.com/lacker/MIT-18-405j",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "leingang/cookiecutter-problemset",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 6,
+   "stars": 0,
+   "pushed_at": "2022-04-15T17:19:19Z",
+   "html_url": "https://github.com/leingang/cookiecutter-problemset",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "leonlan/vu-beamer",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 412,
+   "stars": 2,
+   "pushed_at": "2025-03-25T09:42:23Z",
+   "html_url": "https://github.com/leonlan/vu-beamer",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "Li357/Stanford-CS109",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 198,
+   "stars": 0,
+   "pushed_at": "2019-05-22T03:47:42Z",
+   "html_url": "https://github.com/Li357/Stanford-CS109",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "liangchenn/ntu-beamer-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1562,
+   "stars": 6,
+   "pushed_at": "2021-06-27T13:38:08Z",
+   "html_url": "https://github.com/liangchenn/ntu-beamer-template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "lid-ufpa/lid-slides",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 162,
+   "stars": 2,
+   "pushed_at": "2026-10-23T19:33:56Z",
+   "html_url": "https://github.com/lid-ufpa/lid-slides",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "Lippitz-Lab/EPM1",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 71489,
+   "stars": 0,
+   "pushed_at": "2026-01-10T13:36:40Z",
+   "html_url": "https://github.com/Lippitz-Lab/EPM1",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "Lippitz-Lab/Festkoerper-II",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 40702,
+   "stars": 0,
+   "pushed_at": "2025-07-15T05:33:40Z",
+   "html_url": "https://github.com/Lippitz-Lab/Festkoerper-II",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "Lippitz-Lab/Molekuele-und-Festkoerper",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "published",
+   "size_kb": 31524,
+   "stars": 2,
+   "pushed_at": "2024-03-12T16:50:49Z",
+   "html_url": "https://github.com/Lippitz-Lab/Molekuele-und-Festkoerper",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "Lippitz-Lab/Optics",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 32673,
+   "stars": 2,
+   "pushed_at": "2024-03-12T17:17:03Z",
+   "html_url": "https://github.com/Lippitz-Lab/Optics",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "Lippitz-Lab/Spectroscopy",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 110068,
+   "stars": 0,
+   "pushed_at": "2024-07-04T09:03:30Z",
+   "html_url": "https://github.com/Lippitz-Lab/Spectroscopy",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "liuskywalkerjskd/Control-Note",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 36816,
+   "stars": 175,
+   "pushed_at": "2026-05-24T08:47:15Z",
+   "html_url": "https://github.com/liuskywalkerjskd/Control-Note",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "lkoolik/latex_template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 144,
+   "stars": 0,
+   "pushed_at": "2022-08-29T17:42:53Z",
+   "html_url": "https://github.com/lkoolik/latex_template",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "longdoheun/academic-beamer-skill",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 37,
+   "stars": 0,
+   "pushed_at": "2026-10-08T14:25:19Z",
+   "html_url": "https://github.com/longdoheun/academic-beamer-skill",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "LucaCappelletti94/lectures",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 1584,
+   "stars": 7,
+   "pushed_at": "2026-10-25T10:04:55Z",
+   "html_url": "https://github.com/LucaCappelletti94/lectures",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "lucaseduardoveras/PS2_Equipo3",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 53262,
+   "stars": 0,
+   "pushed_at": "2025-10-21T14:29:32Z",
+   "html_url": "https://github.com/lucaseduardoveras/PS2_Equipo3",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "lucblassel/beamer-template",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 2524,
+   "stars": 0,
+   "pushed_at": "2026-05-12T14:47:12Z",
+   "html_url": "https://github.com/lucblassel/beamer-template",
+   "queries": [
+    "beamer slides|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "Lukas-Heiligenbrunner/MathematicalFinance",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 1985,
+   "stars": 0,
+   "pushed_at": "2025-11-04T11:31:18Z",
+   "html_url": "https://github.com/Lukas-Heiligenbrunner/MathematicalFinance",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "lupengz/DLUT-Beamer",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1883,
+   "stars": 2,
+   "pushed_at": "2022-08-21T13:56:04Z",
+   "html_url": "https://github.com/lupengz/DLUT-Beamer",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "marl-book/slides",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 62452,
+   "stars": 209,
+   "pushed_at": "2025-05-14T19:49:47Z",
+   "html_url": "https://github.com/marl-book/slides",
+   "queries": [
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "mateomics/PopGen_Problem_set_LCG4_2026",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 1867,
+   "stars": 1,
+   "pushed_at": "2026-06-24T01:49:30Z",
+   "html_url": "https://github.com/mateomics/PopGen_Problem_set_LCG4_2026",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "mathieukaltschmidt/Differential-Geometry",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 16164,
+   "stars": 3,
+   "pushed_at": "2019-05-11T21:27:59Z",
+   "html_url": "https://github.com/mathieukaltschmidt/Differential-Geometry",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "MaxMelching/gwbar",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 11106,
+   "stars": 1,
+   "pushed_at": "2025-08-03T14:28:22Z",
+   "html_url": "https://github.com/MaxMelching/gwbar",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "mbannick/uw-neurology-fellows",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 3297,
+   "stars": 0,
+   "pushed_at": "2020-07-23T04:48:50Z",
+   "html_url": "https://github.com/mbannick/uw-neurology-fellows",
+   "queries": [
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "mbastol06/PS1_Equipo3",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 53844,
+   "stars": 0,
+   "pushed_at": "2025-09-09T02:49:42Z",
+   "html_url": "https://github.com/mbastol06/PS1_Equipo3",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "md-arif-shaikh/gw-summer-school-icts-2021",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 3,
+   "stars": 0,
+   "pushed_at": "2021-07-04T17:39:53Z",
+   "html_url": "https://github.com/md-arif-shaikh/gw-summer-school-icts-2021",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "MDBrodskiy/Vector_Calculus",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 3942,
+   "stars": 3,
+   "pushed_at": "2021-01-27T20:37:38Z",
+   "html_url": "https://github.com/MDBrodskiy/Vector_Calculus",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "microshuhao/beamer-academic",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 2131,
+   "stars": 4,
+   "pushed_at": "2026-05-29T08:44:19Z",
+   "html_url": "https://github.com/microshuhao/beamer-academic",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "miguel-sc/GBI-Crashkurs",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 2642,
+   "stars": 1,
+   "pushed_at": "2018-02-24T11:41:32Z",
+   "html_url": "https://github.com/miguel-sc/GBI-Crashkurs",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "milsen/beamer-themes",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 12,
+   "stars": 1,
+   "pushed_at": "2022-05-24T10:29:28Z",
+   "html_url": "https://github.com/milsen/beamer-themes",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "MiriamH98/bodendynamik_tex",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 12749,
+   "stars": 0,
+   "pushed_at": "2022-03-25T08:56:22Z",
+   "html_url": "https://github.com/MiriamH98/bodendynamik_tex",
+   "queries": [
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "MKupperman/uw-beamer-theme",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1049,
+   "stars": 6,
+   "pushed_at": "2022-05-01T06:07:19Z",
+   "html_url": "https://github.com/MKupperman/uw-beamer-theme",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "mo-karbalaee/DSA-SBU-fall-2022",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 379,
+   "stars": 3,
+   "pushed_at": "2022-10-14T15:41:28Z",
+   "html_url": "https://github.com/mo-karbalaee/DSA-SBU-fall-2022",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "moll-re/analysis",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 8271,
+   "stars": 1,
+   "pushed_at": "2024-01-08T16:48:36Z",
+   "html_url": "https://github.com/moll-re/analysis",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "Mouzongsan/bjut-beamer-defense-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 232,
+   "stars": 0,
+   "pushed_at": "2026-05-17T09:25:18Z",
+   "html_url": "https://github.com/Mouzongsan/bjut-beamer-defense-template",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "Moviw/beamer-presentation-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 201,
+   "stars": 0,
+   "pushed_at": "2026-10-28T18:46:33Z",
+   "html_url": "https://github.com/Moviw/beamer-presentation-template",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "Multramate/Cam-GANT",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 17184,
+   "stars": 7,
+   "pushed_at": "2022-07-22T22:49:55Z",
+   "html_url": "https://github.com/Multramate/Cam-GANT",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "Multramate/IC-GANT",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 80467,
+   "stars": 56,
+   "pushed_at": "2023-10-14T13:13:13Z",
+   "html_url": "https://github.com/Multramate/IC-GANT",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "neilrathi/classnotes",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 843,
+   "stars": 7,
+   "pushed_at": "2024-09-05T07:52:34Z",
+   "html_url": "https://github.com/neilrathi/classnotes",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "newell/projects-slide-deck",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 2109,
+   "stars": 0,
+   "pushed_at": "2024-08-22T16:44:09Z",
+   "html_url": "https://github.com/newell/projects-slide-deck",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "niklas-letz/fraunhofer-devops-day-2024",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 3998,
+   "stars": 0,
+   "pushed_at": "2026-06-21T07:33:24Z",
+   "html_url": "https://github.com/niklas-letz/fraunhofer-devops-day-2024",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "ninux-fi/ninux_beamer_template",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 12020,
+   "stars": 0,
+   "pushed_at": "2018-04-08T13:13:05Z",
+   "html_url": "https://github.com/ninux-fi/ninux_beamer_template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "NousernameSG/FurtherQ-Problem-Sets",
+   "licence": "CC-BY-4.0",
+   "default_branch": "master",
+   "size_kb": 3718,
+   "stars": 2,
+   "pushed_at": "2023-04-29T04:42:26Z",
+   "html_url": "https://github.com/NousernameSG/FurtherQ-Problem-Sets",
+   "queries": [
+    "problem set|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "nworbmot/esm-lectures",
+   "licence": "CC-BY-4.0",
+   "default_branch": "master",
+   "size_kb": 269,
+   "stars": 21,
+   "pushed_at": "2023-12-30T16:47:53Z",
+   "html_url": "https://github.com/nworbmot/esm-lectures",
+   "queries": [
+    "lecture slides|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "ojdo/thesis-defense",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "master",
+   "size_kb": 5194,
+   "stars": 43,
+   "pushed_at": "2021-01-11T15:59:30Z",
+   "html_url": "https://github.com/ojdo/thesis-defense",
+   "queries": [
+    "beamer slides|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "omedeiro/qnn-beamer",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 3936,
+   "stars": 0,
+   "pushed_at": "2025-06-24T20:26:51Z",
+   "html_url": "https://github.com/omedeiro/qnn-beamer",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "onurerenarpaci/uwaterloo-beamer-claude",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 11823,
+   "stars": 0,
+   "pushed_at": "2026-04-19T08:12:05Z",
+   "html_url": "https://github.com/onurerenarpaci/uwaterloo-beamer-claude",
+   "queries": [
+    "beamer presentation|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "paithan/LaTeX-LectureNotes",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 334,
+   "stars": 3,
+   "pushed_at": "2025-10-05T20:43:39Z",
+   "html_url": "https://github.com/paithan/LaTeX-LectureNotes",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "pawelboczek/TeX-presentation",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 1596,
+   "stars": 0,
+   "pushed_at": "2019-04-10T18:25:07Z",
+   "html_url": "https://github.com/pawelboczek/TeX-presentation",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "peltona/tamarin-course",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 38335,
+   "stars": 11,
+   "pushed_at": "2025-05-15T12:51:56Z",
+   "html_url": "https://github.com/peltona/tamarin-course",
+   "queries": [
+    "lecture slides|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "pisco-rolo/PS_1_ML",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 5918,
+   "stars": 0,
+   "pushed_at": "2023-09-18T23:08:09Z",
+   "html_url": "https://github.com/pisco-rolo/PS_1_ML",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "pl33/dcs-lecture-notes",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "master",
+   "size_kb": 1377,
+   "stars": 1,
+   "pushed_at": "2023-12-21T15:47:53Z",
+   "html_url": "https://github.com/pl33/dcs-lecture-notes",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "ppolesiuk/type-systems-notes",
+   "licence": "CC-BY-4.0",
+   "default_branch": "master",
+   "size_kb": 171,
+   "stars": 15,
+   "pushed_at": "2024-03-26T08:07:47Z",
+   "html_url": "https://github.com/ppolesiuk/type-systems-notes",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "Project2100/Cryptography-2018_19",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 24193,
+   "stars": 3,
+   "pushed_at": "2024-02-10T07:20:15Z",
+   "html_url": "https://github.com/Project2100/Cryptography-2018_19",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "qubd/SN1_Notes",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 14222,
+   "stars": 0,
+   "pushed_at": "2026-11-03T00:06:51Z",
+   "html_url": "https://github.com/qubd/SN1_Notes",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "rbstern/bayesian_inference_book",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "master",
+   "size_kb": 48162,
+   "stars": 10,
+   "pushed_at": "2024-10-09T16:32:55Z",
+   "html_url": "https://github.com/rbstern/bayesian_inference_book",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "reasner/purdue_beamer_template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 202,
+   "stars": 0,
+   "pushed_at": "2021-02-04T17:40:36Z",
+   "html_url": "https://github.com/reasner/purdue_beamer_template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "Rfernex/Econometrics-Homework",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 11644,
+   "stars": 1,
+   "pushed_at": "2026-01-30T08:51:59Z",
+   "html_url": "https://github.com/Rfernex/Econometrics-Homework",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "RioWeil/PHYS306-notes",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 35832,
+   "stars": 4,
+   "pushed_at": "2023-04-27T07:14:00Z",
+   "html_url": "https://github.com/RioWeil/PHYS306-notes",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "robmelfi/PatternRecognitionLectureNotes",
+   "licence": "CC-BY-4.0",
+   "default_branch": "master",
+   "size_kb": 10140,
+   "stars": 0,
+   "pushed_at": "2020-01-07T18:38:23Z",
+   "html_url": "https://github.com/robmelfi/PatternRecognitionLectureNotes",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "robson-lima2023/ordenacao-multivariada-ecologia-r",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 35045,
+   "stars": 0,
+   "pushed_at": "2026-06-11T23:44:04Z",
+   "html_url": "https://github.com/robson-lima2023/ordenacao-multivariada-ecologia-r",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "SamSeven777/IlliniBeamer",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 6458,
+   "stars": 0,
+   "pushed_at": "2024-01-27T23:38:41Z",
+   "html_url": "https://github.com/SamSeven777/IlliniBeamer",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "samuel-stidham/mat230-snhu-problem-set-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 8,
+   "stars": 0,
+   "pushed_at": "2026-07-07T08:30:22Z",
+   "html_url": "https://github.com/samuel-stidham/mat230-snhu-problem-set-template",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "Sanchit-Srivastava/beamer-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 20,
+   "stars": 1,
+   "pushed_at": "2026-03-29T22:29:56Z",
+   "html_url": "https://github.com/Sanchit-Srivastava/beamer-template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "sanhacheong/stanford-beamer-presentation",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 16051,
+   "stars": 72,
+   "pushed_at": "2018-12-27T08:10:42Z",
+   "html_url": "https://github.com/sanhacheong/stanford-beamer-presentation",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "sara-venkatraman/LaTeX-Templates",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 3923,
+   "stars": 288,
+   "pushed_at": "2025-01-22T17:25:59Z",
+   "html_url": "https://github.com/sara-venkatraman/LaTeX-Templates",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "saxarona/slides-nail",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "master",
+   "size_kb": 1536,
+   "stars": 0,
+   "pushed_at": "2026-02-11T21:47:34Z",
+   "html_url": "https://github.com/saxarona/slides-nail",
+   "queries": [
+    "beamer slides|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "scaotravis/LaTeX-Templates",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 4488,
+   "stars": 8,
+   "pushed_at": "2022-02-21T20:28:30Z",
+   "html_url": "https://github.com/scaotravis/LaTeX-Templates",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "Shass27/stem-notes",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 18,
+   "stars": 24,
+   "pushed_at": "2026-09-28T05:05:56Z",
+   "html_url": "https://github.com/Shass27/stem-notes",
+   "queries": [
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "shreysrins/pset-template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 7,
+   "stars": 0,
+   "pushed_at": "2022-02-22T03:01:48Z",
+   "html_url": "https://github.com/shreysrins/pset-template",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "ShriKaranHanda/ashoka-beamer",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 601,
+   "stars": 0,
+   "pushed_at": "2025-03-23T12:42:07Z",
+   "html_url": "https://github.com/ShriKaranHanda/ashoka-beamer",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "Sibelius-6/class-note-template",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 269,
+   "stars": 5,
+   "pushed_at": "2019-10-27T04:34:35Z",
+   "html_url": "https://github.com/Sibelius-6/class-note-template",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "sim1-99/medical-physics-notes",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "main",
+   "size_kb": 67001,
+   "stars": 4,
+   "pushed_at": "2024-07-17T11:07:39Z",
+   "html_url": "https://github.com/sim1-99/medical-physics-notes",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "Skird/mipt-lectures",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 25688,
+   "stars": 3,
+   "pushed_at": "2018-06-21T12:56:23Z",
+   "html_url": "https://github.com/Skird/mipt-lectures",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "snitramodranoel/lecture",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 66,
+   "stars": 21,
+   "pushed_at": "2017-10-11T20:18:50Z",
+   "html_url": "https://github.com/snitramodranoel/lecture",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "sohamch08/lumina",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 6526,
+   "stars": 89,
+   "pushed_at": "2026-07-23T20:53:38Z",
+   "html_url": "https://github.com/sohamch08/lumina",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "st--/beamer-lecture-template-example",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 539,
+   "stars": 1,
+   "pushed_at": "2023-04-14T13:35:56Z",
+   "html_url": "https://github.com/st--/beamer-lecture-template-example",
+   "queries": [
+    "beamer lecture|mit",
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "stenvala/tampere-university-beamer",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 61,
+   "stars": 1,
+   "pushed_at": "2019-04-09T10:10:17Z",
+   "html_url": "https://github.com/stenvala/tampere-university-beamer",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "stfgrz/20532-macroeconometrics-ps",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 11801,
+   "stars": 0,
+   "pushed_at": "2026-05-20T09:41:29Z",
+   "html_url": "https://github.com/stfgrz/20532-macroeconometrics-ps",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "STOM-Group/USF-Beamer-Template",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 28578,
+   "stars": 3,
+   "pushed_at": "2019-11-19T14:53:13Z",
+   "html_url": "https://github.com/STOM-Group/USF-Beamer-Template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "Stupid-Benz/MATH2131",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 48785,
+   "stars": 34,
+   "pushed_at": "2026-09-29T00:41:21Z",
+   "html_url": "https://github.com/Stupid-Benz/MATH2131",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "The-Shaikh-Ayaz-University-Shikarpur/SAUS-Branding",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 10899,
+   "stars": 0,
+   "pushed_at": "2026-09-29T01:27:18Z",
+   "html_url": "https://github.com/The-Shaikh-Ayaz-University-Shikarpur/SAUS-Branding",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "thmihnea/cambridge_notes",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 12636,
+   "stars": 9,
+   "pushed_at": "2024-04-12T09:39:49Z",
+   "html_url": "https://github.com/thmihnea/cambridge_notes",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "ThorntonLab/RMarkdown_beamer_slides_template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 41,
+   "stars": 1,
+   "pushed_at": "2020-10-01T18:23:30Z",
+   "html_url": "https://github.com/ThorntonLab/RMarkdown_beamer_slides_template",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "tiagobotelh0/18.06",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 33,
+   "stars": 0,
+   "pushed_at": "2020-08-11T23:39:41Z",
+   "html_url": "https://github.com/tiagobotelh0/18.06",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "tommychen99/mathematical-analysis",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 34241,
+   "stars": 0,
+   "pushed_at": "2026-09-20T21:38:13Z",
+   "html_url": "https://github.com/tommychen99/mathematical-analysis",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "tommychen99/real-analysis",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 926,
+   "stars": 1,
+   "pushed_at": "2026-08-26T06:46:41Z",
+   "html_url": "https://github.com/tommychen99/real-analysis",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "TomoakiYamada/beamer-lecture-slide",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 38,
+   "stars": 0,
+   "pushed_at": "2026-04-07T07:51:13Z",
+   "html_url": "https://github.com/TomoakiYamada/beamer-lecture-slide",
+   "queries": [
+    "beamer lecture|mit",
+    "lecture slides|mit"
+   ]
+  },
+  {
+   "full_name": "TomoakiYamada/tikz-econ-figure",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 165,
+   "stars": 0,
+   "pushed_at": "2026-04-29T01:37:45Z",
+   "html_url": "https://github.com/TomoakiYamada/tikz-econ-figure",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "trisct/MathLectureNotes",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "master",
+   "size_kb": 4856,
+   "stars": 1,
+   "pushed_at": "2021-06-04T13:41:51Z",
+   "html_url": "https://github.com/trisct/MathLectureNotes",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "UCL/ucl-beamer",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 68,
+   "stars": 50,
+   "pushed_at": "2025-10-16T16:56:08Z",
+   "html_url": "https://github.com/UCL/ucl-beamer",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "uh-comp-methods2/lectures",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 47,
+   "stars": 0,
+   "pushed_at": "2022-05-05T03:42:23Z",
+   "html_url": "https://github.com/uh-comp-methods2/lectures",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "UweZiegenhagen/gitBeamerSlides",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 224,
+   "stars": 0,
+   "pushed_at": "2018-04-11T18:35:55Z",
+   "html_url": "https://github.com/UweZiegenhagen/gitBeamerSlides",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "valentjn/uni-stuttgart-beamer-template",
+   "licence": "MIT",
+   "default_branch": "develop",
+   "size_kb": 1022,
+   "stars": 26,
+   "pushed_at": "2023-07-11T16:32:47Z",
+   "html_url": "https://github.com/valentjn/uni-stuttgart-beamer-template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "vasishth/FGME_Stan_2017",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 9808,
+   "stars": 5,
+   "pushed_at": "2017-09-24T16:10:39Z",
+   "html_url": "https://github.com/vasishth/FGME_Stan_2017",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "veltzer/demos-lang-beamer",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 115,
+   "stars": 0,
+   "pushed_at": "2026-10-28T08:41:51Z",
+   "html_url": "https://github.com/veltzer/demos-lang-beamer",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "vhbelvadi/LaTeX-lecture-notes-class",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 942,
+   "stars": 114,
+   "pushed_at": "2025-03-18T21:12:26Z",
+   "html_url": "https://github.com/vhbelvadi/LaTeX-lecture-notes-class",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "vishallama/categories-and-categorical-logic",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 14379,
+   "stars": 3,
+   "pushed_at": "2017-06-03T15:56:14Z",
+   "html_url": "https://github.com/vishallama/categories-and-categorical-logic",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "Wang-Zichuan/quasi-1d-nozzle-cfd",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 2488,
+   "stars": 0,
+   "pushed_at": "2026-05-25T17:50:44Z",
+   "html_url": "https://github.com/Wang-Zichuan/quasi-1d-nozzle-cfd",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "Wesius/rl-for-llms-presentation",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 110,
+   "stars": 0,
+   "pushed_at": "2026-04-29T19:50:30Z",
+   "html_url": "https://github.com/Wesius/rl-for-llms-presentation",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "wesleyit/latex_wsconfig_beamer",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 2615,
+   "stars": 0,
+   "pushed_at": "2023-03-07T19:01:03Z",
+   "html_url": "https://github.com/wesleyit/latex_wsconfig_beamer",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "WHULai/WHUBeamer-PolyU",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1706,
+   "stars": 0,
+   "pushed_at": "2026-01-16T05:34:59Z",
+   "html_url": "https://github.com/WHULai/WHUBeamer-PolyU",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "will702/latex-curriculum",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 75,
+   "stars": 0,
+   "pushed_at": "2026-10-31T18:00:00Z",
+   "html_url": "https://github.com/will702/latex-curriculum",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "witulska/Wroclaw-University-of-Science-and-Technology-WUST-Beamer-Presentation-Theme",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 5524,
+   "stars": 1,
+   "pushed_at": "2025-03-16T23:08:28Z",
+   "html_url": "https://github.com/witulska/Wroclaw-University-of-Science-and-Technology-WUST-Beamer-Presentation-Theme",
+   "queries": [
+    "beamer presentation|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "wouter-swierstra/logic-notes",
+   "licence": "CC-BY-4.0",
+   "default_branch": "master",
+   "size_kb": 7688,
+   "stars": 5,
+   "pushed_at": "2024-01-28T20:19:34Z",
+   "html_url": "https://github.com/wouter-swierstra/logic-notes",
+   "queries": [
+    "lecture notes|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "WoWaster/lecture-notes",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 12439,
+   "stars": 9,
+   "pushed_at": "2024-05-28T15:58:51Z",
+   "html_url": "https://github.com/WoWaster/lecture-notes",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "wuji-technology/robotics-rigid-body-mechanics",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 3072,
+   "stars": 7,
+   "pushed_at": "2026-06-18T14:16:34Z",
+   "html_url": "https://github.com/wuji-technology/robotics-rigid-body-mechanics",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "wurahara/PolyU-Beamer-Slides",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 17691,
+   "stars": 15,
+   "pushed_at": "2024-11-16T13:39:36Z",
+   "html_url": "https://github.com/wurahara/PolyU-Beamer-Slides",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "wyphan/qft",
+   "licence": "CC-BY-SA-4.0",
+   "default_branch": "master",
+   "size_kb": 80425,
+   "stars": 5,
+   "pushed_at": "2020-12-01T17:57:42Z",
+   "html_url": "https://github.com/wyphan/qft",
+   "queries": [
+    "lecture notes|cc-by-sa-4.0"
+   ]
+  },
+  {
+   "full_name": "xiongpc520-hub/xmum-beamer-deck",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 4766,
+   "stars": 0,
+   "pushed_at": "2026-10-01T12:09:29Z",
+   "html_url": "https://github.com/xiongpc520-hub/xmum-beamer-deck",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "xuhangc/UMac-Beamer-Template",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 3424,
+   "stars": 4,
+   "pushed_at": "2023-04-15T00:26:50Z",
+   "html_url": "https://github.com/xuhangc/UMac-Beamer-Template",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "xukp20/build-beamer-slides",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1228,
+   "stars": 8,
+   "pushed_at": "2026-09-03T11:40:00Z",
+   "html_url": "https://github.com/xukp20/build-beamer-slides",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "yanwenwang24/NUS-Beamer-Slides",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 885,
+   "stars": 2,
+   "pushed_at": "2026-03-30T04:29:39Z",
+   "html_url": "https://github.com/yanwenwang24/NUS-Beamer-Slides",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "yanwenwang24/NYUAD-Beamer-Slides",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 828,
+   "stars": 0,
+   "pushed_at": "2026-03-30T04:30:11Z",
+   "html_url": "https://github.com/yanwenwang24/NYUAD-Beamer-Slides",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "yegor256/osbp",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 79949,
+   "stars": 18,
+   "pushed_at": "2026-11-03T00:51:36Z",
+   "html_url": "https://github.com/yegor256/osbp",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "yegor256/painofoop",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 69766,
+   "stars": 47,
+   "pushed_at": "2026-11-02T23:48:10Z",
+   "html_url": "https://github.com/yegor256/painofoop",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "yegor256/pmba",
+   "licence": "MIT",
+   "default_branch": "master",
+   "size_kb": 20756,
+   "stars": 11,
+   "pushed_at": "2026-11-03T01:09:58Z",
+   "html_url": "https://github.com/yegor256/pmba",
+   "queries": [
+    "lecture notes|mit"
+   ]
+  },
+  {
+   "full_name": "yigengjiang/paper-to-slides",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 1570,
+   "stars": 2,
+   "pushed_at": "2026-09-26T12:44:02Z",
+   "html_url": "https://github.com/yigengjiang/paper-to-slides",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "ykonyshev/bisection-method",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 123,
+   "stars": 0,
+   "pushed_at": "2026-02-22T19:57:42Z",
+   "html_url": "https://github.com/ykonyshev/bisection-method",
+   "queries": [
+    "beamer slides|mit"
+   ]
+  },
+  {
+   "full_name": "zhangxiany-tamu/beamer-forge",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 586,
+   "stars": 0,
+   "pushed_at": "2026-08-06T18:37:00Z",
+   "html_url": "https://github.com/zhangxiany-tamu/beamer-forge",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  },
+  {
+   "full_name": "zhenyulee816/ucas-beamer",
+   "licence": "CC-BY-4.0",
+   "default_branch": "main",
+   "size_kb": 2517,
+   "stars": 0,
+   "pushed_at": "2026-09-15T14:09:45Z",
+   "html_url": "https://github.com/zhenyulee816/ucas-beamer",
+   "queries": [
+    "beamer presentation|cc-by-4.0"
+   ]
+  },
+  {
+   "full_name": "zimoluo/rosspset",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 15,
+   "stars": 0,
+   "pushed_at": "2023-07-27T18:15:29Z",
+   "html_url": "https://github.com/zimoluo/rosspset",
+   "queries": [
+    "problem set|mit"
+   ]
+  },
+  {
+   "full_name": "zitong-zhang/chalk-annotate",
+   "licence": "MIT",
+   "default_branch": "main",
+   "size_kb": 463,
+   "stars": 2,
+   "pushed_at": "2026-04-24T16:49:04Z",
+   "html_url": "https://github.com/zitong-zhang/chalk-annotate",
+   "queries": [
+    "beamer presentation|mit"
+   ]
+  }
+ ]
+}
