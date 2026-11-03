@@ -664,7 +664,7 @@ def _inline_equation(
 ) -> Element | None:
     """The inline equation element and its fix for one formula run, or None when the LaTeX
     does not validate (the formula then stays in the text)."""
-    cleaned = equation_step.strip_trailing_punctuation(equation_step.clean_latex(latex))
+    cleaned = equation_step.strip_trailing_punctuation(equation_step.read_latex(latex))
     if not cleaned.strip():
         return None
     mathml, checks = equation_step._convert(cleaned, "inline")
@@ -891,7 +891,7 @@ def lone_formula(block: Block) -> Block | None:
     words = "".join(r.value for r in block.runs if r.kind == "text")
     if len(formulas) != 1 or any(c.isalnum() for c in words):
         return None
-    latex = equation_step.clean_latex(formulas[0])
+    latex = equation_step.read_latex(formulas[0])
     mathml, checks = equation_step._convert(latex, "block")
     if not latex.strip() or mathml is None or has_errors(checks):
         return None
@@ -908,7 +908,7 @@ def lone_formula(block: Block) -> Block | None:
 
 
 def _add_equation(block: Block, builder: _Builder, *, skip_marker: bool = False) -> None:
-    latex = equation_step.clean_latex(block.latex)
+    latex = equation_step.read_latex(block.latex)
     if not latex.strip():
         return
     box, usable = builder.bbox(block, skip_marker=skip_marker)

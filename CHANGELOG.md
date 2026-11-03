@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: `\ce` subset and `\ce` on every LaTeX path (branch chem/ce-subset)
+
+- The `\ce{...}` subset (`pipeline/chem.py`) now reads a condition in a state symbol
+  (`(aq, 0.10 M)`), the excited state (`Ni^*`) and gas and precipitate marks (`CO2 ^`, `AgCl v`);
+  every other construct is still refused.
+- `\ce` is accepted on every path that takes LaTeX: the review screen's edit box (equation and
+  table cell), scanned pages and their second reading, table cells' HTML and page-math spans, all
+  through `equation_step.read_latex`. A `\ce` outside the subset fails the LaTeX check with the new
+  code `unsupported_ce` (was `unknown_command`) and the edit box says so in words. See
+  [docs/chemistry.md](docs/chemistry.md).
+
 ## Unreleased: conversions run in a child process (branch fix/worker-child-process)
 
 - The whole conversion (`convert_pdf`) now runs in a child process the worker can kill

@@ -560,6 +560,7 @@ send the fix to review.
 | `latex.no_comments` | `comment` | error | an unescaped `%`: latex2mathml (like TeX) drops the rest of the line, so `x = 50% + y` would become `x = 50` |
 | `latex.no_forbidden_commands` | `forbidden_command` | error | file, shell, macro or link commands: `\input \include \write \immediate \openout \read \def \gdef \edef \xdef \let \newcommand \renewcommand \providecommand \newenvironment \DeclareMathOperator \catcode \csname \expandafter \href \url \usepackage \documentclass \special \includegraphics \verb \class \style \htmlClass ...` |
 | `latex.allowed_commands` | `unknown_command` | error | any control word or symbol not in the allowlist |
+| `latex.allowed_commands` | `unsupported_ce` | error | a `\ce{...}` the chemistry subset could not write out (`pipeline/chem.py`); it is the only unknown command |
 | `latex.allowed_environments` | `unknown_environment` | error | an environment other than `array matrix pmatrix bmatrix Bmatrix vmatrix Vmatrix cases aligned align align* gathered split` |
 | `latex.command_arguments` | `bad_argument` | error | `\hspace` without a braced, non-negative dimension (`x \hspace y` would become `<mspace width="y">` and lose the `y`) |
 | `latex.plain_text_arguments` | `markup_in_text` | error | `<`, `>` or `&` in the argument of `\text \textrm \textbf \textit \textsf \texttt \textnormal \textup \mbox` (latex2mathml copies that argument into its XML unescaped, so it would become markup) |
@@ -581,9 +582,10 @@ sign, never a comment. None of this changes the mathematics. Other callers of
 `check_latex` (for example a reviewer's LaTeX edit) get `comment` for a bare `%`.
 
 Chemistry: the prompt asks for mhchem, `\ce{...}`, for chemical species, and
-`equation_step.expand_ce` writes each `\ce` out as plain LaTeX (`pipeline/chem.py`, a tested
+`equation_step.read_latex` (`expand_ce`, then `clean_latex`; used on every LaTeX path, see
+[chemistry.md](chemistry.md)) writes each `\ce` out as plain LaTeX (`pipeline/chem.py`, a tested
 subset) before `clean_latex` and the checks; one outside the subset is left as it is and
-`check_latex` refuses it (`unknown_command`). `clean_latex` does not convert, because the proof
+`check_latex` refuses it (`unsupported_ce`). `clean_latex` does not convert, because the proof
 applies it to the chatbot arms' recorded LaTeX. See [chemistry.md](chemistry.md).
 
 ### `safe_latex_to_mathml(latex, display)`

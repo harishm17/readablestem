@@ -50,6 +50,22 @@ NS = "{http://www.w3.org/1998/Math/MathML}"
         ("0.5 O2", r"0.5 \text{O}_2"),
         ("N2 + 3 H2 <=> 2 NH3", r"\text{N}_2 + 3 \text{H}_2 \rightleftharpoons 2 \text{NH}_3"),
         ("A <- B", None),  # refused
+        # state conditions, the excited state, gas and precipitate marks
+        ("Zn^2+(aq, 0.10 M)", r"\text{Zn}^{2+}\text{(aq, 0.10 M)}"),
+        ("Zn^2+(aq,0.10M)", r"\text{Zn}^{2+}\text{(aq, 0.10 M)}"),
+        ("NaCl(aq, 1.5)", r"\text{NaCl}\text{(aq, 1.5)}"),
+        ("CO2(g, 1 atm)", r"\text{CO}_2\text{(g, 1 atm)}"),
+        ("Ni^*", r"\text{Ni}^*"),
+        ("Ni^{*}", r"\text{Ni}^*"),
+        ("^{60}_{28}Ni^*", r"{}^{60}_{28}\text{Ni}^*"),
+        ("Ag+ + Cl- -> AgCl v", r"\text{Ag}^+ + \text{Cl}^- \longrightarrow \text{AgCl}\downarrow"),
+        ("AgCl(s) v", r"\text{AgCl}\text{(s)}\downarrow"),
+        (
+            "CaCO3 + 2 H+ -> Ca^2+ + H2O + CO2 ^",
+            r"\text{CaCO}_3 + 2 \text{H}^+ \longrightarrow \text{Ca}^{2+}"
+            r" + \text{H}_2\text{O} + \text{CO}_2\uparrow",
+        ),
+        ("H2O v + CO2 ^", r"\text{H}_2\text{O}\downarrow + \text{CO}_2\uparrow"),
         ("Fe^3+ + e- -> Fe^2+", r"\text{Fe}^{3+} + \text{e}^- \longrightarrow \text{Fe}^{2+}"),
         (
             "Ag+(aq) + Cl-(aq) -> AgCl(s)",
@@ -119,10 +135,7 @@ def test_ce_subset(ce, latex):
         "N2 + 3 H2 <=>> 2 NH3",  # an unequal equilibrium: not guessed
         "N2 + 3 H2 <<=> 2 NH3",
         "A ->[x][y] B",  # a two-part arrow label
-        "H2O ^ ",  # a mark for gas, with no number
         "$H2O$",  # LaTeX math inside
-        "H2O v",  # a precipitate mark
-        "Zn^2+(aq, 0.10 M)",  # a concentration in a state symbol
         "hello world",  # text is not a species
         "Xx2",  # not an element
         "H2O \\text{liquid}",  # LaTeX commands inside
@@ -130,6 +143,20 @@ def test_ce_subset(ce, latex):
         "-H",  # a sign with nothing before it
         "2^{x y}Fe",
         "{H2O",
+        # the C4 additions stay an allowlist: marks, conditions and stars only where read
+        "2 v",  # a mark on a coefficient
+        "-> v",  # a mark on an arrow
+        "H2O v v",  # two marks
+        "v",  # a mark with no species
+        "H2Ov",  # not set apart
+        "Zn(aq, 3 foo)",  # a unit that is not on the list
+        "Zn(aq, M)",  # a unit with no number
+        "Zn(aq, 0.1 M, 25 C)",  # two conditions
+        "Zn(aq, \\text{x})",  # commands in a condition
+        "Zn(x, 0.1 M)",  # not a state
+        "^*Ni",  # a star with nothing before it
+        "Ni^*x",  # a star that is not last
+        "Ni^{a b*}",
     ],
 )
 def test_ce_outside_the_subset_is_refused(ce):

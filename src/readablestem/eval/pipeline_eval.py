@@ -2035,7 +2035,7 @@ def _cell_formulas(cell: Any) -> list[tuple[str, str, str | None]]:
         if piece.kind != "math":
             continue
         try:
-            mathml = validate.safe_latex_to_mathml(equation_step.clean_latex(piece.value), "inline")
+            mathml = validate.safe_latex_to_mathml(equation_step.read_latex(piece.value), "inline")
         except validate.LatexConversionError:
             return whole
         found.append((piece.value, mathml, None))

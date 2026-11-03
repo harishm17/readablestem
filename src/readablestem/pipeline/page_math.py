@@ -36,6 +36,7 @@ from readablestem.core.types import ModelCall
 from readablestem.models.base import VisionClient, VisionRequest
 from readablestem.models.pricing import UnknownModelError
 from readablestem.models.prompts import load_prompt
+from readablestem.pipeline import chem
 
 log = logging.getLogger(__name__)
 
@@ -308,12 +309,18 @@ def verify(output: PageMathOutput | None, rows: Sequence[PageRow]) -> tuple[list
             continue
         segments.sort(key=lambda s: (_row_number(s.row), s.start))
         candidates.append(
-            Span(tuple(segments), expression.display, expression.role, expression.latex)
+            Span(tuple(segments), expression.display, expression.role, _latex_of(expression))
         )
     spans = [_retrimmed(span, by_id) for span in _resolve_overlaps(candidates, stats)]
     spans = [s for s in spans if s.segments]
     stats.verified = len(spans)
     return spans, stats
+
+
+def _latex_of(expression: Expression) -> str:
+    r"""The expression's LaTeX as the other readings are stored: a mathematics `\ce{...}`
+    written out (`chem.expand_ce`; one outside the subset stays and does not convert)."""
+    return chem.expand_ce(expression.latex) if expression.role == "math" else expression.latex
 
 
 def _retrimmed(span: Span, rows: dict[str, PageRow]) -> Span:

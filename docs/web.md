@@ -1847,7 +1847,7 @@ move on as for other kinds. The rules (`web.review`, "tables"):
 - *A cell.* Its text is cleaned as alt text is (invisible format characters removed,
   whitespace collapsed), at most 1,000 characters, and escaped when written; a maths
   cell's LaTeX goes through an equation edit's checks (`web.edit_check.check_cell_edit`:
-  `clean_latex`, the LaTeX and MathML checks, the spoken version, and the cross-checks
+  `read_latex` (`\ce` written out, then `clean_latex`), the LaTeX and MathML checks, the spoken version, and the cross-checks
   against the PDF's text in that cell, `table_step.cell_text_layer`: letters, digits and
   Greek letters, a letter's style, signs). LaTeX that differs from the PDF where that
   changes the meaning is refused with **Use my edit anyway** on the cell's form, as for

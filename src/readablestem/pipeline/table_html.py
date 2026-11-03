@@ -41,10 +41,15 @@ import re
 from dataclasses import dataclass, field
 
 from readablestem.core.types import TableCell, TableGrid
-from readablestem.pipeline.equation_step import clean_latex
+from readablestem.pipeline.equation_step import read_latex
 from readablestem.pipeline.safe_html import Display, escape_text, sanitize_mathml
 from readablestem.pipeline.table_cells import cell_pieces
-from readablestem.pipeline.validate import LatexConversionError, safe_latex_to_mathml
+from readablestem.pipeline.validate import (
+    LatexConversionError,
+    check_latex,
+    has_errors,
+    safe_latex_to_mathml,
+)
 
 # The class of the tool's own words (`assemble.AUTHORED_CLASS`: `lang="en"` in a document
 # in another language).
@@ -305,10 +310,12 @@ class _Writer:
             if piece.kind == "text":
                 parts.append(escape_text(piece.value))
                 continue
+            latex = read_latex(piece.value)
+            if has_errors(check_latex(latex)):
+                return None  # e.g. a `\\ce` outside the subset: never a half-read formula
             try:
                 mathml = sanitize_mathml(
-                    safe_latex_to_mathml(clean_latex(piece.value), "inline"),
-                    display=self.math_display,
+                    safe_latex_to_mathml(latex, "inline"), display=self.math_display
                 )
             except LatexConversionError:
                 return None

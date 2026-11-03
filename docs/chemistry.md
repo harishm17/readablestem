@@ -4,7 +4,7 @@ How formulas, ions, state symbols, reactions and concentrations are found in a P
 as MathML, and read aloud; what it did on the development sets, and what it does not do yet.
 Code: `pipeline/chem.py` (detection and `\ce`), `pipeline/layout.py` (`_chem_words`,
 `_with_chemistry`, `_reaction_row`), `pipeline/speech_chem.py`, `core/latex_groups.py`,
-`pipeline/equation_step.py` (`expand_ce`), `models/prompts/equation.md` ("Chemistry").
+`pipeline/equation_step.py` (`expand_ce`, `read_latex`), `models/prompts/equation.md` ("Chemistry").
 Development sets only: the registered held-out sections were not run or tuned on (the recorded
 held-out results were read to describe the problem, below).
 
@@ -32,7 +32,7 @@ that are about what the output says and not about the answer key:
 | Part | Where |
 |---|---|
 | Detection of formulas, ions, state symbols, reactions in running text and on display lines | `pipeline/chem.py` (pure string rules), `layout._chem_words`, `_chem_runs`, `_with_chemistry`, `_reaction_row` |
-| `\ce{...}` to plain LaTeX, a tested subset, the rest refused | `chem.ce_to_latex`, `chem.convert_ce_commands`, `equation_step.expand_ce` |
+| `\ce{...}` to plain LaTeX, a tested subset, the rest refused | `chem.ce_to_latex`, `chem.convert_ce_commands`, `chem.expand_ce`, `equation_step.read_latex` |
 | The equation prompt asks for `\ce` | `models/prompts/equation.md` and `equation_notation.md`, section "Chemistry" |
 | Subscripts and superscripts after `(...)` and `[...]` belong to the group | `core/latex_groups.group_delimited_scripts`, called by `validate.safe_latex_to_mathml` |
 | A charge or a count hangs on the whole element symbol; a long arrow is an operator | `chem.group_element_symbols`, `chem.arrows_as_operators`, called by `safe_latex_to_mathml` |
@@ -74,17 +74,31 @@ Word text gained a formula that is not one.
 
 The equation prompt asks for mhchem for chemical species (`\ce{H2O}`, `\ce{SO4^2-}`,
 `\ce{2 H2 + O2 <=> 2 H2O}`) and for ordinary LaTeX around it. The model's answer is written out
-as plain LaTeX before any check (`equation_step.expand_ce`, then `clean_latex`); the LaTeX
-allowlist, the converter, the MathML checks and the text-layer cross-check all see the converted
-reading. `clean_latex` itself does not convert: the proof applies it to the chatbot arms'
-recorded LaTeX, whose numbers must not move.
+as plain LaTeX before any check (`equation_step.read_latex`: `expand_ce`, then `clean_latex`); the
+LaTeX allowlist, the converter, the MathML checks and the text-layer cross-check all see the
+converted reading. `clean_latex` itself does not convert: the proof applies it to the chatbot
+arms' recorded LaTeX, whose numbers must not move.
+
+`read_latex` is the one entry on every path that takes LaTeX from a model or a person: the
+equation step, the table step (cells), the image-page reader and its second reading
+(`image_page`, `image_page_check`), the page-math spans (`page_math`, mathematics only), the
+table HTML's words-and-formulas cells, and the review screen's edit box for an equation and for a
+table cell (`web.edit_check`). Each stores the converted LaTeX, so an edited `\ce{H2O}` is
+saved, shown and exported as `\text{H}_2\text{O}`. A `\ce` outside the subset stays as it is and
+fails the LaTeX check with the code `unsupported_ce` (check `latex.allowed_commands`; any other
+unknown command is still `unknown_command`). The edit box says "The chemistry in \ce{...} is
+outside what this tool can read: write the formula with ordinary LaTeX, or check it for a typo."
+and nothing is saved. The proof's arms (`proof/systems.py`) and the gold side of the eval
+(`gold/arxiv_gold.py`) do not expand it, on purpose (recorded numbers must not move).
 
 | Supported | Examples |
 |---|---|
 | species of element symbols with counts | `H2O`, `C6H12O6`, `CuSO4.5H2O` |
 | brackets and parentheses with counts | `Ca(OH)2`, `Al2(SO4)3`, `[Cu(NH3)4]^2+` |
 | charges | `Na+`, `OH-`, `SO4^2-`, `Fe^3+`, `Fe^{3+}`, `Fe+++`, `e-` |
-| state symbols | `(aq)`, `(s)`, `(l)`, `(g)` |
+| state symbols | `(aq)`, `(s)`, `(l)`, `(g)`, with a condition: `(aq, 0.10 M)`, `(g, 1 atm)` (a number, then `M mM m atm bar kPa Pa mmHg torr` or no unit) |
+| the excited state | `Ni^*`, `Ni^{*}`, `^{60}_{28}Ni^*` |
+| gas and precipitate marks | `CO2 ^`, `AgCl v` (after a species, set apart by a space; written `\uparrow`, `\downarrow`) |
 | coefficients | `2`, `0.5`, `1/2` |
 | arrows | `->`, `-->`, `<-`, `<--`, `<->`, `<=>`, with a label `->[\Delta]`, `->[heat]`, or two (`->[above][below]`; text, numbers, `\text{...}`, `^\circ`) |
 | bonds | `-` (between atoms), `=`, `#` |
@@ -93,8 +107,9 @@ recorded LaTeX, whose numbers must not move.
 
 Not supported, and refused (`CeError`, then the LaTeX check says `unknown_command`, the cheap
 model's answer goes to the main model, and a reading that still has it is a failed fix with a
-required decision, the picture kept): `<=>>` and `<<=>`, a gas or precipitate mark `^` / `v`,
-`$...$` in the body, a concentration inside a state symbol `(aq, 0.10 M)`, a three-part arrow label,
+required decision, the picture kept): `<=>>` and `<<=>`, a mark that does not follow a species
+(on a coefficient, an arrow, or two in a row, or glued to the formula), `$...$` in the body, a
+condition with a unit that is not listed or a second condition, a three-part arrow label,
 anything that is not a species (words, a generic letter such as `A`). The prompt says what to do
 instead: ordinary LaTeX with `\ce` only around the species inside it.
 
@@ -510,8 +525,7 @@ scorers as the existing secondary ones.
   document.
 - **Formulas that the PDF set at one size** and **formulas in a table cell** (the cell text is
   flat; docs/tables.md).
-- **Three-part arrow labels**, `<=>>`, a precipitate mark, a state symbol with a concentration in
-  `\ce`: refused, the picture stays with a decision. A two-part label is read aloud as "right arrow
+- **Three-part arrow labels** and `<=>>`: refused, the picture stays with a decision. A two-part label is read aloud as "right arrow
   with 600 degrees Celsius below and electrolysis above", not as "reacts, with ..., to form".
 - **The primary and symbols scorers reward the spelling of the gold**, so a change that is right
   for a reader (the group a bracket's script belongs to, an arrow as an operator) can lower them
@@ -520,7 +534,7 @@ scorers as the existing secondary ones.
 - **The prompt's one `\mathrm` example** (a state symbol with a concentration) is older than the
   `\text` shape the converter now writes; changing it changes the prompt's version and with it
   every recorded answer, so it waits for the next re-recording. The table prompt
-  (`models/prompts/table.md`) does not teach `\ce` either, and `table_step` does not expand it.
+  (`models/prompts/table.md`) does not teach `\ce` either, though `table_step` expands it.
 - **Real screen readers were not run.** The reading is the review screen's string; what NVDA with
   MathCAT or VoiceOver says about this MathML (`mtext` element symbols in OpenStax's shape,
   grouped scripts) is the manual test of docs/mathml-alttext.md and was not done.
