@@ -1219,6 +1219,8 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
 .enlarge-image { display: block; width: auto; min-width: 100%; max-width: none; height: auto; }
 
 /* Table: what the checks found, each with its correction; one place to change it. */
+/* A table shown as paper keeps the light surface for its header cells in dark mode too. */
+.table-view { --surface: #f5f6f8; }
 .finding-list { list-style: none; margin: 0; padding: 0; }
 .finding { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-4); padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
 .finding:first-child { border-top: 0; }
@@ -1255,6 +1257,7 @@ a.finding-action { display: inline-flex; align-items: center; min-height: 2.25re
   }
   .view-toggle a[aria-current="true"] { background: var(--accent); color: var(--on-accent); text-decoration: underline; text-underline-offset: 0.25em; }
   .wrap-review { padding-bottom: 5rem; }
+  html:has(.view-toggle) { scroll-padding-bottom: 5rem; } /* a focused control is never under the bar */
   .page-scroll-hint .button-small { margin-top: var(--space-1); }
 }
 @media (forced-colors: active) {

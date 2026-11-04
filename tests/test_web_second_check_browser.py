@@ -150,7 +150,7 @@ def test_the_note_is_an_optional_check_with_no_axe_violations(
     assert NOTE in (optional.text_content() or "")  # folded: in the page, not shown yet
     lead = " ".join(optional.locator("p").first.inner_text().split())
     assert "something small" not in lead  # the note is not called small
-    assert "a second automated check found a possible mismatch" in lead
+    assert "may have alt text that does not match the image" in lead
     assert "worth a look" in lead
     folded = axe_violations(page, axe_source)
     unfold_everything(page)

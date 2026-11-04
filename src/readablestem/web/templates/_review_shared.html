@@ -100,9 +100,9 @@
 {% if item.status == "edited" %}<p class="saved-state" id="saved-{{ eid }}">Saved and accepted.</p>{% endif %}
 <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
   {% if item.can_accept %}
-  <button type="submit" name="action" value="accept" class="button" data-role="accept">Accept<span class="visually-hidden"> {{ name }} as written</span></button>
+  <button type="submit" name="action" value="accept" class="button" data-role="accept">Accept<span class="visually-hidden"> {{ name }}</span></button>
   {% endif %}
-  <button type="submit" name="action" value="edit" class="{{ 'button-secondary' if item.can_accept else 'button' }}" data-role="save">{{ "Save and accept" if item.pending else "Save changes" }}<span class="visually-hidden"> {{ name }}</span></button>
+  <button type="submit" name="action" value="edit" class="{{ 'button-secondary' if item.can_accept else 'button' }}" data-role="save">{{ "Save and accept" if item.pending else "Save changes" }}<span class="visually-hidden"> ({{ name }})</span></button>
   {% if item.pending %}
   <button type="submit" name="action" value="save" class="button-secondary" data-tone="quiet" data-role="save-later">Save, decide later<span class="visually-hidden"> ({{ name }})</span></button>
   {% endif %}
@@ -121,7 +121,7 @@
   {{ error_line(item, "acknowledge") }}
   <div class="checkbox-field">
     <input type="checkbox" id="acknowledge-{{ eid }}" name="acknowledge" value="on"{% if err %} aria-describedby="acknowledge-error-{{ eid }}" aria-invalid="true"{% endif %}>
-    <label for="acknowledge-{{ eid }}">I understand: screen reader users get no description.</label>
+    <label for="acknowledge-{{ eid }}">I understand: screen reader users get no description.<span class="visually-hidden"> ({{ item.label|lower }})</span></label>
   </div>
   <button type="submit" name="action" value="reject" class="button-secondary" data-tone="quiet" data-role="reject" data-needs-tick="acknowledge-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ item.label|lower }})</span></button>
 </fieldset>

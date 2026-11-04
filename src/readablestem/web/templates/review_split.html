@@ -418,8 +418,8 @@
       <form method="post" action="/jobs/{{ job.id }}/review/{{ m.element_id }}" class="inline-form member-form">
         {{ hidden_fields() }}<input type="hidden" name="stay" value="{{ key }}">
         <div class="decide-row">
-          {% if m.can_accept %}<button type="submit" name="action" value="accept" class="button-secondary" data-role="member-keep">Keep as heading<span class="visually-hidden"> ({{ m.label|lower }}, “{{ hg.text }}”)</span></button>{% endif %}
-          <button type="submit" name="action" value="reject" class="button-secondary" data-role="member-bold">{{ m.reject.button }}<span class="visually-hidden"> ({{ m.label|lower }}, “{{ hg.text }}”)</span></button>
+          {% if m.can_accept %}<button type="submit" name="action" value="accept" class="button-secondary" data-role="member-keep">Keep heading<span class="visually-hidden"> ({{ m.label|lower }}, “{{ hg.text }}”)</span></button>{% endif %}
+          <button type="submit" name="action" value="reject" class="button-secondary" data-role="member-bold">Make it bold<span class="visually-hidden"> ({{ m.label|lower }}, “{{ hg.text }}”)</span></button>
         </div>
       </form>
     </li>
