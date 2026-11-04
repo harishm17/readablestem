@@ -1,7 +1,8 @@
 """Upload, job status, results (download, sandboxed view, crops) and deletion.
 
-Every /jobs/* route loads the job through `owned_job`, which answers 404 for a job that
-does not exist *or* belongs to someone else, so job ids cannot be probed.
+Every /jobs/* route loads the job through `job_access`, which answers 404 for a job that
+does not exist *or* belongs to someone it is not shared with, so job ids cannot be probed, and
+checks the right the route needs: view, review or owner (`web.shares`).
 
 The job page (`job_page`, docs/web.md "The job page") shows an honest headline, live
 progress by step, the before/after card, what the file does not handle, the finish line
@@ -47,6 +48,7 @@ from readablestem.web import (
     pending,
     retention,
     sample,
+    shares,
     upload_result,
 )
 from readablestem.web import combine as combine_rules
@@ -86,6 +88,7 @@ from readablestem.web.outcome import JobOutcome, job_outcome
 from readablestem.web.pending import MAX_PENDING_PER_USER
 from readablestem.web.quota import next_day_start, pages_left
 from readablestem.web.security import VIEW_CSP
+from readablestem.web.shares import OWNER, VIEW
 from readablestem.web.uploads import (
     INSPECT_TIMEOUT_S,
     MAX_FILES_PER_UPLOAD,
@@ -283,16 +286,76 @@ def _quota_message(
     )
 
 
-def owned_job(session: Session, job_id: str, user: CurrentUser, *, lock: bool = False) -> Job:
-    """The user's job, or a 404 page. A job past its `retain_until` counts as deleted even
-    before the hourly purge removes it, so the retention promise does not depend on the
-    scheduler running on time."""
+def job_access(
+    session: Session,
+    job_id: str,
+    user: CurrentUser,
+    need: str = shares.VIEW,
+    *,
+    lock: bool = False,
+) -> Job:
+    """The one check of who may use a document (G1). Returns the job, or raises a page.
+
+    `need` is what the request does: `"view"` reads the result (the job page, the student
+    preview, downloads, the review record), `"review"` makes review decisions and edits, and
+    `"owner"` is everything else (delete, retry, settings, sharing, a revision, combining
+    parts). The owner has every right. Someone the owner shared the document with by email
+    has the right they were given (`web.shares`), read from the database on every request,
+    so a share that was removed stops working at once. Anyone else gets the **same** 404 as
+    for an id that does not exist, so job ids cannot be probed. A shared person asking for
+    more than they have gets a 403 page that says what they can do.
+
+    A job past its `retain_until` counts as deleted even before the hourly purge removes it,
+    so the retention promise does not depend on the scheduler running on time; that holds for
+    every right, and the shares go with the job."""
+    if need not in shares.RANK:
+        raise ValueError(f"unknown access {need!r}")
     if not JOB_ID.match(job_id):
         raise PageError(404, *NOT_FOUND)
     job = session.get(Job, job_id, with_for_update=lock or None)
-    if job is None or job.user_id != user.id or expired(job):
+    if job is None:
         raise _missing(session, job_id, user, job)
+    role = shares.role_of(session, job, user)
+    if role is None and not expired(job) and shares.names_unproved(session, job, user):
+        raise PageError(403, *SIGN_IN_AGAIN)
+    if role is None or expired(job):
+        raise _missing(session, job_id, user, job)
+    if shares.RANK[role] < shares.RANK[need]:
+        raise PageError(403, *_TOO_LITTLE[need], context={"job_id": job.id})
     return job
+
+
+SIGN_IN_AGAIN = (
+    "Sign in again to open this document",
+    "This document was shared with your email address, but this sign-in did not confirm the "
+    "address. Sign out, then sign in again with Google or your university's Microsoft "
+    "account, using that address.",
+)
+
+_TOO_LITTLE = {
+    shares.REVIEW: (
+        "You can view this document",
+        "The owner shared it with you to read. Only people given the Review right can make "
+        "decisions or edits.",
+    ),
+    shares.OWNER: (
+        "Only the owner can do this",
+        "This document was shared with you. Its owner is the only one who can delete it, "
+        "change its settings, upload a new version or share it.",
+    ),
+}
+
+
+def is_owner(job: Job, user: CurrentUser) -> bool:
+    return job.user_id == user.id
+
+
+def restart_owner_clock(job: Job, user: CurrentUser, settings) -> None:
+    """Restart the deletion clock (`retention.restart_clock`) when the owner acted. What a
+    person the document was shared with does never keeps it longer (G1): retention is the
+    owner's choice."""
+    if is_owner(job, user):
+        retention.restart_clock(job, settings)
 
 
 def _missing(session: Session, job_id: str, user: CurrentUser, job: Job | None) -> PageError:
@@ -377,6 +440,18 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         )
         # The recorded sample document the person already has, if any (T3-9).
         sample_job = sample.live_sample(session, user.id, now)
+        # Documents other people shared with this person's address (G1).
+        shared = [
+            {
+                "id": item.id,
+                "title": documents.display_title(
+                    item.result_title, item.filename, item.title_override
+                ),
+                "role": shares.ROLE_WORDS.get(item.role, item.role),
+                "owner": item.owner,
+            }
+            for item in shares.shared_with(session, user, now)
+        ]
         # Large files waiting for their pages to be chosen (T3-3).
         waiting = [
             {
@@ -392,6 +467,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
     phrases = office_convert.accepted_phrases(kinds)
     return {
         "documents": listing,
+        "shared_documents": shared,
         "pages_left": left,
         "page_quota": quota,
         # A new account (open tier) is told its limits are the ones for new accounts.
@@ -942,7 +1018,10 @@ def _job_course(request: Request, job_id: str, user: CurrentUser) -> dict[str, s
     if not notation.enabled(ctx.settings):
         return None
     with session_scope(ctx.factory) as session:
-        course = notation.job_course(session, owned_job(session, job_id, user))
+        job = job_access(session, job_id, user, VIEW)
+        if not is_owner(job, user):  # the course and its notation are the owner's
+            return None
+        course = notation.job_course(session, job)
         return {"id": course.id, "name": course.name} if course is not None else None
 
 
@@ -954,8 +1033,8 @@ def _job_suggestions(request: Request, job_id: str, user: CurrentUser) -> dict[s
     if not notation.enabled(ctx.settings):
         return {}
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user)
-        course = notation.job_course(session, job)
+        job = job_access(session, job_id, user, VIEW)
+        course = notation.job_course(session, job) if is_owner(job, user) else None
         if course is None:
             return {}
         rows = notation.course_suggestions(session, ctx.settings, course, job)
@@ -1011,8 +1090,13 @@ def load_job_status(
     from one read."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
-        job = current_html(ctx, session, owned_job(session, job_id, user))
-        view = job_view(session, job, with_page=True)
+        job = current_html(ctx, session, job_access(session, job_id, user, VIEW))
+        view = job_view(
+            session,
+            job,
+            with_page=True,
+            role=shares.role_of(session, job, user) or VIEW,
+        )
         status, error_code, result_json = str(job.status), job.error_code, job.result_json
     budget_closed = status == JobStatus.QUEUED and conversions_closed(ctx, user) is not None
     outcome = job_outcome(
@@ -1135,7 +1219,7 @@ def set_language(
     file is made again with the new language. Only a language the control offers, or the
     one the document already has, is taken."""
     with session_scope(get_ctx(request).factory) as session:
-        job = owned_job(session, job_id, user, lock=True)
+        job = job_access(session, job_id, user, OWNER, lock=True)
         owned_id = job.id  # the redirect is built from the owned row, not the request
         require_done(job)
         result = DocumentResult.model_validate(job.result_json or {})
@@ -1206,7 +1290,7 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
     enforce(request, "retry_user", user.id)
     refused = ""
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user, lock=True)
+        job = job_access(session, job_id, user, OWNER, lock=True)
         owned_id = job.id  # the redirect is built from the owned row, not the request
         others = int(
             session.scalar(
@@ -1288,14 +1372,15 @@ def content_disposition(filename: str) -> str:
 def download(request: Request, job_id: str, user: UserDep) -> Response:
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, VIEW)
         require_done(job)
         job = current_html(ctx, session, job)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename, job.title_override)
         html, name = job.html or "", download_filename(title, job.id)
         still_open = documents.open_decisions(result.get("fixes"))
-        retention.restart_clock(job, ctx.settings)  # a download is activity (T1-8)
+        if is_owner(job, user):  # only the owner's use keeps a document longer (G1)
+            retention.restart_clock(job, ctx.settings)  # a download is activity (T1-8)
     events.record_download(
         ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, open_decisions=still_open
     )
@@ -1393,7 +1478,7 @@ def combine_parts(request: Request, job_id: str, user: UserDep, format: str = "h
     file_type = exports.checked_format(format)
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, OWNER)
         require_done(job)
         kept = combine_rules.kept_parts(session, job)
         if len(kept) < 2:
@@ -1470,14 +1555,15 @@ def _canvas_export(
     """The finished document, exported for Canvas (the owner's, done, up to date). A
     picture the export cannot hold is a 409 page, and the HTML file stays available."""
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, VIEW)
         require_done(job)
         job = current_html(ctx, session, job)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename)
         html, job_ref = job.html or "", job.id
         still_open = documents.open_decisions(result.get("fixes"))
-        retention.restart_clock(job, ctx.settings)  # a download is activity, as for the HTML
+        if is_owner(job, user):  # only the owner's use keeps a document longer (G1)
+            retention.restart_clock(job, ctx.settings)  # a download is activity, as for the HTML
     try:
         export = export_canvas.export_canvas(
             html,
@@ -1501,7 +1587,7 @@ def _canvas_export(
 def view(request: Request, job_id: str, user: UserDep) -> Response:
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, VIEW)
         require_done(job)
         html = current_html(ctx, session, job).html or ""
     events.record(
@@ -1526,7 +1612,7 @@ def crop(request: Request, job_id: str, element_id: str, user: UserDep) -> Respo
     if not ELEMENT_ID.match(element_id):
         raise PageError(404, *NOT_FOUND)
     with session_scope(get_ctx(request).factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, VIEW)
         png = session.scalar(
             select(Blob.content).where(
                 Blob.job_id == job.id, Blob.kind == "crop", Blob.element_id == element_id
@@ -1544,7 +1630,7 @@ def _confirm_delete_page(
     decisions the person made on it. "No, keep it" goes back where they came from (the
     list's Delete links say `from=app`)."""
     with session_scope(get_ctx(request).factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, OWNER)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename, job.title_override)
         decided = documents.decided_by_you(result.get("fixes"))
@@ -1587,7 +1673,7 @@ def _delete_now(request: Request, job_id: str, user: CurrentUser) -> Response:
     from readablestem.ops.retention import delete_jobs
 
     with session_scope(get_ctx(request).factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, OWNER)
         # The one supported deletion path: counts the job's categories before deleting.
         delete_jobs(session, [job.id])
         events.forget_upload(session, job_id)  # the file's fingerprint goes with it

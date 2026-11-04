@@ -88,10 +88,12 @@ cannot skip these checks unnoticed.
 | Class | Routes |
 |---|---|
 | Public | `/`, `/demo`, `/style` (the design tokens and components; `noindex`, no data), `/privacy`, `/terms`, `/limits`, `/for-accessibility-offices` and its `/summary` download, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (names of late scheduled tasks only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
-| Signed-in user, owner only | `/account`, `/account/delete` (GET, POST), `/app`, `/app/documents`, `/app/download`, `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages), everything under `/courses/...` (including `/courses/{id}/download`) |
+| Signed-in user, owner or a person the owner shared the document with (below) | `/account`, `/account/delete` (GET, POST), `/app`, `/app/documents`, `/app/download`, `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages), everything under `/courses/...` (including `/courses/{id}/download`) |
 | Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
 | Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), rate limited per address (`analytics`, 300 per 10 minutes), the visitor's address is not forwarded (PostHog sees the relay's own), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
 | Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare; production refuses a `CRON_TOKEN` shorter than 32 characters; wrong tokens count against the cron limit below) |
+
+`GET /jobs/{id}/share` and `POST /jobs/{id}/share` and `/share/{share_id}/revoke` (who can open a document, below) are owner-only; the POSTs are CSRF-checked and not rate limited (they send nothing, and a document holds at most 10 shares).
 
 `POST /jobs/{id}/retry` ("Try again") is owner-only and CSRF-checked like every other write on a job, and rate limited; it refuses with 409 when the document is not stopped or has had its 3 tries, and with 429 when the person already has 10 documents waiting or converting.
 
@@ -129,11 +131,68 @@ the stored result as data and written through `html.escape` by the assembler;
 `tests/test_web_edit_page.py` and `tests/test_web_edit_describe.py` put markup, quotes,
 control characters and the tool's own equation marks through every one of these fields.
 
-Every route that takes a job, course or entry id loads it through one owner check
-(`owned_job`, `notation.owned_course`). A stranger gets the **same** 404 as for an id that does
+Every route that takes a job, course or entry id loads it through one access check
+(`routes.jobs.job_access` for a job, `notation.owned_course` for a course). A stranger gets the **same** 404 as for an id that does
 not exist, so ids cannot be probed. Admins have no access to other people's documents.
 `test_audit_authz.py` calls every such route as a second user, as an admin and anonymously,
 with real ids, and compares the answer with the one for a made-up id.
+
+### Sharing a document with named people (G1)
+
+An owner can give one document to named people (`web/shares.py`, `routes/sharing.py`,
+the `job_shares` table). It adds a way in, so it is described in full here.
+
+- **Who.** Only a person signed in with the exact address the owner entered, and only when
+  that sign-in *proved* it: Google's verified email, or the Microsoft directory's own
+  verification of the `email` claim (`xms_edov`). Microsoft's `preferred_username` (a sign-in
+  name, which `email_claims` still offers the allowlist as a fallback) never matches a share,
+  and neither does an admin-linked second address. An emailed sign-in link does count, for the
+  address it was sent to: it is random, single-use, expires in minutes, is delivered to the
+  address and opened by the person, so using it proves control of that mailbox
+  (`login_links.email`, migration `ecb0b22515e0`; the sign-in is verified only when that
+  address is the account's own, so a link sent to a linked address does not count, nor does a
+  link made before the column existed). Someone whose session proved nothing, and who opens a
+  document whose share names their own address, gets a 403 page asking them to sign in again
+  with Google or Microsoft (`job_access`); anyone else still gets the plain 404. The session records
+  this (`CurrentUser.email_verified`, set at sign-in only when the proved address is the
+  account's own), so no migration is needed; a session from before this release has no proof
+  and must sign in again to use a share. The address is compared in lower case and whole: no
+  domain rule, no `+tag` folding. Signing in is still the service's own gate (`users.is_allowed`,
+  or open sign-up), so a share does not let anyone in who could not sign in. Nothing is emailed
+  and there are no links that work without signing in.
+- **What.** Two rights. `view`: the job page, `/view` preview, the downloads, the crops and the
+  review record. `review`: also the review screen and every decision and edit. The owner alone
+  can delete, retry, change the title, contact line, language or retention, upload a revision,
+  combine parts, use "Download all", add or change or remove a share, or read the course
+  notation. A person who is shared a document cannot share it further.
+- **One check.** `job_access(session, job_id, user, need)` with `need` `view`, `review` or
+  `owner` replaces `owned_job` at every call site. A stranger, a person whose share was removed
+  and a made-up id all get the same 404; a shared person asking for more than they have gets a
+  403 page. The share is read from the database on every request, so removing it works on the
+  next click; the session holds no copy. A document past its retention time is refused to
+  everyone before any share is read, and `ops.retention.delete_jobs` deletes its shares (and
+  `erase_user` those that name the erased person's address). Erasing a reviewer's account also
+  deletes their `ReviewEdit` rows on other people's documents (as for any erased account), so
+  the owner's record loses those rows and the reviewer's decisions stay in the stored result.
+- **Who did what.** `ReviewEdit.user_id` is the person who made the edit, and the review
+  record's "Decided by" column names them. Only the owner sees email addresses: the owner gets
+  "Name (address)", everyone else gets names only ("the owner" or "a reviewer" when a person
+  has no name). The banner on a shared document and the "Shared with you" list name the owner
+  the same way. The sharing page, which lists addresses, is owner-only.
+- **Undo.** Undo takes back the last write only if the person asking made it; nobody undoes
+  another person's write (the owner does not undo a reviewer's, nor the reverse).
+- **Money and limits.** A re-read a reviewer asks for uses the owner's daily allowance, spend
+  pool and the document's caps (`reread.read_equation`), and its rate limit is keyed by the
+  owner (`enforce(..., "reread", job.user_id)`), so any number of reviewers share one budget
+  and sharing never raises what a document can spend or how fast. One read at a time per
+  person still applies to each asker. Only the owner's own actions restart the deletion clock
+  (`routes.jobs.restart_owner_clock`): not a viewer's download, nor a reviewer's decision.
+- **Logs.** `share_set`, `share_revoked` and `share_refused` carry the job id, the right and a
+  category; never an address. The flash notices on the sharing page are text without addresses,
+  because they live in the session cookie.
+- **Tests.** `tests/test_job_shares.py` runs every job route against the owner, a viewer, a
+  reviewer, a person whose share was removed and a stranger; and the new routes are in
+  `test_audit_authz.py::ROUTES` and the CSRF list of `test_web_auth.py`.
 
 ### Headers and the served document
 

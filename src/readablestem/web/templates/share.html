@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{# Who can open one document (routes/sharing.py, web/shares.py). Owner only. Plain forms: no
+   script is needed. Nothing is emailed; the owner copies the address. #}
+{% block title %}{% if errors|default([]) %}Error: {% endif %}Share {{ doc_title }}{% endblock %}
+{% block content %}
+<h1>Share {{ doc_title }}</h1>
+{% include "_error_summary.html" %}
+<p>Give a named person access to this one document. They must sign in with the email address
+  you enter here, exactly as it is written. There are no public links: nobody who is not
+  signed in with that address can open it. You can remove access at any time, and it stops on
+  their next click.</p>
+<ul>
+  <li><strong>View</strong> reads the converted document, the student preview, the downloads and the review record.</li>
+  <li><strong>Review</strong> also makes review decisions and edits. Each one is recorded under their name.</li>
+</ul>
+<p>Only you can delete the document, try it again, change its title, language or settings,
+  upload a new version or share it. Conversion and what it costs stay yours.</p>
+
+<section aria-labelledby="add-heading">
+  <h2 id="add-heading">Add a person</h2>
+  <form method="post" action="/jobs/{{ job_id }}/share" novalidate>
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <div class="field{% if email_error %} field-error{% endif %}">
+      <label for="share-email">Their email address</label>
+      <p class="hint" id="share-email-hint">The address they sign in with (Google or Microsoft). Nothing is sent to it.</p>
+      {% if email_error %}<p class="error-message" id="share-email-error"><span class="visually-hidden">Error: </span>{{ email_error }}</p>{% endif %}
+      <input type="email" id="share-email" name="email" maxlength="320" autocomplete="off" spellcheck="false"
+             value="{{ typed }}" aria-describedby="share-email-hint{% if email_error %} share-email-error{% endif %}"{% if email_error %} aria-invalid="true"{% endif %}>
+    </div>
+    <fieldset class="field{% if role_error %} field-error{% endif %}">
+      <legend>What they can do</legend>
+      {% if role_error %}<p class="error-message" id="share-role-error"><span class="visually-hidden">Error: </span>{{ role_error }}</p>{% endif %}
+      {% for value, label in roles %}
+      <p><input type="radio" id="share-role-{{ value }}" name="role" value="{{ value }}"{% if typed_role == value %} checked{% endif %}>
+        <label for="share-role-{{ value }}">{{ label }}</label></p>
+      {% endfor %}
+    </fieldset>
+    <button type="submit" class="button">Share</button>
+  </form>
+</section>
+
+<section aria-labelledby="people-heading">
+  <h2 id="people-heading">People with access</h2>
+  {% if shares %}
+  <ul class="share-list">
+    {% for row in shares %}
+    <li>
+      <p><strong>{{ row.email }}</strong>: {{ role_words[row.role] }}</p>
+      <form method="post" action="/jobs/{{ job_id }}/share" class="inline-form">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        <input type="hidden" name="email" value="{{ row.email }}">
+        <input type="hidden" name="role" value="{{ 'review' if row.role == 'view' else 'view' }}">
+        <button type="submit" class="button-secondary">Change {{ row.email }} to {{ role_words['review' if row.role == 'view' else 'view']|lower }}</button>
+      </form>
+      <form method="post" action="/jobs/{{ job_id }}/share/{{ row.id }}/revoke" class="inline-form">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        <button type="submit" class="button-secondary">Remove {{ row.email }}</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>Nobody yet. A document can be shared with up to {{ max_shares }} people.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="address-heading">
+  <h2 id="address-heading">The document's address</h2>
+  <p class="hint" id="address-hint">Copy this and send it to the people you shared with. It opens only for them, after they sign in.</p>
+  <label for="share-address" class="visually-hidden">Address of this document</label>
+  <input type="text" id="share-address" readonly value="{{ address }}" aria-describedby="address-hint">
+</section>
+
+<p><a href="/jobs/{{ job_id }}">Back to the document</a></p>
+{% endblock %}

@@ -96,6 +96,7 @@ def issue(factory: sessionmaker[Session], email: str, *, minutes: int) -> str | 
             LoginLink(
                 user_id=user.id,
                 token_hash=_hash(token),
+                email=email.strip().lower(),
                 expires_at=now + timedelta(minutes=minutes),
             )
         )
@@ -123,8 +124,10 @@ def _unexpired(session: Session, link_id: str) -> bool:
     )
 
 
-def redeem(factory: sessionmaker[Session], token: str) -> tuple[str, int] | None:
-    """Use the token once: (user id, session version) when it signs in, else None."""
+def redeem(factory: sessionmaker[Session], token: str) -> tuple[str, int, bool] | None:
+    """Use the token once: (user id, session version, proved) when it signs in, else None.
+    `proved`: the link was sent to the account's own address, so opening it proved that
+    mailbox (a link sent to a linked address proves the linked one, not the account's)."""
     if not valid_token_shape(token):
         return None
     with session_scope(factory) as session:
@@ -146,7 +149,8 @@ def redeem(factory: sessionmaker[Session], token: str) -> tuple[str, int] | None
         if user is None or not user.is_allowed:
             return None
         user.last_login_at = now
-        return user.id, user.session_version
+        proved = row is not None and row.email is not None and row.email == user.email.lower()
+        return user.id, user.session_version, proved
 
 
 def message_for(settings: Settings, to: str, token: str) -> LoginEmail:

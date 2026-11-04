@@ -695,3 +695,61 @@ def test_a_university_sign_in_comes_back_to_the_page_asked_for_and_is_counted(ms
     with session_scope(ms.ctx.factory) as session:
         names = list(session.scalars(select(Event.name).where(Event.user_id == user_id(ms, ALICE))))
     assert names == ["signed_in"]
+
+
+# --------------------------------------------------------------------------- shares (G1)
+
+
+def _shared_job(env) -> str:
+    """A finished document of Bob's, shared with Alice's address."""
+    from datetime import timedelta
+
+    from readablestem.web.db import Job, JobShare, JobStatus, utcnow
+
+    env.allow(BOB)
+    with session_scope(env.ctx.factory) as session:
+        job = Job(
+            user_id=user_id(env, BOB),
+            filename="f.pdf",
+            page_count=1,
+            status=JobStatus.DONE,
+            retain_until=utcnow() + timedelta(hours=1),
+        )
+        session.add(job)
+        session.flush()
+        session.add(JobShare(job_id=job.id, email=ALICE, role="view"))
+        return job.id
+
+
+def test_a_share_applies_only_to_an_address_the_directory_verified(ms):
+    """`xms_edov` true: the token's email is verified, so the share naming it applies. With
+    no `xms_edov` the person still signs in, but the share does not apply."""
+    ms.allow(ALICE)
+    job_id = _shared_job(ms)
+    ms.fake.claims |= {"xms_edov": True}
+    assert ms_sign_in(ms).status_code == 303
+    # 409 = found but not rendered; 404 would be "no access"
+    assert ms.browser.get(f"/jobs/{job_id}/download").status_code == 409
+    assert "Shared with you" in ms.browser.get("/app").text
+    other = ms.client()
+    ms.fake.claims |= {"xms_edov": None}
+    assert ms_sign_in(ms, other).status_code == 303
+    assert other.get("/app").status_code == 200
+    told = other.get(f"/jobs/{job_id}/download")
+    assert told.status_code == 403 and "Sign in again to open this document" in told.text
+    assert "Shared with you" not in other.get("/app").text
+    other.close()
+
+
+def test_a_sign_in_name_that_is_not_the_account_address_proves_nothing(ms):
+    """The email is unverified, so the sign-in name signs Alice in; it still cannot open a
+    document shared with that name."""
+    ms.allow(ALICE)
+    job_id = _shared_job(ms)
+    ms.fake.claims |= {
+        "xms_edov": False,
+        "email": "other@uni.example.edu",
+        "preferred_username": ALICE,
+    }
+    assert ms_sign_in(ms).status_code == 303
+    assert ms.browser.get(f"/jobs/{job_id}/download").status_code == 403  # asked to sign in again
