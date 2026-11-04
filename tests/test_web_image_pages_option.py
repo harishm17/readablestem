@@ -206,7 +206,12 @@ def test_the_page_quota_refuses_a_scan_like_any_other_document(tmp_path):
 
 
 def test_a_job_that_asked_may_spend_the_image_page_allowance_and_others_the_old_caps():
-    s = settings(feature_image_pages=True, max_usd_per_job=3.0, max_usd_per_page=0.30)
+    s = settings(
+        feature_image_pages=True,
+        max_usd_per_job=3.0,
+        max_usd_per_page=0.30,
+        max_model_calls_per_job=400,
+    )
     assert job_caps(s, 10) == (3.0, 400)  # unchanged without the option
     assert job_caps(s, 10, image_pages=False) == (3.0, 400)
     assert job_caps(s, 10, image_pages=True)[0] == 3.0  # 10 x $0.25 is less: the old cap stays

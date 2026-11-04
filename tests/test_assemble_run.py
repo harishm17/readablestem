@@ -237,7 +237,10 @@ def test_converts_a_document_end_to_end(fake):
     output = convert_pdf(b"%PDF", settings=settings(), client=fake_client(), pages=[0, 1, 2])
     result = output.result
     assert isinstance(output, PipelineOutput)
-    assert fake.analyze_kwargs == {"pages": [0, 1, 2], "max_pages": 30}
+    assert fake.analyze_kwargs == {
+        "pages": [0, 1, 2],
+        "max_pages": settings().max_pages_per_job,
+    }
 
     assert [e.order for e in result.elements] == list(range(11))
     assert [f.element_id for f in result.fixes] == [
