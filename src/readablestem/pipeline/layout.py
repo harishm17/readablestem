@@ -8308,7 +8308,7 @@ def _marks_of(text: str) -> str:
 
 
 _SYMBOL_CELL_GLYPHS = 4  # a cell of more glyphs than this is not one symbol
-_BULLET_GLYPHS = frozenset("\u2022\u2023\u25e6\u25aa\u25ab\u2219\u00b7")
+_SYMBOL_BULLETS = frozenset("\u2022\u2023\u25e6\u25aa\u25ab\u2219\u00b7")
 
 
 def _symbol_glyphs_only(ink: Sequence[_Char]) -> bool:
@@ -8321,7 +8321,7 @@ def _symbol_glyphs_only(ink: Sequence[_Char]) -> bool:
         face = c.font.split("+", 1)[-1].replace(" ", "")
         if not _MATH_SYMBOL_FONT.match(face) or c.c.isspace():
             return False
-        if face.lower().startswith("symbol") and c.c in _BULLET_GLYPHS:
+        if face.lower().startswith("symbol") and c.c in _SYMBOL_BULLETS:
             return False
     return True
 

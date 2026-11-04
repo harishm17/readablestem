@@ -685,12 +685,17 @@ table of a TeX paper now has a second reader for the cells whose glyphs say they
    their own by the rules that find inline maths in a line of prose (`_inline_runs`: a maths font, an italic variable with an
    operator, a script, a relation with operands). A cell counts when one run covers everything in it (a cell with words and
    a formula, a bare number, a cell of several lines such as a stacked fraction, a table with more than 60 such cells are
-   left to the table step), and a lone italic letter alone in a cell is a variable. The cell becomes an inline equation
+   left to the table step), a lone italic letter alone in a cell is a variable, and a cell of only maths-symbol glyphs (up to
+   four, in a font of `layout._MATH_SYMBOL_FONT`: a `\checkmark` or `\times`, which has no run because a symbol needs an
+   operand beside it) is one formula (its marks must equal the cell's text; a bullet of the plain Symbol face and the Dingbats
+   fonts are not maths, and nothing outside a table is taken this way). The cell becomes an inline equation
    element of the table (`parent_id` = the table, reason `table cell maths`) with its crop; `TableCell.equation_id` names
    it. Layout does not read the tables flag: `run.py` drops these elements (`table_math.without_cell_equations`) when
    tables are off, because the table stays a picture and nothing would write them.
 2. **The equation step** reads the cell's crop like any inline equation (its glyph checks, its flags, its place in the
-   review). Nothing is guessed in layout: a cell is only marked.
+   review). The line shown around the cell and the glyphs beside it are cut to the cell's own column
+   (`layout.line_across`; the table's width took the next column's "(5)" into the reading of `S^3`). Nothing is guessed
+   in layout: a cell is only marked.
 3. **One source per cell** (`pipeline/table_math.py`). A glyph belongs to one cell (the cell boxes of a detected grid overlap
    by a few points: the one it overlaps most), and a cell becomes an equation only when the letters and digits of the glyphs
    equal the cell's own text. After the steps, `settle` (called by `run.py`) drops the equation of a table that is not written

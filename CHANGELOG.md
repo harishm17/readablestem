@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
+
+- Pipeline 0.5.8. arXiv PDFs built by arXiv's own `tex2pdf` ("arXiv GenPDF (tex2pdf:...)") and VTeX
+  files are TeX-made again (0.5.7's whole-word producer match had lost them, so they got no unit
+  trimming, no table-cell maths and no short-formula rules). Every distinct producer and creator in
+  the repo's PDF corpora is a test case (`tests/test_producer_hint.py`).
+- A table cell of only maths-symbol glyphs (a lone `\checkmark`, `\times`) is an inline cell
+  equation, with the same one-glyph-one-cell and text-equality checks as other cell maths
+  (`docs/tables.md`). Bullets and Dingbats are not taken.
+- A cell equation's line crop and glyph context are cut to its own column, not the table's width
+  (the next column's "(5)" was read into `S^3`).
+
 ## Unreleased: site copy rewrite (branch content/site-rewrite)
 
 - Every public and signed-in page says what the service does today. The landing page lists what it
