@@ -367,7 +367,7 @@ def answered(session: Session, user_id: str, job_id: str) -> bool:
 
 def uploaded_at(session: Session, user_id: str, job_id: str) -> datetime | None:
     """When this person uploaded this job, if their events still say so: how a link to a
-    deleted document can tell its owner what happened (`routes.jobs.owned_job`)."""
+    deleted document can tell its owner what happened (`routes.jobs.job_access`)."""
     return as_utc(
         session.scalar(
             select(func.min(Event.created_at)).where(
