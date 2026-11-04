@@ -8287,6 +8287,31 @@ def _letters_of(text: str) -> str:
     return "".join(c for c in folded if c.isalnum())
 
 
+def _marks_of(text: str) -> str:
+    """`text` without spaces, as a text layer and a cell spell it alike (`_letters_of` keeps no
+    symbols)."""
+    return "".join(unicodedata.normalize("NFKC", text).split())
+
+
+_SYMBOL_CELL_GLYPHS = 4  # a cell of more glyphs than this is not one symbol
+_BULLET_GLYPHS = frozenset("\u2022\u2023\u25e6\u25aa\u25ab\u2219\u00b7")
+
+
+def _symbol_glyphs_only(ink: Sequence[_Char]) -> bool:
+    """Every glyph of a cell is set in a maths symbol font (`_MATH_SYMBOL_FONT`: CMSY, MSAM,
+    TXSYA, LM Math Symbols), a few at most. A bullet of the plain `Symbol` face is a list marker
+    that Word and its kin print, not maths, and the Dingbats fonts are not in the set at all."""
+    if not 0 < len(ink) <= _SYMBOL_CELL_GLYPHS:
+        return False
+    for c in ink:
+        face = c.font.split("+", 1)[-1].replace(" ", "")
+        if not _MATH_SYMBOL_FONT.match(face) or c.c.isspace():
+            return False
+        if face.lower().startswith("symbol") and c.c in _BULLET_GLYPHS:
+            return False
+    return True
+
+
 def _cell_owners(grid: TableGrid, glyphs: Sequence[_Char]) -> list[int | None]:
     """For each glyph, the index of the one cell it belongs to, or None. Cell boxes of a detected
     grid overlap by a few points, so a glyph whose centre is in two goes to the cell it overlaps
@@ -8350,6 +8375,12 @@ def _cell_maths(grid: TableGrid, rows: Sequence[_Row]) -> dict[tuple[int, int], 
             # One italic letter alone in its cell is a variable: nothing in prose stands beside it
             # to make it a word (`_italic_variables` needs upright text around it).
             runs = [(first, last + 1, ["italic letter alone in a table cell"])]
+        symbols = not runs and _symbol_glyphs_only(ink)
+        if symbols:
+            # A cell of nothing but maths symbol glyphs (a lone `\checkmark`, a `\times`) has no
+            # run: the run finder wants an operand beside a symbol. In a table cell the glyph is
+            # the whole content, so it is the formula.
+            runs = [(first, last + 1, ["maths symbol glyphs alone in a table cell"])]
         if len(runs) != 1 or runs[0][0] > first or runs[0][1] < last + 1:
             continue
         # A leading or trailing mark the run trims (a comma, a full stop) is punctuation of the
@@ -8358,6 +8389,8 @@ def _cell_maths(grid: TableGrid, rows: Sequence[_Row]) -> dict[tuple[int, int], 
         text = _clean("".join(c.styled for c in span))
         if _letters_of(text) != _letters_of(cell.text):
             continue  # not what the cell says (a glyph of its neighbour, a mark the cell drops)
+        if symbols and _marks_of(text) != _marks_of(cell.text):
+            continue  # symbols have no letters to compare: the marks themselves must agree
         shown = [c for c in span if not c.blank]
         score, _ = equation_score(
             text, sorted({c.font for c in shown}), any(c.flags & _SUPERSCRIPT_FLAG for c in shown)
