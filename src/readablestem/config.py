@@ -267,6 +267,10 @@ class Settings(BaseSettings):
     # (a cgroup's limit, else tasks x address space each, `source.latexml.LIMITS`); the probe fails
     # with --require-latexml when it is more.
     source_sandbox_max_total_mb: int = Field(default=2048, gt=0)
+    # The web process runs the sandbox probe itself in the background at start when LaTeXML is
+    # installed (web/sandbox_status.py); LaTeX source features take effect only after a PASS.
+    sandbox_probe_at_startup: bool = True
+    sandbox_probe_timeout_s: int = Field(default=240, gt=0)
     # Uploads taken in at once per instance (one per user); see web/uploads.py.
     max_concurrent_uploads: int = Field(default=3, gt=0)
     # Stored bytes (web/storage.py): uploads live in Postgres on a volume of fixed size (5000 MB,

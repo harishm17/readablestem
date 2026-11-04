@@ -297,7 +297,8 @@ killer are what is left behind it. The caller kills the group at a wall-clock li
 (120 s) or when the output folders and the program's log pass 200 MB. If bubblewrap or user namespaces are not available the run is
 refused; there is no unsandboxed fallback (a plain child of the web process shares its user, so
 it could read the web process's files). Whether the platform allows it is checked on the deployed
-image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"); a FAIL there means
+image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"; the web process also runs it at start-up and LaTeX source is
+refused with a 503 unless it passed, `web/sandbox_status.py`); a FAIL there means
 LaTeX upload must stay off.
 
 What each layer is for, and what is tested (`tests/test_source_escapes.py` runs these through the
@@ -524,7 +525,7 @@ Triage of what the scanners reported:
   internet. The sandbox contains it; a flaw in bubblewrap or in the kernel's namespaces is not
   prevented by anything here. The lint is not a defence. The image has the distribution's LaTeXML, so
   a security update of it arrives with the next build (`apt`, not pinned).
-- `/healthz/ops` is public and has no rate limit: it reads two rows and a sum of stored sizes, and answers with at most the
+- `/healthz/ops` is public and has no rate limit: it reads two rows, a sum of stored sizes and the last sandbox probe result (`sandbox`: check names and one-word answers), and answers with at most the
   words `backup`, `cron`, `storage` or `database`, and the stored and allowed megabytes (totals, no names). Scheduled-task failures are found by a GitHub Actions job
   that stops after 60 days without a commit to the public repository, unless re-enabled.
 - The session cookie is readable by its owner (signed, not encrypted).

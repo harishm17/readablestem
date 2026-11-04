@@ -572,7 +572,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         # "Convert scanned or handwritten pages" is offered (ADR 0007, FEATURE_IMAGE_PAGES).
         "image_pages_offered": ctx.settings.feature_image_pages,
         # `.tex` files and zips of a LaTeX project are taken (FEATURE_LATEX_SOURCE).
-        "latex_source": ctx.settings.feature_latex_source,
+        "latex_source": ctx.settings.feature_latex_source and ctx.sandbox.allows_source(),
         "office_what": phrases[0],
         "office_choose": phrases[1],
         "keep_default": keep_default,
@@ -1109,7 +1109,7 @@ def _place_source(
     s = ctx.settings
     if revises is not None:
         return Placed(file.filename, code="source_revises", status=400)
-    if not (latexml.installed() and sandbox.available()):
+    if not (latexml.installed() and sandbox.available() and ctx.sandbox.allows_source()):
         return Placed(file.filename, code="source_unavailable", status=503, retry_after="3600")
     try:
         info = source_intake.inspect(

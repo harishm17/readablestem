@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased: sandbox probe at start-up (branch latex/probe-at-startup)
+
+- New: when the web process starts and LaTeXML is in the image it runs the sandbox probe
+  (`--require-latexml`) in the background, logs `sandbox_probe result=PASS|FAIL ...` once, and
+  shows the result on `/healthz/ops` under `sandbox` (state, checks, bound_mb, cgroup, seccomp,
+  checked_at; `not_installed` when there is no LaTeXML). `FEATURE_LATEX_SOURCE`,
+  `FEATURE_BEAMER_SOURCE` and a `FEATURE_BATCH_ZIP` zip with a LaTeX project take effect only
+  while the last probe passed: otherwise the existing 503 `source_unavailable` answer. Settings
+  `SANDBOX_PROBE_AT_STARTUP` and `SANDBOX_PROBE_TIMEOUT_S`.
+
 ## Unreleased: Listen as a student (branch preview/listen-as-student)
 
 - New: an instructor can hear roughly what a screen reader will say for a converted document

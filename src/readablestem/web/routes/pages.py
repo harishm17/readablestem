@@ -51,7 +51,8 @@ def _hero() -> dict[str, object]:
 def _features(request: Request) -> dict[str, object]:
     """Which content features this server has on, so a public page lists only what it does
     (the landing page, /limits and the guides read the same flags)."""
-    settings = get_ctx(request).settings
+    ctx = get_ctx(request)
+    settings = ctx.settings
     return {
         "tables_on": settings.feature_tables,
         "image_pages_on": settings.feature_image_pages,
@@ -60,7 +61,8 @@ def _features(request: Request) -> dict[str, object]:
         "notation_on": settings.feature_notation_memory,
         "office_on": bool(office_convert.input_kinds(settings)),
         "word_export": export_docx.available(),  # Word downloads need pandoc on the server
-        "latex_source": settings.feature_latex_source,  # .tex and project zips (off by default)
+        # .tex and project zips: off by default, and only once the sandbox probe has passed
+        "latex_source": settings.feature_latex_source and ctx.sandbox.allows_source(),
     }
 
 
@@ -348,6 +350,11 @@ def healthz_ops(request: Request) -> Response:
     except Exception:
         stored = None
     return JSONResponse(
-        {"status": "ok" if ok else "stale", "stale": stale, "storage": stored},
+        {
+            "status": "ok" if ok else "stale",
+            "stale": stale,
+            "storage": stored,
+            "sandbox": ctx.sandbox.public(),
+        },
         status_code=200 if ok else 503,
     )

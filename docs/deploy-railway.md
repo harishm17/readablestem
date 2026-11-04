@@ -469,7 +469,9 @@ base). The first Railway build prints the real image size; write it here. Check 
 two `LaTeXML version 0.8.8` lines and the `1` printed by the policy check. Nothing in the app uses
 LaTeXML until the LaTeX-source switch (`FEATURE_LATEX_SOURCE`) is on, and that switch stays off
 until `readablestem ops sandbox-probe --require-latexml` prints PASS on the deployed image
-(docs/operations.md, "Sandbox probe"). CI builds the image with the argument once and checks the
+(docs/operations.md, "Sandbox probe"); the web process also runs that probe at start-up, shows it
+on `/healthz/ops` under `sandbox`, and keeps the source features switched off in effect unless it
+passed, so a flag set by mistake does nothing under a FAIL. CI builds the image with the argument once and checks the
 versions and the policy (job `docker build (no push)`); the sandbox itself cannot be probed inside CI's
 Docker, which does not allow user namespaces.
 
