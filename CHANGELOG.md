@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased: Landlock sandbox backend (branch latex/landlock-sandbox)
+
+- New: a second sandbox for LaTeX source where bubblewrap cannot start (no user namespaces,
+  as on Railway): Landlock (read and execute on the system trees, read on the input, read and
+  write on the output and a private scratch folder, nothing else, not `/proc`) with a strict
+  seccomp filter (no sockets, no `setsid`, no `landlock_*`), `no_new_privs`, rlimits, the
+  one-at-a-time lock, a polled memory cap for the whole process group, and a launcher that is
+  the subreaper and dies with its caller. Chosen automatically; the same probe gates it
+  (`backend=bwrap|landlock`, new in-sandbox checks). The web process and the conversion child
+  call `PR_SET_DUMPABLE=0`. `tests/test_source_escapes.py` runs on both backends.
+- Hardened after review: Landlock ABI 6 is required (signal and abstract-socket scopes); the
+  strict filter also denies calls that name another process of the user (`prlimit64` and the
+  scheduler calls except on pid 0, `setpriority`, `ioprio_set`, pidfds, `kcmp`), memory and disk
+  outside the counters (`memfd_create`, System V and POSIX IPC, `execveat` of an open file), and
+  changes to file mode, owner, times and extended attributes; unlinked-but-open files count
+  against the output budget and the entries in the writable folders are capped; the task bound
+  is 4 x 512 MB and the probe fails over `SOURCE_SANDBOX_MAX_TOTAL_MB`; the memory poll is
+  every 0.1 s; the supervisor watches its caller's pid instead of `PR_SET_PDEATHSIG`.
+- Final review: `source_busy` is decided by the launcher's own observation (the user's task
+  count at the limit while the program has not used its allowance, written to a marker the
+  program cannot reach), no longer from the program's output, which a document could spoof.
+- Second review: `fallocate` denied, the output budget counts blocks and deleted files that are
+  still mapped, a fork that fails for lack of room fails the conversion as `source_busy`
+  (new message: "The server is busy right now ... Try again in a few minutes, or upload the
+  PDF instead."); running a written file through the dynamic loader is documented as a
+  residual (the loader's execute right cannot be withheld).
 ## Unreleased: display grouping (branch eq/display-grouping)
 
 - New setting `LAYOUT_DISPLAY_GROUPING` (off; output byte-identical to before when off, no pipeline bump until it is turned on).

@@ -659,6 +659,12 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 
 ## Sandbox probe
 
+The probe prints `backend=bwrap` or `backend=landlock`: bubblewrap when it can start, else the
+Landlock backend (docs/security.md, "Landlock backend"). Where a platform forbids user
+namespaces (Railway does) `bwrap=ok` can still come with `backend=landlock`: that is the
+expected answer there, and PASS means the Landlock checks held. `READABLESTEM_SANDBOX_BACKEND=bwrap`
+or `landlock` in the environment of `ops sandbox-probe` (or of the test run) tries only that one.
+
 **At start-up.** There is no shell on Railway to run the probe by hand, so the web process runs it
 itself, in the background, when it starts and LaTeXML is in the image
 (`web/sandbox_status.py`; `SANDBOX_PROBE_AT_STARTUP`, default on, `SANDBOX_PROBE_TIMEOUT_S`, default
