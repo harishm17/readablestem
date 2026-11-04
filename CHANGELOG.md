@@ -24,6 +24,20 @@
   as a limit. docs/web.md, docs/deploy.md, docs/deploy-railway.md (the service should be allowed 2 GB; a 95
   MB upload to confirm after the deploy), docs/security.md, docs/operations.md (how much the uploads
   weigh in the database), README, vendor sheet, `.env.example`, `deploy/deploy.env.example`.
+## Unreleased: short inline maths from glyphs (branch eq/inline-simple-maths, on eq/t10-table-cell-maths)
+
+- A relation set in a maths font before a number (`\approx 0.14`, `\geq 2`, `\geq 90\%`) is one inline formula in a
+  TeX-made PDF (`glyph_math.relation_runs`); the run finder had dropped the relation as the tail of a cut formula and the
+  number had no evidence of its own. Nothing else was added: a number with a percent sign (a trial rule predicted 20 and
+  aligned 4 on dev2), a number with a unit, an equation reference, a bare number and an upright letter have no glyph that
+  tells the author's maths mode from text, so they are not taken (docs/eval-equation-diagnostics.md, "Simple inline
+  maths"; docs/layout.md "Short formulas the runs miss"). Page numbers, citations, list markers, years and figure numbers
+  are never taken: `tests/fixtures/layout/latex/short_maths.pdf`.
+- Measured offline (layout alone, no model): 6 gold equations found that were not and none lost, in 3 of 85 papers;
+  recall 0.844 to 0.846 on dev2 (2,153 inline gold), 0.765 to 0.766 on held-out and fresh2 to 4, precision unchanged; the
+  148 PDFs of `scripts/layout_identity.py` are identical. `scripts/eq_short_missed.py` says why short inline gold is
+  missed (what the glyphs there are); `scripts/eq_span_edges.py` prints precision by evidence.
+- Pipeline version 0.5.5 to 0.5.6; results from 0.5.5 load unchanged.
 
 ## Unreleased: maths in table cells (branch eq/t10-table-cell-maths, on eq/t11-glyph-spans)
 
