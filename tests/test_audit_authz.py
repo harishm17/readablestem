@@ -148,6 +148,11 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/symbols"): USER,  # T1-7: CSRF, owner only, not rate limited
     ("POST", "/jobs/{job_id}/undo"): USER,
     ("GET", "/jobs/{job_id}/view"): USER,
+    # G1: who has access to a document. The owner only; a person it is shared with gets a 403,
+    # a stranger the same 404 as for a made-up id (tests/test_job_shares.py has the matrix).
+    ("GET", "/jobs/{job_id}/share"): USER,
+    ("POST", "/jobs/{job_id}/share"): USER,  # CSRF, owner only
+    ("POST", "/jobs/{job_id}/share/{share_id}/revoke"): USER,  # CSRF, owner only
     # T3-3: a large file kept while its owner chooses the pages; owner only like a job
     ("GET", "/uploads/{upload_id}"): USER,
     ("POST", "/uploads/{upload_id}"): USER,  # CSRF, rate limited, quota and caps as an upload
@@ -223,6 +228,7 @@ def site(tmp_path):
             "job_id": job_id,
             "course_id": course_id,
             "entry_id": entry_id,
+            "share_id": "1" * 32,
             "element_id": "p1-e3",
             "slug": "equations",
             "number": "1",
@@ -330,6 +336,8 @@ def send(client, method: str, path: str, token: str):
         "lang": "fr",
         "latex": "x",
         "item": "p1-e3",
+        "email": "someone@example.org",
+        "role": "view",
     }
     return client.post(path, data=fields)
 
