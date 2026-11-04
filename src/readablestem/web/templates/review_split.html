@@ -35,9 +35,9 @@
 {{ error_line(item, "actions") }}
 <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
   {% if item.can_accept %}
-  <button type="submit" name="action" value="accept" class="{{ 'button-secondary' if anyway else 'button' }}" data-role="accept">Accept{% if anyway %} anyway{% endif %}<span class="visually-hidden"> {{ name }}</span></button>
+  <button type="submit" name="action" value="accept" class="{{ 'button-secondary' if anyway else 'button' }}" data-role="accept"{% if anyway %} data-tone="caution"{% endif %}>Accept{% if anyway %} anyway{% endif %}<span class="visually-hidden"> {{ name }}</span></button>
   {% endif %}
-  <button type="submit" name="action" value="reject" class="button-secondary" data-role="reject" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
+  <button type="submit" name="action" value="reject" class="button-secondary" data-role="reject" data-tone="quiet" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
 </div>
 <p class="hint decide-note" id="reject-note-{{ eid }}">{{ item.reject.button }}: {{ item.reject.consequence }}</p>
 {% endmacro %}
@@ -63,8 +63,8 @@
       {% for chip in group.chips %}
       {% set cid = gid ~ "-" ~ loop.index %}
       <li>
-        <button type="submit" name="latex" value="{{ chip.latex }}" class="button-secondary chip" data-role="chip"{% if chip.speech %} aria-describedby="{{ cid }}-said"{% endif %}>Use {{ chip.phrase }}<span class="visually-hidden"> in {{ item.label|lower }}</span></button>
-        {% if chip.speech %}<span class="chip-said" id="{{ cid }}-said">Then read aloud roughly as: “{{ chip.speech }}”</span>{% endif %}
+        <button type="submit" name="latex" value="{{ chip.latex }}" class="button-secondary chip" data-role="chip"{% if chip.speech|speakable %} aria-describedby="{{ cid }}-said"{% endif %}>Use {{ chip.phrase }}<span class="visually-hidden"> in {{ item.label|lower }}</span></button>
+        {% if chip.speech|speakable %}<span class="chip-said" id="{{ cid }}-said">Then read aloud roughly as: “{{ chip.speech|speakable }}”</span>{% endif %}
       </li>
       {% endfor %}
     </ul>
@@ -76,7 +76,7 @@
 {# Roughly how the proposal is read aloud, and what a screen reader gets from the PDF
    itself (its text layer: shown to the document's owner only, here). #}
 {% macro speech_lines(p, item) %}
-{% if item.speech %}<p class="speech"><span class="speech-label">Read aloud roughly as:</span> “{% if p.spoken %}{{ said(p.spoken.said) }}{% else %}{{ item.speech }}{% endif %}”</p>{% endif %}
+{% if item.speech|speakable %}<p class="speech"><span class="speech-label">Read aloud roughly as:</span> “{% if p.spoken %}{{ said(p.spoken.said) }}{% else %}{{ item.speech|speakable }}{% endif %}”</p>{% endif %}
 {% if item.text_layer %}
 <p class="speech"><span class="speech-label">From your PDF a screen reader gets:</span> “<span class="text-layer">{{ item.text_layer }}</span>”{% if p.spoken %}, roughly “{{ said(p.spoken.pdf_said) }}”{% endif %}</p>
 {% if p.spoken %}<p class="hint said-key">Marked: the words where the two readings differ.</p>{% endif %}
@@ -157,7 +157,7 @@
 <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="suggest">
   {{ hidden_fields() }}<input type="hidden" name="action" value="edit"><input type="hidden" name="latex" value="{{ p.suggestion.latex }}">
   <button type="submit" class="button" data-role="suggest" aria-describedby="suggest-hint-{{ eid }}">{{ p.suggestion.label }}<span class="visually-hidden"> in {{ item.label|lower }}</span></button>
-  <p class="hint" id="suggest-hint-{{ eid }}">Saves <code class="latex">{{ p.suggestion.latex }}</code> and runs the checks again.</p>
+  <p class="hint" id="suggest-hint-{{ eid }}">Saves this change and runs the checks again.</p>
 </form>
 {% endif %}
 {% if p.chips %}
@@ -180,10 +180,10 @@
   <p class="hint" id="other-why-{{ eid }}">{{ o.why }} Nothing is chosen for you.</p>
   <p class="cmp-label">Other reading, {{ "read from the picture of the formula" if o.source == "crop" else "read from the whole page" }}</p>
   <div class="cmp-row" tabindex="0" role="group" aria-label="Other reading of {{ item.label|lower }}"><div class="cmp-math cmp-math-plain">{{ o.mathml }}</div></div>
-  {% if o.speech %}<p class="speech" id="other-said-{{ eid }}"><span class="speech-label">Read aloud roughly as:</span> “{{ o.speech }}”</p>{% endif %}
+  {% if o.speech|speakable %}<p class="speech" id="other-said-{{ eid }}"><span class="speech-label">Read aloud roughly as:</span> “{{ o.speech|speakable }}”</p>{% endif %}
   <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="suggest other-form">
     {{ hidden_fields() }}<input type="hidden" name="action" value="edit"><input type="hidden" name="origin" value="page_witness_choice">
-    <button type="submit" name="latex" value="{{ o.latex }}" class="button-secondary" data-role="other"{% if o.speech %} aria-describedby="other-said-{{ eid }}"{% endif %}>Use the other reading<span class="visually-hidden"> for {{ item.label|lower }}</span></button>
+    <button type="submit" name="latex" value="{{ o.latex }}" class="button-secondary" data-role="other"{% if o.speech|speakable %} aria-describedby="other-said-{{ eid }}"{% endif %}>Use the other reading<span class="visually-hidden"> for {{ item.label|lower }}</span></button>
   </form>
   {% if o.chips %}
   <p class="hint">Or take only the symbols that differ:</p>
