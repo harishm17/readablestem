@@ -210,7 +210,11 @@ this registration (`FRESH5_FILES` in `scripts/realworld_register.py`), with `gol
 converter step. The fix is measured on the development papers
 (`docs/eval-realworld.md`, "The spoken-equal scorer"): 68 of 71 equations that print as the gold does but were
 spoken differently became equal, every arm's score moved by about 3 points, and no pair that prints differently became equal.
-Neither the scorer nor the speech rules change after the first request.
+The scorer's converter (`equation_step.clean_latex`, `validate.safe_latex_to_mathml` and the modules that shape
+its MathML: `core/latex_groups.py`, `core/mathchars.py`, `pipeline/chem.py`, `chem_mathml.py`,
+`mathml_shape.py`, and the speech helpers `core/mathml_intent.py`, `core/notation.py`, `eval/equations.py`) is
+the one at the signed candidate commit and is hashed with the rest, so gold and every arm are converted and
+spoken by the same code. Neither the scorer, the converter nor the speech rules change after the first request.
 
 ## 5. Analysis and success criteria
 
