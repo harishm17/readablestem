@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: maths in table cells (branch eq/t10-table-cell-maths, on eq/t11-glyph-spans)
+
+- A table cell that is one formula by its glyphs (TeX-made PDFs; the rules that find inline maths in prose, applied to the
+  cell alone) is an inline equation element of the table (`layout._cell_maths`, `TableCell.equation_id`). The equation step
+  reads its crop with its checks and its place in the review, and the page writes the reading into the table's cell when
+  the table step wrote that cell as text (`pipeline/table_math.py`, `assemble.render_html`); a cell the model already
+  wrote as maths, a failed reading and a table kept as a picture are left as they are. With tables off, `run.py` drops
+  the cell equations. docs/tables.md "Maths cells from glyphs".
+- Measured offline (layout alone, no model): gold equations typed in a float found 661 to 892 of 2,153 over the five
+  development and replay parts; overall inline recall 0.731 to 0.759 on held-out and fresh2 to 4 (6,444 gold), precision
+  0.897 to 0.891 (one paper, `68.8±0.7`, holds most of the fall); 146 of 148 layout-identity PDFs identical, the two
+  that differ are TeX-made (the Beamer table deck gains 6 equation elements, `real-tables/2407.13734` 4; no text lost).
+- A cell and its equation are edited as one (`web.review._written_through`): LaTeX typed on the table card is written to the
+  equation with the same checks and an equation edit to the cell, as recorded changes of one write that Undo takes back
+  together; the card marks such a cell "(also an equation)". `tests/test_web_table_cell_equation.py`.
+- `scripts/eq_span_edges.py` also counts the cell equations (predicted, aligned to a gold equation).
+- Tests: `tests/test_table_math.py`; `tests/test_layout_beamer_math.py` (the table-cell test now asserts the equation
+  elements; the inline count of the table deck stays a strict xfail: its two cells with a number set in maths mode and a
+  text-font unit have no glyph that says they are maths).
+- Pipeline version 0.5.4 to 0.5.5: `TableCell.equation_id` is new (left out of the JSON when empty, so a record without it
+  is unchanged); results from 0.5.4 load unchanged.
+
 ## Unreleased: inline span edges from glyphs (branch eq/t11-glyph-spans)
 
 - Inline formulas of TeX-made PDFs start and end where the glyphs say (`pipeline/glyph_math.py`, docs/layout.md "Inline

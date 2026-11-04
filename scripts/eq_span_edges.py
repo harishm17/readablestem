@@ -87,6 +87,12 @@ def one(args: tuple[str, str]) -> dict:
     item = pe.document_page_item(f"arxiv/{paper}", records, lay.elements, {}, [], [])
     gold = {r["id"]: r for r in records}
     paired = {p["gold_id"]: p for p in item["pairs"]}
+    kinds = {e.id: e.kind for e in lay.elements}
+    cells = {
+        e.id
+        for e in lay.elements
+        if e.kind == "equation" and kinds.get(e.parent_id or "") == "table"
+    }
     rows = []
     for r in records:
         p = paired.get(r["id"])
@@ -104,6 +110,7 @@ def one(args: tuple[str, str]) -> dict:
             row["sim"] = p["text_similarity"]
             row["pred"] = p["pred_text"][:120]
             row["pred_display"] = p["pred_display"]
+            row["pred_cell"] = p["element_id"] in cells
             row["gold_sig"] = sig[:300]
             row["pred_sig"] = pred_sig[:300]
         rows.append(row)
@@ -113,6 +120,7 @@ def one(args: tuple[str, str]) -> dict:
             "display": u["pred_display"],
             "text": u["pred_text"][:80],
             "piece_of": u["piece_of"],
+            "cell": u["element_id"] in cells,
         }
         for u in item["unmatched"]
     ]
@@ -120,6 +128,7 @@ def one(args: tuple[str, str]) -> dict:
         "paper": paper,
         "rows": rows,
         "unmatched": unmatched,
+        "n_pred_cell": len(cells),
         "n_pred_inline": sum(e.display == "inline" for e in lay.elements if e.kind == "equation"),
         "gold_by_id": {g: gold[g].get("display") for g in gold},
     }
@@ -139,6 +148,8 @@ def summarise(papers: list[dict]) -> dict:
         by_len[key] = (sum(r["found"] for r in part), len(part))
     cells = [r for r in inline if r["in_float"]]
     unmatched = [u for p in papers for u in p["unmatched"] if u["display"] == "inline"]
+    cell_pred = sum(p.get("n_pred_cell", 0) for p in papers)
+    cell_found = sum(bool(r.get("pred_cell")) for r in found)
     pred_inline = sum(p["n_pred_inline"] for p in papers)
     return {
         "gold_inline": len(inline),
@@ -152,6 +163,8 @@ def summarise(papers: list[dict]) -> dict:
         "pred_inline_matched": len(found),
         "unmatched_by_reason": dict(Counter(u["reason"] for u in unmatched)),
         "exact_span": len(found) - len(wrong),
+        "cell_pred": cell_pred,
+        "cell_matched": cell_found,
     }
 
 
@@ -172,6 +185,11 @@ def show(label: str, s: dict) -> None:
         "{}/{}".format(*s["float_found"]),
     )
     print("  unaligned inline predictions by reason:", dict(s["unmatched_by_reason"]))
+    if s["cell_pred"]:
+        print(
+            f"  table-cell equations: {s['cell_pred']} predicted, {s['cell_matched']} aligned "
+            f"to a gold equation (precision {s['cell_matched'] / s['cell_pred']:.3f})"
+        )
 
 
 def main() -> int:

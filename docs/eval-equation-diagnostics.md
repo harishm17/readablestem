@@ -224,6 +224,41 @@ question; the gold's edges are the authors' `$`, and about a dozen of the 82 rem
 (`G = $6.6 \times 10^{-11}$`), which glyphs cannot tell from one formula; the nuclide rule (`^{20}\mathrm{Mg}` against
 `20Mg`) is a gold convention left as it is (about a dozen dev2 pairs).
 
+## Table-cell maths (T10, 2026-11-03)
+
+`scripts/eq_span_edges.py` also counts the equations layout now makes of table cells (docs/tables.md, "Maths cells from
+glyphs"): how many it predicts and how many align to a gold equation. Layout alone, no model; the cell equations are
+inline equation elements of the tables, aligned to the gold with every other equation. Gold typed in a float (a table,
+a figure or an algorithm: `in_float`) is the nearest the gold has to "typed in a table".
+
+| part | inline gold | recall (found) | gold in floats found | precision (predicted) | cell equations: predicted, aligned |
+|---|---|---|---|---|---|
+| dev2 (tuned on) | 2,153 | 0.810 to 0.839 (1,745 to 1,806) | 186 to 242 of 442 | 0.898 to 0.898 | 67, 62 (0.925) |
+| held-out | 1,739 | 0.780 to 0.818 (1,357 to 1,423) | 94 to 160 of 326 | 0.880 to 0.881 | 74, 67 (0.905) |
+| fresh2 | 1,555 | 0.752 to 0.785 (1,170 to 1,220) | 116 to 165 of 329 | 0.892 to 0.889 | 61, 54 (0.885) |
+| fresh3 | 1,637 | 0.725 to 0.751 (1,187 to 1,230) | 85 to 126 of 473 | 0.892 to 0.893 | 47, 43 (0.915) |
+| fresh4 | 1,513 | 0.660 to 0.675 (998 to 1,021) | 180 to 199 of 583 | 0.933 to 0.905 | 58, 25 (0.431) |
+| held-out and fresh2 to 4 (replay only) | 6,444 | 0.731 to 0.759 (4,712 to 4,894) | 475 to 650 of 1,711 | 0.897 to 0.891 (5,254 to 5,494) | 240, 189 (0.788) |
+
+Only dev2 was read to build the rule. Overall precision of the predicted inline equations falls on one part, fresh4
+(0.933 to 0.905), and the reason is one paper: 2309.04589 sets 39 results as `68.8±0.7`, whose gold types only the
+plus-or-minus sign (`68.8$\pm$0.7`), so each cell is a formula for a reader and none for the gold; they are 39 of the 49
+unaligned cell equations of that part (33 of 58 predictions here). The cells have real maths glyphs (the sign is in a maths font): the precision is
+against the gold's typing, not against what a reader needs. The other unaligned cell equations are a few per paper (a
+number with a star or a bracket: `6.09e-03⋆`, `Ca∗[-]`). A glyph now belongs to one cell and a cell is an equation only when its glyphs spell its own text (before: 73 cells on dev2, one
+with a glyph of its neighbour's `p<0.05` in `65.1±0.4p`).
+
+Layout identity, 148 PDFs of `scripts/layout_identity.py`, before and after, no model: two differ, both TeX-made and both
+because their tables gain cell equations (`beamer_columns_table.pdf`: 6 equation elements for 6 of the table's 8 maths cells;
+`real-tables/2407.13734.pdf`: 4 elements). The comparison was made against a snapshot of the previous change taken before
+its edge rules were gated on a TeX producer, so a third PDF (`real-tables-heldout/2311.16525.pdf`) showed up too: its producer
+is not one `page_type.producer_hint` calls TeX, so the gate returns it to the main-branch output. No element lost, the letters
+and digits of every page equal.
+
+Not measured here: whether the equation step reads these cells right (it needs a model: they go through the same step,
+checks and review as any inline equation), the cost (one model call per cell equation, at most 60 a table: the 307 cells
+of the five parts are about 3.6 a paper) and the effect on exact and spoken-equal scores.
+
 ## Limits
 
 - Counts describe the recorded runs with the code at the time they were made (D1's layout and D4's replay use the code in

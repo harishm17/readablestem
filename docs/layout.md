@@ -66,7 +66,11 @@ Element conventions:
    columns not text columns. This happens whatever `FEATURE_TABLES` says; with the flag
    off the table step keeps the table as an image with a required decision. A grid of
    prose (one column, or a term and its long definition) is not claimed and is read as
-   before.
+   before. In a TeX-made PDF a cell that is one formula by its glyphs (the rules that
+   find inline maths in prose, applied to the cell alone) is also an inline equation
+   element of the table, `TableCell.equation_id` naming it (`_cell_maths`,
+   [tables.md](tables.md) "Maths cells from glyphs"); `run.py` drops these when the flag
+   is off.
 1. **Characters.** PyMuPDF's raw text dictionary with `TEXT_ACCURATE_BBOXES`, so glyph boxes
    are tight. Without it, a fraction's numerator and denominator boxes overlap the main
    line and cannot be told apart. Ligatures are expanded.
