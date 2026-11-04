@@ -1079,3 +1079,7 @@ button[data-tone="quiet"]:hover { background: var(--surface); color: var(--ink);
 /* The data-flow diagram is drawn for white; it stays on white paper in dark mode. */
 .data-flow-figure { background: var(--paper); color: var(--paper-ink); padding: var(--space-4); border-radius: var(--radius-frame); border: 1px solid var(--border-subtle); }
 .data-flow-figure figcaption { color: #474c55; }
+
+/* Small controls on the review screen are at least 24px high. */
+.shortcuts > summary, .tech > summary { display: list-item; min-height: 1.5rem; padding: var(--space-1) 0; }
+.toggle-accepted { display: inline-flex; align-items: center; min-height: 1.5rem; }
