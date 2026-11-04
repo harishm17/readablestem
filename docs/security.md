@@ -267,6 +267,36 @@ never an address): a proxy is missing from the setting, or a client is forging t
 visitor share the platform's address. Launch-check runs from the repo and the settings, so it
 cannot see the live header; the log line is the only live check.
 
+### Running uploaded TeX (sandbox)
+
+A `.tex` file is a program, so a LaTeX upload (a later change; the switch is `FEATURE_LATEX_SOURCE`)
+runs LaTeXML only inside `core/sandbox.py`: bubblewrap with a minimal read-only root (no
+application, no `/home`, `/proc/1/environ` hidden), the project mounted read-only and one output
+folder writable, a new network namespace (no network), a new pid namespace that dies with the
+caller, an empty environment, a seccomp filter (`core/seccomp.py`: `ptrace`, `mount` and the new
+mount API, `unshare`, `setns`, `clone` with namespace flags, `keyctl`, `bpf`, `perf_event_open`,
+`userfaultfd`, `io_uring_*`, `kexec_*`, module loading, `process_vm_*` answer EPERM; `clone3` answers
+ENOSYS; x86-64 and arm64 only) and `prlimit` caps. **What is capped, exactly:** address space
+(512 MB for LaTeXML), CPU time (120 s), the size of any one file (50 MB) and open files (256) are
+limits **per process**. The sandbox joins its cgroup before it starts bubblewrap, so when the
+container delegates a cgroup v2 (the probe says `sandbox_cgroup=ok`) the memory limit (512 MB) and
+the pids limit hold for the whole tree. Without one, the total is bounded by arithmetic: at most 4
+tasks (LaTeXML needs 3, measured: the sandbox's init, `prlimit` becoming perl, perl; counted inside
+the sandbox's own user namespace on kernels from 5.14, else as this user's tasks now plus 4) times
+512 MB of address space each (a 29-page equation-heavy document needs between 256 and 384 MB), and
+one source conversion runs at a time on the machine (`sandbox.exclusive`, a file lock), so the
+bound is 4 x 512 MB = 2 GB for the whole server. `ops sandbox-probe` prints it as
+`sandbox_total_bound_mb` (the cgroup's limit, else tasks x address space) and, with
+`--require-latexml`, fails when it is over `SOURCE_SANDBOX_MAX_TOTAL_MB` (2048). **Residual:** address
+space is more than memory in use, so the bound is loose, and it can only be approached by code that
+runs inside LaTeXML's Perl first (a LaTeXML bug); the container's memory limit and the host's OOM
+killer are what is left behind it. The caller kills the group at a wall-clock limit
+(120 s) or when the output folders and the program's log pass 200 MB. If bubblewrap or user namespaces are not available the run is
+refused; there is no unsandboxed fallback (a plain child of the web process shares its user, so
+it could read the web process's files). Whether the platform allows it is checked on the deployed
+image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"); a FAIL there means
+LaTeX upload must stay off.
+
 ### Rotating the session secret
 
 `SESSION_SECRET` signs the session cookie. To change it without signing everyone out:
