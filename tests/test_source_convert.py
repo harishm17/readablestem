@@ -175,3 +175,19 @@ def test_a_project_that_is_not_latex_fails_with_a_plain_code():
     with pytest.raises(SourceFailed) as raised:
         convert_source(blob, settings=get_settings(), client=FakeVisionClient())
     assert raised.value.code in {"source_unreadable", "source_failed"}
+
+
+def test_a_second_conversion_waits_for_the_first_and_gives_up_as_a_timeout(monkeypatch, tmp_path):
+    from readablestem.core import sandbox
+    from readablestem.source import convert
+
+    monkeypatch.setattr(convert, "GATE_WAIT_S", 0.3)
+    # (the holder waits long: other test workers convert under the same lock)
+    with sandbox.exclusive(convert.GATE_NAME, 300), pytest.raises(convert.SourceFailed) as raised:
+        convert.run_latexml(tmp_path, "main.tex", tmp_path / "out")
+    assert raised.value.code == "timeout"
+
+
+def test_conversions_one_after_another_each_get_the_gate():
+    for _ in range(2):
+        assert convert("bib").stats.required_decisions == 0

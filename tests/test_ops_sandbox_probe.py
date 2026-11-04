@@ -101,3 +101,25 @@ def test_the_probe_reports_the_cgroup_and_the_filter(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert ("sandbox_cgroup=ok" in out) or ("sandbox_cgroup=unavailable" in out)
     assert ("sandbox_seccomp=ok" in out) == seccomp.supported()
+
+
+def test_a_total_bound_over_the_setting_fails_the_probe_when_latex_is_required(monkeypatch):
+    from readablestem.config import get_settings
+
+    monkeypatch.setenv("SOURCE_SANDBOX_MAX_TOTAL_MB", "1024")
+    get_settings.cache_clear()
+    try:
+        report = sandbox_probe.Report()
+        sandbox_probe._check_total_bound(report, cgroup=False)
+        lines = report.lines()
+        assert "sandbox_total_bound_mb=2048" in lines and "sandbox_total_bound=fail" in lines
+        assert report.passed  # information until LaTeX is required
+        for check in report.checks:
+            if check.name == "sandbox_total_bound":
+                check.required = True
+        assert not report.passed
+        cgroup_report = sandbox_probe.Report()
+        sandbox_probe._check_total_bound(cgroup_report, cgroup=True)
+        assert "sandbox_total_bound=ok" in cgroup_report.lines()  # 512 MB under a cgroup
+    finally:
+        get_settings.cache_clear()

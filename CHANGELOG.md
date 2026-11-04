@@ -38,6 +38,11 @@
   the kernel's seccomp mode, Landlock ABI and same-UID `/proc/<pid>/environ` readability, and
   prints PASS or FAIL (exit 1). Nothing it prints is document content. Docs: docs/operations.md,
   "Sandbox probe"; docs/security.md, "Running uploaded TeX".
+- The sandbox joins its cgroup before bubblewrap starts (a wrapper, not a move afterwards, so no child escapes it),
+  and without a cgroup the total is bounded by arithmetic: LaTeXML gets 4 tasks (it needs 3) and 512 MB of address
+  space each (`source.latexml.LIMITS`), one source conversion runs at a time on the machine (`sandbox.exclusive`),
+  and `ops sandbox-probe` prints `sandbox_total_bound_mb` and fails `--require-latexml` over
+  `SOURCE_SANDBOX_MAX_TOTAL_MB` (2048). The upload comment now assumes a 2 GB web service.
 - The sandbox also caps tasks and open files (`prlimit --nproc --nofile`), puts a seccomp filter in front of the
   program (`core/seccomp.py`, built without libseccomp), counts the program's own output against the output budget,
   and uses a cgroup v2 memory and pids limit for the whole group when the container allows one; the probe reports

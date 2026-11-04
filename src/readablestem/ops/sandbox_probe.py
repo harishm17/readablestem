@@ -236,6 +236,29 @@ def _check_limits(report: Report, tmp: Path) -> None:
     report.add("sandbox_cgroup", "ok" if group is not None else "unavailable", required=False)
     if group is not None:
         group.remove()
+    _check_total_bound(report, cgroup=group is not None)
+
+
+def total_bound_mb(*, cgroup: bool) -> int:
+    """What a source conversion may use in all, in MB: the cgroup's memory limit when there is a
+    cgroup, else the tasks it may have times the address space each may map (the worst case,
+    and a loose one: address space is more than memory in use)."""
+    from readablestem.source import latexml
+
+    limits = latexml.LIMITS
+    total = limits.memory_bytes if cgroup else limits.pids * limits.memory_bytes
+    return -(-total // (1024 * 1024))
+
+
+def _check_total_bound(report: Report, *, cgroup: bool) -> None:
+    """`sandbox_total_bound_mb`, checked against `SOURCE_SANDBOX_MAX_TOTAL_MB`
+    (`sandbox_total_bound` fails when it is over; only `--require-latexml` makes that fatal)."""
+    from readablestem.config import get_settings
+
+    bound = total_bound_mb(cgroup=cgroup)
+    report.add("sandbox_total_bound_mb", str(bound), required=False)
+    allowed = get_settings().source_sandbox_max_total_mb
+    report.add("sandbox_total_bound", "ok" if bound <= allowed else "fail", required=False)
 
 
 # ------------------------------------------------------------------------------- LaTeXML run
@@ -374,4 +397,8 @@ def probe(*, require_latexml: bool = False) -> Report:
         _information(report)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    if require_latexml:  # a total the settings do not allow is a failure when LaTeX is wanted
+        for check in report.checks:
+            if check.name == "sandbox_total_bound":
+                check.required = True
     return report

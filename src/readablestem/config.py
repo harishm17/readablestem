@@ -260,6 +260,10 @@ class Settings(BaseSettings):
     soffice_path: str | None = None
     # How long LibreOffice may take for one file, in seconds (it is killed after that).
     office_timeout_s: float = Field(default=90.0, gt=0, le=300)
+    # The most memory (MB) one source conversion may use in all, as `ops sandbox-probe` works it out
+    # (a cgroup's limit, else tasks x address space each, `source.latexml.LIMITS`); the probe fails
+    # with --require-latexml when it is more.
+    source_sandbox_max_total_mb: int = Field(default=2048, gt=0)
     # Uploads taken in at once per instance (one per user); see web/uploads.py.
     max_concurrent_uploads: int = Field(default=3, gt=0)
 

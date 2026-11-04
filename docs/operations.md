@@ -633,7 +633,7 @@ inside the sandbox `sandbox_env` (empty environment), `sandbox_no_secrets` (a va
 probe's own environment is absent), `sandbox_no_etc` (no `/etc/passwd`, `/app`, `/home`),
 `sandbox_pid1_environ` (empty), `sandbox_no_network`, `sandbox_output_writable`,
 `sandbox_root_readonly`; the caps `sandbox_memory_cap`, `sandbox_wall_cap`, `sandbox_output_cap`,
-`sandbox_task_cap`, `sandbox_file_cap`; `sandbox_seccomp` (the filter denies `ptrace` inside;
+`sandbox_task_cap`, `sandbox_file_cap`; `sandbox_total_bound_mb` (the cgroup's memory limit, else tasks x address space of `source.latexml.LIMITS`: 2048) and `sandbox_total_bound` (`fail` when it is over `SOURCE_SANDBOX_MAX_TOTAL_MB`, which fails the probe with `--require-latexml`); `sandbox_seccomp` (the filter denies `ptrace` inside;
 `unsupported` on a machine other than x86-64 and arm64, which does not fail the probe);
 and `latexml` (`ok` with `latexml_seconds`, or `missing` when the image was built without
 LaTeXML; `--require-latexml` turns `missing` into a failure). Information lines that never fail
