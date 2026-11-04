@@ -21,10 +21,17 @@ reading first repairs what the converter reads wrongly
 (`math_canonical.repair_converter_gaps`: `\\textbf` bold, sized delimiters). The folded reading
 only adds to the as-written one. The folds never join two different prints
 (`tests/test_math_canonical_spoken.py` holds pairs that must stay different).
+
+Two sides have no LaTeX to fold. OpenStax gold (strata B and D of fresh5) is MathML only: its
+speech is `mathml_to_speech` of the gold MathML, compared with the prediction as written. A
+prediction written as MathML (a chatbot that answers in `<math>`) is spoken from its MathML and
+compared with the gold as written. Neither side is folded then, so such a pair can only be
+credited when the two are said in the same words without `speakable_latex`.
 """
 
 from __future__ import annotations
 
+import re
 from functools import cache
 
 from readablestem.gold import arxiv_gold as ag
@@ -42,7 +49,26 @@ def _gold_speech(latex: str) -> str | None:
         return None
 
 
+_MATH_ELEMENT = re.compile(r"\s*<(?:[A-Za-z][\w.-]*:)?math\b", re.IGNORECASE)
+
+
+def _is_markup(pred: str) -> bool:
+    """A prediction written as a MathML element (`<math>...`, `<m:math>...`) rather than LaTeX
+    (`<x` is LaTeX: "less than x")."""
+    return _MATH_ELEMENT.match(pred) is not None
+
+
+@cache
+def _mathml_speech(mathml: str) -> str | None:
+    try:
+        return mathml_to_speech(mathml)
+    except Exception:  # markup the speech cannot read never matches
+        return None
+
+
 def _pred_speech(latex: str) -> str | None:
+    if _is_markup(latex):
+        return _mathml_speech(latex)
     try:
         return mathml_to_speech(
             validate.safe_latex_to_mathml(clean_latex(repair_converter_gaps(latex)), "inline")
@@ -72,19 +98,30 @@ def spoken_exact(pred_latex: str | None, gold_latex: str, registered: bool) -> b
     said = _pred_speech(pred_latex)
     if said is not None and said == _gold_speech(gold_latex):
         return True
+    if _is_markup(pred_latex):  # MathML has no LaTeX to fold
+        return False
     alike = _alike_speech(pred_latex)
     return alike is not None and alike == _gold_alike(gold_latex)
 
 
+def spoken_exact_mathml_gold(pred_latex: str | None, gold_mathml: str, registered: bool) -> bool:
+    """`spoken_exact` for gold that is MathML only (OpenStax): the prediction as written
+    against the gold's MathML spoken as it is, with no fold on either side."""
+    if registered or not pred_latex:
+        return registered
+    said = _pred_speech(pred_latex)
+    return said is not None and said == _mathml_speech(gold_mathml)
+
+
+def _right(pair: dict, gold: dict) -> bool:
+    if gold.get("latex"):
+        return spoken_exact(pair.get("pred_latex"), gold["latex"], pair["exact_lenient"])
+    return spoken_exact_mathml_gold(
+        pair.get("pred_latex"), gold.get("mathml") or "", pair["exact_lenient"]
+    )
+
+
 def refold(item: dict, gold: dict[str, dict]) -> dict:
     """The item with `exact_lenient` of each aligned pair read by what is spoken."""
-    pairs = [
-        p
-        | {
-            "exact_lenient": spoken_exact(
-                p.get("pred_latex"), gold[p["gold_id"]]["latex"], p["exact_lenient"]
-            )
-        }
-        for p in item["pairs"]
-    ]
+    pairs = [p | {"exact_lenient": _right(p, gold[p["gold_id"]])} for p in item["pairs"]]
     return item | {"pairs": pairs}
