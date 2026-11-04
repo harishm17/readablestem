@@ -41,11 +41,13 @@ from __future__ import annotations
 
 import ctypes
 import os
+import re
 import shutil
 import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -203,6 +205,29 @@ def _check_sandbox(report: Report, tmp: Path) -> bool:
     return True
 
 
+def _task_growth_killed(tmp: Path) -> bool:
+    """120 threads of this process exist while the sandbox works out its task limit and are gone a
+    second later; the program then tries to make 60 children. It must be killed for having more
+    tasks than its allowance (`Outcome.over_tasks`), however much room the limit then gives."""
+    release = threading.Event()
+    waiters = [threading.Thread(target=release.wait, daemon=True) for _ in range(120)]
+    for thread in waiters:
+        thread.start()
+    dropper = threading.Timer(1.0, release.set)
+    dropper.start()
+    try:
+        outcome, _ = _perl(
+            "sleep 2; my $n = 0; for (1..60) { my $p = fork(); last unless defined $p;"
+            " if ($p == 0) { sleep 5; exit 0 } $n++ } sleep 3;",
+            tmp=tmp,
+            limits=sandbox.Limits(wall_s=20, pids=4),
+        )
+    finally:
+        release.set()
+        dropper.cancel()
+    return outcome.over_tasks
+
+
 def _check_limits(report: Report, tmp: Path) -> None:
     # Memory: ask for 300 MB under a 128 MB address-space cap; Perl must fail to allocate.
     outcome, text = _perl(
@@ -256,15 +281,25 @@ def _check_limits(report: Report, tmp: Path) -> None:
     )
     # Memory of the group together: three processes that each hold 100 MB under a group cap of
     # 150 MB are killed (the poll in `sandbox.run`, which bounds the sum where no cgroup does).
-    outcome, _ = _perl(
-        "my @k; for (1..3) { my $p = fork(); next unless defined $p; if ($p == 0) "
-        '{ my $x = "a" x 100_000_000; sleep 20; exit 0 } push @k, $p } sleep 20;',
+    outcome, text = _perl(
+        "$| = 1; my $n = 0; for (1..3) { my $p = fork(); next unless defined $p; $n++;"
+        ' if ($p == 0) { my $x = "a" x 100_000_000; sleep 20; exit 0 } }'
+        ' print "forked:$n\\n"; sleep 20;',
         tmp=tmp,
         limits=sandbox.Limits(
             wall_s=20, memory_bytes=300_000_000, pids=8, group_memory_bytes=150_000_000
         ),
     )
     report.add("sandbox_group_memory_cap", "ok" if outcome.over_memory else "fail")
+    if not outcome.over_memory:  # why: how many of the three tasks could be made, and the end
+        forked = text.split("forked:")[1].split()[0] if "forked:" in text else "unknown"
+        report.add("group_cap_forked", forked if forked.isdigit() else "unknown", required=False)
+        report.add("group_cap_exit", str(outcome.returncode), required=False)
+        report.add("group_cap_timed_out", "yes" if outcome.timed_out else "no", required=False)
+    # Growth of the program's tree after other tasks of the user have gone: the limit was worked
+    # out while they existed, and now gives room it was never meant to (Landlock backend).
+    if sandbox.backend() == "landlock":
+        report.add("sandbox_task_growth", "ok" if _task_growth_killed(tmp) else "fail")
     # seccomp: ptrace answers EPERM inside (the filter, `core/seccomp.py`).
     if seccomp.supported():
         _outcome, text = _perl(
@@ -326,6 +361,23 @@ def _check_total_bound(report: Report, *, cgroup: bool) -> None:
 # ------------------------------------------------------------------------------- LaTeXML run
 
 
+LOG_TAIL_CHARS = 240
+
+
+def _log_tail(path: Path) -> str:
+    """The end of LaTeXML's own output for the probe's fixed fixture, made safe to print: paths
+    removed, only plain characters kept, whitespace collapsed, a fixed size. (It is the probe's
+    document, never a user's.)"""
+    try:
+        raw = path.read_bytes()[-2000:].decode("ascii", "replace")
+    except OSError:
+        return "none"
+    raw = re.sub(r"/[\w./+-]*", "<path>", raw)
+    raw = re.sub(r"[^A-Za-z0-9 .,:;()=<>_-]+", " ", raw)
+    text = " ".join(raw.split())[-LOG_TAIL_CHARS:].strip()
+    return text.replace(" ", "_") or "empty"
+
+
 def _check_latexml(report: Report, tmp: Path, *, require: bool) -> None:
     from readablestem.source import latexml  # imported late: the module is part of the source path
 
@@ -343,6 +395,16 @@ def _check_latexml(report: Report, tmp: Path, *, require: bool) -> None:
     good = result.ok and html.is_file() and "<math" in html.read_text(errors="replace")
     report.add("latexml", "ok" if good else "fail")
     report.add("latexml_seconds", f"{elapsed:.1f}", required=False)
+    if not good:  # where it stopped, and the end of what LaTeXML said about the probe's own file
+        xml = out / latexml.XML_PATH
+        step = (
+            "latexml" if not xml.is_file() else ("latexmlpost" if not html.is_file() else "check")
+        )
+        report.add("latexml_step", step, required=False)
+        report.add("latexml_exit", str(result.returncode), required=False)
+        report.add("latexml_timed_out", "yes" if result.timed_out else "no", required=False)
+        log = out / ("post.out" if step != "latexml" else "latexml.out")
+        report.add("latexml_log", _log_tail(log), required=False)
 
 
 # ------------------------------------------------------------------------------- information

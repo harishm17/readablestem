@@ -178,6 +178,9 @@ class Outcome:
     timed_out: bool = False
     over_quota: bool = False
     over_memory: bool = False
+    # The program's tree grew past `Limits.task_bound` (the other tasks of the user that made room
+    # for the RLIMIT_NPROC limit left): killed by the supervisor or by the poll.
+    over_tasks: bool = False
     # The program could not fork or start because the machine had no room for more tasks
     # (the user's task count was at the limit): not the document's fault, try again.
     busy: bool = False
@@ -193,6 +196,7 @@ class Outcome:
             and not self.timed_out
             and not self.over_quota
             and not self.over_memory
+            and not self.over_tasks
         )
 
 
@@ -411,6 +415,15 @@ def process_tree(root: int) -> tuple[set[int], int]:
 def group_rss_bytes(root: int) -> int:
     """Resident memory, in bytes, of `root` and every descendant of it."""
     return process_tree(root)[1]
+
+
+def _tree_tasks(pids: set[int]) -> int:
+    """Tasks (threads count) of these processes, from /proc."""
+    total = 0
+    for pid in pids:
+        with contextlib.suppress(OSError):
+            total += len(os.listdir(f"/proc/{pid}/task"))
+    return total
 
 
 def deleted_open_bytes(pids: set[int]) -> int:
@@ -711,6 +724,7 @@ def _run(
                 return Outcome(
                     proc.returncode,
                     busy=bool(proc.returncode) and marker is not None and marker.exists(),
+                    over_tasks=step == "over_tasks",
                     step=step,
                     step_errno=step_errno,
                 )
@@ -727,7 +741,10 @@ def _run(
             )
             over = written > limits.out_bytes or entries > limits.max_entries
             heavy = bool(limits.group_memory_bytes) and resident > limits.group_memory_bytes
-            if timed_out or over or heavy:
+            # (The supervisor checks this too, faster; this is the backstop. Its own task is not the
+            # program's.)
+            grown = landlock and _tree_tasks(tree - {proc.pid}) > limits.task_bound("landlock")
+            if timed_out or over or heavy or grown:
                 if landlock:
                     # The supervisor first: it kills what the program started and reaps it
                     # (nothing is left as a zombie for pid 1), then ends. The group kill below
@@ -739,7 +756,9 @@ def _run(
                 with contextlib.suppress(ProcessLookupError):
                     os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait()
-                return Outcome(-9, timed_out=timed_out, over_quota=over, over_memory=heavy)
+                return Outcome(
+                    -9, timed_out=timed_out, over_quota=over, over_memory=heavy, over_tasks=grown
+                )
     finally:
         if landlock:
             # No pid namespace to end with the program: whatever it left in its group (it cannot

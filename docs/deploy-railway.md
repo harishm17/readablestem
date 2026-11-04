@@ -525,6 +525,19 @@ Railway. What the probe found there:
   `/healthz/ops` (`sandbox.checks`) shows the ENTRYPOINT is in force; any other name means the
   app is pid 1 again. In the container reproduction below, the cleanup probe leaves one zombie
   with the app as pid 1 and none with an init (`podman run --init`).
+- **The task limit must be the kernel's count, not `/proc`'s** (found after #153 was deployed).
+  With the launcher running, the probe passed every isolation check but failed
+  `sandbox_group_memory_cap` (its three tasks could not be made) and `latexml` (120 s, the wall
+  clock): the launcher worked out `RLIMIT_NPROC` as the user's tasks visible in `/proc` plus the
+  allowance, but the kernel counts every task of uid 10001 in the user namespace, including ones
+  this container's `/proc` does not show, so the limit was below the real count, every fork
+  failed, and LaTeXML (which forks for `kpsewhich`'s stand-in) waited and retried. The launcher
+  now asks the kernel (`landlock_exec.fork_fits`, `count_tasks`). Reproduced locally with 400 tasks
+  of the same user in another pid namespace of one container (`tests/test_sandbox_steps.py`,
+  `test_a_program_can_fork_and_latexml_converts_when_most_of_the_users_tasks_are_hidden`), also with
+  `--cpus=0.5`. A failed probe now also prints `latexml_step=`, `latexml_exit=`,
+  `latexml_timed_out=` and `latexml_log=` (the end of LaTeXML's own output for the probe's fixed
+  document, paths removed), and `group_cap_forked=`, `group_cap_exit=`, `group_cap_timed_out=`.
 - **When LaTeX source is switched on.** `FEATURE_LATEX_SOURCE` takes effect only after the web
   process's start-up probe reports PASS (`/healthz/ops`, `sandbox.result`); the flag stays off
   until a deploy shows PASS there. `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` stay off even

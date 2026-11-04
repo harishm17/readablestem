@@ -380,11 +380,28 @@ What the two layers cover:
   a document that prints "Resource temporarily unavailable", or a program that hits its own task
   limit, is an ordinary failure.
 - **Limits.** `RLIMIT_AS` 512 MB per task, CPU, file size, no core, 256 files, and `RLIMIT_NPROC`
-  set to the user's tasks at that moment plus 2 (what LaTeXML needs: one task, the program,
+  set to the user's tasks at that moment (**as the kernel counts them**: the launcher finds the
+  count by asking `fork_fits`, a search for the smallest limit under which a throwaway child's
+  fork works, because the kernel counts every task of the user in the user namespace, including
+  ones this container's `/proc` does not show; reading `/proc` undercounted on Railway and made
+  every fork fail, see docs/deploy-railway.md) plus 2 (what LaTeXML needs: one task, the program,
   measured on every fixture: peak 2 with the supervisor) plus 2 of slack, because the web app's
   own threads come and go meanwhile and the limit counts them. One conversion at a time (the
   `flock`); the caller kills the whole group at the wall-clock limit, the output budget or the
   entry cap.
+- **The program's own task count is bounded by the supervisor, not by the limit.** `RLIMIT_NPROC`
+  is worked out from the user's tasks when the program starts; if other tasks of the user exit
+  afterwards, the limit gives room the program was never meant to have (a program waiting for that
+  made 411 children). The supervisor therefore checks the program's tree every 0.05 s and, over
+  the allowance (`Limits.task_bound`), writes the step `over_tasks`, kills and reaps the tree and
+  ends; the caller's poll (0.1 s) checks the same as a backstop (`Outcome.over_tasks`). The probe
+  checks it (`sandbox_task_growth`: 120 threads exist while the limit is worked out and go a
+  second later, then the program tries 60 children). So the task count that `sandbox_total_bound_mb`
+  assumes holds after the next check, not within it: in the 0.05 s before the supervisor looks, a
+  program that has been waiting for that room can make as many tasks as the room allows (the
+  review's probe: 411), each limited to 512 MB of address space and, together, to the group memory
+  poll's 768 MB; they are killed and reaped at the check. This is a residual of the Landlock
+  backend (a cgroup's `pids.max` has no such window).
 - **Worst case for memory, without a cgroup.** At most 4 tasks (`Limits.task_bound`) times 512 MB
   of address space is 2048 MB, which is what `ops sandbox-probe` prints as
   `sandbox_total_bound_mb` and, with `--require-latexml`, **fails on** when it is over

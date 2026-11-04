@@ -135,20 +135,62 @@ def fail(code: str, number: int = 0) -> None:
     os._exit(125)
 
 
-def own_tasks(uid: int, proc: str = "/proc") -> int:
-    """Tasks of this user right now (RLIMIT_NPROC compares with every task of the user)."""
-    total = 0
+def nproc_ceiling() -> int:
+    """The most `RLIMIT_NPROC` can be set to by this process: its hard limit (a limit above it is
+    refused), or a very large number when the hard limit is unlimited."""
+    hard = resource.getrlimit(resource.RLIMIT_NPROC)[1]
+    return 1 << 22 if hard == resource.RLIM_INFINITY else min(hard, 1 << 22)
+
+
+def fork_fits(limit: int) -> bool:
+    """Whether a task can still be made under `RLIMIT_NPROC` = `limit`: a throwaway child lowers
+    its own limit and forks once; success means the kernel's count of this user's tasks, with that
+    child, is below `limit`. The kernel counts every task of the user (in this user namespace),
+    including ones this container's `/proc` does not show (another pid namespace, another
+    container of the same user), so the count is asked of the kernel, not read from `/proc`."""
     try:
-        for name in os.listdir(proc):
-            if name.isdigit():
-                try:
-                    if os.stat(f"{proc}/{name}").st_uid == uid:
-                        total += len(os.listdir(f"{proc}/{name}/task"))
-                except OSError:
-                    pass
+        pid = os.fork()
     except OSError:
-        pass
-    return total
+        return False
+    if pid == 0:
+        status = 2
+        try:
+            soft = min(limit, nproc_ceiling())
+            resource.setrlimit(
+                resource.RLIMIT_NPROC, (soft, resource.getrlimit(resource.RLIMIT_NPROC)[1])
+            )
+            grandchild = os.fork()
+            if grandchild == 0:
+                os._exit(0)
+            os.waitpid(grandchild, 0)
+            status = 0
+        except OSError:
+            status = 1
+        os._exit(status)
+    _, wait_status = os.waitpid(pid, 0)
+    return os.WIFEXITED(wait_status) and os.WEXITSTATUS(wait_status) == 0
+
+
+def count_tasks() -> int | None:
+    """The kernel's count of this user's tasks now, this process included, found by asking
+    `fork_fits` (a search: the smallest limit under which a fork works); None when no fork works
+    at all. A fork under limit L works when the count before it, with the asking child, is below
+    L, so the count is that smallest L minus 2."""
+    ceiling = nproc_ceiling()
+    high = min(64, ceiling)
+    low = 0  # (a limit of 0 never fits)
+    while not fork_fits(high):
+        if high >= ceiling:
+            return None
+        low = high  # known not to fit
+        high = min(high * 2, ceiling)
+    while high - low > 1:
+        middle = (low + high) // 2
+        if fork_fits(middle):
+            high = middle
+        else:
+            low = middle
+    return max(high - 2, 1)
 
 
 def program_tasks(root: int) -> int:
@@ -258,6 +300,7 @@ def confine_and_exec(libc, spec: dict, tasks: int, supervisor: int) -> None:
             except (OSError, ValueError) as exc:
                 fail(f"prlimit_{name}", getattr(exc, "errno", 0) or errno.EINVAL)
     try:
+        tasks = min(tasks, nproc_ceiling())  # (never above the hard limit: that would be refused)
         resource.setrlimit(resource.RLIMIT_NPROC, (tasks, tasks))
     except (OSError, ValueError) as exc:
         fail("prlimit_nproc", getattr(exc, "errno", 0) or errno.EINVAL)
@@ -352,15 +395,16 @@ def main() -> None:
         os._exit(143)
 
     signal.signal(signal.SIGTERM, on_term)
-    # Counted now: after the ruleset /proc is no longer readable. This process becomes nothing;
+    # Counted now, by the kernel's own answer. This process becomes nothing;
     # the program is the child, one of the allowance, so the program may have `pids` tasks (plus
     # slack for the user's other threads starting meanwhile) beside this supervisor.
     limits = spec["limits"]
     # `nproc_adjust` is only ever negative (a test makes the limit one the user is already
     # over, to see a fork refused for lack of room without filling the machine).
-    counted = own_tasks(os.getuid(), spec.get("proc_root", "/proc"))  # (the root is a test's)
-    if counted == 0:  # /proc is not readable: the limit cannot be worked out
+    counted = count_tasks()
+    if counted is None:  # no task can be made at all: the limit cannot be worked out
         fail("count_tasks")
+    assert counted is not None
     tasks = counted + limits["pids"] + limits.get("slack", 0)
     tasks += min(0, limits.get("nproc_adjust", 0))
     supervisor = os.getpid()  # the child's parent, named here: the child cannot ask itself
@@ -393,13 +437,22 @@ def main() -> None:
             break
         if os.getppid() != parent:  # the caller (the process, not a thread of it) is gone
             on_term(0, None)
+        if program_tasks(os.getpid()) > allowance:
+            # More tasks than the allowance: the user's other tasks left after the limit was
+            # worked out and RLIMIT_NPROC now gives room it was never meant to. The program's
+            # tree is bounded here, whatever the user's other tasks do.
+            if step_file:
+                with contextlib.suppress(OSError), open(step_file, "w") as handle:
+                    handle.write("over_tasks")
+            on_term(0, None)
         now = time.monotonic()
         if marker and not starved and now - last_look > 0.25:
             # The machine is "busy" when the user's tasks are at the limit while the program has
             # not used its own allowance: what filled the room is not the program. This is the
             # launcher's own observation, never the program's output.
             last_look = now
-            if own_tasks(os.getuid()) >= tasks and program_tasks(os.getpid()) < allowance:
+            # (+1: the question's own child counts, the program's fork would not.)
+            if not fork_fits(tasks + 1) and program_tasks(os.getpid()) < allowance:
                 starved = True
         time.sleep(0.05)
     if subreaper:

@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: the Landlock launcher counts the user's tasks as the kernel does (branch latex/nproc-hidden-tasks)
+
+- The program's task count is bounded by the supervisor's check (every 0.05 s) and the caller's
+  poll, not only by `RLIMIT_NPROC`, which gives room when other tasks of the user exit after it was
+  worked out: over the allowance the tree is killed (`over_tasks`); the probe checks it
+  (`sandbox_task_growth`).
+- Fixed: on Railway the launcher set `RLIMIT_NPROC` from the tasks visible in `/proc`, below
+  the kernel's count of the user's tasks (some are in other pid namespaces), so every fork
+  failed and the probe's LaTeXML run timed out and its group-memory test never started. The
+  count is now asked of the kernel (`fork_fits` search), the busy check uses the same question,
+  and the limit is never set above the hard limit. A failed probe prints LaTeXML's step, exit,
+  whether it timed out, the sanitised end of its own output for the probe's fixture, and why the
+  group-memory test did not run. No change to what the sandbox allows.
+
 ## Unreleased: the Landlock launcher starts where the web process is pid 1 (branch latex/launcher-railway)
 
 - The image's ENTRYPOINT is now `tini`, so the web app is no longer pid 1 and the orphans and
