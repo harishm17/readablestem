@@ -36,6 +36,7 @@ import ctypes
 import errno
 import json
 import os
+import re
 import resource
 import signal
 import struct
@@ -109,8 +110,27 @@ def fs_rights(abi: int) -> int:
     return mask
 
 
-def fail(reason: str) -> None:
-    sys.stderr.write(f"landlock_exec: {reason}\n")
+# Where a failing setup step is reported: the write end of a pipe the supervisor made, which is
+# close-on-exec, so the program never has it and cannot write to it. The supervisor reads it and
+# makes the step file. Fixed codes only, never free text.
+REPORT: dict = {"fd": -1, "file": ""}
+
+
+def errno_name(number: int) -> str:
+    return errno.errorcode.get(number, "EUNKNOWN") if number else ""
+
+
+def fail(code: str, number: int = 0) -> None:
+    """End with status 125, reporting which step failed (`code`, one of the fixed codes of
+    docs/security.md "Landlock backend", and the errno's name)."""
+    line = f"{code} {errno_name(number)}".strip()
+    if REPORT["fd"] >= 0:  # the child: through the pipe the supervisor reads
+        with contextlib.suppress(OSError):
+            os.write(REPORT["fd"], line.encode() + b"\n")
+    elif REPORT["file"]:  # the supervisor itself
+        with contextlib.suppress(OSError), open(REPORT["file"], "w") as handle:
+            handle.write(line)
+    sys.stderr.write(f"landlock_exec: {line}\n")
     sys.stderr.flush()
     os._exit(125)
 
@@ -163,7 +183,7 @@ def program_tasks(root: int) -> int:
 def restrict(libc, spec: dict) -> None:
     abi = abi_version(libc)
     if abi < spec["min_abi"]:
-        fail(f"landlock ABI {abi} is below the {spec['min_abi']} needed")
+        fail("abi_below_min")
     handled = fs_rights(abi)
     net = (NET_BIND_TCP | NET_CONNECT_TCP) if abi >= 4 else 0
     scoped = (SCOPE_ABSTRACT_UNIX | SCOPE_SIGNAL) if abi >= 6 else 0
@@ -171,15 +191,15 @@ def restrict(libc, spec: dict) -> None:
     attr = struct.pack("=QQQ", handled, net, scoped)[:size]
     ruleset = libc.syscall(SYS_CREATE, attr, size, 0)
     if ruleset < 0:
-        fail(f"landlock_create_ruleset: errno {ctypes.get_errno()}")
+        fail("landlock_create_ruleset", ctypes.get_errno())
     grants = (
-        (spec.get("exec", []), READ_EXEC),
-        (spec.get("read", []), READ),
-        (spec.get("write", []), READ | WRITE_ALL),
-        (spec.get("files_rw", []), READ_FILE | WRITE_FILE | TRUNCATE | IOCTL_DEV),
-        (spec.get("files_read", []), READ_FILE | IOCTL_DEV),
+        ("exec", spec.get("exec", []), READ_EXEC),
+        ("read", spec.get("read", []), READ),
+        ("write", spec.get("write", []), READ | WRITE_ALL),
+        ("files_rw", spec.get("files_rw", []), READ_FILE | WRITE_FILE | TRUNCATE | IOCTL_DEV),
+        ("files_read", spec.get("files_read", []), READ_FILE | IOCTL_DEV),
     )
-    for paths, rights in grants:
+    for kind, paths, rights in grants:
         for path in paths:
             try:
                 fd = os.open(path, os.O_PATH | os.O_CLOEXEC)
@@ -193,13 +213,13 @@ def restrict(libc, spec: dict) -> None:
                     continue
                 rule = struct.pack("=Qi", allowed, fd)  # a packed struct: 12 bytes
                 if libc.syscall(SYS_ADD, ruleset, RULE_PATH_BENEATH, rule, 0) != 0:
-                    fail(f"landlock_add_rule {path}: errno {ctypes.get_errno()}")
+                    fail(f"landlock_add_rule:{kind}", ctypes.get_errno())
             finally:
                 os.close(fd)
     if libc.prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0:
-        fail("no_new_privs")
+        fail("no_new_privs", ctypes.get_errno())
     if libc.syscall(SYS_RESTRICT, ruleset, 0) != 0:
-        fail(f"landlock_restrict_self: errno {ctypes.get_errno()}")
+        fail("landlock_restrict_self", ctypes.get_errno())
     os.close(ruleset)
 
 
@@ -215,7 +235,7 @@ def install_seccomp(libc, program: bytes) -> None:
         )
         != 0
     ):
-        fail(f"seccomp: errno {ctypes.get_errno()}")
+        fail("seccomp_install", ctypes.get_errno())
 
 
 PR_SET_PDEATHSIG = 1
@@ -231,14 +251,20 @@ def confine_and_exec(libc, spec: dict, tasks: int) -> None:
     if spec.get("seccomp"):
         install_seccomp(libc, base64.b64decode(spec["seccomp"]))
     limits = spec["limits"]
-    try:
-        for name, which in LIMITS.items():
-            if name in limits:
+    for name, which in LIMITS.items():
+        if name in limits:
+            try:
                 resource.setrlimit(which, (limits[name], limits[name]))
+            except (OSError, ValueError) as exc:
+                fail(f"prlimit_{name}", getattr(exc, "errno", 0) or errno.EINVAL)
+    try:
         resource.setrlimit(resource.RLIMIT_NPROC, (tasks, tasks))
+    except (OSError, ValueError) as exc:
+        fail("prlimit_nproc", getattr(exc, "errno", 0) or errno.EINVAL)
+    try:
         os.execve(spec["cmd"][0], spec["cmd"], spec["env"])
     except OSError as exc:
-        fail(f"exec: errno {exc.errno}")
+        fail("exec", exc.errno or 0)
 
 
 def kill_descendants() -> None:
@@ -277,11 +303,14 @@ def main() -> None:
     whatever it left behind is killed before this process reports the program's exit status."""
     spec = json.loads(sys.argv[1])
     libc = ctypes.CDLL(None, use_errno=True)
+    step_file = spec.get("step_file", "")
+    REPORT["file"] = step_file
     try:
         os.chdir(spec.get("cwd", "/"))
         os.closerange(3, 1 << 16)
     except OSError as exc:
-        fail(f"chdir: errno {exc.errno}")
+        fail("chdir", exc.errno or 0)
+    report_read, report_write = os.pipe()  # close-on-exec: the program never has either end
     # The caller is watched by its pid (below), not by PR_SET_PDEATHSIG, which fires when the
     # *thread* that started this process exits, even while the caller lives.
     parent = os.getppid()
@@ -297,7 +326,10 @@ def main() -> None:
     # the program is the child, one of the allowance, so the program may have `pids` tasks (plus
     # slack for the user's other threads starting meanwhile) beside this supervisor.
     limits = spec["limits"]
+    # `nproc_adjust` is only ever negative (a test makes the limit one the user is already
+    # over, to see a fork refused for lack of room without filling the machine).
     tasks = own_tasks(os.getuid()) + limits["pids"] + limits.get("slack", 0)
+    tasks += min(0, limits.get("nproc_adjust", 0))
     marker = spec.get("busy_marker", "")
     allowance = limits["pids"] + limits.get("slack", 0)
     starved = False
@@ -307,11 +339,14 @@ def main() -> None:
     except OSError as exc:  # no room for the program at all
         if marker and exc.errno == errno.EAGAIN:
             open(marker, "w").close()
-        os._exit(125)
+        fail("fork", exc.errno or 0)
     if child == 0:
+        os.close(report_read)
+        REPORT["fd"] = report_write
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
         confine_and_exec(libc, spec, tasks)
         os._exit(125)
+    os.close(report_write)
     status = 0
     while True:
         try:
@@ -334,6 +369,15 @@ def main() -> None:
                 starved = True
         time.sleep(0.05)
     kill_descendants()
+    if step_file:
+        # What the child reported before it became the program: read after it has ended, so
+        # the pipe is at its end. Only a code of the fixed shape is passed on.
+        with contextlib.suppress(OSError):
+            os.set_blocking(report_read, False)
+            reported = os.read(report_read, 200).decode("ascii", "replace").strip()
+            if re.fullmatch(r"[a-z_]+(:[a-z_]+)? ?(E[A-Z0-9]+)?", reported):
+                with open(step_file, "w") as handle:
+                    handle.write(reported)
     if marker and starved and status != 0:
         with contextlib.suppress(OSError):
             open(marker, "w").close()

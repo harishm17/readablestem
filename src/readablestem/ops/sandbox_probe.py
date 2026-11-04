@@ -165,6 +165,7 @@ def _check_sandbox(report: Report, tmp: Path) -> bool:
     report.add("landlock_abi", str(abi) if abi else "unavailable", required=False)
     name = sandbox.backend()
     report.add("backend", name or "none", required=False)
+    _landlock_step(report, name)
     if name is None:  # neither bubblewrap nor Landlock can start here
         report.add("sandbox_start", "fail")
         return False
@@ -415,7 +416,109 @@ def _plain_child_can_unshare_net() -> str:
     return "yes" if run.returncode == 0 else "no"
 
 
+def _landlock_step(report: Report, name: str | None) -> None:
+    """Why the Landlock backend does not start, when it does not: the step the launcher named (a
+    fixed code, `sandbox.backend_failure`), the errno's name and the launcher's exit status."""
+    failure = sandbox.backend_failure("landlock")
+    if name == "landlock":
+        report.add("landlock_step", "ok", required=False)
+    elif failure is None:
+        report.add("landlock_step", "not_tried", required=False)
+    else:
+        step, errno_name, status = failure
+        report.add("landlock_step", step, required=False)
+        if errno_name:
+            report.add("landlock_errno", errno_name, required=False)
+        report.add("landlock_exit", str(status), required=False)
+
+
+# Each runs once in a throwaway child (the children inherit this container's own seccomp filter, so
+# the answer is what the launcher would meet): the system calls the Landlock launcher needs.
+_CAN_CHILD = r"""
+import ctypes, errno, platform, struct, sys
+libc = ctypes.CDLL(None, use_errno=True)
+arm = platform.machine() != "x86_64"
+SECCOMP, PRLIMIT = (277, 261) if arm else (317, 302)
+what = sys.argv[1]
+def result(rc):
+    print("yes" if rc >= 0 else "no " + errno.errorcode.get(ctypes.get_errno(), "EUNKNOWN"))
+def nnp():
+    return libc.prctl(38, 1, 0, 0, 0)
+def filt():
+    f = struct.pack("=HBBI", 0x06, 0, 0, 0x7FFF0000)  # return ALLOW
+    buf = ctypes.create_string_buffer(f, len(f))
+    prog = struct.pack("=HxxxxxxQ", 1, ctypes.addressof(buf))
+    return ctypes.create_string_buffer(prog, len(prog)), buf
+if what == "landlock_create_ruleset":
+    result(libc.syscall(444, None, 0, 1))
+elif what == "no_new_privs":
+    result(nnp())
+elif what == "landlock_restrict_self":
+    attr = struct.pack("=Q", 1)  # handles EXECUTE; no rule: an empty ruleset
+    fd = libc.syscall(444, attr, 8, 0)
+    if fd < 0:
+        result(fd)
+    elif nnp() < 0:
+        result(-1)
+    else:
+        result(libc.syscall(446, fd, 0))
+elif what == "seccomp_syscall":
+    nnp()
+    holder, buf = filt()
+    result(libc.syscall(SECCOMP, 1, 0, ctypes.c_void_p(ctypes.addressof(holder))))
+elif what == "seccomp_prctl":
+    nnp()
+    holder, buf = filt()
+    result(libc.prctl(22, 2, ctypes.c_void_p(ctypes.addressof(holder)), 0, 0))
+elif what == "prlimit_self":
+    cur = ctypes.create_string_buffer(16)
+    if libc.syscall(PRLIMIT, 0, 4, None, cur) < 0:
+        result(-1)
+    else:
+        result(libc.syscall(PRLIMIT, 0, 4, cur, None))
+"""
+_CAN = (
+    "landlock_create_ruleset",
+    "landlock_restrict_self",
+    "no_new_privs",
+    "seccomp_syscall",
+    "seccomp_prctl",
+    "prlimit_self",
+)
+
+
+def can_do(name: str) -> tuple[bool, str]:
+    """Whether the system call behind `name` works here, tried once in a child of its own:
+    (answer, errno's name when not)."""
+    try:
+        run = subprocess.run(
+            [sys.executable, "-I", "-S", "-c", _CAN_CHILD, name],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            stdin=subprocess.DEVNULL,
+            env={"PATH": "/usr/bin:/bin"},
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False, "ESTART"
+    answer = run.stdout.strip()
+    if answer == "yes":
+        return True, ""
+    if answer.startswith("no E") and answer[3:].replace(" ", "").isalnum():
+        return False, answer[3:].strip()
+    return False, "EFAILED"
+
+
+def _can_checks(report: Report) -> None:
+    for name in _CAN:
+        ok, errno_name = can_do(name)
+        report.add(f"can_{name}", "yes" if ok else "no", required=False)
+        if not ok:
+            report.add(f"can_{name}_errno", errno_name, required=False)
+
+
 def _information(report: Report) -> None:
+    _can_checks(report)
     report.add("seccomp_mode", seccomp_mode(), required=False)
     report.add("user", f"uid-{os.getuid()}", required=False)
     report.add("pid1_environ_readable", "yes" if _can_read_pid1() else "no", required=False)

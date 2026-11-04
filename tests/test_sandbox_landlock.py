@@ -96,7 +96,7 @@ def test_the_launcher_refuses_to_run_half_confined(tmp_path):
         text=True,
         stdin=subprocess.DEVNULL,
     )
-    assert done.returncode == 125 and "ABI" in done.stderr and spec_abi
+    assert done.returncode == 125 and "abi_below_min" in done.stderr and spec_abi
     assert not (out / "ran").exists()
 
 
@@ -772,33 +772,42 @@ def test_a_document_that_prints_the_busy_text_is_a_normal_conversion_failure(mon
     assert caught.value.code in {"source_unreadable", "source_failed"}  # never source_busy
 
 
-def test_a_machine_with_no_room_for_the_programs_tasks_is_busy(tmp_path):
-    """Other tasks of the user fill the limit while the program has used none of its allowance:
-    its fork fails and the launcher says so."""
-    code = (
-        'sleep 2; my $p = fork(); die "no fork: $!\\n" unless defined $p; exit 0 if $p == 0; wait;'
+def _launch(tmp_path, code: str, *, adjust: int = 0):
+    """Start the launcher directly on a Perl program; (return code, busy marker exists)."""
+    import json
+
+    out = tmp_path / "out"
+    out.mkdir(exist_ok=True)
+    marker = tmp_path / "busy"
+    spec = sandbox._landlock_spec(
+        [PERL, "-e", code], ro=(), rw=((out, "/out"),), tools=(), env=None, cwd="/",
+        limits=sandbox.Limits(wall_s=20, pids=4), hide=(), scratch=out, stubs=out,
+        program=seccomp.program(strict=True), busy_marker=str(marker),
+    )  # fmt: skip
+    spec["limits"]["nproc_adjust"] = adjust
+    done = subprocess.run(
+        [sys.executable, "-I", "-S", str(sandbox.LAUNCHER), json.dumps(spec)],
+        capture_output=True,
+        stdin=subprocess.DEVNULL,
+        timeout=30,
     )
-    limits = sandbox.Limits(wall_s=30, pids=4)
-    squatters: list[subprocess.Popen] = []
+    return done.returncode, marker.exists()
 
-    def fill():
-        time.sleep(0.5)
-        # Just over this run's limit (and no more: they count against every sandbox of the
-        # user that is running meanwhile, under xdist too).
-        for _ in range(limits.task_bound("landlock") + 2):
-            squatters.append(subprocess.Popen(["sleep", "4"]))
 
-    thread = threading.Thread(target=fill)
-    thread.start()
-    try:
-        outcome, text = run_perl(code, tmp_path, limits=limits)
-    finally:
-        thread.join()
-        for proc in squatters:
-            proc.kill()
-            proc.wait()
-    assert not outcome.ok and "no fork" in text
-    assert outcome.busy
+def test_a_machine_with_no_room_for_the_programs_tasks_is_busy(tmp_path):
+    """The user's task count is over the limit while the program has used none of its allowance:
+    its fork fails and the launcher says so (the limit is lowered by the test, so that nothing
+    else on the machine is affected)."""
+    code = (
+        'sleep 1; my $p = fork(); die "no fork: $!\\n" unless defined $p; exit 0 if $p == 0; wait;'
+    )
+    status, busy = _launch(tmp_path, code, adjust=-100_000)
+    assert status != 0 and busy
+
+
+def test_the_same_program_is_not_busy_when_there_is_room(tmp_path):
+    code = 'my $p = fork(); die "no fork: $!\\n" unless defined $p; exit 0 if $p == 0; wait;'
+    assert _launch(tmp_path, code) == (0, False)
 
 
 def test_a_busy_machine_is_its_own_failure_code_for_a_conversion(tmp_path, monkeypatch):
