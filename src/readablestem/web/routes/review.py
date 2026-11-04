@@ -1495,7 +1495,7 @@ def review_action(
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
             retention.restart_clock(job, get_ctx(request).settings)
-            session.add(_review_edit(job.id, user, change_made, written))
+            session.add_all(_review_edit(job.id, user, c, written) for c in change_made.every)
             _decision_events(request, session, user, job, result, "single", 1)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None

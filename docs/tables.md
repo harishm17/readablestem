@@ -701,8 +701,12 @@ table of a TeX paper now has a second reader for the cells whose glyphs say they
    also when the equation is flagged for review (it has its own decision, as an inline formula of a paragraph has), so a
    reviewer's edit or accept of the equation is the cell's in the HTML, Word, EPUB, Canvas and the record, which are made
    from it. A failed, abstained or rejected equation leaves the cell as the table step wrote it; the cell's text, header and
-   span never change, and the equation elements of cells are not written on their own. To change such a cell, edit its
-   equation: a LaTeX typed into the table card's cell is replaced by the equation's reading when the page is written.
+   span never change, and the equation elements of cells are not written on their own. After the steps the stored grid
+   holds each equation's reading (`table_math.adopt`), so the table card, an edit and the page start from the same cell.
+   **A cell and its equation are edited as one**: LaTeX typed into the cell on the table card is written to the equation
+   with the same checks (`web.review._written_through`), and an edit of the equation is written to the cell; each is its own
+   recorded change of the same write, so Undo takes both back, and the page, every re-render of the review screen and the
+   files made from the page show the person's reading. The card marks such a cell "(also an equation)" and says so in its form.
 
 Measured offline with the layout alone (`scripts/eq_span_edges.py`, [eval-equation-diagnostics.md](eval-equation-diagnostics.md),
 "Table-cell maths"): gold equations typed in floats found 661 to 892 of 2,153 over the five development and replay parts.
