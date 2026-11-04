@@ -182,7 +182,8 @@ def test_a_table_check_without_a_sentence_is_named_by_the_part_of_the_table():
     explained = messages.explain_check(Check(name="table.cell_text", passed=False, code="new_code"))
     assert not explained.known
     assert explained.text == (
-        "A check on the words and numbers of this table did not pass, so compare them with the image."
+        "A check on the words and numbers of this table did not pass, "
+        "so compare them with the image."
     )
     other = messages.explain_check(Check(name="table.something_new", passed=False, code="x"))
     assert "of this table" in other.text and other.text != messages.UNKNOWN_CHECK_MESSAGE

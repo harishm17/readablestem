@@ -293,10 +293,8 @@ def test_decisions_first_by_kind_then_optional_then_accepted(web):
 def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
     page = review_page(web)
     equation = card(page, "p1-e3")
-    assert (
-        '<h4 id="fix-title-p1-e3" class="visually-hidden">Equation 2 <span class="meta">on page 1</span></h4>'
-        in (equation)
-    )  # numbered in reading order: the inline p1-e2 is equation 1
+    title = '<h4 id="fix-title-p1-e3" class="visually-hidden">Equation 2 <span class="meta">'
+    assert title + "on page 1</span></h4>" in equation  # in reading order: inline p1-e2 is no. 1
     assert f'src="/jobs/{web.job_id}/crops/p1-e3.png"' in equation
     assert 'alt="The original equation 2 from page 1 of the PDF, as an image."' in equation
     assert '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">' in equation
