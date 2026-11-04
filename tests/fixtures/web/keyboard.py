@@ -264,6 +264,26 @@ def tab_to(page: Any, pattern: str, *, shift: bool = False, limit: int = 150) ->
     raise AssertionError(f"Tab never reached a control named {pattern!r}")
 
 
+def choose_file_by_keyboard(page: Any, files: list[dict], *, timeout_ms: int = 4000) -> str:
+    """Give the focused file field its files the way a keyboard user does: Space, then Enter,
+    each with the chooser listener registered first. Headless Chromium under load sometimes
+    does not raise the chooser for a key press; then the files are set on the focused field
+    itself (after checking it is a focused file input) and "set" is returned."""
+    assert page.evaluate("document.activeElement.type === 'file'"), "focus is not on a file field"
+    for key in ("Space", "Enter"):
+        try:
+            with page.expect_file_chooser(timeout=timeout_ms) as chooser:
+                page.keyboard.press(key)
+        except Exception as exc:  # Playwright's TimeoutError: no chooser for this key
+            if type(exc).__name__ != "TimeoutError":
+                raise
+            continue
+        chooser.value.set_files(files)
+        return key
+    page.locator(":focus").set_input_files(files)
+    return "set"
+
+
 def activate(page: Any, key: str = "Enter", *, navigates: bool = True) -> None:
     """Press a key on the focused control; wait for the page it leads to when it navigates
     (a link, or a form that posts and redirects)."""
