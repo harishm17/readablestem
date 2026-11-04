@@ -375,9 +375,9 @@ got a little worse (90 to 96 in running text), and equations wrong without being
   `claude-opus-5-5` (main) and `claude-haiku-5-5` (cheap), as in the baseline.
 - Answers: the run started from the recorded answers of `base-0503`. A request whose text matches a
   recorded answer is replayed; one that the code changes since had altered is asked live. The first offline
-  pass reported 570 requests without a recorded answer, the first live pass asked 377 of them (the others
-  were requests that code changes made identical to recorded ones once earlier answers changed), the
-  second asked 57 more, and the third pass reported 2,718 hits and 0 misses. Cost per page is the list
+  pass reported 570 requests without a recorded answer; the first live pass finished with 377 still
+  unrecorded (a request's text depends on earlier answers, so the count changes as answers are asked), the
+  second with 57, and the third pass reported 2,718 hits and 0 misses. Cost per page is the list
   price of all 2,709 recorded calls (replayed ones included), as in the baseline.
 - Recordings in `~/.cache/readablestem/realworld/runs/dev/base-0507/` next to `base-0503`.
 
@@ -448,7 +448,7 @@ and just excludes it under exact (+0.005).
 Table equations are the one place the four changes show: 9 more right, 14 fewer not found, and 4 more
 found and read wrong. Short inline maths barely moved (125 to 122), running-text spans got 6 worse (90 to
 96), and the running-text right count is 4 lower. These are single-run differences of a few equations in
-2,350 and are within the run-to-run variation of the models.
+2,350; one run each, so run-to-run variation of the models is not measured here.
 
 ### Spend
 
