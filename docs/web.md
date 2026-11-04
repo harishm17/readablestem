@@ -75,6 +75,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `MAX_UPLOAD_MB` (50), `MAX_PAGES_PER_JOB` (100), `MAX_CONCURRENT_UPLOADS` (3) | Upload limits (the last: uploads taken in at once per instance, one per user) |
 | `MAX_LARGE_UPLOAD_MB` (100), `MAX_SOURCE_PAGES` (500) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (the old 30 was sized for Cloud Run's 32 MiB request limit, which a Cloud Run deployment still has; Railway documents none). Equal to the limits above, they turn the feature off: such files are refused |
 | `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project ("LaTeX source" below, ADR 0008). Off by default; needs the image built with `INSTALL_LATEXML` and a PASS from `readablestem ops sandbox-probe` |
+| `FEATURE_BEAMER_SOURCE` | Takes Beamer decks within LaTeX source ("LaTeX source" below). Off by default; needs `FEATURE_LATEX_SOURCE` |
 | `MAX_USD_PER_JOB` ($6.00), `MAX_MODEL_CALLS_PER_JOB` (1200) | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
 | `FEATURE_IMAGE_PAGES`, `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE` ($0.25), `IMAGE_PAGES_MAX_USD_PER_JOB` ($7.50), `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`, `IMAGE_PAGES_OMISSION_CHECK` (default on), `IMAGE_PAGES_RECOVER_OMISSIONS` (default on), `IMAGE_PAGES_VECTOR_CROPS` (default off, unmeasured: on a handwritten page whose ink is vector, the pictures of expressions are drawn from the pen strokes) and `IMAGE_PAGES_VECTOR_CHECKS` (default on: a letter in the other case, a power lost, added or moved, and ink no block accounts for are flagged by comparing the reading with the strokes, docs/layout.md), `IMAGE_PAGES_SECOND_READING` (default off), `IMAGE_PAGES_ACCEPT_AGREED` (default off), `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED` (default on), `IMAGE_PAGES_SECOND_READER` (`off`, `local`, `claude`, `openai`; default `off`), `IMAGE_PAGES_SECOND_READER_TIME_S` (120) | Scanned and handwritten pages read from an image of the page (ADR 0007, "Scanned and handwritten pages on request" below); the omission check makes writing the reading left out a required decision, and the recovery reads such a stretch from a picture of just that part so it is converted instead; the second reading reads each `medium` block with a formula again from a picture of its line and records whether the two agree, and acceptance lets a block whose two readings agree, the second sure of every symbol, be an optional note (off: docs/eval-handwriting.md, "Root causes and fixes"); the last makes every block of a page read from an image that holds maths (a display equation, or a paragraph, list item or heading with a formula) a required decision whatever the reader's confidence (ADR 0007, point 12; typed pages and prose-only blocks are not affected); the second reader (`docs/math-readers.md`, "Using a reader in the pipeline") reads the crop of each handwritten display equation and compares it with the page's reading, so the review card can offer the differences as choices (it must also be enabled with its `MATH_READER_*_ENABLED`). The flag only offers the upload option; the model is the main one unless `IMAGE_PAGES_MODEL` says otherwise; a job that asked may spend `IMAGE_PAGES_USD_PER_PAGE` a page, at most `IMAGE_PAGES_MAX_USD_PER_JOB`, when that is more than `MAX_USD_PER_JOB` and `MAX_USD_PER_PAGE` allow |
@@ -584,13 +585,31 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   paragraphs, lists, tables, exact equations (LaTeXML's MathML through the sanitiser, accepted),
   and figures with the project's own picture through the ordinary figure step. A formula
   LaTeXML could not read, and a figure with no picture, are required decisions.
+- **Beamer** (`FEATURE_BEAMER_SOURCE`, off by default, needs `FEATURE_LATEX_SOURCE`): a deck is
+  read through LaTeXML's `beamer.cls` binding, which writes one `ltx_slide` per overlay step. A
+  frame is a heading (its title) and its content: sections are the top level, frames sit one level
+  below the section they are in (the title page's title is the document title). Of a frame's
+  steps only the last is written, plus any earlier step that shows something the last one does
+  not (`\only`, `\alt`, a formula or picture that changes), headed "(step 2 of 3)": the rule of
+  the PDF path's slide decks (docs/layout.md, "Slide decks"). Text a step covers (`\pause`,
+  `\uncover`, `\visible`) is not written for that step, and a list item a pause reveals is an
+  item of its own. LaTeXML 0.8.8's binding has no `block`, `alertblock`, `exampleblock`,
+  `columns`, `column` or `\institute`: `source/beamer_compat.tex` gives them as plain text and is
+  read first for a deck (`--preload`, mounted read-only in the sandbox). A deck counts one page
+  per frame (or per figure), not by characters; `DocumentResult.origin` is `beamer` and the student
+  note says "a slide deck". The spike behind it (E2) used five decks written for the purpose
+  (`tests/fixtures/source/beamer/`: 20 frames, 3 to 5 overlay steps in two of them): with the
+  compat file none of the 20 frames hit an unknown command (without it 3 did, 15 percent: a
+  block, a column and a block with `\institute`); **no real decks were tried**, which is why the
+  switch stays off.
+||||||| 2c0fc253
 - **One at a time.** A source conversion takes a machine-wide lock (`sandbox.exclusive`, an `flock`)
   before LaTeXML starts and others wait for it, so the sandbox's limits (4 tasks, 512 MB of address
   space each) bound the whole server and not each conversion; the worker already runs one job at a
   time, and the lock also covers a job whose abandoned conversion is still ending.
 - **TeX Live is not read.** LaTeXML finds a package's own TeX with `kpsewhich`. With TeX Live's base
   installed (the image has `texlive-latex-base`, which `latexml` depends on) it then reads raw TeX for a
-  package it has a binding for and runs expl3 under its own interpreter: `\\usepackage{siunitx}` took 72 s
+  package it has a binding for and runs expl3 under its own interpreter: `\usepackage{siunitx}` took 72 s
   and ended in over 100 errors (found by the CI job that runs the real sandbox). The sandbox puts an empty
   file over `kpsewhich` (`sandbox.run(hide=)`, `latexml.HIDDEN_FILES`), so LaTeXML uses only its own
   bindings, as it does where TeX Live is not installed: 2 s and the right answer. A package it has no

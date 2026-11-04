@@ -35,6 +35,17 @@
   upload form's 7-day box ticked; each upload still decides. The job page says near the top when
   the document will be deleted, with a one-click "Keep it for 7 days". Retention wording says the
   clock restarts on each decision or download.
+## Unreleased: Beamer source (branch latex/e2-beamer-source)
+
+- Beamer decks within LaTeX source (`FEATURE_BEAMER_SOURCE`, off by default, needs `FEATURE_LATEX_SOURCE`): frames
+  become headings with their content (sections the top level, frames below them), an overlay step is written only
+  when it shows something the frame's last step does not ("(step 2 of 3)"; the rule of the PDF slide decks), text a
+  step covers is not written, a list item a pause reveals is an item of its own, a title page drawn by Beamer is read
+  for its blocks. `source/beamer_compat.tex` gives LaTeXML 0.8.8's binding the block, column and `\institute`
+  definitions it lacks (read first, read-only in the sandbox). A deck counts a page per frame. Spike on five decks
+  written for it: 20 frames, none with an unknown command (3 had one without the compat file); no
+  real deck tried. `DocumentResult.origin` `beamer`, the student note says "a slide deck". Tests:
+  `tests/test_source_beamer.py`; fixtures `tests/fixtures/source/beamer/`.
 
 ## Unreleased: LaTeX source upload (branch latex/e1-source-intake)
 
