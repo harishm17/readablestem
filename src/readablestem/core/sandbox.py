@@ -33,6 +33,7 @@ import contextlib
 import errno
 import functools
 import os
+import re
 import shutil
 import signal
 import stat
@@ -178,6 +179,10 @@ class Outcome:
     # The program could not fork or start because the machine had no room for more tasks
     # (the user's task count was at the limit): not the document's fault, try again.
     busy: bool = False
+    # Landlock backend: the setup step that failed (a fixed code, `landlock_exec.fail`) and the
+    # errno's name, read from the launcher's own report, never from the program.
+    step: str = ""
+    step_errno: str = ""
 
     @property
     def ok(self) -> bool:
@@ -207,18 +212,53 @@ LAUNCHER = Path(__file__).with_name("landlock_exec.py")
 _STUB = "#!/bin/sh\nexit 0\n"
 
 
+# Why a backend was refused at the last `backend()` (and so, for the probe, why the sandbox does
+# not start): name -> (step code, errno name, exit status). Fixed codes only.
+_FAILURES: dict[str, tuple[str, str, int]] = {}
+_STEP = re.compile(r"([a-z_]+(?::[a-z_]+)?)(?: (E[A-Z0-9]+))?")
+
+
+def _read_step(folder: Path | None) -> tuple[str, str]:
+    """The step the Landlock launcher reported (`landlock_exec.fail`) and the errno's name; only
+    text of the fixed shape counts, and the file is in a folder the program cannot write."""
+    if folder is None:
+        return "", ""
+    try:
+        text = (folder / "step").read_text(errors="replace").strip()
+    except OSError:
+        return "", ""
+    match = _STEP.fullmatch(text)
+    return (match.group(1), match.group(2) or "") if match else ("", "")
+
+
+def backend_failure(name: str) -> tuple[str, str, int] | None:
+    """Why `name` was refused by the last `backend()`: (step code, errno name, exit status), or None
+    when it was not tried or worked. Codes: `abi_below_min`, `landlock_create_ruleset`,
+    `landlock_add_rule:<exec|read|write|files_rw|files_read>`, `no_new_privs`,
+    `landlock_restrict_self`, `seccomp_install`, `prlimit_<resource>`, `chdir`, `fork`, `exec`,
+    `no_report` (the launcher ended without naming a step), `unavailable`."""
+    return _FAILURES.get(name)
+
+
 @functools.cache
 def backend() -> str | None:
     """The sandbox this machine can start: "bwrap", else "landlock", else None. Found by running
     `true` inside each; cached for the life of the process. `READABLESTEM_SANDBOX_BACKEND` limits
     the choice to one (for tests and for the probe)."""
     forced = os.environ.get(BACKEND_ENV)
+    _FAILURES.clear()
     for name in (forced,) if forced in ("bwrap", "landlock") else ("bwrap", "landlock"):
         try:
-            if _run(name, ["/usr/bin/true"], limits=Limits(wall_s=20)).ok:
-                return name
-        except (SandboxUnavailable, OSError):
+            outcome = _run(name, ["/usr/bin/true"], limits=Limits(wall_s=20))
+        except SandboxUnavailable:
+            _FAILURES[name] = ("abi_below_min" if name == "landlock" else "unavailable", "", 0)
             continue
+        except OSError:
+            _FAILURES[name] = ("unavailable", "", 0)
+            continue
+        if outcome.ok:
+            return name
+        _FAILURES[name] = (outcome.step or "no_report", outcome.step_errno, outcome.returncode)
     return None
 
 
@@ -548,6 +588,7 @@ def _landlock_spec(
     stubs: Path,
     program: bytes | None,
     busy_marker: str = "",
+    step_file: str = "",
 ) -> dict:
     import base64
 
@@ -579,6 +620,7 @@ def _landlock_spec(
         "seccomp": base64.b64encode(program).decode() if program else "",
         "cmd": command,
         "busy_marker": busy_marker,
+        "step_file": step_file,
     }  # fmt: skip
 
 
@@ -624,6 +666,7 @@ def _run(
         spec = _landlock_spec(
             command, ro=ro, rw=rw, tools=tools, env=env, cwd=cwd, limits=limits, hide=hide,
             scratch=scratch, stubs=stubs, program=program, busy_marker=str(marker),
+            step_file=str(marker_dir / "step"),
         )  # fmt: skip
         argv = [sys.executable, "-I", "-S", str(LAUNCHER), json.dumps(spec)]
         rw_hosts = (*(host for host, _ in rw), scratch)
@@ -660,9 +703,12 @@ def _run(
         while True:
             try:
                 proc.wait(timeout=POLL_SECONDS)
+                step, step_errno = _read_step(marker_dir) if proc.returncode else ("", "")
                 return Outcome(
                     proc.returncode,
                     busy=bool(proc.returncode) and marker is not None and marker.exists(),
+                    step=step,
+                    step_errno=step_errno,
                 )
             except subprocess.TimeoutExpired:
                 pass

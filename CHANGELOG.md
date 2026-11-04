@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased: which Landlock step failed (branch latex/probe-step-codes)
+
+- New: when the Landlock launcher fails to start, it reports the failing setup step as a fixed
+  code and the errno's name; `ops sandbox-probe`, the `sandbox_probe` log line and
+  `/healthz/ops` show `landlock_step=`, `landlock_errno=`, `landlock_exit=` and
+  `can_<call>=yes|no` for each system call the launcher needs, tried once in a throwaway child
+  under the container's own seccomp filter. Information only: no change to what the sandbox
+  allows.
+
 ## Unreleased: equation reading push (branch eq/read-push)
 
 - Pipeline 0.5.9. New setting `EQUATION_GLYPH_RECONCILE` (off; needs `EQUATION_GLYPH_CHECKS`):
