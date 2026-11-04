@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Listen as a student{% endblock %}
+{% block description %}Roughly what a screen reader says for a converted document, so you can hear it before you share it.{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ static_url('listen.css') }}">
+  <script src="{{ static_url('listen.js') }}" defer></script>
+{% endblock %}
+{% block content %}
+{# GET /jobs/{id}/listen (access: view) and GET /demo/listen (public). The transcript is
+   built from the same HTML the student gets (web/listen.py); the player is optional. #}
+<div id="listen-page">
+<p class="crumb"><a href="{{ back_url }}">{{ back_label }}</a></p>
+<h1>Listen as a student</h1>
+<p class="listen-doc"><strong>{{ title }}</strong></p>
+<p class="notice listen-honest"><strong>Roughly what a screen reader says.</strong> NVDA, JAWS and VoiceOver each speak differently; test with one before you rely on it.</p>
+<p>This is the converted page read in order, with headings and their levels, lists, links, equations, figures and tables. It is not stored with the file and not part of any download.{% if student_url %} <a href="{{ student_url }}">Open the student version</a> to try it with your own screen reader.{% endif %}</p>
+{% include "_listen_player.html" %}
+</div>
+{% endblock %}

@@ -5,11 +5,13 @@
    link to its item, every decision a form: it all works without JavaScript. #}
 {% block title %}{% if errors %}Error: {% endif %}{% if panel.mode == "decision" %}{{ panel.title }}: {% endif %}Review {{ job.filename }}{% endblock %}
 {% block main_class %}wrap wrap-review{% endblock %}
-{% block head %}<link rel="stylesheet" href="/jobs/{{ job.id }}/review/marks.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/jobs/{{ job.id }}/review/marks.css">
+  <script src="{{ static_url('listen.js') }}" defer></script>{% endblock %}
 {% from "_table_card.html" import table_split_body with context %}
 {% from "_describe.html" import describe_box with context %}
 {% from "_report_item.html" import report_link with context %}
 {% from "_leave_out.html" import leave_out_forms with context %}
+{% from "_hear.html" import hear_button %}
 {# The second Tab stop: straight to the decision's heading, past the site menu, the steps
    and the links (UX review BW11). #}
 {% block skip_links %}<a class="skip-link" href="#decision-title">Skip to the decision</a>{% endblock %}
@@ -83,6 +85,7 @@
 {% else %}
 <p class="speech"><span class="speech-label">From your PDF a screen reader gets</span> nothing here: the PDF has no text for this equation.</p>
 {% endif %}
+{{ hear_button(item) }}
 {% endmacro %}
 
 {% macro save_button(item, main=False) %}
@@ -235,6 +238,7 @@
   {% endif %}
   {% if item.caption %}<figcaption><span class="cap-label">Caption in the PDF:</span> {{ item.caption }}</figcaption>{% endif %}
 </figure>
+{{ hear_button(item) }}
 {# Long descriptions on (figures work): the chart's data table as students will get it.
    It scrolls sideways in its own box on a narrow screen, so it can take focus, and its
    cells keep whole numbers (`table-view`). A table whose values were read from the image
@@ -319,6 +323,7 @@
   {% if item.heading_level %}<div><dt>Proposed level</dt><dd>{{ item.heading_level }}</dd></div>{% endif %}
   {% if item.heading_shown %}<div><dt>{% if item.heading_in_document %}In the document{% else %}If accepted{% endif %}</dt><dd>level {{ item.heading_shown }}</dd></div>{% endif %}
 </dl>
+{{ hear_button(item) }}
 <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form{% if item.edited %} is-edited{% endif %}">
   {{ hidden_fields() }}
   {% set err = item.errors.get("level") %}
@@ -554,8 +559,9 @@
     <p>{{ ready.finish }}{% if ready.sentence %} {{ ready.sentence }}{% endif %}</p>
     {% if ready.shareable %}
     <p class="done-actions"><a class="button" href="/jobs/{{ job.id }}/download">Download the HTML file</a>
-      <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a></p>
-    <p>Before you share, read the student version through once: the automatic checks look at the structure of the file, not at whether each part says what you meant.{% if ready.notes %} {{ ready.notes }} {{ "item was" if ready.notes == 1 else "items were" }} accepted for you with a note; looking at {{ "it" if ready.notes == 1 else "them" }} is optional.{% endif %}</p>
+      <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a>
+      <a href="/jobs/{{ job.id }}/listen">Listen as a student</a></p>
+    <p>Before you share, read the student version through once, and listen to it: the automatic checks look at the structure of the file, not at whether each part says what you meant.{% if ready.notes %} {{ ready.notes }} {{ "item was" if ready.notes == 1 else "items were" }} accepted for you with a note; looking at {{ "it" if ready.notes == 1 else "them" }} is optional.{% endif %}</p>
     <p><a href="/help/posting">How to post it in your course</a> · <a href="/jobs/{{ job.id }}#ready">Back to the results</a></p>
     {% else %}
     <p><a href="/jobs/{{ job.id }}">Back to the results</a></p>

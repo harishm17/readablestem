@@ -3,6 +3,7 @@
 {% block font_preload %}<link rel="preload" href="/static/vendor/fonts/source-serif-4-5.3.1-latin-600.woff2" as="font" type="font/woff2" crossorigin>{% endblock %}
 {% block title %}Accessible HTML with MathML from STEM course PDFs{% endblock %}
 {% block description %}Turns STEM notes, slides and problem sets into accessible web pages: equations as MathML a screen reader can speak, real headings, tables and described figures.{% endblock %}
+{% block head %}<script src="{{ static_url('listen.js') }}" defer></script>{% endblock %}
 {% block content %}
 {# Layout (DESIGN.md): hero with the real before/after, what it handles, three steps, what
    you download, the numbers, then sign-in and questions. The feature list reads the same
@@ -47,6 +48,7 @@
         <dt>A screen reader reads the PDF's text layer</dt>
         <dd>{{ hero.text_layer }}</dd>
       </dl>
+      <p class="hear"><button type="button" class="button-secondary button-small" data-hear hidden data-hear-idle="Play the PDF reading" data-hear-a="{{ hero.text_layer_speech }}" data-hear-a-lead="In the PDF a screen reader says"><span data-hear-label>Play the PDF reading</span></button><span class="hear-note" data-hear-note role="status"></span></p>
     </section>
     <section class="pane after" aria-labelledby="hero-after">
       <h2 id="hero-after">In the converted page <span class="tag tag-ok">MathML</span></h2>
@@ -59,6 +61,7 @@
         <dt>A screen reader says</dt>
         <dd>{{ hero.speech }}</dd>
       </dl>
+      <p class="hear"><button type="button" class="button-secondary button-small" data-hear hidden data-hear-idle="Play the converted reading" data-hear-a="{{ hero.speech }}" data-hear-a-lead="On the converted page a screen reader says"><span data-hear-label>Play the converted reading</span></button><span class="hear-note" data-hear-note role="status"></span></p>
     </section>
   </div>
   <p class="hero-source">From <a href="https://openstax.org/books/physics/pages/2-3-position-vs-time-graphs">OpenStax Physics, 2.3 Position vs. Time Graphs</a>

@@ -96,6 +96,7 @@ the owner shared the document with by email has it if their right is that one or
 |---|---|---|
 | GET `/` | anyone | What the tool does, why now, how long (with the review load: about 1.8 decisions per page as on `/limits`, a full job, a new account's daily pages read from `OPEN_TIER_DAILY_PAGE_QUOTA`, and the deletion time), how accurate (numbers from docs/eval.md, linked), what to do with the file, sign-in, link to the demo |
 | GET `/demo` | anyone | `web/static/demo/index.html` if present (served with the sandbox CSP, an `ETag` and `Cache-Control: public, max-age=3600`, and a 304 for a matching `If-None-Match`: "Security headers"), else a "being prepared" page |
+| GET `/demo/listen` | anyone | "Listen as a student" for the stored demo: the transcript of what a screen reader roughly says, with the player ("Listen as a student", below); `noindex`, read-only |
 | GET `/guides` | anyone | The list of the guides below it, each with its summary and date (`seo.GUIDES`); in the sitemap, `llms.txt` and the footer |
 | GET `/privacy`, `/terms` | anyone | The beta wording, describing the real behaviour (hourly purge, Railway's daily backups kept about 6 days, Langfuse only when tracing is on). `readablestem ops launch-check` lists any unfinished wording left on the public pages |
 | GET `/for-accessibility-offices` | anyone | The page for an accessibility or procurement office (`web/offices.py`, `offices.html`): data flow (an SVG with a described list as its text equivalent), the companies that receive data (one row per entry of `web/recipients.py`, the list `/privacy` uses, so tracing and analytics appear only when on), retention from the settings, no training and the `store` setting (OpenAI path only), student records (FERPA), what the tool does not do, an eight-step pilot checklist. It makes no conformance claim (`tests/test_web_offices.py`). Linked from every footer, in the sitemap and `llms.txt` |
@@ -137,6 +138,7 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/jobs/{id}/share` | owner | Give a person (`email`, in full) the right `role` (`view` or `review`), or change theirs; 422 with the reason beside the field for an address that is not one, your own, a right that does not exist, or an eleventh person. CSRF-checked, nothing is sent |
 | POST `/jobs/{id}/share/{share_id}/revoke` | owner | Remove one person's access; it stops on their next request. CSRF-checked |
 | GET `/jobs/{id}/view` | view | The HTML inline, sandboxed (see below) |
+| GET `/jobs/{id}/listen` | view | "Listen as a student": the transcript of what a screen reader roughly says for the converted file, with an optional player ("Listen as a student", below); 409 until the job is done; no POST |
 | GET `/jobs/{id}/crops/{element_id}.png` | view | Original image of one equation, figure or table |
 | GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | review | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
 | GET `/jobs/{id}/review/list?kind=&page=` | review | "All items as a list": every fix, grouped by kind; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below) |
@@ -1044,6 +1046,56 @@ starts with a byte order mark so Excel reads non-English letters right. Its colu
 `docs/vendor-information.md` is the matching one-page sheet for a procurement office: what the
 tool does, what happens to a document, and where it falls short. The site's own page for such an
 office is `/for-accessibility-offices`; change the sheet and that page together.
+
+## Listen as a student (`web/listen.py`, `routes/listen.py`, `static/listen.js`)
+
+Three blind reviewers asked for a way to hear roughly what a screen reader will say before
+sharing a file. `GET /jobs/{id}/listen` (access `view`: the owner and anyone the document is
+shared with; a stranger gets the same 404 as for a made-up id) and `GET /demo/listen`
+(public, the stored demo) show a **listening transcript** and an optional player. The
+showcase site has one per example (`site/build.py` writes `examples/<id>/listen.html` when
+the site is built, with the same component and the same script).
+
+- **The transcript** is built on the server from the final HTML in reading order, with no
+  model call: the page title and language, landmarks, headings with their level ("Heading
+  level 2: Kinematics"), paragraphs, lists ("List, 3 items", then each item), links ("link"
+  before the text), figures (alt text, caption, the long description inside its collapsed
+  section), tables (caption, size, column headers, then up to 8 rows read with their headers
+  and "…N more rows"), pictures kept as images ("Image, not converted"), page breaks and
+  language changes. An equation is spoken by the same speech rules as "Read aloud roughly
+  as" on the review screen: the stored reading of that equation when the job has one, else the
+  file's `alttext`, else `pipeline.speech` on the MathML. A reading that looks like LaTeX is
+  never used (`listen.speakable`, the rule the review screen's `speakable` filter applies).
+- **Kept per job result version** in memory (`listen.CACHE`, the last 32; the key also holds a
+  digest of the HTML). Nothing is stored in the database, logged, or put in a downloaded or
+  exported file.
+- **The page** says "Roughly what a screen reader says. NVDA, JAWS and VoiceOver each speak
+  differently; test with one before you rely on it." Each item is a block with its role. The
+  transcript is plain text, so it works without JavaScript and in a browser that cannot
+  speak; the controls are hidden until `listen.js` finds `speechSynthesis`.
+- **The player** uses the browser's Web Speech API (a static file under `script-src
+  'self'`): Play, Pause, Stop, speed, voice, previous and next item, next heading and next
+  equation, the item being spoken marked (a bar and a tint, `aria-current`) and scrolled into
+  view (instantly under `prefers-reduced-motion`). Keys (`p`, `s` or Esc, `[`, `]`, `h`, `e`)
+  work only while focus is inside the page's content, never with a modifier or in a menu. State
+  changes go to a polite status line; the item being spoken is not announced again. It never
+  moves focus, so it does not fight a screen reader.
+- **Privacy.** A voice with `localService === true` is the default. When the browser lists only
+  online voices, the player says some browsers send the text to their maker and speaks nothing
+  until a voice is chosen; a "Hear this" button asks once and speaks only on the second press.
+- **Where it is offered.** The job page (beside "Preview the student version", and as the
+  "Check how it sounds" step of "Before you share"), the review screen's finish line and list,
+  the demo's note, the showcase examples, `/help/posting#listen`. On the review screen (split
+  view, list view and "accept many") a **Hear this** button beside an equation plays the
+  proposal's reading and then how the PDF's text layer reads (`speech_diff.read_text_layer`);
+  beside a figure it plays the alt text, beside a heading its level and text
+  (`listen.hear_for`). The landing hero has a Play button for each of its two readings.
+- **Tests.** `tests/test_web_listen.py` (fixture HTML: equations, chemistry, tables, figures,
+  a kept image, a slide deck, languages, LaTeX), `tests/test_web_listen_routes.py` (viewer
+  opens it, stranger gets the 404, LaTeX never appears), `tests/test_web_listen_browser.py`
+  (a stubbed `speechSynthesis`: Play, Pause, next, voices and privacy; axe), the keyboard walk in
+  `tests/test_web_keyboard_browser.py`, and the route tables in `tests/test_audit_authz.py` and
+  `tests/test_job_shares.py`.
 
 ## Spend cap (`web/spend.py`)
 

@@ -63,6 +63,7 @@ PUBLIC = {
     "privacy": "/privacy",
     "login": "/login",
     "status": "/status",
+    "demo-listen": "/demo/listen",
 }
 SIGNED_IN = {
     "app": "/app",
@@ -72,6 +73,7 @@ SIGNED_IN = {
     "review-figure": "/jobs/{job}/review?item=p1-e6",
     "review-list": "/jobs/{job}/review/list",
     "symbols": "/jobs/{job}/symbols?view=split",
+    "listen": "/jobs/{job}/listen",
 }
 VIEWS = {"1440": {"width": 1440, "height": 900}, "390": {"width": 390, "height": 844}}
 

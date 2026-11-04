@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import functools
 import logging
-import re
 import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -55,6 +54,7 @@ from readablestem.web.deps import (
     render,
 )
 from readablestem.web.health import stop_worker_on_sigterm
+from readablestem.web.listen import speakable
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.return_to import decision_link, remember_return, signed_out_page
 from readablestem.web.routes import (
@@ -72,6 +72,7 @@ from readablestem.web.routes import (
     inventory,
     job_settings,
     jobs,
+    listen,
     pages,
     parts,
     record,
@@ -146,11 +147,10 @@ def _utc_text(value: datetime | None) -> str:
 
 
 def _speakable(text: str | None) -> str:
-    """A spoken reading to show, or "" when the text is not one. Speech is words ("v equals d
-    over t"); a string with a backslash, braces, a caret or an underscore is LaTeX that stood
-    in for a reading, and the review screen must never present that as what a person hears."""
-    value = (text or "").strip()
-    return "" if not value or re.search(r"[\\{}^_]", value) else value
+    """A spoken reading to show, or "" when the text is not one (LaTeX that stood in for a
+    reading must never be presented as what a person hears). One rule, in `web.listen`,
+    shared with the listening transcript."""
+    return speakable(text)
 
 
 def _utc(value: datetime | None) -> Markup:
@@ -495,6 +495,7 @@ def create_app(
         cron,
         courses,
         record,
+        listen,
         email_login,
         discovery,
     ):

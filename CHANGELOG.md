@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: Listen as a student (branch preview/listen-as-student)
+
+- New: an instructor can hear roughly what a screen reader will say for a converted document
+  before sharing it. `GET /jobs/{id}/listen` (owners and anyone it is shared with) and
+  `GET /demo/listen` (public) show a transcript built from the final HTML, in reading order
+  (landmarks, headings with their level, lists, links, equations spoken by the same speech rules
+  as the review screen, figures, tables with their headers, pictures kept as images, language
+  changes; never LaTeX), with an optional Play, Pause, Stop, speed, previous and next item, next
+  heading and next equation, using the browser's own voice (a voice on the device by default;
+  online voices only on request). The job page, the review screen (a "Hear this" button
+  beside an equation plays the proposal and how the PDF's text layer reads), the landing hero,
+  the demo, the showcase examples and `/help/posting` offer it. Not part of any download.
+  See docs/web.md, "Listen as a student".
+
 ## Unreleased: site copy rewrite (branch content/site-rewrite)
 
 - Every public and signed-in page says what the service does today. The landing page lists what it

@@ -331,7 +331,10 @@ def test_the_build_fits_the_light_budget(built):
     own = sum(
         (out / p).stat().st_size
         for p in paths
-        if p.endswith((".html", ".css")) and "converted" not in p and "sample-report" not in p
+        if p.endswith((".html", ".css"))
+        and not any(
+            k in p for k in ("converted", "sample-report", "listen")
+        )  # transcripts are the document, read aloud
     )
     assert own < 400_000
     for rel in OWN_PAGES:

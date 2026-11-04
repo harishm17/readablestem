@@ -1,0 +1,65 @@
+{# The listening transcript with its player (web/listen.py, static/listen.js). One
+   component for a job's page, the demo and the showcase site's examples (site/build.py
+   loads this folder too), so it takes only `items` and uses no app global. Without
+   JavaScript, or in a browser that cannot speak, the transcript is still plain text: the
+   controls are hidden until the script has found a speech engine. #}
+<div data-listen-player>
+  <h2 id="player-heading">Play it</h2>
+  <p class="hint" id="player-hint">Playing is optional. If you use a screen reader, read the transcript below with it instead.</p>
+  <noscript><p>Playing needs JavaScript. The transcript below can be read as it is.</p></noscript>
+  <p data-listen-unsupported hidden>This browser cannot speak text, so there is nothing to play. The transcript below can be read as it is.</p>
+  <div class="listen-controls" data-listen-controls hidden role="group" aria-labelledby="player-heading" aria-describedby="player-hint">
+    <div class="listen-row">
+      <button type="button" class="button" data-listen="play">Play</button>
+      <button type="button" class="button-secondary" data-listen="pause" aria-disabled="true">Pause</button>
+      <button type="button" class="button-secondary" data-listen="stop" aria-disabled="true">Stop</button>
+    </div>
+    <div class="listen-row">
+      <button type="button" class="button-secondary" data-listen="prev">Previous item</button>
+      <button type="button" class="button-secondary" data-listen="next">Next item</button>
+      <button type="button" class="button-secondary" data-listen="heading">Next heading</button>
+      <button type="button" class="button-secondary" data-listen="equation">Next equation</button>
+    </div>
+    <div class="listen-row listen-settings">
+      <div class="field">
+        <label for="listen-rate">Speed</label>
+        <select id="listen-rate" data-listen-rate>
+          <option value="0.75">Slower (0.75)</option>
+          <option value="1" selected>Normal (1)</option>
+          <option value="1.25">Faster (1.25)</option>
+          <option value="1.5">Fast (1.5)</option>
+          <option value="2">Very fast (2)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="listen-voice">Voice</label>
+        <select id="listen-voice" data-listen-voice aria-describedby="listen-voice-note"></select>
+      </div>
+    </div>
+    <p class="hint" id="listen-voice-note" data-listen-voice-note hidden></p>
+    <p class="listen-position" data-listen-position></p>
+    <p class="visually-hidden" data-listen-status role="status"></p>
+    <details class="listen-keys">
+      <summary>Keyboard shortcuts</summary>
+      <p>These work while focus is on this page's content and you are not in a menu. A screen reader in browse mode may keep these keys for itself: the buttons do the same.</p>
+      <dl>
+        <dt><kbd>p</kbd></dt><dd>Play or pause</dd>
+        <dt><kbd>s</kbd> or <kbd>Esc</kbd></dt><dd>Stop</dd>
+        <dt><kbd>[</kbd> and <kbd>]</kbd></dt><dd>Previous and next item</dd>
+        <dt><kbd>h</kbd></dt><dd>Next heading</dd>
+        <dt><kbd>e</kbd></dt><dd>Next equation</dd>
+      </dl>
+    </details>
+  </div>
+
+  <h2 id="transcript-heading">Transcript</h2>
+  <p class="hint" id="transcript-hint">{{ items|length }} {{ "item" if items|length == 1 else "items" }}, in reading order. Each starts with what it is.</p>
+  <ol class="listen-transcript" role="list" data-listen-transcript aria-labelledby="transcript-heading" aria-describedby="transcript-hint">
+    {% for item in items %}
+    <li class="listen-item" id="item-{{ loop.index }}" data-listen-item data-kinds="{{ item.kinds|join(' ') }}"{% if item.say != item.text %} data-say="{{ item.say }}"{% endif %}{% if item.lang and not item.lang.lower().startswith('en') %} lang="{{ item.lang }}"{% endif %}>
+      <span class="listen-role">{{ item.role }}</span>{% if item.text %}<span class="visually-hidden">: </span> <span class="listen-text">{{ item.text }}</span>{% endif %}
+
+    </li>
+    {% endfor %}
+  </ol>
+</div>
