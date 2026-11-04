@@ -6,7 +6,7 @@
 {% set suggest_job = suggest_job|default(none) %}
 {% if suggestions|default([]) %}
 <section aria-labelledby="suggest-heading" id="suggestions">
-  <h2 id="suggest-heading">Symbols found in {{ "this document" if suggest_job else "your documents" }}</h2>
+  <h{{ hl|default(2) }} id="suggest-heading">Symbols found in {{ "this document" if suggest_job else "your documents" }}</h{{ hl|default(2) }}>
   <p>{{ "This document uses" if suggest_job else "Your documents use" }}
     {{ suggestions|length }} {{ "symbol" if suggestions|length == 1 else "symbols" }} not in
     {{ course.name }} yet. Tick the ones to add; the meaning is a guess, so correct it.</p>

@@ -284,7 +284,7 @@ def test_the_word_and_epub_buttons_download_in_one_click(site, browser, jobs):
     sign_in(page, site.base, ALICE)
     page.goto(f"{site.base}/jobs/{jobs['ready']}")
     ready = page.locator("#ready")
-    assert ready.get_by_role("heading", name="Other file types").is_visible()
+    assert ready.get_by_role("heading", name="Where will you post it?").is_visible()
     expected = [("Download as EPUB", ".epub")]
     if export_docx.available():
         expected.insert(0, ("Download as Word (.docx)", ".docx"))

@@ -8,8 +8,7 @@
 {# `posting_link` false: the including block already links the posting help (the job
    page's "Put it in your course"). #}
 {% if posting_link|default(true) %}
-<p class="after-download"><a href="/help/posting">How to post it in your course</a>:
-  upload the file and link to it. Do not paste it into a page.</p>
+<p class="after-download"><a href="/help/posting">How to post it in your course</a></p>
 {% endif %}
 {% if ad and ad.ask %}
 <div id="feedback" class="feedback"{% if ad.hidden %} hidden data-after-download{% endif %}>

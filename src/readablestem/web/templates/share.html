@@ -83,7 +83,7 @@
   <p class="hint" id="share-copy-state" role="status"></p>
   {% if retain_until %}
   <p class="share-expiry" id="share-expiry">Deleted automatically on {{ retain_until|utc }}; the link stops working then.
-    {%- if retention_mode != "dev" %} <a href="/jobs/{{ job_id }}#delete-heading">Keep it longer</a>.{% endif %}</p>
+    {%- if retention_mode != "dev" %} Sharing does not extend the deletion date; your own work does. <a href="/jobs/{{ job_id }}#delete-heading">Keep it longer</a>.{% endif %}</p>
   {% endif %}
 </section>
 

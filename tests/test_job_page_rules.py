@@ -94,16 +94,21 @@ def test_the_last_steps_follow_the_model_work():
 @pytest.mark.parametrize(
     ("ahead", "yours", "seconds", "sentence"),
     [
-        (0, 0, 20, "Your document is next in line, less than a minute to go."),
-        (1, 0, 150, "1 document ahead of yours, about 2 minutes to go."),
-        (4, 2, 600, "4 documents ahead of yours (2 are yours), about 10 minutes to go."),
+        (0, 0, 20, "Your document is next in line, less than a minute to go (an estimate)."),
+        (1, 0, 150, "1 document ahead of yours, about 2 minutes to go (an estimate)."),
+        (
+            4,
+            2,
+            600,
+            "4 documents ahead of yours (2 are yours), about 10 minutes to go (an estimate).",
+        ),
         (2, 1, None, "2 documents ahead of yours (1 is yours)."),
     ],
 )
 def test_the_wait_says_where_and_how_long_and_that_leaving_is_fine(ahead, yours, seconds,
                                                                    sentence):  # fmt: skip
     text = job_page.queue_sentence(ahead, yours, seconds)
-    assert text == sentence.removesuffix(".") + ". You can leave this page; it keeps its place."
+    assert text == sentence + " You can leave this page; it keeps its place."
 
 
 # --------------------------------------------------------------------------- counts
@@ -152,7 +157,7 @@ def test_every_state_has_its_own_headline():
         headline = job_page.headline(*args)
         assert (headline.label, headline.state) == (label, state), args
     assert job_page.headline("done", "", None, waiting).message == (
-        "2 decisions need you before you share it."
+        "2 decisions need you before you give it to students."
     )
     assert job_page.headline("done", "", None, images).message == (
         "1 equation is shown as an image that screen readers cannot read."
@@ -493,7 +498,7 @@ def test_the_open_decisions_line_says_what_the_reader_may_do():
     owner = job_page.headline("done", "", None, waiting).message
     reviewer = job_page.headline("done", "", None, waiting, "review").message
     viewer = job_page.headline("done", "", None, waiting, "view").message
-    assert owner == "2 decisions need you before you share it."
+    assert owner == "2 decisions need you before you give it to students."
     assert reviewer == "2 decisions are still open. You can review them."
     assert viewer.startswith("2 decisions are still open. Only the owner or a reviewer")
     assert "need you" not in reviewer and "need you" not in viewer

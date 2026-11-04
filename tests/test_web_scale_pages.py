@@ -176,18 +176,18 @@ def finished(tmp_path):
 def test_the_results_page_offers_a_revised_version_with_decisions_open_and_when_ready(finished):
     link = f'href="/app?revises={finished.job_id}#upload-heading"'
     page = finished.browser.get(f"/jobs/{finished.job_id}").text
-    assert page.count(link) == 2  # in the actions, and in its own section lower down
-    assert 'data-role="revise"' in page
+    # Once, in "Settings and sharing" (ux2-lane-a): not repeated beside the review actions.
+    assert page.count(link) == 1 and 'data-role="revise"' in page
+    assert page.index("settings-heading") < page.index(link)
 
 
-def test_my_documents_has_the_link_on_each_finished_row_only(finished):
-    queued = job_id_from(upload(finished.browser, make_pdf(1)))
+def test_my_documents_rows_offer_one_next_step_and_delete_not_a_revision(finished):
+    """A revised version starts from the document's own page: the list keeps a row to its
+    file name, one next step and Delete (fewer repeated links per row)."""
     page = finished.browser.get("/app").text
-    assert f'id="rev-{finished.job_id}"' in page
-    assert f'href="/app?revises={finished.job_id}#upload-heading"' in page
-    assert f'id="rev-{queued}"' not in page  # not converted yet
-    row = page[page.index(f'id="rev-{finished.job_id}"') :][:400]
-    assert "Upload a revised version" in row and "visually-hidden" in row
+    assert f'id="rev-{finished.job_id}"' not in page
+    assert f'href="/app?revises={finished.job_id}#upload-heading"' not in page
+    assert f'id="act-{finished.job_id}"' in page and f'id="del-{finished.job_id}"' in page
 
 
 def test_the_revision_form_opens_from_the_link(finished):

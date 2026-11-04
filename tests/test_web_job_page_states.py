@@ -86,7 +86,7 @@ def test_open_decisions_are_the_headline_and_the_review_is_one_click_away(web):
     html = web.browser.get(f"/jobs/{job_id}").text
     assert title(html) == "Converted: SECRET-HEADING Kinematics | ReadableSTEM"
     status = page_text(section_of_status(html))
-    assert "Converted 3 decisions need you before you share it." in status
+    assert "Converted 3 decisions need you before you give it to students." in status
     actions = html[
         html.index('id="next-actions"') : html.index("</ul>", html.index("next-actions"))
     ]
@@ -115,19 +115,20 @@ def test_nothing_to_decide_is_ready_to_share_with_the_download_first(web):
     ready = page_text(section(html, "ready-heading"))
     assert "Nothing in this file needed your decision." in ready
     assert f'<a class="button" href="/jobs/{job_id}/download">Download the HTML file</a>' in html
-    assert "Before you share" in ready and "Put it in your course" in ready
+    assert "Before you share" in ready and "Where will you post it?" in ready
+    assert "Recommended" in ready
     assert "Do not paste it into a page editor" in ready
     # As the posting help says: the HTML is the main version, linked where the PDF was.
-    assert "link to it where the PDF was linked, so it is the main version" in ready
+    assert "link to it where the PDF was." in ready
     assert "next to the PDF" not in ready
-    # One link to the posting help (ux-a's Canvas steps), in "Put it in your course";
+    # One link to the posting help (ux-a's Canvas steps), in the recommended route;
     # the two questions after a download follow it, hidden until a download.
     main = html[html.index("<main") : html.index("</main>")]  # the footer links it too
     assert main.count('href="/help/posting"') == 1
     assert 'href="/help/posting">How to post it in your course</a>' in section(
         html, "ready-heading"
     )
-    assert html.index('id="course-heading"') < html.index('id="feedback"')
+    assert html.index('id="post-heading"') < html.index('id="feedback"')
     assert "draft" not in html.lower()
 
 
@@ -165,7 +166,7 @@ def test_an_ai_outage_is_not_shown_as_finished(web):
     text = page_text(html)
     assert "did not answer for 4 of 4 equations and figures" in text
     assert "Nothing is wrong with your PDF" in text
-    assert "4 decisions need you before you share it." in text
+    assert "4 decisions need you before you give it to students." in text
     assert 'id="partial-note"' in html
     assert "All 0 checks" not in text
 
@@ -278,7 +279,7 @@ def test_waiting_gives_an_estimate_and_counts_your_own_documents(web):
     mine = job_id_from(upload(web.browser, make_pdf(1)))
     text = page_text(web.browser.get(f"/jobs/{mine}").text)
     # 6 pages at the default pace (no finished job to go by yet): 60 s.
-    assert "2 documents ahead of yours (1 is yours), about 1 minute to go." in text
+    assert "2 documents ahead of yours (1 is yours), about 1 minute to go (an estimate)." in text
     assert "You can leave this page; it keeps its place." in text
     assert "next in line, less than a minute to go" in page_text(
         web.browser.get(f"/jobs/{first}").text
@@ -419,7 +420,7 @@ def test_for_a_tagged_pdf_the_examples_say_text_layer_not_what_a_reader_gets(web
     job_id = convert(web, source_facts=FACTS.model_copy(update={"tagged": True}))
     text = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "changed-heading"))
     assert "Your PDF's text layer gives: “x 2 plus 1”" in text
-    assert "a screen reader may get more from it than its text layer" in text
+    assert "a reader may get more than its text layer" in text
     assert "From your PDF a screen reader gets" not in text
 
 

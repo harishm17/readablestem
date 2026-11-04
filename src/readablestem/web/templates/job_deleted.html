@@ -1,21 +1,17 @@
 {% extends "base.html" %}
 {# What the owner of a deleted document finds at its old address (routes/jobs.py
-   `_missing`, UX review MF10). `kept`: how long it was kept ("24 hours", "30 days") when
-   the row still says so; empty once the purge has removed it, when only the owner's
-   usage events remember the upload. #}
+   `_missing`, UX review MF10). `kept`: how long it was kept ("24 hours", "30 days") when the
+   row still says so; empty once the purge has removed it. Retention slides with the owner's
+   work (web/retention.py), so it is never said to run "after upload"; the page gives the
+   times that apply now. #}
 {% block title %}Document deleted{% endblock %}
 {% block content %}
 <h1>This document has been deleted</h1>
-{% if kept %}
-<p>It was deleted automatically {{ kept }} after upload, as promised when you uploaded it.</p>
-{% else %}
-<p>Documents are deleted automatically {{ retention_hours }} hours after you last worked on
-  them (7 days if you chose to keep them, {{ opt_in_days }} if you also let us look at the
-  results), or earlier if you delete them yourself.</p>
-{% endif %}
-<p>Files you downloaded are not affected. To start again, upload the PDF again.</p>
+<p>{% if kept %}Deleted automatically after {{ kept }} in all. {% endif %}Documents go
+  {{ retention_hours }} hours after you last work on them (7 days if you keep them,
+  {{ opt_in_days }} days from upload if you share results). Files you downloaded are not affected.</p>
 <ul class="actions">
+  <li><a class="button" href="/app#upload-heading">Upload the PDF again</a></li>
   <li><a href="/app">Go to my documents</a></li>
-  <li><a href="/">Go to the home page</a></li>
 </ul>
 {% endblock %}

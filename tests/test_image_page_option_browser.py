@@ -121,6 +121,7 @@ def upload(page, site, *, ask: bool) -> None:
         files=[{"name": "notes.pdf", "mimeType": "application/pdf", "buffer": SCAN}]
     )
     if ask:
+        page.locator("#group-convert > summary").click()  # the groups are one line until opened
         page.get_by_label(OFFER).check()
     page.get_by_role("button", name="Upload and convert").click()
 
@@ -142,15 +143,14 @@ def job(site, browser) -> str:
 def test_the_option_is_a_labelled_unchecked_checkbox_with_its_explanation(browser, site):
     context, page = open_page(browser, site)
     page.goto(f"{site.base}/app")
+    page.locator("#group-convert > summary").click()  # the groups are one line until opened
     box = page.get_by_label(OFFER)
     assert box.count() == 1 and not box.is_checked()
     label = page.locator("label[for=image_pages]").inner_text()
-    assert label.strip() == OFFER  # short; the cost is the first thing the hint says
+    assert label.strip() == OFFER  # short; the rule is the first thing the hint says
     hint = " ".join(page.locator("#image-pages-hint").inner_text().split())
-    assert hint.startswith("Slower, and you check every converted equation and table.")
-    # the long explanation is disclosed under the option, in the same group
-    more = " ".join(page.locator(".image-pages-choice .more-detail").text_content().split())
-    assert "does nothing for a PDF that has no scanned or handwritten pages" in more
+    assert hint.startswith("Needed for a PDF that is all scans or handwriting")
+    assert "Slower" in hint
     described = box.get_attribute("aria-describedby")
     assert described == "image-pages-hint"
     context.close()
@@ -159,6 +159,7 @@ def test_the_option_is_a_labelled_unchecked_checkbox_with_its_explanation(browse
 def test_the_option_can_be_ticked_with_the_keyboard(browser, site):
     context, page = open_page(browser, site)
     page.goto(f"{site.base}/app")
+    page.locator("#group-convert > summary").click()  # the groups are one line until opened
     page.get_by_label(OFFER).focus()
     page.keyboard.press("Space")
     assert page.get_by_label(OFFER).is_checked()
@@ -194,7 +195,7 @@ def test_a_scan_without_the_option_is_refused_with_the_way_to_ask(browser, site,
     upload(page, site, ask=False)
     page.wait_for_load_state("networkidle")
     body = " ".join(page.locator("main").inner_text().split())
-    assert "is scanned, so this tool cannot convert it" in body
+    assert "has only scanned pages, which are read only when you ask" in body
     assert "Convert scanned or handwritten pages" in body
     assert page.get_by_label(OFFER).count() == 1  # the form is still there to tick it
     found = strict_axe(page, axe_source)

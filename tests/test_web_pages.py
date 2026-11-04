@@ -150,7 +150,8 @@ def test_privacy_and_terms_describe_real_behaviour(pages):
     privacy = " ".join(pages["/privacy"].split())
     assert "deleted automatically <strong>24 hours</strong> after you last worked on it" in privacy
     assert "<strong>7 days</strong>" in privacy and "<strong>30 days</strong>" in privacy
-    assert "Both boxes are unticked unless you tick them" in privacy
+    assert "can be made the default for new uploads in" in privacy
+    assert "does not keep it longer" in privacy  # sharing does not extend the owner clock
     assert "We do not use your uploads to train models, sell them or share them" in privacy
     assert "beta built and maintained by Harish Manoharan" in privacy
     assert "an individual developer" not in privacy and "not a company" not in privacy

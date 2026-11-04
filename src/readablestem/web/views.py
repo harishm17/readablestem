@@ -95,8 +95,8 @@ JOB_ERROR_MESSAGES = {
     "or upload the PDF instead.",
     "source_busy": "The server is busy right now and could not start converting this LaTeX "
     "source. Try again in a few minutes, or upload the PDF instead.",
-    "source_unavailable": "LaTeX source cannot be converted on this server right now. "
-    "Upload the PDF instead.",
+    "source_unavailable": "LaTeX source is not available on this server at the moment, so "
+    "this file was not converted. Compile it to a PDF and upload that.",
     "internal_error": "Something went wrong on our side. The error was recorded without any "
     "of your document's content. You can use “Try again”: what was already converted is kept.",
     # Codes with a longer explanation of what to do next (scanned PDFs, no model key,
@@ -106,7 +106,9 @@ JOB_ERROR_MESSAGES = {
 
 
 def job_error_message(code: str | None) -> str:
-    return JOB_ERROR_MESSAGES.get(code or "", "The conversion stopped unexpectedly.")
+    return JOB_ERROR_MESSAGES.get(
+        code or "", "The conversion stopped, and the tool has no more specific reason to show."
+    )
 
 
 @dataclass
@@ -172,6 +174,12 @@ class JobView:
     # While queued: how many of the jobs ahead are this user's, and the estimated wait.
     ahead_yours: int = 0
     wait_s: float | None = None
+    # While waiting or converting: since when (the upload for a waiting job that was never
+    # tried again, the start of the attempt for a running one), and after how many seconds
+    # that counts as longer than usual (`job_page.slow_after`). The page counts the elapsed
+    # time itself; no percentage or finish time is made up.
+    waiting_since: datetime | None = None
+    slow_after_s: float = 0.0
     # "Try again" (T3-1, `web.retry`): the offer for a stopped or partly converted job, how
     # many tries it has had, and whether the AI service is not answering right now.
     retry: retry_rules.Offer | None = None
@@ -243,6 +251,24 @@ class JobView:
         """Changes whenever the list of steps would look different (its own poll)."""
         lines = "|".join(f"{line.text}:{line.state}" for line in self.stage_lines)
         return f"{self.status}-{zlib.crc32(lines.encode()):08x}"
+
+    @property
+    def waited_s(self) -> float | None:
+        """Seconds since the wait began, as of now; None when it is not a wait to count."""
+        if self.waiting_since is None or self.status not in (JobStatus.QUEUED, JobStatus.RUNNING):
+            return None
+        return max(0.0, (utcnow() - self.waiting_since).total_seconds())
+
+    @property
+    def waited_text(self) -> str:
+        waited = self.waited_s
+        return job_page.elapsed_words(waited) if waited is not None else ""
+
+    @property
+    def slow(self) -> bool:
+        """The wait has gone on longer than usual for a document like this."""
+        waited = self.waited_s
+        return waited is not None and waited > self.slow_after_s
 
     @property
     def status_label(self) -> str:
@@ -484,6 +510,15 @@ def job_view(
     yours, wait_s = (
         queue_wait(session, job) if with_page and job.status == JobStatus.QUEUED else (0, None)
     )
+    since = None
+    slow_s = 0.0
+    if with_page and job.status == JobStatus.QUEUED and not job.retries:
+        since = as_utc(job.created_at)
+        slow_s = job_page.slow_after(wait_s)
+    elif with_page and job.status == JobStatus.RUNNING:
+        since = as_utc(job.started_at) or as_utc(job.created_at)
+        pace = seconds_per_page(session)
+        slow_s = job_page.slow_after((job.page_count or 0) * pace)
     page = None
     carried = None
     if with_page and job.status == JobStatus.DONE and job.result_json:
@@ -517,6 +552,8 @@ def job_view(
         result_version=job.result_version or 0,
         ahead_yours=yours,
         wait_s=wait_s,
+        waiting_since=since,
+        slow_after_s=slow_s,
         progress=job.progress_json if job.status == JobStatus.RUNNING else None,
         page=page,
         title=titles.effective_title(

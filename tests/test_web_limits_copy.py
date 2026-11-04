@@ -56,8 +56,8 @@ def test_the_limits_page_names_the_configured_limits(web):
 def test_the_upload_form_names_the_configured_limits(web):
     text = flat(web.alice.get("/app").text)
     # the site copy (content/site-rewrite) states each limit once, from the settings
-    assert "Up to 77 pages and 66 MB each." in text
-    assert "up to 333 pages and 88 MB, is kept" in text
+    assert "up to 77 pages and 66 MB." in text
+    assert "up to 333 pages, 88 MB) are kept" in text
     for old in OLD:
         assert old not in text, old
     page = web.alice.get("/app").text
