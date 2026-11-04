@@ -922,7 +922,7 @@ class _Run:
         ):
             return None
         parent = self.parents.get(element.parent_id or "")
-        across = (parent.bbox[0], parent.bbox[2]) if parent is not None else None
+        across = layout.line_across(parent, element)
         try:
             return layout.crop_line(self.pdf_bytes, element, across)
         except Exception as exc:
@@ -939,7 +939,7 @@ class _Run:
             return
         reach = self.settings.equation_line_context and element.display == "inline"
         parent = self.parents.get(element.parent_id or "")
-        across = (parent.bbox[0], parent.bbox[2]) if parent is not None else None
+        across = layout.line_across(parent, element)
         try:
             glyphs = layout.line_glyphs(self.pdf_bytes, element, across, reach=reach)
         except Exception as exc:

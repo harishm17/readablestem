@@ -566,6 +566,20 @@ def _line_clip(
     return clip
 
 
+def line_across(parent: Element | None, element: Element) -> tuple[float, float] | None:
+    """The x-range the line of an inline equation is cut from (`crop_line`, `line_glyphs`): its
+    paragraph's. A cell equation of a table is cut to its own cell's columns, not the table's
+    width: the next column's text ("(5)", a reference mark) is not part of its formula and the
+    model read it into it. None without a parent."""
+    if parent is None:
+        return None
+    if parent.table is not None:
+        for cell in parent.table.cells:
+            if cell.equation_id == element.id and cell.bbox is not None:
+                return (cell.bbox[0], cell.bbox[2])
+    return (parent.bbox[0], parent.bbox[2])
+
+
 def crop_line(
     pdf_bytes: bytes,
     element: Element,

@@ -20,6 +20,7 @@ from readablestem.core.types import (
     Element,
     EquationFix,
     Fix,
+    GlyphContext,
     Kind,
     Status,
     TableCell,
@@ -30,7 +31,13 @@ from readablestem.gold import safe_tex
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import equation_step, figure_step, layout, run, table_math, table_step
 from readablestem.pipeline.assemble import render_html
-from readablestem.pipeline.layout import Layout, analyze
+from readablestem.pipeline.layout import (
+    Layout,
+    analyze,
+    crop_line,
+    line_across,
+    line_glyphs,
+)
 
 # ------------------------------------------------------------------ the layout side
 
@@ -142,6 +149,66 @@ def test_a_symbol_glyph_outside_a_table_is_not_an_equation():
     page.insert_text((100, 130), "•", fontsize=11, fontname="symb")
     page.insert_text((115, 130), "an item of a list", fontsize=11, fontname="helv")
     assert [e for e in analyze(doc.tobytes()).elements if e.kind == Kind.EQUATION] == []
+
+
+def neighbour_page() -> bytes:
+    """A ruled table whose formula cell has the next column's "(5)" 20 points to its right."""
+    doc = pymupdf.open()
+    doc.set_metadata({"producer": "pdfTeX-1.40.25"})
+    page = doc.new_page(width=612, height=792)
+    x = [100, 220, 340]
+    y = [100, 130, 160]
+    for k in x:
+        page.draw_line((k, y[0]), (k, y[-1]))
+    for k in y:
+        page.draw_line((x[0], k), (x[-1], k))
+    page.insert_text((106, y[0] + 19), "Name", fontsize=11, fontname="helv")
+    page.insert_text((226, y[0] + 19), "Ref", fontsize=11, fontname="helv")
+    x0 = 106
+    for text, font in (
+        ("T", "heit"),
+        (" = 2", "helv"),
+        ("p", "heit"),
+        ("/", "helv"),
+        ("w", "heit"),
+    ):
+        page.insert_text((x0, y[1] + 19), text, fontsize=11, fontname=font)
+        x0 += pymupdf.get_text_length(text, fontname=font, fontsize=11)
+    page.insert_text((226, y[1] + 19), "(5)", fontsize=11, fontname="helv")
+    return doc.tobytes()
+
+
+def test_a_cell_equations_line_is_cut_to_its_own_column():
+    """The line the equation step sees (the crop and the glyphs around the box) stops at the
+    cell's column: the table's width took the next column's "(5)" into the reading."""
+    data = neighbour_page()
+    layout, found = tables_of(data)
+    table = found[0]
+    cell = next(c for c in table.table.cells if c.equation_id)
+    equation = next(e for e in layout.elements if e.id == cell.equation_id)
+    across = line_across(table, equation)
+    assert across == (cell.bbox[0], cell.bbox[2])
+    assert across[1] < 226  # not the table's right edge
+    glyphs = glyph_context(data, equation, across)
+    assert "(" not in glyphs.after and "5" not in glyphs.after
+    wide = glyph_context(data, equation, (table.bbox[0], table.bbox[2]))
+    assert "(5)" in "".join(c for c, _ in GlyphContext.decode(wide.after))
+    narrow_png = crop_line(data, equation, across)
+    wide_png = crop_line(data, equation, (table.bbox[0], table.bbox[2]))
+    assert len(narrow_png) != len(wide_png)
+
+
+def test_a_paragraph_equations_line_still_spans_the_paragraph():
+    parent = Element(id="p1-e0", kind=Kind.PARAGRAPH, page=0, bbox=(72, 100, 500, 120), order=0)
+    child = Element(id="p1-e1", kind=Kind.EQUATION, page=0, bbox=(100, 100, 120, 110), order=1)
+    assert line_across(parent, child) == (72, 500)
+    assert line_across(None, child) is None
+
+
+def glyph_context(data: bytes, equation: Element, across: tuple[float, float]) -> GlyphContext:
+    context = line_glyphs(data, equation, across)
+    assert context is not None
+    return context
 
 
 TECTONIC_CACHE = safe_tex.tectonic_cache().is_dir()
