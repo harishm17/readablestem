@@ -178,11 +178,12 @@ def count_tasks() -> int | None:
     L, so the count is that smallest L minus 2."""
     ceiling = nproc_ceiling()
     high = min(64, ceiling)
+    low = 0  # (a limit of 0 never fits)
     while not fork_fits(high):
         if high >= ceiling:
             return None
+        low = high  # known not to fit
         high = min(high * 2, ceiling)
-    low = high // 2  # (does not fit, or is 32: below any real count)
     while high - low > 1:
         middle = (low + high) // 2
         if fork_fits(middle):

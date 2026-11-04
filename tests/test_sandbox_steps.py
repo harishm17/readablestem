@@ -670,3 +670,56 @@ def test_a_failed_latexml_run_says_which_step_it_was_in(tmp_path, monkeypatch):
     assert any(line.startswith("latexml_log=") and "fork_failed" in line for line in lines)
     assert not report.passed  # the diagnostic lines are information; the failure is `latexml`
     assert all(not c.required for c in report.checks if c.name.startswith("latexml_"))
+
+
+COUNT_SMALL = r"""
+import importlib.util, os, sys
+sys.path.insert(0, "/src")
+from readablestem.core import sandbox
+spec = importlib.util.spec_from_file_location("l", sandbox.LAUNCHER)
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+visible = sum(len(os.listdir(f"/proc/{p}/task")) for p in os.listdir("/proc") if p.isdigit())
+print("visible", visible, "counted", m.count_tasks())
+"""
+
+
+@pytest.mark.skipif(
+    shutil.which("podman") is None
+    or subprocess.run(
+        ["podman", "image", "exists", "localhost/mini-latexml"], capture_output=True
+    ).returncode
+    != 0,
+    reason="needs podman and the localhost/mini-latexml image (docs/deploy-railway.md)",
+)
+def test_the_count_is_exact_when_the_user_has_very_few_tasks(tmp_path):
+    """A count below the search's first guess (64) is found too (a quiet container: the process
+    and nothing else): the program's limit is then the real count plus the allowance, not a
+    guess of 30 more."""
+    root = Path(sandbox.LAUNCHER).parents[2]
+    (tmp_path / "count.py").write_text(COUNT_SMALL)
+    tmp_path.chmod(0o755)
+    (tmp_path / "count.py").chmod(0o644)
+    done = subprocess.run(
+        [
+            "podman", "run", "--rm", "--user", "10001:10001", "--read-only",
+            "-v", f"{root}:/src:ro", "-v", f"{tmp_path}:/rail:ro",
+            "localhost/mini-latexml", "python3", "/rail/count.py",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=100,
+    )  # fmt: skip
+    _, visible, _, counted = done.stdout.split()
+    # (>=, not ==: another container of this test run, such as the hidden-tasks test, may share the
+    # user namespace and its tasks count too, which is the point of asking the kernel)
+    assert int(counted) >= int(visible), done.stdout
+
+
+@pytest.mark.parametrize("real", [1, 2, 5, 31, 32, 33, 63, 64, 65, 127, 128, 500, 5000])
+def test_the_search_finds_the_count_wherever_it_is(launcher, monkeypatch, real):
+    """`fork_fits(L)` is true when L is at least the count plus 2 (the asking child and the fork);
+    the search must give back the count for every size, in particular below its first guess."""
+    monkeypatch.setattr(launcher, "fork_fits", lambda limit: limit >= real + 2)
+    monkeypatch.setattr(launcher, "nproc_ceiling", lambda: 1 << 22)
+    assert launcher.count_tasks() == real
