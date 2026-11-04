@@ -239,7 +239,7 @@ def _check_limits(report: Report, tmp: Path) -> None:
         limits=sandbox.Limits(wall_s=20, pids=16),
     )
     # (Landlock: the user's own threads start and stop meanwhile, so a few more are allowed.)
-    allowed = 16 + (sandbox.LANDLOCK_NPROC_SLACK if sandbox.backend() == "landlock" else 0)
+    allowed = sandbox.Limits(pids=16).task_bound(sandbox.backend())
     report.add(
         "sandbox_task_cap", "ok" if text.strip().isdigit() and int(text) <= allowed else "fail"
     )
@@ -290,20 +290,20 @@ def _check_limits(report: Report, tmp: Path) -> None:
 
 
 def total_bound_mb(*, cgroup: bool) -> int:
-    """What a source conversion may use in all, in MB: the cgroup's memory limit when there is a
-    cgroup; else the resident-memory cap of the whole group that `sandbox.run` polls for
-    (`Limits.group_memory_bytes`; it is enforced every 0.2 s, so a burst between two polls can
-    pass it by what the allowed tasks can touch in that time); else the tasks it may have times
-    the address space each may map (the worst case, and a loose one)."""
+    """What a source conversion can map in all, in MB: the cgroup's memory limit when there is a
+    cgroup, else the tasks it may have (`Limits.task_bound` for the backend in use) times the
+    address space each may map: a hard bound on what the kernel will give, though a loose one
+    (address space is more than memory in use). The resident-memory poll
+    (`Limits.group_memory_bytes`, `sandbox_group_poll_cap_mb`) kills the group earlier than that,
+    every 0.1 s, so a burst between two polls is what the tasks can touch in 0.1 s."""
     from readablestem.source import latexml
 
     limits = latexml.LIMITS
-    if cgroup:
-        total = limits.memory_bytes
-    elif limits.group_memory_bytes:
-        total = limits.group_memory_bytes
-    else:
-        total = limits.pids * limits.memory_bytes
+    total = (
+        limits.memory_bytes
+        if cgroup
+        else limits.task_bound(sandbox.backend()) * limits.memory_bytes
+    )
     return -(-total // (1024 * 1024))
 
 
@@ -314,6 +314,10 @@ def _check_total_bound(report: Report, *, cgroup: bool) -> None:
 
     bound = total_bound_mb(cgroup=cgroup)
     report.add("sandbox_total_bound_mb", str(bound), required=False)
+    from readablestem.source import latexml
+
+    poll_cap = latexml.LIMITS.group_memory_bytes // (1024 * 1024)
+    report.add("sandbox_group_poll_cap_mb", str(poll_cap), required=False)
     allowed = get_settings().source_sandbox_max_total_mb
     report.add("sandbox_total_bound", "ok" if bound <= allowed else "fail", required=False)
 

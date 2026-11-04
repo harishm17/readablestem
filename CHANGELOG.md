@@ -10,6 +10,14 @@
   the subreaper and dies with its caller. Chosen automatically; the same probe gates it
   (`backend=bwrap|landlock`, new in-sandbox checks). The web process and the conversion child
   call `PR_SET_DUMPABLE=0`. `tests/test_source_escapes.py` runs on both backends.
+- Hardened after review: Landlock ABI 6 is required (signal and abstract-socket scopes); the
+  strict filter also denies calls that name another process of the user (`prlimit64` and the
+  scheduler calls except on pid 0, `setpriority`, `ioprio_set`, pidfds, `kcmp`), memory and disk
+  outside the counters (`memfd_create`, System V and POSIX IPC, `execveat` of an open file), and
+  changes to file mode, owner, times and extended attributes; unlinked-but-open files count
+  against the output budget and the entries in the writable folders are capped; the task bound
+  is 4 x 512 MB and the probe fails over `SOURCE_SANDBOX_MAX_TOTAL_MB`; the memory poll is
+  every 0.1 s; the supervisor watches its caller's pid instead of `PR_SET_PDEATHSIG`.
 
 ## Unreleased: equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
 

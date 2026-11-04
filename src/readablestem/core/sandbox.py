@@ -35,6 +35,7 @@ import functools
 import os
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -42,7 +43,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-POLL_SECONDS = 0.2
+POLL_SECONDS = 0.1
 # Processes (threads count) the program and what it starts may add to what this user already has,
 # and open files. RLIMIT_NPROC counts every task of the user, the web app's threads included, so
 # the limit is "now plus this much", worked out when the sandbox starts (`_nproc_limit`).
@@ -50,9 +51,9 @@ NPROC_EXTRA = 64
 NOFILE = 256
 # Landlock backend: RLIMIT_NPROC counts every task of the user, the web app's threads included,
 # which come and go while a conversion runs; this many more than asked for keep a thread started
-# meanwhile from making LaTeXML's own forks fail. The sum over tasks is bounded by
-# `Limits.group_memory_bytes`, not by this.
-LANDLOCK_NPROC_SLACK = 8
+# meanwhile from making LaTeXML's own forks fail. It adds to the tasks of the bound
+# (`Limits.task_bound`), so it is small.
+LANDLOCK_NPROC_SLACK = 2
 TMPFS_BYTES = 128_000_000
 
 # Read-only system trees; each is skipped when absent. No /home, /root, /var, /mnt or /srv.
@@ -154,6 +155,18 @@ class Limits:
     # cgroup cannot be made it is what bounds the sum over tasks that the per-process address
     # space limit does not.
     group_memory_bytes: int = 0
+    # Entries (files and folders) the program may have made in its writable folders; over it the
+    # group is killed (a million empty files fill the inodes, not the bytes).
+    max_entries: int = 5000
+    # Tasks the program may have on the Landlock backend, whose first task is the program
+    # itself (there is no init and no `prlimit` in front of it): None means `pids`.
+    landlock_pids: int | None = None
+
+    def task_bound(self, backend_name: str | None) -> int:
+        """The most tasks the program and what it starts can be, on a backend."""
+        if backend_name == "landlock":
+            return (self.landlock_pids or self.pids) + LANDLOCK_NPROC_SLACK
+        return self.pids
 
 
 @dataclass
@@ -182,7 +195,9 @@ def prlimit_path() -> str | None:
 
 
 BACKEND_ENV = "READABLESTEM_SANDBOX_BACKEND"  # "bwrap" or "landlock": try only that one
-LANDLOCK_MIN_ABI = 3  # path rights plus REFER (2) and TRUNCATE (3)
+# Path rights plus REFER (2) and TRUNCATE (3), TCP rules (4), IOCTL_DEV (5), and the scopes that
+# keep a signal or an abstract unix socket inside the sandbox (6).
+LANDLOCK_MIN_ABI = 6
 LAUNCHER = Path(__file__).with_name("landlock_exec.py")
 # Shown in place of a file of the system that must look absent (`hide`), on the Landlock backend:
 # an executable that does nothing, first on PATH.
@@ -318,9 +333,9 @@ def build_argv(
     return args
 
 
-def group_rss_bytes(root: int) -> int:
-    """Resident memory, in bytes, of process `root` and every descendant of it (from /proc: the
-    tree by parent, which holds whatever the program does to its own group or session)."""
+def process_tree(root: int) -> tuple[set[int], int]:
+    """(pids of `root` and every descendant of it, their resident memory in bytes), from /proc:
+    the tree by parent, which holds whatever the program does to its own group or session."""
     page = os.sysconf("SC_PAGE_SIZE")
     parents: dict[int, int] = {}
     pages: dict[int, int] = {}
@@ -329,11 +344,11 @@ def group_rss_bytes(root: int) -> int:
             if not entry.name.isdigit():
                 continue
             try:
-                stat = Path(f"/proc/{entry.name}/stat").read_text()
-                parents[int(entry.name)] = int(stat[stat.rindex(")") + 2 :].split()[1])
-                pages[int(entry.name)] = int(
-                    Path(f"/proc/{entry.name}/statm").read_text().split()[1]
-                )
+                with open(f"/proc/{entry.name}/stat") as handle:
+                    text = handle.read()
+                fields = text[text.rindex(")") + 2 :].split()
+                parents[int(entry.name)] = int(fields[1])
+                pages[int(entry.name)] = int(fields[21])  # rss, in pages
             except (OSError, ValueError, IndexError):
                 continue
     tree = {root}
@@ -344,17 +359,49 @@ def group_rss_bytes(root: int) -> int:
             if parent in tree and pid not in tree:
                 tree.add(pid)
                 grew = True
-    return sum(pages.get(pid, 0) for pid in tree) * page
+    return tree, sum(pages.get(pid, 0) for pid in tree) * page
 
 
-def _tree_bytes(*roots: Path) -> int:
+def group_rss_bytes(root: int) -> int:
+    """Resident memory, in bytes, of `root` and every descendant of it."""
+    return process_tree(root)[1]
+
+
+def deleted_open_bytes(pids: set[int]) -> int:
+    """Bytes held by regular files that these processes still have open but that are no longer
+    in any folder (unlinked): the folder counters cannot see them."""
     total = 0
+    for pid in pids:
+        try:
+            names = os.listdir(f"/proc/{pid}/fd")
+        except OSError:
+            continue
+        for name in names:
+            try:
+                info = os.stat(f"/proc/{pid}/fd/{name}")
+            except OSError:
+                continue
+            if stat.S_ISREG(info.st_mode) and info.st_nlink == 0:
+                total += info.st_blocks * 512
+    return total
+
+
+def _tree_usage(roots: tuple[Path, ...], cap: int) -> tuple[int, int]:
+    """(bytes, entries) under `roots`; stops counting once entries pass `cap`."""
+    total = entries = 0
     for root in roots:
-        for folder, _dirs, files in os.walk(root):
+        for folder, dirs, files in os.walk(root):
+            entries += len(dirs) + len(files)
+            if entries > cap:
+                return total, entries
             for name in files:
                 with contextlib.suppress(OSError):
                     total += os.lstat(os.path.join(folder, name)).st_size
-    return total
+    return total, entries
+
+
+def _tree_bytes(*roots: Path) -> int:
+    return _tree_usage(roots, 1 << 62)[0]
 
 
 _CGROUP_TAG = "readablestem-sandbox"
@@ -493,7 +540,8 @@ def _landlock_spec(
         "env": environment,
         "limits": {
             "as": limits.memory_bytes, "cpu": limits.cpu_s, "fsize": limits.file_bytes,
-            "core": 0, "nofile": NOFILE, "pids": limits.pids, "slack": LANDLOCK_NPROC_SLACK,
+            "core": 0, "nofile": NOFILE, "pids": limits.landlock_pids or limits.pids,
+            "slack": LANDLOCK_NPROC_SLACK,
         },
         "seccomp": base64.b64encode(program).decode() if program else "",
         "cmd": command,
@@ -578,11 +626,15 @@ def _run(
             except subprocess.TimeoutExpired:
                 pass
             timed_out = time.monotonic() > deadline
-            written = _tree_bytes(*rw_hosts) + (log.stat().st_size if log and log.exists() else 0)
-            over = written > limits.out_bytes
-            heavy = bool(limits.group_memory_bytes) and (
-                group_rss_bytes(proc.pid) > limits.group_memory_bytes
+            size, entries = _tree_usage(rw_hosts, limits.max_entries)
+            tree, resident = process_tree(proc.pid)
+            written = (
+                size
+                + deleted_open_bytes(tree)
+                + (log.stat().st_size if log and log.exists() else 0)
             )
+            over = written > limits.out_bytes or entries > limits.max_entries
+            heavy = bool(limits.group_memory_bytes) and resident > limits.group_memory_bytes
             if timed_out or over or heavy:
                 with contextlib.suppress(ProcessLookupError):
                     os.killpg(proc.pid, signal.SIGKILL)

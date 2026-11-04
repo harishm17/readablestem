@@ -42,6 +42,7 @@ LIMITS = sandbox.Limits(
     out_bytes=200_000_000,
     pids=4,
     group_memory_bytes=768 * 1024 * 1024,
+    landlock_pids=2,
 )
 
 # LaTeXML finds a package's own TeX with `kpsewhich`. With TeX Live's base installed (the image's

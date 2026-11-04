@@ -468,9 +468,14 @@ def test_latexmls_limits_bound_the_worst_case_below_the_setting(monkeypatch):
 
     limits = latexml.LIMITS
     assert limits.pids == 4 and limits.memory_bytes == 512 * 1024 * 1024
-    assert sandbox_probe.total_bound_mb(cgroup=False) == 768  # the polled group cap
-    monkeypatch.setattr(latexml, "LIMITS", dataclasses.replace(limits, group_memory_bytes=0))
-    assert sandbox_probe.total_bound_mb(cgroup=False) == 2048  # tasks x address space
+    # tasks x address space, whichever backend is in use (4 x 512 MB: the Landlock backend's 2
+    # tasks of the program plus 2 of slack, or the bubblewrap sandbox's 4)
+    assert sandbox_probe.total_bound_mb(cgroup=False) == 2048
+    for backend_name in ("bwrap", "landlock"):
+        assert limits.task_bound(backend_name) * limits.memory_bytes == 2048 * 1024 * 1024
+    monkeypatch.setattr(latexml, "LIMITS", dataclasses.replace(limits, landlock_pids=3))
+    monkeypatch.setattr(sandbox, "backend", lambda: "landlock")
+    assert sandbox_probe.total_bound_mb(cgroup=False) == 2560  # one more task: over the setting
     assert sandbox_probe.total_bound_mb(cgroup=True) == 512
     assert Settings(_env_file=None).source_sandbox_max_total_mb == 2048  # type: ignore[call-arg]
 

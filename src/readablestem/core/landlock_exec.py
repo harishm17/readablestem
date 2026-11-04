@@ -8,9 +8,9 @@ cannot start (no unprivileged user namespaces). It is run by file path, never im
 in a fresh process of its own, with nothing but the spec to go on, and in this order:
 
 0. this process is the supervisor: it forks the program as its child, is the subreaper of
-   everything the program starts, dies with its caller (taking the group down) and, when the
-   program ends, kills what it left behind and reports its exit status. Steps 1 to 6 are the
-   child's;
+   everything the program starts, watches its caller by pid and takes the group down when the
+   caller is gone, and, when the program ends, kills what it left behind and reports its exit
+   status. Steps 1 to 6 are the child's;
 1. change into the working folder and close every inherited file descriptor above 2;
 2. build a Landlock ruleset that handles every filesystem right of the kernel's ABI (and, from
    ABI 4, TCP bind and connect, and from ABI 6 abstract unix sockets and signals to other
@@ -39,6 +39,7 @@ import resource
 import signal
 import struct
 import sys
+import time
 
 SYS_CREATE, SYS_ADD, SYS_RESTRICT = 444, 445, 446  # the same on x86-64 and arm64
 CREATE_VERSION = 1 << 0
@@ -251,8 +252,10 @@ def main() -> None:
         os.closerange(3, 1 << 16)
     except OSError as exc:
         fail(f"chdir: errno {exc.errno}")
-    libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM, 0, 0, 0)
-    if os.getppid() == 1:
+    # The caller is watched by its pid (below), not by PR_SET_PDEATHSIG, which fires when the
+    # *thread* that started this process exits, even while the caller lives.
+    parent = os.getppid()
+    if parent == 1:
         os._exit(125)
     libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0)
 
@@ -273,13 +276,16 @@ def main() -> None:
     status = 0
     while True:
         try:
-            pid, status = os.waitpid(child, 0)
+            pid, status = os.waitpid(child, os.WNOHANG)
             if pid == child:
                 break
         except InterruptedError:
             continue
         except ChildProcessError:
             break
+        if os.getppid() != parent:  # the caller (the process, not a thread of it) is gone
+            on_term(0, None)
+        time.sleep(0.05)
     kill_descendants()
     if os.WIFSIGNALED(status):
         signal.signal(os.WTERMSIG(status), signal.SIG_DFL)

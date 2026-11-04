@@ -24,19 +24,20 @@ pytestmark = pytest.mark.skipif(
         and seccomp.supported()
         and sys.platform == "linux"
     ),
-    reason="needs Landlock ABI 3 or later",
+    reason="needs Landlock ABI 6 or later",
 )
 PERL = "/usr/bin/perl"
 
 
-def run_perl(code: str, tmp_path: Path, *, ro=(), **kwargs):
-    """Run Perl on the Landlock backend with a writable output folder as `$ARGV[0]`."""
+def run_perl(code: str, tmp_path: Path, *, ro=(), args=(), **kwargs):
+    """Run Perl on the Landlock backend with a writable output folder as `$ARGV[0]` (and more
+    arguments after it)."""
     out = tmp_path / "out"
     out.mkdir(exist_ok=True)
     log = tmp_path / "log"
     outcome = sandbox._run(
         "landlock",
-        [PERL, "-e", code, str(out)],
+        [PERL, "-e", code, str(out), *args],
         ro=ro,
         rw=((out, "/out"),),
         env={"HOME": "/tmp"},
@@ -389,3 +390,261 @@ def test_the_strict_filter_adds_the_socket_and_session_calls_to_the_plain_one():
     assert plain is not None and strict is not None and len(strict) > len(plain)
     assert {"socket", "setsid", "landlock_restrict_self"} <= set(seccomp.denied_names(strict=True))
     assert "socket" not in seccomp.denied_names()
+
+
+# --------------------------------------------------------------------- the review's probes
+
+
+@pytest.fixture
+def victim():
+    """A process of the same user with PR_SET_DUMPABLE=0, like the web process."""
+    proc = subprocess.Popen(
+        [
+            sys.executable, "-I", "-c",
+            "import ctypes, time; ctypes.CDLL(None).prctl(4, 0, 0, 0, 0);"
+            "print('ready', flush=True); time.sleep(120)",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )  # fmt: skip
+    assert proc.stdout is not None
+    proc.stdout.readline()
+    yield proc
+    proc.kill()
+    proc.wait()
+
+
+def limits_of(pid: int) -> dict[str, str]:
+    rows = Path(f"/proc/{pid}/limits").read_text().splitlines()[1:]
+    return {row[:25].strip(): row[25:].split()[0] for row in rows}
+
+
+def test_another_process_of_the_user_cannot_be_controlled_without_a_signal(tmp_path, victim):
+    """prlimit64, the scheduler calls, priorities, ioprio and pidfds on a pid that is not the
+    caller's: every one answers EPERM and the victim is left as it was."""
+    before = limits_of(victim.pid)
+    n = seccomp.number
+    code = (
+        'my $v = $ARGV[1] + 0; my %r; my $lim = pack("QQ", 1, 1); my $p = pack("i", 0);'
+        ' my $nf = pack("QQ", 3, 3); my $aff = pack("Q", 1); my $attr = pack("L8", 56, 5);'
+        f" $r{{prlimit_cpu}} = syscall({n('prlimit64')}, $v, 0, $lim, 0);"
+        f" $r{{prlimit_nofile}} = syscall({n('prlimit64')}, $v, 7, $nf, 0);"
+        f" $r{{setscheduler}} = syscall({n('sched_setscheduler')}, $v, 5, $p);"
+        f" $r{{setparam}} = syscall({n('sched_setparam')}, $v, $p);"
+        f" $r{{setaffinity}} = syscall({n('sched_setaffinity')}, $v, 8, $aff);"
+        f" $r{{setattr}} = syscall({n('sched_setattr')}, $v, $attr, 0);"
+        f" $r{{setpriority}} = syscall({n('setpriority')}, 0, $v, 19);"
+        f" $r{{setpriority_user}} = syscall({n('setpriority')}, 2, 0, 19);"
+        f" $r{{ioprio}} = syscall({n('ioprio_set')}, 1, $v, (3 << 13) | 7);"
+        f" $r{{pidfd}} = syscall({n('pidfd_open')}, $v, 0);"
+        f" $r{{pidfd_parent}} = syscall({n('pidfd_open')}, getppid(), 0);"
+        ' print join(",", map { "$_=" . ($r{$_} < 0 ? ($!+0) : "OK") } sort keys %r);'
+    )
+    outcome, text = run_perl(code, tmp_path, args=(str(victim.pid),))
+    assert outcome.ok, text
+    results = dict(item.split("=") for item in text.split(","))
+    assert all(value == "1" for value in results.values()), results  # EPERM
+    assert limits_of(victim.pid) == before
+    assert victim.poll() is None
+
+
+def test_a_program_may_still_set_its_own_limits_and_affinity(tmp_path):
+    n = seccomp.number
+    code = (
+        'my $core = pack("QQ", 0, 0); my $aff = pack("Q", 1); my $p = pack("i", 0);'
+        f" my $a = syscall({n('prlimit64')}, 0, 4, $core, 0);"  # RLIMIT_CORE on itself
+        f" my $b = syscall({n('sched_setaffinity')}, 0, 8, $aff);"
+        f" my $c = syscall({n('sched_setscheduler')}, 0, 0, $p);"
+        ' print "$a,$b,$c";'
+    )
+    outcome, text = run_perl(code, tmp_path)
+    assert outcome.ok and text == "0,0,0", text
+
+
+def test_signals_stay_inside_the_sandbox_and_the_supervisor_is_out_of_reach(tmp_path, victim):
+    code = (
+        "my $v = $ARGV[1] + 0; $! = 0; my $a = kill(0, $v); my $ea = $!+0;"
+        ' $! = 0; my $b = kill("STOP", getppid()); my $eb = $!+0;'
+        ' $! = 0; my $c = kill("KILL", $v); my $ec = $!+0;'
+        ' print "$a:$ea,$b:$eb,$c:$ec";'
+    )
+    outcome, text = run_perl(code, tmp_path, args=(str(victim.pid),))
+    assert outcome.ok, text  # the supervisor was not stopped: the run ended
+    assert text == "0:1,0:1,0:1" or text.count(":1") == 3, text  # EPERM each
+    assert victim.poll() is None
+
+
+def test_no_anonymous_files_shared_memory_or_queues(tmp_path):
+    n = seccomp.number
+    code = (
+        'my %r; my @k = (["memfd", ' + f'{n("memfd_create")}, "x", 0],'
+        f' ["shmget", {n("shmget")}, 0, 256000000, 01000 | 0600],'
+        f' ["msgget", {n("msgget")}, 0, 01000 | 0600],'
+        f' ["semget", {n("semget")}, 0, 1, 01000 | 0600],'
+        f' ["mq_open", {n("mq_open")}, "/rsprobe", 0102, 0600, 0]);'
+        " for my $c (@k) { my ($name, $nr, @a) = @$c; $! = 0;"
+        ' my $x = syscall($nr, @a); $r{$name} = $x < 0 ? ($!+0) : "OK"; }'
+        ' print join(",", map { "$_=$r{$_}" } sort keys %r);'
+    )
+    before = subprocess.run(["ipcs", "-m"], capture_output=True, text=True).stdout
+    outcome, text = run_perl(code, tmp_path)
+    after = subprocess.run(["ipcs", "-m"], capture_output=True, text=True).stdout
+    assert outcome.ok, text
+    assert all(item.endswith("=1") for item in text.split(",")), text
+    assert before == after
+
+
+def test_a_program_cannot_run_a_file_it_wrote_or_an_open_file(tmp_path):
+    n = seccomp.number
+    code = (
+        f'open(my $f, "<", "/usr/bin/true") or die; my $fd = fileno($f);'
+        f' my $e = ""; $! = 0; my $r = syscall({n("execveat")}, $fd, $e, 0, 0, 0x1000);'
+        ' print(($r < 0 ? ($!+0) : "OK"));'
+    )
+    outcome, text = run_perl(code, tmp_path)
+    assert outcome.ok and text == "1", text  # EPERM, not an exec of the open file
+
+
+def test_files_deleted_but_held_open_still_count_against_the_budget(tmp_path):
+    code = (
+        'my $out = $ARGV[0]; my @held; for my $i (1..30) { open(my $f, "+>", "$out/f$i") or last;'
+        ' print $f "x" x 20_000_000; $f->flush; unlink("$out/f$i"); push @held, $f; }'
+        " sleep 30;"
+    )
+    start = time.monotonic()
+    outcome, _ = run_perl(
+        code, tmp_path,
+        limits=sandbox.Limits(wall_s=30, out_bytes=100_000_000, file_bytes=50_000_000),
+    )  # fmt: skip
+    assert outcome.over_quota and not outcome.ok
+    assert time.monotonic() - start < 15
+
+
+def test_the_number_of_entries_in_the_writable_folders_is_capped(tmp_path):
+    code = (
+        'my $out = $ARGV[0]; for my $i (1..100000) { open(my $f, ">", "$out/e$i") or last }'
+        " sleep 30;"
+    )
+    start = time.monotonic()
+    outcome, _ = run_perl(
+        code, tmp_path, limits=sandbox.Limits(wall_s=30, max_entries=500)
+    )  # fmt: skip
+    assert outcome.over_quota and time.monotonic() - start < 15
+    assert len(list((tmp_path / "out").iterdir())) < 20_000
+
+
+@pytest.mark.parametrize("where", ["inside the output folder", "outside every grant"])
+def test_file_metadata_cannot_be_changed(tmp_path, where):
+    target = (tmp_path / "out" / "t.txt") if where.startswith("inside") else tmp_path / "keep.txt"
+    (tmp_path / "out").mkdir(exist_ok=True)
+    target.write_text("data")
+    target.chmod(0o640)
+    before = target.stat()
+    n = seccomp.number
+    path = str(target)
+    code = (
+        f'my $p = "{path}"; my %r;'
+        ' $! = 0; $r{chmod} = chmod(0, $p) ? "OK" : ($!+0);'
+        ' $! = 0; $r{utime} = utime(1, 1, $p) ? "OK" : ($!+0);'
+        ' $! = 0; $r{chown} = chown(-1, 12345, $p) ? "OK" : ($!+0);'
+        f' my ($xn, $xv) = ("user.x", "v"); $! = 0;'
+        f' $r{{setxattr}} = syscall({n("setxattr")}, $p, $xn, $xv, 1, 0) < 0 ? ($!+0) : "OK";'
+        ' open(my $h, "<", $p); $! = 0; $r{fchmod} = chmod(0, $h) ? "OK" : ($!+0);'
+        ' print join(",", map { "$_=$r{$_}" } sort keys %r);'
+    )
+    outcome, text = run_perl(code, tmp_path)
+    after = target.stat()
+    assert outcome.ok, text
+    for item in text.split(","):
+        name, value = item.split("=")
+        # EPERM; EACCES where Landlock answers; EBADF for fchmod when the file could not be opened
+        assert value in {"1", "13"} or (name == "fchmod" and value == "9"), (name, value)
+    assert (after.st_mode, after.st_mtime, after.st_uid, after.st_gid) == (
+        before.st_mode, before.st_mtime, before.st_uid, before.st_gid,
+    )  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    "name", sorted(n for n in seccomp._STRICT_DENIED if seccomp.number(n) >= 0)
+)
+def test_every_strict_call_answers_eperm(tmp_path, name):
+    code = (
+        f"my $r = syscall({seccomp.number(name)}, 0, 0, 0, 0, 0); use Errno qw(EPERM);"
+        'print(($r < 0 && $! == EPERM) ? "denied" : "allowed:$r:".($!+0));'
+    )
+    outcome, text = run_perl(code, tmp_path)
+    assert outcome.ok and text == "denied", (name, text)
+
+
+def test_the_launcher_needs_landlock_abi_6_for_the_signal_and_socket_scopes():
+    assert sandbox.LANDLOCK_MIN_ABI == 6
+
+
+def test_the_bound_is_the_tasks_times_the_address_space_and_fits_the_setting():
+    from readablestem.config import Settings
+    from readablestem.source import latexml
+
+    limits = latexml.LIMITS
+    tasks = limits.task_bound("landlock")
+    assert tasks == 4 and tasks * limits.memory_bytes <= 2048 * 1024 * 1024
+    assert (
+        tasks * limits.memory_bytes // (1024 * 1024)
+        <= Settings(
+            _env_file=None  # type: ignore[call-arg]
+        ).source_sandbox_max_total_mb
+    )
+
+
+def test_latexml_needs_no_more_tasks_than_the_launcher_allows(tmp_path, monkeypatch):
+    """The program itself is 1 task and LaTeXML adds at most 1 (measured: the supervisor and
+    perl); a conversion under the Landlock limits succeeds."""
+    from readablestem.source import latexml
+    from source_support import needs_latexml  # noqa: F401
+
+    if not latexml.installed():
+        pytest.skip("needs LaTeXML")
+    monkeypatch.setenv(sandbox.BACKEND_ENV, "landlock")
+    sandbox.backend.cache_clear()
+    try:
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "main.tex").write_text(
+            "\\documentclass{article}\\begin{document}Hi $x^2$.\\end{document}"
+        )
+        outcome = latexml.convert(src, "main.tex", tmp_path / "out")
+    finally:
+        monkeypatch.undo()
+        sandbox.backend.cache_clear()
+    assert outcome.ok and (tmp_path / "out" / latexml.DOC_PATH).is_file()
+    assert latexml.LIMITS.landlock_pids == 2
+
+
+def test_the_supervisor_watches_the_process_not_the_thread_that_started_it(tmp_path):
+    """PR_SET_PDEATHSIG would end the sandbox when the starting thread exits; the supervisor
+    watches the caller's pid, so a short-lived thread does not matter."""
+    import json
+
+    out = tmp_path / "out"
+    out.mkdir()
+    spec = sandbox._landlock_spec(
+        [PERL, "-e", 'sleep 2; print "alive"'], ro=(), rw=((out, "/out"),), tools=(), env=None,
+        cwd="/", limits=sandbox.Limits(wall_s=20), hide=(), scratch=out, stubs=out,
+        program=seccomp.program(strict=True),
+    )  # fmt: skip
+    started: list[subprocess.Popen] = []
+    log = (tmp_path / "log").open("wb")
+
+    def start():
+        started.append(
+            subprocess.Popen(
+                [sys.executable, "-I", "-S", str(sandbox.LAUNCHER), json.dumps(spec)],
+                stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+            )
+        )  # fmt: skip
+
+    thread = threading.Thread(target=start)
+    thread.start()
+    thread.join()  # the thread that forked the launcher is gone
+    assert started[0].wait(15) == 0
+    log.close()
+    assert (tmp_path / "log").read_text() == "alive"
