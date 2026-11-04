@@ -15,6 +15,7 @@ Perl is pointed at it. Production never sets it.
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import shutil
 import time
@@ -25,10 +26,21 @@ from readablestem.core import sandbox
 DEV_ROOT_VAR = "READABLESTEM_LATEXML_ROOT"
 _DEV_MOUNT = "/opt/latexml-root"
 
-# What a conversion may use: a wall-clock cap well under the web request's patience, memory and
-# CPU caps from the plan (docs/security.md, "Source uploads"), and no single file over 50 MB.
+# What a conversion may use: a wall-clock cap well under the web request's patience, CPU time, no
+# single file over 50 MB, and two numbers that bound the worst case where there is no cgroup:
+# at most 4 tasks (measured: LaTeXML needs 3 in the sandbox, with kpsewhich hidden and image
+# conversion off: the sandbox's init, `prlimit` becoming perl, and perl; 4 leaves one spare) and
+# 512 MB of address space each (measured on the fixtures and a 87 KB equation-heavy document of
+# about 29 pages, the page limit: it needs between 256 and 384 MB; 192 MB is enough for the small
+# fixtures). So 4 x 512 MB = 2 GB for the whole sandbox, which `ops sandbox-probe` prints as
+# `sandbox_total_bound_mb` and checks against `SOURCE_SANDBOX_MAX_TOTAL_MB`.
 LIMITS = sandbox.Limits(
-    wall_s=120, cpu_s=120, memory_bytes=1_500_000_000, file_bytes=50_000_000, out_bytes=200_000_000
+    wall_s=120,
+    cpu_s=120,
+    memory_bytes=512 * 1024 * 1024,
+    file_bytes=50_000_000,
+    out_bytes=200_000_000,
+    pids=4,
 )
 
 DOC_NAME = "doc.html"
@@ -93,13 +105,7 @@ def convert(src: Path, main: str, out: Path, *, limits: sandbox.Limits = LIMITS)
 
     prefix, extra, mounts = _program("latexmlpost")
     remaining = max(5, limits.wall_s - int(time.monotonic() - started))
-    second_limits = sandbox.Limits(
-        wall_s=remaining,
-        cpu_s=limits.cpu_s,
-        memory_bytes=limits.memory_bytes,
-        file_bytes=limits.file_bytes,
-        out_bytes=limits.out_bytes,
-    )
+    second_limits = dataclasses.replace(limits, wall_s=remaining)
     return sandbox.run(
         [
             *prefix, "--format=html5", "--pmml", "--nomathimages", "--nographicimages",

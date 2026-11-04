@@ -94,6 +94,32 @@ def _nproc_counted_inside() -> bool:
         return False
 
 
+@contextlib.contextmanager
+def exclusive(name: str, timeout_s: float):
+    """One holder at a time across every process of this machine (an `flock` on a file in the
+    temporary folder): waits up to `timeout_s`, then raises `TimeoutError`. Used so that one
+    source conversion runs at a time, which makes `tasks x address space` the bound for the whole
+    server and not for each conversion."""
+    import fcntl
+    import tempfile
+
+    path = Path(tempfile.gettempdir()) / f"readablestem-{name}.lock"
+    handle = path.open("a")
+    deadline = time.monotonic() + timeout_s
+    try:
+        while True:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() > deadline:
+                    raise TimeoutError(name) from None
+                time.sleep(0.1)
+        yield
+    finally:
+        handle.close()
+
+
 def nproc_limit(extra: int) -> int:
     """The `--nproc` for a sandbox: `extra` when the count starts from zero inside, else this
     user's tasks now plus `extra`."""
@@ -213,6 +239,9 @@ def _tree_bytes(*roots: Path) -> int:
 
 
 _CGROUP_TAG = "readablestem-sandbox"
+# Writes the shell's own pid into the cgroup, then becomes the program (a failed write only means
+# the limits are the per-process ones; the sandbox still runs).
+JOIN_SCRIPT = '{ echo $$ > "$0"; } 2>/dev/null; exec "$@"'
 
 
 def cgroup_parent() -> Path | None:
@@ -284,6 +313,7 @@ def run(
     log: Path | None = None,
     seccomp: bool = True,
     cgroup: bool = True,
+    cgroup_parent: Path | None = None,
 ) -> Outcome:
     """Run `command` in the sandbox and wait. The caller's own environment is not passed on, not
     even to bubblewrap. A wall-clock timeout, or more than `limits.out_bytes` in the `rw` host
@@ -302,7 +332,12 @@ def run(
         os.close(write_end)
     argv = build_argv(command, ro=ro, rw=rw, env=env, cwd=cwd, limits=limits, seccomp_fd=read_end)
     sink = log.open("wb") if log is not None else None
-    group = Cgroup.make(limits) if cgroup else None
+    group = Cgroup.make(limits, cgroup_parent) if cgroup else None
+    if group is not None:
+        # The process joins the cgroup before it becomes bubblewrap, so everything bubblewrap
+        # starts is born in it: moving a running process would leave the children it has
+        # already forked outside the limits.
+        argv = ["/bin/sh", "-c", JOIN_SCRIPT, str(group.path / "cgroup.procs"), *argv]
     try:
         proc = subprocess.Popen(
             argv,
@@ -313,8 +348,6 @@ def run(
             start_new_session=True,
             pass_fds=(read_end,) if read_end is not None else (),
         )
-        if group is not None:
-            group.add(proc.pid)
         deadline = time.monotonic() + limits.wall_s
         roots = tuple(host for host, _ in rw)
         while True:
