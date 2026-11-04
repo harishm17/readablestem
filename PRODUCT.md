@@ -18,13 +18,14 @@ ReadableSTEM assists instructors who need to turn a STEM course PDF into an acce
 The converted output and the review step are shown, not claimed: the site shows a real PDF page beside the HTML it became and what a screen reader says for each. Results are published with sample sizes, including where a general chatbot does better.
 
 ## Operating Context
-- Live at readablestem.com as a free beta (Python, FastAPI, server-rendered Jinja templates, one stylesheet, htmx; deployed on Railway). Sign-in with Google (or Microsoft for set-up universities).
+- Live at readablestem.com as a free beta (Python, FastAPI, server-rendered Jinja templates, plain CSS (tokens, app, controls), htmx; deployed on Railway). Sign-in with Google (or Microsoft for set-up universities).
 - Public pages: landing, /demo (a stored conversion of OpenStax Physics 2.3), /limits, /help/posting, guides (ADA Title II, comparison with Mathpix and LaTeXML), /for-accessibility-offices, privacy, terms, status. App pages: upload, documents, job page, review (split and list), Symbols, account. A static showcase is built from `site/`.
 - Strict Content-Security-Policy: no inline scripts, no outside requests, fonts and scripts self-hosted. Converted student documents are separate files and are sandboxed.
 
 ## Capabilities and Constraints
-- Input is a PDF (Word and PowerPoint are first turned into PDFs); output is one HTML file, plus a Canvas zip and Common Cartridge.
-- Not a compliance checker, not an OCR engine, not a general PDF-to-Markdown converter, does not work from LaTeX sources.
+- Input is a PDF (Word and PowerPoint are first turned into PDFs where the server has LibreOffice); output is one HTML file, plus a Canvas zip, Common Cartridge, Word and EPUB downloads.
+- Scanned and handwritten pages are read by a model only when the instructor ticks "Convert scanned or handwritten pages"; every block it writes is a review item.
+- Not a compliance checker, not a general OCR engine, not a general PDF-to-Markdown converter. LaTeX source (and Beamer, and zips of documents) is built but switched off on the hosted service, so it takes PDFs only (docs/deploy-railway.md, "Feature flags in production").
 - Wording rules (CONTRIBUTING.md): the tool assists; no claim of conformance, guaranteed accessibility or checked results; numbers carry their sample size and say what they do not show; no document content in logs.
 - Copy is the owner's. New labels are placeholders until reviewed.
 

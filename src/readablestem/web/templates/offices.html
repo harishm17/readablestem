@@ -41,8 +41,8 @@
   <li>Uploads are not used to train models. Student records are forbidden by the terms, and no
     data processing agreement is offered.</li>
   <li>Every change the tool is unsure about goes to the instructor, who decides. In a held-out
-    test about half of the equations came out exactly right end to end, so the review
-    matters.</li>
+    test, 0.79 of the equations came out exactly right end to end, and the tool asked about
+    fewer than half of the wrong ones, so the review matters.</li>
   <li>It makes no claim that a document meets WCAG, the ADA or Section 508.</li>
 </ul>
 
@@ -165,10 +165,12 @@
   <li>It assists the instructor. It does not make a document accessible by itself, and it
     does not say that a document meets WCAG, the ADA, Section 508 or any other standard or
     law.</li>
-  <li>Its proposals can be wrong. In a pre-registered test on 15 sections of five OpenStax
-    textbooks it had not seen (version 0.4.0, 14 October 2026), about half of the equations
-    (0.50) came out exactly right end to end, against 0.62 for a general chatbot given the same
-    PDFs. On 15 held-out research papers typeset with LaTeX it was 0.58, against 0.64. The tool asks the instructor about the parts it
+  <li>Its proposals can be wrong. In a pre-registered test on 26 documents it had not seen
+    (arXiv papers, OpenStax sections and course documents made with LaTeX; version 0.5.9,
+    4 November 2026), 0.79 of the equations came out exactly right end to end, against 0.77
+    for a general chatbot given the same PDFs, and the test could detect no difference between
+    them in how a screen reader reads the equations (0.840 against 0.836). In 3 chemistry
+    sections, 0.33 of the equations were right as chemistry. The tool asks the instructor about the parts it
     is unsure about and accepts the rest on its own checks.
     <a href="/limits#accuracy">The measured numbers and their limits</a>.</li>
   <li>The automatic checks look at structure (language, title, headings, lists, tables, links,

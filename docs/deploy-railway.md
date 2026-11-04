@@ -20,7 +20,7 @@ Backup service "backup" (postgres:18 image, daily) ── pg_dump ──> Postgr
 GitHub uptime.yml (every 5 min: GET /readyz; every 3 h: GET /healthz/ops and /demo) ──> readablestem.com
 ```
 
-## As deployed (2026-10-14)
+## As deployed (first deploy 2026-10-14; settings read from `.railway/railway.ts` on 2026-11-04)
 
 What the first deploy found, and how production is actually configured:
 
@@ -34,7 +34,7 @@ What the first deploy found, and how production is actually configured:
 
   | Service | Settings |
   |---|---|
-  | `web` | Dockerfile; pre-deploy `readablestem db upgrade`; health check `/healthz` (300 s); restart policy not set in `railway.ts`, so Railway's default applies (on failure, 10 retries); one replica; domains readablestem.com and www.readablestem.com |
+  | `web` | Built from the repository Dockerfile (builder setting `RAILPACK`, see below); pre-deploy `readablestem db upgrade`; health check `/healthz` (300 s); restart policy not set in `railway.ts`, so Railway's default applies (on failure, 10 retries); one replica; domains readablestem.com and www.readablestem.com |
   | `cron` | Same image; start `readablestem ops cron`; schedule `7 * * * *`; restart policy `NEVER`; every variable a reference to `web` (`${{web.NAME}}`) |
   | `backup` | Image `postgres:18`; daily at 08:17 UTC `pg_dump` of the database (`PGURL=${{Postgres.DATABASE_URL}}`), written to a `.part` file on the private volume `/backups`, restored into a scratch database and compared with the live one (gzip reads back, completion line, every table, same `alembic_version`), and only then moved into place; on any failure it prints `backup_failed reason=...`, removes the file and exits 1; after a good run it records the `backup` heartbeat (`ops_heartbeat`); dumps older than 5 days are deleted, so the last 6 are kept; restart policy `NEVER`. The command is the bash script `backupScript` in `.railway/railway.ts` |
 
@@ -96,8 +96,8 @@ Rules that keep the plan honest:
   be written as a literal only if it equals what production has; secrets and anything changed from
   the dashboard stay `preserve()`.
 - **Do not set `build.watchPatterns`.** With them `railway up` skips builds whose files did not
-  match. Do not add a `builder` either: the file records the live value, and the plan compares
-  against it.
+  match. Leave the `builder` the file records (`RAILPACK`) as it is: it is the live value, and the plan
+  compares against it. The Dockerfile is what gets built regardless.
 - **Applying never deploys code.** It changes service settings and creates or removes the
   resources the file names or drops. A settings change reaches a running service at its next
   deployment. Deploy code with `railway up`, below.
@@ -133,8 +133,8 @@ Rules that keep the plan honest:
 Already set by hand on the web service: `ENV=prod`, `PORT=8080`, `BASE_URL=https://readablestem.com`,
 `DATABASE_URL`, `MODEL_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, `SESSION_SECRET`, `CRON_TOKEN`,
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `CONTACT_EMAIL`, `ADMIN_EMAILS`,
-`DAILY_SPEND_CAP_USD=10`, `PER_USER_DAILY_PAGE_QUOTA=90`, `TRUSTED_PROXY_HOPS=1`, the `FEATURE_*` and
-the `DECISIONS_*` variables. The `DECISIONS_*` ones (`DECISIONS_CANARY`, `DECISIONS_EQUATION_SHADOW`,
+`DAILY_SPEND_CAP_USD=10`, `PER_USER_DAILY_PAGE_QUOTA=300`, `TRUSTED_PROXY_HOPS=1`, the `FEATURE_*`, `EQUATION_*`, `FLAG_POLICY` and
+the `DECISIONS_*` variables (which feature flags are on in production: "Feature flags in production" below). The `DECISIONS_*` ones (`DECISIONS_CANARY`, `DECISIONS_EQUATION_SHADOW`,
 `DECISIONS_FIGURE_VERIFY`) have no effect under `MODEL_PROVIDER=anthropic`: they only control OpenAI's
 Decisions API check, which is skipped with Claude (`models.verifier.any_check_enabled`). They stay in
 `.railway/railway.ts` so the plan stays empty. `SIGNUP_MODE` and the open-tier variables in the next
@@ -159,13 +159,13 @@ production if a required one is missing, and logs the reason):
 | `MAX_USD_PER_JOB`, `MAX_USD_PER_PAGE` | Per-conversion dollar caps. | Leave unset: the defaults for Claude are $6.00 and $1.00 (a 100-page document is $1.50 spent plus about $1.1 held at once; with tables on the job cap must be at least $5.71), and the start-up check refuses numbers that cannot work. A value set earlier (a job cap of $3.00 or $4.70) is too low for 100-page documents: unset it. |
 | `FEEDBACK_URL` | The footer's Feedback link. | Leave unset: it becomes an email to `CONTACT_EMAIL`. A form service is a new data processor to name on the privacy page. |
 | `ALERT_EMAIL` | Read only by `deploy/deploy.sh` (Google Cloud alert policies). The app ignores it, so setting it on Railway does nothing. | Skip. Use Railway's project notifications and the GitHub uptime checks (below). |
-| `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | Defaults 24 hours and 30 days. | Leave unset. If you set them, the cron service needs the same values (reference the web service's). |
+| `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | Defaults 24 hours after the last activity, and 30 days for a document whose owner also lets the developer look at the results; "Keep for 7 days" is a per-upload choice with a fixed length (`web/retention.py`). Neither is named in `railway.ts`, so production uses the defaults. | Leave unset. If you set them, the cron service needs the same values (reference the web service's). |
 | `CLAUDE_CANARY` | Daily drift check of the Claude second check. Only the HTTP cron route runs it, so with the cron service it never runs and this variable does nothing. | Leave unset. |
 | `INSTALL_LIBREOFFICE` | Build argument, see decision 4. | Unset. |
-| `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project (docs/web.md, "LaTeX source"; ADR 0008). Declared on `web` in `railway.ts`. | Unset (off) until the image has LaTeXML (`INSTALL_LATEXML`) and `railway ssh -s web -- readablestem ops sandbox-probe --require-latexml` prints PASS. |
-| `FEATURE_BATCH_ZIP` | Takes a `.zip` of PDFs and LaTeX project folders as a batch of documents (docs/web.md, "Zip of documents and the batch page"). Declared on `web` in `railway.ts`. | Unset (off) until you want it. Zips of LaTeX projects also need `FEATURE_LATEX_SOURCE`. |
-| `FEATURE_BEAMER_SOURCE` | Takes Beamer decks within LaTeX source (needs `FEATURE_LATEX_SOURCE`; docs/web.md). Declared on `web` in `railway.ts`. | Unset (off) until a few real decks have been converted and read. |
-| `INSTALL_LATEXML` | Build argument: adds LaTeXML, TeX Live's base and ImageMagick (about 270 MB; see "LaTeXML" below). Needed for LaTeX source uploads, which also need the sandbox to pass `readablestem ops sandbox-probe` on this image. Declared on `web` in `.railway/railway.ts` so that `railway config apply` keeps it. | Unset until the probe has passed. |
+| `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project (docs/web.md, "LaTeX source"; ADR 0008). Declared on `web` in `railway.ts`. | **Off in production today** (see "LaTeXML" below: the sandbox probe fails on Railway). Turn it on only after the image has LaTeXML (`INSTALL_LATEXML`) and `railway ssh -s web -- readablestem ops sandbox-probe --require-latexml` prints PASS. |
+| `FEATURE_BATCH_ZIP` | Takes a `.zip` of PDFs and LaTeX project folders as a batch of documents (docs/web.md, "Zip of documents and the batch page"). Declared on `web` in `railway.ts`. | **Off in production today.** Zips of LaTeX projects also need `FEATURE_LATEX_SOURCE`, so the sandbox problem below blocks those. |
+| `FEATURE_BEAMER_SOURCE` | Takes Beamer decks within LaTeX source (needs `FEATURE_LATEX_SOURCE`; docs/web.md). Declared on `web` in `railway.ts`. | **Off in production today**; keep it off until a few real decks have been converted and read, and the sandbox probe passes. |
+| `INSTALL_LATEXML` | Build argument: adds LaTeXML, TeX Live's base and ImageMagick (about 270 MB; see "LaTeXML" below). Needed for LaTeX source uploads, which also need the sandbox to pass `readablestem ops sandbox-probe` on this image. Declared on `web` in `.railway/railway.ts` so that `railway config apply` keeps it. | Leave as it is until the probe passes on Railway (it does not today). |
 | `INSTALL_MATH_READER` | Build argument: adds the local handwriting reader's model files (0.6 GB; `docs/math-readers.md`, "The local reader"). Only `IMAGE_PAGES_SECOND_READER=local` makes the pipeline call it, and both it and `MATH_READER_LOCAL_ENABLED` are off. With it, allow 2 GB of memory. | Unset. |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | How long Railway waits between SIGTERM and SIGKILL for the old deployment (its documented default is 0). The worker stops claiming at once on SIGTERM and gives its running job back; uvicorn waits up to 5 s for open connections, then the worker stop up to 3 s. | `10`, set as `deploy.drainingSeconds` on `web` in `.railway/railway.ts` |
 | `TRACING_ENABLED` and the Langfuse keys | Off. | Leave off. |
@@ -188,6 +188,29 @@ only flags `TRUSTED_PROXY_HOPS=0`.
 `CRON_TOKEN` must be at least 32 characters (production refuses to start otherwise). To rotate
 `SESSION_SECRET` without signing people out, use `SESSION_SECRET_PREVIOUS`
 ([security.md](security.md), "Rotating the session secret").
+
+## Feature flags in production
+
+As of 2026-11-04 (pipeline version 0.5.9). The values live in Railway, not in the repository
+(`railway.ts` only names them with `preserve()`); the defaults are in `src/readablestem/config.py`
+(all of these default to off in code).
+
+| State in production | Settings |
+|---|---|
+| On | `EQUATION_GLYPH_RECONCILE`, `EQUATION_GLYPH_CHECKS`, `EQUATION_LINE_CONTEXT`, `FLAG_POLICY`, `FEATURE_TABLES`, `FEATURE_IMAGE_PAGES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_NOTATION_MEMORY` |
+| Off | `LAYOUT_DISPLAY_GROUPING`; `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE`, `FEATURE_BATCH_ZIP` (the sandbox probe fails on Railway, see "LaTeXML") |
+
+The other flags `railway.ts` names (`FEATURE_COLOUR`, `FEATURE_PAGE_WITNESS`, the `IMAGE_PAGES_*`
+settings) are not listed here because this page cannot tell their production values; read them with
+`railway variable list -s web`.
+
+Limits in production (each equals the code default in `config.py`, except the per-user page quota and the daily
+spend cap, which are set on `web`): 100 pages and 50 MB per upload (`MAX_PAGES_PER_JOB`, `MAX_UPLOAD_MB`); a file of up
+to 500 pages and 100 MB is kept for choosing pages (`MAX_SOURCE_PAGES`, `MAX_LARGE_UPLOAD_MB`);
+open tier 150 pages a day; invited 300 pages a day (`PER_USER_DAILY_PAGE_QUOTA`); stored-upload caps
+of 250 MB per open-tier person, 300 MB per invited person and 2000 MB for everybody
+(`STORAGE_*_MB`; these cap what is stored at a time, not what is uploaded per day); a spend cap of
+$6 per job and $10 a day for the site, of which open-tier accounts may use $4.
 
 ## Microsoft sign-in on Railway
 
@@ -279,7 +302,7 @@ Publisher verification (Branding & properties) is only needed if an IT team asks
    private hostname, as a reference to the Postgres service (for example
    `postgresql+psycopg://${{Postgres.PGUSER}}:${{Postgres.PGPASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}`).
    Production refuses SQLite, a non-https `BASE_URL`, and any missing key.
-3. **Web service settings.** Source: the repository; builder Dockerfile; no start command; no cron
+3. **Web service settings.** Source: the repository (deployed with `railway up`); the repository Dockerfile is built; no start command; no cron
    schedule; replicas 1. `.railway/railway.ts` sets the rest. Do not scale beyond one replica: rate limits
    and the upload gate are per process, and a second worker would only take pages.
 4. **Migrations run before each deploy** through `preDeployCommand`:
@@ -292,7 +315,7 @@ Publisher verification (Branding & properties) is only needed if an IT team asks
 
    | Setting | Value |
    |---|---|
-   | Builder | Dockerfile (`Dockerfile`) |
+   | Builder setting | `RAILPACK` as `railway.ts` records it; the deployments are built from the repository `Dockerfile` |
    | Pre-deploy command | `readablestem db upgrade` |
    | Healthcheck path | `/healthz` (timeout 300 s) |
    | Restart policy | Not set in `railway.ts`: Railway's default, on failure with 10 retries |
@@ -458,7 +481,7 @@ change because `gcloud builds submit --tag` cannot pass build arguments.)
 **LaTeXML.** The Dockerfile declares `ARG INSTALL_LATEXML=false` in its final stage. Setting the
 service variable `INSTALL_LATEXML=true` (declared in `railway.ts`, so an apply keeps it) and
 redeploying installs the distribution's `latexml` package (0.8.8) with `--no-install-recommends`; it
-depends on TeX Live's base (`texlive-latex-base`), ImageMagick and their Perl bindings. The same step installs `bubblewrap` (the sandbox LaTeX source runs in) and `util-linux` (`prlimit`), and the build fails if `bwrap` or `prlimit` is missing, so `readablestem ops sandbox-probe` on Railway tests the sandbox of this image (whether the platform allows user namespaces is what the probe decides). Right after
+depends on TeX Live's base (`texlive-latex-base`), ImageMagick and their Perl bindings. The same step installs `bubblewrap` (the sandbox LaTeX source runs in) and `util-linux` (`prlimit`), and the build fails if `bwrap` or `prlimit` is missing, so `readablestem ops sandbox-probe` on Railway tests the sandbox of this image (it currently fails: see "Status today" below). Right after
 the install the build replaces ImageMagick's `policy.xml` with `src/readablestem/source/imagemagick-policy.xml`:
 nothing is allowed except PNG, JPEG and GIF, and PS, EPS, PDF, XPS, URL, HTTP(S), FTP, MVG, MSL, TEXT,
 LABEL, SVG and `@file` paths are named as denied. The build fails if no policy file was replaced or
@@ -471,7 +494,18 @@ LaTeXML until the LaTeX-source switch (`FEATURE_LATEX_SOURCE`) is on, and that s
 until `readablestem ops sandbox-probe --require-latexml` prints PASS on the deployed image
 (docs/operations.md, "Sandbox probe"); the web process also runs that probe at start-up, shows it
 on `/healthz/ops` under `sandbox`, and keeps the source features switched off in effect unless it
-passed, so a flag set by mistake does nothing under a FAIL. CI builds the image with the argument once and checks the
+passed, so a flag set by mistake does nothing under a FAIL.
+
+**Status today (2026-11-04).** The LaTeX source, Beamer and zip-batch features exist in the code and
+the image can carry LaTeXML, but all three are off in production because the sandbox probe fails on
+Railway: bubblewrap cannot start there. A Landlock backend was added as the fallback (`core/landlock_exec.py`; docs/security.md,
+"Landlock backend"), and the probe now reports which step of it fails (`landlock_step=`,
+`landlock_errno=` and the `can_<call>` lines). Until a deploy of the web service shows PASS on
+`/healthz/ops`, keep the three flags off.
+
+TODO(coordinator): fill in the sandbox probe's findings (landlock_step, landlock_errno, can_<call>) from /healthz/ops after the next deploy.
+
+CI builds the image with the argument once and checks the
 versions and the policy (job `docker build (no push)`); the sandbox itself cannot be probed inside CI's
 Docker, which does not allow user namespaces.
 

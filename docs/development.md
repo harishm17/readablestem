@@ -22,6 +22,8 @@ printed pages read differently.
 | `make lint` | `ruff check` + `ruff format --check` |
 | `make fmt` | Format and auto-fix |
 | `make ci-local` | What CI's `static` and `pytest` jobs run (ruff, ty, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
+| `make table-model` | Download the SLANet-plus table-structure model (7.5 MB, SHA-256 checked) into `~/.cache/readablestem/models` (or `TABLE_MODEL_DIR`); without it tables use PyMuPDF's grid |
+| `make fuzz-tables` | Upgrade check before any PyMuPDF bump: byte mutants of the repository's fixtures through the probe and the table detector (`pytest -m slow`; a few minutes; docs/tables.md) |
 | `make gold` | Fetch the sample gold set (3 sections of `physics`, chapter 2) into `data/gold/` |
 | `make gold-licenses` | Write every OpenStax book's license to `data/openstax-licenses.csv` |
 | `make reproduce` | Offline reproduction: gold files against their manifests, committed eval reports against the gold they were scored on, the scorer's ceiling, then the committed numbers. No key, no network, no browser |
@@ -62,6 +64,8 @@ readablestem parse FILE.pdf [--pages 1,2] [--json]
 readablestem proof [--set ID] [--check | --verify-sources | --live --max-usd N] [--out PATH]
 ```
 
+The other subcommands (`convert`, `export`, `demo`, `serve`, `users`, `db`, `ops`) are covered where they belong: `readablestem --help` lists them, docs/operations.md and docs/deploy-railway.md the hosted ones.
+
 Default paths (`data/gold`, `.cache/openstax`) resolve against the project root (the
 nearest parent directory whose `pyproject.toml` names `readablestem`), so commands work from
 any subdirectory. Outside a checkout they fall back to the working directory. Bad input
@@ -81,8 +85,9 @@ UTC) and by hand. Jobs, by check name:
 | `pytest -m browser (Playwright Chromium, shard i/2)` | Browser tests, two shards of three xdist workers each |
 | `CI passed` | Fails if any job failed or was cancelled; require this one in branch protection |
 
-The other jobs (`postgres`, `docker`, `make proof`, `make site`, `pip-audit`, `eval gate`,
-`gitleaks`) are described in [operations.md](operations.md). Branch protection is not
+The other jobs (`postgres`, `docker`, `latex source`, `make proof`, `make site`, `pip-audit`,
+`eval gate`, `gitleaks`) are described in [operations.md](operations.md) and in the comments of
+`ci.yml`. Branch protection is not
 configured on the repo today; before this split the checks were named
 `ruff + ty + pytest (Python 3.12)` and `(Python 3.14)`.
 

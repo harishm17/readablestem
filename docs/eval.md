@@ -14,12 +14,24 @@ say which; they are kept as they were.
 The invented-content rate (how much of an output the PDF does not support, for ReadableSTEM
 and for other systems) has its own page: [eval-invented.md](eval-invented.md).
 
+**Registered held-out results, newest first.** Each was registered before any system ran, and
+each page says which pipeline version it measured; an older one is history, not the current
+system.
+
+| Result | Report |
+|---|---|
+| fresh5, 2026-11-04: 26 documents, 1,715 gold equations. Registered verdict on the primary score: no difference this set can detect from the Opus chatbot (0.840 against 0.836); silent-error and flag-recall criteria not met; stratum D (chemistry) not a success. Pipeline 0.5.9 | [eval-equation-fresh5.md](eval-equation-fresh5.md) (summary in [PROOF.md](../PROOF.md)) |
+| fresh4, 2026-10-26: 15 papers, 1,600 equations | [eval-equation-round3.md](eval-equation-round3.md) |
+| fresh3, 2026-10-23: a third set of papers | [eval-equation-round2.md](eval-equation-round2.md) |
+| Real-world held-out part, 2026-10-21: 15 arXiv papers, 1,826 equations | [eval-realworld.md](eval-realworld.md) |
+| First registered result, 2026-10-14: 15 OpenStax sections. Pipeline 0.4.0 | [PROOF.md](../PROOF.md), "First registered result" |
+
 ## Versions of the committed reports
 
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.3 today; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.9 as of 2026-11-04; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a

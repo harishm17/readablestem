@@ -8,11 +8,12 @@ arrived at; read them by question, not front to back.
 
 | Question | Read |
 |---|---|
+| What is the newest registered result, and what may be claimed from it? | [../PROOF.md](../PROOF.md), "Latest registered result"; [eval-equation-fresh5.md](eval-equation-fresh5.md) (fresh5, 26 documents, 2026-11-04: no difference from the Opus chatbot this set can detect) |
 | How is quality measured, on what data, with what error bars? | [eval.md](eval.md): "The idea", "Metrics", "Results", then "What the numbers do not show" |
 | Why does the app ask a person about some conversions and not others? | [steps.md](steps.md); [eval.md](eval.md), "Review load" |
 | How are equations and figures checked after the model has answered? | [steps.md](steps.md) |
 | How are headings, lists, equations and figures found in a PDF? | [layout.md](layout.md): "How a page is read" and "Known failure modes" |
-| How do tables work, and why are they off by default? | [tables.md](tables.md); [eval.md](eval.md), "Tables" |
+| How do tables work (off by default in the code, on in production)? | [tables.md](tables.md); [eval.md](eval.md), "Tables" |
 | Which equation scores are secondary, and what do they say about the held-out run? | [eval-secondary-metrics.md](eval-secondary-metrics.md) |
 | What does the current system score on the held-out sections (a re-measurement, not blind)? | [remeasurement-2026-10-21.md](remeasurement-2026-10-21.md) |
 | Does the page math pass help, and what did it cost? | [eval-page-math.md](eval-page-math.md); [decisions/0006-page-math-pass.md](decisions/0006-page-math-pass.md) |
@@ -27,7 +28,11 @@ arrived at; read them by question, not front to back.
 | Why did it lose equations to the chatbot recipe on real papers, what was fixed, and what did a fresh set of papers say? | [eval-equation-rootcause.md](eval-equation-rootcause.md) |
 | What did the second round of equation fixes do, on a third registered set of papers? | [eval-equation-round2.md](eval-equation-round2.md) |
 | Why did it trail a chatbot on equations, and what did reading each inline equation with its line do? | [eval-equation-round3.md](eval-equation-round3.md) |
-| Which 50 figures will long descriptions and chart data tables be judged on, how were they drawn, and what is pre-registered (draft)? | [eval-figures-long.md](eval-figures-long.md) |
+| Which 50 figures will long descriptions and chart data tables be judged on, how were they drawn, and what is pre-registered (draft, unsigned: no model has run on it)? | [eval-figures-long.md](eval-figures-long.md) |
+| What did the page witness do on twelve development papers (round 5, no default changed)? | [eval-equation-round5.md](eval-equation-round5.md) |
+| How well are chemistry formulas read on five held-out sections, and what did a second round of chemistry prompts do (not shipped)? | [eval-chemistry-heldout.md](eval-chemistry-heldout.md); [eval-chemistry-round2.md](eval-chemistry-round2.md) |
+| How is the invented-content rate (output the PDF does not support) computed? | [eval-invented.md](eval-invented.md) |
+| How is the recorded proof run replayed with one command (`make proof`)? | [proof.md](proof.md); [../PROOF.md](../PROOF.md) |
 | Why are maths in table cells missed, do the misses carry glyph evidence the rules ignore, and why were wrong equations not flagged? (no model, recorded runs) | [eval-equation-diagnostics.md](eval-equation-diagnostics.md) |
 | What do the glyph checks (a reading's extent past its box, letter styles from the fonts) do to flag recall and decisions, replayed on recorded runs? | [eval-equation-glyph-checks.md](eval-equation-glyph-checks.md) |
 | Which accepted equations does a small calibrated rule (`FLAG_POLICY`) ask a person about, fitted on development and replayed on fresh2 to fresh4? | [eval-flag-policy.md](eval-flag-policy.md) |
@@ -41,6 +46,7 @@ arrived at; read them by question, not front to back.
 | How does the web app work (routes, sign-in, review screen, retention)? | [web.md](web.md) |
 | How do I run, test and extend it? | [development.md](development.md) |
 | What is the threat model, what protects it, and how do I report a problem? | [security.md](security.md) |
+| What is the static reviewer demo under `site/`, and how is it built? | [site.md](site.md) |
 | What do I give an accessibility or procurement office? | [vendor-information.md](vendor-information.md), the site's `/for-accessibility-offices` page and its downloadable one-page summary (web.md), and the review record each document has (web.md "The review record") |
 | What is in the EPUB export? | [output.md](output.md), "The EPUB export" |
 | How do I test the Canvas export in a real Canvas? | [canvas-sandbox-test.md](canvas-sandbox-test.md) |
@@ -50,7 +56,7 @@ arrived at; read them by question, not front to back.
 ## If you want to know why a choice was made
 
 The decision records are in [decisions/](decisions/): 0001 scope, 0002 models, 0003 PDF
-library and the AGPL, 0004 web stack, 0005 the second automated check, 0006 the page math pass (a proposal, off by default), 0007 converting scanned and handwritten pages. Each ends with its
+library and the AGPL, 0004 web stack, 0005 the OpenAI Decisions API as a second automated check, 0006 the page math pass (a proposal, off by default), 0007 converting scanned and handwritten pages, 0008 LaTeX source uploads converted by LaTeXML in a sandbox. Each ends with its
 consequences.
 
 ## If you want to run it as a service

@@ -242,8 +242,9 @@ def llms_txt(site: str, showcase: bool) -> str:
             f"- [Method and limits]({site}/showcase/method/): how the numbers were made",
         ]
     lines += [
-        f"- [PROOF.md]({PROOF_URL}): the pre-registered evaluation on held-out OpenStax "
-        "sections, including where it loses to a general chatbot",
+        f"- [PROOF.md]({PROOF_URL}): the pre-registered evaluations on held-out "
+        "documents: the newest (26 documents, version 0.5.9) found no difference it could "
+        "detect between ReadableSTEM and a general chatbot on equations",
         "",
         "## Source and author",
         "",

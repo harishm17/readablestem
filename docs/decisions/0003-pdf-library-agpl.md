@@ -43,7 +43,7 @@ Drafted from what the repository shows; the author confirms or edits.
 
 | Field | Value |
 |---|---|
-| Status | **Proposed** (merged behind `FEATURE_TABLES`, which is off; it stays proposed until the real-document check in `docs/eval.md`, "Tables", has passed) |
+| Status | **Proposed** when written (merged behind `FEATURE_TABLES`, off until the real-document check in `docs/eval.md`, "Tables", had passed). Later: the owner decided on 2026-10-21 to turn `FEATURE_TABLES` on in production (docs/tables.md, "The decision"), although the measured full-extent recall (0.56) stayed under the 0.85 floor; the code default is still off |
 | Date | 2026-10-09 |
 | Decider | Harish |
 
@@ -109,7 +109,7 @@ source) is **not met while the repository is private** (checked with `gh` on 202
 included), the repository must be public, or the source offered another way, and
 `SOURCE_URL` must point at the deployed commit. Open: make the repository public at https://github.com/harishm17/readablestem (the
 `SOURCE_URL` default) before the beta, or offer the source another way; this change does not
-alter visibility. Optionally ask Artifex to confirm the 1.28.2 terms, without blocking on
+alter visibility. **Update (2026-11-04): met.** The repository is public (checked with `gh` on 2026-11-04). Optionally ask Artifex to confirm the 1.28.2 terms, without blocking on
 the reply.
 
 ### Consequences

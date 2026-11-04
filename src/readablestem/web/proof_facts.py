@@ -1,14 +1,15 @@
 """The proof numbers the landing page and /limits show, read from PROOF.md once.
 
-PROOF.md is written by `make proof` from the recorded held-out run (CI replays it and fails on
-any difference), so it is the one source. The image the service runs from has no PROOF.md, so
-`parse()` turns it into `proof_facts.json` beside this file (`uv run python -m
-readablestem.web.proof_facts`) and the pages read that. `tests/test_proof_facts.py` fails when
-the JSON and PROOF.md differ, so a new proof run cannot leave the pages on old numbers.
+PROOF.md's section "Latest registered result" is the one source: the newest registered held-out
+result (fresh5, 2026-11-04), taken from `docs/eval-equation-fresh5.md`. The image the service
+runs from has no PROOF.md, so `parse()` turns it into `proof_facts.json` beside this file
+(`uv run python -m readablestem.web.proof_facts`) and the pages read that.
+`tests/test_proof_facts.py` fails when the JSON and PROOF.md differ, so a new registered result
+cannot leave the pages on old numbers.
 
-Every fact names its set, its date, whether it is a blind result, its count, and a link to how
-it was measured. Nothing here says one tool beats another: where a general chatbot scored higher
-on the same sections, the fact says so.
+Every fact names its set, its date, that it is a registered result, its count, and a link to how
+it was measured. Nothing here says one tool beats another: each fact gives the chatbot's number
+beside ReadableSTEM's and says where a goal registered before the run was not met.
 """
 
 from __future__ import annotations
@@ -25,112 +26,105 @@ PROOF_MD = ROOT / "PROOF.md"
 SNAPSHOT = Path(__file__).with_name("proof_facts.json")
 SOURCE = "https://github.com/harishm17/readablestem/blob/main/PROOF.md"
 
+LATEST = "## Latest registered result: fresh5"
+HISTORY = "## First registered result"
+
 
 @dataclass(frozen=True)
 class Fact:
-    value: str  # "89%"
+    value: str  # "0.840"
     label: str  # what it counts
-    count: str  # "2,434 of 2,738 equations"
-    caveat: str  # a plain sentence; names where a general chatbot did better
+    count: str  # "1,715 gold equations in 26 documents"
+    caveat: str  # a plain sentence; gives the chatbot's number and any goal not met
     href: str  # how it was measured
 
 
 @dataclass(frozen=True)
 class ProofFacts:
-    set_label: str  # "held-out set, 15 OpenStax sections"
-    date: str  # "2026-10-14"
-    blind: str  # "Registered before the run; blind."
-    pipeline: str  # "version 0.4.0"
+    set_label: str  # "fresh5 set, 26 documents"
+    date: str  # "2026-11-04"
+    blind: str  # "Registered before the run; one run."
+    pipeline: str  # "version 0.5.9"
     facts: list[Fact]
 
 
-def _row(proof: str, label: str, table: str = "") -> list[str]:
-    """The cells of the PROOF.md table row whose first cell contains `label`, searched
-    after the heading `table` when one is given."""
-    start = proof.index(table) if table else 0
-    match = re.search(rf"^\|[^|]*{re.escape(label)}[^|]*\|(.*)$", proof[start:], re.M)
-    assert match, f"PROOF.md has no row {label!r}"
+def _section(proof: str) -> str:
+    start = proof.index(LATEST)
+    return proof[start : proof.index(HISTORY, start)]
+
+
+def _row(section: str, label: str) -> list[str]:
+    """The cells of the table row of the latest-result section whose first cell contains
+    `label`."""
+    match = re.search(rf"^\|[^|]*{re.escape(label)}[^|]*\|(.*)$", section, re.M)
+    assert match, f"PROOF.md has no row {label!r} in its latest-result section"
     return [cell.strip() for cell in match.group(0).strip("|").split("|")]
 
 
-def _field(proof: str, name: str) -> str:
-    match = re.search(rf"^\| {re.escape(name)} \| ([^|]+) \|", proof, re.M)
-    assert match, name
-    return match.group(1).strip()
+def _number(cell: str) -> str:
+    match = re.match(r"\$?([0-9.]+)", cell)
+    assert match, cell
+    return match.group(1)
 
 
-def _percent(value: str) -> str:
-    return f"{round(float(value) * 100)}%"
+def _found(section: str, pattern: str, flags: int = 0) -> re.Match[str]:
+    match = re.search(pattern, section, flags)
+    assert match, f"the latest-result section no longer says {pattern!r}"
+    return match
 
 
 def parse(proof: str) -> ProofFacts:
-    sections = re.search(r"^Fifteen sections", proof, re.M)
-    assert sections, "PROOF.md no longer describes fifteen sections"
-    recall = _row(proof, "detection_recall", "### ReadableSTEM on the whole section")
-    exact = _row(
-        proof,
-        "end_to_end_exact_lenient (all gold equations)",
-        "### ReadableSTEM on the whole section",
-    )
-    headings = _row(proof, "heading F1", "### Headings")
-    judge = _row(proof, "judge_pass_rate", "### Figure descriptions")
-    chatbot = _row(
-        proof,
-        "end_to_end_exact_lenient (all gold equations)",
-        "## Comparison with the chatbot recipe",
-    )
-    chatbot_exact = re.match(r"([0-9.]+)", chatbot[2])
-    assert chatbot_exact
-    chatbot_recall = re.match(
-        r"([0-9.]+)", _row(proof, "detection_recall", "## Comparison with the chatbot recipe")[2]
-    )
-    assert chatbot_recall
-    heading_row = re.search(r"^\| heading F1 \| chatbot-opus-purdue .*$", proof, re.M)
-    assert heading_row and "no difference this set can detect" in heading_row.group(0)
-    heading_total = sum(
-        int(m.group(1))
-        for m in re.finditer(
-            r"^\| [a-z-]+/[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\| ([0-9]+) \(",
-            proof,
-            re.M,
-        )
-    )
-    assert heading_total > 0
-    base = f"{SOURCE}#"
+    section = _section(proof)
+    size = _found(section, r"n = (\d+) documents, ([0-9,]+) gold equations")
+    units, gold = size.group(1), size.group(2)
+    assert "no difference this set can detect" in section
+    assert "beats the chatbot baseline on equations is not made" in section
+    pipeline = _found(section, r"ReadableSTEM pipeline ([0-9.]+)").group(1)
+    date = _found(section, r"^## Latest registered result: fresh5 \(([0-9-]+)\)", re.M).group(1)
+    primary = _row(section, "Spoken-equal, end to end (primary)")
+    exact = _row(section, "Exact match, tree equal")
+    silent = _row(section, "Wrong equations nobody is asked about")
+    recall = _row(section, "flag recall")
+    goal_silent = _found(section, r"above the registered ([0-9.]+) per 100 gold").group(1)
+    goal_recall = _found(section, r"below the registered ([0-9.]+) \(").group(1)
+    count = f"{gold} gold equations in {units} documents"
+    href = f"{SOURCE}#latest-registered-result-fresh5-{date}"
     return ProofFacts(
-        set_label="held-out set, 15 OpenStax sections",
-        date=_field(proof, "Run recorded on"),
-        blind="Registered before the run; blind.",
-        pipeline=f"version {_field(proof, 'Pipeline version')}",
+        set_label=f"fresh5 set, {units} documents",
+        date=date,
+        blind="Registered before the run; one run.",
+        pipeline=f"version {pipeline}",
         facts=[
             Fact(
-                _percent(recall[1]),
-                "of equations found",
-                f"{recall[2].replace('/', ' of ')} equations",
-                f"A general chatbot recipe found {_percent(chatbot_recall.group(1))}.",
-                base + "readablestem-on-the-whole-section-document-task",
+                _number(primary[1]),
+                "spoken-equal, end to end",
+                count,
+                f"The chatbot on Opus scored {_number(primary[2])}: this set can detect no "
+                "difference between them.",
+                href,
             ),
             Fact(
-                _percent(exact[1]),
-                "of equations exactly right, end to end",
-                f"{exact[2].replace('/', ' of ')} equations",
-                "A general chatbot recipe scored "
-                f"{_percent(chatbot_exact.group(1))} on the same sections.",
-                base + "comparison-with-the-chatbot-recipe",
+                _number(exact[1]),
+                "exactly right, end to end",
+                count,
+                f"The chatbot on Opus scored {_number(exact[2])}.",
+                href,
             ),
             Fact(
-                f"{float(headings[1]):.2f}",
-                "heading F1",
-                f"{heading_total} headings",
-                "Not different from a general chatbot's, as far as this set can tell.",
-                base + "headings-headings-task",
+                f"{float(_number(silent[1])):.1f}",
+                "wrong equations nobody is asked about, per 100",
+                count,
+                f"The chatbot on Opus: {float(_number(silent[2])):.1f}. The goal registered "
+                f"before the run was {goal_silent} or fewer, so it was not met.",
+                href,
             ),
             Fact(
-                _percent(judge[1]),
-                "of figure descriptions passed a model judge",
-                f"{judge[2].replace('/', ' of ')} figures",
-                "This is agreement with a model judge, not a person's check.",
-                base + "figure-descriptions-figures-task",
+                f"{float(_number(recall[1])):.2f}",
+                "of wrong equations the review screen asks about",
+                count,
+                f"The goal registered before the run was {goal_recall}, so it was not met. "
+                "A chatbot asks nothing.",
+                href,
             ),
         ],
     )

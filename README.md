@@ -19,13 +19,16 @@ The site is at readablestem.com.
 handwriting are converted only when you ask, by reading each page's picture with a model, so
 every converted equation and table is for a person to check and the original page stays in the
 file; without that request those pages are kept as images and flagged. It is not a general PDF-to-Markdown
-converter, and it does not work from LaTeX sources: it starts from the PDF (a Word or
-PowerPoint file is first turned into a PDF, on a server set up for that).
+converter. It starts from the PDF (a Word or PowerPoint file is first turned into a PDF, on a
+server set up for that). Upload of LaTeX source, Beamer decks and zip batches is built but off
+on readablestem.com: the check that the sandbox for compiling TeX works fails on the host
+(docs/deploy-railway.md, "Feature flags in production").
 
 **Status.** Beta. The service is live at https://readablestem.com as a free beta built and maintained by
 Harish Manoharan. Anyone with a Google account can sign in and try it (the beta runs `SIGNUP_MODE=open`;
 the code's default is `allowlist`, invitation only), with daily limits for new accounts; the demo
-needs no sign-in. The code, the evaluation harness and the documentation
+needs no sign-in. The pipeline is version 0.5.9 (`PIPELINE_VERSION`). Questions go to
+hello@readablestem.com. The code, the evaluation harness and the documentation
 are here. `uv run readablestem ops launch-check` lists the checks a deploy has to pass.
 
 ## See it
@@ -46,7 +49,35 @@ on documents the system had never been run on, with the protocol written down be
 run. The second kind comes from the sample on which the checks were developed. The scan
 numbers and the re-measurement below are neither, and say so where they appear.
 
-### Held-out results (2026-10-14)
+### Latest registered result: fresh5 (2026-11-04)
+
+The newest held-out result is the fifth fresh split, run once on 2026-11-04 under
+[`data/realworld/PREREGISTRATION-FRESH5.md`](data/realworld/PREREGISTRATION-FRESH5.md) (hash in
+`data/realworld/REGISTRATION-fresh5.sha256`, merged to `main` before the first request). It tests
+equations only, on ReadableSTEM pipeline 0.5.9 with the settings the live service uses: 26
+documents (12 arXiv papers, 6 OpenStax sections, 8 course LaTeX documents, 3 of them Beamer
+decks), 131 pages, 1,715 gold equations. Report: [docs/eval-equation-fresh5.md](docs/eval-equation-fresh5.md);
+the summary is in [PROOF.md](PROOF.md).
+
+| Strata A to C, 26 documents, 1,715 gold equations | ReadableSTEM | Chatbot, Opus | Chatbot, Haiku |
+|---|---|---|---|
+| Spoken-equal, end to end (primary) | 0.840 [0.791, 0.876] | 0.836 [0.778, 0.878] | 0.816 [0.750, 0.860] |
+| Exact match (secondary) | 0.793 [0.736, 0.834] | 0.770 [0.704, 0.824] | 0.732 [0.657, 0.793] |
+| Wrong equations nobody is asked about, per 100 gold | 5.02 [3.55, 6.39] | 9.56 [5.86, 14.55] | 11.90 [8.36, 16.07] |
+| Flag recall (share of wrong equations the review screen asks about) | 0.461 [0.309, 0.613] | 0 (asks nothing) | 0 |
+| Cost per page | $0.0222 | $0.0681 | $0.0017 |
+
+**Verdict, as registered:** on the primary score ReadableSTEM and the Opus chatbot show **no
+difference this set can detect** (+0.004, 97.5% interval [-0.023, +0.036]); the set was powered
+for about 3 points. The registered claim that ReadableSTEM beats the chatbot baseline on
+equations is **not made**: silent errors are above the registered 4.0 per 100 gold (5.02) and flag
+recall is below 0.60 (0.461). The unseen-loss and cost criteria are met. Stratum D (3 OpenStax
+chemistry sections, 123 gold equations) is not a success (0.333 chemically right against 0.80),
+and its comparison with the chatbots is not measured. One run per arm; the speech is
+ReadableSTEM's own rules, not a particular screen reader's; nothing here covers scans,
+handwriting, Word files or maths inside figures. Recorded spend $21.98.
+
+### First registered held-out result (2026-10-14)
 
 > **Superseded for the current system, not for this run.** The table and text below are the
 > registered held-out results of the system as it was on 2026-10-14 (pipeline 0.4.0) and are kept as
@@ -398,19 +429,29 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
 
 - **PDF in, web page out** (with Word, EPUB, Canvas zip and Common Cartridge downloads). Word and
   PowerPoint files are taken only on a server with LibreOffice (readablestem.com takes PDF only).
+  In production the limits are 150 pages a day and 250 MB stored for a new account and 300 pages
+  a day and 300 MB for an invited one, 2000 MB stored in all, $6 of model spend for one
+  document and $10 a day for the whole service.
   One upload is limited by `MAX_PAGES_PER_JOB` and `MAX_UPLOAD_MB` (100 pages and 50 MB by
   default); a bigger file, up to `MAX_SOURCE_PAGES` and `MAX_LARGE_UPLOAD_MB` (500 pages and
   100 MB), is kept so you can choose which pages to convert, in parts. The live values are on
-  the site's Known limits page. LaTeX source upload exists behind `FEATURE_LATEX_SOURCE`, off by
-  default and on no public server.
+  the site's Known limits page. LaTeX source upload (`FEATURE_LATEX_SOURCE`), Beamer decks
+  (`FEATURE_BEAMER_SOURCE`) and zip batches (`FEATURE_BATCH_ZIP`) exist, are off by default,
+  and are off on readablestem.com until the sandbox check passes there.
 - **A model is in the loop.** Document images and the text around them are sent to Anthropic's
   Claude API (the beta's provider, `MODEL_PROVIDER=anthropic`), or to OpenAI's API (with
   `store=False`) if you set `MODEL_PROVIDER=openai`; the handwriting readers (off, unused) would send crops to their own company. Models are not deterministic, so two runs on the same file can differ.
-- **Equations are the hard part.** On the development sample 23 of 30 equations match the
-  answer key under the lenient scorer, and 5 of the 7 misses are gaps in the scorer, not in
-  the transcription. On the held-out sections 1,379 of 2,738 (two runs, 0.504, version 0.4.0) match through
-  the whole pipeline, and about 23 of every 100 equations are wrong and not flagged for review
-  (re-measured on the same sections, which is not a blind result: 0.596 and 22 of 100). A symbol, sign or relation that differs from the PDF's text layer is
+- **Equations are the hard part.** On the newest registered test (fresh5: 26 documents, 1,715
+  equations, version 0.5.9) 0.840 of equations were spoken the same as the original end to end and
+  0.793 matched exactly; the Opus chatbot scored 0.836 and 0.770, which is no difference this
+  set can detect. 5.0 in every 100 equations were wrong and not flagged for review (the
+  chatbot's 9.6), and the review screen asked about 0.46 of the wrong ones; chemistry was 0.33
+  right as chemistry in 3 sections. On the first held-out sections 1,379 of 2,738 (two runs,
+  0.504, version 0.4.0) matched through the whole pipeline, and about 23 of every 100 equations
+  were wrong and not flagged for review (re-measured on the same sections, which is not a blind
+  result: 0.596 and 22 of 100). On the development sample 23 of 30 equations match the answer key
+  under the lenient scorer, and 5 of the 7 misses are gaps in the scorer, not in the
+  transcription. A symbol, sign or relation that differs from the PDF's text layer is
   sent to review, but an error that agrees with the text layer, or a PDF with no usable text
   layer, can still pass.
 - **Scans and handwriting** are converted only on request (an upload option): a model reads the

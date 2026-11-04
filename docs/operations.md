@@ -43,8 +43,9 @@ so `/healthz/ops` goes stale 150 minutes after the last good one.
 
 ## Retention
 
-Each job gets `retain_until` when it is uploaded: `RETENTION_HOURS` (24) later, or
-`OPT_IN_RETENTION_DAYS` (30) when the instructor opted in. The hourly purge deletes every
+Each job gets `retain_until` when it is uploaded: `RETENTION_HOURS` (24) later, 7 days later when
+the instructor ticked "Keep for 7 days" (or has it as their default on the Account page,
+`users.keep_week_default`), or `OPT_IN_RETENTION_DAYS` (30) when they opted in. The hourly purge deletes every
 job past that time together with everything derived from the document: the uploaded PDF,
 the crops, the result JSON, the HTML, the filename and the review edits. It deletes the
 child rows itself and does not rely on the database cascade alone.
@@ -164,7 +165,7 @@ read from the `before` snapshot of its earliest review. Categories:
 | same | `reason:<code>` | `Fix.reason`, e.g. `reason:low_confidence`, `reason:budget_daily` |
 | same | `call:<model>:outcome:<outcome>` | every model call attempt, e.g. `call:gpt-6-luna:outcome:timeout` |
 | same | `call:fallback` | calls made on the other model after a failure |
-| same | `call:escalated` | fixes re-asked on a different model without a failure (e.g. a low-confidence `gpt-6-luna` answer sent to `gpt-6.1-sol`) |
+| same | `call:escalated` | fixes re-asked on a different model without a failure (e.g. a low-confidence `claude-haiku-5-5` answer sent to `claude-opus-5-5` in production, or `gpt-6-luna` to `gpt-6.1-sol` on the OpenAI pair) |
 | same | `review:<action>` | reviewer decisions (`accept`, `edit`, `reject`), counted when the job is deleted, because reviews can happen until then |
 | same | `tier:<tier>` | fixes by review tier as the pipeline left them (`required`, `optional`, `none`; `Fix.review`) |
 | same | `tier:<tier>:<reason>` | why each required or optional fix has its tier: each failed check code, its `Fix.reason`, `heading.repeated_label` for a member of a group of repeated headings, or `below_accept` when only the confidence held it back (`core.triage.tier_reasons`) |
@@ -672,7 +673,9 @@ itself, in the background, when it starts and LaTeXML is in the image
 <check>=<value> ...` (the probe's own check names and one-word answers, nothing else), and
 `/healthz/ops` shows it under `sandbox`: `state` (`running`, `pass`, `fail`, `timeout`,
 `not_installed` or `not_run`), `result`, `checks`, `bound_mb`, `cgroup`, `seccomp`, `checked_at`.
-Neither start-up nor `/healthz` waits for it. `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE` and
+Neither start-up nor `/healthz` waits for it. In production (2026-11-04) the probe reports FAIL, so
+`FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` are off; the Landlock
+backend's failure step codes (`landlock_step=`, docs/security.md, "Why it did not start") are being read. `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE` and
 a `FEATURE_BATCH_ZIP` zip with a LaTeX project take effect only while the state is `pass`; before
 that, after a FAIL and after a timeout, such an upload gets the 503 "cannot read LaTeX source right
 now" answer and the pages do not offer it. A redeploy runs the probe again.

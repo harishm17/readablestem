@@ -2,6 +2,14 @@
 
 This project defines its Railway infrastructure in code.
 
+For this repository: `railway.ts` is the whole production project (services `web`, `cron` and
+`backup`, Postgres, both volumes), imported from the live project on 2026-10-21. There is no
+`railway.json` or `railway.toml`, and `tests/test_railway_config.py` fails if one appears. Variables
+are listed by name only (`preserve()`); values stay in Railway. The rules for changing it, and how
+code is deployed (`railway up --service web|cron`, which this file never does), are in
+[`docs/deploy-railway.md`](../docs/deploy-railway.md). The rest of this page is Railway's generic
+text for the CLI commands.
+
 ```txt
 .railway/railway.ts
 ```
@@ -114,7 +122,7 @@ command reports the API error without falling back to a configuration apply.
 - `railway config apply` previews changes and asks before applying unless you pass `--yes`.
 - Destructive changes in non-interactive or agent sessions require `railway config apply --confirm-destructive` after reviewing the plan.
 - CI should pin a plan (`railway config plan --out railway-plan.json`) and apply that file on merge (`railway config apply --plan railway-plan.json --yes --confirm-destructive`) so the reviewed change set is what lands. On GitHub Actions, use https://github.com/railwayapp/config.
-- Services already managed by `railway.json` must be migrated before `.railway/railway.ts` can manage them.
+- Services already managed by a `railway.json` file must be migrated before `.railway/railway.ts` can manage them (none of this project's services is: the file was deleted).
 - Keep one `.railway` file for the whole project. A named `export const partial` (or `PARTIAL` / `const Partial`) is a last resort for separate repos that cannot share that file. Do not add it unless omit=delete across repos is a blocker.
 - Use `replicas` for scaling; advanced placement can still specify region names.
 - Use `group("Name", [resources])` to keep large projects organized on the Railway canvas.

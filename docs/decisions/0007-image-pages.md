@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Accepted 2026-10-21** as an opt-in per upload with the main model, default off (the offer is `FEATURE_IMAGE_PAGES`); measured on the development sets and once on the real-world held-out papers ([eval-image-pages.md](../eval-image-pages.md)) |
+| Status | **Accepted 2026-10-21** and current, as an opt-in per upload with the main model (the offer is `FEATURE_IMAGE_PAGES`: off by default in code, on in production since after this record, see the update at the end); measured on the development sets and once on the real-world held-out papers ([eval-image-pages.md](../eval-image-pages.md)) |
 | Date | 2026-10-21 |
 | Decider | Harish |
 | Revisits | the 2026-10-09 decision in `pipeline/page_type.py` and docs/layout.md ("There is no handwriting or scan conversion": such pages are kept as page images, marked "Not converted") |
@@ -286,3 +286,12 @@ pages as an opt-in per upload, read by the main model, default off.**
   mostly by mistake or its cost per page rises, or if a cheaper reader closes the gap on equations
   and on handwriting, change the model or the allowance; if a held-out scan set shows more silent
   wrong words than the notes can catch, withdraw the option.
+
+## Update 2026-11-04
+
+The decision stands and is current: the conversion is still opt-in per upload and still reads pages
+with the main model, and the code default of `FEATURE_IMAGE_PAGES` is still off. What changed is that
+the offer is switched on in production, so the upload form shows "Convert scanned or handwritten
+pages" there ([deploy-railway.md](../deploy-railway.md), "Feature flags in production"). The spend
+allowance per such job is `IMAGE_PAGES_USD_PER_PAGE` ($0.25 a page of the document) up to
+`IMAGE_PAGES_MAX_USD_PER_JOB` ($7.50), inside the $10 daily cap and the open tier's $4 pool.

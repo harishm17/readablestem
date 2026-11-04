@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Accepted** (Harish, 2026-10-08) |
+| Status | **Accepted** (Harish, 2026-10-08); in force only with `MODEL_PROVIDER=openai`, not used in production (see the update below) |
 | Date | 2026-10-08 |
 | Decider | Harish |
 

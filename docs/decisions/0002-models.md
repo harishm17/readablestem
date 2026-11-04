@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Accepted** (Harish, 2026-10-07) |
+| Status | **Accepted** (Harish, 2026-10-07); current for the code defaults, while production uses the Claude pair (see the update below) |
 | Date | 2026-10-07 |
 | Decider | Harish |
 
@@ -30,6 +30,8 @@ above, but production runs `MODEL_PROVIDER=anthropic`: `claude-opus-5-5` (main) 
 `claude-haiku-5-5` (cheap), each the other's fallback, with their own spend-limit defaults
 (`PROVIDER_LIMIT_DEFAULTS` in `config.py`). The decision above is kept as written; the OpenAI
 path still works as an alternative.
+
+**Update (2026-11-04).** Unchanged: production runs `MODEL_PROVIDER=anthropic`. The Claude prices the app uses are in `models/pricing.py` (claude-opus-5-5 $4 / $20 per million tokens, claude-haiku-5-5 $0.10 / $0.50); the OpenAI table above is the 2026-10-07 reading and was not re-checked.
 
 ## Smoke test (2026-10-07)
 

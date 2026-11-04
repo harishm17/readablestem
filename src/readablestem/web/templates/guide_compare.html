@@ -63,13 +63,14 @@
 <h2 id="side-by-side">Side by side</h2>
 {# Each cell says where it comes from and the day that source was read: Mathpix and LaTeXML on
    2026-10-28, Aelira and the rest on 2026-11-03; the chatbot column is the recipe tested in
-   PROOF.md (run recorded 2026-10-14), not a claim about any chatbot's features. No conformance
+   PROOF.md (registered result, run 2026-11-04), not a claim about any chatbot's features. No conformance
    claims, and accuracy only where we measured it. #}
 {% macro src(href, day, label="Source") -%}
-<span class="source-note"><a href="{{ href }}">{{ label }}</a>, read <time datetime="{{ day }}">{{ {"2026-10-28": "October 28, 2026", "2026-11-03": "November 3, 2026", "2026-10-14": "October 14, 2026"}[day] }}</time></span>
+<span class="source-note"><a href="{{ href }}">{{ label }}</a>, read <time datetime="{{ day }}">{{ {"2026-10-28": "October 28, 2026", "2026-11-03": "November 3, 2026", "2026-10-14": "October 14, 2026", "2026-11-04": "November 4, 2026"}[day] }}</time></span>
 {%- endmacro %}
 {% set RS = source_url ~ "/blob/main/README.md" %}
-{% set PF = source_url ~ "/blob/main/PROOF.md#comparison-with-the-chatbot-recipe" %}
+{% set PF = source_url ~ "/blob/main/PROOF.md#latest-registered-result-fresh5-2026-11-04" %}
+{% set PF_FIRST = source_url ~ "/blob/main/PROOF.md#comparison-with-the-chatbot-recipe" %}
 {% set MX = "https://mathpix.com/pdf-to-html" %}
 {% set AE = "https://aelira.ai/us" %}
 {% set LX = "https://dlmf.nist.gov/LaTeXML/manual/usage/" %}
@@ -77,7 +78,7 @@
 {% if tool == 0 %}A STEM course PDF, including Beamer slide decks{% if office_on %}; also Word (DOCX) and PowerPoint (PPTX), turned into a PDF first{% endif %}{% if image_pages_on %}. Scanned and handwritten pages only when you ask{% endif %}. {{ src(RS, "2026-11-03") }}
 {% elif tool == 1 %}PDF, EPUB, Word (DOCX, DOC), PowerPoint (PPTX), OpenDocument Text (ODT), DjVu, WordPerfect (WPD), Mobipocket (MOBI) and Amazon Kindle (AZW3); also images and handwriting strokes. {{ src(MX, "2026-10-28") }}
 {% elif tool == 2 %}Scanning workflows for PDF, PowerPoint, Word, Excel, LaTeX, images, video captions and web pages; remediation depth varies by format. {{ src(AE, "2026-11-03") }}
-{% elif tool == 3 %}In the recipe we tested: the PDF and a 150 dpi image of every page, with one sentence of prompt. {{ src(PF, "2026-10-14", "PROOF.md") }}
+{% elif tool == 3 %}In the recipe we tested: the PDF and a 150 dpi image of every page, with one sentence of prompt. {{ src(PF_FIRST, "2026-10-14", "PROOF.md") }}
 {% elif tool == 4 %}TeX and LaTeX sources (and BibTeX). {{ src(LX, "2026-10-28") }}
 {% endif %}
 {%- endmacro %}
@@ -85,7 +86,7 @@
 {% if tool == 0 %}One self-contained HTML file. Also {% if word_export %}Word (DOCX), {% endif %}EPUB, a zip for a Canvas page and a Common Cartridge. {{ src(RS, "2026-11-03") }}
 {% elif tool == 1 %}Mathpix Markdown, DOCX, XLSX, LaTeX, HTML, PDF and PPTX. Also a tagged accessible PDF (PDF/UA) of the PDF you sent. {{ src("https://docs.mathpix.com/guides/accessible-pdf", "2026-10-28") }}
 {% elif tool == 2 %}A revised file and findings to review with your team; its supported fixes are partial and include structure and suggested alt text. {{ src(AE, "2026-11-03") }}
-{% elif tool == 3 %}HTML in the reply. {{ src(PF, "2026-10-14", "PROOF.md") }}
+{% elif tool == 3 %}HTML in the reply. {{ src(PF_FIRST, "2026-10-14", "PROOF.md") }}
 {% elif tool == 4 %}XML, HTML5 (also XHTML and HTML4) and ePub; the project page also names JATS. {{ src("https://dlmf.nist.gov/LaTeXML/manual/commands/latexmlpost.html", "2026-10-28") }}
 {% endif %}
 {%- endmacro %}
@@ -93,7 +94,7 @@
 {% if tool == 0 %}MathML. {{ src(RS, "2026-11-03") }}
 {% elif tool == 1 %}SVG by default. MathML or LaTeX (for MathJax or KaTeX) by option. An accessibility option adds assistive MathML. {{ src("https://docs.mathpix.com/reference/shared-types", "2026-10-28") }}
 {% elif tool == 2 %}Not stated on the page we read. {{ src(AE, "2026-11-03") }}
-{% elif tool == 3 %}MathJax TeX or MathML, as the model writes it; our scorer reads both. {{ src(PF, "2026-10-14", "PROOF.md") }}
+{% elif tool == 3 %}MathJax TeX or MathML, as the model writes it; our scorer reads both. {{ src(PF_FIRST, "2026-10-14", "PROOF.md") }}
 {% elif tool == 4 %}Presentation MathML by default for HTML5 and XHTML. Content MathML, OpenMath and math images by option. {{ src("https://dlmf.nist.gov/LaTeXML/manual/commands/latexmlpost.html", "2026-10-28") }}
 {% endif %}
 {%- endmacro %}
@@ -101,7 +102,7 @@
 {% if tool == 0 %}Finding and rebuilding equations, restoring headings and lists, and writing short alt text for figures, with AI models. {{ src(RS, "2026-11-03") }}
 {% elif tool == 1 %}Recognition and export, through the Snip web editor, an API, a command-line tool and a Files API for batches. {{ src("https://docs.mathpix.com/", "2026-10-28") }}
 {% elif tool == 2 %}Scans with axe-core, and partial fixes for supported content. {{ src(AE, "2026-11-03") }}
-{% elif tool == 3 %}Whatever one prompt gets from the model. {{ src(PF, "2026-10-14", "PROOF.md") }}
+{% elif tool == 3 %}Whatever one prompt gets from the model. {{ src(PF_FIRST, "2026-10-14", "PROOF.md") }}
 {% elif tool == 4 %}The whole conversion, from the command line (<code>latexmlc</code>). {{ src(LX, "2026-10-28") }}
 {% endif %}
 {%- endmacro %}
@@ -109,7 +110,7 @@
 {% if tool == 0 %}A review screen where the instructor accepts, edits or rejects each change it is unsure about. {{ src(RS, "2026-11-03") }}
 {% elif tool == 1 %}The pages we read describe none. Figure alt text &ldquo;remains yours to write&rdquo;. {{ src(MX, "2026-10-28") }}
 {% elif tool == 2 %}Its site says supported fixes need human review and that the team handles remaining issues. {{ src(AE, "2026-11-03") }}
-{% elif tool == 3 %}None in the recipe: the reply is scored as it comes. {{ src(PF, "2026-10-14", "PROOF.md") }}
+{% elif tool == 3 %}None in the recipe: the reply is scored as it comes. {{ src(PF_FIRST, "2026-10-14", "PROOF.md") }}
 {% elif tool == 4 %}None built in. The manual lists the errors it reports. {{ src(LX, "2026-10-28") }}
 {% endif %}
 {%- endmacro %}
@@ -130,10 +131,10 @@
 {% endif %}
 {%- endmacro %}
 {% macro cell_7(tool) -%}
-{% if tool == 0 %}15 OpenStax sections held out: 89% of equations found and 50% exactly right end to end (1,379 of 2,738). {{ src(PF, "2026-10-14", "PROOF.md") }}
+{% if tool == 0 %}26 documents held out (registered test, 1,715 equations): 0.840 of equations read the same as the original, end to end, and 0.793 exactly right. {{ src(PF, "2026-11-04", "PROOF.md") }}
 {% elif tool == 1 %}We have not run it, so this page makes no accuracy comparison.
 {% elif tool == 2 %}We have not run it. Its FAQ says automated scores do not establish WCAG conformance. {{ src(AE, "2026-11-03") }}
-{% elif tool == 3 %}The same test with one prompt on Claude Opus: 89% found and 62% exactly right end to end. {{ src(PF, "2026-10-14", "PROOF.md") }}
+{% elif tool == 3 %}The same test with one prompt on Claude Opus: 0.836 and 0.770; the test can detect no difference between the two on the first score. {{ src(PF, "2026-11-04", "PROOF.md") }}
 {% elif tool == 4 %}We have not run it; it starts from LaTeX source.
 {% endif %}
 {%- endmacro %}
@@ -210,7 +211,7 @@
 <p>It makes mistakes, so look over the equations your students rely on. We have not run
   Mathpix or LaTeXML on our held-out test, so this page makes no accuracy comparison.
   <a href="{{ source_url }}/blob/main/PROOF.md">The full results</a> compare ReadableSTEM with a
-  general chatbot and three open parsers, including where it loses. It starts from a PDF, and
+  general chatbot, and in the first test with three open parsers. It starts from a PDF, and
   its <a href="/limits">known limits</a> list what it does not do yet.</p>
 
 <h2 id="mathpix">Mathpix</h2>
@@ -247,11 +248,17 @@
 
 <h2 id="chatbots">General chatbots</h2>
 <p>What many instructors do today is upload the PDF to a general chatbot and type one sentence.
-  We tested that recipe, with a prompt Purdue publishes, against ReadableSTEM on the same 15
-  held-out sections. It found as many equations (89% each), and more of them came out exactly right
-  end to end (62% against 50%); for headings the test found no difference it could detect.
-  <a href="{{ source_url }}/blob/main/PROOF.md#comparison-with-the-chatbot-recipe">The full
-  comparison</a>. This page does not compare the features of any particular chatbot.</p>
+  We tested that recipe, with a prompt Purdue publishes, on Claude Opus against ReadableSTEM
+  on the same 26 held-out documents (1,715 equations, registered before the run). Scored by
+  whether a screen reader reads each equation the same as the original, it was 0.836 against
+  0.840: the test found no difference it could detect. Exactly right, symbol for symbol, it was
+  0.770 against 0.793. ReadableSTEM left fewer wrong equations without a question to the
+  reader (5.0 against 9.6 per 100), but not as few as the goal registered before the run.
+  <a href="{{ source_url }}/blob/main/PROOF.md#latest-registered-result-fresh5-2026-11-04">The
+  full result</a>. An earlier test, on 15 textbook sections, had the chatbot ahead on equations
+  exactly right (0.62 against 0.50); it ran on version 0.4.0, and
+  <a href="{{ source_url }}/blob/main/PROOF.md#comparison-with-the-chatbot-recipe">its
+  comparison</a> is kept as history. This page does not compare the features of any particular chatbot.</p>
 
 <h2 id="accessibility-office">Check with your accessibility office</h2>
 <p>This page is guidance, not legal advice. Your campus accessibility office can say what your
@@ -270,7 +277,7 @@
   <li><a href="https://dlmf.nist.gov/LaTeXML/">LaTeXML home page</a> and <a href="https://math.nist.gov/~BMiller/LaTeXML/">project description</a> (NIST)</li>
   <li><a href="https://dlmf.nist.gov/LaTeXML/manual/usage/">LaTeXML manual: using LaTeXML</a> and <a href="https://dlmf.nist.gov/LaTeXML/manual/commands/latexmlpost.html">latexmlpost options</a> (version 0.8.8, February 26, 2024)</li>
   <li><a href="https://aelira.ai/us">Aelira, United States</a> (what it checks and fixes, its formats, plans and FAQ; read on November 3, 2026)</li>
-  <li><a href="{{ source_url }}/blob/main/PROOF.md#comparison-with-the-chatbot-recipe">PROOF.md, comparison with the chatbot recipe</a> (the recipe and its results; run recorded on October 14, 2026)</li>
+  <li><a href="{{ source_url }}/blob/main/PROOF.md#latest-registered-result-fresh5-2026-11-04">PROOF.md, latest registered result</a> (the recipe and its results; run on November 4, 2026) and the <a href="{{ source_url }}/blob/main/PROOF.md#comparison-with-the-chatbot-recipe">earlier comparison</a> (run recorded on October 14, 2026)</li>
   <li><a href="https://github.com/brucemiller/LaTeXML/blob/master/LICENSE">LaTeXML licence file</a> and <a href="https://github.com/brucemiller/LaTeXML/releases/tag/v0.8.8">release v0.8.8</a> (GitHub)</li>
   <li><a href="{{ source_url }}/blob/main/README.md">ReadableSTEM README</a>, <a href="/limits">known limits</a>, <a href="/help/posting">posting in your course</a> and <a href="{{ source_url }}/blob/main/PROOF.md">PROOF.md</a></li>
 </ul>

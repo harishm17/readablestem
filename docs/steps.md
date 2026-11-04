@@ -159,7 +159,7 @@ The model sees `Caption: ...` (from `Element.caption`) and `Nearby text: ...` (t
 
 ### Long descriptions, data tables and colour (FEATURE_LONG_DESCRIPTIONS)
 
-Off by default (`ConversionOptions.long_descriptions`, read with `options.current()`).
+Off by default in code, on in production (`ConversionOptions.long_descriptions`, read with `options.current()`).
 Off, the step sends `figure.md` and `FigureOutput` exactly as before, and the fix has
 none of the fields below. On, it sends `figure_long.md` with `FigureLongOutput` in the
 same single call per attempt (`max_output_tokens` 4,096), and the context also gets
@@ -255,7 +255,7 @@ Both sides go through one parser. The text layer is flat (a lowered 4 and a rais
 as `SO42−`), and the MathML is flattened the same way (a script glued to its base, an
 operator between spaces, a nuclide's prescripts first), so the check never asks a reading
 to tell `Fe3+` from `Fe3 +` when the page cannot. Where the text layer breaks a formula at a
-script change (`H2 O`, `SO4 2−`, `Na[Al(OH)4 ](aq)`) the pieces are joined; a state with
+script change (`H2 O`, `SO4 2−`, `Na[Al(OH)4 ]` before its `(aq)`) the pieces are joined; a state with
 conditions (`(aq, 1 M)`) is its state; a charge the text layer put before its formula
 (`−CH3 CO2`) does not count as a difference unless the page's signs, counted, differ too;
 the species on one side of an arrow are compared as a multiset (a fraction's numerator and
@@ -365,7 +365,7 @@ pins each. On 2026-10-09 layout started reading the TeX style fonts (above), so 
 handout's `\mathbb{R}^n` is now a match, not a cosmetic note, and `\mathbb{R}` read as
 `R` there is meaning-level (`tests/test_letter_style_fonts.py`, on a Tectonic PDF).
 
-## Glyph checks (equations; `EQUATION_GLYPH_CHECKS`, off)
+## Glyph checks (equations; `EQUATION_GLYPH_CHECKS`, off in code, on in production)
 
 The checks above read `Element.text`, the text layer of the equation's box. Two things that text
 cannot say are read from the glyphs themselves (`layout.line_glyphs`, kept on the element as
@@ -416,7 +416,7 @@ glyphs nothing changes.
 
 Measured by replay on the recorded fresh4 run (docs/eval-equation-glyph-checks.md).
 
-### Corrections from the glyphs (`EQUATION_GLYPH_RECONCILE`, off; needs `EQUATION_GLYPH_CHECKS`)
+### Corrections from the glyphs (`EQUATION_GLYPH_RECONCILE`, off in code, on in production; needs `EQUATION_GLYPH_CHECKS`)
 
 Five deterministic rules after the model, none of which changes a request (so recorded answers
 replay), in `pipeline/glyph_reconcile.py`. Each fires only when the glyphs leave one answer, keeps
@@ -470,7 +470,7 @@ replays to the same result (docs/eval-equation-rootcause.md):
   `CMMIB`, newtx's `bmi`, Nimbus `MediItal`, any `BoldItalic`). A crop shows a bold vector as bold and the model
   writes `\mathbf`; `\bm` and `\boldsymbol` are what the author typed (62 equations of the development set).
 
-## Flag policy (equations; `FLAG_POLICY`, off)
+## Flag policy (equations; `FLAG_POLICY`, off in code, on in production)
 
 The checks above find a wrong reading only when it differs from the text layer in letters, digits,
 signs or styles. Most wrong readings nobody is asked about do not (diagnostics D4). `pipeline/flag_policy.py`

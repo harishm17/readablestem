@@ -200,7 +200,7 @@ the same models (claude-opus-5-5, claude-haiku-5-5), thresholds and settings, th
 with its new "Chemistry" section being the one change to what the model is asked. Every model
 answer was recorded once and the "after" numbers were scored again from the recording with the
 final converter (`--answers`, `--answers-offline`: no model call for a scoring change). Tables
-are off, as in production. Scored by the repository's scorers (`scripts/dev_buckets.py`) and by
+are off in that run (production has them on since 2026-10-21, docs/tables.md). Scored by the repository's scorers (`scripts/dev_buckets.py`) and by
 `scripts/dev_chem.py`.
 
 | 12 documents, 443 gold equations | before | after |
@@ -637,7 +637,7 @@ What it says, as measured:
    operator) happens to match the primary's rule, and it moved the authored document the wrong
    way (10 to 4) because the gold of that document has the old converter's shape.
 2. **What is really missing is detection, not reading.** 124 of the 443 (28%) are not found at
-   all: 94 are formulas in the cells of tables (tables are off, as in production; docs/tables.md),
+   all: 94 are formulas in the cells of tables (tables were off in that run; production has them on since 2026-10-21, docs/tables.md),
    22 are a lone `×` that the gold counts as an equation and the page prints in a sentence (not
    chemistry, nothing to read: no equation to find; a reader hears "times" in the sentence), and 7
    are not paired: 2 are a reaction line that the table element under it holds (17-3), 5 are
