@@ -293,13 +293,14 @@ def test_decisions_first_by_kind_then_optional_then_accepted(web):
 def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
     page = review_page(web)
     equation = card(page, "p1-e3")
-    assert '<h4 id="fix-title-p1-e3">Equation 2 <span class="meta">on page 1</span></h4>' in (
-        equation
+    assert (
+        '<h4 id="fix-title-p1-e3" class="visually-hidden">Equation 2 <span class="meta">on page 1</span></h4>'
+        in (equation)
     )  # numbered in reading order: the inline p1-e2 is equation 1
     assert f'src="/jobs/{web.job_id}/crops/p1-e3.png"' in equation
     assert 'alt="The original equation 2 from page 1 of the PDF, as an image."' in equation
     assert '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">' in equation
-    assert "<strong>Read aloud roughly as:</strong> x plus 1" in equation
+    assert "Read aloud roughly as:</span> “x plus 1”" in equation
     assert "\\SECRETLATEX{x}</textarea>" in equation
     assert '<label for="latex-p1-e3">LaTeX for equation 2</label>' in equation
     # No confidence percentage and no internal code on the list view (T1-11).
@@ -331,8 +332,8 @@ def test_buttons_name_the_fix_they_act_on(web):
     # "Reject" is named for what it does, with what that means under it.
     assert 'Keep without a description<span class="visually-hidden"> (figure 1)</span>' in figure
     assert "marked “Needs a description”; screen readers get no description of it." in figure
-    assert 'Accept<span class="visually-hidden"> figure 1</span>' in figure
-    assert 'Save edit<span class="visually-hidden"> to figure 1</span>' in figure
+    assert 'Accept as written<span class="visually-hidden"> figure 1</span>' in figure
+    assert 'Save and accept<span class="visually-hidden"> figure 1</span>' in figure
 
 
 def test_decided_fixes_are_folded_away(web):
@@ -431,7 +432,7 @@ def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
 def test_when_nothing_is_left_the_reviewer_lands_on_the_progress_summary(web):
     post(web, "p1-e3", action="accept")
     post(web, "p1-e5", action="reject")
-    response = post(web, "p1-e4", action="reject")
+    response = post(web, "p1-e4", action="reject", acknowledge="on")
     assert response.headers["location"] == f"/jobs/{web.job_id}/review/list#review-progress"
     page = review_page(web)
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
@@ -536,7 +537,7 @@ def test_figure_alt_text_failing_a_check_is_not_saved(web):
     assert "Your alt text was not saved. The alt text starts with words like" in response.text
     assert "(alt.no_redundant_prefix" not in response.text  # codes are for the Details only
     assert "Image of a graph</textarea>" in response.text
-    assert "(this text has 16)" in response.text  # counts the reviewer's input
+    assert "(this has 16)" in response.text  # counts the reviewer's input
     assert edits(web) == []
 
 
@@ -555,7 +556,7 @@ def test_figure_needs_alt_text_or_decorative(web):
 
 
 def test_reject_keeps_the_original(web):
-    assert post(web, "p1-e4", action="reject").status_code == 303
+    assert post(web, "p1-e4", action="reject", acknowledge="on").status_code == 303
     fix = result(web).fix_for("p1-e4")
     assert fix is not None and fix.status.value == "rejected"
     assert "p1-e4:rejected" in (with_file(web).html or "")
@@ -1027,7 +1028,7 @@ def test_a_reviewers_accept_is_marked_as_the_reviewers(web):
     fixes = {f.element_id: f for f in result(web).fixes}
     assert fixes["p1-e3"].status is Status.ACCEPTED and fixes["p1-e3"].reviewed
     assert fixes["p1-e2"].status is Status.ACCEPTED and not fixes["p1-e2"].reviewed
-    assert post(web, "p1-e4", action="reject").status_code == 303
+    assert post(web, "p1-e4", action="reject", acknowledge="on").status_code == 303
     assert result(web).fix_for("p1-e4").reviewed  # type: ignore[union-attr]
     decided = card(review_page(web), "p1-e3")
     assert "Accepted by you" in decided

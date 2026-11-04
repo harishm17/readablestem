@@ -29,6 +29,7 @@ from readablestem.pipeline.assemble_tables import (
 )
 from readablestem.pipeline.table_html import render_table
 from readablestem.pipeline.table_step import NOTE_CODES, STRUCTURE_PROBLEMS
+from readablestem.web.messages import explain_check
 from readablestem.web.review import (
     cell_label,
     cell_region,
@@ -62,6 +63,38 @@ class CellChoice:
     tied: bool = False
 
 
+@dataclass(frozen=True)
+class Finding:
+    """One thing wrong with the table, in a sentence that names the row, header, cell or grid
+    it is about, and the one correction the card can make for it (`fix`)."""
+
+    text: str
+    fix: str = ""  # "headers" (one click), "grid" (one click), "edit" (the place below), or none
+    label: str = ""  # the correction's words ("Use the first row as headers")
+
+
+# What each failed check or structural problem asks for. A one-click correction is only
+# offered when the card can make it (`_finding`).
+FINDING_FIXES = {
+    "no_headers": "headers",
+    "header_problem": "edit",
+    "headers_cover_table": "edit",
+    "header_span_into_body": "edit",
+    "header_below_body": "edit",
+    "data_in_header_rows": "edit",
+    "data_in_header_cols": "edit",
+    "grid_invalid": "grid",
+    "no_cells": "grid",
+    "cell_out_of_bounds": "grid",
+    "cells_overlap": "grid",
+    "grid_hole": "grid",
+    "grid_size_differs": "grid",
+    "spans_differ": "grid",
+    "written_as_text": "grid",
+    "numbers_not_a_table": "grid",
+}
+
+
 @dataclass
 class TableCard:
     proposal: Markup | None  # the proposal as the student would get it; None without one
@@ -79,6 +112,9 @@ class TableCard:
     only_headers_missing: bool = False
     # "This grid is not a table" (T3-11): its words can be written one after another.
     can_text: bool = False
+    # What is wrong with the proposal, each with the correction that answers it (the failed
+    # checks and the structural problems, in sentences that name the row, header or grid).
+    findings: list[Finding] = field(default_factory=list)
 
     def pick(self, ref: str) -> None:
         """Open the form of the cell `ref` ("r1c2"); an unknown ref opens nothing."""
@@ -182,10 +218,49 @@ def table_card(fix: Fix, element: Element | None) -> TableCard:
             grid_problem_sentence(p) for p in grid_problems(grid) if not _reported(p, fix)
         ]
         card.only_headers_missing = _only_headers_missing(fix, grid, card)
+        card.findings = _findings(fix, grid, card)
     card.can_text = grid_as_text(fix, element) is not None and not (
         card.in_document and not card.is_data
     )
     return card
+
+
+def _can_use_first_row(grid: TableGrid, card: TableCard) -> bool:
+    """The first row can be made the header row: a data table of at least two rows in the
+    document that has no header row yet."""
+    return grid.is_data and card.in_document and not card.header_row and grid.rows >= 2
+
+
+def _finding(code: str, text: str, grid: TableGrid, card: TableCard) -> Finding:
+    """The sentence, and the correction for it that the card can make: the first row as
+    headers, the grid read from the PDF, or the place below where headers and cells change."""
+    fix = FINDING_FIXES.get(code, "edit")
+    if fix == "headers" and not _can_use_first_row(grid, card):
+        fix = "edit"
+    if fix == "grid" and card.local is None:
+        fix = "edit" if grid.is_data and card.cells else ""
+    if fix == "edit" and not grid.is_data:
+        fix = "grid" if card.local is not None else ""
+    labels = {
+        "headers": "Use the first row as headers",
+        "grid": "Use the grid read from the PDF",
+        "edit": "Change the table",
+    }
+    return Finding(text, fix, labels.get(fix, ""))
+
+
+def _findings(fix: Fix, grid: TableGrid, card: TableCard) -> list[Finding]:
+    """What the checks and the grid found, named for the table: a failed check says so in
+    its own words (`web.messages`; one with no sentence of its own is named by the part of the
+    table it is about), a structural problem the checks did not report says which row, header
+    or cell it is."""
+    out = []
+    for check in fix.failed_checks:
+        out.append(_finding(check.code or "", explain_check(check).text, grid, card))
+    for problem in grid_problems(grid):
+        if not _reported(problem, fix):
+            out.append(_finding(problem, grid_problem_sentence(problem), grid, card))
+    return out
 
 
 def _only_headers_missing(fix: Fix, grid: TableGrid, card: TableCard) -> bool:

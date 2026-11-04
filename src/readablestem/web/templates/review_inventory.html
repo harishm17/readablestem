@@ -2,7 +2,8 @@
 {# The Symbols screen (routes/inventory.py, web/inventory.py): every letter and symbol read in
    the handwritten equations, grouped with the ones that look alike, one form per symbol that
    changes it everywhere. A plain form: it works without JavaScript, and the places a symbol
-   stands are a list of checkboxes under a <details>, so the keyboard reaches them all. #}
+   stands are a list of checkboxes under a <details>, each ticked (it will change) until it is
+   unticked, so the keyboard reaches them all. #}
 {% block title %}{% if errors %}Error: {% endif %}Symbols in the handwritten equations: {{ job.filename }}{% endblock %}
 {% block content %}
 <p class="crumb"><a href="{{ back_href }}">Back to the review</a></p>
@@ -22,7 +23,9 @@
 </div>
 {% endif %}
 
-{% macro places_list(row, can_leave_out) %}
+{# The places a symbol stands. With `can_change`, each changeable one is ticked: ticked is
+   "will change". An equation already decided is listed and never changed. #}
+{% macro places_list(row, can_change) %}
 <ul class="places">
   {% for p in row.places %}
   <li class="place">
@@ -30,8 +33,8 @@
     <div class="place-text">
       <p class="place-where"><a href="/jobs/{{ job.id }}/review?item={{ p.element_id }}">{{ p.label }}<span class="visually-hidden">, on the review screen</span></a>, page {{ p.page }}{% if p.which %}, {{ p.which }}{% endif %}</p>
       <p class="place-latex"><span class="visually-hidden">In the LaTeX: </span><code class="latex">{{ p.before }}<mark class="said-diff">{{ row.key }}</mark>{{ p.after }}</code></p>
-      {% if p.changeable and can_leave_out %}
-      <label class="place-keep"><input type="checkbox" name="exclude" value="{{ p.value }}"> Leave this one as it is<span class="visually-hidden">: {{ p.label }}{% if p.which %}, {{ p.which }}{% endif %}</span></label>
+      {% if p.changeable and can_change %}
+      <label class="place-keep"><input type="checkbox" name="include" value="{{ p.value }}" checked> Change this one<span class="visually-hidden">: {{ p.label }}{% if p.which %}, {{ p.which }}{% endif %}</span></label>
       {% elif not p.changeable %}
       <p class="hint">Already decided: not changed.</p>
       {% endif %}
@@ -41,13 +44,33 @@
 </ul>
 {% endmacro %}
 
+{# Where the change lands, in words, so it can be read without opening the list: "Equation 2
+   (page 1), Equation 5 (page 1, twice)". #}
+{% macro affected(row) %}
+{% set seen = [] %}
+{% for p in row.places if p.changeable %}{% if p.label not in seen %}{% set _ = seen.append(p.label) %}{% endif %}{% endfor %}
+{% for label in seen %}{% set here = row.places|selectattr("changeable")|selectattr("label", "equalto", label)|list %}{{ label }} (page {{ here[0].page }}{% if here|length > 1 %}, {{ here|length }} times{% endif %}){% if not loop.last %}, {% endif %}{% endfor %}
+{% endmacro %}
+
 {% if not inv.families %}
-<p>This document has no handwritten equations with a proposal to list.</p>
-<p><a href="{{ back_href }}">Back to the review</a></p>
+<section class="symbols-empty" aria-labelledby="symbols-empty-title">
+  <h2 id="symbols-empty-title">Nothing to change here yet</h2>
+  <p>This screen is for handwritten equations. When the tool has read some, it lists every letter and symbol it found, so a letter it misread the same way throughout can be changed in all its places at once. This document has no handwritten equations with a proposal, so there is nothing to list.</p>
+  <p>Handwritten and scanned pages are read when “Convert scanned or handwritten pages” is ticked as the PDF is uploaded.</p>
+  <figure class="symbols-example">
+    <figcaption>What it will look like, as an example. It is not part of your document.</figcaption>
+    <div class="symbols-example-card">
+      <p class="symbols-example-name"><span class="symbol-glyph" aria-hidden="true">p</span> Letter p</p>
+      <p>Read 4 times, in 3 equations.</p>
+      <p>Change every p to: ρ (rho). Changes 4 of 4 places.</p>
+    </div>
+  </figure>
+  <p><a class="button" href="{{ back_href }}">Back to the review</a></p>
+</section>
 {% else %}
 <div class="symbols-intro">
-  <p>These are the letters and symbols the tool read in the handwritten equations: {{ inv.symbols }} different {{ "symbol" if inv.symbols == 1 else "symbols" }}, {{ inv.places }} in all, in {{ inv.equations }} {{ "equation" if inv.equations == 1 else "equations" }}. They are grouped with the ones that look alike when written by hand.</p>
-  <p>If one was read wrongly throughout, change it everywhere here, and tick the places where it was right. Each equation you change stays waiting for your decision: you still look at it and accept it yourself. Undo takes the whole change back in one step.</p>
+  <p>These are the letters and symbols the tool read in the handwritten equations: {{ inv.symbols }} different {{ "symbol" if inv.symbols == 1 else "symbols" }}, {{ inv.places }} in all, in {{ inv.equations }} {{ "equation" if inv.equations == 1 else "equations" }}. Ones that look alike when written by hand are grouped.</p>
+  <p>If one was read wrongly throughout, choose what it should be and change it in every place. Untick a place to leave it as it is. Each equation you change stays waiting for your decision, and Undo takes the whole change back in one step.</p>
 </div>
 
 {% for family in inv.families %}
@@ -59,27 +82,28 @@
   {% endif %}
   {% for row in family.rows %}
   {% set rid = row.element_id %}
-  <form method="post" action="/jobs/{{ job.id }}/symbols" class="symbol-form">
+  <form method="post" action="/jobs/{{ job.id }}/symbols" class="symbol-form" data-name="{{ row.name }}" data-total="{{ row.times }}" data-changeable="{{ row.changeable }}">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="version" value="{{ result_version }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="symbol" value="{{ row.key }}">
     <h3 id="{{ rid }}-title"><span class="symbol-glyph" aria-hidden="true">{{ row.glyph }}</span> {{ row.name[0]|upper }}{{ row.name[1:] }}</h3>
     <p class="symbol-count">Read {{ row.times }} {{ "time" if row.times == 1 else "times" }}, in {{ row.equations }} {{ "equation" if row.equations == 1 else "equations" }}.{% if row.changeable < row.times %} {{ row.times - row.changeable }} of them {{ "is" if row.times - row.changeable == 1 else "are" }} in equations you already decided, and {{ "is" if row.times - row.changeable == 1 else "are" }} not changed.{% endif %}</p>
     {% if family.members and row.changeable %}
+    <input type="hidden" name="places" value="chosen">
     <div class="field">
       <label for="to-{{ rid }}">Change every {{ row.name }} to</label>
-      <select id="to-{{ rid }}" name="to" required>
+      <select id="to-{{ rid }}" name="to" required data-symbol-to>
         <option value="">Choose a symbol</option>
         {% for t in family.targets(row.key) %}<option value="{{ t.key }}">{{ t.name }} ({{ t.glyph }})</option>{% endfor %}
       </select>
     </div>
+    <p class="symbol-where" id="{{ rid }}-where"><span class="symbol-where-label">Where it changes:</span> {{ affected(row)|trim }}.</p>
     <details class="symbol-places">
-      <summary>Show the {{ row.times }} {{ "place" if row.times == 1 else "places" }}, and leave some out</summary>
+      <summary>Choose the places ({{ row.changeable }} of {{ row.times }} ticked)</summary>
       {{ places_list(row, True) }}
     </details>
-    <p class="symbol-affect" id="{{ rid }}-affect" data-changeable="{{ row.changeable }}">Changes <strong data-affect-count>{{ row.changeable }}</strong> of {{ row.times }} {{ "place" if row.times == 1 else "places" }}; <span data-affect-left>{{ row.times - row.changeable }}</span> left as they are{% if row.times > row.changeable %} (already decided){% endif %}.</p>
+    <p class="symbol-affect" id="{{ rid }}-affect" role="status" data-symbol-affect>Choose a symbol above to continue. {{ row.changeable }} {{ "place" if row.changeable == 1 else "places" }} will change; untick any place to leave it as it is.</p>
     <div class="button-row">
-      <button type="submit" class="button" data-role="relabel" aria-describedby="{{ rid }}-affect {{ rid }}-note">Change all {{ row.name }}</button>
+      <button type="submit" class="button" data-role="relabel" aria-describedby="{{ rid }}-affect">Change all {{ row.name }}</button>
     </div>
-    <p class="hint" id="{{ rid }}-note">The places you tick under “Show the places” are left as they are. Equations that already have your decision are not changed.</p>
     {% else %}
     <details class="symbol-places">
       <summary>Show the {{ row.times }} {{ "place" if row.times == 1 else "places" }}</summary>

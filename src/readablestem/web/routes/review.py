@@ -108,6 +108,7 @@ from readablestem.web.review import (
     GROUP_SLUGS,
     KEPT_IMAGES_SLUG,
     NOT_CONVERTED,
+    SAVE_ONLY,
     STATUS_FOR_ACTION,
     TABLE_CHANGES,
     UNDO_ACTION,
@@ -169,6 +170,12 @@ DONE_MESSAGES = {
     "reader hear it.",
 }
 DESCRIPTION_REMOVED = "The description was taken away."
+# A figure's text: "Save and accept" settles it; "Save, decide later" keeps it waiting.
+FIGURE_SAVED_ACCEPTED = "Saved and accepted. Your alt text is now the one students get."
+FIGURE_SAVED_OPEN = (
+    "Saved, not accepted yet. This figure still needs your decision: choose Accept when "
+    "the alt text is right."
+)
 # A table edit: the decision stays open while a required check fails (web.review
 # `table_still_open`), and the grid read from the PDF is not checked against itself.
 TABLE_OPEN = (
@@ -282,7 +289,11 @@ def done_message(change: ReviewChange, element: Element | None) -> str:
         return DESCRIPTION_REMOVED
     if change.anyway:
         return ANYWAY_DONE
+    if change.kept_open:
+        return FIGURE_SAVED_OPEN
     message = DONE_MESSAGES.get(change.action, "Done.")
+    if change.action == "edit" and change.fix.kind is Kind.FIGURE:
+        message = FIGURE_SAVED_ACCEPTED
     if change.action == "edit" and change.fix.kind is Kind.TABLE:
         if change.fix.pending:
             message = TABLE_OPEN
@@ -465,6 +476,8 @@ class ReviewItem:
     # "Describe it in words" (T3-16): offered on an item kept as an image; what it replaces.
     can_describe: bool = False
     describe_hint: str = ""
+    # A figure: what its alt text should say for the kind of figure it is (`ALT_GUIDANCE`).
+    alt_guidance: str = ""
 
     @property
     def open(self) -> bool:
@@ -882,7 +895,25 @@ def _item(
         kept_state=KEPT_IMAGE_STATE if is_kept_image(fix) and not fix.pending else "",
         can_describe=describable,
         describe_hint=DESCRIBE_HINTS.get(fix.kind.value, "") if describable else "",
+        alt_guidance=ALT_GUIDANCE.get(fix.figure.figure_type, ALT_GUIDANCE["other"])
+        if fix.figure is not None
+        else "",
     )
+
+
+# What a figure's alt text should say, by the kind of figure the pipeline found (`FigureType`).
+# One sentence each, to sit under the field; the length goes after it.
+ALT_GUIDANCE = {
+    "chart": "Name the kind of chart, what each axis measures with its units, and the trend or "
+    "the values a reader needs.",
+    "diagram": "Say what the diagram shows and how its labelled parts connect, in the order a "
+    "reader would follow them.",
+    "photo": "Say what the photo shows that matters to this lesson, and leave out the rest.",
+    "illustration": "Say what the illustration shows and what it is there to teach.",
+    "table_image": "Say what the table holds and what it shows. A table is better kept as a "
+    "table than as a picture.",
+    "other": "Say what the figure shows and why it matters here.",
+}
 
 
 # What a description in words replaces, by the kind of item kept as an image (T3-16).
@@ -1351,6 +1382,15 @@ def review_list(
     return response
 
 
+def _group_still_open(result: DocumentResult, element_id: str, stay: str) -> str | None:
+    """The key of the repeated heading `element_id` belongs to, when the form came from that
+    group's card (`stay` names it) and a heading of it still waits; else None."""
+    fix = result.fix_for(element_id)
+    if not stay or fix is None or not is_group_key(stay) or fix.group_key != stay:
+        return None
+    return stay if any(f.group_key == stay and f.pending for f in result.fixes) else None
+
+
 def _split_redirect(owned_id: str, result: DocumentResult, after: str | None) -> Response:
     """To the review screen's next decision still open after `after` (an element id or a
     group key; None: the first one still open), or to its done state. `owned_id` is the id
@@ -1433,6 +1473,8 @@ def review_action(
     remove_data_table: Annotated[str | None, Form()] = None,
     description: Annotated[str | None, Form()] = None,
     origin: Annotated[str | None, Form()] = None,
+    acknowledge: Annotated[str | None, Form()] = None,  # "Keep without a description"
+    stay: Annotated[str, Form()] = "",  # a heading of a group decided on its own: stay on the group
     version: Annotated[str, Form()] = "",
     flt: Annotated[str, Form()] = "",
 ) -> Response:
@@ -1485,12 +1527,15 @@ def review_action(
         "remove_data_table": remove_data_table,
         "description": description,
         "origin": origin,  # a choice pressed on the card (`review.CHOICE_ORIGINS`)
+        "acknowledge": acknowledge,
     }
     form = {name: value for name, value in sent.items() if value is not None}
     # "Use my edit anyway": an edit the reviewer chose to use although it differs from
     # the PDF's text where that changes the meaning (web.edit_check).
     anyway = action == EDIT_ANYWAY
-    action = "edit" if anyway else action
+    # "Save, decide later" on a figure: the edit is saved and the item keeps waiting.
+    keep_open = action == SAVE_ONLY
+    action = "edit" if anyway or keep_open else action
     ctx = get_ctx(request)
     try:
         with (
@@ -1509,6 +1554,7 @@ def review_action(
                 form,
                 anyway=anyway,
                 witness=ctx.settings.feature_page_witness,
+                keep_open=keep_open,
             )
             job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
             job.result_json = result.model_dump(mode="json", exclude={"html"})
@@ -1542,15 +1588,32 @@ def review_action(
     message += _moved_message(change_made.moved, item_numbers(result))
     flash(request, message, element_id=element_id)
     if view != LIST_VIEW:
-        if (table and action == "edit") or action in {ADD_DATA_TABLE, DESCRIBE}:
-            # A table is often changed more than once (a header, then a cell), and a
-            # data table just added is worth a look: the reviewer stays on the item and
-            # sees it as it is now.
+        if (
+            (table and action == "edit")
+            or change_made.kept_open
+            or action
+            in {
+                ADD_DATA_TABLE,
+                DESCRIBE,
+            }
+        ):
+            # A table is often changed more than once (a header, then a cell), a data table
+            # just added is worth a look, and a figure saved without deciding is still
+            # waiting: the reviewer stays on the item and sees it as it is now.
             from readablestem.web.routes.split import review_url
 
             item = change_made.fix.element_id  # the stored fix's id, not the path's
             return RedirectResponse(review_url(owned_id, item=item), status_code=303)
-        return _split_redirect(owned_id, result, element_id)
+        group = _group_still_open(result, element_id, stay)
+        if group is not None:
+            # One heading of a repeated heading, decided on its own from the review
+            # screen: stay on the group while some of its headings still wait.
+            from readablestem.web.routes.split import review_url
+
+            return RedirectResponse(
+                review_url(owned_id, item=group, anchor="group-members"), status_code=303
+            )
+        return _split_redirect(owned_id, result, stay or element_id)
     response = RedirectResponse(_landing(owned_id, result, element_id), status_code=303)
     return keep_filter(response, flt)
 

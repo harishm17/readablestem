@@ -18,10 +18,17 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 
-from readablestem.web import bulk_accept
+from readablestem.web import bulk_accept, queue
 from readablestem.web.deps import PageError, UserDep, flash, render, require_csrf
 from readablestem.web.logsafe import log_event
-from readablestem.web.review import ReviewInvalid, ReviewStale, item_labels, item_numbers
+from readablestem.web.review import (
+    ReviewInvalid,
+    ReviewStale,
+    item_labels,
+    item_numbers,
+    reading_order,
+    review_anchor,
+)
 from readablestem.web.routes.edits import write_review
 from readablestem.web.routes.jobs import NOT_FOUND
 from readablestem.web.routes.review import (
@@ -66,6 +73,12 @@ def confirm_page(
               labels.get(fix.element_id))
         for fix in bulk_accept.candidates(result, slug)
     ]  # fmt: skip
+    split = view == "split"
+    # With nothing to accept at once, the page names the next useful thing to do: the first
+    # of this kind still waiting (a check failed, or it was flagged), else the next decision.
+    waiting = reading_order(result, [f for f in result.fixes if f.kind is spec.kind and f.pending])
+    open_total = sum(d.open for d in queue.decisions(result))
+    first = review_anchor(result, waiting[0].element_id) if waiting else ""
     context = {
         "job": job,
         "spec": spec,
@@ -74,9 +87,16 @@ def confirm_page(
         "counted": f"{len(items)} {spec.one if len(items) == 1 else spec.many}",
         "result_version": version,
         "view": _view(view),
-        "back_href": (
-            review_url(job.id) if view == "split" else list_url(job.id, "needs-decision")
+        "back_href": (review_url(job.id) if split else list_url(job.id, "needs-decision")),
+        "kind_waiting": len(waiting),
+        "kind_href": (
+            review_url(job.id, item=waiting[0].element_id)
+            if split and waiting
+            else list_url(job.id, first)
+            if waiting
+            else ""
         ),
+        "open_total": open_total,
     }
     return render(request, "review_bulk.html", context)
 

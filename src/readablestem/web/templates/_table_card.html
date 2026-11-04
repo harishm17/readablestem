@@ -48,52 +48,55 @@
 <div class="table-scroll table-view" tabindex="0" role="group" aria-label="{{ label }}">{{ html }}</div>
 {%- endmacro %}
 
-{% macro findings(item) %}
+{# ------------------------------------------------------------------ review screen #}
+
+{# What is wrong with the proposal, one sentence each that names the part of the table it is
+   about, and under it the one correction the card can make: the first row as headers, the
+   grid read from the PDF, or the place below where headers and cells are changed. #}
+{% macro table_findings(item) %}
 {% set t = item.table %}
-{% if item.checks or t.problems %}
-<div class="explained table-findings">
-  <p class="part-label">What the checks found</p>
-  <ul class="check-list">
-    {% for check in item.checks %}<li>{{ check.text }}</li>{% endfor %}
-    {% for problem in t.problems %}<li>{{ problem }}</li>{% endfor %}
+{% set eid = item.element_id %}
+{% set name = item.label|lower %}
+{% if t.findings %}
+<div class="explained table-findings" role="group" aria-labelledby="findings-title-{{ eid }}">
+  <p class="part-label" id="findings-title-{{ eid }}">What the checks found, and what to do</p>
+  <ul class="finding-list">
+    {% for f in t.findings %}
+    <li class="finding">
+      <span class="finding-text">{{ f.text }}</span>
+      {% if f.fix == "headers" and not t.only_headers_missing %}
+      <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form finding-action">
+        {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers"><input type="hidden" name="header_row" value="on">{% if t.header_col %}<input type="hidden" name="header_col" value="on">{% endif %}
+        <button type="submit" class="button-secondary button-small" data-role="finding-headers">{{ f.label }}<span class="visually-hidden"> in {{ name }}</span></button>
+      </form>
+      {% elif f.fix == "grid" %}
+      <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form finding-action">
+        {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="use_local">
+        <button type="submit" class="button-secondary button-small" data-role="finding-grid">{{ f.label }}<span class="visually-hidden"> for {{ name }}</span></button>
+      </form>
+      {% elif f.fix == "edit" %}
+      <a class="finding-action" href="#table-correct-{{ eid }}" data-role="finding-edit">{{ f.label }}<span class="visually-hidden"> ({{ name }}): headers and cells</span></a>
+      {% endif %}
+    </li>
+    {% endfor %}
   </ul>
 </div>
 {% endif %}
 {% endmacro %}
 
-{# ------------------------------------------------------------------ review screen #}
-
-{% macro table_split_body(p) %}
-{% set item = p.item %}
+{# Changing the table, in one place: its headers, one cell, and the grid read from the PDF as
+   the other way to get the table right. Open when the checks found something. #}
+{% macro table_correct(item, p) %}
 {% set t = item.table %}
 {% set eid = item.element_id %}
 {% set name = item.label|lower %}
 {% set here = "/jobs/" ~ job.id ~ "/review?item=" ~ eid %}
-<div class="compare table-compare" role="group" aria-labelledby="tbl-title-{{ eid }}">
-  <h3 id="tbl-title-{{ eid }}" class="part-label">{% if t.proposal %}The table in the PDF, and rebuilt{% elif t.local %}The table in the PDF, and the grid read from it{% else %}The table in the PDF{% endif %}</h3>
-  <p class="cmp-label">In the PDF</p>
-  {% if p.region_url %}<img class="cmp-image table-crop" src="{{ p.region_url }}" alt="{{ p.region_alt }}">{% else %}<p class="cmp-none">No image of the original is available.</p>{% endif %}
-  {% if t.proposal %}
-  <p class="cmp-label">{% if not t.in_document %}Proposal (the document has the image instead){% elif not t.is_data %}As students get it: text, not a table{% elif item.pending %}Proposal, as students would get it{% else %}Rebuilt, as students get it{% endif %}</p>
-  {{ table_box(t.proposal, "Proposed " ~ name) }}
-  {% if not t.is_data %}<p class="hint">The model judged that this is not a table of data (text set out in boxes), so its words are written in reading order. If it is a data table, use the grid read from the PDF.</p>{% endif %}
-  {% elif t.local %}
-  <p class="cmp-label">Grid read from the PDF</p>
-  {{ table_box(t.local, "Grid read from the PDF for " ~ name) }}
-  <p class="hint">Read from the PDF's own text and lines, without a model. Compare it with the image before you use it.</p>
-  {% if t.local_flat %}{{ flat_hint() }}{% endif %}
-  {% else %}
-  <p class="cmp-none">No rebuilt table: the document shows the image of the table, marked “not converted”.</p>
-  {% endif %}
-</div>
-{{ findings(item) }}
-
-{% if t.proposal %}
 {% set cell_err = item.errors.get("cell") %}
 {% set header_err = item.errors.get("header") %}
-{% if t.is_data %}
-<details class="edit-box table-edit"{% if t.editing or cell_err or header_err %} open{% endif %}>
-  <summary>Change the table</summary>
+{% if t.proposal and (t.is_data or t.local) %}
+<details class="edit-box table-edit" id="table-correct-{{ eid }}"{% if t.editing or cell_err or header_err or (item.pending and t.findings) %} open{% endif %}>
+  <summary>{% if t.is_data %}Change the table{% else %}The grid read from the PDF{% endif %}</summary>
+  {% if t.is_data %}
   {% if t.editing %}
   {% set c = t.editing %}
   <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form table-cell-form{% if item.edited %} is-edited{% endif %}" data-draft-key="cell-{{ c.ref }}">
@@ -161,57 +164,102 @@
     </fieldset>
     <button type="submit" class="button-secondary" data-role="save">Save headers<span class="visually-hidden"> of {{ name }}</span></button>
   </form>
-</details>
-{% endif %}
-{% if t.local %}
-<details class="edit-box">
-  <summary>The grid read from the PDF</summary>
-  <p class="hint">The same table read from the PDF's own text and lines, without a model.</p>
-  {{ table_box(t.local, "Grid read from the PDF for " ~ name) }}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}">
-    {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="use_local">
-    <button type="submit" class="button-secondary">Use this grid instead<span class="visually-hidden"> for {{ name }}</span></button>
-  </form>
-</details>
-{% endif %}
-{% endif %}
-
-{{ table_error(item, "actions") }}
-<div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
-  {% if t.proposal %}
-  {% if t.only_headers_missing %}
-  {# T1-19: the only finding is that no cell is a header, so the main action sets the first
-     row as the headers (an edit, which re-checks the table and settles it). #}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
-    {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers"><input type="hidden" name="header_row" value="on">{% if t.header_col %}<input type="hidden" name="header_col" value="on">{% endif %}
-    <button type="submit" class="button" data-role="headers">Use the first row as headers<span class="visually-hidden"> in {{ name }}</span></button>
-  </form>
   {% endif %}
-  {% if item.can_accept %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
-    {{ table_fields("split") }}
-    <button type="submit" name="action" value="accept" class="{{ 'button-secondary' if t.only_headers_missing else 'button' }}" data-role="accept">{{ "Accept without headers" if t.only_headers_missing else "Accept" }}<span class="visually-hidden"> {{ name }}</span></button>
-  </form>
-  {% endif %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
-    {{ table_fields("split") }}
-    <button type="submit" name="action" value="reject" class="button-secondary" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
-  </form>
-  {% else %}
   {% if t.local %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
-    {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="use_local">
-    <button type="submit" class="{{ 'button-secondary' if t.local_flat else 'button' }}">Use the grid read from the PDF<span class="visually-hidden"> for {{ name }}</span></button>
-  </form>
+  <div class="table-source-grid">
+    <p class="part-label">Or start again from the grid read from the PDF</p>
+    <p class="hint">The same table read from the PDF's own text and lines, without a model.</p>
+    {{ table_box(t.local, "Grid read from the PDF for " ~ name) }}
+    {% if t.local_flat %}{{ flat_hint() }}{% endif %}
+    <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}">
+      {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="use_local">
+      <button type="submit" class="button-secondary" data-role="use-local">Use this grid instead<span class="visually-hidden"> for {{ name }}</span></button>
+    </form>
+  </div>
   {% endif %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
-    {{ table_fields("split") }}
-    <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.local and not t.local_flat else 'button' }}" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
-  </form>
+</details>
+{% endif %}
+{% endmacro %}
+
+{# The choices that leave the table out of the document as a table, kept apart from the ones
+   that repair it, each with what students get. #}
+{% macro table_fallback(item, only) %}
+{% set t = item.table %}
+{% set eid = item.element_id %}
+{% set name = item.label|lower %}
+<div class="fallback" role="group" aria-labelledby="fallback-title-{{ eid }}">
+  <p class="fallback-title" id="fallback-title-{{ eid }}">{{ "If it cannot be used as a table" if t.proposal else "Or leave it as an image" }}</p>
+  <div class="fallback-choice">
+    <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
+      {{ table_fields("split") }}
+      <button type="submit" name="action" value="reject" class="{{ 'button' if only else 'button-secondary' }}"{% if not only %} data-tone="quiet"{% endif %} data-role="reject" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
+    </form>
+    <p class="hint" id="reject-note-{{ eid }}">{% if t.proposal %}{{ item.reject.consequence }}{% else %}The image stays in the document, marked “not converted”: screen readers cannot read its cells.{% endif %}</p>
+  </div>
+  {{ not_a_table(item, "split") }}
+</div>
+{% endmacro %}
+
+{% macro table_split_body(p) %}
+{% set item = p.item %}
+{% set t = item.table %}
+{% set eid = item.element_id %}
+{% set name = item.label|lower %}
+<div class="compare table-compare" role="group" aria-labelledby="tbl-title-{{ eid }}">
+  <h3 id="tbl-title-{{ eid }}" class="part-label">{% if t.proposal %}The table in the PDF, and rebuilt{% elif t.local %}The table in the PDF, and the grid read from it{% else %}The table in the PDF{% endif %}</h3>
+  <p class="cmp-label">In the PDF</p>
+  {% if p.region_url %}<img class="cmp-image table-crop" src="{{ p.region_url }}" alt="{{ p.region_alt }}"><a class="enlarge-link" href="{{ p.region_url }}" data-enlarge target="_blank" rel="noopener">Enlarge the PDF image<span class="visually-hidden"> of {{ name }}</span></a>{% else %}<p class="cmp-none">No image of the original is available.</p>{% endif %}
+  {% if t.proposal %}
+  <p class="cmp-label">{% if not t.in_document %}Proposal (the document has the image instead){% elif not t.is_data %}As students get it: text, not a table{% elif item.pending %}Proposal, as students would get it{% else %}Rebuilt, as students get it{% endif %}</p>
+  {{ table_box(t.proposal, "Proposed " ~ name) }}
+  {% if not t.is_data %}<p class="hint">The model judged that this is not a table of data (text set out in boxes), so its words are written in reading order. If it is a data table, use the grid read from the PDF.</p>{% endif %}
+  {% elif t.local %}
+  <p class="cmp-label">Grid read from the PDF</p>
+  {{ table_box(t.local, "Grid read from the PDF for " ~ name) }}
+  <p class="hint">Read from the PDF's own text and lines, without a model. Compare it with the image before you use it.</p>
+  {% if t.local_flat %}{{ flat_hint() }}{% endif %}
+  {% else %}
+  <p class="cmp-none">No rebuilt table: the document shows the image of the table, marked “not converted”.</p>
   {% endif %}
 </div>
-<p class="hint decide-note" id="reject-note-{{ eid }}">{% if t.proposal %}{{ item.reject.button }}: {{ item.reject.consequence }}{% else %}The image stays in the document, marked “not converted”: screen readers cannot read its cells.{% endif %}</p>
-{{ not_a_table(item, "split") }}
+{{ table_findings(item) }}
+{{ table_error(item, "actions") }}
+{% if t.proposal and (item.can_accept or t.only_headers_missing) %}
+<div class="decision-bar" role="group" aria-labelledby="bar-lead-{{ eid }}">
+  <p class="bar-lead" id="bar-lead-{{ eid }}">{% if t.only_headers_missing %}The only thing found: no cell is marked as a header{% else %}Your choice for {{ name }}{% endif %}</p>
+  <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
+    {% if t.only_headers_missing %}
+    {# T1-19: the only finding is that no cell is a header, so the main action sets the first
+       row as the headers (an edit, which re-checks the table and settles it). #}
+    <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
+      {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers"><input type="hidden" name="header_row" value="on">{% if t.header_col %}<input type="hidden" name="header_col" value="on">{% endif %}
+      <button type="submit" class="button" data-role="headers" aria-describedby="headers-note-{{ eid }}">Use the first row as headers<span class="visually-hidden"> in {{ name }}</span></button>
+    </form>
+    {% endif %}
+    {% if item.can_accept %}
+    <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
+      {{ table_fields("split") }}
+      <button type="submit" name="action" value="accept" class="{{ 'button-secondary' if t.only_headers_missing else 'button' }}" data-role="accept" aria-describedby="accept-note-{{ eid }}">{{ "Accept without headers" if t.only_headers_missing else "Accept" }}<span class="visually-hidden"> {{ name }}</span></button>
+    </form>
+    {% endif %}
+  </div>
+  {% if t.only_headers_missing %}<p class="hint decide-note" id="headers-note-{{ eid }}">Use the first row as headers: screen readers read each header with its cells, and the table is settled.</p>{% endif %}
+  {% if item.can_accept %}<p class="hint decide-note" id="accept-note-{{ eid }}">{% if t.only_headers_missing %}Accept without headers: students get the table with no header cells, so a screen reader cannot say what each value means.{% else %}Accept: students get the table as shown.{% endif %}</p>{% endif %}
+</div>
+{% elif t.local and not t.proposal %}
+<div class="decision-bar" role="group" aria-labelledby="bar-lead-{{ eid }}">
+  <p class="bar-lead" id="bar-lead-{{ eid }}">No rebuilt table: the PDF's own grid is the other way to get a table</p>
+  <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
+    <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
+      {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="use_local">
+      <button type="submit" class="{{ 'button-secondary' if t.local_flat else 'button' }}" data-role="use-local" aria-describedby="local-note-{{ eid }}">Use the grid read from the PDF<span class="visually-hidden"> for {{ name }}</span></button>
+    </form>
+  </div>
+  <p class="hint decide-note" id="local-note-{{ eid }}">Students get the grid as a table, as read from the PDF; compare it with the image first.</p>
+</div>
+{% endif %}
+{{ table_correct(item, p) }}
+{{ table_fallback(item, not t.proposal and (not t.local or t.local_flat)) }}
 {{ accept_clean(p.clean_tables, "split") }}
 {{ describe_box(item, "split") }}
 {% if p.continue_href %}<p class="table-continue"><a href="{{ p.continue_href }}">{{ p.continue_label }}</a></p>{% endif %}
@@ -219,7 +267,9 @@
 
 {# ------------------------------------------------------------------ list view #}
 
-{# What the list's card shows in its proposal column. #}
+{# What the list's card shows in its proposal column: the table, then what is wrong with it
+   (each finding names the part of the table it is about; headers and cells are changed on the
+   review screen, where the table and its image are side by side). #}
 {% macro table_list_proposal(item) %}
 {% set t = item.table %}
 {% set name = item.label|lower %}
@@ -235,13 +285,16 @@
 {% else %}
 <p>No rebuilt table: the document shows the image of the table, marked “not converted”.</p>
 {% endif %}
-{% if t.problems %}
-<ul class="check-list">{% for problem in t.problems %}<li>{{ problem }}</li>{% endfor %}</ul>
+{% if t.findings %}
+<p class="part-label">What the checks found</p>
+<ul class="finding-list">
+  {% for f in t.findings %}<li class="finding"><span class="finding-text">{{ f.text }}</span>{% if f.fix == "edit" or (f.fix == "headers" and not t.only_headers_missing) %} <a class="finding-action" href="/jobs/{{ job.id }}/review?item={{ item.element_id }}#table-correct-{{ item.element_id }}">Change the table<span class="visually-hidden"> {{ name }} on the review screen</span></a>{% endif %}</li>{% endfor %}
+</ul>
 {% endif %}
 {% endmacro %}
 
-{# The list's decision buttons for a table. Headers and cells are changed on the review
-   screen, where the table and its image are side by side. #}
+{# The list's decision buttons for a table: the ones that repair or accept it, then the ones
+   that leave it as an image or as text, apart and with what students get. #}
 {% macro table_list_actions(item) %}
 {% set t = item.table %}
 {% set eid = item.element_id %}
@@ -269,12 +322,20 @@
       <button type="submit" class="{{ 'button-secondary' if t.local_flat or t.proposal else 'button' }}">Use the grid read from the PDF<span class="visually-hidden"> for {{ name }}</span></button>
     </form>
     {% endif %}
-    <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
-      {{ table_fields("list") }}
-      <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.proposal or (t.local and not t.local_flat) else 'button' }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
-    </form>
   </div>
-  {{ not_a_table(item, "list") }}
-  <p class="hint">{{ item.reject.button }}: {{ item.reject.consequence }}{% if t.proposal and t.is_data %} To change its headers or a cell, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.{% elif t.proposal and t.local %} Use the grid read from the PDF: students get it as a table, as read from the PDF; compare it with the image first.{% endif %}</p>
+  {% if t.proposal and t.is_data %}<p class="hint">To change its headers or a cell, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.</p>
+  {% elif t.proposal and t.local %}<p class="hint">Use the grid read from the PDF: students get it as a table, as read from the PDF; compare it with the image first.</p>{% endif %}
+  {% set only = not t.proposal and (not t.local or t.local_flat) %}
+  <div class="fallback" role="group" aria-labelledby="fallback-title-{{ eid }}">
+    <p class="fallback-title" id="fallback-title-{{ eid }}">{{ "If it cannot be used as a table" if t.proposal else "Or leave it as an image" }}</p>
+    <div class="fallback-choice">
+      <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
+        {{ table_fields("list") }}
+        <button type="submit" name="action" value="reject" class="{{ 'button' if only else 'button-secondary' }}"{% if not only %} data-tone="quiet"{% endif %} aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
+      </form>
+      <p class="hint" id="reject-note-{{ eid }}">{{ item.reject.consequence }}</p>
+    </div>
+    {{ not_a_table(item, "list") }}
+  </div>
 </div>
 {% endmacro %}

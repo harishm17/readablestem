@@ -131,7 +131,7 @@ def test_page_lists_decisions_by_kind_then_the_decided_ones(rich):
 
 
 def test_labels_stay_the_same_after_a_decision(rich):
-    title = '<h4 id="fix-title-p2-e2">Equation 3 <span class="meta">on page 2</span></h4>'
+    title = '<h4 id="fix-title-p2-e2" class="visually-hidden">Equation 3 <span class="meta">on page 2</span></h4>'
     assert title in page_of(rich)
     assert post(rich, "p1-e1", action="accept").status_code == 303
     assert title in page_of(rich)  # not renumbered by the move of equation 1

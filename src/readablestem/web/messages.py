@@ -475,6 +475,23 @@ NOTICE_MESSAGES: dict[str, str] = {
 }
 
 UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."
+# A table check with no sentence of its own is still named by the part of the table it is about,
+# so the reviewer is told where to look (rows, headers, words, maths), not only that one failed.
+UNKNOWN_TABLE_CHECK_MESSAGE = (
+    "A check on the {part} of this table did not pass, so compare them with the image."
+)
+TABLE_CHECK_PARTS = {
+    "table.grid": "rows and columns",
+    "table.grid_agreement": "rows and columns",
+    "table.headers": "header cells",
+    "table.row_headers": "row headers",
+    "table.cell_text": "words and numbers",
+    "table.edge_text": "words and numbers",
+    "table.math": "maths cells",
+    "table.math_symbols": "maths cells",
+    "table.math_signs": "maths cells",
+    "table.math_style": "maths cells",
+}
 UNKNOWN_REASON_MESSAGE = "This item could not be converted, so the original is kept."
 UNKNOWN_NOTICE_MESSAGE = "Something in this file may need a look."
 
@@ -505,6 +522,9 @@ def explain_check(check: Check) -> Explained:
         return Explained(text, code, known=True)
     if check.name.startswith(AXE_RULE_PREFIX) and check.code:
         return Explained(AXE_RULE_MESSAGE.format(rule=check.code), code, known=True)
+    if check.name.startswith("table."):
+        part = TABLE_CHECK_PARTS.get(check.name, "contents")
+        return Explained(UNKNOWN_TABLE_CHECK_MESSAGE.format(part=part), code, known=False)
     return Explained(UNKNOWN_CHECK_MESSAGE, code, known=False)
 
 

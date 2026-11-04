@@ -131,19 +131,30 @@ def test_the_first_decision_is_the_equation_with_a_same_size_compare(split):
     row = text_of(section(table, "<tbody>", "</tbody>"))
     assert row == "𝛚 style bold plain Yes"
     # It changes the meaning, so the fix comes first: one button that makes the omega bold
-    # (posted as an edit, its own form), the edit box closed (one click away, since the button
-    # is the fix), and Accept only "anyway".
+    # (posted as an edit by a form of its own; the button sits with the other choices, in front
+    # of the table of differences and the edit box), the edit box closed (one click away, since
+    # the button is the fix), and Accept only "anyway".
     suggest = section(body, '<form method="post"', "</form>")
-    assert 'class="suggest"' in suggest
+    assert 'class="suggest"' in suggest and 'id="suggest-p1-e2"' in suggest
     assert 'name="action" value="edit"' in suggest
     assert 'name="latex" value="\\boldsymbol{\\omega}"' in suggest
-    assert re.search(r'class="button" data-role="suggest"[^>]*>Use bold ω<', suggest)
+    assert re.search(
+        r'form="suggest-p1-e2" class="button" data-role="suggest"[^>]*>Use bold ω<', body
+    )
+    assert body.index('data-role="suggest"') < body.index('<table class="diff-table">')
+    assert body.index('data-role="suggest"') < body.index("Edit the LaTeX")
     assert '<details class="edit-box">' in body and "Edit the LaTeX" in body
     assert re.search(
-        r'value="accept" class="button-secondary" data-role="accept"'
-        r' data-tone="caution">Accept anyway<',
+        r'form="decide-p1-e2" name="action" value="accept" class="button-secondary"'
+        r' data-role="accept" data-tone="caution"[^>]*>Accept anyway<',
         body,
     )
+    # Each choice says what it does, in the same block; Keep as image is apart, below.
+    bar = section(body, '<div class="decision-bar"', "</div>\n</div>")
+    assert "Recommended repair: Use bold ω" in bar
+    assert "Accept anyway: students get the proposal as it is" in bar
+    assert body.index('class="decision-bar"') < body.index('class="fallback"')
+    assert "Keep as image" in section(body, 'class="fallback"', "</div>")
     assert 'name="view" value="split"' in body
 
 
@@ -242,10 +253,17 @@ def test_the_figure_decision_shows_the_image_and_the_alt_field(split):
     assert "Caption in the PDF:</span> Figure 1 A car moves from home to school." in body
     assert re.search(r'<textarea id="alt-p1-e6"[^>]*>A car on a road between', body)
     assert 'id="decorative-p1-e6"' in body
-    assert (
-        "Keep without a description: The figure stays as it is in the PDF, marked “Needs a "
-        "description”" in body
-    )
+    # "Save and accept" settles the figure in one step; "Save, decide later" keeps the text.
+    assert re.search(r'name="action" value="edit"[^>]*data-role="save"[^>]*>Save and accept<', body)
+    assert re.search(r'name="action" value="save"[^>]*data-role="save-later"', body)
+    # The alt-text help is for the kind of figure it is (the fixture's is a diagram).
+    assert "how its labelled parts connect" in body
+    # "Keep without a description" is apart from those, says what students get, and is made
+    # with a tick box that says the same.
+    fallback = section(body, 'class="fallback fallback-figure"', "</fieldset>")
+    assert "The figure stays as it is in the PDF, marked “Needs a description”" in fallback
+    assert 'id="acknowledge-p1-e6"' in fallback and "will get no description" in fallback
+    assert 'data-role="reject"' in fallback and 'data-needs-tick="acknowledge-p1-e6"' in fallback
 
 
 @pytest.mark.parametrize("item", [GROUP, "p1-e7", "p2-e0"])

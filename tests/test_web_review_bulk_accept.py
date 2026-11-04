@@ -673,5 +673,4 @@ def test_the_confirm_button_comes_after_the_previews_and_asks_for_a_comparison(s
     assert page.index("What would be accepted") < page.index(
         'class="button" aria-describedby="bulk-summary"'
     )
-    assert "with the image of the original before you accept" in flat
-    assert "The button to accept is after the list." in flat
+    assert "with the original below, then accept at the end of the list" in flat

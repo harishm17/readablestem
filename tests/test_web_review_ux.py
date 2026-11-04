@@ -271,7 +271,7 @@ def test_saving_an_unchanged_edit_changes_nothing(ux):
 
 
 def test_saving_a_rejected_figures_text_unchanged_puts_it_back(ux):
-    assert post(ux, "p1-e6", action="reject", version="0").status_code == 303
+    assert post(ux, "p1-e6", action="reject", acknowledge="on", version="0").status_code == 303
     alt = "A car on a road between a house and a school."
     assert post(ux, "p1-e6", action="edit", alt=alt, version="1").status_code == 303
     assert stored(ux).fix_for("p1-e6").status.value == "edited"
@@ -402,7 +402,7 @@ def test_reject_is_named_for_what_it_does(ux):
     equation = panel(screen(ux))
     assert re.search(r'data-role="reject"[^>]*>Keep as image<span', equation)
     assert (
-        "Keep as image: Students see a picture of the original; screen readers hear the PDF "
+        "Students see a picture of the original; screen readers hear the PDF "
         "text of the equation, marked as not checked." in text_of(equation)
     )
     heading = panel(screen(ux, "?item=p1-e0"))  # a bold heading, accepted
