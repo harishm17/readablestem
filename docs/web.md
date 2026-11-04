@@ -623,7 +623,8 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
 - **Review.** A source has no pages to show, so its review is the list view; the split view
   redirects to it. `DocumentResult.origin` is `latex`; the student note says "a LaTeX document".
 - **Failure.** A source that cannot be converted fails the job with `source_failed`,
-  `source_unreadable`, `source_refused`, `source_unavailable` or `timeout` and the message "Upload
+  `source_unreadable`, `source_refused`, `source_unavailable`, `source_busy` (the machine had no
+  room for the conversion's tasks: "The server is busy ... Try again") or `timeout` and the message "Upload
   the PDF instead"; nothing half-made is kept. If LaTeXML or the sandbox is missing, the upload
   itself is refused at once.
 

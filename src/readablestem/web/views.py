@@ -93,6 +93,8 @@ JOB_ERROR_MESSAGES = {
     "source_unreadable": "This LaTeX source could not be converted. Upload the PDF instead.",
     "source_refused": "This LaTeX source uses something this tool will not run. Remove it, "
     "or upload the PDF instead.",
+    "source_busy": "The server is busy right now and could not start converting this LaTeX "
+    "source. Try again in a few minutes, or upload the PDF instead.",
     "source_unavailable": "LaTeX source cannot be converted on this server right now. "
     "Upload the PDF instead.",
     "internal_error": "Something went wrong on our side. The error was recorded without any "

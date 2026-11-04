@@ -345,9 +345,12 @@ What the two layers cover:
   (`mq_*`) are denied, as is `execveat` with `AT_EMPTY_PATH` (running an open file, such as one
   the program wrote): the review's anonymous 1.4 GB in two seconds and four 256 MB System V
   segments that outlive the sandbox, and a program written to disk and run, are closed. `/dev/shm`
-  and `/tmp` are not granted by Landlock. Files unlinked while still open are added to the
-  output budget (`sandbox.deleted_open_bytes`), and the number of entries in the writable folders
-  is capped (`Limits.max_entries`, 5000).
+  and `/tmp` are not granted by Landlock. `fallocate` is denied too (with `FALLOC_FL_KEEP_SIZE` it
+  reserves gigabytes of blocks with a size of 0, which `RLIMIT_FSIZE` and a size count miss; it
+  was not needed by any fixture). The budget counts the larger of size and blocks for every file,
+  files unlinked while still open (`sandbox.deleted_open_bytes`) and deleted files still mapped
+  (`deleted_mapped_bytes`, from `/proc/<pid>/maps`), and the number of entries in the writable
+  folders is capped (`Limits.max_entries`, 5000); the job's folders are removed after the run.
 - **File metadata (seccomp).** `chmod`, `fchmod`, `fchmodat(2)`, `chown`, `fchown`, `lchown`,
   `fchownat`, `utime`, `utimes`, `futimesat`, `utimensat` and the extended-attribute setters
   answer `EPERM`: Landlock (to ABI 8) does not govern them, and the user owns the uploads volume.
@@ -360,6 +363,10 @@ What the two layers cover:
   (`sandbox.make_undumpable`), so even a same-user process that could open `/proc` could not read
   their `environ` or memory; the probe checks the property (`dumpable0_protects_environ`) and that
   the program's own environment holds only what the caller named.
+- **A busy machine.** When a fork fails for lack of room (the user's task count is at the
+  limit because the web app's threads came and went), the end of the program's log is checked
+  for the errno text and the conversion fails as `source_busy` ("The server is busy ... Try
+  again"), not as a bad document. The text is only looked for, never returned.
 - **Limits.** `RLIMIT_AS` 512 MB per task, CPU, file size, no core, 256 files, and `RLIMIT_NPROC`
   set to the user's tasks at that moment plus 2 (what LaTeXML needs: one task, the program,
   measured on every fixture: peak 2 with the supervisor) plus 2 of slack, because the web app's
@@ -385,6 +392,13 @@ What the two layers cover:
 What neither covers (residual risks of this backend, which a platform without user namespaces
 leaves):
 
+- **The dynamic loader can run a file the program wrote.** Landlock does not check `PROT_EXEC`
+  mappings, and the kernel needs the right to execute the loader (`/lib*/ld-linux*`) to start
+  any dynamically linked program (granting `EXECUTE` only on Perl makes Perl itself fail with
+  `EACCES`), so `ld.so /out/file` runs native code. Not mitigated: it is the same ruleset and
+  filter as for Perl, so it reads nothing Perl cannot and makes no call Perl cannot
+  (`test_the_dynamic_loader_can_run_a_file_the_program_wrote_but_it_stays_confined`); the output
+  folder has no execute right, so the file cannot be executed directly.
 - **Same user, same pid and network namespaces.** There is no namespace between the program and
   the web process. What keeps it out is the ruleset (no `/proc`, no files of the app), the
   scopes, the filter's denial of every call that names another process, and

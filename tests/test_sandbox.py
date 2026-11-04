@@ -217,6 +217,7 @@ def test_parent_environment_is_not_passed_to_bubblewrap(monkeypatch, tmp_path):
     monkeypatch.setattr(sandbox, "bwrap_path", lambda: "/usr/bin/bwrap")
     monkeypatch.setattr(sandbox, "prlimit_path", lambda: "/usr/bin/prlimit")
     monkeypatch.setattr(sandbox, "_nproc_counted_inside", lambda: True)
+    monkeypatch.setattr(sandbox, "backend", lambda: "bwrap")  # not the one the machine would pick
     monkeypatch.setattr(sandbox.subprocess, "Popen", popen)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     sandbox.run(["/usr/bin/true"], cgroup=False)

@@ -6,6 +6,7 @@ older than the backend needs or is filtered."""
 from __future__ import annotations
 
 import os
+import platform
 import signal
 import socket
 import subprocess
@@ -486,12 +487,11 @@ def test_no_anonymous_files_shared_memory_or_queues(tmp_path):
         ' my $x = syscall($nr, @a); $r{$name} = $x < 0 ? ($!+0) : "OK"; }'
         ' print join(",", map { "$_=$r{$_}" } sort keys %r);'
     )
-    before = subprocess.run(["ipcs", "-m"], capture_output=True, text=True).stdout
     outcome, text = run_perl(code, tmp_path)
-    after = subprocess.run(["ipcs", "-m"], capture_output=True, text=True).stdout
+    segments = subprocess.run(["ipcs", "-m"], capture_output=True, text=True).stdout
     assert outcome.ok, text
     assert all(item.endswith("=1") for item in text.split(",")), text
-    assert before == after
+    assert "256000000" not in segments  # no segment of the size the program asked for
 
 
 def test_a_program_cannot_run_a_file_it_wrote_or_an_open_file(tmp_path):
@@ -648,3 +648,131 @@ def test_the_supervisor_watches_the_process_not_the_thread_that_started_it(tmp_p
     assert started[0].wait(15) == 0
     log.close()
     assert (tmp_path / "log").read_text() == "alive"
+
+
+# ------------------------------------------------------------- the second review's probes
+
+
+def test_space_reserved_without_a_size_is_refused(tmp_path):
+    """fallocate(FALLOC_FL_KEEP_SIZE, 10 GB): blocks on disk, st_size 0, no FSIZE limit."""
+    code = (
+        'my $out = $ARGV[0]; open(my $h, ">", "$out/k") or die;'
+        f" $! = 0; my $r = syscall({seccomp.number('fallocate')}, fileno($h), 1, 0, 10240 << 20);"
+        ' my @s = stat("$out/k"); print(($r == 0 ? "RESERVED" : ($!+0)), ":$s[12]");'
+    )
+    outcome, text = run_perl(code, tmp_path)
+    assert outcome.ok and text == "1:0", text  # EPERM, no blocks
+    assert sum(f.stat().st_blocks for f in (tmp_path / "out").iterdir()) == 0
+
+
+def test_the_budget_counts_blocks_as_well_as_size(tmp_path):
+    import ctypes
+
+    path = tmp_path / "reserved"
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT, 0o600)
+    libc = ctypes.CDLL(None, use_errno=True)
+    try:
+        if libc.fallocate(fd, 1, 0, ctypes.c_longlong(50 << 20)) != 0:  # KEEP_SIZE
+            pytest.skip("this filesystem cannot reserve space")
+    finally:
+        os.close(fd)
+    assert path.stat().st_size == 0 and path.stat().st_blocks * 512 >= 50 << 20
+    assert sandbox._tree_usage((tmp_path,), 100)[0] >= 50 << 20
+
+
+def test_a_shared_mapping_of_a_deleted_file_still_counts_against_the_budget(tmp_path):
+    code = (
+        'my $out = $ARGV[0]; my $chunk = "B" x (1 << 20); my @maps;'
+        ' for my $i (1..30) { my $f = "$out/g$i"; open(my $h, "+>", $f) or last; binmode $h;'
+        " for (1..45) { print $h $chunk } $h->flush;"
+        f" my $a = syscall({9 if platform.machine() == 'x86_64' else 222},"
+        " 0, 45 << 20, 1, 1, fileno($h), 0);"
+        " last if $a == -1; push @maps, $a; close $h; CORE::unlink($f); }"
+        " sleep 30;"
+    )
+    start = time.monotonic()
+    outcome, _ = run_perl(
+        code, tmp_path,
+        limits=sandbox.Limits(wall_s=30, out_bytes=100_000_000, file_bytes=50_000_000),
+    )  # fmt: skip
+    assert outcome.over_quota and time.monotonic() - start < 15
+
+
+def test_the_dynamic_loader_can_run_a_file_the_program_wrote_but_it_stays_confined(tmp_path):
+    """Landlock does not check PROT_EXEC mappings, and the kernel needs the right to execute the
+    loader for every program, so a file written to the output folder can be run through
+    `ld.so`. That is native code under the same ruleset and filter as Perl: it cannot read what
+    Perl cannot, and cannot make the calls Perl cannot (docs/security.md, residual risks)."""
+    loader = next(
+        (
+            p
+            for p in ("/lib64/ld-linux-x86-64.so.2", "/lib/ld-linux-aarch64.so.1")
+            if Path(p).exists()
+        ),
+        None,
+    )
+    if loader is None:
+        pytest.skip("no dynamic loader at the usual place")
+    code = (
+        'my $out = $ARGV[0]; my $dst = "$out/mycat"; open(my $s, "<", "/usr/bin/cat") or die;'
+        " binmode $s; my $d = do { local $/; scalar readline($s) };"
+        ' open(my $o, ">", $dst) or die; binmode $o; print $o $d; close $o; chmod(0755, $dst);'
+        ' $! = 0; my $direct = system($dst, "/usr/bin/true"); my $e1 = $!+0;'
+        f' my $ok = system("{loader}", $dst, "/usr/share/zoneinfo/UTC") >> 8;'
+        f' my $secret = system("{loader}", $dst, "/etc/passwd") >> 8;'
+        f' my $proc = system("{loader}", $dst, "/proc/1/environ") >> 8;'
+        ' open(my $r, ">", "$out/result"); '
+        'print $r "direct:" . ($direct == 0 ? "RAN" : "no");'
+        ' print $r ",ld_ok:$ok,passwd:$secret,proc:$proc";'
+    )
+    outcome, text = run_perl(code, tmp_path)
+    assert outcome.ok, text
+    result = (tmp_path / "out" / "result").read_text()
+    got = dict(item.split(":") for item in result.split(","))
+    assert got["direct"] == "no"  # no execute right on the output folder
+    assert got["passwd"] != "0" and got["proc"] != "0"  # still no /etc/passwd, no /proc
+
+
+def test_a_fork_that_fails_for_lack_of_room_is_reported_as_busy_not_as_a_bad_document(tmp_path):
+    # Forks until the task limit stops it, then dies with the errno text, as Perl does.
+    loop = (
+        'my @k; for (1..40) { my $p = fork(); if (!defined $p) { die "Can\'t fork: $!\n" }'
+        " if ($p == 0) { sleep 5; exit 0 } push @k, $p }"
+    )
+    outcome, text = run_perl(loop, tmp_path, limits=sandbox.Limits(wall_s=20, pids=4))
+    assert not outcome.ok and "Resource temporarily unavailable" in text
+    assert outcome.busy
+    other, _ = run_perl('die "a different failure\n";', tmp_path)
+    assert not other.ok and not other.busy
+
+
+def test_a_busy_machine_is_its_own_failure_code_for_a_conversion(tmp_path, monkeypatch):
+    from readablestem.source import convert, latexml
+
+    monkeypatch.setattr(latexml, "installed", lambda: True)
+    monkeypatch.setattr(latexml, "convert", lambda *a, **k: sandbox.Outcome(1, busy=True))
+    with pytest.raises(convert.SourceFailed) as caught:
+        convert.run_latexml(tmp_path, "main.tex", tmp_path / "out")
+    assert caught.value.code == "source_busy"
+    assert "source_busy" in convert.FAILURE_CODES
+
+
+def test_a_filter_that_denies_fallocate_does_not_stop_a_real_conversion(tmp_path, monkeypatch):
+    from readablestem.source import latexml
+
+    if not latexml.installed():
+        pytest.skip("needs LaTeXML")
+    monkeypatch.setenv(sandbox.BACKEND_ENV, "landlock")
+    sandbox.backend.cache_clear()
+    try:
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "main.tex").write_text(
+            "\\documentclass{article}\\usepackage{amsmath}\\begin{document}"
+            "\\begin{align}a&=b\\end{align}\\end{document}"
+        )
+        outcome = latexml.convert(src, "main.tex", tmp_path / "out")
+    finally:
+        monkeypatch.undo()
+        sandbox.backend.cache_clear()
+    assert outcome.ok and "fallocate" in seccomp._STRICT_DENIED

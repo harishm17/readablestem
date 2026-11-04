@@ -175,6 +175,9 @@ class Outcome:
     timed_out: bool = False
     over_quota: bool = False
     over_memory: bool = False
+    # The program could not fork or start because the machine had no room for more tasks
+    # (the user's task count was at the limit): not the document's fault, try again.
+    busy: bool = False
 
     @property
     def ok(self) -> bool:
@@ -386,6 +389,50 @@ def deleted_open_bytes(pids: set[int]) -> int:
     return total
 
 
+def deleted_mapped_bytes(pids: set[int]) -> int:
+    """Bytes of files that these processes have mapped but that are no longer in any folder: a
+    mapping keeps a deleted file's blocks after its descriptor is closed. Each file once, by its
+    size on disk (read through `map_files`) or else by the length of the mapping."""
+    seen: dict[tuple[str, str], int] = {}
+    for pid in pids:
+        try:
+            with open(f"/proc/{pid}/maps") as handle:
+                lines = handle.read().splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            if not line.endswith("(deleted)"):
+                continue
+            parts = line.split(None, 5)
+            if len(parts) < 6 or parts[4] == "0" or not parts[5].startswith("/"):
+                continue
+            start, end = (int(x, 16) for x in parts[0].split("-"))
+            size = end - start
+            with contextlib.suppress(OSError):
+                info = os.stat(f"/proc/{pid}/map_files/{parts[0]}")
+                size = max(info.st_size, info.st_blocks * 512)
+            key = (parts[3], parts[4])
+            seen[key] = max(seen.get(key, 0), size)
+    return sum(seen.values())
+
+
+# What a program prints when `fork` fails for lack of room (EAGAIN): Perl's, LaTeXML's and the
+# launcher's own. Only this errno text is looked for, in the end of the log, and never returned.
+_NO_ROOM = b"Resource temporarily unavailable"
+
+
+def _no_room(log: Path | None) -> bool:
+    if log is None:
+        return False
+    try:
+        with log.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            handle.seek(max(0, handle.tell() - 4096))
+            return _NO_ROOM in handle.read()
+    except OSError:
+        return False
+
+
 def _tree_usage(roots: tuple[Path, ...], cap: int) -> tuple[int, int]:
     """(bytes, entries) under `roots`; stops counting once entries pass `cap`."""
     total = entries = 0
@@ -396,7 +443,9 @@ def _tree_usage(roots: tuple[Path, ...], cap: int) -> tuple[int, int]:
                 return total, entries
             for name in files:
                 with contextlib.suppress(OSError):
-                    total += os.lstat(os.path.join(folder, name)).st_size
+                    info = os.lstat(os.path.join(folder, name))
+                    # Blocks as well as size: space can be reserved without a size.
+                    total += max(info.st_size, info.st_blocks * 512)
     return total, entries
 
 
@@ -622,7 +671,7 @@ def _run(
         while True:
             try:
                 proc.wait(timeout=POLL_SECONDS)
-                return Outcome(proc.returncode)
+                return Outcome(proc.returncode, busy=bool(proc.returncode) and _no_room(log))
             except subprocess.TimeoutExpired:
                 pass
             timed_out = time.monotonic() > deadline
@@ -631,6 +680,7 @@ def _run(
             written = (
                 size
                 + deleted_open_bytes(tree)
+                + deleted_mapped_bytes(tree)
                 + (log.stat().st_size if log and log.exists() else 0)
             )
             over = written > limits.out_bytes or entries > limits.max_entries

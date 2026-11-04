@@ -54,6 +54,7 @@ log = logging.getLogger(__name__)
 # Result of the conversion, for the job's record: the origin and the LaTeXML run's budget.
 FAILURE_CODES = {
     "source_unavailable",  # no sandbox or no LaTeXML on this machine
+    "source_busy",  # the machine had no room for the conversion's tasks right now
     "source_failed",  # LaTeXML did not produce a document
     "source_unreadable",  # it did, and it is not usable
     "source_refused",  # the source is not allowed (the child checks again)
@@ -172,6 +173,8 @@ def run_latexml(project: Path, main: str, out: Path, *, beamer: bool = False) ->
         raise SourceFailed("source_unavailable") from None
     if outcome.timed_out:
         raise SourceFailed("timeout")
+    if outcome.busy:
+        raise SourceFailed("source_busy")
     document = out / latexml.DOC_PATH
     if not outcome.ok or not document.is_file():
         raise SourceFailed("source_failed")

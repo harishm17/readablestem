@@ -121,6 +121,7 @@ _STRICT_DENIED: dict[str, tuple[int, int]] = {
     "ioprio_set": (251, 30),
     # memory and disk outside the counters
     "memfd_create": (319, 279),
+    "fallocate": (285, 47),  # reserves blocks with an apparent size of 0 (FALLOC_FL_KEEP_SIZE)
     "memfd_secret": (447, 447),
     "shmget": (29, 194),
     "shmat": (30, 196),

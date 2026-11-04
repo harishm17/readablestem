@@ -18,6 +18,11 @@
   against the output budget and the entries in the writable folders are capped; the task bound
   is 4 x 512 MB and the probe fails over `SOURCE_SANDBOX_MAX_TOTAL_MB`; the memory poll is
   every 0.1 s; the supervisor watches its caller's pid instead of `PR_SET_PDEATHSIG`.
+- Second review: `fallocate` denied, the output budget counts blocks and deleted files that are
+  still mapped, a fork that fails for lack of room fails the conversion as `source_busy`
+  (new message: "The server is busy right now ... Try again in a few minutes, or upload the
+  PDF instead."); running a written file through the dynamic loader is documented as a
+  residual (the loader's execute right cannot be withheld).
 
 ## Unreleased: equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
 
