@@ -247,6 +247,23 @@ class ReviewEdit(Base):
     job: Mapped[Job] = relationship(back_populates="edits")
 
 
+class JobShare(Base):
+    """One document shared with one named person (`web.shares`): the address they must sign
+    in with, lower-cased, and what they may do ("view" or "review"). The owner is the only one
+    who can add, change or remove a row. There is no expiry of its own: the row goes with the
+    document (`ops.retention.delete_jobs`), and a document past its retention time is
+    refused to everyone before any share is read (`routes.jobs.job_access`)."""
+
+    __tablename__ = "job_shares"
+    __table_args__ = (UniqueConstraint("job_id", "email", name="uq_job_share_person"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    role: Mapped[str] = mapped_column(String(8))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class SpendDay(Base):
     """Global model spend per UTC day. Updated with conditional UPDATEs (see web.spend).
 
@@ -525,6 +542,10 @@ class LoginLink(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    # The address the link was sent to, lower case. Opening it proves that mailbox, and only
+    # that: a share (`web.shares`) applies when it is the account's own address. Links made
+    # before this column existed have none and prove nothing.
+    email: Mapped[str | None] = mapped_column(String(320))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

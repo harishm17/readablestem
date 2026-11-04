@@ -175,7 +175,9 @@ def test_keep_7_more_days_on_the_job_page(ux):
     job = stored_job(ux)
     assert (job.retention_mode, job.opt_in_retention) == ("week", False)
     assert timedelta(days=6, hours=23) < retain_in(ux) <= timedelta(days=7)
-    assert "kept for 7 days, and only you can see it" in text_of(page(ux))
+    assert "kept for 7 days, and only you and the people you share it with can see it" in text_of(
+        page(ux)
+    )
 
 
 def test_a_developer_look_job_is_not_offered_more_days(ux):

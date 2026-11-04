@@ -96,5 +96,5 @@ async def confirm(request: Request, token: Annotated[str, Form()] = "") -> Respo
         return render(
             request, "login_email_confirm.html", {"token": "", "usable": False}, status_code=400
         )
-    user_id, version = found
-    return await run_in_threadpool(signed_in, request, user_id, version, "email")
+    user_id, version, proved = found
+    return await run_in_threadpool(signed_in, request, user_id, version, "email", False, proved)

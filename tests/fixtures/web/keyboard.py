@@ -31,8 +31,11 @@ DESCRIBE = """() => {
   const vw = innerWidth, vh = innerHeight;
   const inView = r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 &&
     r.top < vh && r.left < vw;
-  const cx = Math.min(Math.max(r.left + r.width / 2, 0), vw - 1);
-  const cy = Math.min(Math.max(r.top + Math.min(r.height / 2, 8), 0), vh - 1);
+  // An inline link that wraps has a bounding box wider than any one of its lines, and its
+  // centre can lie over a neighbour on the first line: probe the middle of its first line box.
+  const q = el.getClientRects()[0] || r;
+  const cx = Math.min(Math.max(q.left + q.width / 2, 0), vw - 1);
+  const cy = Math.min(Math.max(q.top + Math.min(q.height / 2, 8), 0), vh - 1);
   const top = document.elementFromPoint(cx, cy);
   const covered = !!top && !(el === top || el.contains(top) || top.contains(el));
   const named = (el.getAttribute('aria-label') ||

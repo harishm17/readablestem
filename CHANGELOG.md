@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased: sharing with named people (branch share/g1-named-people)
+
+- An owner can share one finished document with named people by email address (`/jobs/{id}/share`,
+  `web/shares.py`, `routes/sharing.py`; migration `b7112167eb0d`, table `job_shares`). They must sign in with
+  that exact address (matched in lower case and in full; no domain rule, no public link, nothing is emailed:
+  the owner copies the address). Two rights: `view` (job page, preview, downloads, review record) and
+  `review` (also the review screen and every decision and edit, each recorded under the reviewer's name in the
+  review record). The owner alone can delete, retry, change settings, upload a revision, combine parts, share
+  further or remove a share; removing one works on the next request. A shared document is listed under "Shared
+  with you" on My documents.
+- One access check, `routes.jobs.job_access(session, job_id, user, need)` with `need` `view`, `review` or
+  `owner`, replaces `owned_job` at every call site (about 50). A stranger or a removed person still gets the same
+  404 as for a made-up id; a shared person asking for more than their right gets a 403 page.
+- Quotas and spend stay the owner's: a model re-read a reviewer asks for counts against the owner's day allowance
+  and the document's caps. A viewer's download does not restart the owner's deletion clock.
+- Deleting a document deletes its shares; erasing an account deletes the shares that name its address.
+- A share applies only to a sign-in that proved the address (Google's verified email, Microsoft's `xms_edov`, or
+  an emailed single-use link sent to that address; migration `ecb0b22515e0` adds `login_links.email`). **After
+  this deploy, people who use a shared document sign in once more** (sessions from before it carry no proof);
+  until they do, the document's address shows a page telling them to sign in again.
+- Wording: the privacy notice, the accessibility-office page, the landing page and the job page no longer say
+  that only the owner can see a document. docs/web.md, docs/security.md. Test: `tests/test_job_shares.py` (every
+  job route against the owner, a viewer, a reviewer, a removed person and a stranger).
 ## Unreleased: keyboard walk and draft ACR
 
 - New keyboard-only walk of the web app (`tests/test_web_keyboard_browser.py`, browser-marked,
