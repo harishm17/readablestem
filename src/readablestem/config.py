@@ -425,7 +425,8 @@ class Settings(BaseSettings):
     image_pages_second_reader_time_s: float = Field(default=120.0, gt=0, le=1800)
 
     # --- content features. Each is off by default in code until its eval
-    # says it helps (production turns several on, docs/deploy-railway.md); ConversionOptions.from_settings reads them for every conversion.
+    # says it helps (production turns several on, docs/deploy-railway.md);
+    # ConversionOptions.from_settings reads them for every conversion.
     # Rebuild data tables as <table> (off: a detected table is kept as an image of the
     # table with a required decision, "table not rebuilt").
     feature_tables: bool = False
