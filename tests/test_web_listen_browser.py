@@ -283,6 +283,20 @@ def test_online_voices_alone_need_an_explicit_choice(site, browser, job):
     context.close()
 
 
+def test_with_no_voice_at_all_the_menu_goes_and_a_line_says_why(site, browser, job):
+    context, page = open_listen(
+        browser, site, f"/jobs/{job}/listen", init="window.__voices = [];\n" + STUB
+    )
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.wait_for_timeout(1500)  # the page waits a moment for voices to turn up
+    assert page.locator("[data-listen-voice-field]").is_hidden()
+    assert "No voice on this device" in page.locator("[data-listen-voice-note]").inner_text()
+    play = page.get_by_role("button", name="Play")
+    assert play.is_disabled()
+    assert play.get_attribute("aria-describedby") == "listen-voice-note"
+    context.close()
+
+
 def test_without_speech_the_transcript_still_reads(site, browser, job):
     context, page = open_listen(browser, site, f"/jobs/{job}/listen", init=NO_SPEECH)
     page.wait_for_selector("[data-listen-unsupported]:not([hidden])")

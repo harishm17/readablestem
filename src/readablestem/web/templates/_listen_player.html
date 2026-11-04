@@ -10,7 +10,7 @@
   <p data-listen-unsupported hidden>This browser cannot speak text, so there is nothing to play. The transcript below can be read as it is.</p>
   <div class="listen-controls" data-listen-controls hidden role="group" aria-labelledby="player-heading" aria-describedby="player-hint">
     <div class="listen-row">
-      <button type="button" class="button" data-listen="play">Play</button>
+      <button type="button" class="button" data-listen="play" aria-describedby="listen-voice-note">Play</button>
       <button type="button" class="button-secondary" data-listen="pause" aria-disabled="true">Pause</button>
       <button type="button" class="button-secondary" data-listen="stop" aria-disabled="true">Stop</button>
     </div>
@@ -31,7 +31,7 @@
           <option value="2">Very fast (2)</option>
         </select>
       </div>
-      <div class="field">
+      <div class="field" data-listen-voice-field>
         <label for="listen-voice">Voice</label>
         <select id="listen-voice" data-listen-voice aria-describedby="listen-voice-note"></select>
       </div>

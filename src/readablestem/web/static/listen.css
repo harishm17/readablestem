@@ -5,7 +5,7 @@
 .listen-honest { max-width: var(--prose-max); }
 
 .listen-controls { border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--surface); padding: var(--space-4); margin: var(--space-3) 0 var(--space-5); }
-.listen-controls[hidden] { display: none; }
+.listen-controls[hidden], .listen-controls [hidden] { display: none; }
 .listen-row { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: flex-end; margin: 0 0 var(--space-3); }
 .listen-row button { min-height: 2.75rem; min-width: 2.75rem; }
 .listen-settings .field { margin: 0; }

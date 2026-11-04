@@ -148,6 +148,7 @@
     var voiceNote = root.querySelector("[data-listen-voice-note]");
     var voiceSelect = root.querySelector("[data-listen-voice]");
     var rateSelect = root.querySelector("[data-listen-rate]");
+    var voiceField = root.querySelector("[data-listen-voice-field]");
     if (!controls || !list) return;
     if (!supported) {
       // The transcript stays as it is; say so once, where the controls would have been.
@@ -346,8 +347,8 @@
     function explain() {
       var local = localVoices(voices);
       if (!voices.length) {
-        voiceNote.textContent = "This browser lists no voices, so nothing can be played here. " +
-          "The transcript below can still be read.";
+        voiceNote.textContent = "No voice on this device. Read the transcript below, or use " +
+          "your own screen reader.";
       } else if (!local.length && !voice) {
         voiceNote.textContent = "This browser has only online voices. Some browsers send the " +
           "text to their maker to speak it. Choose a voice to play the transcript this way, " +
@@ -396,6 +397,7 @@
       }
       voiceSelect.value = voice ? voice.voiceURI : "";
       voiceSelect.disabled = !voices.length;
+      voiceField.hidden = !voices.length; // an empty menu explains nothing
       explain();
       paint();
     }
