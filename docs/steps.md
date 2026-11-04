@@ -442,7 +442,7 @@ not the PDF's is still flagged.
   one slash, layout found no fraction bar in the box, and the letters and digits of A and B are those
   on each side of the slash: it is written `A/B`, with the parentheses the glyphs show.
 - **Equation number** (`number_dropped`, display). The reading ends `, (N)` or `\quad (N)`, or starts
-  `(N) \qquad`, and the glyphs have `(N)` at that edge of the box a font-size-wide gap or more from the
+  `(N) \qquad`, and the glyphs have `(N)` at that edge of the box half a font size or more (the printed labels stand 0.7 em off) from the
   rest of its row (`GlyphContext.labels`, `glyph_reconcile.edge_labels`): it is taken out and becomes
   `Element.equation_label` when that is empty. `f(1)` at the end of a formula has neither the
   separator nor the gap.

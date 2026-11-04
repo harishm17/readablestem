@@ -378,3 +378,33 @@ def test_a_note_check_is_a_note_with_a_message():
     for code in gr.CODES:
         assert (gr.CHECK_NAME, code) in CHECK_MESSAGES
     assert Check(name=gr.CHECK_NAME, passed=False, code="slash_kept").code in gr.CODES
+
+
+def test_a_label_as_far_off_as_the_printed_ones_is_found():
+    # 2404.14123/eq-023: the comma ends at 561.7, the "(8)" starts at 568.9: 0.7 em at 10 pt
+    row = [gr.Item(",", 559.0, 561.7, 376.0, 10.0)]
+    for ch, x in (("(", 568.9), ("8", 572.8), (")", 577.7)):
+        row.append(gr.Item(ch, x, x + 4.5, 376.0, 10.0))
+    assert gr.edge_labels(row) == ("(8)",)
+
+
+def test_a_number_before_the_end_of_an_array_goes_and_its_glyphs_leave_the_text():
+    # 2404.14123/eq-023: the label sits inside the array the reading is wrapped in
+    latex = r"\begin{array}{rcl} P & = & w \end{array}"
+    inside = r"\begin{array}{rcl} P & = & w, \quad (8) \end{array}"
+    assert gr.edge_label(inside, ["(8)"]) == (
+        r"\begin{array}{rcl} P & = & w, \end{array}",
+        "(8)",
+    )
+    assert latex
+    assert gr.without_label("A = f , (1) s2x", "(1)") == "A = f , s2x"
+    assert gr.without_label("A = f", "(1)") == "A = f"
+
+
+def test_the_fixs_checks_compare_a_display_with_its_text_less_the_number():
+    element = equation(
+        "A = f , (1)", ctx("Ai -=- -fi,- -(-1-)-", labels="(1)", tex=True), display="block"
+    )
+    fix = run(element, r"A = f, \quad (1)")
+    assert "symbol_mismatch" not in codes(fix)
+    assert fix.status.value == "accepted"

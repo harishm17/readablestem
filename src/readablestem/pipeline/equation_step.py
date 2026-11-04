@@ -934,6 +934,10 @@ def _evaluate(
         return candidate
     if reconcile:
         _reconcile(candidate, element, display)
+        if candidate.label:  # the number is no part of the formula the glyphs are checked against
+            element = element.model_copy(
+                update={"text": glyph_reconcile.without_label(element.text, candidate.label)}
+            )
     candidate.speech, speech_check = _speech(candidate.mathml, spoken)
     candidate.checks.append(speech_check)
     meaning = False  # a meaning-level difference from the text layer

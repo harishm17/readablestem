@@ -365,9 +365,25 @@ def keep_slash(latex: str, text: str | None, *, fraction_bar: bool) -> str | Non
 
 _NUMBER = r"\(\s*(\d+(?:\.\d+)?)\s*\)"
 _SPACING = r"(?:\s|~|\\[;:! ,]|\\q?quad(?![A-Za-z]))"
-_TRAILING_NUMBER = re.compile(rf"(?P<lead>(?:{_SPACING}|,)*){_NUMBER}\s*$")
+_TRAILING_NUMBER = re.compile(
+    rf"(?P<lead>(?:{_SPACING}|,)*){_NUMBER}\s*(?P<end>(?:\\end\{{[a-z*]+\}}\s*)?)$"
+)
 _LEADING_NUMBER = re.compile(rf"^\s*{_NUMBER}(?P<tail>{_SPACING}*)")
 _QUAD = re.compile(r"\\q?quad(?![A-Za-z])")
+
+
+def without_label(text: str | None, label: str) -> str | None:
+    """The PDF text without the equation number that was taken out of the reading, so the checks
+    compare the formula with its own glyphs (the last `(N)` of the text)."""
+    if not text:
+        return text
+    found = list(
+        re.finditer(re.escape(label[0]) + r"\s*" + re.escape(label[1:-1]) + r"\s*\)", text)
+    )
+    if not found:
+        return text
+    last = found[-1]
+    return " ".join((text[: last.start()] + " " + text[last.end() :]).split())
 
 
 def edge_label(latex: str, labels: Sequence[str]) -> tuple[str, str] | None:
@@ -381,7 +397,10 @@ def edge_label(latex: str, labels: Sequence[str]) -> tuple[str, str] | None:
         label = f"({trailing.group(2)})"
         kept = latex[: trailing.start()].rstrip()
         if label in wanted and kept:
-            return (kept + ("," if "," in trailing["lead"] else "")).rstrip(), label
+            comma = "," if "," in trailing["lead"] else ""
+            return f"{kept}{comma} {trailing['end']}".strip() if trailing[
+                "end"
+            ] else kept + comma, label
     leading = _LEADING_NUMBER.match(latex)
     if leading is not None and _QUAD.search(leading["tail"]):
         label = f"({leading.group(1)})"
@@ -404,13 +423,14 @@ class Item(NamedTuple):
 
 _LABEL_TEXT = re.compile(r"^\(\d+(?:\.\d+)?\)$")
 CLUSTER_GAP = 0.5  # x font size: glyphs closer than this are one run (the digits of "(5.5)")
-LABEL_GAP = 1.0  # x font size: a label stands this far from the formula on its row
+LABEL_GAP = 0.5  # x font size: a label stands this far from the formula on its row (real ones: 0.7)
 ROW_TOLERANCE = 0.5  # x font size: glyphs this close in height share a row
 
 
 def edge_labels(items: Sequence[Item]) -> tuple[str, ...]:
     """The equation numbers `(N)` or `(N.M)` printed at the left or right edge of a box, a gap
-    of at least `LABEL_GAP` of the font size from the rest of their row (or alone on it). The
+    of at least `LABEL_GAP` (half an em) of the font size from the rest of their row (or alone on
+    it).
     rightmost and the leftmost run of the row each of those glyphs sits on."""
     ink = [i for i in items if i.c.strip()]
     if not ink:
