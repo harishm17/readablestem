@@ -100,7 +100,7 @@
     {{ table_fields("split") }}<input type="hidden" name="change" value="cell"><input type="hidden" name="row" value="{{ c.row }}"><input type="hidden" name="col" value="{{ c.col }}">
     <div class="field{% if cell_err %} field-error{% endif %}">
       <label for="cell-{{ eid }}">{{ "LaTeX in" if c.maths else "Text in" }} {{ c.position|lower }}</label>
-      <p class="hint" id="cell-hint-{{ eid }}">{% if c.flat %}This cell holds maths that the PDF's text gives flat (“{{ c.flat }}”), so it cannot be used as it is: type it as LaTeX. Save cell checks the LaTeX as it checks an equation.{% elif c.maths %}This cell holds maths. Save cell checks the LaTeX as it checks an equation.{% else %}As printed in the PDF. Save cell checks it and shows the table again.{% endif %}</p>
+      <p class="hint" id="cell-hint-{{ eid }}">{% if c.flat %}This cell holds maths that the PDF's text gives flat (“{{ c.flat }}”), so it cannot be used as it is: type it as LaTeX. Save cell checks the LaTeX as it checks an equation.{% elif c.maths %}This cell holds maths. Save cell checks the LaTeX as it checks an equation.{% if c.tied %} This cell is also an equation of the document (listed under Equations): your change is made to that equation too, and Undo takes back both.{% endif %}{% else %}As printed in the PDF. Save cell checks it and shows the table again.{% endif %}</p>
       {{ table_error(item, "cell") }}
       {# autofocus: the reviewer chose this cell to change it. #}
       <textarea id="cell-{{ eid }}" name="cell" rows="2"{% if not c.maths %} class="prose-input"{% else %} spellcheck="false" autocapitalize="off"{% endif %} data-edit-field autofocus

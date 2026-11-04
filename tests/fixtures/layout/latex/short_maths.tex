@@ -1,0 +1,27 @@
+% Layout fixture: short inline maths and the plain text that looks like it. A relation set in a maths
+% font before a number ($\approx 0.14$, $\geq 2$, $\geq 90\%$) is maths; a percentage, a year, a
+% number with a unit, a citation, a figure number, a page number and a list marker are text.
+% Used by tests/test_glyph_math.py. Written for ReadableSTEM's tests; no third-party text.
+\documentclass[11pt]{article}
+\usepackage[OT1]{fontenc}
+\renewcommand{\rmdefault}{cmr}
+\usepackage[margin=1in]{geometry}
+% The layout reads TeX conventions only from a PDF that says TeX made it (/Creator); Tectonic's
+% own creator string does not, so the fixture sets one as a pdfLaTeX file has it.
+\usepackage[pdfcreator={LaTeX with hyperref}]{hyperref}
+\pagestyle{empty}
+
+\begin{document}
+
+The measured loss is about $\approx 0.14$ per cycle, and the sample needs at least
+$\geq 2$ trials before the estimate settles. The yield was $\geq 90\%$ in every run.
+
+A response rate of 95\% was reported in 2024 for 12 participants, with a mean age of 34.5 years
+and a dose of 5 mg per kilogram [3]. See Figure 3 and Table 2 on page 7 (Section 4.1).
+
+\begin{enumerate}
+\item The first step takes 10 minutes.
+\item The second step takes 25\% longer than the first.
+\end{enumerate}
+
+\end{document}
