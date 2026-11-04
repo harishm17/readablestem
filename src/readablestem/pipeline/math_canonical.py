@@ -26,9 +26,11 @@ difference in the symbol streams. It holds formula text: never log it.
 
 Pure functions, no model call, no network. `fold_upright_words`, `latex_to_mathml` and `speech_of`
 repeat the steps of the offline scorers `scripts/rw_notation_neutral.py` and
-`scripts/rw_spoken.py`. Those scripts are hashed by the registrations
-(`scripts/realworld_register.py`) and must not change, so they do not import this module;
-`tests/test_math_canonical_scale.py` fails if the two ever disagree.
+`scripts/rw_spoken.py` (as written). `rw_notation_neutral.py` is hashed by the registrations
+(`scripts/realworld_register.py`) and must not change, so it does not import this module;
+`tests/test_math_canonical_scale.py` fails if the two ever disagree. `rw_spoken.py` is the
+primary score of fresh5 and is hashed with this file; it imports `speakable_latex` and
+`repair_converter_gaps` from here.
 """
 
 from __future__ import annotations
@@ -221,6 +223,108 @@ def canonical_latex(latex: str) -> str:
         if s == before:
             break
     s = _order_scripts(s)
+    return re.sub("[\ue000-\uf8ff]", lambda m: bodies[ord(m.group(0)) - _PLACEHOLDER_BASE], s)
+
+
+# ---------------------------------------------------------- speaking LaTeX that prints alike
+#
+# `speakable_latex` and `repair_converter_gaps` are for the spoken-equal scorer
+# (`scripts/rw_spoken.py`); `compare` does not use them, so no product decision changes. Two
+# LaTeX strings that print the same must be spoken the same, and the converter and the speech
+# rules read some spellings of one print differently (`\mathrm{in}` letter by
+# letter, `\text{in}` as a word; `\min` "minimum", `\text{min}` "min"; `\textbf{R}` loses its
+# bold; `\bigl(` is not converted; `...` is "period period period"). Each rule here writes one
+# print one way, and never joins two different prints: a `\min_x` keeps its script (in display
+# it is set under the word, `\text{min}_x` is not), and a `\mathrm` with a script or a command
+# inside is not text. A guard test holds recorded pairs that differ in print and must stay
+# different (`tests/test_math_canonical_spoken.py`).
+
+_UPRIGHT_SPEAK = re.compile(
+    r"\\(mathrm|textrm|mbox|textnormal|operatorname|text)\s*\{((?:[^{}\\$_^]|\\[,;: ])*)\}"
+    r"|\{\\rm\s+((?:[^{}\\$_^]|\\[,;: ])*)\}"
+)
+_TEXT_SPACE = re.compile(r"\\[,;: ]|~|\s+")
+_OPERATOR_NAMES = (
+    *("arccos", "arcsin", "arctan", "arg", "cos", "cosh", "cot", "coth", "csc", "deg", "dim"),
+    *("exp", "hom", "ker", "lg", "ln", "log", "sec", "sin", "sinh", "tan", "tanh"),
+    *("min", "max", "sup", "inf", "lim", "liminf", "limsup", "det", "gcd", "Pr"),
+)
+# Limits go under these in display style, so `\max_x` is not `\text{max}_x`.
+_NAMED_OPERATOR = re.compile(r"\\(" + "|".join(_OPERATOR_NAMES) + r")(?![A-Za-z])(?!\s*[_^])")
+_BOLD_TEXT = re.compile(r"\\textbf\s*\{([^{}]*)\}|\{\\bf\s+([^{}]*)\}")
+_ELLIPSIS = re.compile(r"(?<![.\\])\.\.\.(?!\.)")
+_SIZE_COMMAND = re.compile(r"\\[bB]ig{1,2}[lrm]?(?![A-Za-z])\s*")
+_SCRIPT_ON_SCRIPT = re.compile(r"\^\{\^(\{[^{}]*\}|\\text\{[^{}]*\}|[^\s{}\\])\}")
+_PRIME_SCRIPT = re.compile(r"\^\s*(?:\{\s*((?:\\prime\s*)+)\}|\\prime(?![A-Za-z]))")
+_ROW_SPACE = re.compile(r"\\\\\s*\[\s*-?[\d.]+\s*(?:pt|em|ex|mm|cm|in|bp|pc)\s*\]")
+_DOLLAR_TEXT = re.compile(r"\\text\{([^{}$]*\$[^{}]*)\}")
+_PAREN_TEXT_SCRIPT = re.compile(r"([_^])\s*\\text\{\(([^{}()]*)\)\}")
+_PAREN_TEXT = re.compile(r"\\text\{\(([^{}()]*)\)\}")
+_PRIME_AFTER_SUBSCRIPT = re.compile(r"(_\{[^{}]*\}|_[^\s{}\\])\s*'")
+_UNDERLINED_ACCENT = re.compile(r"\\(widehat|hat|widetilde|tilde)\{\\underline\{([^{}]*)\}\}")
+_WORD_THEN_DIGITS = re.compile(r"\\text\{([A-Za-z]+)\}(\d+)")
+
+
+def _upright_text(m: re.Match[str]) -> str:
+    """Upright letters as `\\text{...}`. Spaces count in text (`\\text{if } x`) and not in
+    `\\mathrm` or `\\operatorname`, which ignore them."""
+    command = m.group(1)
+    body = m.group(2) if command else m.group(3)
+    if command in ("mathrm", "operatorname", None):  # typed spaces only; `\;` and `\ ` still space
+        body = re.sub(r"(?<!\\)\s+", "", body)
+    return "\\text{" + _TEXT_SPACE.sub(" ", body) + "}"
+
+
+def _dollar_text(m: re.Match[str]) -> str:
+    r"""`\text{$1$r}` (a number or letter set in maths inside text) is `\text{1r}`;
+    `\text{$m$-r}` is `{m\text{-r}}`: the same print without the maths-in-text."""
+    parts = m.group(1).split("$")
+    if len(parts) % 2 == 0:  # an unpaired dollar: leave it
+        return m.group(0)
+    if all(p.isdigit() for p in parts[1::2]):
+        return "\\text{" + "".join(parts) + "}"
+    out = []
+    for i, part in enumerate(parts):
+        if i % 2:  # maths
+            out.append(part)
+        elif part:
+            out.append("\\text{" + part + "}")
+    return "{" + "".join(out) + "}"
+
+
+def repair_converter_gaps(latex: str) -> str:
+    r"""The two spellings the converter reads wrongly, not differently: `\textbf{R}` and
+    `{\bf R}` in maths lose their bold (written `\mathbf{R}`), and a sized delimiter (`\bigl(`,
+    `\Bigr\rangle`) is not converted (the size is dropped; a size is not spoken). Nothing else
+    changes."""
+    s = _SIZE_COMMAND.sub("", latex)
+    return _BOLD_TEXT.sub(lambda m: "\\mathbf{" + (m.group(1) or m.group(2) or "") + "}", s)
+
+
+def speakable_latex(latex: str) -> str:
+    r"""LaTeX with each print written one way for the speech rules (the comment above). A
+    string for converting and speaking, not for showing; `\text{...}` bodies are kept."""
+    bodies: list[str] = []
+
+    def hold(match: re.Match[str]) -> str:
+        bodies.append(match.group(0))
+        return chr(_PLACEHOLDER_BASE + len(bodies) - 1)
+
+    s = _DOLLAR_TEXT.sub(_dollar_text, latex)
+    s = _UPRIGHT_SPEAK.sub(_upright_text, s)
+    s = _WORD_THEN_DIGITS.sub(r"\\text{\1\2}", s)
+    s = _SCRIPT_ON_SCRIPT.sub(r"^{\1}", s)
+    s = _PAREN_TEXT_SCRIPT.sub(lambda m: m.group(1) + "{(\\text{" + m.group(2) + "})}", s)
+    s = _PAREN_TEXT.sub(lambda m: "(\\text{" + m.group(1) + "})", s)
+    s = _TEXT_BODY.sub(hold, s)
+    s = _ROW_SPACE.sub(lambda _: "\\\\", s)
+    s = repair_converter_gaps(s)
+    s = _ELLIPSIS.sub(r"\\ldots ", s)
+    s = re.sub(r"\\backslash(?![A-Za-z])", r"\\setminus ", s)
+    s = _NAMED_OPERATOR.sub(lambda m: "\\text{" + m.group(1) + "}", s)
+    s = _PRIME_SCRIPT.sub(lambda m: "'" * (m.group(1).count("\\prime") if m.group(1) else 1), s)
+    s = _PRIME_AFTER_SUBSCRIPT.sub(lambda m: "'" + m.group(1), s)
+    s = _UNDERLINED_ACCENT.sub(r"\\underline{\\\1{\2}}", s)
     return re.sub("[\ue000-\uf8ff]", lambda m: bodies[ord(m.group(0)) - _PLACEHOLDER_BASE], s)
 
 
