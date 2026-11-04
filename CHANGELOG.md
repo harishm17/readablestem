@@ -17,6 +17,16 @@
   docs/security.md "Running uploaded TeX", docs/development.md. Tests: `tests/test_archive_intake.py`,
   `test_source_intake.py`, `test_source_reader.py`, `test_source_convert.py`, `test_source_escapes.py` (hostile
   files through the real sandbox), `test_source_child.py`, `test_web_source.py`.
+## Unreleased: design polish (branch design/d6-polish)
+
+- Fixes from the Impeccable audit and critique of the redesign: paragraphs, hints and list items are capped at 75ch;
+  Sign out, document-row links and check boxes meet the 24px target floor (header buttons 44px); the review screen's
+  desk colour is lighter so its links have 7.3:1; the current step on the review screen keeps the two-tone focus
+  ring; the three fonts the first view needs are preloaded (no layout shift on a phone); buttons and the page tools'
+  forms never overflow at 320px or 200% zoom; the file chooser button is styled as a secondary button; the
+  comparison table keeps its topic column in view and tints the ReadableSTEM column; a few legacy radii and an
+  off-token colour moved onto the tokens. The focus-style test reads the new tokens, light and dark.
+
 ## Unreleased: comparison table and showcase on the tokens (branch design/d4-compare-showcase)
 
 - The comparison guide (`/guides/readablestem-mathpix-latexml`) now compares five tools: ReadableSTEM, Mathpix,
