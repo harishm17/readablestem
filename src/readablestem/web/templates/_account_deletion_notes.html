@@ -1,18 +1,30 @@
 {# What deleting an account does not reach. Shared by the Account page and its confirmation
-   (web/routes/account.py); keep it in step with privacy.html. #}
+   (web/routes/account.py); keep it in step with privacy.html. A short list first; the full
+   wording is in the disclosure, and the privacy notice has the policy. #}
 {% from "_recipients.html" import retention_short %}
+{% set ai = recipients|selectattr("gets_documents")|list %}
 <p><strong>What deleting does not reach.</strong></p>
 <ul>
-  <li>The database is backed up once a day, and each backup is kept for about 6 days, so your
-    account and documents can remain in a backup for up to about a week after you delete
-    them. Backups are only used to recover the service after a failure.</li>
-  {% set ai = recipients|selectattr("gets_documents")|list %}
-  <li>The images and nearby text of equations and figures that were already sent to
-    {{ ai|map(attribute="name")|join(" and ") }} stay under {{ "its" if ai|length == 1 else "their" }} own retention.
-    {% for r in ai %}{{ retention_short(r.name) }} {% endfor %}Your email address was never sent.</li>
+  <li>Backups: your account and documents can stay in a daily backup for about a week.</li>
+  <li>Text and images of equations and figures already sent to {{ ai|map(attribute="name")|join(" and ") }}: they stay under {{ "its" if ai|length == 1 else "their" }} own retention.</li>
   {% if signup_open %}
-  <li>For the rest of today we keep a scrambled fingerprint of your address, with today's
-    page and read counts, so that deleting an account and signing up again does not reset
-    today's limits. It is deleted tomorrow.</li>
+  <li>Today's limits: a scrambled fingerprint of your address is kept until tomorrow.</li>
   {% endif %}
 </ul>
+<details class="account-delete-details">
+  <summary>The full wording, and the privacy notice</summary>
+  <ul>
+    <li>The database is backed up once a day, and each backup is kept for about 6 days, so your
+      account and documents can remain in a backup for up to about a week after you delete
+      them. Backups are only used to recover the service after a failure.</li>
+    <li>The images and nearby text of equations and figures that were already sent to
+      {{ ai|map(attribute="name")|join(" and ") }} stay under {{ "its" if ai|length == 1 else "their" }} own retention.
+      {% for r in ai %}{{ retention_short(r.name) }} {% endfor %}Your email address was never sent.</li>
+    {% if signup_open %}
+    <li>For the rest of today we keep a scrambled fingerprint of your address, with today's
+      page and read counts, so that deleting an account and signing up again does not reset
+      today's limits. It is deleted tomorrow.</li>
+    {% endif %}
+  </ul>
+  <p>The <a href="/privacy">privacy notice</a> has the full policy.</p>
+</details>

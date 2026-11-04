@@ -274,6 +274,8 @@ def test_every_page_can_be_walked_with_the_tab_key(
     context, page = open_as(
         browser, site, path.format(**docs), email, viewport=viewport, unfold=unfold
     )
+    if "listen" in path:
+        page.wait_for_timeout(1600)  # the player waits a moment for voices, then says if none
     skip = skip_link_works(page, label=name)
     found = walk(page, label=name)
     context.close()
@@ -571,7 +573,7 @@ def test_a_document_is_deleted_by_keyboard_and_the_notice_takes_focus(site, brow
     activate(page)
     assert page.url.startswith(f"{site.base}/jobs/{gone}/delete")
     assert "Delete" in page.locator("h1").inner_text()
-    tab_to(page, "Yes, delete it")
+    tab_to(page, "^Delete “")
     activate(page)
     page.wait_for_url(re.compile(r"/app"))
     state = wait_focus(page)
@@ -592,7 +594,7 @@ def test_an_account_is_deleted_by_keyboard_after_a_confirmation_page(site, brows
     # "No, keep it" is a plain way back; the destructive button is a second, separate stop.
     keep = tab_to(page, "No, keep it")
     assert keep["tag"] == "a"
-    tab_to(page, "Yes, delete my account", shift=True)
+    tab_to(page, "^Delete my account$", shift=True)
     activate(page)
     state = wait_focus(page)  # the notice takes focus at the next rendering opportunity
     assert state["role"] == "status" and "deleted" in state["text"].lower(), state

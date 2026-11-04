@@ -123,3 +123,23 @@ def test_the_demo_is_public(site):
         assert "\\frac" not in response.text
         assert 'content="noindex"' in response.text
         assert anonymous.post("/demo/listen").status_code in {403, 405}
+
+
+def test_the_page_folds_what_precedes_the_lesson_and_indexes_headings_and_equations(site):
+    """Play starts at the lesson, so the title and notices are folded away; the index is plain
+    links (it works without script) and the filter is there for script to show."""
+    listen.CACHE.clear()
+    body = site.owner.get(f"/jobs/{site.job_id}/listen").text
+    assert "data-listen-before" in body and "Before the lesson: 2 items" in body
+    assert body.index("data-listen-before") < body.index('id="item-3"')
+    assert 'id="item-1"' in body and 'id="item-3"' in body
+    assert "Play starts at the lesson, item 3." in body
+    assert re.search(r"<summary>Index: 1 heading, 1 equation</summary>", body)
+    assert 'href="#item-4">Kinematics' in body
+    assert "data-listen-filter hidden" in body and 'data-listen="beginning"' in body
+    # The transport is Play, Previous and Next; the rest is behind "More controls".
+    transport = body[body.index("data-listen-transport") : body.index("data-listen-controls")]
+    assert re.findall(r'data-listen="(\w+)"', transport) == ["play", "prev", "next"]
+    assert "data-listen-voice-note" in transport and 'href="#transcript-heading"' in transport
+    controls = body[body.index("data-listen-controls") : body.index('id="transcript-heading"')]
+    assert "More controls" in controls and 'data-listen="heading"' in controls

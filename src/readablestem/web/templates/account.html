@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{# Your account (routes/account.py): what is held, how long documents are kept (the one
+   setting, so it comes first), the daily limits, and deleting the account. #}
 {% block title %}Your account{% endblock %}
 {% block content %}
 <h1>Your account</h1>
@@ -12,6 +14,26 @@
     <div><dt>Documents kept now</dt><dd>{{ documents }}</dd></div>
   </dl>
   <p>The <a href="/privacy">privacy notice</a> says what else is stored and for how long.</p>
+</section>
+
+<section aria-labelledby="account-keep-heading" id="account-keep" class="account-keep">
+  <h2 id="account-keep-heading">How long your documents are kept</h2>
+  <p>New documents are kept for
+    <strong>{% if keep_default %}7 days{% else %}{{ retention_hours }} hours{% endif %}</strong>
+    after you last work on them. The clock starts again each time you make a decision or
+    download one. You can also choose “Keep for 7 days” for one document when you upload it
+    or later from its page.</p>
+  <form method="post" action="/account/keep-default" class="stack-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <div class="field checkbox-field">
+      <input type="checkbox" id="keep-default" name="keep_default" value="on" aria-describedby="keep-default-hint"{% if keep_default %} checked{% endif %}>
+      <label for="keep-default">Keep new documents for 7 days by default</label>
+      <p class="hint" id="keep-default-hint">The “Keep for 7 days” box on the upload form
+        then starts ticked, and you can untick it for any upload. Documents you already
+        uploaded keep the deletion time they have.</p>
+    </div>
+    <button type="submit" class="button">Save how long documents are kept</button>
+  </form>
 </section>
 
 <section aria-labelledby="account-limits">
@@ -33,29 +55,11 @@
   <p><a href="/limits">Known limits</a> lists the rest.</p>
 </section>
 
-<section aria-labelledby="account-keep-heading" id="account-keep">
-  <h2 id="account-keep-heading">How long your documents are kept</h2>
-  <p>A document is deleted {{ retention_hours }} hours after you last work on it: the clock
-    starts again each time you make a decision or download it. You can choose “Keep for 7
-    days” instead, when you upload a document or later from its page.</p>
-  <form method="post" action="/account/keep-default" class="stack-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <div class="field checkbox-field">
-      <input type="checkbox" id="keep-default" name="keep_default" value="on" aria-describedby="keep-default-hint"{% if keep_default %} checked{% endif %}>
-      <label for="keep-default">Keep new documents for 7 days by default</label>
-      <p class="hint" id="keep-default-hint">The “Keep for 7 days” box on the upload form
-        then starts ticked, and you can untick it for any upload. Documents you already
-        uploaded keep the deletion time they have.</p>
-    </div>
-    <button type="submit" class="button-secondary">Save</button>
-  </form>
-</section>
-
 <section aria-labelledby="account-delete">
   <h2 id="account-delete">Delete my account</h2>
-  <p>This deletes your account and everything in it: your email address and name, every
-    document you uploaded and everything made from it, your review decisions, courses and
-    notation, and the notes about what you did in the app. It cannot be undone.</p>
+  <p>This deletes your email address and name, every document you uploaded and everything
+    made from it, your review decisions, courses and notation. It cannot be undone.
+    Download what you want to keep first.</p>
   {% include "_account_deletion_notes.html" %}
   <p><a class="button-danger-outline" href="/account/delete">Delete my account</a></p>
 </section>

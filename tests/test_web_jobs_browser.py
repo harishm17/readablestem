@@ -361,13 +361,21 @@ def test_the_page_for_choosing_pages_passes_axe_in_each_state(site, browser, axe
     context, page = look(
         site, browser, axe_source, f"/uploads/{upload_id}", viewport, "choose-pages", "chooser"
     )
+    # Script shows the page fields and the parts as a list; the typed box is folded away.
+    expect(page.get_by_label("First page")).to_be_visible()
+    expect(page.locator(".parts-row")).to_have_count(3)
+    expect(page.locator("#parts-summary")).to_have_text("3 parts, 12 pages.")
+    expect(page.get_by_label("Pages for each part")).to_be_hidden()
+    page.get_by_text("Type the pages instead").click()
     expect(page.get_by_label("Pages for each part")).to_have_value("1-4\n5-8\n9-12")
     assert not sideways_overflow(page)
-    # An error: the summary links to the box, which keeps what was typed.
+    # An error: the summary links to the box, which is open and keeps what was typed.
     page.get_by_label("Pages for each part").fill("1-9")
     page.get_by_role("button", name="Convert these parts").click()
     expect(page.locator(".error-summary")).to_be_visible()
+    expect(page.get_by_label("Pages for each part")).to_be_visible()
     expect(page.get_by_label("Pages for each part")).to_have_value("1-9")
+    expect(page.locator(".parts-row-error")).to_have_count(1)
     clean(page, axe_source, "chooser with an error")
     shoot(page, "choose-pages-error", viewport)
     # My documents lists the file waiting, with a link to choose its pages.
@@ -378,7 +386,7 @@ def test_the_page_for_choosing_pages_passes_axe_in_each_state(site, browser, axe
     page.goto(f"{site.base}/uploads/{upload_id}")
     # Discarding asks first.
     page.get_by_role("button", name="Discard this file").click()
-    expect(page.get_by_role("heading", name="Discard chapter2.pdf?")).to_be_visible()
+    expect(page.get_by_role("heading", name="Discard “chapter2.pdf”?")).to_be_visible()
     clean(page, axe_source, "discard confirmation")
     shoot(page, "discard-confirm", viewport)
     context.close()
@@ -388,15 +396,54 @@ def test_the_parts_are_chosen_and_started_from_the_keyboard(site, browser):
     upload_id = keep_big(site, 8, "keyboard.pdf")
     context, page = open_page(browser, site)
     page.goto(f"{site.base}/uploads/{upload_id}")
-    box = page.get_by_label("Pages for each part")
-    box.focus()
-    page.keyboard.press("Control+A")
-    page.keyboard.type("1-4\n5-8")
-    page.keyboard.press("Tab")  # the shrink box
-    page.keyboard.press("Tab")  # the button
+    # Take the suggestion away with Remove, then build two parts with the page fields.
+    for _ in range(2):
+        page.get_by_role("button", name="Remove part 1").focus()
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(500)
+    expect(page.locator("#parts-summary")).to_have_text("No parts yet.")
+    for first, last in (("1", "4"), ("5", "8")):
+        page.get_by_label("First page").focus()
+        page.keyboard.type(first)
+        page.keyboard.press("Tab")
+        page.keyboard.type(last)
+        page.keyboard.press("Enter")  # adds the part; it does not send the form
+        page.wait_for_timeout(500)
+    expect(page.locator("#parts-summary")).to_have_text("2 parts, 8 pages.")
+    page.get_by_role("button", name="Convert these parts").focus()
     page.keyboard.press("Enter")
     page.wait_for_url(f"{site.base}/app")
     expect(page.locator("[role=status]").first).to_contain_text("2 parts are converting")
+    context.close()
+
+
+def test_add_part_and_the_preview_say_what_is_wrong_before_anything_is_sent(site, browser):
+    upload_id = keep_big(site, 12, "builder.pdf")
+    context, page = open_page(browser, site)
+    page.goto(f"{site.base}/uploads/{upload_id}")
+    expect(page.locator("details[data-parts-advanced]")).not_to_have_attribute("open", "")
+    note = page.locator("[data-builder-note]")
+    page.get_by_role("button", name="Add part").click()  # nothing typed
+    expect(note).to_contain_text("Enter the first page")
+    page.get_by_label("First page").fill("9")
+    page.get_by_label("Last page").fill("3")
+    page.get_by_role("button", name="Add part").click()
+    expect(note).to_contain_text("the first no later than the last")
+    page.get_by_label("First page").fill("2")
+    page.get_by_label("Last page").fill("40")
+    page.get_by_role("button", name="Add part").click()  # beyond the file
+    expect(note).to_contain_text("1 to 12")
+    page.get_by_label("First page").fill("1")
+    page.get_by_label("Last page").fill("2")
+    page.get_by_role("button", name="Add part").click()  # overlaps the suggestion's part 1
+    expect(note).to_contain_text("Part 4 added")
+    expect(page.locator("#parts-summary")).to_contain_text("1 part needs fixing", timeout=5000)
+    expect(page.locator(".parts-row-error")).to_contain_text("Page 1 is in part 1 and part 4")
+    page.get_by_role("button", name="Remove part 4").click()
+    expect(page.locator("#parts-summary")).to_have_text("3 parts, 12 pages.", timeout=5000)
+    # What the preview shows is what is in the box (the form still sends the box).
+    page.get_by_text("Type the pages instead").click()
+    expect(page.get_by_label("Pages for each part")).to_have_value("1-4\n5-8\n9-12")
     context.close()
 
 

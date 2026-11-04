@@ -1,40 +1,10 @@
 {% extends "base.html" %}
-{# Courses (routes/courses.py): only with FEATURE_NOTATION_MEMORY on. #}
+{# Courses (routes/courses.py): only with FEATURE_NOTATION_MEMORY on. The list comes first
+   (documents and symbols per course, and the next step for each); adding a course is below it,
+   or first when there are none. #}
 {% set field_errors = field_errors|default({}) %}
 {% block title %}{% if errors|default([]) %}Error: {% endif %}Your courses{% endblock %}
-{% block content %}
-<h1>Your courses</h1>
-{% include "_error_summary.html" %}
-<p class="lede">A course keeps the notation you use, such as “bold d is a vector”. When you
-  convert a document for a course, the tool uses it to read the letters and to say them
-  on the review screen. You still decide anything it is unsure of.</p>
-
-<section aria-labelledby="list-heading">
-  <h2 id="list-heading">Courses</h2>
-  {% if courses %}
-  <div class="table-scroll">
-  <table>
-    <caption class="visually-hidden">Your courses, by name</caption>
-    <thead>
-      <tr><th scope="col">Course</th><th scope="col">Symbols</th></tr>
-    </thead>
-    <tbody>
-      {% for course in courses %}
-      <tr>
-        <th scope="row"><a href="/courses/{{ course.id }}">{{ course.name }}</a></th>
-        <td>{{ course.entries }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  </div>
-  {% else %}
-  <p>You have no courses yet.</p>
-  {% endif %}
-</section>
-
-<section aria-labelledby="add-heading">
-  <h2 id="add-heading">Add a course</h2>
+{% macro add_form() %}
   {% if courses|length >= max_courses %}
   <p>You have {{ max_courses }} courses, the most you can keep. Delete one you no longer use
     to add another.</p>
@@ -52,6 +22,49 @@
     <button type="submit" class="button">Add course</button>
   </form>
   {% endif %}
+{% endmacro %}
+{% block content %}
+<h1>Your courses</h1>
+{% include "_error_summary.html" %}
+<p class="lede">A course keeps the notation you use, such as “bold d is a vector”, so the tool
+  reads and says your letters the way your course does. You still decide anything it is
+  unsure of.</p>
+
+{% if courses %}
+<section aria-labelledby="list-heading">
+  <h2 id="list-heading">Courses</h2>
+  <div class="table-scroll">
+  <table class="course-table">
+    <caption class="visually-hidden">Your courses, with their documents and symbols</caption>
+    <thead>
+      <tr><th scope="col">Course</th><th scope="col">Documents</th><th scope="col">Symbols</th><th scope="col">Notation</th></tr>
+    </thead>
+    <tbody>
+      {% for course in courses %}
+      <tr>
+        <th scope="row"><a href="/courses/{{ course.id }}">{{ course.name }}</a></th>
+        <td data-label="Documents">{{ course.documents }}</td>
+        <td data-label="Symbols">{{ course.entries }}</td>
+        <td data-label="Notation"><a href="/courses/{{ course.id }}#entries-heading">{{ "Edit notation" if course.entries else "Set up notation" }}<span class="visually-hidden"> for {{ course.name }}</span></a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
 </section>
+
+<section aria-labelledby="add-heading">
+  <h2 id="add-heading">Add a course</h2>
+  {{ add_form() }}
+</section>
+{% else %}
+<section aria-labelledby="add-heading">
+  <h2 id="add-heading">Add your first course</h2>
+  <p>You have no courses yet. Name the course, then say which symbols it writes in a special way. The course page
+    offers a short list of common bold vectors and matrices to start from, and you can add
+    your own. Choose the course when you convert a PDF.</p>
+  {{ add_form() }}
+</section>
+{% endif %}
 <p><a href="/app">Back to my documents</a></p>
 {% endblock %}

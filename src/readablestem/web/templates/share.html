@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {# Who can open one document (routes/sharing.py, web/shares.py). Owner only. Plain forms: no
-   script is needed. Nothing is emailed; the owner copies the address. #}
+   script is needed. Nothing is emailed; the owner copies the address and sends it. The page
+   leads with the three steps; the exact-address rule and what only the owner can do are under
+   "Help with sharing". An error summary sits directly above the form it is about. #}
 {% block title %}{% if errors|default([]) %}Error: {% endif %}Share {{ doc_title }}{% endblock %}
 {% block head %}<script src="{{ static_url('copy-link.js') }}" defer></script>{% endblock %}
 {% block content %}
 <h1>Share {{ doc_title }}</h1>
+<ol class="share-steps">
+  <li>Add the person by the email address they sign in with.</li>
+  <li>Copy the link.</li>
+  <li>Send it to them yourself: nothing is emailed from here.</li>
+</ol>
 {% include "_error_summary.html" %}
-<p>Give a named person access to this one document. They must sign in with the email address
-  you enter here. Letter case does not matter, but it has to be the same address: an alias, a
-  forwarding address or another account of theirs does not match. There are no public links:
-  nobody who is not signed in with that address can open it. You can remove access at any time,
-  and it stops on their next click.</p>
-<p>Only you can delete the document, try it again, change its title, language or settings,
-  upload a new version or share it. Conversion and what it costs stay yours.</p>
 
 <section aria-labelledby="add-heading">
   <h2 id="add-heading">Add a person</h2>
@@ -41,7 +41,10 @@
       {% endfor %}
       </div>
     </fieldset>
-    <button type="submit" class="button">Share</button>
+    <div class="share-submit">
+      <button type="submit" class="button">Share</button>
+      {% if retain_until %}<p class="hint share-expiry-note">They can open it until the document is deleted on {{ retain_until|utc }}, or until you remove them.</p>{% endif %}
+    </div>
   </form>
 </section>
 
@@ -73,8 +76,8 @@
 </section>
 
 <section aria-labelledby="address-heading">
-  <h2 id="address-heading">The document's address</h2>
-  <p class="hint" id="address-hint">Copy this and send it to the people you shared with. It opens only for them, after they sign in.</p>
+  <h2 id="address-heading">Copy the link and send it</h2>
+  <p class="hint" id="address-hint">Copy this and send it to the people you added. It opens only for them, after they sign in: copying it gives nobody access by itself. People added with “View” can read the document; people added with “Review” can also make review decisions.</p>
   <label for="share-address" class="visually-hidden">Address of this document</label>
   <div class="copy-row">
     <input type="text" id="share-address" readonly value="{{ address }}" aria-describedby="address-hint">
@@ -88,6 +91,17 @@
     {%- if retention_mode != "dev" %} <a href="/jobs/{{ job_id }}#delete-heading">Keep it longer</a>.{% endif %}</p>
   {% endif %}
 </section>
+
+<details class="share-help">
+  <summary>Help with sharing</summary>
+  <p>Give a named person access to this one document. They must sign in with the email address
+    you enter here. Letter case does not matter, but it has to be the same address: an alias, a
+    forwarding address or another account of theirs does not match. There are no public links:
+    nobody who is not signed in with that address can open it. You can remove access at any time,
+    and it stops on their next click.</p>
+  <p>Only you can delete the document, try it again, change its title, language or settings,
+    upload a new version or share it. Conversion and what it costs stay yours.</p>
+</details>
 
 <p><a href="/jobs/{{ job_id }}">Back to the document</a></p>
 {% endblock %}

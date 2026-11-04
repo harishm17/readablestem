@@ -18,6 +18,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from readablestem.core.notation import canonical_symbol
@@ -25,7 +26,7 @@ from readablestem.core.types import DocumentResult
 from readablestem.pipeline import export_docx
 from readablestem.pipeline.notation_memory import describe, phrase
 from readablestem.web import documents, notation
-from readablestem.web.db import Course, CourseNotation, Job, session_scope, utcnow
+from readablestem.web.db import Course, CourseNotation, Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import (
     ELEMENT_ID,
     JOB_ID,
@@ -148,8 +149,32 @@ def _course_page(
             ),
             "word_export": export_docx.available(),  # "Download all as Word" needs pandoc
             "suggestions": notation.course_suggestions(session, get_ctx(request).settings, course),
+            "starter": notation.STARTER if not course.notation else (),
+            "attachable": _attachable(session, user, course),
+            "attach_cap": notation.MAX_ATTACH,
         }
     return render(request, "course.html", context | (extra or {}), status_code=status)
+
+
+def _attachable(session: Session, user: CurrentUser, course: Course) -> list[documents.DocumentRow]:
+    """The person's finished documents that belong to no course yet: what "Add documents you
+    already converted" offers (`notation.attach_documents`)."""
+    now = utcnow()
+    free = set(
+        session.scalars(
+            select(Job.id).where(
+                Job.user_id == user.id,
+                Job.course_id.is_(None),
+                Job.status == JobStatus.DONE,
+                Job.is_sample.is_(False),
+                Job.retain_until > now,
+            )
+        )
+    )
+    if not free:
+        return []
+    listing = documents.documents(session, user.id, now=now, budget_closed=False)
+    return [row for row in listing.rows if row.id in free][: notation.MAX_ATTACH]
 
 
 @router.get("/courses/{course_id}")
@@ -347,6 +372,87 @@ def add_suggestions(
         if skipped:
             parts.append(f"{skipped} could not be added: already in the course, or not found.")
         flash(request, " ".join(parts), undo=False)
+    return RedirectResponse(back, status_code=303)
+
+
+# --------------------------------------------------------------------------- starter set
+
+
+@router.post("/courses/{course_id}/starter", dependencies=[Depends(require_csrf)])
+def add_starter(
+    request: Request,
+    course_id: str,
+    user: UserDep,
+    symbol: Annotated[list[str], Form()] = [],  # noqa: B006 (FastAPI copies the default)
+    meaning: Annotated[list[str], Form()] = [],  # noqa: B006
+    pick: Annotated[list[str], Form()] = [],  # noqa: B006
+) -> Response:
+    """Add the starter symbols the instructor ticked, as they edited them (a small set of
+    bold vectors and matrices, `notation.STARTER`). Each row has a symbol and a meaning;
+    `pick` holds the row numbers that were ticked. Nothing is added when none is ticked."""
+    _require_feature(request)
+    rows: list[tuple[str, str]] = []
+    for number in pick:
+        if number.isascii() and number.isdigit() and int(number) < min(len(symbol), len(meaning)):
+            rows.append((symbol[int(number)], meaning[int(number)]))
+    with session_scope(get_ctx(request).factory) as session:
+        course = _course(session, course_id, user)
+        back = f"/courses/{course.id}"  # from the owned row, not the request
+        added, refused = notation.add_starter(session, course, rows[: notation.MAX_ENTRIES])
+        name = course.name
+    if not rows:
+        flash(request, "Tick the symbols to add first. Nothing was added.", undo=False)
+    else:
+        log_event(logger, "notation_added", course_id=course_id, source="user", n=len(added))
+        parts = []
+        if added:
+            parts.append(
+                f"Added to {name}: {'; '.join(added)}."
+                if len(added) <= 6
+                else f"Added {len(added)} symbols to {name}."
+            )
+        else:
+            parts.append("Nothing was added.")
+        if refused:
+            parts.append(
+                f"{len(refused)} could not be added: this tool cannot read the symbol, or the "
+                "course already has it."
+            )
+        flash(request, " ".join(parts), undo=False)
+    return RedirectResponse(back, status_code=303)
+
+
+# --------------------------------------------------------------------------- documents
+
+
+@router.post("/courses/{course_id}/documents", dependencies=[Depends(require_csrf)])
+def add_documents(
+    request: Request,
+    course_id: str,
+    user: UserDep,
+    job: Annotated[list[str], Form()] = [],  # noqa: B006 (FastAPI copies the default)
+) -> Response:
+    """Add documents already converted, with no course yet, to this course. They are listed
+    under it and their review screen uses its notation; they are not converted again."""
+    _require_feature(request)
+    ids = [j for j in job if JOB_ID.match(j)]
+    with session_scope(get_ctx(request).factory) as session:
+        course = _course(session, course_id, user)
+        back = f"/courses/{course.id}#course-documents"  # from the owned row, not the request
+        count = notation.attach_documents(session, course, ids) if ids else 0
+        name = course.name
+    if not ids:
+        flash(request, "Tick the documents to add first. Nothing was added.", undo=False)
+    elif count:
+        log_event(logger, "course_documents_added", course_id=course_id, n=count)
+        flash(
+            request,
+            f"Added {count} {'document' if count == 1 else 'documents'} to {name}. "
+            "They were not converted again.",
+            undo=False,
+        )
+    else:
+        flash(request, "Nothing was added: those documents are not available to add.", undo=False)
     return RedirectResponse(back, status_code=303)
 
 

@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 {# T3-3: a file over the page or size limit is kept for a while and the person chooses which
    pages to convert, in parts that each fit (web/routes/parts.py, web/ranges.py). Every part
-   becomes its own document. #}
+   becomes its own document. The parts are built with two page fields and "Add part" (script,
+   static/parts.js) and shown as a list with their page counts, fetched again as they change;
+   the text box they fill is the same box the form has always sent, kept under "Type the pages
+   instead" and open when there is no script or something to fix. #}
 {% set field_errors = field_errors|default({}) %}
 {% block title %}{% if errors|default([]) %}Error: {% endif %}Choose which pages to convert{% endblock %}
+{% block head %}<script src="{{ static_url('parts.js') }}" defer></script>{% endblock %}
 {% block content %}
 <h1>Choose which pages to convert</h1>
 {% include "_error_summary.html" %}
@@ -18,7 +22,9 @@
 {% endif %}
 <p><strong>{{ pending.filename }}</strong> has {{ pending.pages }} pages and is {{ size_text }}.
   One conversion takes up to {{ limit }} pages and {{ max_upload_mb }} MB, so a larger file is converted
-  in parts. Nothing has been converted yet, and no pages have been taken from your daily count.</p>
+  in parts, and each part becomes its own document. Nothing has been converted yet, and no pages have been taken from your daily count.
+  {% if pages_left is not none %}You can convert {{ pages_left }} more {{ "page" if pages_left == 1 else "pages" }}
+  today; the count starts again at {{ next_reset|utc }}.{% endif %}</p>
 {% if done_label %}
 <p id="parts-done">Pages {{ done_label }} {{ "is" if done_count == 1 else "are" }} already sent to be converted; they are left out below.</p>
 {% endif %}
@@ -28,27 +34,49 @@
   {{ "page" if left_out_count == 1 else "pages" }} {{ left_out_label }}
   {{ "is" if left_out_count == 1 else "are" }} not in it. Send these parts first; this page then suggests the next ones.</p>
 {% endif %}
-<form method="post" action="/uploads/{{ pending.id }}" novalidate class="upload-form">
+<form method="post" action="/uploads/{{ pending.id }}" novalidate class="upload-form parts-form">
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
   {% set parts_error = field_errors.get("parts") %}
-  <div class="field{% if parts_error %} field-error{% endif %}">
-    <label for="parts">Pages for each part</label>
-    <p class="hint" id="parts-hint">One part on each line. Pages are numbered from 1, as in a PDF
-      viewer. Write a range with a hyphen, and join ranges in one part with a comma: {% for example in examples %}<code>{{ example }}</code>{{ " or " if loop.first and examples|length > 1 else "" }}{% endfor %}. A part can have up to {{ limit }} pages. The parts below are a
-      suggestion that covers the {{ "page" if remaining == 1 else "pages" }} not yet sent; change them as you like.
-      {% if pages_left is not none %}You can convert {{ pages_left }} more {{ "page" if pages_left == 1 else "pages" }}
-      today; the count starts again at {{ next_reset|utc }}. Parts that do not fit today are not started, and
-      you can choose them later.{% endif %}</p>
-    {% if parts_error %}<p class="error-message" id="parts-error"><span class="visually-hidden">Error: </span>{{ parts_error.message }}</p>{% endif %}
-    <textarea id="parts" name="parts" rows="{{ [3, [suggestion_lines, 8]|min]|max }}" spellcheck="false" autocomplete="off"
-      aria-describedby="parts-hint{% if parts_error %} parts-error{% endif %}"{% if parts_error %} aria-invalid="true"{% endif %}>{{ typed_parts }}</textarea>
-  </div>
+  <section aria-labelledby="parts-heading" class="parts-section">
+    <h2 id="parts-heading">Parts to convert</h2>
+    <p class="hint" id="parts-lead">Each part has up to {{ limit }} pages. The parts below are a suggestion
+      that covers the {{ "page" if remaining == 1 else "pages" }} not yet sent; change them as you like.</p>
+    {# Script shows these: two page fields and a button that adds one line to the box below. #}
+    <div class="parts-builder" data-parts-builder data-total="{{ pending.pages }}" hidden>
+      <div class="field">
+        <label for="part-from">First page</label>
+        <input type="number" inputmode="numeric" id="part-from" min="1" max="{{ pending.pages }}" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="part-to">Last page</label>
+        <input type="number" inputmode="numeric" id="part-to" min="1" max="{{ pending.pages }}" autocomplete="off">
+      </div>
+      <button type="button" class="button-secondary" data-add-part>Add part</button>
+      <p class="hint parts-builder-note" data-builder-note role="status"></p>
+    </div>
+    <p class="hint">For example, first page 1 and last page {{ [limit, pending.pages]|min }} is one part. Pages are numbered from 1, as in a PDF viewer.</p>
+    <p id="parts-summary" class="parts-summary" role="status">{{ preview_summary }}</p>
+    {% include "_parts_preview.html" %}
+
+    <details class="parts-advanced" data-parts-advanced open{% if parts_error %} data-has-error{% endif %}>
+      <summary>Type the pages instead</summary>
+      <div class="field{% if parts_error %} field-error{% endif %}">
+        <label for="parts">Pages for each part</label>
+        <p class="hint" id="parts-hint">One part on each line. Write a range with a hyphen and join
+          ranges in one part with a comma: {% for example in examples %}<code>{{ example }}</code>{{ " or " if loop.first and examples|length > 1 else "" }}{% endfor %}.</p>
+        {% if parts_error %}<p class="error-message" id="parts-error"><span class="visually-hidden">Error: </span>{{ parts_error.message }}</p>{% endif %}
+        <textarea id="parts" name="parts" rows="{{ [3, [suggestion_lines, 8]|min]|max }}" spellcheck="false" autocomplete="off"
+          hx-get="/uploads/{{ pending.id }}/preview" hx-trigger="input changed delay:250ms" hx-target="#parts-preview" hx-swap="outerHTML" hx-sync="this:replace"
+          aria-describedby="parts-hint{% if parts_error %} parts-error{% endif %}"{% if parts_error %} aria-invalid="true"{% endif %}>{{ typed_parts }}</textarea>
+      </div>
+    </details>
+  </section>
   <div class="field checkbox-field">
     <input type="checkbox" id="shrink" name="shrink" value="on" aria-describedby="shrink-hint"{% if shrink %} checked{% endif %}>
     <label for="shrink">Shrink large pictures first</label>
     <p class="hint" id="shrink-hint">{% if heavy %}This file is large because of its pictures, so this is ticked. {% endif %}Pictures
-      sharper than {{ shrink_from }} dots per inch are saved at {{ shrink_to }}, which makes each part much smaller. Text and
-      equations are not changed. A figure in the converted file can look a little less sharp.</p>
+      sharper than {{ shrink_from }} dots per inch are saved at {{ shrink_to }}, so each part is much smaller. Text and
+      equations are not changed.</p>
   </div>
   <button type="submit" class="button">Convert these parts</button>
 </form>

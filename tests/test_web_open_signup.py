@@ -788,7 +788,7 @@ def test_deleting_an_account_asks_first_and_changes_nothing_until_confirmed(open
     csrf = csrf_from(confirm.text)
     # A POST without the confirmation is only the confirmation page again.
     again = client.post("/account/delete", data={"csrf_token": csrf})
-    assert again.status_code == 200 and "Yes, delete my account" in again.text
+    assert again.status_code == 200 and "Delete my account" in again.text and "No, keep it" in again.text
     assert rows_of(open_web, uid)["users"] == 1 and rows_of(open_web, uid)["jobs"] == 1
     # The form needs the CSRF token.
     assert client.post("/account/delete", data={"confirm": "yes"}).status_code == 403

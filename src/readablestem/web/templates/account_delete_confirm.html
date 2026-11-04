@@ -1,15 +1,29 @@
 {% extends "base.html" %}
+{# Confirm deleting the account (routes/account.py): download what to keep, a short list of
+   what goes, the short list of what stays (full wording folded away), then the button. #}
 {% block title %}Delete your account?{% endblock %}
+{% block body_class %}page-confirm{% endblock %}
 {% block content %}
 <h1>Delete your account?</h1>
-<p>This deletes the account for <strong>{{ user.email }}</strong>:</p>
+<p>This deletes the account for <strong>{{ user.email }}</strong> and signs you out. It cannot
+  be undone.</p>
+{% if documents %}
+<section aria-labelledby="export-heading" class="confirm-export">
+  <h2 id="export-heading">Download what you want to keep first</h2>
+  <p>Your {{ documents }} {{ "document is" if documents == 1 else "documents are" }} deleted
+    with the account. Files you have already downloaded are not affected.</p>
+  <ul class="actions">
+    {% if ready_documents %}<li><a href="/app/download">Download the {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} (zip)</a></li>{% endif %}
+    <li><a href="/app">Open My documents</a> to download them one by one or in Word or EPUB</li>
+  </ul>
+</section>
+{% endif %}
+<h2>What is deleted</h2>
 <ul>
   <li>your email address and name;</li>
   <li>{% if documents %}the {{ documents }} {{ "document" if documents == 1 else "documents" }} you have now{% else %}any documents you have now{% endif %}, with the uploaded PDFs, the converted HTML, the images cut from them and your review decisions;</li>
   <li>your courses and notation, and the notes about what you did in the app.</li>
 </ul>
-<p>It cannot be undone. Files you have already downloaded are not affected. You will be
-  signed out.</p>
 {% include "_account_deletion_notes.html" %}
 {% if invitation_only %}
 <p>You are on the invitation list. Deleting your account takes you off it, so you would need
@@ -25,10 +39,12 @@
   used.{% if is_admin %} You are an admin: the new account has no admin rights, and an admin
   would have to make you one again.{% endif %}</p>
 {% endif %}
-<form method="post" action="/account/delete" class="inline-form">
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-  <input type="hidden" name="confirm" value="yes">
-  <button type="submit" class="button-danger">Yes, delete my account</button>
-</form>
-<p><a href="/account">No, keep it</a></p>
+<div class="confirm-actions">
+  <form method="post" action="/account/delete" class="inline-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <input type="hidden" name="confirm" value="yes">
+    <button type="submit" class="button-danger">Delete my account</button>
+  </form>
+  <a class="button-secondary" href="/account">No, keep it</a>
+</div>
 {% endblock %}

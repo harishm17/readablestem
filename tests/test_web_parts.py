@@ -386,7 +386,7 @@ def test_discarding_asks_first_and_then_deletes_the_copy(web):
         f"/uploads/{upload_id}/delete",
         data={"csrf_token": token(web.alice, f"/uploads/{upload_id}")},
     )
-    assert first.status_code == 200 and "Discard chapter2.pdf?" in first.text
+    assert first.status_code == 200 and "Discard “chapter2.pdf”?" in first.text
     assert len(pending_rows(web)) == 1
     done = web.alice.post(
         f"/uploads/{upload_id}/delete",
