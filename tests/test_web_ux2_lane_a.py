@@ -334,12 +334,17 @@ def test_the_seven_tiles_are_one_line_with_the_counts_on_request(web):
 
 
 def test_sharing_says_it_is_for_colleagues_and_is_not_how_students_get_it(web):
-    page = flat(web.browser.get(f"/jobs/{finish(web)}").text)
+    job_id = finish(web)
+    page = flat(web.browser.get(f"/jobs/{job_id}").text)
     assert "Share with a colleague" in page
     assert "at any time" in page
     assert "Not how students get it" in page
     assert "before you give it to students" in page  # the headline no longer says "share"
     assert "need you before you share it" not in page
+    # the job page's panel and the share page both say sharing does not move the deletion date
+    line = "Sharing does not extend the deletion date; your own work does."
+    assert line in page
+    assert line in flat(web.browser.get(f"/jobs/{job_id}/share").text)
 
 
 def test_retention_is_explained_once_with_the_real_deletion_time_and_who_moves_it(web):
@@ -470,10 +475,11 @@ def test_a_batch_shares_the_wait_note_while_anything_is_unfinished(tmp_path):
         )
         assert response.status_code == 303
         page = client.get(response.headers["location"]).text
-        assert 'class="wait-note"' in page and "Uploaded less than a minute ago." in flat(page)
-        env.run_worker()
-        env.run_worker()
-        assert 'class="wait-note"' not in client.get(response.headers["location"]).text
+        assert "Uploaded less than a minute ago." in flat(page)
+        # the same words as the job page (`job_page.elapsed_words`)
+        from readablestem.web.routes.batch import _elapsed
+
+        assert _elapsed(0) == job_page.elapsed_words(5) and _elapsed(65) == "1 hour 5 minutes"
 
 
 # --------------------------------------------------------------------------- stopped

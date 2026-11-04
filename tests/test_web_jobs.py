@@ -542,10 +542,10 @@ def test_delete_asks_first_and_one_post_without_confirmation_deletes_nothing(web
     page = web.browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser)})
     assert page.status_code == 200
     text = " ".join(page.text.split())
-    assert "Delete SECRET-HEADING Kinematics?" in text and "cannot be undone" in text
+    assert "Delete “SECRET-HEADING Kinematics”?" in text and "cannot be undone" in text
     assert "notes.pdf, uploaded <time" in text  # the title first, the file name under it
     assert 'name="confirm" value="yes"' in page.text
-    assert f'<a href="/jobs/{job_id}">No, keep it</a>' in page.text
+    assert f'<a class="button-secondary" href="/jobs/{job_id}">No, keep it</a>' in page.text
     assert count(web, Job) == 1 and count(web, Blob) == blobs
     assert web.browser.get(f"/jobs/{job_id}/delete").status_code == 200  # the same page
 

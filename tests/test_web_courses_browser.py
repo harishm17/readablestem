@@ -198,7 +198,7 @@ def test_without_javascript_a_course_symbol_and_a_remembered_letter(site, browse
         in page.locator("#decision-notice").inner_text()
     )
     page.goto(f"{site.base}/courses")
-    page.get_by_role("link", name="No script course").click()
+    page.get_by_role("link", name="No script course", exact=True).click()
     row = page.get_by_role("row", name="bold ω")
     assert "From a review" in row.inner_text()
     context.close()
@@ -248,7 +248,7 @@ def test_the_suggestion_lists_pass_axe_and_fit_the_screen(suggesting, site, widt
     for name, url in (("course page", None), ("job page", f"{site.base}/jobs/{job_id}")):
         if url is None:
             page.goto(f"{site.base}/courses")
-            page.get_by_role("link", name=course_name).click()
+            page.get_by_role("link", name=course_name, exact=True).click()
             page.get_by_role("heading", name="Symbols found in your documents").wait_for()
         else:
             page.goto(url)
@@ -278,7 +278,7 @@ def test_ticking_a_suggestion_and_changing_its_meaning_works_without_javascript(
     assert "Added to Plain suggestion course" in page.locator("body").inner_text()
     page.goto(f"{site.base}/jobs/{job_id}")
     assert page.get_by_label("double-struck R (1 equation, first on page 2)").count() == 0
-    page.get_by_role("link", name="Plain suggestion course").first.click()
+    page.get_by_role("link", name="Plain suggestion course", exact=True).first.click()
     assert "From a document" in page.get_by_role("row", name="double-struck R").inner_text()
     context.close()
 

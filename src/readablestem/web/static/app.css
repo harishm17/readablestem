@@ -1260,6 +1260,96 @@ section.job-group { padding-top: 0; }
   .wait-slow, .jump-links, .option-groups, details.option-group, .route, .job-group { border-color: CanvasText; }
 }
 /* ==== end ux2-lane-a ==================================================================== */
+/* ==== ux2-lane-c: confirmations, account, sharing, courses, page picking, batch ===========
+   Everything below belongs to the second UX round, lane C. Same tokens, no new colours.
+   Confirmations: the danger button names its object and "No, keep it" is a button of the same
+   size beside it (side by side when they fit); the compact footer is one tight line of links so
+   the choice is not pushed down a phone. */
+.confirm-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: stretch; margin: var(--space-5) 0 var(--space-4); }
+.confirm-actions .inline-form { display: flex; max-width: 100%; }
+.confirm-actions .button-danger { overflow-wrap: anywhere; }
+.confirm-export { margin: var(--space-4) 0; }
+.confirm-export .actions { margin: 0; gap: var(--space-2) var(--space-5); }
+.page-confirm .site-footer-compact { margin-top: var(--space-5); padding: var(--space-3) 0; }
+.page-confirm .footer-compact-links { gap: 0 var(--space-4); font-size: var(--step--1); }
+.page-confirm .footer-note { margin-top: var(--space-3); padding-top: var(--space-2); }
+@media (max-width: 37.5rem) {
+  .confirm-actions { flex-direction: column; }
+  .confirm-actions .inline-form, .confirm-actions .button-secondary { width: 100%; }
+  .confirm-actions .button-danger { width: 100%; }
+}
+
+/* Account: the one setting people change (how long documents are kept) is its own block,
+   before the limits. The deletion notes are a short list with the long wording folded away. */
+.account-keep { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); padding: var(--space-3) var(--space-5) var(--space-4); margin: var(--space-5) 0; }
+.account-delete-details { margin: 0 0 var(--space-4); max-width: var(--prose-max); }
+.account-delete-details > summary { cursor: pointer; min-height: 1.5rem; color: var(--accent); text-decoration: underline; text-underline-offset: 0.18em; }
+.account-delete-details[open] > summary { margin-bottom: var(--space-2); }
+
+/* Sharing: the three steps lead; the button and the copy row each carry the access's end. */
+.share-steps { margin: 0 0 var(--space-4); max-width: var(--prose-max); }
+.share-submit { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
+.share-submit .hint { margin: 0; flex: 1 1 16rem; }
+.share-help { margin: var(--space-5) 0; max-width: var(--prose-max); }
+.share-help > summary { cursor: pointer; min-height: 1.5rem; font-weight: 700; }
+.share-help[open] > summary { margin-bottom: var(--space-2); }
+
+/* Courses: documents and symbols per course, a jump list on a course page, the starter set
+   as rows (a tick, an editable symbol and its meaning), adding documents, and the settings
+   kept apart under a rule. */
+.course-table td, .course-table th { vertical-align: middle; }
+.course-table td a { display: inline-flex; align-items: center; min-height: 1.5rem; }
+.starter-form { margin: var(--space-4) 0 var(--space-5); max-width: 40rem; }
+.starter-form h3 { margin-bottom: var(--space-1); }
+.starter-list { list-style: none; margin: var(--space-3) 0; padding: 0; display: grid; gap: var(--space-2); }
+.starter-row { display: grid; grid-template-columns: 8rem minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2) var(--space-3); align-items: center; padding: var(--space-1) 0; border-top: 1px solid var(--border-subtle); }
+.starter-row .field, .starter-row .checkbox-field { margin: 0; }
+.starter-row input[type="text"], .starter-row select { width: 100%; min-height: 2.75rem; }
+@media (max-width: 37.5rem) {
+  .starter-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .starter-row .checkbox-field { grid-column: 1 / -1; }
+  .course-table thead { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .course-table, .course-table tbody, .course-table tr, .course-table th, .course-table td { display: block; }
+  .course-table tr { padding: var(--space-2) 0; border-bottom: 1px solid var(--border-subtle); }
+  .course-table th, .course-table td { border: 0; padding: var(--space-1) 0; }
+  .course-table td[data-label]::before { content: attr(data-label) ": "; content: attr(data-label) ": " / ""; color: var(--ink-muted); }
+}
+.attach-documents { margin: var(--space-4) 0; max-width: var(--prose-max); }
+.attach-documents > summary { cursor: pointer; min-height: 1.5rem; font-weight: 700; }
+.attach-documents[open] > summary { margin-bottom: var(--space-2); }
+.course-settings { margin-top: var(--space-7); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
+.course-settings h3 { margin-top: var(--space-4); }
+
+/* Choosing pages: two page fields and "Add part" (script), the parts as a list with their
+   page counts and one summary line, and the typed form folded under "Type the pages instead". */
+.parts-section { margin: var(--space-4) 0; }
+.parts-builder { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: flex-end; margin: var(--space-3) 0 var(--space-2); }
+.parts-builder[hidden] { display: none; }
+.parts-builder .field { margin: 0; }
+.parts-builder input[type="number"] { width: 8rem; min-height: 2.75rem; }
+.parts-builder-note { flex-basis: 100%; margin: 0; min-height: 1.4em; }
+.parts-summary { margin: var(--space-3) 0 var(--space-2); font-weight: 700; }
+.parts-list { list-style: none; margin: 0 0 var(--space-4); padding: 0; max-width: 40rem; }
+.parts-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-4); padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
+.parts-row:last-child { border-bottom: 1px solid var(--border-subtle); }
+.parts-name { font-weight: 700; min-width: 5rem; }
+.parts-count { color: var(--ink-muted); }
+.parts-problem { color: var(--err); flex: 1 1 14rem; }
+.parts-row .link-button { margin-left: auto; min-height: 2rem; }
+.parts-row .link-button[hidden] { display: none; }
+.parts-empty { margin: 0 0 var(--space-4); }
+.parts-advanced { margin: var(--space-3) 0 var(--space-4); max-width: 40rem; }
+.parts-advanced > summary { cursor: pointer; min-height: 1.5rem; font-weight: 700; }
+.parts-advanced[open] > summary { margin-bottom: var(--space-3); }
+@media (forced-colors: active) { .parts-problem { color: CanvasText; } .parts-row { border-color: CanvasText; } }
+
+/* Batch: what to do next, and how long ago it was uploaded, above the documents. */
+.batch-next { margin: var(--space-4) 0; }
+.batch-next p { margin: 0 0 var(--space-2); }
+.batch-elapsed { color: var(--ink-muted); }
+@media (forced-colors: active) { .account-keep { border-color: CanvasText; } }
+/* ==== end ux2-lane-c ==================================================================== */
+
 /* ===== ux2-lane-d: public pages and the shared chrome =====================================
    Offices, privacy, limits, the comparison guide, guides, status, sign-in, the /style page,
    the signed-in navigation and the footer targets. Colours and sizes are tokens; nothing here
