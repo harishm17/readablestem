@@ -897,3 +897,69 @@ def test_a_timeout_asks_the_supervisor_to_stop_before_the_group_is_killed(tmp_pa
     assert outcome.timed_out
     assert sent[0] == ("kill", int(signal.SIGTERM))  # the supervisor, first
     assert not _alive("sleep 904")
+
+
+# ---------------------------------------- the tree is bounded whatever the user's other tasks do
+
+
+def _drop_scenario():
+    """400 threads of this process exist while the launcher works out its limit, and are gone one
+    second later (probe `drop154.py` of the review): the limit then gives room."""
+    release = threading.Event()
+    waiters = [threading.Thread(target=release.wait, daemon=True) for _ in range(400)]
+    for thread in waiters:
+        thread.start()
+    timer = threading.Timer(1.0, release.set)
+    timer.start()
+    return release, timer
+
+
+def test_a_program_that_waits_for_room_to_appear_is_killed_for_having_too_many_tasks(tmp_path):
+    release, timer = _drop_scenario()
+    code = (
+        "$| = 1; sleep 2; my $n = 0;"
+        " for (1..2000) { my $p = fork(); last unless defined $p;"
+        " if ($p == 0) { sleep 4; exit 0 } $n++ }"
+        ' print "made $n\\n"; sleep 3;'
+    )
+    started = time.monotonic()
+    try:
+        outcome, text = run_perl(code, tmp_path, limits=sandbox.Limits(wall_s=30, pids=4))
+    finally:
+        release.set()
+        timer.cancel()
+    assert outcome.over_tasks and not outcome.ok, (outcome, text)
+    # (the supervisor names the step; when the caller's poll gets there first there is none)
+    assert outcome.step in ("over_tasks", "") and time.monotonic() - started < 10
+    # How many it made before the next check is however much room appeared in that interval (here
+    # a few hundred: the review's probe saw 411); the tree is then killed, not left to 2000.
+    made = int(text.split("made ")[1].split()[0]) if "made " in text else 0
+    assert made < 2000
+
+
+def test_the_callers_poll_is_the_backstop_when_the_supervisor_does_not_catch_it(tmp_path):
+    """Without the supervisor's own check, the poll in `sandbox.run` still ends the run."""
+    assert sandbox.Limits(pids=4).task_bound("landlock") == 4 + sandbox.LANDLOCK_NPROC_SLACK
+    source = Path(sandbox.__file__).read_text()
+    assert "_tree_tasks(tree - {proc.pid}) > limits.task_bound" in source
+
+
+def test_a_program_within_its_allowance_is_not_killed(tmp_path):
+    code = (
+        "my @k; for (1..2) { my $p = fork(); die 'nofork' unless defined $p;"
+        " if ($p == 0) { sleep 1; exit 0 } push @k, $p } waitpid($_, 0) for @k;"
+    )
+    outcome, text = run_perl(code, tmp_path, limits=sandbox.Limits(wall_s=20, pids=4))
+    assert outcome.ok and not outcome.over_tasks, text
+
+
+def test_the_probe_checks_that_growth_is_killed(tmp_path, monkeypatch):
+    from readablestem.ops import sandbox_probe
+
+    monkeypatch.setenv(sandbox.BACKEND_ENV, "landlock")
+    sandbox.backend.cache_clear()
+    try:
+        assert sandbox_probe._task_growth_killed(tmp_path) is True
+    finally:
+        monkeypatch.undo()
+        sandbox.backend.cache_clear()

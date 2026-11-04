@@ -2,6 +2,10 @@
 
 ## Unreleased: the Landlock launcher counts the user's tasks as the kernel does (branch latex/nproc-hidden-tasks)
 
+- The program's task count is bounded by the supervisor's check (every 0.05 s) and the caller's
+  poll, not only by `RLIMIT_NPROC`, which gives room when other tasks of the user exit after it was
+  worked out: over the allowance the tree is killed (`over_tasks`); the probe checks it
+  (`sandbox_task_growth`).
 - Fixed: on Railway the launcher set `RLIMIT_NPROC` from the tasks visible in `/proc`, below
   the kernel's count of the user's tasks (some are in other pid namespaces), so every fork
   failed and the probe's LaTeXML run timed out and its group-memory test never started. The

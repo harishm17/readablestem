@@ -47,6 +47,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -204,6 +205,29 @@ def _check_sandbox(report: Report, tmp: Path) -> bool:
     return True
 
 
+def _task_growth_killed(tmp: Path) -> bool:
+    """120 threads of this process exist while the sandbox works out its task limit and are gone a
+    second later; the program then tries to make 60 children. It must be killed for having more
+    tasks than its allowance (`Outcome.over_tasks`), however much room the limit then gives."""
+    release = threading.Event()
+    waiters = [threading.Thread(target=release.wait, daemon=True) for _ in range(120)]
+    for thread in waiters:
+        thread.start()
+    dropper = threading.Timer(1.0, release.set)
+    dropper.start()
+    try:
+        outcome, _ = _perl(
+            "sleep 2; my $n = 0; for (1..60) { my $p = fork(); last unless defined $p;"
+            " if ($p == 0) { sleep 5; exit 0 } $n++ } sleep 3;",
+            tmp=tmp,
+            limits=sandbox.Limits(wall_s=20, pids=4),
+        )
+    finally:
+        release.set()
+        dropper.cancel()
+    return outcome.over_tasks
+
+
 def _check_limits(report: Report, tmp: Path) -> None:
     # Memory: ask for 300 MB under a 128 MB address-space cap; Perl must fail to allocate.
     outcome, text = _perl(
@@ -272,6 +296,10 @@ def _check_limits(report: Report, tmp: Path) -> None:
         report.add("group_cap_forked", forked if forked.isdigit() else "unknown", required=False)
         report.add("group_cap_exit", str(outcome.returncode), required=False)
         report.add("group_cap_timed_out", "yes" if outcome.timed_out else "no", required=False)
+    # Growth of the program's tree after other tasks of the user have gone: the limit was worked
+    # out while they existed, and now gives room it was never meant to (Landlock backend).
+    if sandbox.backend() == "landlock":
+        report.add("sandbox_task_growth", "ok" if _task_growth_killed(tmp) else "fail")
     # seccomp: ptrace answers EPERM inside (the filter, `core/seccomp.py`).
     if seccomp.supported():
         _outcome, text = _perl(

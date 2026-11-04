@@ -436,6 +436,14 @@ def main() -> None:
             break
         if os.getppid() != parent:  # the caller (the process, not a thread of it) is gone
             on_term(0, None)
+        if program_tasks(os.getpid()) > allowance:
+            # More tasks than the allowance: the user's other tasks left after the limit was
+            # worked out and RLIMIT_NPROC now gives room it was never meant to. The program's
+            # tree is bounded here, whatever the user's other tasks do.
+            if step_file:
+                with contextlib.suppress(OSError), open(step_file, "w") as handle:
+                    handle.write("over_tasks")
+            on_term(0, None)
         now = time.monotonic()
         if marker and not starved and now - last_look > 0.25:
             # The machine is "busy" when the user's tasks are at the limit while the program has
