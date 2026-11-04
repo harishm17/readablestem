@@ -394,7 +394,8 @@ def test_the_list_is_built_with_one_query_for_the_jobs_and_one_for_their_facts(w
     web.browser.get("/app")
     selects = [s for s in reads.stop() if "FROM jobs" in s and s.lstrip().startswith("SELECT")]
     # the jobs, then the facts of the finished ones (the page's own lookups are elsewhere)
-    assert sum("jobs.result_title" in s for s in selects) == 1
+    # (the "Shared with you" lookup reads titles too, and is another query: web.shares)
+    assert sum("jobs.result_title" in s and "job_shares" not in s for s in selects) == 1
 
 
 def test_a_decision_in_review_changes_the_number_the_list_shows(web):

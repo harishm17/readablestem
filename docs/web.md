@@ -89,6 +89,11 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 
 ## Routes
 
+In the Who column, `owner`, `review` and `view` are what a document's routes need
+(`routes.jobs.job_access`; "Sharing a document" below): the owner always has it, and a person
+the owner shared the document with by email has it if their right is that one or a higher one
+(`view` < `review` < `owner`). `signed in` routes are about the person's own account and lists.
+
 | Method and path | Who | What |
 |---|---|---|
 | GET `/` | anyone | What the tool does, why now, how long (with the review load: about 1.8 decisions per page as on `/limits`, a full job, a new account's daily pages read from `OPEN_TIER_DAILY_PAGE_QUOTA`, and the deletion time), how accurate (numbers from docs/eval.md, linked), what to do with the file, sign-in, link to the demo |
@@ -118,46 +123,49 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | GET `/uploads/{id}` | owner | A large file kept for choosing its pages: the suggested parts, the box to change them, "Shrink large pictures first" ("Large files in parts") |
 | POST `/uploads/{id}` | owner | Convert the chosen parts: each is cut out, checked, counted against the quota and queued as a document of its own; rate limited like an upload. 400 for pages that cannot be used, 413 for a part over the size limit, 429 for the quota or the caps |
 | POST `/uploads/{id}/delete` | owner | "Discard this file": only a POST with `confirm=yes` deletes it, any other POST shows the confirmation page |
-| GET `/jobs/{id}` | owner | The job page: status, live progress, what is left to do, the before/after card, notices, results, language (below) |
-| GET `/jobs/{id}/status?v=` | owner | Status fragment for htmx polling (204 while unchanged); changes per step |
-| GET `/jobs/{id}/progress?v=` | owner | The list of steps with their counts, polled on its own outside the live region (204 while unchanged) |
-| GET `/jobs/{id}/draft` | owner | Asked before a download while decisions are open: what students would get, "Review N decisions first" or "Download the draft anyway"; with none open, 303 to the finish line |
+| GET `/jobs/{id}` | view | The job page: status, live progress, what is left to do, the before/after card, notices, results, language (below) |
+| GET `/jobs/{id}/status?v=` | view | Status fragment for htmx polling (204 while unchanged); changes per step |
+| GET `/jobs/{id}/progress?v=` | view | The list of steps with their counts, polled on its own outside the live region (204 while unchanged) |
+| GET `/jobs/{id}/draft` | view | Asked before a download while decisions are open: what students would get, "Review N decisions first" or "Download the draft anyway"; with none open, 303 to the finish line |
 | POST `/jobs/{id}/language` | owner | Confirm or change the document language (`lang`, one the control offers); lang_source becomes "user" and the HTML is made again |
 | POST `/jobs/{id}/retry` | owner | "Try again" / "Convert the missing parts" on a stopped or partly converted document (below): the same job goes back in the queue; 409 when it is not stopped or has had its 3 tries, 429 with 10 documents already waiting or converting; rate limited per address and per person |
-| GET `/jobs/{id}/download` | owner | The HTML as an attachment |
+| GET `/jobs/{id}/download` | view | The HTML as an attachment |
 | GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back; `?format=docx` or `?format=epub` gives the joined file as Word or EPUB, recorded in that file type); 409 with fewer than two such parts, 404 for another person's or an expired document |
-| GET `/jobs/{id}/download/canvas` | owner | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
-| GET `/jobs/{id}/download/cartridge` | owner | The same page as an IMS Common Cartridge 1.3 package, `.imscc` (`pipeline/export_cartridge.py`, docs/output.md "The Common Cartridge export"). Same errors and recording as the Canvas zip; a plain link on the job page |
-| GET `/jobs/{id}/download.docx` | owner | The document as a Word file with native equations (`pipeline/export_docx.py`, docs/output.md "The Word export"). The same rules as `/download`: another user's or an expired job is 404, one that is not done 409, the file is made again first when a review write left it out of date, the deletion clock restarts, and it is recorded as a download (code `open` when decisions were still open) with the file type `docx`. 503 when pandoc is not installed or two Word files are already being made; 409 with a plain page when the file cannot be made (the HTML stays available). A plain link under "Other file types" on the finish line, shown only when pandoc is installed |
-| GET `/jobs/{id}/download.epub` | owner | The document as an EPUB 3 publication (`pipeline/export_epub.py`). Same rules, errors and recording as the Word file (file type `epub`); a plain link under "Other file types" |
-| GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
-| GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation, figure or table |
-| GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | owner | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
-| GET `/jobs/{id}/review/list?kind=&page=` | owner | "All items as a list": every fix, grouped by kind; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below) |
+| GET `/jobs/{id}/download/canvas` | view | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
+| GET `/jobs/{id}/download/cartridge` | view | The same page as an IMS Common Cartridge 1.3 package, `.imscc` (`pipeline/export_cartridge.py`, docs/output.md "The Common Cartridge export"). Same errors and recording as the Canvas zip; a plain link on the job page |
+| GET `/jobs/{id}/download.docx` | view | The document as a Word file with native equations (`pipeline/export_docx.py`, docs/output.md "The Word export"). The same rules as `/download`: another user's or an expired job is 404, one that is not done 409, the file is made again first when a review write left it out of date, the deletion clock restarts, and it is recorded as a download (code `open` when decisions were still open) with the file type `docx`. 503 when pandoc is not installed or two Word files are already being made; 409 with a plain page when the file cannot be made (the HTML stays available). A plain link under "Other file types" on the finish line, shown only when pandoc is installed |
+| GET `/jobs/{id}/download.epub` | view | The document as an EPUB 3 publication (`pipeline/export_epub.py`). Same rules, errors and recording as the Word file (file type `epub`); a plain link under "Other file types" |
+| GET `/jobs/{id}/share` | owner | Who can open this document (G1, "Sharing a document" below): the people and their right, the form to add one, the document's address to copy. 404 for a sample or an unfinished document |
+| POST `/jobs/{id}/share` | owner | Give a person (`email`, in full) the right `role` (`view` or `review`), or change theirs; 422 with the reason beside the field for an address that is not one, your own, a right that does not exist, or an eleventh person. CSRF-checked, nothing is sent |
+| POST `/jobs/{id}/share/{share_id}/revoke` | owner | Remove one person's access; it stops on their next request. CSRF-checked |
+| GET `/jobs/{id}/view` | view | The HTML inline, sandboxed (see below) |
+| GET `/jobs/{id}/crops/{element_id}.png` | view | Original image of one equation, figure or table |
+| GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | review | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
+| GET `/jobs/{id}/review/list?kind=&page=` | review | "All items as a list": every fix, grouped by kind; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below) |
 | GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept all remaining equations whose checks passed" or "Accept all figures that have generated alt text" would accept, its count, and the form that does it (404 for another kind) |
 | POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item that list shows, as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
-| GET `/jobs/{id}/symbols?view=` | owner | The Symbols screen of a document with handwritten equations: every symbol read in them, grouped with the ones that look alike, with counts and places ("Symbols in handwritten equations" below) |
-| POST `/jobs/{id}/symbols` | owner | Write one symbol as another of its family in every handwritten equation still waiting, except the places the form ticked; one write (CSRF, review `version` checked: 409 and nothing changed when the document changed since the page was drawn; 422 when no symbol, or one outside the family, is chosen); one Undo takes it back |
-| GET `/jobs/{id}/review/marks.css` | owner | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
-| GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond four renders in progress for one person (a review page asks for the page and up to three crops of a repeated-heading group at once), 503 when the instance's two render slots stay busy |
-| GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
-| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers`, `use_local` or `not_a_table`; `action=add_data_table` adds a chart's data table read from the image; `action=describe` with `description` gives an item kept as an image its alt text, T3-16); a kind (`equations`, ...) in place of the id, the bulk accept removed on 2026-10-09, is a 404; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` the review version the page was drawn at (a form from an out-of-date page is refused with a 409; "Stale tabs" below) |
-| POST `/jobs/{id}/review/{element_id}/check` | owner | The checks Save edit would run, on the LaTeX being typed (htmx, after a 0.6 s pause): an HTML fragment, nothing stored; 204 when signed out |
-| POST `/jobs/{id}/undo` | owner | Undo the job's last review write, from the page that write drew (its `version` must be the job's); a structural edit below is put back too |
-| POST `/jobs/{id}/edit/{element_id}` | owner | Change what the tool did not propose (T3-5): `action=text` changes the words of a paragraph, list item or heading (`text`), `action=heading` makes a paragraph a heading (`level`). Review `version` checked; 422 with the error beside the field |
-| GET `/jobs/{id}/pages/{n}/region.png?left=&top=&right=&bottom=` | owner | The region of page `n` the four edges (percent of the page) describe, cut as it would be added; rendered now in the render child, never stored; 404 for a region that is not one |
-| POST `/jobs/{id}/pages/{n}/add` | owner | Add a picture the tool did not find (`kind=picture`, `alt`) or mark a region as an equation (`kind=equation`: the equation step reads it, the answer is a required decision), the region as `left`, `top`, `right`, `bottom`. Rate limited (`edit_region`, and `reread` for an equation), one read at a time per person, under the job's and the day's spend caps |
-| POST `/jobs/{id}/pages/{n}/omit`, `/restore` | owner | Leave page `n` out of review and of the student file (T3-16), and put it back. From a kept-image card the form also sends `after=review` (and `view`): the reviewer then goes on to the next decision instead of the page tools |
-| POST `/jobs/{id}/tables/accept-clean` | owner | Accept every table that waits with nothing wrong found in it (T3-11), one write |
-| POST `/jobs/{id}/tables/{element_id}/read-cell` | owner | Read a table's maths cell with the equation step and check it like a typed edit (T3-11); rate limited (`reread`), one read at a time, spend capped |
+| GET `/jobs/{id}/symbols?view=` | review | The Symbols screen of a document with handwritten equations: every symbol read in them, grouped with the ones that look alike, with counts and places ("Symbols in handwritten equations" below) |
+| POST `/jobs/{id}/symbols` | review | Write one symbol as another of its family in every handwritten equation still waiting, except the places the form ticked; one write (CSRF, review `version` checked: 409 and nothing changed when the document changed since the page was drawn; 422 when no symbol, or one outside the family, is chosen); one Undo takes it back |
+| GET `/jobs/{id}/review/marks.css` | review | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
+| GET `/jobs/{id}/pages/{n}.png` | review | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond four renders in progress for one person (a review page asks for the page and up to three crops of a repeated-heading group at once), 503 when the instance's two render slots stay busy |
+| GET `/jobs/{id}/regions/{element_id}.png` | review | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
+| POST `/jobs/{id}/review/{element_id}` | review | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers`, `use_local` or `not_a_table`; `action=add_data_table` adds a chart's data table read from the image; `action=describe` with `description` gives an item kept as an image its alt text, T3-16); a kind (`equations`, ...) in place of the id, the bulk accept removed on 2026-10-09, is a 404; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` the review version the page was drawn at (a form from an out-of-date page is refused with a 409; "Stale tabs" below) |
+| POST `/jobs/{id}/review/{element_id}/check` | review | The checks Save edit would run, on the LaTeX being typed (htmx, after a 0.6 s pause): an HTML fragment, nothing stored; 204 when signed out |
+| POST `/jobs/{id}/undo` | review | Undo the job's last review write, from the page that write drew (its `version` must be the job's); a structural edit below is put back too |
+| POST `/jobs/{id}/edit/{element_id}` | review | Change what the tool did not propose (T3-5): `action=text` changes the words of a paragraph, list item or heading (`text`), `action=heading` makes a paragraph a heading (`level`). Review `version` checked; 422 with the error beside the field |
+| GET `/jobs/{id}/pages/{n}/region.png?left=&top=&right=&bottom=` | review | The region of page `n` the four edges (percent of the page) describe, cut as it would be added; rendered now in the render child, never stored; 404 for a region that is not one |
+| POST `/jobs/{id}/pages/{n}/add` | review | Add a picture the tool did not find (`kind=picture`, `alt`) or mark a region as an equation (`kind=equation`: the equation step reads it, the answer is a required decision), the region as `left`, `top`, `right`, `bottom`. Rate limited (`edit_region`, and `reread` for an equation), one read at a time per person, under the job's and the day's spend caps |
+| POST `/jobs/{id}/pages/{n}/omit`, `/restore` | review | Leave page `n` out of review and of the student file (T3-16), and put it back. From a kept-image card the form also sends `after=review` (and `view`): the reviewer then goes on to the next decision instead of the page tools |
+| POST `/jobs/{id}/tables/accept-clean` | review | Accept every table that waits with nothing wrong found in it (T3-11), one write |
+| POST `/jobs/{id}/tables/{element_id}/read-cell` | review | Read a table's maths cell with the equation step and check it like a typed edit (T3-11); rate limited (`reread`), one read at a time, spend capped |
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <title>? This cannot be undone" confirmation page (the file, its upload time, the decisions made on it); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list |
-| GET, POST `/jobs/{id}/feedback` | owner | The two optional questions after a download, on a page of their own; POST stores them as usage events, once per document (404 when the questions are off) |
+| GET, POST `/jobs/{id}/feedback` | view | The two optional questions after a download, on a page of their own; POST stores them as usage events, once per document (404 when the questions are off) |
 | GET, POST `/courses` | signed in | Courses (with `FEATURE_NOTATION_MEMORY` only, else 404): the user's courses; add one ("Courses and notation" below) |
 | GET `/courses/{id}/download` | owner | One zip of the ready documents converted for the course ("Several files, courses and download all"); `?format=` as for `/app/download` |
 | GET `/courses/{id}`; POST `/courses/{id}/rename`, `/courses/{id}/entries` | owner | A course's notation; rename; add a symbol |
 | GET, POST `/courses/{id}/entries/{entry}`; POST `.../delete` | owner | Edit or remove one symbol |
 | GET, POST `/courses/{id}/delete` | owner | "Delete <course>?" confirmation; only a POST with `confirm=yes` deletes |
-| GET `/jobs/{id}/record`, `/jobs/{id}/record.csv` | owner | The review record (T3-6, "The review record" below): a page to print and a CSV; owner only, finished jobs only (409 otherwise), changes nothing |
+| GET `/jobs/{id}/record`, `/jobs/{id}/record.csv` | view | The review record (T3-6, "The review record" below): a page to print and a CSV; owner only, finished jobs only (409 otherwise), changes nothing |
 | POST `/courses/{id}/suggestions` | owner of the course (and of the job, when sent) | Add the ticked symbols found in the course's documents; back to the course page or the job page |
 | POST `/courses/{id}/remember` | owner of the course and the job | "Remember for <course>" from the review screen; back to the review screen |
 | GET `/admin` | admins | Sign-up numbers (accounts today against the limit, accounts by tier, blocked), the allowlist with each person's tier, blocked accounts, today's spend against the cap and the open pool, queue depth, aggregate counts, usage counts per day and per pseudonymous person |
@@ -709,6 +717,54 @@ documents (zip)". My documents offers the same for everything the person has
 - It is a plain GET for the owner, like the single download: the deletion clock of the
   documents in it restarts, each counts as downloaded, a stranger gets a 404 for someone
   else's course, and with courses switched off the course route is a 404.
+
+### Sharing a document with named people (`web/shares.py`, `routes/sharing.py`)
+
+The owner of a finished document can let named people open it (G1). It is for an instructor who
+wants a colleague or an accessibility coordinator to read it or to review it with them.
+
+- **The owner's side.** The job page's "Share this document" opens `/jobs/{id}/share`: the
+  people with access and their right, a form (email address, View or Review), "Change ... to"
+  and "Remove ..." per person, and the document's address to copy. Nothing is emailed; the
+  owner sends the address. At most 10 people per document; the sample document and an
+  unfinished one cannot be shared; the owner's own address is refused. The address is stored in
+  lower case and must be a whole address (`shares._ADDRESS`: no `*` or `?`, a dotted domain);
+  there is no domain rule and no `+tag` folding.
+- **The shared person's side.** They sign in as usual (Google, Microsoft, or an emailed link sent to that address) with
+  that exact address, and see the document under "Shared with you" on My documents and at its
+  address. A person who cannot sign in at all (not on the allowlist, in allowlist mode) cannot
+  use a share.
+- **Rights.** `view`: the job page (without the owner's controls: delete, keep, retry, title,
+  contact line, language, revision, parts, sharing and the course), the student preview, the
+  crops, every download (HTML, Canvas, Common Cartridge, Word, EPUB), the review record and its
+  CSV, and the two optional questions. `review`: also the review screen, its list, the page and
+  region images, bulk accept, the Symbols screen and every decision and edit, with Undo. The
+  owner alone: delete, retry, title, contact, language, keep, a revised version, combining parts,
+  "Download all", the course notation, and sharing.
+- **One check.** Every route loads its job with `job_access(session, job_id, user, need)`,
+  with `need` `"view"`, `"review"` or `"owner"` (it replaced `owned_job`). A stranger or someone
+  whose share was removed gets the same 404 as for an id that does not exist; a shared person
+  asking for more than their right gets a 403 page. A document past its retention time is a 404
+  for everyone. The share is read on every request, so removing it works on the next click.
+- **Who did what.** A review edit is stored with the person who made it
+  (`ReviewEdit.user_id`, as before), and the review record's "Decided by" column and its CSV
+  name them: name and address for the owner, names only for everyone else. Undo only takes
+  back a write the person made themselves. A share applies only to a sign-in that proved the
+  address (Google's verified email, Microsoft's `xms_edov`), see docs/security.md.
+- **Limits and cost stay the owner's.** A model re-read a reviewer asks for (marking an
+  equation, reading a table cell) counts against the owner's day allowance, spend pool and the
+  document's caps, as if the owner had asked; the reviewer's own rate limits still apply.
+  Retention: a viewer's download does not restart the owner's deletion clock; a reviewer's
+  decisions do, as the owner's would.
+- **Deletion.** Deleting the document or its time passing deletes its shares
+  (`ops.retention.delete_jobs`); erasing a person's account deletes the shares of other people's
+  documents that name their address, and their review edits, as before.
+- **Not in this version.** No links that work without signing in, no expiry of its own, no
+  email, no sharing a course or a list, no "shared by me" overview. An invited-only service
+  still needs the person on its allowlist.
+- Tests: `tests/test_job_shares.py` (the matrix of every job route against the owner, a viewer, a
+  reviewer, a removed person and a stranger; the address rules; removal at once; who is
+  recorded; the clock; deletion), `tests/test_audit_authz.py`, `tests/test_web_auth.py`.
 
 ### The sample document (`web/sample.py`)
 
@@ -1910,7 +1966,7 @@ user's burst cannot tie up the instance), two children at once per instance (a r
 waits at most 3 s for one, then 503). A burst of 150 requests from one user now renders
 two images and refuses the rest at once, and other pages stay fast. Nothing is stored
 and nothing is cached: the responses carry `Cache-Control: private, no-store`
-like the crops, a job past its retention time or deleted answers 404 (`owned_job`), and
+like the crops, a job past its retention time or deleted answers 404 (`job_access`), and
 someone else's job 404 too. A failed render answers 503 (logged as `page_image_failed`
 with a code, no content); the decision still works, and the screen says the image could
 not be shown (with JavaScript) and points to the list view.
@@ -2648,10 +2704,16 @@ test fails when a table with a user id is added without it.
   and the tables `signup_days`, `spend_holds` and `deleted_accounts`. Additive, so a release from before it keeps working on the
   migrated schema; the downgrade drops them. `tests/test_web_open_signup_migration.py` runs it
   up and down on SQLite with real rows, and `tests/test_web_postgres.py` on Postgres.
-- `e1a7c3b95d24` (ops monitoring, the head): the tables `ops_heartbeat` (`backup` and `cron`, a time
+- `e1a7c3b95d24` (ops monitoring): the tables `ops_heartbeat` (`backup` and `cron`, a time
   and a count note) and `erasure_ledger`, `quota_days.spent_usd` (server default 0),
   `spend_holds.user_id` and `signup_days.cap_warned` (server default false). Additive; the downgrade
   drops them. `a6c2e9f4b713` above is no longer the head.
+- `ecb0b22515e0` (the head): `login_links.email`, the address an emailed sign-in link was sent to
+  (nullable; links made before it prove nothing). Additive; the downgrade drops the column.
+- `b7112167eb0d` (job shares): the table `job_shares` (`job_id`, the sign-in address in
+  lower case, `role` `view` or `review`; unique per document and address). Additive: nothing else
+  changes, and the downgrade drops the table (the shares are lost, the documents are not).
+  `a6c2e9f4b713` and `e1a7c3b95d24` above are no longer the head.
 - New migration: change `web/db.py`, then
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic upgrade head` followed by
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic revision --autogenerate -m "..."`,
