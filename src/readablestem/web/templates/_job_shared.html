@@ -1,8 +1,8 @@
 {# Shown to someone a document was shared with (web/shares.py): who shared it and what they
    may do. The owner never sees this. #}
 <div class="notice" id="shared-note">
-  <p><strong>{{ job.shared_by }}</strong> shared this document with you.
+  <p>{% if job.shared_by %}<strong>{{ job.shared_by }}</strong> shared this document with you.{% else %}This document was shared with you.{% endif %}
     {% if job.role == "review" %}You can read it, download it, and make review decisions and edits; each one is recorded under your name.
     {% else %}You can read it and download it.{% endif %}
-    Only {{ job.shared_by if job.shared_by != "The owner" else "the owner" }} can delete it, change its settings, upload a new version or share it.</p>
+    Only {{ job.shared_by or "the owner" }} can delete it, change its settings, upload a new version or share it.</p>
 </div>

@@ -115,3 +115,29 @@ def test_the_suggestion_is_the_text_the_box_takes_and_reads_back_the_same():
     parts = suggest_parts(100, 30)
     text = ranges.suggestion_text(parts)
     assert parse_parts(text, total=100, limit=30) == parts
+
+
+@pytest.mark.parametrize(
+    ("limit", "total", "expected"),
+    [
+        (100, 120, ["1-10", "5-12, 20"]),
+        (5, 105, ["1-5", "5-8, 20"]),
+        (3, 50, ["1-3", "5-6, 20"]),
+        (2, 50, ["1-2"]),
+        (30, 12, ["1-10"]),
+    ],
+)
+def test_range_examples_follow_the_active_limit_and_the_file(limit, total, expected):
+    assert ranges.examples(limit, total) == expected
+    for example in ranges.examples(limit, total):
+        parts = parse_parts(example, total=total, limit=limit)
+        assert len(parts) == 1
+
+
+def test_the_suggestion_says_which_pages_it_leaves_out():
+    parts = suggest_parts(105, 5)
+    assert len(parts) == ranges.MAX_PARTS
+    assert label(ranges.left_out(105, None, parts)) == "101-105"
+    assert ranges.left_out(30, None, suggest_parts(30, 30)) == []
+    taken = set(range(100))
+    assert label(ranges.left_out(105, taken, suggest_parts(105, 5, taken))) == ""

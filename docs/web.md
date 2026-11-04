@@ -536,18 +536,21 @@ A third box, off by default: "Exam or quiz: describe figures without giving answ
 course notation; with neither, the run uses the settings' flags as before). Figure
 descriptions then say what is shown and never the result (`pipeline/figure_step.py`).
 
-Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep it for 7 days after
-I last work on it" (`keep`) and "Also let us look at the results (30 days)" (`share`; implies
+Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep for 7 days"
+(`keep`; deleted 7 days after the last activity) and "Also let us look at the results (30 days)" (`share`; implies
 keeping). They set `jobs.retention_mode`: `day` (neither), `week` or `dev`; `dev` is also
 `jobs.opt_in_retention`, which `ops.export` reads, so only `dev` jobs can be looked at.
-The Account page has "Keep my documents for 7 days by default" (`users.keep_week_default`,
+The Account page has "Keep new documents for 7 days by default" (`users.keep_week_default`,
 `POST /account/keep-default`): when it is on, the `keep` box starts ticked; each upload still
-decides. The job page says near the top when the document will be deleted, with "Keep it for 7
-days" (the same `POST /jobs/{id}/keep`) while it is a 24-hour document.
+decides. The job page says when the document will be deleted once, under its review and download
+actions (`_job_retention.html`), with "Keep for 7 days" (the same `POST /jobs/{id}/keep`) and
+the day it would then be deleted (`retention.keep_offer`: not offered for a `dev` job or when
+the document is already kept that long). "Keep for 7 days" is the one wording on the upload
+form, the job page, the Account page, the notices and the privacy page.
 `retain_until` is a full window from upload: `RETENTION_HOURS`, 7 days, or
 `OPT_IN_RETENTION_DAYS`. For `day` and `week` jobs the window restarts on activity (a
 review write, a language, title or contact change, a download), never earlier than it
-was; `dev` keeps its 30 days from upload. "Keep 7 more days" on the job page
+was; `dev` keeps its 30 days from upload. "Keep for 7 days" on the job page
 (`POST /jobs/{id}/keep`) makes a `day` job a `week` job and starts its seven days now. The
 purge knows only `retain_until` (`ops.retention.purge_expired`), so it honours all of
 this unchanged. The privacy page's three lines are the beta wording.
@@ -1672,8 +1675,9 @@ From top to bottom:
    (`assemble._contact_sentence`, which checks it again). Both are CSRF-checked, owner
    only, finished jobs only; an unusable line shows the job page again, status 400, with
    the error under the field and the typed text kept. Neither is logged.
-9. **Keeping and deleting**: when the document will be deleted and why, "Keep 7 more
-   days" (not for a `dev` job) and "Delete now".
+9. **Deleting**: "Delete now" at the end of the page, styled as a danger entry point
+   (`button-danger-outline`); the confirmation page's button is the filled `button-danger`.
+   When the document will be deleted, and "Keep for 7 days", are under the actions (above).
 
 ## Review screen
 

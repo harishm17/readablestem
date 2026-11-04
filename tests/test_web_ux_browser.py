@@ -328,6 +328,29 @@ def test_the_questions_work_without_javascript(site, browser):
 # --------------------------------------------------------------------------- the list
 
 
+def test_a_refreshed_list_keeps_the_readers_time_zone(site, browser):
+    """The list swapped in by htmx shows times in the reader's zone, as the first render does
+    (the server only knows UTC; app.js rewrites both)."""
+    context = browser.new_context(timezone_id="America/Chicago", locale="en-US")
+    page = context.new_page()
+    sign_in(page, site.base, BOB)
+    upload_pdf(page, site.base)
+    page.goto(f"{site.base}/app")
+    before = page.locator("#documents time.local-time").first.inner_text()
+    assert "UTC" not in before, before
+    assert site.run_worker()
+    page.wait_for_function("() => document.title === 'My documents | ReadableSTEM'", timeout=15000)
+    page.wait_for_function(
+        "() => document.querySelectorAll('#documents time[data-local]').length >= 2",
+        timeout=5000,
+    )
+    times = page.locator("#documents time.local-time")
+    for index in range(times.count()):
+        shown = times.nth(index).inner_text()
+        assert "UTC" not in shown and re.search(r"\b(CDT|CST)\b", shown), shown
+    context.close()
+
+
 def test_the_list_refreshes_in_place_and_keeps_focus(site, browser):
     """While a document converts, htmx swaps the list when something changed; the link
     that had focus has it again afterwards, and the tab title follows the count."""

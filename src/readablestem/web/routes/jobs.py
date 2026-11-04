@@ -131,9 +131,9 @@ FRESH_COPY = (
 # the deployment offers the conversion of such pages (ADR 0007).
 IMAGE_PAGE_REFUSALS = frozenset({"scanned", "scanned_ocr", "handwritten", "handwritten_no_text"})
 IMAGE_PAGES_ADVICE = (
-    "Or upload it again with “Convert scanned or handwritten pages” ticked: the pages are "
-    "read from their images, which is slower, and every converted equation and table needs "
-    "your check."
+    "Or tick “Convert scanned or handwritten pages” and choose the file again (the form "
+    "cannot keep it for you): the pages are read from their images, which is slower, and "
+    "every converted equation and table needs your check."
 )
 # Uploads are turned away while the service holds as much as it will (`web.storage`).
 STORAGE_FULL_TITLE = "Uploads are paused while storage catches up"
@@ -533,7 +533,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
                 "id": row.id,
                 "filename": row.filename,
                 "pages": row.pages,
-                "size_mb": f"{row.size_bytes / (1024 * 1024):.1f}",
+                "size_text": pending.size_text(row.size_bytes),
                 "retain_until": as_utc(row.retain_until),
             }
             for row in pending.live(session, user.id, now)
@@ -673,7 +673,17 @@ def _upload_error_page(
     field_id = "upload-closed" if context["pages_left"] == 0 else "pdf"
     # The summary links to the field with a short line; the field says all of it.
     summary = message if field_id == "upload-closed" else upload_error_summary(message)
-    errors = [{"field_id": field_id, "message": summary}]
+    if code in IMAGE_PAGE_REFUSALS and ctx.settings.feature_image_pages and field_id == "pdf":
+        # The summary says what to do, and links to the box to tick (the file has to be
+        # chosen again: a browser cannot keep a chosen file across a refused form).
+        summary = (
+            f"{filename or 'This file'} has only scanned or handwritten pages. Tick “Convert "
+            "scanned or handwritten pages” and choose the file again."
+        )
+        summary_field = "image_pages"
+    else:
+        summary_field = field_id
+    errors = [{"field_id": summary_field, "message": summary}]
     context |= {
         "errors": errors,
         "field_errors": {"pdf": {"field_id": field_id, "message": message}},
@@ -1372,7 +1382,8 @@ def status_context(job: JobView, outcome: JobOutcome | None) -> dict[str, Any]:
     would look different, outcome included (htmx polling answers 204 until then)."""
     version = f"{job.version}-{outcome.code}" if outcome is not None else job.version
     counts = job.summary.counts if job.summary is not None else None
-    headline = page_rules.headline(job.status, job.status_detail, outcome, counts)
+    audience = "owner" if job.is_owner else ("review" if job.can_review else "view")
+    headline = page_rules.headline(job.status, job.status_detail, outcome, counts, audience)
     # The AI service is not answering right now (T3-1, `web.provider_health`): said on a
     # document that is waiting or converting, and beside "Try again". The status version
     # changes with it, so a page left open hears when it starts and stops.
@@ -1386,6 +1397,7 @@ def status_context(job: JobView, outcome: JobOutcome | None) -> dict[str, Any]:
         "outcome": outcome,
         "status_version": version,
         "headline": headline,
+        "open_line": page_rules.open_decisions_line(counts.decisions, audience) if counts else "",
         "provider_down": down,
         "conversion_event": analytics.conversion_props(job),  # product analytics, if enabled
     }
@@ -1405,6 +1417,8 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
     context |= _job_suggestions(request, job_id, user)  # notation found in the document
     context["after_download"] = after_download_state(request, job_id, user)  # ux-a
     context["word_export"] = export_docx.available()  # the Word button needs pandoc
+    # When "Keep for 7 days" would delete it (None: the button is not offered).
+    context["keep_until"] = retention.keep_offer(job.retention_mode, job.retain_until)
     # No `active` nav item: this page is not "My documents" itself (aria-current="page"
     # would announce it as such).
     return render(request, "job.html", context | {"auto_reload_s": AUTO_RELOAD_S})

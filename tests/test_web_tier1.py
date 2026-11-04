@@ -98,7 +98,7 @@ def retain_in(env) -> timedelta:
 def test_the_upload_form_has_two_separate_choices_both_off(ux):
     html = ux.browser.get("/app").text
     for box, label in (
-        ("keep", "Keep it for 7 days after I last work on it"),
+        ("keep", "Keep for 7 days"),
         ("share", "Also let us look at the results (30 days)"),
     ):
         assert f'id="{box}"' in html and f'name="{box}"' in html
@@ -168,8 +168,11 @@ def test_the_developer_look_choice_keeps_its_30_days_from_upload(ux):
 
 def test_keep_7_more_days_on_the_job_page(ux):
     html = page(ux)
-    assert "Keep 7 more days" in html
-    assert f'action="/jobs/{ux.job_id}/keep"' in html
+    assert "Keep for 7 days" in html and "Then it is deleted on" in html
+    assert html.count(f'action="/jobs/{ux.job_id}/keep"') == 1  # once, not repeated below
+    assert (
+        html.index('id="retention-line"') > html.index('id="next-actions"') or "Review" not in html
+    )
     set_retain_until(ux, utcnow() + timedelta(hours=1))
     post(ux, "/keep")
     job = stored_job(ux)
@@ -185,7 +188,7 @@ def test_a_developer_look_job_is_not_offered_more_days(ux):
         job = session.get(Job, ux.job_id)
         assert job is not None
         job.retention_mode, job.opt_in_retention = "dev", True
-    assert "Keep 7 more days" not in page(ux)
+    assert "Keep for 7 days" not in page(ux)
     before = stored_job(ux).retain_until
     post(ux, "/keep")
     assert stored_job(ux).retain_until == before and stored_job(ux).retention_mode == "dev"

@@ -122,10 +122,15 @@ def chooser_context(
     done = {p for p in (row.done_pages or []) if isinstance(p, int)}
     remaining = row.pages - len(done)
     suggested = ranges.suggest_parts(row.pages, s.max_pages_per_job, done)
+    left_out_pages = ranges.left_out(row.pages, done, suggested)
     heavy = row.size_bytes > s.max_upload_mb * 1024 * 1024
     context: dict[str, Any] = {
         "pending": row,
-        "size_mb": f"{row.size_bytes / (1024 * 1024):.1f}",
+        "size_text": pending.size_text(row.size_bytes),
+        "examples": ranges.examples(s.max_pages_per_job, row.pages),
+        "max_parts": ranges.MAX_PARTS,
+        "left_out_label": ranges.label(left_out_pages) if left_out_pages else "",
+        "left_out_count": len(left_out_pages),
         "limit": s.max_pages_per_job,
         "remaining": remaining,
         "done_label": ranges.label(sorted(done)) if done else "",
@@ -190,7 +195,7 @@ def _start_parts(
             cut = extract_part_isolated(data, list(part.pages), shrink=shrink)
             if len(cut) > limit_bytes:
                 out.error = (
-                    f"{named} is {len(cut) / (1024 * 1024):.1f} MB, over the {s.max_upload_mb} MB "
+                    f"{named} is {pending.size_text(len(cut))}, over the {s.max_upload_mb} MB "
                     "limit for one document. Tick “Shrink large pictures first”, or split it into "
                     "smaller parts."
                 )

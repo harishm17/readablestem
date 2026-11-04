@@ -262,8 +262,8 @@ def test_a_viewer_reads_and_downloads_but_cannot_write(site):
     viewer = site.who[VIEWER]
     page = viewer.get(f"/jobs/{site.job_id}")
     assert page.status_code == 200
-    assert "shared this document with you" in page.text
-    for owner_only in ("Delete now", "Keep 7 more days", "/share", "Upload a revised version"):
+    assert "document was shared with you" in page.text
+    for owner_only in ("Delete now", "Keep for 7 days", "/share", "Upload a revised version"):
         assert owner_only not in page.text, owner_only
     assert f"/jobs/{site.job_id}/review" not in page.text  # a viewer is not offered the review
     assert viewer.get(f"/jobs/{site.job_id}/view").status_code == 200
@@ -541,7 +541,10 @@ def test_only_the_owner_sees_email_addresses_in_the_record(site):
     # the banner and the list name the owner without an address
     assert ALICE not in site.who[VIEWER].get(f"/jobs/{site.job_id}").text
     assert ALICE not in site.who[VIEWER].get("/app").text
-    assert "shared by The owner" in site.who[VIEWER].get("/app").text
+    listing = site.who[VIEWER].get("/app").text
+    assert "shared with you, you can" in listing and "The owner" not in listing
+    banner = site.who[VIEWER].get(f"/jobs/{site.job_id}").text
+    assert "The owner" not in banner and "This document was shared with you." in banner
 
 
 def test_a_name_is_shown_when_there_is_one(site):
