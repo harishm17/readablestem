@@ -55,9 +55,9 @@ def test_the_limits_page_names_the_configured_limits(web):
 
 def test_the_upload_form_names_the_configured_limits(web):
     text = flat(web.alice.get("/app").text)
-    assert "Up to 66 MB and 77 pages each." in text
-    assert "up to 88 MB and 333 pages" in text
-    assert "(all files together 88 MB)" in text
+    # the site copy (content/site-rewrite) states each limit once, from the settings
+    assert "Up to 77 pages and 66 MB each." in text
+    assert "up to 333 pages and 88 MB, is kept" in text
     for old in OLD:
         assert old not in text, old
     page = web.alice.get("/app").text
@@ -67,8 +67,7 @@ def test_the_upload_form_names_the_configured_limits(web):
 
 def test_the_landing_and_sign_in_pages_name_the_configured_quota(web):
     landing = flat(web.client().get("/").text)
-    assert "A document of 77 pages, the most one upload can hold" in landing
-    assert "A new account can convert 111 pages a day" in landing
+    assert "Upload up to 77 pages at a time" in landing
     assert "New accounts have daily limits: 111 pages a day" in landing
     for old in OLD:
         assert old not in landing, old
