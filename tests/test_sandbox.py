@@ -11,7 +11,7 @@ import time
 
 import pytest
 
-from readablestem.core import sandbox
+from readablestem.core import sandbox, seccomp
 
 needs_sandbox = pytest.mark.skipif(
     not (shutil.which("bwrap") and shutil.which("prlimit") and sandbox.available()),
@@ -220,3 +220,131 @@ def test_parent_environment_is_not_passed_to_bubblewrap(monkeypatch, tmp_path):
     assert seen["env"] == {"PATH": "/usr/bin:/bin"}
     assert seen["start_new_session"] is True
     assert os.environ["ANTHROPIC_API_KEY"] == "sk-test"
+
+
+# ---------------------------------------------------------------- seccomp, task and file limits
+
+
+def _syscall_errno(tmp_path, number_expr: str) -> str:
+    """The errno name a system call gets inside the sandbox ("ok" when it returned 0 or more)."""
+    program = (
+        f"my $r = syscall({number_expr}); use Errno qw(EPERM ENOSYS);"
+        'print(($r >= 0) ? "ok" : ($! == EPERM ? "EPERM" : '
+        '($! == ENOSYS ? "ENOSYS" : "other:$!")));'
+    )
+    _outcome, text = perl(program, tmp_path)
+    return text
+
+
+DENIED = [
+    "ptrace", "mount", "umount2", "pivot_root", "keyctl", "add_key", "request_key", "bpf",
+    "perf_event_open", "userfaultfd", "unshare", "setns", "kexec_load", "kexec_file_load",
+    "init_module", "finit_module", "process_vm_readv", "process_vm_writev", "io_uring_setup",
+    "io_uring_enter", "io_uring_register", "chroot", "reboot", "open_by_handle_at",
+]  # fmt: skip
+needs_filter = pytest.mark.skipif(
+    not seccomp.supported(), reason="the filter knows x86-64 and arm64 only"
+)
+
+
+@needs_sandbox
+@needs_filter
+@pytest.mark.parametrize("name", DENIED)
+def test_the_denied_calls_answer_eperm_inside_the_sandbox(tmp_path, name):
+    assert _syscall_errno(tmp_path, f"{seccomp.number(name)}, 0, 0, 0, 0") == "EPERM"
+
+
+@needs_sandbox
+@needs_filter
+def test_clone_with_namespace_flags_is_denied_and_clone3_falls_back(tmp_path):
+    clone = seccomp.number("clone")
+    assert _syscall_errno(tmp_path, f"{clone}, 0x40000000, 0, 0, 0") == "EPERM"  # CLONE_NEWNET
+    assert _syscall_errno(tmp_path, f"{seccomp.number('clone3')}, 0, 0") == "ENOSYS"
+    _outcome, text = perl(
+        'my $p = fork(); if ($p == 0) { exit 0 } waitpid($p, 0); print "forked";', tmp_path
+    )
+    assert text == "forked"  # an ordinary fork is a clone without namespace flags
+
+
+def test_the_filter_is_whole_and_unknown_machines_get_none():
+    blob = seccomp.program("x86_64")
+    assert blob is not None and len(blob) % 8 == 0 and len(blob) // 8 < 255
+    assert seccomp.program("aarch64") is not None
+    assert seccomp.program("riscv64") is None
+    assert {"ptrace", "mount", "bpf", "io_uring_setup", "clone3"} <= set(seccomp.denied_names())
+
+
+@needs_sandbox
+@needs_filter
+def test_without_the_filter_the_same_call_is_not_refused(tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    log = tmp_path / "log"
+    sandbox.run(
+        [PERL, "-e", f"my $r = syscall({seccomp.number('ptrace')}, 0, 0, 0, 0); print $r;"],
+        rw=((out, "/out"),),
+        log=log,
+        seccomp=False,
+    )
+    assert log.read_text() == "0"  # PTRACE_TRACEME succeeds: it is the filter that said EPERM above
+
+
+@needs_sandbox
+def test_a_fork_bomb_stops_at_the_task_limit(tmp_path):
+    program = (
+        "my $n = 0; for (1..300) { my $p = fork(); last unless defined $p; "
+        "if ($p == 0) { sleep 5; exit 0 } $n++; } print $n;"
+    )
+    _outcome, text = perl(program, tmp_path, limits=sandbox.Limits(wall_s=30, pids=16))
+    assert text.isdigit() and int(text) <= 16
+
+
+@needs_sandbox
+def test_open_files_are_capped(tmp_path):
+    program = (
+        'my $n = 0; for (1..600) { open(my $f, "<", "/usr/bin/perl") or last; push @h, $f; $n++ }'
+        " print $n;"
+    )
+    _outcome, text = perl(program, tmp_path)
+    assert text.isdigit() and int(text) <= sandbox.NOFILE
+
+
+@needs_sandbox
+def test_the_programs_own_output_counts_against_the_budget(tmp_path):
+    outcome, _ = perl(
+        'while (1) { print "x" x 100000; select(undef, undef, undef, 0.02); }',
+        tmp_path,
+        limits=sandbox.Limits(wall_s=30, out_bytes=500_000, file_bytes=100_000_000),
+    )
+    assert outcome.over_quota and not outcome.ok
+
+
+@needs_sandbox
+def test_killing_the_caller_leaves_no_sandboxed_process():
+    import os
+    import signal
+    import subprocess
+    import sys
+    import time
+
+    marker = f"sleep {os.getpid()}1"
+    inner = (
+        "from readablestem.core import sandbox as s;"
+        f"s.run(['/bin/sh', '-c', {marker!r}], limits=s.Limits(wall_s=60))"
+    )
+    caller = subprocess.Popen([sys.executable, "-I", "-c", inner], start_new_session=True)
+    time.sleep(2)
+    os.killpg(caller.pid, signal.SIGKILL)
+    caller.wait()
+    time.sleep(1)
+    survivors = subprocess.run(["pgrep", "-f", marker], capture_output=True, text=True).stdout
+    assert survivors.strip() == ""
+
+
+def test_a_cgroup_gets_a_memory_and_a_pids_limit_when_one_can_be_made(tmp_path):
+    group = sandbox.Cgroup.make(sandbox.Limits(memory_bytes=123456, pids=7), parent=tmp_path)
+    assert group is not None
+    assert (group.path / "memory.max").read_text() == "123456"
+    assert (group.path / "pids.max").read_text() == "7"
+    assert group.add(4242) and (group.path / "cgroup.procs").read_text() == "4242"
+    assert sandbox.Cgroup.make(sandbox.Limits(), parent=tmp_path / "missing") is None

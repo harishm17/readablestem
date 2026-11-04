@@ -632,10 +632,12 @@ Exit status 0 is PASS, 1 is FAIL. The checks, one line each: `bwrap`, `prlimit`,
 inside the sandbox `sandbox_env` (empty environment), `sandbox_no_secrets` (a variable set in the
 probe's own environment is absent), `sandbox_no_etc` (no `/etc/passwd`, `/app`, `/home`),
 `sandbox_pid1_environ` (empty), `sandbox_no_network`, `sandbox_output_writable`,
-`sandbox_root_readonly`; the caps `sandbox_memory_cap`, `sandbox_wall_cap`, `sandbox_output_cap`;
+`sandbox_root_readonly`; the caps `sandbox_memory_cap`, `sandbox_wall_cap`, `sandbox_output_cap`,
+`sandbox_task_cap`, `sandbox_file_cap`; `sandbox_seccomp` (the filter denies `ptrace` inside;
+`unsupported` on a machine other than x86-64 and arm64, which does not fail the probe);
 and `latexml` (`ok` with `latexml_seconds`, or `missing` when the image was built without
 LaTeXML; `--require-latexml` turns `missing` into a failure). Information lines that never fail
-the probe: `seccomp_mode`, `landlock_abi`, whether a same-UID process can read another's
+the probe: `sandbox_cgroup` (`ok` when the container delegates a cgroup v2, so memory and tasks are also capped for the whole group; `unavailable`: the memory cap is then per process), `seccomp_mode`, `landlock_abi`, whether a same-UID process can read another's
 `/proc/<pid>/environ` with and without `PR_SET_DUMPABLE=0`, and `fallback_unshare_net` (whether a
 plain child could cut its own network; it would still see every file, so it is not used). If it
 fails, keep `FEATURE_LATEX_SOURCE` off; the alternative is a separate service with no secrets.

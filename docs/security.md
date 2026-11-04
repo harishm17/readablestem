@@ -212,9 +212,18 @@ A `.tex` file is a program, so a LaTeX upload (a later change; the switch is `FE
 runs LaTeXML only inside `core/sandbox.py`: bubblewrap with a minimal read-only root (no
 application, no `/home`, `/proc/1/environ` hidden), the project mounted read-only and one output
 folder writable, a new network namespace (no network), a new pid namespace that dies with the
-caller, an empty environment, and `prlimit` caps on address space (1.5 GB), CPU time (120 s) and
-the size of any one file (50 MB). The caller kills the group at a wall-clock limit (120 s) or when
-the output folder passes 200 MB. If bubblewrap or user namespaces are not available the run is
+caller, an empty environment, a seccomp filter (`core/seccomp.py`: `ptrace`, `mount` and the new
+mount API, `unshare`, `setns`, `clone` with namespace flags, `keyctl`, `bpf`, `perf_event_open`,
+`userfaultfd`, `io_uring_*`, `kexec_*`, module loading, `process_vm_*` answer EPERM; `clone3` answers
+ENOSYS; x86-64 and arm64 only) and `prlimit` caps. **What is capped, exactly:** address space
+(1.5 GB), CPU time (120 s), the size of any one file (50 MB) and open files (256) are limits **per
+process**: six Perl children may each hold up to 1.5 GB of address space, so the total is bounded
+only by the tasks limit (64 tasks, counted inside the sandbox's own user namespace on kernels from
+5.14, else as this user's tasks now plus 64), by the wall clock and, **when the container delegates
+a cgroup v2** (the probe says `sandbox_cgroup=ok`), by a memory limit of 1.5 GB and a pids limit
+for the whole group. Without a cgroup there is no total memory limit; the container's own memory
+limit and the host's OOM killer are what is left. The caller kills the group at a wall-clock limit
+(120 s) or when the output folders and the program's log pass 200 MB. If bubblewrap or user namespaces are not available the run is
 refused; there is no unsandboxed fallback (a plain child of the web process shares its user, so
 it could read the web process's files). Whether the platform allows it is checked on the deployed
 image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"); a FAIL there means

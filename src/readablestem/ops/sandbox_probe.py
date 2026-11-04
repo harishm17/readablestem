@@ -46,7 +46,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from readablestem.core import sandbox
+from readablestem.core import sandbox, seccomp
 
 SECRET_NAME = "READABLESTEM_PROBE_SECRET"
 SECRET_VALUE = "probe-secret-value-1234"
@@ -118,13 +118,20 @@ class Report:
 # ---------------------------------------------------------------------------- inside the sandbox
 
 
-def _perl(code: str, *, tmp: Path, wall_s: int = 20, memory_bytes: int | None = None):
+def _perl(
+    code: str,
+    *,
+    tmp: Path,
+    wall_s: int = 20,
+    memory_bytes: int | None = None,
+    limits: sandbox.Limits | None = None,
+):
     """Run a Perl one-liner in the sandbox with a writable /out; returns (outcome, its output).
     Perl is in every Debian image (perl-base)."""
     out = tmp / "out"
     out.mkdir(exist_ok=True)
     log = tmp / "perl.log"
-    limits = sandbox.Limits(
+    limits = limits or sandbox.Limits(
         wall_s=wall_s, **({"memory_bytes": memory_bytes} if memory_bytes else {})
     )
     outcome = sandbox.run(
@@ -196,6 +203,39 @@ def _check_limits(report: Report, tmp: Path) -> None:
         limits=limits,
     )
     report.add("sandbox_output_cap", "ok" if outcome.over_quota or not outcome.ok else "fail")
+    # Tasks: a program that forks without end is stopped at the limit.
+    _outcome, text = _perl(
+        "my $n = 0; for (1..200) { my $p = fork(); last unless defined $p; "
+        "if ($p == 0) { sleep 3; exit 0 } $n++; } print $n;",
+        tmp=tmp,
+        limits=sandbox.Limits(wall_s=20, pids=16),
+    )
+    report.add("sandbox_task_cap", "ok" if text.strip().isdigit() and int(text) <= 16 else "fail")
+    # Files: opens stop at the limit.
+    _outcome, text = _perl(
+        'my $n = 0; for (1..600) { open(my $f, "<", "/usr/bin/perl") or last; push @h, $f; $n++ }'
+        " print $n;",
+        tmp=tmp,
+    )
+    report.add(
+        "sandbox_file_cap",
+        "ok" if text.strip().isdigit() and int(text) <= sandbox.NOFILE else "fail",
+    )
+    # seccomp: ptrace answers EPERM inside (the filter, `core/seccomp.py`).
+    if seccomp.supported():
+        _outcome, text = _perl(
+            f"my $r = syscall({seccomp.number('ptrace')}, 0, 0, 0, 0); use Errno qw(EPERM);"
+            'print(($r < 0 && $! == EPERM) ? "denied" : "allowed");',
+            tmp=tmp,
+        )
+        report.add("sandbox_seccomp", "ok" if text.strip() == "denied" else "fail")
+    else:
+        report.add("sandbox_seccomp", "unsupported", required=False)
+    # cgroup v2: a child cgroup with memory and pids limits, when the container delegates one.
+    group = sandbox.Cgroup.make(sandbox.Limits())
+    report.add("sandbox_cgroup", "ok" if group is not None else "unavailable", required=False)
+    if group is not None:
+        group.remove()
 
 
 # ------------------------------------------------------------------------------- LaTeXML run
