@@ -25,6 +25,7 @@ Nothing here reads or logs what the program printed: its output goes to a file t
 from __future__ import annotations
 
 import contextlib
+import errno
 import functools
 import os
 import shutil
@@ -35,6 +36,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 POLL_SECONDS = 0.2
+# Processes (threads count) the program and what it starts may add to what this user already has,
+# and open files. RLIMIT_NPROC counts every task of the user, the web app's threads included, so
+# the limit is "now plus this much", worked out when the sandbox starts (`_nproc_limit`).
+NPROC_EXTRA = 64
+NOFILE = 256
 TMPFS_BYTES = 128_000_000
 
 # Read-only system trees; each is skipped when absent. No /home, /root, /var, /mnt or /srv.
@@ -47,6 +53,53 @@ _SYSTEM_FILES = (
 )  # fmt: skip
 
 
+def _own_tasks() -> int:
+    """Tasks (processes and threads) this user owns now: what RLIMIT_NPROC compares with."""
+    uid = os.getuid()
+    total = 0
+    with contextlib.suppress(OSError):
+        for entry in os.scandir("/proc"):
+            if entry.name.isdigit():
+                with contextlib.suppress(OSError):
+                    if entry.stat().st_uid == uid:
+                        total += len(os.listdir(f"/proc/{entry.name}/task"))
+    return total
+
+
+@functools.cache
+def _nproc_counted_inside() -> bool:
+    """Whether RLIMIT_NPROC counts a new user namespace's tasks from zero (kernels from 5.14: the
+    count is per namespace), found by trying: a limit of 8 inside the sandbox lets some forks
+    through and then stops. When it does, the limit can be small and absolute; when it counts the
+    user's tasks outside as well (older kernels), forks would fail at once, so the limit has to
+    be "tasks now plus some"."""
+    bwrap, prlimit = bwrap_path(), prlimit_path()
+    if bwrap is None or prlimit is None:
+        return False
+    program = (
+        "my $n = 0; for (1..40) { my $p = fork(); last unless defined $p; "
+        "if ($p == 0) { sleep 3; exit 0 } $n++; } print $n;"
+    )
+    argv = [
+        bwrap, "--die-with-parent", "--unshare-all", *_system_mounts(), "--proc", "/proc",
+        "--dev", "/dev", "--", prlimit, "--nproc=8", "--", "/usr/bin/perl", "-e", program,
+    ]  # fmt: skip
+    try:
+        run = subprocess.run(
+            argv, capture_output=True, timeout=20, stdin=subprocess.DEVNULL,
+            env={"PATH": "/usr/bin:/bin"},
+        )  # fmt: skip
+        return 0 < int(run.stdout.strip() or 0) <= 8
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return False
+
+
+def nproc_limit(extra: int) -> int:
+    """The `--nproc` for a sandbox: `extra` when the count starts from zero inside, else this
+    user's tasks now plus `extra`."""
+    return extra if _nproc_counted_inside() else _own_tasks() + extra
+
+
 class SandboxUnavailable(RuntimeError):
     """The sandbox cannot be built here (no bubblewrap, no user namespaces, no prlimit)."""
 
@@ -57,7 +110,8 @@ class Limits:
     cpu_s: int = 120
     memory_bytes: int = 1_500_000_000
     file_bytes: int = 50_000_000
-    out_bytes: int = 200_000_000  # all the program may leave in its writable folders
+    out_bytes: int = 200_000_000  # all the program may leave in its writable folders and its log
+    pids: int = NPROC_EXTRA  # tasks the program may have at once (a cgroup limit when there is one)
 
 
 @dataclass
@@ -112,6 +166,7 @@ def build_argv(
     cwd: str = "/",
     limits: Limits | None = None,
     hide: tuple[str, ...] = (),
+    seccomp_fd: int | None = None,
 ) -> list[str]:
     """The `bwrap` command line for `command` (a list, never a shell string). `ro` and `rw` are
     (host path, path inside) pairs; every path is absolute and `inside` never overlaps
@@ -123,8 +178,11 @@ def build_argv(
         raise SandboxUnavailable("bubblewrap (bwrap) is not installed")
     if prlimit is None:
         raise SandboxUnavailable("prlimit (util-linux) is not installed")
-    args = [
-        bwrap, "--die-with-parent", "--new-session", "--unshare-all", "--clearenv",
+    args = [bwrap]
+    if seccomp_fd is not None:
+        args += ["--seccomp", str(seccomp_fd)]
+    args += [
+        "--die-with-parent", "--new-session", "--unshare-all", "--clearenv",
         *_system_mounts(), "--proc", "/proc", "--dev", "/dev",
         "--size", str(TMPFS_BYTES), "--tmpfs", "/tmp",
     ]  # fmt: skip
@@ -143,7 +201,8 @@ def build_argv(
     args += [
         "--chdir", cwd, "--",
         prlimit, f"--as={limits.memory_bytes}", f"--cpu={limits.cpu_s}",
-        f"--fsize={limits.file_bytes}", "--core=0", "--", *command,
+        f"--fsize={limits.file_bytes}", "--core=0", f"--nofile={NOFILE}",
+        f"--nproc={nproc_limit(limits.pids)}", "--", *command,
     ]  # fmt: skip
     return args
 
@@ -158,6 +217,67 @@ def _tree_bytes(*roots: Path) -> int:
     return total
 
 
+_CGROUP_TAG = "readablestem-sandbox"
+
+
+def cgroup_parent() -> Path | None:
+    """This process's own cgroup directory (cgroup v2), or None."""
+    try:
+        line = next(
+            ln for ln in Path("/proc/self/cgroup").read_text().splitlines() if ln.startswith("0::")
+        )
+    except (OSError, StopIteration):
+        return None
+    path = Path("/sys/fs/cgroup") / line[3:].lstrip("/")
+    return path if path.is_dir() else None
+
+
+class Cgroup:
+    """A child cgroup with a memory and a pids limit for one sandbox run, when the container lets
+    this process make one (cgroup v2, delegated). `make` returns None when it cannot: the limits
+    are then per process (`prlimit`) and the probe says `sandbox_cgroup=unavailable`."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    @classmethod
+    def make(cls, limits: Limits, parent: Path | None = None) -> Cgroup | None:
+        parent = parent if parent is not None else cgroup_parent()
+        if parent is None:
+            return None
+        path = parent / f"{_CGROUP_TAG}-{os.getpid()}-{time.monotonic_ns()}"
+        try:
+            path.mkdir()
+            (path / "memory.max").write_text(str(limits.memory_bytes))
+            with contextlib.suppress(OSError):
+                (path / "memory.swap.max").write_text("0")
+            (path / "pids.max").write_text(str(limits.pids))
+        except OSError:
+            with contextlib.suppress(OSError):
+                path.rmdir()
+            return None
+        return cls(path)
+
+    def add(self, pid: int) -> bool:
+        try:
+            (self.path / "cgroup.procs").write_text(str(pid))
+        except OSError:
+            return False
+        return True
+
+    def remove(self) -> None:
+        with contextlib.suppress(OSError):
+            (self.path / "cgroup.kill").write_text("1")
+        for _ in range(20):
+            try:
+                self.path.rmdir()
+                return
+            except OSError as exc:
+                if exc.errno != errno.EBUSY:
+                    return
+                time.sleep(0.05)
+
+
 def run(
     command: list[str],
     *,
@@ -168,14 +288,29 @@ def run(
     limits: Limits | None = None,
     log: Path | None = None,
     hide: tuple[str, ...] = (),
+    seccomp: bool = True,
+    cgroup: bool = True,
 ) -> Outcome:
     """Run `command` in the sandbox and wait. The caller's own environment is not passed on, not
     even to bubblewrap. A wall-clock timeout, or more than `limits.out_bytes` in the `rw` host
-    folders, kills the whole group. `log` receives the program's stdout and stderr (never
-    read here); without it they are discarded."""
+    folders plus `log`, kills the whole group. `log` receives the program's stdout and stderr
+    (never read here); without it they are discarded. `seccomp`: the filter of `core.seccomp`
+    (when this machine is one it knows). `cgroup`: a memory and pids limit for the whole group
+    when the container allows one."""
+    from readablestem.core import seccomp as filters
+
     limits = limits or Limits()
-    argv = build_argv(command, ro=ro, rw=rw, env=env, cwd=cwd, limits=limits, hide=hide)
+    program = filters.program() if seccomp else None
+    read_end = write_end = None
+    if program is not None:
+        read_end, write_end = os.pipe()
+        os.write(write_end, program)
+        os.close(write_end)
+    argv = build_argv(
+        command, ro=ro, rw=rw, env=env, cwd=cwd, limits=limits, hide=hide, seccomp_fd=read_end
+    )
     sink = log.open("wb") if log is not None else None
+    group = Cgroup.make(limits) if cgroup else None
     try:
         proc = subprocess.Popen(
             argv,
@@ -184,7 +319,10 @@ def run(
             stdout=sink or subprocess.DEVNULL,
             stderr=subprocess.STDOUT if sink else subprocess.DEVNULL,
             start_new_session=True,
+            pass_fds=(read_end,) if read_end is not None else (),
         )
+        if group is not None:
+            group.add(proc.pid)
         deadline = time.monotonic() + limits.wall_s
         roots = tuple(host for host, _ in rw)
         while True:
@@ -194,12 +332,17 @@ def run(
             except subprocess.TimeoutExpired:
                 pass
             timed_out = time.monotonic() > deadline
-            over = _tree_bytes(*roots) > limits.out_bytes
+            written = _tree_bytes(*roots) + (log.stat().st_size if log and log.exists() else 0)
+            over = written > limits.out_bytes
             if timed_out or over:
                 with contextlib.suppress(ProcessLookupError):
                     os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait()
                 return Outcome(-9, timed_out=timed_out, over_quota=over)
     finally:
+        if read_end is not None:
+            os.close(read_end)
         if sink is not None:
             sink.close()
+        if group is not None:
+            group.remove()
