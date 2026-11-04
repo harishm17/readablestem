@@ -75,8 +75,9 @@
       <summary>Show the {{ row.times }} {{ "place" if row.times == 1 else "places" }}, and leave some out</summary>
       {{ places_list(row, True) }}
     </details>
+    <p class="symbol-affect" id="{{ rid }}-affect" data-changeable="{{ row.changeable }}">Changes <strong data-affect-count>{{ row.changeable }}</strong> of {{ row.times }} {{ "place" if row.times == 1 else "places" }}; <span data-affect-left>{{ row.times - row.changeable }}</span> left as they are{% if row.times > row.changeable %} (already decided){% endif %}.</p>
     <div class="button-row">
-      <button type="submit" class="button" data-role="relabel" aria-describedby="{{ rid }}-note">Change all {{ row.name }}</button>
+      <button type="submit" class="button" data-role="relabel" aria-describedby="{{ rid }}-affect {{ rid }}-note">Change all {{ row.name }}</button>
     </div>
     <p class="hint" id="{{ rid }}-note">The places you tick under “Show the places” are left as they are. Equations that already have your decision are not changed.</p>
     {% else %}
