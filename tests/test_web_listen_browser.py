@@ -289,7 +289,7 @@ def test_online_voices_alone_need_an_explicit_choice(site, browser, job):
     assert page.locator(".listen-more").evaluate("d => d.open")
     assert page.evaluate("document.activeElement.id") == "listen-voice"
     page.get_by_label("Voice").select_option("cloud")
-    assert "online" in note.inner_text()
+    assert "Online voice" in note.inner_text()
     play.click()
     assert page.evaluate("window.__spoken[0].voice") == "Cloud Voice"
     context.close()

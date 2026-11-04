@@ -437,7 +437,7 @@ def test_add_part_and_the_preview_say_what_is_wrong_before_anything_is_sent(site
     page.get_by_label("Last page").fill("2")
     page.get_by_role("button", name="Add part").click()  # overlaps the suggestion's part 1
     expect(note).to_contain_text("Part 4 added")
-    expect(page.locator("#parts-summary")).to_contain_text("1 part needs fixing", timeout=5000)
+    expect(page.locator("#parts-summary")).to_contain_text("Fix 1 before converting", timeout=5000)
     expect(page.locator(".parts-row-error")).to_contain_text("Page 1 is in part 1 and part 4")
     page.get_by_role("button", name="Remove part 4").click()
     expect(page.locator("#parts-summary")).to_have_text("3 parts, 12 pages.", timeout=5000)
