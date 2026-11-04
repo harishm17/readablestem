@@ -2,7 +2,7 @@
    options as two short groups that each say their current setting in one line and open to
    change it (ux2-lane-a). `form_values`: what the person had set when a refusal sent the form
    back, so nothing but the file has to be chosen again (routes/jobs.py `_upload_error_page`).
-   `focus_field`: the control a refusal puts focus on (the file chooser). The summaries
+   The error summary takes focus and links to the file chooser (or the scan box). The summaries
    are written here for the first view and rewritten by static/app.js as boxes change. #}
 {% set fv = form_values|default(none) %}
 {% set revising = revises|default(none) %}
@@ -71,7 +71,7 @@
             Word{% if "pptx" in office_kinds %} and PowerPoint{% endif %} work too.{% endif %}</li>
           {% if pages_left is not none %}
           <li>{{ pages_left }} {{ "page" if pages_left == 1 else "pages" }} left today{% if new_account %}
-            (new accounts get {{ page_quota }} a day){% endif %}; resets at {{ next_reset|utc }}.</li>
+            (a new account can convert {{ page_quota }} pages a day){% endif %}; resets at {{ next_reset|utc }}.</li>
           {% endif %}
           <li>Your own materials only, with no student records.</li>
         </ul>
@@ -100,7 +100,7 @@
       {# app.js checks the size and type as soon as a file is chosen and puts what is
          wrong here, before anything is sent (UX review MF21). #}
       <div id="pdf-check" aria-live="polite"></div>
-      <input type="file" id="pdf" name="pdf"{% if not revising %} multiple{% endif %}{% if focus_field|default("") == "pdf" %} autofocus{% endif %}
+      <input type="file" id="pdf" name="pdf"{% if not revising %} multiple{% endif %}
              accept="application/pdf,.pdf{% if latex_source and not revising %},.tex,.zip,application/zip{% elif batch_zip and not revising %},.zip,application/zip{% endif %}{% if "docx" in office_kinds %},.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document{% endif %}{% if "pptx" in office_kinds %},.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation{% endif %}"
              {% if latex_source and not revising %}data-latex="1" {% endif %}{% if batch_zip and not revising %}data-zip="1" {% endif %}{% if office_kinds %}data-office="{{ office_kinds|join(' ') }}" data-office-what="{{ office_what }}" data-office-choose="{{ office_choose }}" {% endif %}data-max-bytes="{{ max_upload_mb * 1024 * 1024 }}" data-max-mb="{{ max_upload_mb }}"
              data-limit-bytes="{{ upload_limit_mb * 1024 * 1024 }}" data-limit-mb="{{ upload_limit_mb }}"
@@ -148,7 +148,7 @@
              pictures. #}
           {% if image_pages_offered|default(false) %}
           <div class="field checkbox-field image-pages-choice">
-            <input type="checkbox" id="image_pages" name="image_pages" value="on" aria-describedby="image-pages-hint"{% if pages_on %} checked{% endif %}{% if focus_field|default("") == "image_pages" %} autofocus{% endif %}
+            <input type="checkbox" id="image_pages" name="image_pages" value="on" aria-describedby="image-pages-hint"{% if pages_on %} checked{% endif %}
                    data-on="Scanned and handwritten pages converted" data-off="Scanned pages kept as pictures">
             <label for="image_pages">Convert scanned or handwritten pages</label>
             <p class="hint" id="image-pages-hint">Needed for a PDF that is all scans or handwriting;

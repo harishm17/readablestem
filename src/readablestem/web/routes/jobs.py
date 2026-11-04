@@ -707,10 +707,6 @@ def _upload_error_page(
     context |= {
         "errors": errors,
         "field_errors": {"pdf": {"field_id": field_id, "message": message}},
-        # Focus goes to what the summary links to (the file chooser, or the box to tick for a
-        # scan), not to the summary: the error is announced and the next step is under the
-        # keyboard. With no form (no pages left) the summary keeps focus.
-        "focus_field": summary_field if summary_field != "upload-closed" else "",
     }
     return render(request, "app.html", context, status_code=status, headers=headers)
 
@@ -1392,7 +1388,6 @@ def _course_error_page(
     context = app_context(ctx, user) | {"errors": errors, "field_errors": {"course": errors[0]}}
     if fields is not None:
         context["form_values"] = form_values(fields)
-    context["focus_field"] = "course"
     return render(request, "app.html", context, status_code=400)
 
 

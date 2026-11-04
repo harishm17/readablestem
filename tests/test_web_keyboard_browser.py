@@ -335,14 +335,15 @@ def test_upload_by_keyboard_lands_on_the_job_and_a_wrong_file_is_explained(site,
     page = context.new_page()
     keyboard_sign_in(page, site.base, ALICE)
     assert page.url == f"{site.base}/app"
-    # Nothing chosen: the server's answer. The problem list announces itself and links to the
-    # file chooser, which takes focus (ux2-lane-a), so the next step is under the keyboard.
+    # Nothing chosen: the server's answer, and the problem list takes focus. Its link goes
+    # to the file chooser (the form now sits right under it after a refusal).
     tab_to(page, "Upload and convert")
     activate(page)
     state = wait_focus(page)
-    assert state["id"] == "pdf", state
-    assert "There is a problem" in page.locator(".error-summary").inner_text()
-    assert page.locator(".error-summary").get_attribute("role") == "alert"
+    assert state["role"] == "alert" and "There is a problem" in state["text"], state
+    page.keyboard.press("Tab")  # the first link of the list
+    page.keyboard.press("Enter")  # it leads to the file chooser, which takes focus
+    assert focus_summary(page)["id"] == "pdf"
     # A file that is not a PDF: the page says so as soon as it is chosen (a live region), and
     # Enter on the button does not send it but puts focus on the field that has the problem.
     start_of_page(page)

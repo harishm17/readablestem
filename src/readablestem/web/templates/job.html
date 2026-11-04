@@ -49,9 +49,9 @@
 <p class="hint"><a href="/jobs/{{ job.id }}{% if auto_reload %}?auto=1{% endif %}">Refresh the status</a></p>
 <noscript>
   {% if auto_reload %}
-  <p>Reloading every {{ auto_reload_s }} seconds. <a href="/jobs/{{ job.id }}">Stop reloading</a></p>
+  <p>This page reloads every {{ auto_reload_s }} seconds until the conversion finishes. <a href="/jobs/{{ job.id }}">Stop reloading this page</a></p>
   {% else %}
-  <p><a href="/jobs/{{ job.id }}?auto=1">Reload every {{ auto_reload_s }} seconds until it finishes</a></p>
+  <p><a href="/jobs/{{ job.id }}?auto=1">Reload this page every {{ auto_reload_s }} seconds until the conversion finishes</a></p>
   {% endif %}
 </noscript>
 {% endif %}

@@ -167,11 +167,8 @@ def test_a_refusal_keeps_what_was_ticked_and_puts_the_file_chooser_first_and_foc
         < page.index('id="pdf"')
         < page.index('id="jobs-heading"')
     )
-    assert re.search(r'<input type="file" id="pdf"[^>]*\sautofocus', page)
-    assert (
-        'class="error-summary" role="alert" aria-labelledby="error-summary-title" tabindex="-1">'
-        in page
-    )
+    # the summary takes focus (the established contract) and its first link goes to the chooser
+    assert re.search(r'<div class="error-summary"[^>]*tabindex="-1" autofocus>', page)
     assert 'href="#pdf"' in page  # the summary links to the chooser
 
 
@@ -192,8 +189,8 @@ def test_with_the_option_offered_a_scan_refusal_does_not_say_the_tool_cannot_con
     assert "cannot convert" not in page
     assert "which are read only when you ask" in page
     assert "upload a PDF exported from the original" in page
-    # the box to tick is where focus goes, in an open group, with the other choices kept
-    assert re.search(r'<input type="checkbox" id="image_pages"[^>]*\sautofocus', response.text)
+    # the summary links to the box to tick, which sits in an open group, other choices kept
+    assert 'href="#image_pages"' in response.text
     assert re.search(r'<input type="checkbox" id="exam"[^>]*checked', response.text)
     assert re.search(r'id="group-convert"[^>]*\sopen', response.text)
 

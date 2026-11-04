@@ -10,8 +10,8 @@
   that a PDF of only scans is refused without it and a mixed PDF keeps its scanned pages as
   pictures; "Tick it every time" is now "Make this the default in Account"; "Main file of a zip"
   sits in a disclosure and appears only with LaTeX source on. After a refusal the form comes back
-  before the documents list with every choice kept, the error links to the file chooser and focus
-  goes there. LaTeX source that is not available says so and offers the PDF route; a scan refusal
+  before the documents list with every choice kept, the error summary takes focus and its
+  link goes to the file chooser, right under it. LaTeX source that is not available says so and offers the PDF route; a scan refusal
   where the scan option is offered no longer says the tool cannot convert it.
 - My documents: rows lead with the uploaded file name (a part with its pages; the generated title
   under it; a title you set leads), one next step and Delete per row ("Upload a revised version" is

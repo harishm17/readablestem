@@ -7,7 +7,7 @@
   <label for="course">Course (optional)</label>
   <p class="hint" id="course-hint">Read with the course’s notation. <a href="/courses">Your courses</a></p>
   {% if course_error %}<p class="error-message" id="course-error"><span class="visually-hidden">Error: </span>{{ course_error.message }}</p>{% endif %}
-  <select id="course" name="course"{% if focus_field|default("") == "course" %} autofocus{% endif %} aria-describedby="course-hint{% if course_error %} course-error{% endif %}"{% if course_error %} aria-invalid="true"{% endif %}>
+  <select id="course" name="course"  aria-describedby="course-hint{% if course_error %} course-error{% endif %}"{% if course_error %} aria-invalid="true"{% endif %}>
     <option value="">No course</option>
     {% for course in courses %}<option value="{{ course.id }}"{% if chosen_course is defined and chosen_course == course.id %} selected{% endif %}>{{ course.name }}</option>{% endfor %}
   </select>

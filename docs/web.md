@@ -558,10 +558,10 @@ that is all scans or handwriting (refused without it), while a mixed PDF keeps i
 as pictures marked "Not converted" unless it is ticked. "Main file of a zip" is offered only with
 LaTeX source on, inside a disclosure. When an upload is refused, the form comes back before the
 documents list with every choice kept (`routes/jobs.form_values`; only the file has to be chosen
-again), the error summary links to the file chooser and focus goes there (to the scan box for a
-scan refusal, which is the step to take), and the message says what is unavailable and offers the
-PDF route (LaTeX source on a server that cannot run it: "Compile it to a PDF and choose that file
-here instead").
+again), the error summary takes focus, as on every form, and its link goes to the file chooser right
+under it (to the scan box for a scan refusal, which is the step to take), and the message says
+what is unavailable and offers the PDF route (LaTeX source on a server that cannot run it:
+"Compile it to a PDF and choose that here instead").
 
 Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep for 7 days"
 (`keep`; deleted 7 days after the last activity) and "Also let us look at the results (30 days)" (`share`; implies
