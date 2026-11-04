@@ -193,6 +193,18 @@ class JobView:
     # The recorded sample document (T3-9, `web.sample`) and, for its page, where it comes from.
     is_sample: bool = False
     sample: SampleView | None = None
+    # What the person looking at it is to it (`web.shares`): "owner", or the right the owner
+    # gave them, and who shared it. The page shows only what that right allows.
+    role: str = "owner"
+    shared_by: str = ""
+
+    @property
+    def is_owner(self) -> bool:
+        return self.role == "owner"
+
+    @property
+    def can_review(self) -> bool:
+        return self.role in {"owner", "review"}
 
     @property
     def finished(self) -> bool:
@@ -446,11 +458,19 @@ def last_decision(session: Session, job: Job) -> date | None:
 
 
 def job_view(
-    session: Session, job: Job, *, with_summary: bool = False, with_page: bool = False
+    session: Session,
+    job: Job,
+    *,
+    with_summary: bool = False,
+    with_page: bool = False,
+    role: str = "owner",
 ) -> JobView:
     """The job's view model. `with_summary`: the counts from its result (the job page and
     the review list); `with_page`: also the job page's own data (`job_page.PageData`),
-    the queue estimate and the live progress."""
+    the queue estimate and the live progress. `role` is what the person looking is to the
+    document (`web.shares`); someone it was shared with sees none of the owner's other parts
+    and is told who shared it."""
+    owner = role == "owner"
     ahead = queue_ahead(session, job) if job.status == JobStatus.QUEUED else 0
     yours, wait_s = (
         queue_wait(session, job) if with_page and job.status == JobStatus.QUEUED else (0, None)
@@ -503,9 +523,18 @@ def job_view(
         part_label=job.part_label or "",
         is_sample=bool(job.is_sample),
         sample=sample_view() if job.is_sample and with_page else None,
-        parts=part_links(session, job) if with_page and job.part_group else [],
-        combinable=len(combine_rules.kept_parts(session, job)) if with_page else 0,
+        parts=part_links(session, job) if with_page and job.part_group and owner else [],
+        combinable=len(combine_rules.kept_parts(session, job)) if with_page and owner else 0,
+        role=role,
+        shared_by=_owner_name(session, job) if not owner else "",
     )
+
+
+def _owner_name(session: Session, job: Job) -> str:
+    """Who owns the document, for the person it was shared with: their name only (an address
+    is for the owner to see), else "The owner"."""
+    person = session.get(User, job.user_id)
+    return (person.name if person is not None and person.name else None) or "The owner"
 
 
 def carry_view(job: Job, result: DocumentResult) -> CarryView | None:

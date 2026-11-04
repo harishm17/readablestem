@@ -7,7 +7,7 @@ hold in `Job.part_label`. This module finds the parts a person may join:
 - only the person's own (`Job.user_id`), whatever group id is asked about;
 - only finished ones (`JobStatus.DONE`);
 - only ones still kept: a part past its `retain_until` counts as deleted even before the
-  hourly purge removes it (as `owned_job` treats it), so a deleted part is never in the file
+  hourly purge removes it (as `job_access` treats it), so a deleted part is never in the file
   and the file is not made from anything the retention promise says is gone;
 - only ones whose label names as many pages as the part has (otherwise a page cannot be put
   back where it was in the source).
