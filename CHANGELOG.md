@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: fifth fresh split, registered result (branch eval/fresh5-report)
+
+- `docs/eval-equation-fresh5.md`: the fresh5 run (registration PR #149). The candidate and the Opus chatbot
+  show no difference this set can detect on spoken-equal end to end (0.840 against 0.836, 26 units, 1,715 gold
+  equations). The candidate has fewer silent errors (5.0 against 9.6 per 100 gold), but the registered claim is
+  not made, because silent errors are above 4.0 and flag recall is 0.46. Stratum D (chemistry) is not a success.
+- `scripts/realworld_run.py` reads the four fresh5 strata. It adds the registered settings in a clean environment
+  (`--settings`), one cap for the two ReadableSTEM arms (`--group-cap`), chatbot runs over the split in the
+  registered order (`--part fresh5`), a free token-count dry mode (`--dry`) and the strong-prompt arm
+  (`chatbot-opus-expert`). `scripts/fresh5_report.py` writes the registered tables.
+
 ## Unreleased: which Landlock step failed (branch latex/probe-step-codes)
 
 - New: when the Landlock launcher fails to start, it reports the failing setup step as a fixed

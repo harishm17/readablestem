@@ -1,0 +1,1004 @@
+{
+ "arms": {
+  "Candidate": {
+   "spoken-equal, end to end (primary)": {
+    "point": 0.8396501457725948,
+    "low": 0.7906538603195065,
+    "high": 0.8761854397217249,
+    "units": 26
+   },
+   "exact_lenient (secondary)": {
+    "point": 0.793002915451895,
+    "low": 0.7356102653671439,
+    "high": 0.8335015568060966,
+    "units": 26
+   },
+   "silent errors per 100 gold (wrong under the primary, not asked)": {
+    "point": 5.014577259475218,
+    "low": 3.554143858409965,
+    "high": 6.384615853559409,
+    "units": 26
+   },
+   "flag recall (symbols-wrong aligned equations that were a required decision)": {
+    "point": 0.46111111111111114,
+    "low": 0.30864197530864196,
+    "high": 0.612721424575797,
+    "units": 26
+   },
+   "required decisions per PDF page": {
+    "point": 2.8702290076335877,
+    "low": 1.7412387231089523,
+    "high": 4.564516129032258,
+    "units": 26
+   },
+   "unseen loss per 100 gold (silent plus undetected)": {
+    "point": 11.020408163265307,
+    "low": 8.336975197968027,
+    "high": 14.218384855101059,
+    "units": 26
+   },
+   "cost per PDF page (USD)": {
+    "point": 0.022170138511450384,
+    "low": 0.016482051008112827,
+    "high": 0.029674548199186992,
+    "units": 26
+   },
+   "detection recall": {
+    "point": 0.9399416909620991,
+    "low": 0.9080131828961824,
+    "high": 0.9643030249327331,
+    "units": 26
+   },
+   "symbols, credited": {
+    "point": 0.8402332361516035,
+    "low": 0.7952289600862471,
+    "high": 0.8762600831324615,
+    "units": 26
+   },
+   "A": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.848356309650053,
+     "units": 12
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.8048780487804879,
+     "units": 12
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 4.3478260869565215,
+     "units": 12
+    }
+   },
+   "B": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.7037037037037037,
+     "units": 6
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.6518518518518519,
+     "units": 6
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 9.25925925925926,
+     "units": 6
+    }
+   },
+   "C": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.896414342629482,
+     "units": 8
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.8466135458167331,
+     "units": 8
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 3.9840637450199203,
+     "units": 8
+    }
+   }
+  },
+  "Control": {
+   "spoken-equal, end to end (primary)": {
+    "point": 0.8384839650145772,
+    "low": 0.792716850413359,
+    "high": 0.8744635766296174,
+    "units": 26
+   },
+   "exact_lenient (secondary)": {
+    "point": 0.7825072886297376,
+    "low": 0.7264085008241311,
+    "high": 0.8237482542086281,
+    "units": 26
+   },
+   "silent errors per 100 gold (wrong under the primary, not asked)": {
+    "point": 6.588921282798834,
+    "low": 4.105471613819649,
+    "high": 9.674874834292185,
+    "units": 26
+   },
+   "flag recall (symbols-wrong aligned equations that were a required decision)": {
+    "point": 0.33,
+    "low": 0.18604410916778782,
+    "high": 0.5061754222842089,
+    "units": 26
+   },
+   "required decisions per PDF page": {
+    "point": 2.49618320610687,
+    "low": 1.3740791873543419,
+    "high": 4.259541984732825,
+    "units": 26
+   },
+   "unseen loss per 100 gold (silent plus undetected)": {
+    "point": 12.594752186588922,
+    "low": 9.34896598812933,
+    "high": 16.49716569767442,
+    "units": 26
+   },
+   "cost per PDF page (USD)": {
+    "point": 0.02185871866412214,
+    "low": 0.016232246845685108,
+    "high": 0.029347619126755285,
+    "units": 26
+   },
+   "detection recall": {
+    "point": 0.9399416909620991,
+    "low": 0.9080131828961824,
+    "high": 0.9643030249327331,
+    "units": 26
+   },
+   "symbols, credited": {
+    "point": 0.8285714285714286,
+    "low": 0.7812703804347826,
+    "high": 0.8655394620234843,
+    "units": 26
+   },
+   "A": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.8451749734888653,
+     "units": 12
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.7857900318133616,
+     "units": 12
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 4.665959703075291,
+     "units": 12
+    }
+   },
+   "B": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.7111111111111111,
+     "units": 6
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.6592592592592592,
+     "units": 6
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 18.14814814814815,
+     "units": 6
+    }
+   },
+   "C": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.8944223107569721,
+     "units": 8
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.8426294820717132,
+     "units": 8
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 3.9840637450199203,
+     "units": 8
+    }
+   }
+  },
+  "Chatbot, Opus": {
+   "spoken-equal, end to end (primary)": {
+    "point": 0.8355685131195335,
+    "low": 0.7779805086682556,
+    "high": 0.8779563090588293,
+    "units": 26
+   },
+   "exact_lenient (secondary)": {
+    "point": 0.7702623906705539,
+    "low": 0.7043070914237881,
+    "high": 0.82370710849668,
+    "units": 26
+   },
+   "silent errors per 100 gold (wrong under the primary, not asked)": {
+    "point": 9.56268221574344,
+    "low": 5.859975227039796,
+    "high": 14.549946502782507,
+    "units": 26
+   },
+   "flag recall (symbols-wrong aligned equations that were a required decision)": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0,
+    "units": 26
+   },
+   "required decisions per PDF page": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0,
+    "units": 26
+   },
+   "unseen loss per 100 gold (silent plus undetected)": {
+    "point": 16.443148688046648,
+    "low": 12.204369094117073,
+    "high": 22.20194913317444,
+    "units": 26
+   },
+   "cost per PDF page (USD)": {
+    "point": 0.06808274809160304,
+    "low": 0.061908053741746155,
+    "high": 0.07425789103015461,
+    "units": 26
+   },
+   "detection recall": {
+    "point": 0.931195335276968,
+    "low": 0.8912359269405097,
+    "high": 0.9644326878682968,
+    "units": 26
+   },
+   "symbols, credited": {
+    "point": 0.8268221574344023,
+    "low": 0.7789016369880043,
+    "high": 0.8699081943764183,
+    "units": 26
+   },
+   "A": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.8600212089077413,
+     "units": 12
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.809119830328738,
+     "units": 12
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 7.741251325556734,
+     "units": 12
+    }
+   },
+   "B": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.6666666666666666,
+     "units": 6
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.5296296296296297,
+     "units": 6
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 28.51851851851852,
+     "units": 6
+    }
+   },
+   "C": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.8804780876494024,
+     "units": 8
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.8266932270916335,
+     "units": 8
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 2.7888446215139444,
+     "units": 8
+    }
+   }
+  },
+  "Chatbot, Opus, strong prompt": {
+   "spoken-equal, end to end (primary)": {
+    "point": 0.8172323759791122,
+    "low": 0.7321597598647782,
+    "high": 0.8689701137625443,
+    "units": 17
+   },
+   "exact_lenient (secondary)": {
+    "point": 0.6736292428198434,
+    "low": 0.561125904030805,
+    "high": 0.7423475588461269,
+    "units": 17
+   },
+   "silent errors per 100 gold (wrong under the primary, not asked)": {
+    "point": 14.273281114012185,
+    "low": 8.891102295591732,
+    "high": 21.180345948456,
+    "units": 17
+   },
+   "flag recall (symbols-wrong aligned equations that were a required decision)": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0,
+    "units": 17
+   },
+   "required decisions per PDF page": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0,
+    "units": 17
+   },
+   "unseen loss per 100 gold (silent plus undetected)": {
+    "point": 18.276762402088774,
+    "low": 13.102988623745574,
+    "high": 26.784024013522174,
+    "units": 17
+   },
+   "cost per PDF page (USD)": {
+    "point": 0.09798335802469135,
+    "low": 0.08077694718279571,
+    "high": 0.11851847535211267,
+    "units": 17
+   },
+   "detection recall": {
+    "point": 0.9599651871192341,
+    "low": 0.9247292013421046,
+    "high": 0.9824569632335999,
+    "units": 17
+   },
+   "symbols, credited": {
+    "point": 0.7824194952132288,
+    "low": 0.7134375000000001,
+    "high": 0.8275098524775304,
+    "units": 17
+   },
+   "A": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.8783269961977186,
+     "units": 6
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.6863117870722434,
+     "units": 6
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 10.64638783269962,
+     "units": 6
+    }
+   },
+   "B": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.636,
+     "units": 5
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.56,
+     "units": 5
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 32.0,
+     "units": 5
+    }
+   },
+   "C": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.8525469168900804,
+     "units": 6
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.7319034852546917,
+     "units": 6
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 7.506702412868632,
+     "units": 6
+    }
+   }
+  },
+  "Chatbot, Haiku": {
+   "spoken-equal, end to end (primary)": {
+    "point": 0.8157434402332362,
+    "low": 0.7498080017690534,
+    "high": 0.8604337679850228,
+    "units": 26
+   },
+   "exact_lenient (secondary)": {
+    "point": 0.7323615160349854,
+    "low": 0.657059824646155,
+    "high": 0.792624449941304,
+    "units": 26
+   },
+   "silent errors per 100 gold (wrong under the primary, not asked)": {
+    "point": 11.895043731778426,
+    "low": 8.364072458906408,
+    "high": 16.073399106685375,
+    "units": 26
+   },
+   "flag recall (symbols-wrong aligned equations that were a required decision)": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0,
+    "units": 26
+   },
+   "required decisions per PDF page": {
+    "point": 0.0,
+    "low": 0.0,
+    "high": 0.0,
+    "units": 26
+   },
+   "unseen loss per 100 gold (silent plus undetected)": {
+    "point": 18.425655976676385,
+    "low": 13.956623201497715,
+    "high": 25.019199823094667,
+    "units": 26
+   },
+   "cost per PDF page (USD)": {
+    "point": 0.0017166717557251907,
+    "low": 0.0015553426190476186,
+    "high": 0.0018907846442814409,
+    "units": 26
+   },
+   "detection recall": {
+    "point": 0.9346938775510204,
+    "low": 0.8842909625014226,
+    "high": 0.9646733020715257,
+    "units": 26
+   },
+   "symbols, credited": {
+    "point": 0.7755102040816326,
+    "low": 0.7088901455546813,
+    "high": 0.8259952558517315,
+    "units": 26
+   },
+   "A": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.848356309650053,
+     "units": 12
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.76033934252386,
+     "units": 12
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 9.43796394485684,
+     "units": 12
+    }
+   },
+   "B": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.6259259259259259,
+     "units": 6
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.5,
+     "units": 6
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 25.185185185185187,
+     "units": 6
+    }
+   },
+   "C": {
+    "spoken-equal, end to end (primary)": {
+     "point": 0.8565737051792829,
+     "units": 8
+    },
+    "exact_lenient (secondary)": {
+     "point": 0.8047808764940239,
+     "units": 8
+    },
+    "silent errors per 100 gold (wrong under the primary, not asked)": {
+     "point": 9.362549800796813,
+     "units": 8
+    }
+   }
+  }
+ },
+ "paired": [
+  {
+   "other": "Control",
+   "metric": "spoken-equal, end to end (primary)",
+   "units": 26,
+   "estimate": 0.0011661807580175543,
+   "low": -0.0038255791031025386,
+   "high": 0.0047562425683709275,
+   "low_975": -0.00481434678145389,
+   "high_975": 0.005146738386580353,
+   "sign_flip_p": 1.0,
+   "strata": {
+    "A": 0.0031813361611877644,
+    "B": -0.007407407407407418,
+    "C": 0.0019920318725099584
+   },
+   "missing_units": []
+  },
+  {
+   "other": "Control",
+   "metric": "exact_lenient (secondary)",
+   "units": 26,
+   "estimate": 0.010495626822157433,
+   "low": -0.0013124439514184396,
+   "high": 0.028377069101418868,
+   "low_975": -0.002421454787531763,
+   "high_975": 0.0315925446406788,
+   "sign_flip_p": 0.2734375,
+   "strata": {
+    "A": 0.019088016967126253,
+    "B": -0.007407407407407307,
+    "C": 0.003984063745019917
+   },
+   "missing_units": []
+  },
+  {
+   "other": "Control",
+   "metric": "silent errors per 100 gold (wrong under the primary, not asked)",
+   "units": 26,
+   "estimate": -1.574344023323616,
+   "low": -3.6145192077530695,
+   "high": -0.16787677972530868,
+   "low_975": -4.006912422774655,
+   "high_975": -0.07111685377016069,
+   "sign_flip_p": 0.0625,
+   "strata": {
+    "A": -0.3181336161187698,
+    "B": -8.88888888888889,
+    "C": 0.0
+   },
+   "missing_units": []
+  },
+  {
+   "other": "Control",
+   "metric": "unseen loss per 100 gold (silent plus undetected)",
+   "units": 26,
+   "estimate": -1.574344023323615,
+   "low": -3.6145192077530703,
+   "high": -0.16787677972530957,
+   "low_975": -4.006912422774654,
+   "high_975": -0.07111685377016157,
+   "sign_flip_p": 0.0625,
+   "strata": {
+    "A": -0.3181336161187698,
+    "B": -8.888888888888888,
+    "C": 0.0
+   },
+   "missing_units": []
+  },
+  {
+   "other": "Chatbot, Opus",
+   "metric": "spoken-equal, end to end (primary)",
+   "units": 26,
+   "estimate": 0.004081632653061273,
+   "low": -0.01983305678439745,
+   "high": 0.031251790488922813,
+   "low_975": -0.022886515285743404,
+   "high_975": 0.036078172205438165,
+   "sign_flip_p": 0.441655,
+   "strata": {
+    "A": -0.01166489925768821,
+    "B": 0.03703703703703709,
+    "C": 0.015936254980079667
+   },
+   "missing_units": []
+  },
+  {
+   "other": "Chatbot, Opus",
+   "metric": "exact_lenient (secondary)",
+   "units": 26,
+   "estimate": 0.022740524781341143,
+   "low": -0.012393418735647522,
+   "high": 0.06113585187020914,
+   "low_975": -0.0162040794853295,
+   "high_975": 0.06783576373622552,
+   "sign_flip_p": 0.191765,
+   "strata": {
+    "A": -0.0042417815482501675,
+    "B": 0.12222222222222223,
+    "C": 0.019920318725099584
+   },
+   "missing_units": []
+  },
+  {
+   "other": "Chatbot, Opus",
+   "metric": "silent errors per 100 gold (wrong under the primary, not asked)",
+   "units": 26,
+   "estimate": -4.548104956268221,
+   "low": -9.127120026092626,
+   "high": -0.9644218828296917,
+   "low_975": -9.904729547152412,
+   "high_975": -0.5847655198956409,
+   "sign_flip_p": 0.005485,
+   "strata": {
+    "A": -3.393425238600212,
+    "B": -19.25925925925926,
+    "C": 1.195219123505976
+   },
+   "missing_units": []
+  },
+  {
+   "other": "Chatbot, Opus",
+   "metric": "unseen loss per 100 gold (silent plus undetected)",
+   "units": 26,
+   "estimate": -5.422740524781341,
+   "low": -10.322617108685609,
+   "high": -1.6911813730912693,
+   "low_975": -11.07324146189563,
+   "high_975": -1.1705646389799678,
+   "sign_flip_p": 0.00833,
+   "strata": {
+    "A": -3.2873806998939568,
+    "B": -18.148148148148152,
+    "C": -2.5896414342629477
+   },
+   "missing_units": []
+  },
+  {
+   "other": "Chatbot, Opus, strong prompt",
+   "metric": "spoken-equal, end to end (primary)",
+   "units": 17,
+   "estimate": 0.006962576153176747,
+   "low": -0.03308173575547055,
+   "high": 0.050378162018789835,
+   "low_975": -0.03759449025790287,
+   "high_975": 0.055854015588595006,
+   "sign_flip_p": 0.5667724609375,
+   "strata": {
+    "A": -0.049429657794676785,
+    "B": 0.05599999999999994,
+    "C": 0.0536193029490617
+   },
+   "missing_units": [
+    "arxiv/2406.12076",
+    "arxiv/2406.15398",
+    "arxiv/2407.08468",
+    "arxiv/2501.16660",
+    "arxiv/2503.17870",
+    "arxiv/2505.04942",
+    "course/course_gmarciani_research_computer-security_main",
+    "course/course_sim1-99_medical-physics-notes_main",
+    "statistics/12-2-the-regression-equation"
+   ]
+  },
+  {
+   "other": "Chatbot, Opus, strong prompt",
+   "metric": "exact_lenient (secondary)",
+   "units": 17,
+   "estimate": 0.10182767624020883,
+   "low": 0.057802731545371036,
+   "high": 0.15585794757262306,
+   "low_975": 0.052715137141999026,
+   "high_975": 0.1639570336011619,
+   "sign_flip_p": 0.03350830078125,
+   "strata": {
+    "A": 0.09695817490494296,
+    "B": 0.07599999999999996,
+    "C": 0.12600536193029488
+   },
+   "missing_units": [
+    "arxiv/2406.12076",
+    "arxiv/2406.15398",
+    "arxiv/2407.08468",
+    "arxiv/2501.16660",
+    "arxiv/2503.17870",
+    "arxiv/2505.04942",
+    "course/course_gmarciani_research_computer-security_main",
+    "course/course_sim1-99_medical-physics-notes_main",
+    "statistics/12-2-the-regression-equation"
+   ]
+  },
+  {
+   "other": "Chatbot, Opus, strong prompt",
+   "metric": "silent errors per 100 gold (wrong under the primary, not asked)",
+   "units": 17,
+   "estimate": -8.96431679721497,
+   "low": -14.970906204669237,
+   "high": -4.105375419719967,
+   "low_975": -15.951905100135754,
+   "high_975": -3.4854068821911115,
+   "sign_flip_p": 0.00018310546875,
+   "strata": {
+    "A": -6.463878326996198,
+    "B": -22.0,
+    "C": -3.753351206434316
+   },
+   "missing_units": [
+    "arxiv/2406.12076",
+    "arxiv/2406.15398",
+    "arxiv/2407.08468",
+    "arxiv/2501.16660",
+    "arxiv/2503.17870",
+    "arxiv/2505.04942",
+    "course/course_gmarciani_research_computer-security_main",
+    "course/course_sim1-99_medical-physics-notes_main",
+    "statistics/12-2-the-regression-equation"
+   ]
+  },
+  {
+   "other": "Chatbot, Opus, strong prompt",
+   "metric": "unseen loss per 100 gold (silent plus undetected)",
+   "units": 17,
+   "estimate": -6.701479547432552,
+   "low": -14.137875289973778,
+   "high": -1.066375397954351,
+   "low_975": -15.607087806220754,
+   "high_975": -0.4162544830318652,
+   "sign_flip_p": 0.00927734375,
+   "strata": {
+    "A": -0.7604562737642571,
+    "B": -20.0,
+    "C": -6.166219839142091
+   },
+   "missing_units": [
+    "arxiv/2406.12076",
+    "arxiv/2406.15398",
+    "arxiv/2407.08468",
+    "arxiv/2501.16660",
+    "arxiv/2503.17870",
+    "arxiv/2505.04942",
+    "course/course_gmarciani_research_computer-security_main",
+    "course/course_sim1-99_medical-physics-notes_main",
+    "statistics/12-2-the-regression-equation"
+   ]
+  },
+  {
+   "other": "Chatbot, Haiku",
+   "metric": "spoken-equal, end to end (primary)",
+   "units": 26,
+   "estimate": 0.023906705539358586,
+   "low": -0.01751137297889841,
+   "high": 0.0717764939886194,
+   "low_975": -0.023580641854320097,
+   "high_975": 0.07939021255815147,
+   "sign_flip_p": 0.02607,
+   "strata": {
+    "A": 0.0,
+    "B": 0.07777777777777783,
+    "C": 0.03984063745019917
+   },
+   "missing_units": []
+  },
+  {
+   "other": "Chatbot, Haiku",
+   "metric": "exact_lenient (secondary)",
+   "units": 26,
+   "estimate": 0.0606413994169096,
+   "low": 0.006671399624377699,
+   "high": 0.11566822600789015,
+   "low_975": -0.0014378793584400287,
+   "high_975": 0.12279766062273346,
+   "sign_flip_p": 0.04393,
+   "strata": {
+    "A": 0.044538706256627814,
+    "B": 0.1518518518518519,
+    "C": 0.04183266932270924
+   },
+   "missing_units": []
+  },
+  {
+   "other": "Chatbot, Haiku",
+   "metric": "silent errors per 100 gold (wrong under the primary, not asked)",
+   "units": 26,
+   "estimate": -6.880466472303207,
+   "low": -10.885890637472915,
+   "high": -3.4960550387567344,
+   "low_975": -11.556645915663074,
+   "high_975": -3.04318021993387,
+   "sign_flip_p": 0.00015,
+   "strata": {
+    "A": -5.090137857900318,
+    "B": -15.925925925925927,
+    "C": -5.378486055776893
+   },
+   "missing_units": []
+  },
+  {
+   "other": "Chatbot, Haiku",
+   "metric": "unseen loss per 100 gold (silent plus undetected)",
+   "units": 26,
+   "estimate": -7.405247813411078,
+   "low": -13.797064208277671,
+   "high": -2.3116553195813445,
+   "low_975": -14.720202366396185,
+   "high_975": -1.6259311462461317,
+   "sign_flip_p": 0.000335,
+   "strata": {
+    "A": -4.453870625662779,
+    "B": -22.22222222222222,
+    "C": -4.9800796812748995
+   },
+   "missing_units": []
+  }
+ ],
+ "stratum_d": {
+  "Candidate": {
+   "units": 3,
+   "chem_right_excl_times": {
+    "n": 123,
+    "right": 41,
+    "rate": 0.3333333333333333,
+    "lone_times": 0,
+    "chem_right_n": 123,
+    "chem_right": 41,
+    "chem_right_rate": 0.3333333333333333
+   },
+   "silent_harm": {
+    "n_gold": 123,
+    "n": 23,
+    "per_100_gold": 18.69918699186992
+   },
+   "spoken_equal": 0.18699186991869918,
+   "exact_lenient": 0.008130081300813009,
+   "gold": 123,
+   "cost_usd": 0.33124808,
+   "pages": 24
+  },
+  "Control": {
+   "units": 3,
+   "chem_right_excl_times": {
+    "n": 123,
+    "right": 41,
+    "rate": 0.3333333333333333,
+    "lone_times": 0,
+    "chem_right_n": 123,
+    "chem_right": 41,
+    "chem_right_rate": 0.3333333333333333
+   },
+   "silent_harm": {
+    "n_gold": 123,
+    "n": 30,
+    "per_100_gold": 24.390243902439025
+   },
+   "spoken_equal": 0.18699186991869918,
+   "exact_lenient": 0.008130081300813009,
+   "gold": 123,
+   "cost_usd": 0.32412728,
+   "pages": 24
+  },
+  "Chatbot, Opus": {
+   "units": 3,
+   "chem_right_excl_times": {
+    "n": 123,
+    "right": 3,
+    "rate": 0.024390243902439025,
+    "lone_times": 0,
+    "chem_right_n": 123,
+    "chem_right": 3,
+    "chem_right_rate": 0.024390243902439025
+   },
+   "silent_harm": {
+    "n_gold": 123,
+    "n": 4,
+    "per_100_gold": 3.252032520325203
+   },
+   "spoken_equal": 0.008130081300813009,
+   "exact_lenient": 0.008130081300813009,
+   "gold": 123,
+   "cost_usd": 1.600076,
+   "pages": 24
+  },
+  "Chatbot, Haiku": {
+   "units": 3,
+   "chem_right_excl_times": {
+    "n": 123,
+    "right": 2,
+    "rate": 0.016260162601626018,
+    "lone_times": 0,
+    "chem_right_n": 123,
+    "chem_right": 2,
+    "chem_right_rate": 0.016260162601626018
+   },
+   "silent_harm": {
+    "n_gold": 123,
+    "n": 5,
+    "per_100_gold": 4.065040650406504
+   },
+   "spoken_equal": 0.008130081300813009,
+   "exact_lenient": 0.008130081300813009,
+   "gold": 123,
+   "cost_usd": 0.034728,
+   "pages": 24
+  }
+ },
+ "cost_per_page_all_units": {
+  "Candidate": 0.02087442725806452,
+  "Control": 0.020565286612903223,
+  "Chatbot, Opus": 0.06786397419354838,
+  "Chatbot, Opus, strong prompt": 0.09798335802469135,
+  "Chatbot, Haiku": 0.0016749161290322578
+ },
+ "criteria": [
+  {
+   "criterion": "1. primary, candidate minus Opus chatbot",
+   "met": false,
+   "value": "no difference this set can detect (higher by point estimate)"
+  },
+  {
+   "criterion": "2. silent errors <= 4.0, <= half the Opus chatbot's, <= control + 0.5",
+   "met": false,
+   "value": "candidate 5.01, Opus 9.56, control 6.59"
+  },
+  {
+   "criterion": "3. flag recall >= 0.60 at <= 4.0 required decisions a page",
+   "met": false,
+   "value": "recall 0.461, 2.87 a page"
+  },
+  {
+   "criterion": "4. unseen loss <= the Opus chatbot's",
+   "met": true,
+   "value": "11.02 vs 16.44"
+  },
+  {
+   "criterion": "5. cost <= $0.07 a page (all 29 units)",
+   "met": true,
+   "value": "$0.0209 a page"
+  }
+ ],
+ "claim": false,
+ "wording": {
+  "Control": "no difference this set can detect (higher by point estimate)",
+  "Chatbot, Opus": "no difference this set can detect (higher by point estimate)",
+  "Chatbot, Opus, strong prompt": "no difference this set can detect (higher by point estimate)",
+  "Chatbot, Haiku": "no difference this set can detect (higher by point estimate)"
+ },
+ "stratum_d_criteria": [
+  {
+   "criterion": "D1. candidate chemically right >= 0.80",
+   "met": false,
+   "value": "0.333"
+  },
+  {
+   "criterion": "D2. candidate >= control + 5 points",
+   "met": false,
+   "value": "0.333 vs 0.333"
+  },
+  {
+   "criterion": "D3. candidate >= Opus chatbot (point)",
+   "met": true,
+   "value": "0.333 vs 0.024"
+  },
+  {
+   "criterion": "D4. silent harm <= 1 per 100",
+   "met": false,
+   "value": "18.70"
+  }
+ ],
+ "coverage": {
+  "Candidate": {
+   "answered_units": 29,
+   "missing_public_units": [],
+   "missing_private_units": 0,
+   "not_ok_public": {}
+  },
+  "Control": {
+   "answered_units": 29,
+   "missing_public_units": [],
+   "missing_private_units": 0,
+   "not_ok_public": {}
+  },
+  "Chatbot, Opus": {
+   "answered_units": 29,
+   "missing_public_units": [],
+   "missing_private_units": 0,
+   "not_ok_public": {}
+  },
+  "Chatbot, Opus, strong prompt": {
+   "answered_units": 17,
+   "missing_public_units": [
+    "arxiv/2406.12076",
+    "arxiv/2406.15398",
+    "arxiv/2407.08468",
+    "arxiv/2501.16660",
+    "arxiv/2503.17870",
+    "arxiv/2505.04942",
+    "chemistry/2-6-molecular-and-ionic-compounds",
+    "course/course_gmarciani_research_computer-security_main",
+    "course/course_sim1-99_medical-physics-notes_main",
+    "statistics/12-2-the-regression-equation"
+   ],
+   "missing_private_units": 2,
+   "not_ok_public": {}
+  },
+  "Chatbot, Haiku": {
+   "answered_units": 29,
+   "missing_public_units": [],
+   "missing_private_units": 0,
+   "not_ok_public": {}
+  }
+ }
+}
