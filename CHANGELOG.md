@@ -906,7 +906,7 @@ are in the code and off on readablestem.com until the sandbox check passes there
   (version 0.4.0), which stay on `/limits` and in `PROOF.md` as history. Registered wording: no difference this set
   can detect from the Opus chatbot on the primary score (0.840 against 0.836, 26 documents, 1,715 equations);
   silent errors 5.0 against 9.6 per 100 (goal 4.0 not met); flag recall 0.46 (goal 0.60 not met); chemistry (3
-  sections) not a success. The tiles come from `PROOF.md` through `web/proof_facts.py`.
+  sections) not a success. The tiles come from `docs/eval-equation-fresh5.md` through `web/proof_facts.py`.
 
 #### Site copy rewrite (branch content/site-rewrite)
 
@@ -1215,9 +1215,10 @@ are in the code and off on readablestem.com until the sandbox check passes there
   Beamer and zip-batch features, because the sandbox probe fails on Railway), limits, the pipeline version (0.5.9),
   deploy files (`.railway/railway.ts`, not `railway.json`), settings in `.env.example`, decision-record statuses and
   the documentation index.
-- `PROOF.md` leads with the newest registered result (fresh5, 2026-11-04) and keeps the first registered result
-  (15 OpenStax sections, version 0.4.0) as history; `docs/eval.md` lists the registered results newest first; the README's
-  results section follows the same order.
+- `docs/eval.md` lists the registered results newest first and the README's results section follows the same order: the
+  fresh5 result (26 documents, version 0.5.9) first, the first registered result (15 OpenStax sections, version 0.4.0) as
+  history. `PROOF.md` is the replayed report of that first result and stays as it is (`proof/verify-rename.py` checks it
+  against its tag); the site's proof tiles read `docs/eval-equation-fresh5.md` through `web/proof_facts.py`.
 
 #### Screen-reader test protocol
 

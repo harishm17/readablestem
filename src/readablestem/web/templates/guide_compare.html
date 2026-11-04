@@ -69,7 +69,7 @@
 <span class="source-note"><a href="{{ href }}">{{ label }}</a>, read <time datetime="{{ day }}">{{ {"2026-10-28": "October 28, 2026", "2026-11-03": "November 3, 2026", "2026-10-14": "October 14, 2026", "2026-11-04": "November 4, 2026"}[day] }}</time></span>
 {%- endmacro %}
 {% set RS = source_url ~ "/blob/main/README.md" %}
-{% set PF = source_url ~ "/blob/main/PROOF.md#latest-registered-result-fresh5-2026-11-04" %}
+{% set PF = source_url ~ "/blob/main/docs/eval-equation-fresh5.md" %}
 {% set PF_FIRST = source_url ~ "/blob/main/PROOF.md#comparison-with-the-chatbot-recipe" %}
 {% set MX = "https://mathpix.com/pdf-to-html" %}
 {% set AE = "https://aelira.ai/us" %}
@@ -131,10 +131,10 @@
 {% endif %}
 {%- endmacro %}
 {% macro cell_7(tool) -%}
-{% if tool == 0 %}26 documents held out (registered test, 1,715 equations): 0.840 of equations read the same as the original, end to end, and 0.793 exactly right. {{ src(PF, "2026-11-04", "PROOF.md") }}
+{% if tool == 0 %}26 documents held out (registered test, 1,715 equations): 0.840 of equations read the same as the original, end to end, and 0.793 exactly right. {{ src(PF, "2026-11-04", "Report") }}
 {% elif tool == 1 %}We have not run it, so this page makes no accuracy comparison.
 {% elif tool == 2 %}We have not run it. Its FAQ says automated scores do not establish WCAG conformance. {{ src(AE, "2026-11-03") }}
-{% elif tool == 3 %}The same test with one prompt on Claude Opus: 0.836 and 0.770; the test can detect no difference between the two on the first score. {{ src(PF, "2026-11-04", "PROOF.md") }}
+{% elif tool == 3 %}The same test with one prompt on Claude Opus: 0.836 and 0.770; the test can detect no difference between the two on the first score. {{ src(PF, "2026-11-04", "Report") }}
 {% elif tool == 4 %}We have not run it; it starts from LaTeX source.
 {% endif %}
 {%- endmacro %}
@@ -254,7 +254,7 @@
   0.840: the test found no difference it could detect. Exactly right, symbol for symbol, it was
   0.770 against 0.793. ReadableSTEM left fewer wrong equations without a question to the
   reader (5.0 against 9.6 per 100), but not as few as the goal registered before the run.
-  <a href="{{ source_url }}/blob/main/PROOF.md#latest-registered-result-fresh5-2026-11-04">The
+  <a href="{{ source_url }}/blob/main/docs/eval-equation-fresh5.md">The
   full result</a>. An earlier test, on 15 textbook sections, had the chatbot ahead on equations
   exactly right (0.62 against 0.50); it ran on version 0.4.0, and
   <a href="{{ source_url }}/blob/main/PROOF.md#comparison-with-the-chatbot-recipe">its
@@ -277,7 +277,7 @@
   <li><a href="https://dlmf.nist.gov/LaTeXML/">LaTeXML home page</a> and <a href="https://math.nist.gov/~BMiller/LaTeXML/">project description</a> (NIST)</li>
   <li><a href="https://dlmf.nist.gov/LaTeXML/manual/usage/">LaTeXML manual: using LaTeXML</a> and <a href="https://dlmf.nist.gov/LaTeXML/manual/commands/latexmlpost.html">latexmlpost options</a> (version 0.8.8, February 26, 2024)</li>
   <li><a href="https://aelira.ai/us">Aelira, United States</a> (what it checks and fixes, its formats, plans and FAQ; read on November 3, 2026)</li>
-  <li><a href="{{ source_url }}/blob/main/PROOF.md#latest-registered-result-fresh5-2026-11-04">PROOF.md, latest registered result</a> (the recipe and its results; run on November 4, 2026) and the <a href="{{ source_url }}/blob/main/PROOF.md#comparison-with-the-chatbot-recipe">earlier comparison</a> (run recorded on October 14, 2026)</li>
+  <li><a href="{{ source_url }}/blob/main/docs/eval-equation-fresh5.md">Report of the latest registered result</a> (the recipe and its results; run on November 4, 2026) and the <a href="{{ source_url }}/blob/main/PROOF.md#comparison-with-the-chatbot-recipe">earlier comparison</a> (run recorded on October 14, 2026)</li>
   <li><a href="https://github.com/brucemiller/LaTeXML/blob/master/LICENSE">LaTeXML licence file</a> and <a href="https://github.com/brucemiller/LaTeXML/releases/tag/v0.8.8">release v0.8.8</a> (GitHub)</li>
   <li><a href="{{ source_url }}/blob/main/README.md">ReadableSTEM README</a>, <a href="/limits">known limits</a>, <a href="/help/posting">posting in your course</a> and <a href="{{ source_url }}/blob/main/PROOF.md">PROOF.md</a></li>
 </ul>

@@ -8,7 +8,7 @@ arrived at; read them by question, not front to back.
 
 | Question | Read |
 |---|---|
-| What is the newest registered result, and what may be claimed from it? | [../PROOF.md](../PROOF.md), "Latest registered result"; [eval-equation-fresh5.md](eval-equation-fresh5.md) (fresh5, 26 documents, 2026-11-04: no difference from the Opus chatbot this set can detect) |
+| What is the newest registered result, and what may be claimed from it? | [eval-equation-fresh5.md](eval-equation-fresh5.md) (fresh5, 26 documents, 2026-11-04: no difference from the Opus chatbot this set can detect) |
 | How is quality measured, on what data, with what error bars? | [eval.md](eval.md): "The idea", "Metrics", "Results", then "What the numbers do not show" |
 | Why does the app ask a person about some conversions and not others? | [steps.md](steps.md); [eval.md](eval.md), "Review load" |
 | How are equations and figures checked after the model has answered? | [steps.md](steps.md) |

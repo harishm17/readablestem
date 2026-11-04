@@ -9,28 +9,28 @@
       "label": "spoken-equal, end to end",
       "count": "1,715 gold equations in 26 documents",
       "caveat": "The chatbot on Opus scored 0.836: this set can detect no difference between them.",
-      "href": "https://github.com/harishm17/readablestem/blob/main/PROOF.md#latest-registered-result-fresh5-2026-11-04"
+      "href": "https://github.com/harishm17/readablestem/blob/main/docs/eval-equation-fresh5.md#primary-and-secondaries-strata-a-to-c-pooled"
     },
     {
       "value": "0.793",
       "label": "exactly right, end to end",
       "count": "1,715 gold equations in 26 documents",
       "caveat": "The chatbot on Opus scored 0.770.",
-      "href": "https://github.com/harishm17/readablestem/blob/main/PROOF.md#latest-registered-result-fresh5-2026-11-04"
+      "href": "https://github.com/harishm17/readablestem/blob/main/docs/eval-equation-fresh5.md#primary-and-secondaries-strata-a-to-c-pooled"
     },
     {
       "value": "5.0",
       "label": "wrong equations nobody is asked about, per 100",
       "count": "1,715 gold equations in 26 documents",
       "caveat": "The chatbot on Opus: 9.6. The goal registered before the run was 4.0 or fewer, so it was not met.",
-      "href": "https://github.com/harishm17/readablestem/blob/main/PROOF.md#latest-registered-result-fresh5-2026-11-04"
+      "href": "https://github.com/harishm17/readablestem/blob/main/docs/eval-equation-fresh5.md#primary-and-secondaries-strata-a-to-c-pooled"
     },
     {
       "value": "0.46",
       "label": "of wrong equations the review screen asks about",
       "count": "1,715 gold equations in 26 documents",
       "caveat": "The goal registered before the run was 0.60, so it was not met. A chatbot asks nothing.",
-      "href": "https://github.com/harishm17/readablestem/blob/main/PROOF.md#latest-registered-result-fresh5-2026-11-04"
+      "href": "https://github.com/harishm17/readablestem/blob/main/docs/eval-equation-fresh5.md#primary-and-secondaries-strata-a-to-c-pooled"
     }
   ]
 }

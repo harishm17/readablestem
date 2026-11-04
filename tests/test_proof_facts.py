@@ -1,6 +1,6 @@
-"""The proof numbers on the landing page and /limits come from PROOF.md once (web/proof_facts.py):
-the committed snapshot equals what PROOF.md says now, each fact names its count and links to how
-it was measured, and no fact says one tool beats another."""
+"""The proof numbers on the landing page and /limits come from the registered fresh5 report once
+(web/proof_facts.py): the committed snapshot equals what the report says now, each fact names
+its count and links to how it was measured, and no fact says one tool beats another."""
 
 from __future__ import annotations
 
@@ -16,11 +16,11 @@ from readablestem.web import proof_facts
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def test_the_snapshot_is_what_proof_md_says_now():
-    parsed = proof_facts.parse(proof_facts.PROOF_MD.read_text(encoding="utf-8"))
+def test_the_snapshot_is_what_the_report_says_now():
+    parsed = proof_facts.parse(proof_facts.REPORT.read_text(encoding="utf-8"))
     snapshot = json.loads(proof_facts.SNAPSHOT.read_text(encoding="utf-8"))
     assert snapshot == asdict(parsed), (
-        "PROOF.md changed: run `uv run python -m readablestem.web.proof_facts`"
+        "the fresh5 report changed: run `uv run python -m readablestem.web.proof_facts`"
     )
 
 
@@ -36,12 +36,12 @@ def test_every_fact_has_its_count_a_caveat_and_a_link():
             and fact.href.startswith("https://")
         )
         assert "beat" not in (fact.label + fact.caveat).lower()
-        assert "#" in fact.href  # a section of PROOF.md, not just the file
+        assert "#" in fact.href  # a section of the report, not just the file
         assert fact.count == "1,715 gold equations in 26 documents"
 
 
 def test_the_tiles_are_the_registered_fresh5_numbers_and_say_where_goals_were_missed():
-    """docs/eval-equation-fresh5.md is the report; PROOF.md and the tiles quote it."""
+    """docs/eval-equation-fresh5.md is the report; the tiles quote it."""
     report = (ROOT / "docs/eval-equation-fresh5.md").read_text(encoding="utf-8")
     primary, exact, silent, recall = proof_facts.load().facts
     assert primary.value == "0.840" and "0.840** [0.791, 0.876]" in report

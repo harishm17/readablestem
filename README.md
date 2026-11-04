@@ -57,7 +57,7 @@ The newest held-out result is the fifth fresh split, run once on 2026-11-04 unde
 equations only, on ReadableSTEM pipeline 0.5.9 with the settings the live service uses: 26
 documents (12 arXiv papers, 6 OpenStax sections, 8 course LaTeX documents, 3 of them Beamer
 decks), 131 pages, 1,715 gold equations. Report: [docs/eval-equation-fresh5.md](docs/eval-equation-fresh5.md);
-the summary is in [PROOF.md](PROOF.md).
+[PROOF.md](PROOF.md) is the replayed report of the first registered result, below.
 
 | Strata A to C, 26 documents, 1,715 gold equations | ReadableSTEM | Chatbot, Opus | Chatbot, Haiku |
 |---|---|---|---|

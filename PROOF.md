@@ -4,30 +4,6 @@ ReadableSTEM assists a person who makes course material accessible. Nothing here
 
 > **Incomplete.** Not computed in this build: Human labels and judge agreement.
 
-## Latest registered result: fresh5 (2026-11-04)
-
-The newest registered held-out result is the fifth fresh split ("fresh5"): equations only, run once on 2026-11-04 under `data/realworld/PREREGISTRATION-FRESH5.md` (registration hash in `data/realworld/REGISTRATION-fresh5.sha256`, merged to `main` before the first request). The code was ReadableSTEM pipeline 0.5.9 with the settings the live service uses. It covers 26 documents (12 arXiv papers, 6 OpenStax sections, 8 course LaTeX documents, 3 of them Beamer decks) and 1,715 gold equations on 131 pages. The full report, with the paired differences, the strata and the spend, is [docs/eval-equation-fresh5.md](docs/eval-equation-fresh5.md); the machine-readable copy is `data/realworld/results-fresh5.json`.
-
-**Verdict, as registered:** on the primary score (spoken-equal, end to end) ReadableSTEM and the chatbot on Claude Opus show **no difference this set can detect** (ReadableSTEM higher by point estimate). The claim that ReadableSTEM beats the chatbot baseline on equations is not made: the silent-error and flag-recall criteria were not met. Stratum D (chemistry) is not a success, and its comparison with the chatbots is not measured.
-
-| Measure (95% interval, n = 26 documents, 1,715 gold equations) | ReadableSTEM | Chatbot on Opus |
-|---|---|---|
-| Spoken-equal, end to end (primary) | 0.840 [0.791, 0.876] | 0.836 [0.778, 0.878] |
-| Exact match, tree equal (secondary) | 0.793 [0.736, 0.834] | 0.770 [0.704, 0.824] |
-| Wrong equations nobody is asked about, per 100 gold | 5.02 [3.55, 6.39] | 9.56 [5.86, 14.55] |
-| Share of wrong equations the review screen asks about (flag recall) | 0.461 [0.309, 0.613] | 0 (asks nothing) |
-| Cost per page | $0.0222 | $0.0681 |
-
-Paired difference on the primary, ReadableSTEM minus the Opus chatbot: +0.004, 97.5% interval [-0.023, +0.036], sign-flip p 0.44. The set was powered for about 3 points, so a difference smaller than that is not claimed either way.
-
-Registered criteria: the primary criterion is not met; silent errors are above the registered 4.0 per 100 gold (5.02, the Opus chatbot's is 9.56); flag recall is below the registered 0.60 (0.461, at 2.87 required decisions a page); the unseen-loss criterion (11.02 against 16.44) and the cost criterion ($0.0209 a page over 29 units) are met. Stratum D (3 OpenStax chemistry sections, 123 gold equations): chemically right 0.333, below the registered 0.80.
-
-What it does not say: one run per arm; the speech is ReadableSTEM's own rules, not a particular screen reader's; nothing about scans, handwriting, Word files or maths inside figures. This result does not change the earlier one below: the October 2026 OpenStax result stays as history.
-
-## First registered result: held-out OpenStax sections (October 2026, pipeline 0.4.0)
-
-Everything from here down is the first registered result: 15 OpenStax sections, recorded 2026-10-14 on pipeline 0.4.0. It is kept as history and replayed byte for byte at the tag `proof-heldout-2026-10` (see [Reproduce](#reproduce)). The pipeline has changed since; for the current system see the latest result above.
-
 ## Status
 
 |  |  |

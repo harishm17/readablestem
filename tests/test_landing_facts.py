@@ -76,11 +76,8 @@ def test_limits_latest_registered_numbers_match_the_fresh5_report(pages):
     assert "so it was not met" in text and "do not claim that ReadableSTEM does better" in text
     assert "26 / 1,715 / 131" in FRESH5 and "26 documents" in text and "1,715" in text
     assert "0.33 right as chemistry" in text and "not measured" in text
-    # PROOF.md carries the same section, and keeps the first registered result as history.
-    assert "## Latest registered result: fresh5 (2026-11-04)" in PROOF
-    assert "## First registered result: held-out OpenStax sections" in PROOF
-    for needle in ("0.840 [0.791, 0.876]", "0.836 [0.778, 0.878]", "+0.004, 97.5% interval"):
-        assert needle in PROOF, needle
+    # PROOF.md is the replayed report of the first registered result and says nothing of fresh5.
+    assert "fresh5" not in PROOF
 
 
 def test_limits_first_registered_result_is_history_and_matches_proof_md(pages):

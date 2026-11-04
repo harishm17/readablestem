@@ -143,8 +143,7 @@
 <p>The main result is the newest registered test: 26 documents the tool had not seen (12 arXiv
   papers, 6 OpenStax sections and 8 course documents made with LaTeX, 131 pages, 1,715
   equations), run once on 2026-11-04 with version 0.5.9 and the settings the live service uses
-  (<a href="{{ source_url }}/blob/main/PROOF.md#latest-registered-result-fresh5-2026-11-04">full
-  results</a>, <a href="{{ source_url }}/blob/main/docs/eval-equation-fresh5.md">the
+  (<a href="{{ source_url }}/blob/main/docs/eval-equation-fresh5.md">the full
   report</a>):</p>
 <ul>
   <li>Equations, scored by whether a screen reader reads each one the same as the original:
@@ -171,15 +170,15 @@
 <p>Earlier results, kept as history (older versions of the tool):</p>
 <ul>
   <li><strong>The first registered test</strong> (15 sections of five OpenStax textbooks, 242
-    pages, 2,738 equations, version 0.4.0, October 2026; <a href="{{ source_url }}/blob/main/PROOF.md#first-registered-result-held-out-openstax-sections-october-2026-pipeline-040">full
+    pages, 2,738 equations, version 0.4.0, October 2026; <a href="{{ source_url }}/blob/main/PROOF.md">full
     results</a>). Equations: it found about as many as the chatbot (Claude Opus given the PDF
     and one sentence), 89% of them in both cases, but fewer came out exactly right end to end:
     about half (0.50) against 0.62 for the chatbot. Given each equation on its own, about two in
     three were right (0.68). Headings: F1 0.96, with every matched heading at the right level.
     (F1 is a score out of 1 that counts both headings missed and headings invented.) Figure
     descriptions: 97% passed a model judge, a second AI model asked whether each description is
-    right (not yet checked by people). It asked for about 1.8 decisions a page, and for only a
-    third of the equations that were wrong.</li>
+    right (not yet checked by people). Decisions it asked for: about 1.8 per page; it
+    asked about only a third of the equations that were wrong.</li>
   <li><strong>Research papers typeset with LaTeX, held out</strong> (15 arXiv papers, 71
     pages, 1,826 equations, registered before the run): 0.58 of equations exactly right end to
     end, against 0.64 for the chatbot on Opus and on Haiku. The set is too small to show a

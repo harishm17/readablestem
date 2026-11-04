@@ -20,11 +20,11 @@ system.
 
 | Result | Report |
 |---|---|
-| fresh5, 2026-11-04: 26 documents, 1,715 gold equations. Registered verdict on the primary score: no difference this set can detect from the Opus chatbot (0.840 against 0.836); silent-error and flag-recall criteria not met; stratum D (chemistry) not a success. Pipeline 0.5.9 | [eval-equation-fresh5.md](eval-equation-fresh5.md) (summary in [PROOF.md](../PROOF.md)) |
+| fresh5, 2026-11-04: 26 documents, 1,715 gold equations. Registered verdict on the primary score: no difference this set can detect from the Opus chatbot (0.840 against 0.836); silent-error and flag-recall criteria not met; stratum D (chemistry) not a success. Pipeline 0.5.9 | [eval-equation-fresh5.md](eval-equation-fresh5.md) |
 | fresh4, 2026-10-26: 15 papers, 1,600 equations | [eval-equation-round3.md](eval-equation-round3.md) |
 | fresh3, 2026-10-23: a third set of papers | [eval-equation-round2.md](eval-equation-round2.md) |
 | Real-world held-out part, 2026-10-21: 15 arXiv papers, 1,826 equations | [eval-realworld.md](eval-realworld.md) |
-| First registered result, 2026-10-14: 15 OpenStax sections. Pipeline 0.4.0 | [PROOF.md](../PROOF.md), "First registered result" |
+| First registered result, 2026-10-14: 15 OpenStax sections. Pipeline 0.4.0 | [PROOF.md](../PROOF.md) (the replayed report, frozen at the tag) |
 
 ## Versions of the committed reports
 
