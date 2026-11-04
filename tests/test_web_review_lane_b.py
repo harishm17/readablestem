@@ -112,10 +112,8 @@ def test_save_decide_later_is_for_a_figure_only(env):
 
 def test_the_figure_card_names_what_each_choice_does_and_guides_the_alt_text(env):
     body = screen(env, "?item=p1-e6")
-    note = re.search(r'id="figure-note-p1-e6">([^<]+)<', body)
-    assert note is not None
-    for words in ("Accept as written", "Save and accept", "Save, decide later"):
-        assert words in note.group(1) or words in body
+    for words in ("Accept", "Save and accept", "Save, decide later"):
+        assert f">{words}<" in body
     assert "how its labelled parts connect" in body  # a diagram's guidance, not a general one
     # the list view uses the same markup
     listing = env.browser.get(f"/jobs/{env.job_id}/review/list").text
@@ -152,7 +150,7 @@ def test_bulk_page_with_nothing_to_accept_names_the_next_step(env):
     page = env.browser.get(f"/jobs/{env.job_id}/accept/equations?view=split").text
     text = text_of(page)
     assert "No equation is waiting with every check passed." in text
-    assert "still waiting, each held back by a failed check or a flag" in text
+    assert "still waits: a check failed or flagged it" in text
     assert re.search(r'href="/jobs/\w+/review\?item=p1-e\d">Review the first equation<', page)
 
 

@@ -6,7 +6,7 @@
    one made before another tab changed the review is refused, not applied. #}
 
 {% from "_describe.html" import describe_box with context %}
-{% macro flat_hint() %}<p class="hint">Some cells hold maths that the PDF's text gives flat (a fraction, a vector arrow), so this grid cannot go into the document as it is: if you use it, write those cells as LaTeX.</p>{% endmacro %}
+{% macro flat_hint() %}<p class="hint">Some cells hold flattened maths (a fraction, a vector arrow). If you use this grid, write those cells as LaTeX.</p>{% endmacro %}
 
 {% macro table_fields(view) -%}
 <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="version" value="{{ job.result_version }}">
@@ -20,7 +20,7 @@
 <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form not-a-table">
   {{ table_fields(view) }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="not_a_table">
   <button type="submit" class="button-secondary" data-role="not-a-table" aria-describedby="not-a-table-note-{{ eid }}">This grid is not a table<span class="visually-hidden"> ({{ item.label|lower }})</span></button>
-  <p class="hint" id="not-a-table-note-{{ eid }}">Its words are written one after another, without rows and columns. You can make it a table again.</p>
+  <p class="hint" id="not-a-table-note-{{ eid }}">Its words are written in order, without rows and columns.</p>
 </form>
 {% endif %}
 {% endmacro %}
@@ -59,7 +59,7 @@
 {% set name = item.label|lower %}
 {% if t.findings %}
 <div class="explained table-findings" role="group" aria-labelledby="findings-title-{{ eid }}">
-  <p class="part-label" id="findings-title-{{ eid }}">What the checks found, and what to do</p>
+  <p class="part-label" id="findings-title-{{ eid }}">What the checks found</p>
   <ul class="finding-list">
     {% for f in t.findings %}
     <li class="finding">
@@ -94,7 +94,7 @@
 {% set cell_err = item.errors.get("cell") %}
 {% set header_err = item.errors.get("header") %}
 {% if t.proposal and (t.is_data or t.local) %}
-<details class="edit-box table-edit" id="table-correct-{{ eid }}"{% if t.editing or cell_err or header_err or (item.pending and t.findings) %} open{% endif %}>
+<details class="edit-box table-edit" id="table-correct-{{ eid }}"{% if t.editing or cell_err or header_err %} open{% endif %}>
   <summary>{% if t.is_data %}Change the table{% else %}The grid read from the PDF{% endif %}</summary>
   {% if t.is_data %}
   {% if t.editing %}
@@ -149,9 +149,8 @@
   {% set col_on = (item.values.get("header_col") == "on") if "header_col" in item.values else t.header_col %}
   <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form table-headers" data-draft-key="headers">
     {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers">
-    <fieldset class="table-fieldset{% if header_err %} field-error{% endif %}" aria-describedby="header-hint-{{ eid }}{% if header_err %} header-error-{{ eid }}{% endif %}">
+    <fieldset class="table-fieldset{% if header_err %} field-error{% endif %}"{% if header_err %} aria-describedby="header-error-{{ eid }}"{% endif %}>
       <legend>Headers</legend>
-      <p class="hint" id="header-hint-{{ eid }}">A header labels the cells of its column or row; screen readers read it out with them.</p>
       {{ table_error(item, "header") }}
       <div class="checkbox-field">
         <input type="checkbox" id="header-row-{{ eid }}" name="header_row" value="on" data-edit-field{% if row_on %} checked{% endif %}{% if header_err %} aria-invalid="true"{% endif %}>
@@ -167,9 +166,10 @@
   {% endif %}
   {% if t.local %}
   <div class="table-source-grid">
-    <p class="part-label">Or start again from the grid read from the PDF</p>
-    <p class="hint">The same table read from the PDF's own text and lines, without a model.</p>
+    <p class="part-label">Or use the grid read from the PDF</p>
+    <details class="grid-preview"><summary>Compare the grid</summary>
     {{ table_box(t.local, "Grid read from the PDF for " ~ name) }}
+    </details>
     {% if t.local_flat %}{{ flat_hint() }}{% endif %}
     <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}">
       {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="use_local">
@@ -194,7 +194,7 @@
       {{ table_fields("split") }}
       <button type="submit" name="action" value="reject" class="{{ 'button' if only else 'button-secondary' }}"{% if not only %} data-tone="quiet"{% endif %} data-role="reject" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
     </form>
-    <p class="hint" id="reject-note-{{ eid }}">{% if t.proposal %}{{ item.reject.consequence }}{% else %}The image stays in the document, marked “not converted”: screen readers cannot read its cells.{% endif %}</p>
+    <p class="hint" id="reject-note-{{ eid }}">{% if t.proposal %}{{ item.reject.consequence }}{% else %}The image stays, marked “not converted”; screen readers cannot read its cells.{% endif %}</p>
   </div>
   {{ not_a_table(item, "split") }}
 </div>
@@ -208,25 +208,24 @@
 <div class="compare table-compare" role="group" aria-labelledby="tbl-title-{{ eid }}">
   <h3 id="tbl-title-{{ eid }}" class="part-label">{% if t.proposal %}The table in the PDF, and rebuilt{% elif t.local %}The table in the PDF, and the grid read from it{% else %}The table in the PDF{% endif %}</h3>
   <p class="cmp-label">In the PDF</p>
-  {% if p.region_url %}<img class="cmp-image table-crop" src="{{ p.region_url }}" alt="{{ p.region_alt }}"><a class="enlarge-link" href="{{ p.region_url }}" data-enlarge target="_blank" rel="noopener">Enlarge the PDF image<span class="visually-hidden"> of {{ name }}</span></a>{% else %}<p class="cmp-none">No image of the original is available.</p>{% endif %}
+  {% if p.region_url %}<img class="cmp-image table-crop" src="{{ p.region_url }}" alt="{{ p.region_alt }}"><a class="enlarge-link" href="{{ p.region_url }}" data-enlarge target="_blank" rel="noopener">Enlarge<span class="visually-hidden"> the PDF image of {{ name }}</span></a>{% else %}<p class="cmp-none">No image of the original is available.</p>{% endif %}
   {% if t.proposal %}
   <p class="cmp-label">{% if not t.in_document %}Proposal (the document has the image instead){% elif not t.is_data %}As students get it: text, not a table{% elif item.pending %}Proposal, as students would get it{% else %}Rebuilt, as students get it{% endif %}</p>
   {{ table_box(t.proposal, "Proposed " ~ name) }}
-  {% if not t.is_data %}<p class="hint">The model judged that this is not a table of data (text set out in boxes), so its words are written in reading order. If it is a data table, use the grid read from the PDF.</p>{% endif %}
+  {% if not t.is_data %}<p class="hint">Not a data table, so its words are written in reading order.</p>{% endif %}
   {% elif t.local %}
   <p class="cmp-label">Grid read from the PDF</p>
   {{ table_box(t.local, "Grid read from the PDF for " ~ name) }}
-  <p class="hint">Read from the PDF's own text and lines, without a model. Compare it with the image before you use it.</p>
+  <p class="hint">Read from the PDF's own text, without a model. Compare it with the image.</p>
   {% if t.local_flat %}{{ flat_hint() }}{% endif %}
   {% else %}
-  <p class="cmp-none">No rebuilt table: the document shows the image of the table, marked “not converted”.</p>
+  <p class="cmp-none">No rebuilt table: the document shows the image, marked “not converted”.</p>
   {% endif %}
 </div>
 {{ table_findings(item) }}
 {{ table_error(item, "actions") }}
 {% if t.proposal and (item.can_accept or t.only_headers_missing) %}
-<div class="decision-bar" role="group" aria-labelledby="bar-lead-{{ eid }}">
-  <p class="bar-lead" id="bar-lead-{{ eid }}">{% if t.only_headers_missing %}The only thing found: no cell is marked as a header{% else %}Your choice for {{ name }}{% endif %}</p>
+<div class="decision-bar" role="group" aria-label="Choices for {{ name }}">
   <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
     {% if t.only_headers_missing %}
     {# T1-19: the only finding is that no cell is a header, so the main action sets the first
@@ -239,12 +238,12 @@
     {% if item.can_accept %}
     <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
       {{ table_fields("split") }}
-      <button type="submit" name="action" value="accept" class="{{ 'button-secondary' if t.only_headers_missing else 'button' }}" data-role="accept" aria-describedby="accept-note-{{ eid }}">{{ "Accept without headers" if t.only_headers_missing else "Accept" }}<span class="visually-hidden"> {{ name }}</span></button>
+      <button type="submit" name="action" value="accept" class="{{ 'button-secondary' if t.only_headers_missing else 'button' }}" data-role="accept" {% if t.only_headers_missing %}aria-describedby="accept-note-{{ eid }}"{% endif %}>{{ "Accept without headers" if t.only_headers_missing else "Accept" }}<span class="visually-hidden"> {{ name }}</span></button>
     </form>
     {% endif %}
   </div>
-  {% if t.only_headers_missing %}<p class="hint decide-note" id="headers-note-{{ eid }}">Use the first row as headers: screen readers read each header with its cells, and the table is settled.</p>{% endif %}
-  {% if item.can_accept %}<p class="hint decide-note" id="accept-note-{{ eid }}">{% if t.only_headers_missing %}Accept without headers: students get the table with no header cells, so a screen reader cannot say what each value means.{% else %}Accept: students get the table as shown.{% endif %}</p>{% endif %}
+  {% if t.only_headers_missing %}<p class="hint decide-note" id="headers-note-{{ eid }}">Screen readers read each header with its cells.</p>{% endif %}
+  {% if item.can_accept and t.only_headers_missing %}<p class="hint decide-note" id="accept-note-{{ eid }}">Without headers, screen readers cannot say what each value means.</p>{% endif %}
 </div>
 {% elif t.local and not t.proposal %}
 <div class="decision-bar" role="group" aria-labelledby="bar-lead-{{ eid }}">

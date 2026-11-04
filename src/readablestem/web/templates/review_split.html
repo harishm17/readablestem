@@ -27,17 +27,16 @@
 {% macro decide_row(item, anyway=False) %}
 {% set eid = item.element_id %}
 {% set name = item.label|lower %}
-<div class="decision-bar" role="group" aria-labelledby="bar-lead-{{ eid }}">
+<div class="decision-bar" role="group" aria-label="Choices for {{ name }}">
   {{ error_line(item, "actions") }}
-  <p class="bar-lead" id="bar-lead-{{ eid }}">Your choice for {{ name }}</p>
   <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
     {% if item.can_accept %}
     <button type="submit" name="action" value="accept" class="button" data-role="accept" aria-describedby="accept-note-{{ eid }}">Accept<span class="visually-hidden"> {{ name }}</span></button>
     {% endif %}
     <button type="submit" name="action" value="reject" class="button-secondary" data-role="reject" data-tone="quiet" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
   </div>
-  {% if item.can_accept %}<p class="hint decide-note" id="accept-note-{{ eid }}">Accept: students get it as proposed.</p>{% endif %}
-  <p class="hint decide-note" id="reject-note-{{ eid }}">{{ item.reject.button }}: {{ item.reject.consequence }}</p>
+  {% if item.can_accept %}<p class="hint decide-note" id="accept-note-{{ eid }}">Accept keeps it as proposed.</p>{% endif %}
+  <p class="hint decide-note" id="reject-note-{{ eid }}">{{ item.reject.consequence }}</p>
 </div>
 {% endmacro %}
 
@@ -85,7 +84,7 @@
    JavaScript in a dialog (app.js), without it as the image itself. On a phone this is the
    one-tap enlargement of the source. #}
 {% macro enlarge(url, what) %}
-<a class="enlarge-link" href="{{ url }}" data-enlarge target="_blank" rel="noopener">Enlarge the PDF image<span class="visually-hidden"> of {{ what }}</span></a>
+<a class="enlarge-link" href="{{ url }}" data-enlarge target="_blank" rel="noopener">Enlarge<span class="visually-hidden"> the PDF image of {{ what }}</span></a>
 {% endmacro %}
 
 {# The choices for an equation, first in the card (before the longer evidence under it): the
@@ -97,19 +96,19 @@
 {% set eid = item.element_id %}
 {% set name = item.label|lower %}
 {% if p.suggestion or item.can_accept %}
-<div class="decision-bar" role="group" aria-labelledby="bar-lead-{{ eid }}" data-decide-form="decide-{{ eid }}">
+<div class="decision-bar" role="group" aria-label="Choices for {{ name }}" data-decide-form="decide-{{ eid }}">
   {{ error_line(item, "actions") }}
-  <p class="bar-lead" id="bar-lead-{{ eid }}">{% if p.suggestion %}Recommended repair: {{ p.suggestion.label }}{% elif anyway %}The proposal changes the meaning of the PDF{% else %}Your choice for {{ name }}{% endif %}</p>
+  {% if anyway and not p.suggestion %}<p class="bar-lead">The proposal changes the meaning.</p>{% endif %}
   <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
     {% if p.suggestion %}
     <button type="submit" form="suggest-{{ eid }}" class="button" data-role="suggest" aria-describedby="suggest-hint-{{ eid }}">{{ p.suggestion.label }}<span class="visually-hidden"> in {{ name }}</span></button>
     {% endif %}
     {% if item.can_accept %}
-    <button type="submit" form="decide-{{ eid }}" name="action" value="accept" class="{{ 'button-secondary' if (anyway or p.suggestion) else 'button' }}" data-role="accept"{% if anyway %} data-tone="caution"{% endif %} aria-describedby="accept-note-{{ eid }}">Accept{% if anyway %} anyway{% endif %}<span class="visually-hidden"> {{ name }}</span></button>
+    <button type="submit" form="decide-{{ eid }}" name="action" value="accept" class="{{ 'button-secondary' if (anyway or p.suggestion) else 'button' }}" data-role="accept"{% if anyway %} data-tone="caution"{% endif %} {% if anyway %}aria-describedby="accept-note-{{ eid }}"{% endif %}>Accept{% if anyway %} anyway{% endif %}<span class="visually-hidden"> {{ name }}</span></button>
     {% endif %}
   </div>
-  {% if p.suggestion %}<p class="hint decide-note" id="suggest-hint-{{ eid }}">{{ p.suggestion.label }}: saves this change and runs the checks again.</p>{% endif %}
-  {% if item.can_accept %}<p class="hint decide-note" id="accept-note-{{ eid }}">{% if anyway %}Accept anyway: students get the proposal as it is, although it differs from the PDF where it changes the meaning.{% else %}Accept: students get the proposal as it is, read aloud as shown above.{% endif %}</p>{% endif %}
+  {% if p.suggestion %}<p class="hint decide-note" id="suggest-hint-{{ eid }}">Saves and rechecks.</p>{% endif %}
+  {% if item.can_accept and anyway %}<p class="hint decide-note" id="accept-note-{{ eid }}">Accept anyway keeps the differing meaning.</p>{% endif %}
 </div>
 {% else %}
 {{ error_line(item, "actions") }}
@@ -121,12 +120,11 @@
 {% set eid = item.element_id %}
 {% set anyway = p.changes_meaning %}
 {% if p.region_url and p.compare_size %}
-<div class="compare" role="group" aria-labelledby="cmp-title">
+<div class="compare" role="group" aria-label="PDF and proposal at the same scale">
   {# Same font size (marks.css, compare.compare_geometry); the letter shapes can differ
      a little because the proposal is drawn in a TeX maths font (Latin Modern Math). #}
-  <h3 id="cmp-title" class="part-label">Original and proposal at the same scale</h3>
   <div class="cmp-frame" id="cmp-{{ eid }}">
-    <p class="cmp-label">In the PDF</p>
+    <p class="cmp-label">PDF</p>
     <img class="cmp-image" src="{{ p.region_url }}" alt="{{ p.region_alt }}" width="{{ p.compare_size[0]|round|int }}" height="{{ p.compare_size[1]|round|int }}">
     {{ enlarge(p.region_url, item.label|lower) }}
     <p class="cmp-label">Proposal</p>
@@ -375,8 +373,7 @@
 {% if p.group_pages %}<p class="group-pages">On {{ "page" if p.group_pages|length == 1 else "pages" }} {% for pl in p.group_pages %}{% if not loop.first %}{{ " and " if loop.last else ", " }}{% endif %}<a href="{{ pl.href }}">{{ pl.number }}</a>{% endfor %}.</p>{% endif %}
 {% if n %}
 {% if hg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ hg.error }}</p>{% endif %}
-<div class="decision-bar" role="group" aria-labelledby="group-bar-lead-{{ key }}">
-  <p class="bar-lead" id="group-bar-lead-{{ key }}">One choice for all {{ n }}</p>
+<div class="decision-bar" role="group" aria-label="One choice for all {{ n }}">
   <div class="decide-row" id="group-actions-{{ key }}" tabindex="-1">
     {% if hg.bold_first %}
     {{ group_bold_button(hg, true) }}
@@ -386,10 +383,10 @@
     {{ group_bold_button(hg, false) }}
     {% endif %}
   </div>
-  <p class="hint decide-note">Make bold text: they stay in the text, in bold, and are no longer headings in the outline. Keep as headings: they stay in the outline{% if hg.level %} at level {{ hg.level }}{% endif %}.</p>
+  <p class="hint decide-note">Bold text leaves the outline.</p>
 </div>
-{% if not hg.keep %}<p class="hint">At level {{ hg.level }} they would skip a level after the heading before them, so choose the level to keep them at.</p>
-{% elif hg.keep < n %}<p class="hint">Keeping them leaves out {{ n - hg.keep }} the document would show at another level: choose a level for {{ "it" if n - hg.keep == 1 else "them" }} below.</p>{% endif %}
+{% if not hg.keep %}<p class="hint">Level {{ hg.level }} would skip a level: choose another.</p>
+{% elif hg.keep < n %}<p class="hint">{{ n - hg.keep }} would show at another level: choose a level below.</p>{% endif %}
 <details class="edit-box"{% if hg.error or not hg.keep %} open{% endif %}>
   <summary>Choose another level</summary>
   <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}">
@@ -397,7 +394,7 @@
     <input type="hidden" name="action" value="edit">
     <div class="field field-inline{% if hg.error %} field-error{% endif %}">
       <label for="group-level-{{ key }}">Level for all {{ n }}</label>
-      <p class="hint" id="group-level-hint-{{ key }}">Level 1 is the top; level 1{% if hg.level_max > 1 %} to {{ hg.level_max }}{% endif %} fits.</p>
+      <p class="hint" id="group-level-hint-{{ key }}">Level 1{% if hg.level_max > 1 %} to {{ hg.level_max }}{% endif %} fits.</p>
       <div class="inline-controls">
         <select id="group-level-{{ key }}" name="level" aria-describedby="group-level-hint-{{ key }}{% if hg.error %} group-error-{{ key }}{% endif %}"{% if hg.error %} aria-invalid="true"{% endif %}>
           {% for lv in range(1, 7) %}<option value="{{ lv }}"{% if hg.values.get("level") == lv|string %} selected{% endif %}>Level {{ lv }}</option>{% endfor %}
@@ -532,14 +529,14 @@
     </div>
     {% endif %}
     <ul class="review-links">
-      <li><a href="{{ list_url }}">All items as a list</a></li>
+      <li><a href="{{ list_url }}">List view</a></li>
       {% for o in bulk_offers %}
-      <li><a href="/jobs/{{ job.id }}/accept/{{ o.slug }}?view=split">{{ o.title }} ({{ o.count }})</a></li>
+      <li><a href="/jobs/{{ job.id }}/accept/{{ o.slug }}?view=split">Accept many {{ o.many }} ({{ o.count }})</a></li>
       {% endfor %}
       {% if symbols_offer %}
-      <li><a href="/jobs/{{ job.id }}/symbols?view=split">Symbols in the handwritten equations</a></li>
+      <li><a href="/jobs/{{ job.id }}/symbols?view=split">Symbols</a></li>
       {% endif %}
-      <li><a href="/jobs/{{ job.id }}">Back to the results</a></li>
+      <li><a href="/jobs/{{ job.id }}">Results</a></li>
     </ul>
   </div>
 </div>
@@ -640,7 +637,7 @@
       <summary>Keyboard shortcuts</summary>
       <div class="field checkbox-field">
         <input type="checkbox" id="shortcuts-on">
-        <label for="shortcuts-on">Use keyboard shortcuts on this screen</label>
+        <label for="shortcuts-on">Use keyboard shortcuts</label>
       </div>
       <dl class="keys">
         <div><dt><kbd>N</kbd></dt><dd>next decision</dd></div>
@@ -648,7 +645,7 @@
         <div><dt><kbd>A</kbd></dt><dd>accept</dd></div>
         <div><dt><kbd>E</kbd></dt><dd>edit (go to the field)</dd></div>
       </dl>
-      <p class="hint">Off until you turn them on. They never act while you are typing in a field.</p>
+      <p class="hint">Off by default. Not active while you type.</p>
     </details>
   </section>
 
@@ -710,8 +707,8 @@
       <a class="toggle-accepted" href="{{ page.accepted_href }}">{% if show_accepted %}Hide accepted{% else %}Show accepted{% if page.hidden_accepted %} ({{ page.hidden_accepted }}){% endif %}{% endif %}</a>
     </div>
     {% if page.omitted %}<p class="page-note page-left-out" id="page-left-out">This page is left out of the student file and of the review. <a href="#page-tools-summary">Put it back</a></p>{% endif %}
-    <p class="hint page-scroll-hint">The page is wider than a phone screen: scroll it sideways to see all of it.
-      <button type="button" class="button-secondary button-small" data-fit-width hidden aria-pressed="false">Fit the page to the screen width</button></p>
+    <p class="hint page-scroll-hint">Scroll the page sideways.
+      <button type="button" class="button-secondary button-small" data-fit-width hidden aria-pressed="false">Fit to width</button></p>
     <div class="page-scroll" role="region" tabindex="0" aria-label="Page {{ page.number }} image{% if page.boxes %} with {{ page.boxes|length }} {{ 'mark' if page.boxes|length == 1 else 'marks' }}{% endif %}">
       <div class="page-frame">
         <img class="page-image" src="{{ page.image_url }}" alt="Page {{ page.number }} of the PDF." width="{{ (page.width or 612)|round|int }}" height="{{ (page.height or 792)|round|int }}">
@@ -721,8 +718,8 @@
         <a id="box-{{ b.element_id }}" class="box box-{{ b.tier }}{% if b.current %} is-current{% endif %}" href="{{ b.href }}"{% if b.current %} aria-current="true"{% endif %}><span class="box-frame" aria-hidden="true"></span><span class="box-tag" aria-hidden="true">{{ b.tag }}</span><span class="visually-hidden">{% if b.tier != "accepted" %}{{ b.tag }}: {% endif %}{{ b.name }}</span></a>
         {% endfor %}
       </div>
-      {% if not page.placed %}<p class="page-note">The marks could not be placed on this page. Every item is still in <a href="{{ list_url }}">the list view</a>.</p>{% endif %}
-      <p class="page-note page-failed" hidden>The page image could not be shown. Every item is still in <a href="{{ list_url }}">the list view</a>.</p>
+      {% if not page.placed %}<p class="page-note">No marks on this page. Every item is in <a href="{{ list_url }}">the list view</a>.</p>{% endif %}
+      <p class="page-note page-failed" hidden>The page image did not load. Every item is in <a href="{{ list_url }}">the list view</a>.</p>
     </div>
   </section>
 </div>

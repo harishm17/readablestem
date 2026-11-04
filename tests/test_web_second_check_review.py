@@ -28,10 +28,7 @@ from readablestem.core.types import (
 from readablestem.web.messages import CHECK_MESSAGES
 
 NOTE = CHECK_MESSAGES[("figure.second_check", "second_check_mismatch")]
-SMALL_LEAD = (
-    "These were accepted automatically: the checks found something small that does not "
-    "change the meaning."
-)
+SMALL_LEAD = "Accepted automatically with a small note; you can still change any."
 WORTH_A_LOOK = "Optional check (worth a look; it does not hold up the document):"
 NOTHING_TO_DO = "Optional check (nothing to do unless you disagree):"
 
@@ -150,48 +147,38 @@ def test_the_lead_does_not_call_the_second_check_note_small(pages):
     lead = optional_section(review)
     assert SMALL_LEAD not in lead
     assert (
-        "These were accepted automatically, and nothing here holds up the document, but you "
-        "can still change any of them. For 1 figure, a second automated check found a "
-        "possible mismatch between the alt text and the image: worth a look, because a "
-        "wrong alt text changes what a screen reader user hears. For the other 2, the "
-        "checks found something small that does not change the meaning."
+        "Accepted automatically; you can still change any. 1 figure may have alt text that "
+        "does not match the image: worth a look. 2 have a small note."
     ) in lead
     assert NOTE in card(review, "p1-e1")
     assert WORTH_A_LOOK in card(review, "p1-e1")
     assert NOTHING_TO_DO in card(review, "p1-e2") and WORTH_A_LOOK not in card(review, "p1-e2")
     # The intro says the same before the reader gets to the section.
     assert (
-        "Figures where a second automated check found a possible mismatch between the alt "
-        "text and the image are among the optional checks. Those are worth a look"
+        "A second automated check found a possible mismatch between alt text and image in "
+        "some optional checks: worth a look, but it can be wrong."
     ) in review
     assert "Needs your decision (1)" in review  # still optional: never a decision
     # The line at the top, read first and announced after a decision, says so too.
-    assert (
-        "3 optional checks do not hold anything up, but 1 of them is worth a look."
-    ) in progress(review)
-    assert "can be looked at if you want" not in progress(review)
+    assert "3 optional checks below, 1 worth a look." in progress(review)
 
 
 def test_only_second_check_notes(pages):
     review, _ = pages(second=2, small=0)
     lead = optional_section(review)
-    assert "For 2 figures, a second automated check found a possible mismatch" in lead
-    assert "something small" not in lead and "For the other" not in lead
-    assert "2 optional checks do not hold anything up, but they are worth a look." in (
-        progress(review)
-    )
+    assert "2 figures may have alt text that does not match the image: worth a look." in lead
+    assert "small note" not in lead
+    assert "2 optional checks below, 2 worth a look." in progress(review)
 
 
 def test_one_other_small_note_reads_as_one(pages):
     review, _ = pages(second=1, small=1)
-    assert "For the other one, the checks found something small" in optional_section(review)
+    assert "1 has a small note." in optional_section(review)
 
 
 def test_a_single_second_check_note_at_the_top(pages):
     review, _ = pages(second=1, small=0)
-    assert "1 optional check does not hold anything up, but it is worth a look." in (
-        progress(review)
-    )
+    assert "1 optional check below, 1 worth a look." in progress(review)
 
 
 def test_without_a_second_check_note_the_wording_is_as_before(pages):
@@ -199,9 +186,7 @@ def test_without_a_second_check_note_the_wording_is_as_before(pages):
     assert SMALL_LEAD in optional_section(review)
     assert "second automated check" not in review
     assert NOTHING_TO_DO in card(review, "p1-e1")
-    assert "1 optional check can be looked at if you want; it does not hold anything up." in (
-        progress(review)
-    )
+    assert "1 optional check below." in progress(review)
     assert 'id="notes-line">1 part was accepted for you with a note: ' in job
 
 

@@ -204,8 +204,7 @@ class RejectWords:
 REJECT_WORDS = {
     Kind.EQUATION: RejectWords(
         "Keep as image",
-        "Students see a picture of the original; screen readers hear the PDF text of the "
-        "equation, marked as not checked.",
+        "Students see a picture; screen readers read the PDF's text, marked unchecked.",
         "Kept as an image of the original. Screen readers will hear the PDF text of the "
         "equation, marked as not checked.",
         "Kept as an image by you",
@@ -214,42 +213,39 @@ REJECT_WORDS = {
     # is nothing else to keep).
     Kind.TABLE: RejectWords(
         "Keep as image",
-        "Students see a picture of the table, marked “not converted”; screen readers get no "
-        "table to read.",
+        "Students see a picture marked “not converted”; screen readers get no table.",
         "The image of the table is kept in the document, marked “not converted”.",
         "Kept as an image by you",
     ),
     # Text read from an image of a scanned or handwritten page (ADR 0007).
     Kind.PARAGRAPH: RejectWords(
         "Keep as image",
-        "Students see a picture of the original text, marked “Not converted”; screen readers "
-        "get no text to read.",
+        "Students see a picture marked “Not converted”; screen readers get no text.",
         "The text is kept as an image of the original, marked “Not converted”.",
         "Kept as an image by you",
     ),
     Kind.FIGURE: RejectWords(
         "Keep without a description",
-        "The figure stays as it is in the PDF, marked “Needs a description”; screen readers "
-        "get no description of it.",
+        "The figure stays, marked “Needs a description”; screen readers get no description.",
         "Kept without a description, marked “Needs a description”.",
         "Left without a description by you",
     ),
 }
 BOLD_TEXT_WORDS = RejectWords(
     "Make bold text",
-    "It stays in the text, in bold, but is no longer a heading in the outline.",
+    "It stays in bold but leaves the outline.",
     "Made bold text, not a heading.",
     "Made bold text by you",
 )
 PLAIN_TEXT_WORDS = RejectWords(
     "Make plain text",
-    "It stays in the text, but is no longer a heading in the outline.",
+    "It stays as text but leaves the outline.",
     "Made plain text, not a heading.",
     "Made plain text by you",
 )
 OTHER_WORDS = RejectWords(
     "Keep the original",
-    "The original from the PDF stays in the document, marked for a later look.",
+    "The PDF's original stays, marked for a later look.",
     DONE_MESSAGES["reject"],
     "Original kept by you",
 )
@@ -258,7 +254,7 @@ OTHER_WORDS = RejectWords(
 # A page (or handwriting) kept as an image before any model work (pipeline.page_type).
 KEPT_IMAGE_WORDS = RejectWords(
     "Keep as image",
-    "Students see a picture of it, marked “Not converted”; screen readers hear only that.",
+    "Students see a picture marked “Not converted”; screen readers hear only that.",
     "Kept as an image, marked “Not converted”.",
     "Kept by you",  # short: the review screen's status pill does not wrap at 320 px
 )
@@ -904,15 +900,12 @@ def _item(
 # What a figure's alt text should say, by the kind of figure the pipeline found (`FigureType`).
 # One sentence each, to sit under the field; the length goes after it.
 ALT_GUIDANCE = {
-    "chart": "Name the kind of chart, what each axis measures with its units, and the trend or "
-    "the values a reader needs.",
-    "diagram": "Say what the diagram shows and how its labelled parts connect, in the order a "
-    "reader would follow them.",
-    "photo": "Say what the photo shows that matters to this lesson, and leave out the rest.",
-    "illustration": "Say what the illustration shows and what it is there to teach.",
-    "table_image": "Say what the table holds and what it shows. A table is better kept as a "
-    "table than as a picture.",
-    "other": "Say what the figure shows and why it matters here.",
+    "chart": "Name the chart type, what each axis measures (with units) and the trend.",
+    "diagram": "Say what it shows and how its labelled parts connect.",
+    "photo": "Say what matters to this lesson; leave out the rest.",
+    "illustration": "Say what it shows and what it teaches.",
+    "table_image": "Say what the table holds and shows.",
+    "other": "Say what it shows and why it matters here.",
 }
 
 

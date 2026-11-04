@@ -151,7 +151,7 @@ def test_the_list_view_shows_no_confidence(rich):
 def test_checks_and_reasons_are_explained_not_coded(rich):
     page = page_of(rich)
     style = card(page, "p2-e2")
-    assert "a bold letter, a vector, is plain here" in style
+    assert "a bold vector or double-struck letter shown plain" in style
     assert "style_mismatch" not in style and "<code>" not in style
     heading = card(page, "p1-e3")
     assert "Only weak signs say this is a heading" in heading
@@ -219,7 +219,7 @@ def test_the_list_view_offers_no_bulk_accept(rich):
     page = page_of(rich)
     for gone in ("bulk-form", "min_confidence", "accept_confident", "accept_all"):
         assert gone not in page
-    assert "Accept all remaining equations whose checks passed" in page  # a link to a preview
+    assert "Accept equations that passed every check" in page  # a link to a preview
     assert (
         'action="/jobs/'
         not in page[page.index("bulk-offers") : page.index("</ul>", page.index("bulk-offers"))]

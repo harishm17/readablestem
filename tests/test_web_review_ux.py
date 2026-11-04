@@ -402,8 +402,8 @@ def test_reject_is_named_for_what_it_does(ux):
     equation = panel(screen(ux))
     assert re.search(r'data-role="reject"[^>]*>Keep as image<span', equation)
     assert (
-        "Students see a picture of the original; screen readers hear the PDF "
-        "text of the equation, marked as not checked." in text_of(equation)
+        "Students see a picture; screen readers read the PDF's text, marked unchecked."
+        in text_of(equation)
     )
     heading = panel(screen(ux, "?item=p1-e0"))  # a bold heading, accepted
     assert re.search(r'data-role="reject"[^>]*>Make bold text<span', heading)
@@ -547,7 +547,7 @@ def test_the_card_says_what_a_screen_reader_gets_from_the_pdf(ux):
         '<span class="speech-label">From your PDF a screen reader gets:</span> “<span '
         'class="text-layer">𝛚</span>”, roughly “<mark class="said-diff">bold omega</mark>”' in body
     )
-    assert "Marked: the words where the two readings differ." in body
+    assert "Marked words differ." in body
     # Nothing differs in an accepted equation: no reading of the PDF, nothing marked.
     other = panel(screen(ux, "?item=p2-e2"))
     assert 'From your PDF a screen reader gets:</span> “<span class="text-layer">v = d / t' in (

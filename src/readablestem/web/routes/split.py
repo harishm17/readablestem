@@ -530,10 +530,7 @@ def _why(fix: Fix, compare: EquationCompare | None) -> str | None:
     for check in fix.failed_checks:
         return explain_check(check).text
     if fix.pending and fix.confidence is not None:
-        return (
-            "The proposal passed every check, but the model was not sure enough of it to "
-            "accept it without you."
-        )
+        return "Every check passed, but the model was not sure enough to accept it alone."
     return None
 
 
@@ -1255,20 +1252,14 @@ def _group_state(kept: int, bold: int, size: int) -> str:
 
 
 def headline(open_count: int, total: int, optional: int) -> str:
-    """The one sentence at the top. Counts decisions, never fixes."""
-    rest = "Everything else was accepted"
-    rest += "; optional checks are below." if optional else "."
+    """The one short line at the top. Counts decisions, never fixes."""
     if total == 0:
-        return "Nothing needs your decision. Everything was accepted" + (
-            "; optional checks are below." if optional else "."
-        )
+        return "Nothing needs your decision."
     if open_count == 0:
-        return "All decisions made. " + rest
+        return "All decisions made."
     if open_count == total:
-        things = "thing needs" if total == 1 else "things need"
-        return f"{total} {things} your decision. {rest}"
-    left = "decision" if total == 1 else "decisions"
-    return f"{open_count} of {total} {left} left. {rest}"
+        return f"{total} {'decision' if total == 1 else 'decisions'} to make."
+    return f"{open_count} of {total} {'decision' if total == 1 else 'decisions'} left."
 
 
 def _notice(

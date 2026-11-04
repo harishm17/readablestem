@@ -315,22 +315,22 @@ def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
     assert "SECRET-ALT a rising line</textarea>" in figure
     assert '<label for="alt-p1-e4">Alt text for figure 1</label>' in figure
     assert 'id="decorative-p1-e4"' in figure
-    assert "Aim for 150 characters or fewer (this text has 24)." in figure
+    assert "150 characters at most (this has 24)." in figure
     assert "<strong>Caption in the PDF:</strong> Figure 1 SECRET-CAPTION" in figure
 
     abstained = card(page, "p1-e5")
     assert 'value="accept"' not in abstained  # nothing to accept
-    assert "<strong>Why it was not converted:</strong> The model was not sure enough" in abstained
+    assert "<strong>Not converted:</strong> The model was not sure enough" in abstained
     assert "Code:" not in abstained and "low_confidence" not in abstained
-    assert "Type the LaTeX for the equation in the image" in abstained
+    assert "Type the LaTeX, then save." in abstained
 
 
 def test_buttons_name_the_fix_they_act_on(web):
     figure = card(review_page(web), "p1-e4")
     # "Reject" is named for what it does, with what that means under it.
     assert 'Keep without a description<span class="visually-hidden"> (figure 1)</span>' in figure
-    assert "marked “Needs a description”; screen readers get no description of it." in figure
-    assert 'Accept as written<span class="visually-hidden"> figure 1</span>' in figure
+    assert "I understand: screen reader users get no description." in figure
+    assert 'Accept<span class="visually-hidden"> figure 1 as written</span>' in figure
     assert 'Save and accept<span class="visually-hidden"> figure 1</span>' in figure
 
 
@@ -339,7 +339,7 @@ def test_decided_fixes_are_folded_away(web):
     # The reviewer's own decisions apart from what was accepted for them.
     mine = page[page.index('id="decided"') : page.index('id="accepted"')]
     assert '<h2 id="decided-title">Your decisions (0)</h2>' in mine
-    assert "You have not decided anything yet." in mine
+    assert "None yet." in mine
     accepted = page[page.index('id="accepted"') :]
     assert '<h2 id="accepted-title">Accepted automatically (2)</h2>' in accepted
     assert '<details class="done-group">' in accepted  # closed: no "open" attribute
@@ -373,7 +373,7 @@ def test_page_has_a_table_of_contents_with_counts(web):
         "</span></h3>" in page
     )
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
-    assert "3 decisions are still needed:</strong>\n    2 equations, 1 figure." in progress
+    assert "3 decisions left:</strong>\n    2 equations, 1 figure." in progress
 
 
 def test_job_page_breaks_down_what_needs_review_by_kind(web):
@@ -424,7 +424,7 @@ def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     assert '<details class="done-group" open>' in page
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
     assert "Accepted." in progress
-    assert "2 decisions are still needed" in progress
+    assert "2 decisions left" in progress
 
 
 def test_when_nothing_is_left_the_reviewer_lands_on_the_progress_summary(web):
@@ -436,7 +436,7 @@ def test_when_nothing_is_left_the_reviewer_lands_on_the_progress_summary(web):
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
     # "Reject" is named for what it does, and so is its notice.
     assert '<a href="#item-p1-e4">Figure 1 on page 1</a>: Kept without a description' in progress
-    assert "Nothing left that needs your decision." in progress
+    assert "Nothing left to decide." in progress
 
 
 def test_saving_an_equation_edit_validates_and_stores_it(web):
@@ -791,10 +791,10 @@ def test_the_first_heading_may_take_any_level(outline):
 
 def test_the_review_page_says_which_levels_fit(outline):
     page = review_page(outline)
-    assert "this one can be level 1 to 6." in card(page, "p1-e0")  # the first heading
-    assert "this one can be level 1 to 2." in card(page, "p1-e1")
+    assert "Level 1 to 6 fits." in card(page, "p1-e0")  # the first heading
+    assert "Level 1 to 2 fits." in card(page, "p1-e1")
     third = card(page, "p1-e2")
-    assert "this one can be level 1 to 3." in third
+    assert "Level 1 to 3 fits." in third
     assert 'aria-describedby="level-hint-p1-e2"' in third
 
 

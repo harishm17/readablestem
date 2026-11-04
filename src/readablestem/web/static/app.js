@@ -773,15 +773,12 @@
 (function () {
   "use strict";
 
-  function plural(n, one, many) { return n + " " + (n === 1 ? one : many); }
-
   document.querySelectorAll("form.symbol-form").forEach(function (form) {
     var select = form.querySelector("[data-symbol-to]");
     var line = form.querySelector("[data-symbol-affect]");
     var button = form.querySelector('button[data-role="relabel"]');
     if (!select || !line || !button) return;
     var total = Number(form.getAttribute("data-total")) || 0;
-    var name = form.getAttribute("data-name") || "this symbol";
     var summary = form.querySelector(".symbol-places > summary");
     var changeable = Number(form.getAttribute("data-changeable")) || 0;
     var said = "";
@@ -798,18 +795,16 @@
       var n = ticked();
       var chosen = select.value !== "";
       var target = chosen ? select.options[select.selectedIndex].text : "";
-      if (summary) summary.textContent = "Choose the places (" + n + " of " + changeable + " ticked)";
+      if (summary) summary.textContent = "Places (" + n + " of " + changeable + " ticked)";
       var ready = chosen && n > 0;
       if (ready) button.removeAttribute("aria-disabled");
       else button.setAttribute("aria-disabled", "true");
       if (!chosen) {
-        say("Choose a symbol above to continue. " + plural(n, "place", "places") +
-          " will change; untick any place to leave it as it is.");
+        say("Choose a symbol first.");
       } else if (n === 0) {
-        say("No place is ticked, so nothing will change. Tick at least one place.");
+        say("No place is ticked. Tick at least one.");
       } else {
-        say(plural(n, "place", "places") + " of " + total + " will change from " + name + " to " +
-          target + "; " + (total - n) + " stay as they are.");
+        say(n + " of " + total + " places change to " + target + ".");
       }
     }
 
@@ -841,6 +836,17 @@
     });
     sync();
   });
+
+  // A table finding's "Change the table" opens the folded place where it is changed.
+  function openCorrection(hash) {
+    var target = hash && hash.indexOf("#table-correct-") === 0 ? document.getElementById(hash.slice(1)) : null;
+    if (target && target.tagName === "DETAILS") target.open = true;
+  }
+  document.addEventListener("click", function (event) {
+    var link = event.target instanceof Element ? event.target.closest('a[href^="#table-correct-"]') : null;
+    if (link) openCorrection(link.getAttribute("href"));
+  });
+  openCorrection(window.location.hash);
 
   // The picture of the PDF, larger, in a dialog (Escape or Close puts you back where you were).
   var dialog = null;

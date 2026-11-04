@@ -409,7 +409,7 @@ def test_a_page_is_left_out_of_review_and_output(review):
 
 def test_the_review_screen_counts_decisions_without_the_page(review):
     page = page_of(review)
-    assert "3 things need your decision" in page  # the heading group spans both pages
+    assert "3 decisions to make" in page  # the heading group spans both pages
     pages_post(review, 2, "omit", version=current_version(review))
     page = page_of(review, "?item=hg-p1-e3")
     assert "Decision 3 of 3" in page  # the group is still one decision, of two headings

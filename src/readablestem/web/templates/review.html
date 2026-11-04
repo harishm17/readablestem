@@ -39,12 +39,10 @@
 {% for message in item.changed %}
 <p class="changed-note" role="status"><strong>Just changed:</strong> {{ message }}</p>
 {% endfor %}
-<dl class="fix-meta">
-  <div><dt>Status</dt><dd><span class="status-badge fix-{{ item.status }}">{{ item.status_label }}</span></dd></div>
-</dl>
+<p class="fix-meta"><span class="status-badge fix-{{ item.status }}">{{ item.status_label }}</span></p>
 {% if item.reason %}
 <div class="explained">
-  <p><strong>Why it was not converted:</strong> {{ item.reason.text }}</p>
+  <p><strong>Not converted:</strong> {{ item.reason.text }}</p>
 </div>
 {% endif %}
 {# A table's findings are with its proposal (each names the part of the table it is about). #}
@@ -68,7 +66,7 @@
     {% else %}
     <p>No image of the original is available.</p>
     {% endif %}
-    <figcaption>Original in the PDF</figcaption>
+    <figcaption>PDF</figcaption>
   </figure>
   {% endif %}
 
@@ -81,7 +79,7 @@
        tell which boxes scroll, so every preview is a tab stop with its own name. #}
     <div class="mathml-preview" tabindex="0" role="group" aria-label="Proposed {{ name }}">{{ item.mathml }}</div>
     {% else %}
-    <p>No proposal: type the LaTeX below, or reject to keep the image.</p>
+    <p>No proposal: type the LaTeX below, or keep the image.</p>
     {% endif %}
     {# How it is read aloud, and what a screen reader gets from the PDF itself: its text layer
        (owner only). The same lines as on the review screen. #}
@@ -111,7 +109,7 @@
     <p class="part-label">Data table, as students will get it</p>
     <div class="table-scroll table-view" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
     {% endif %}
-    {% if item.data_table or item.long_description %}<p class="hint">To change the {% if item.data_table and not item.data_table_offered %}data table or the {% endif %}longer description, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.</p>{% endif %}
+    {% if item.data_table or item.long_description %}<p class="hint"><a href="/jobs/{{ job.id }}/review?item={{ eid }}">Change the {% if item.data_table and not item.data_table_offered %}data table or {% endif %}longer description on the review screen</a>.</p>{% endif %}
     {% elif item.kind == "heading" %}
     <p class="part-label">Heading text</p>
     <p class="heading-proposal">{{ item.heading_text or "(no text)" }}</p>
@@ -127,7 +125,7 @@
     {% elif item.kind == "paragraph" %}
     <p class="part-label">Text as read from the image</p>
     <p class="read-text">{{ item.read_text or "(no text)" }}</p>
-    <p class="hint">To change the words, open this text on the review screen and choose “Change the words”.</p>
+    <p class="hint"><a href="/jobs/{{ job.id }}/review?item={{ eid }}">Change the words on the review screen</a>.</p>
     {% endif %}
   </div>
 </div>
@@ -155,7 +153,7 @@
     <label for="level-{{ eid }}">Level for {{ name }}</label>
     {% if item.heading_max_level %}
     {# The output never skips a level, so a deeper level would be shown as another. #}
-    <p class="hint" id="level-hint-{{ eid }}">Level 1 is the top. After the heading before it, this one can be level 1{% if item.heading_max_level > 1 %} to {{ item.heading_max_level }}{% endif %}.</p>
+    <p class="hint" id="level-hint-{{ eid }}">Level 1{% if item.heading_max_level > 1 %} to {{ item.heading_max_level }}{% endif %} fits.</p>
     {% endif %}
     {% if err %}<p class="error-message" id="level-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
     {% set described = (["level-hint-" ~ eid] if item.heading_max_level else []) + (["level-error-" ~ eid] if err else []) %}
@@ -268,7 +266,7 @@
       <input type="hidden" name="action" value="edit">
       <div class="field{% if hg.error %} field-error{% endif %}">
         <label for="group-level-{{ key }}">Or choose one level for all {{ n }}</label>
-        <p class="hint" id="group-level-hint-{{ key }}">Level 1 is the top. After the heading before the first of them, level 1{% if hg.level_max > 1 %} to {{ hg.level_max }}{% endif %} fits.</p>
+        <p class="hint" id="group-level-hint-{{ key }}">Level 1{% if hg.level_max > 1 %} to {{ hg.level_max }}{% endif %} fits.</p>
         <select id="group-level-{{ key }}" name="level" aria-describedby="group-level-hint-{{ key }}{% if hg.error %} group-error-{{ key }}{% endif %}"{% if hg.error %} aria-invalid="true"{% endif %}>
           {% for lv in range(1, 7) %}
           <option value="{{ lv }}"{% if hg.values.get("level") == lv|string %} selected{% endif %}>Level {{ lv }}</option>
@@ -359,15 +357,14 @@
     <button type="submit" class="link-button" data-role="undo">Undo the last decision</button>
   </form>
   {% endif %}
-  <p>{% if remaining %}<strong>{{ remaining }} {{ "decision is" if remaining == 1 else "decisions are" }} still needed:</strong>
-    {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left that needs your decision.{% endif %}{% if optional and second_checks %}
-    {{ counted(optional|length, "optional check", "optional checks") }} {{ "does" if optional|length == 1 else "do" }} not hold anything up, but {% if second_checks == optional|length %}{{ "it is" if second_checks == 1 else "they are" }}{% else %}{{ second_checks }} of them {{ "is" if second_checks == 1 else "are" }}{% endif %} worth a look.{% elif optional %}
-    {{ counted(optional|length, "optional check", "optional checks") }} can be looked at if you want; {{ "it does" if optional|length == 1 else "they do" }} not hold anything up.{% endif %}</p>
-  <p class="list-links"><a href="/jobs/{{ job.id }}/review">Back to the review screen</a>
-    {% if symbols_offer %}<a href="/jobs/{{ job.id }}/symbols?view=list">Symbols in the handwritten equations</a>
+  <p>{% if remaining %}<strong>{{ remaining }} {{ "decision" if remaining == 1 else "decisions" }} left:</strong>
+    {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left to decide.{% endif %}{% if optional %}
+    {{ counted(optional|length, "optional check", "optional checks") }} below{% if second_checks %}, {{ second_checks }} worth a look{% endif %}.{% endif %}</p>
+  <p class="list-links"><a href="/jobs/{{ job.id }}/review">Review screen</a>
+    {% if symbols_offer %}<a href="/jobs/{{ job.id }}/symbols?view=list">Symbols</a>
     {% endif %}
-    <a href="/jobs/{{ job.id }}">Back to the results</a>
-    <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Open the accessible HTML</a>
+    <a href="/jobs/{{ job.id }}">Results</a>
+    <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Accessible HTML</a>
     <a href="/jobs/{{ job.id }}/listen">Listen as a student</a></p>
 </div>
 
@@ -381,7 +378,8 @@
      in use. Every item keeps its own anchor, so a link to one still lands on it. #}
   <details class="list-tools" id="list-tools"{% if decision_filter.active %} open{% endif %}>
     <summary>Sections{% if remaining > 1 %}, filter{% endif %}{% if bulk_offers %} and accepting many at once{% endif %}</summary>
-    <p class="hint">Every item of the document, grouped by kind: what needs your decision first, then the optional checks and everything accepted, folded.{% if second_checks %} Figures where a second automated check found a possible mismatch between the alt text and the image are among the optional checks. Those are worth a look, since a wrong alt text changes what a screen reader user hears; the check is new and can be wrong, so it does not hold up the document.{% endif %}</p>
+    {% if second_checks %}<p class="hint">A second automated check found a possible mismatch between alt text and image in some optional checks: worth a look, but it can be wrong.</p>
+    {% endif %}
     <nav class="review-toc" aria-labelledby="review-toc-title">
       <h3 id="review-toc-title">Sections</h3>
       <ul>
@@ -394,7 +392,7 @@
         <li><a href="#optional-checks">Optional checks</a>: {{ optional|length + note_rows|length }}</li>
         <li><a href="#decided">Your decisions</a>: {{ done|selectattr("by_you")|list|length }}</li>
         <li><a href="#accepted">Accepted automatically</a>: {{ done|rejectattr("by_you")|list|length }}</li>
-        <li><a href="#page-changes">Change the text, add what was missed, leave a page out</a></li>
+        <li><a href="#page-changes">Page changes</a></li>
       </ul>
     </nav>
     {# Many decisions: accept the ones no check found fault with, after seeing the list. #}
@@ -487,16 +485,9 @@
   {% if optional %}
   {% if second_checks %}
   {% set small = optional|length - second_checks %}
-  <p>These were accepted automatically, and nothing here holds up the document, but you
-    can still change any of them. For {{ counted(second_checks, "figure", "figures") }},
-    a second automated check found a possible mismatch between the alt text and the
-    image: worth a look, because a wrong alt text changes what a screen reader user
-    hears.{% if small %} For the other {{ small if small > 1 else "one" }}, the checks
-    found something small that does not change the meaning.{% endif %}</p>
+  <p>Accepted automatically; you can still change any. {{ counted(second_checks, "figure", "figures") }} may have alt text that does not match the image: worth a look.{% if small %} {{ small }} {{ "has" if small == 1 else "have" }} a small note.{% endif %}</p>
   {% else %}
-  <p>These were accepted automatically: the checks found something small that does not
-    change the meaning. Nothing here holds up the document, but you can still change any
-    of them.</p>
+  <p>Accepted automatically with a small note; you can still change any.</p>
   {% endif %}
   <details class="done-group"{% if optional_open %} open{% endif %}>
     <summary>Show the {{ counted(optional|length, "optional check", "optional checks") }}</summary>
@@ -510,7 +501,7 @@
   {# T3-7: notes about a link, a line or a figure, each with its place on the review screen. #}
   {% if note_rows %}
   <h3 id="notes-title">Notes on links, text and figures ({{ note_rows|length }})</h3>
-  <p class="hint">Nothing here holds up the document. Each one names what it is about and opens its place on the page.</p>
+  
   <ul class="check-list" aria-labelledby="notes-title">
     {% for r in note_rows %}
     <li><strong>{{ r.label }}:</strong> {{ r.sentence }}{% if r.what %} <span class="notice-names">“{{ r.what }}”.</span>{% endif %} <a href="{{ r.href }}">Show it on the page<span class="visually-hidden">: {{ r.label }}{% if r.what %}, {{ r.what }}{% endif %}</span></a></li>
@@ -532,7 +523,7 @@
     </ol>
   </details>
   {% else %}
-  <p>You have not decided anything yet.</p>
+  <p>None yet.</p>
   {% endif %}
 </section>
 
@@ -546,15 +537,15 @@
     </ol>
   </details>
   {% else %}
-  <p>Nothing was accepted automatically.</p>
+  <p>None.</p>
   {% endif %}
 </section>
 
 {# T3-5, T3-16: what the tool did not propose. The tools sit beside the page, on the review
    screen; one link to each page's. #}
 <section id="page-changes" class="review-section" aria-labelledby="page-changes-title" tabindex="-1">
-  <h2 id="page-changes-title">Change the text, add what was missed, leave a page out</h2>
-  <p>For the words of a paragraph or a heading, a line that should be a heading, a picture or an equation the tool did not find, or a blank or cover page. They are on the review screen, beside the page.</p>
+  <h2 id="page-changes-title">Page changes</h2>
+  <p>Change words, add a missed picture or equation, or leave a page out, on the review screen.</p>
   <ul class="check-list">
     {% for number, out in tool_pages %}
     <li><a href="/jobs/{{ job.id }}/review?page={{ number }}&amp;tools=1#page-tools-summary">Page {{ number }}<span class="visually-hidden">: change its text, add something, or leave it out</span></a>{% if out %} (left out of the student file){% endif %}</li>

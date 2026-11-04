@@ -152,13 +152,13 @@ def test_the_screen_lists_each_symbol_with_its_count_grouped_by_look_alike(symbo
     html = page(symbols)
     assert text_of(section(html, "<h1", "</h1>")) == "Symbols in the handwritten equations"
     intro = text_of(section(html, 'class="symbols-intro"', "</div>"))
-    assert "6 different symbols, 10 in all, in 3 equations" in intro
+    assert "6 symbols, 10 places, in 3 equations" in intro
     x_form = text_of(form_of(html, "sym-x"))
     assert "Small x" in x_form and "Read 3 times, in 2 equations." in x_form
     capital = text_of(form_of(html, "sym-X"))
     assert "Capital X" in capital and "Read 2 times, in 2 equations." in capital
     # 1 of the capital X is in the equation already accepted, and is not changed
-    assert "1 of them is in equations you already decided, and is not changed." in capital
+    assert "1 in decided equations stay." in capital
     # x, X, p and rho are in families with more than one symbol read: those come first
     headings = [text_of(h) for h in re.findall(r"<h2[^>]*>.*?</h2>", html, re.S)]
     assert headings[0].startswith("Looks alike: x X \u00d7") and "small x, capital X" in headings[0]
@@ -180,14 +180,13 @@ def test_each_place_shows_the_equation_picture_and_where_the_symbol_is(symbols):
     boxes = re.findall(r'<input type="checkbox" name="include" value="([^"]+)" checked', form)
     assert boxes == ["p1-e2:1", "p1-e5:1", "p1-e5:2"]
     assert 'name="exclude"' not in form
-    assert re.search(r"Change this one\s*: Equation", text_of(form))
+    assert re.search(r"Change\s*: Equation", text_of(form))
     assert 'name="places" value="chosen"' in form
     # where it lands is said in words before the list is opened, and what to do first
-    assert "Where it changes: Equation 1 (page 1), Equation 2 (page 1, 2 times)." in text_of(form)
-    assert "Choose the places (3 of 3 ticked)" in text_of(form)
+    assert "Changes: Equation 1 (page 1), Equation 2 (page 1, 2 times)." in text_of(form)
+    assert "Places (3 of 3 ticked)" in text_of(form)
     status = section(form, "data-symbol-affect", "</p>")
-    assert 'role="status"' in form and "Choose a symbol above to continue." in status
-    assert "3 places will change" in status
+    assert 'role="status"' in form and "Choose a symbol first." in status
     # no replacement is chosen before the person acts
     assert "selected" not in form
     # the choices are the family's other symbols, each by its name
@@ -203,7 +202,7 @@ def test_a_decided_equation_is_listed_and_has_no_checkbox(symbols):
     capital = form_of(page(symbols), "sym-X")
     assert capital.count('class="place"') == 2
     assert capital.count('name="include"') == 1  # equation 1's; equation 3 is decided
-    assert "Already decided: not changed." in text_of(capital)
+    assert "Decided: stays." in text_of(capital)
 
 
 def test_the_review_screen_links_to_the_symbols_when_there_is_handwritten_maths(symbols):
@@ -212,7 +211,7 @@ def test_the_review_screen_links_to_the_symbols_when_there_is_handwritten_maths(
         (f"/jobs/{symbols.job_id}/review/list", f"/jobs/{symbols.job_id}/symbols?view=list"),
     ):
         body = symbols.browser.get(path).text
-        assert f'href="{link}"' in body and "Symbols in the handwritten equations" in body
+        assert f'href="{link}"' in body and ">Symbols</a>" in body
 
 
 def test_a_typed_document_has_no_link_and_an_empty_screen(tmp_path):
@@ -229,7 +228,7 @@ def test_a_typed_document_has_no_link_and_an_empty_screen(tmp_path):
             not in client.get(f"/jobs/{env.job_id}/review").text
         )
         empty = text_of(page(env))
-        assert "no handwritten equations" in empty
+        assert "No symbols to change yet" in empty
 
 
 def test_a_scanned_page_of_printed_maths_is_not_listed(tmp_path):
@@ -493,8 +492,8 @@ def test_the_empty_screen_says_when_it_helps_and_shows_a_small_example(tmp_path)
         env.run_worker()
         html = page(env)
         empty = text_of(section(html, 'class="symbols-empty"', "</section>"))
-        assert "This screen is for handwritten equations" in empty
+        assert "Symbols appear once handwritten equations have been read" in empty
         assert "Convert scanned or handwritten pages" in empty
-        assert "What it will look like, as an example." in empty
+        assert "Example, not part of your document" in empty
         assert "<form" not in section(html, 'class="symbols-example"', "</figure>")
-        assert 'href="/jobs/' in section(html, 'class="symbols-empty"', "</section>")
+        assert 'href="/jobs/' in html.split("<h1", 1)[0].rsplit("<main", 1)[-1]  # Back, above

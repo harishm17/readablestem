@@ -11,24 +11,24 @@
 {# Nothing to accept at once: say why, and what is worth doing next. #}
 <p>{{ spec.nothing }}</p>
 {% if kind_waiting %}
-<p>{{ kind_waiting }} {{ spec.one if kind_waiting == 1 else spec.many }} {{ "is" if kind_waiting == 1 else "are" }} still waiting, each held back by a failed check or a flag, so {{ "it needs" if kind_waiting == 1 else "they need" }} your decision one at a time.</p>
+<p>{{ kind_waiting }} {{ spec.one if kind_waiting == 1 else spec.many }} still {{ "waits" if kind_waiting == 1 else "wait" }}: a check failed or flagged {{ "it" if kind_waiting == 1 else "them" }}.</p>
 <p><a class="button" href="{{ kind_href }}">Review the first {{ spec.one }}</a> <a href="{{ back_href }}">Back to the review</a></p>
 {% elif open_total %}
-<p>Every {{ spec.one }} is decided. {{ open_total }} other {{ "decision is" if open_total == 1 else "decisions are" }} still waiting.</p>
+<p>Every {{ spec.one }} is decided. {{ open_total }} other {{ "decision waits" if open_total == 1 else "decisions wait" }}.</p>
 <p><a class="button" href="{{ back_href }}">Go to the next decision</a></p>
 {% else %}
 <p>Nothing is waiting for a decision.</p>
 <p><a class="button" href="/jobs/{{ job.id }}">Back to the results</a></p>
 {% endif %}
 {% else %}
-<p id="bulk-summary">{{ counted|capitalize }} {{ "is" if count == 1 else "are" }} waiting with {% if spec.slug == "equations" %}every check passed{% else %}alt text the tool wrote and every check passed{% endif %}. Compare {{ "the proposal" if count == 1 else "each proposal" }} with the original below, then accept at the end of the list. Anything with a failed check or a flag is not here and stays for you. {{ "It stays" if count == 1 else "They stay" }} editable afterwards, and Undo takes the whole action back in one step.</p>
+<p id="bulk-summary">{{ counted|capitalize }} {{ "is" if count == 1 else "are" }} waiting with every check passed. Compare {{ "it" if count == 1 else "each" }} with the original, then accept. Anything that failed a check or was flagged stays for you. Undo reverses this in one step.</p>
 
-<h2 id="bulk-list-title">What would be accepted ({{ count }})</h2>
+<h2 id="bulk-list-title">To accept ({{ count }})</h2>
 <ol class="bulk-preview" aria-labelledby="bulk-list-title">
   {% for item in items %}
   <li id="bulk-{{ item.element_id }}">
     <p><strong>{{ item.label }}</strong>{% if item.page %}, page {{ item.page }}{% endif %}.
-      <a href="/jobs/{{ job.id }}/review?item={{ item.element_id }}">Open {{ item.label|lower }} on the review screen<span class="visually-hidden"> to decide it on its own</span></a></p>
+      <a href="/jobs/{{ job.id }}/review?item={{ item.element_id }}">Open<span class="visually-hidden"> {{ item.label|lower }} on the review screen to decide it on its own</span></a></p>
     <div class="fix-body">
     <figure class="crop">
       {% if item.crop_url %}
@@ -36,12 +36,11 @@
       {% else %}
       <p>No image of the original is available.</p>
       {% endif %}
-      <figcaption>Original in the PDF</figcaption>
     </figure>
     <div class="proposal">
     {% if item.kind == "equation" %}
     {% if item.mathml %}<div class="mathml-preview" tabindex="0" role="group" aria-label="Proposed {{ item.label|lower }}">{{ item.mathml }}</div>{% endif %}
-    {% if item.speech|speakable %}<p>Read aloud roughly as: {{ item.speech|speakable }}</p>{% endif %}
+    {% if item.speech|speakable %}<p>Read aloud: {{ item.speech|speakable }}</p>{% endif %}
     {{ hear_button(item) }}
     {% else %}
     <p class="alt-proposal"><span class="part-label">Alt text:</span> {{ item.alt }}</p>
@@ -52,7 +51,6 @@
   </li>
   {% endfor %}
 </ol>
-<h2 id="bulk-confirm-title">Accept after comparing</h2>
 <form method="post" action="/jobs/{{ job.id }}/accept/{{ spec.slug }}" class="bulk-confirm">
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
   <input type="hidden" name="version" value="{{ result_version }}">
