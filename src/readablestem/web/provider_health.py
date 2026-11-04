@@ -55,6 +55,17 @@ class ProviderHealth:
             recent = self._recent()
         return len(recent) >= MIN_CALLS and all(failed for _, failed in recent[-MIN_CALLS:])
 
+    def observed(self) -> tuple[int, int, datetime | None]:
+        """What the last `WINDOW_S` seconds show: requests answered or failed, how many of them
+        failed, and when the newest ended (None when there were none). The status page says
+        "no recent requests" rather than "no problems" when the first is 0."""
+        with self._lock:
+            recent = self._recent()
+        if not recent:
+            return 0, 0, None
+        failed = sum(1 for _, was_failure in recent if was_failure)
+        return len(recent), failed, datetime.fromtimestamp(recent[-1][0], UTC)
+
     def down_since(self) -> datetime | None:
         """When the run of failures that makes the service "not answering" began (the first
         of the unbroken run, at most `WINDOW_S` ago), else None."""

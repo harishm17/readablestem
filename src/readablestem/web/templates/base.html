@@ -49,6 +49,8 @@
   {{ json_ld(request.url.path, self.title() ~ " | ReadableSTEM", self.description()) }}
   {% endif %}
 </head>
+{# A page asks for the short footer with a top-level `{% set footer_mode = "minimal" %}` (the
+   sign-in pages). #}
 <body class="{% block body_class %}{% endblock %}">
   <a class="skip-link" href="#main">Skip to main content</a>
   {# A page can add its own skip links here (the review screen: "Skip to the decision"). #}
@@ -65,9 +67,8 @@
         <summary>Menu</summary>
         <nav aria-label="Main">
           <ul class="nav-list">
-            <li><a href="/"{% if active == "home" %} aria-current="page"{% endif %}>Home</a></li>
-            <li><a href="/demo"{% if active == "demo" %} aria-current="page"{% endif %}>Demo</a></li>
             {% if user %}
+            {# Signed in: the workspace first (documents, courses, account); the public pages after. #}
             <li><a href="/app"{% if active == "app" %} aria-current="page"{% endif %}>My documents</a></li>
             {% if courses_enabled %}
             <li><a href="/courses"{% if active == "courses" %} aria-current="page"{% endif %}>Courses</a></li>
@@ -76,9 +77,14 @@
             {% if user.is_admin %}
             <li><a href="/admin"{% if active == "admin" %} aria-current="page"{% endif %}>Admin</a></li>
             {% endif %}
-            {% endif %}
+            <li class="nav-secondary"><a href="/guides"{% if active == "guides" %} aria-current="page"{% endif %}>Guides</a></li>
+            <li class="nav-secondary"><a href="/for-accessibility-offices"{% if active == "offices" %} aria-current="page"{% endif %}>For accessibility offices</a></li>
+            {% else %}
+            <li><a href="/"{% if active == "home" %} aria-current="page"{% endif %}>Home</a></li>
+            <li><a href="/demo"{% if active == "demo" %} aria-current="page"{% endif %}>Demo</a></li>
             <li><a href="/guides"{% if active == "guides" %} aria-current="page"{% endif %}>Guides</a></li>
             <li><a href="/for-accessibility-offices"{% if active == "offices" %} aria-current="page"{% endif %}>For accessibility offices</a></li>
+            {% endif %}
           </ul>
         </nav>
       </details>
@@ -105,30 +111,43 @@
     {% block content %}{% endblock %}
   </main>
 
-  {% if compact_footer|default(false) %}
-  {# Signed-in pages: the trust and help links on one line. Public pages keep the full footer. #}
+  {% if footer_mode|default("") == "minimal" %}
+  {# Sign-in pages: one task, so only the notices that bear on it. #}
   <footer class="site-footer site-footer-compact">
     <div class="{{ self.main_class() }}">
       <nav aria-label="Footer">
         <ul class="footer-compact-links">
+          <li><a href="/terms">Terms</a></li>
+          <li><a href="/privacy">Privacy</a></li>
+          <li><a href="/limits">Known limits</a></li>
+          <li><a href="/status">Service status</a></li>
+          <li><a href="/terms#open-source">Open source</a></li>
+        </ul>
+      </nav>
+    </div>
+  </footer>
+  {% elif compact_footer|default(false) %}
+  {# Signed-in pages: the help and trust links on one line (the guides and the page for
+     accessibility offices are reached from the header and the guides page). Public pages keep
+     the full footer. #}
+  <footer class="site-footer site-footer-compact">
+    <div class="{{ self.main_class() }}">
+      <nav aria-label="Footer">
+        <ul class="footer-compact-links">
+          <li><a href="/help/posting">Posting in your course</a></li>
+          <li><a href="/limits">Known limits</a></li>
           <li><a href="/privacy">Privacy</a></li>
           <li><a href="/terms">Terms</a></li>
-          <li><a href="/limits">Known limits</a></li>
-          <li><a href="/help/posting">Posting in your course</a></li>
           <li><a href="/status">Service status</a></li>
-          <li><a href="/for-accessibility-offices">For accessibility offices</a></li>
-          <li><a href="/guides">Guides</a></li>
           {% if feedback_url %}
           <li><a href="{{ feedback_url }}">Send feedback</a></li>
           {% elif contact_email %}
           <li><a href="mailto:{{ contact_email }}?subject=ReadableSTEM%20feedback">Send feedback by email</a></li>
           {% endif %}
-          <li><a href="{{ source_url }}">Source code</a></li>
-          <li><a href="/terms#open-source">Open source</a></li>
         </ul>
       </nav>
       <p class="footer-note">Built and maintained by <a href="https://harishmanoharan.com/?ref=readablestem">Harish Manoharan</a>.
-        <a href="{{ source_url }}">Open source</a>{% if contact_email %} · <a href="mailto:{{ contact_email }}">Contact</a>{% endif %}</p>
+        <a href="/terms#open-source">Open source</a>.</p>
     </div>
   </footer>
   {% else %}
@@ -160,7 +179,7 @@
           <ul>
             <li><a href="/guides"{% if active == "guides" %} aria-current="page"{% endif %}>All guides</a></li>
             <li><a href="/guides/ada-title-ii-stem-course-materials"{% if active == "guide-ada" %} aria-current="page"{% endif %}>ADA Title II guide</a></li>
-            <li><a href="/guides/readablestem-mathpix-latexml"{% if active == "guide-compare" %} aria-current="page"{% endif %}>Compared with other tools</a></li>
+            <li><a href="/guides/readablestem-mathpix-latexml"{% if active == "guide-compare" %} aria-current="page"{% endif %}>Choosing a tool</a></li>
           </ul>
         </div>
         <div>

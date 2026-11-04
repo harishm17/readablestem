@@ -149,8 +149,9 @@ def test_no_guide_claims_conformance_or_ranks_the_tools(env, path):
 
 def test_the_comparison_says_where_the_other_tools_fit_better(env):
     text = flat(client_html(env, COMPARE))
-    assert "You have the LaTeX source. LaTeXML is the better fit." in text
-    assert "Mathpix is the better fit" in text
+    assert "The LaTeX source: LaTeXML." in text
+    assert "The file has to stay a PDF: Mathpix." in text
+    assert "Other formats, images, handwriting or a large batch: Mathpix." in text
     assert "no accuracy comparison" in text
     for source in (
         "docs.mathpix.com/reference/shared-types",

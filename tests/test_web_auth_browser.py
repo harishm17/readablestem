@@ -146,13 +146,13 @@ def open_sign_in_page(page, site, path: str) -> None:
         page.goto(site.base + path)
 
 
-@pytest.mark.parametrize("path", ["/login", "/", "org"])
+@pytest.mark.parametrize("path", ["/login", "/", "org"])  # "/" has no buttons now: a link to /login
 def test_sign_in_pages_pass_wcag22_aa_at_moderate_and_above(site, browser, axe_source, path):
     # bypass_csp only so axe can be injected; the round trip above runs under the CSP.
     context = browser.new_context(bypass_csp=True)
     page = context.new_page()
     open_sign_in_page(page, site, path)
-    assert page.get_by_role("button", name=UNIVERSITY_BUTTON).count() == (path != "org")
+    assert page.get_by_role("button", name=UNIVERSITY_BUTTON).count() == (path == "/login")
     serious = axe_violations(page, axe_source)
     results = page.evaluate(
         "async (tags) => await axe.run(document, "

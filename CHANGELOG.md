@@ -32,6 +32,44 @@
 - Deleted and unavailable documents: "kept N hours in all" instead of "after upload", the current
   retention times, "Upload the PDF again"; a document that cannot be opened gets the same
   help text whatever the reason. Privacy and Limits name the saved Account default.
+## Unreleased: UX round 2, lane D: public pages and the shared chrome (branch ux2/lane-d)
+
+- Offices page: a table of data by kind (what is sent where, for how long) now leads the page, a
+  retention table replaces the retention bullets, and every scrolling table is a focusable, named
+  box (fixes axe `scrollable-region-focusable` at 320px; `_table_scroll.html`). The by-kind table,
+  the by-company table and the downloadable one-page summary are all written from one list
+  (`offices.data_items`), so the summary now includes tables, opted-in full-page images, course
+  notation and handwriting close-ups when they are on. The summary's pilot is an ordered list, its
+  headings step down in size, it has no raw URLs, links back to the live page and still prints on
+  one page.
+- Privacy opens with a default-and-exceptions retention table and says the 7-day choice can be
+  the default in Account. Terms open with a short summary. Known limits open with what you can
+  upload, then what it handles, review time and accuracy. Posting help and the ADA guide open
+  with a short list.
+- Comparison guide: shorter title ("Choosing a tool for STEM course files"), a short decision list
+  before the table, and LaTeX source in the Inputs cell; the landing, limits, ADA, offices and
+  privacy pages name LaTeX source under the same flag. The guides index gives each guide an
+  audience line.
+- Landing: a headline, one line, the real before/after, a comparison chart (ReadableSTEM, the Opus
+  chatbot and the Haiku chatbot on the newest registered test, drawn from
+  `data/realworld/results-fresh5.json` by `web/proof_facts.py`, with a data table behind it, and the
+  first test's heading and figure counts), three lines on what it handles, and the questions
+  folded; under half the words shown before. The earlier chatbot-ahead result is history on
+  `/limits`, in PROOF.md and the README, not on the landing or comparison pages. The same chart
+  is on the comparison guide and the offices page (`_proof_chart.html`).
+- Long public pages (offices, privacy, terms, limits, the ADA guide, posting help, the comparison
+  guide) open with a summary or table and fold their detail into disclosures under the same
+  headings.
+- Demo: the note above the paper is two short paragraphs with the licence, original page and the
+  Teacher Support explanation in a disclosure (the committed demo file carries the new note; the
+  conversion itself is unchanged).
+- Status: "No recent requests; availability untested" or "Recent requests were answered", the
+  time of the last request, an optional one-minute refresh (`?refresh=1`), retention prose removed.
+- Sign-in: the account-creation consent sits under the buttons; sign-in pages use a five-link
+  footer. Signed-in pages put My documents, Courses and Account first and have a footer of six
+  links; footer and cancel links are 44px targets.
+- `/style`: every demonstration is labelled an inert example, the light, dark and forced-colour
+  states are shown, and examples link to the pages where they are in use.
 
 ## Unreleased: the Landlock launcher counts the user's tasks as the kernel does (branch latex/nproc-hidden-tasks)
 

@@ -44,9 +44,9 @@ def web(tmp_path):
 
 
 def test_the_limits_page_names_the_configured_limits(web):
-    assert "up to 333 pages and 88 MB, is kept" in text
+    text = flat(web.alice.get("/limits").text)
     assert "Up to 77 pages and 66 MB per upload." in text
-    assert "up to 333 pages, 88 MB) are kept" in text
+    assert "up to 333 pages and 88 MB, is kept" in text
     assert "can convert 111 pages and start" in text
     assert "an invited account can convert 222 pages a day" in text
     for old in OLD:
@@ -67,7 +67,7 @@ def test_the_upload_form_names_the_configured_limits(web):
 
 def test_the_landing_and_sign_in_pages_name_the_configured_quota(web):
     landing = flat(web.client().get("/").text)
-    assert "Upload up to 77 pages at a time" in landing
+    assert "up to 77 pages at a time" in landing
     assert "New accounts have daily limits: 111 pages a day" in landing
     for old in OLD:
         assert old not in landing, old

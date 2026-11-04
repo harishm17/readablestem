@@ -14,7 +14,6 @@ from readablestem.web import offices, seo
 
 LONG_PAGES = (
     seo.ADA_GUIDE,
-    seo.COMPARE_GUIDE,
     "/help/posting",
     offices.PAGE_PATH,
 )
@@ -59,7 +58,7 @@ def view(html: str, start: str, end: str) -> str:
 def test_the_comparison_stack_carries_every_fact_source_and_date_of_the_table(env):
     html = fetch(env, seo.COMPARE_GUIDE)
     table = view(html, '<div class="table-scroll compare-wide-view"', '<div class="compare-stack">')
-    stack = view(html, '<div class="compare-stack">', '<h2 id="readablestem">')
+    stack = view(html, '<div class="compare-stack">', '<h2 id="notes">')
     assert "<table" in table and "<table" not in stack
     cells = re.findall(r"<td>(.*?)</td>", table, re.S)
     entries = re.findall(r"<dd>(.*?)</dd>", stack, re.S)

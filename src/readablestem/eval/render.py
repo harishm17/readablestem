@@ -994,6 +994,8 @@ DEMO_NOTE_CSS = """\
 .demo-note a:visited { color: #5b2a86; }
 .demo-note a:hover { color: #072b66; }
 .demo-note :focus-visible { outline: 3px solid #0b3d91; outline-offset: 2px; }
+.demo-note summary { cursor: pointer; font-weight: 700; }
+.demo-note details p { margin: 0.5em 0 0; }
 @media (forced-colors: active) {
   .demo-note a:link { color: LinkText; }
   .demo-note a:visited { color: VisitedText; }
@@ -1004,13 +1006,21 @@ _HEAD_CLOSE = re.compile(r"</head\s*>", re.IGNORECASE)
 
 
 def demo_note_html(
-    page: PageSource, *, date: str, source_url: str | None = None, placeholder: bool = False
+    page: PageSource,
+    *,
+    date: str,
+    source_url: str | None = None,
+    placeholder: bool = False,
+    teacher_support: bool = False,
 ) -> str:
     """Short accessible note placed above the converted page in the public demo.
 
-    It links back to the app and, when `source_url` is given, to the source code (the
-    service's pages all link it; the licence wording is on the Terms page). A `placeholder`
-    demo (built with the offline client) says so in a marked paragraph.
+    Two short paragraphs (what this is, and the way back), then the licence, the original page
+    and the other notes in a disclosure, so the paper starts sooner. It links back to the app
+    and, when `source_url` is given, to the source code (the service's pages all link it; the
+    licence wording is on the Terms page). A `placeholder` demo (built with the offline client)
+    says so in a marked paragraph. `teacher_support`: the page has the book's "Teacher
+    Support" boxes, which the note explains once.
     """
     esc = html.escape
     authors = ", ".join(page.authors) if page.authors else "OpenStax authors"
@@ -1019,6 +1029,12 @@ def demo_note_html(
         "with the offline test client: the equations and descriptions below are "
         "placeholders, not real model output.</p>\n"
         if placeholder
+        else ""
+    )
+    teacher = (
+        "<p>Boxes headed “Teacher Support” are the book's own notes for teachers, and are kept "
+        "as printed.</p>\n"
+        if teacher_support
         else ""
     )
     source = (
@@ -1034,18 +1050,21 @@ def demo_note_html(
         "padding:0.75em 1em;margin:0 0 1.5em;background:#fff;color:#000;"
         'overflow-wrap:anywhere;">\n'
         + fake
-        + "<p><strong>Precomputed demo.</strong> This is ReadableSTEM's output for a PDF print "
+        + "<p><strong>Precomputed demo.</strong> ReadableSTEM's output for a PDF print "
         f"of “{esc(page.page_title)}” from <cite>{esc(page.book_title)}</cite> by "
-        f"{esc(authors)} (OpenStax), converted on {esc(date)}. Equations, headings and "
-        "image descriptions below are the tool's proposals; the ones marked for review "
-        "have not been checked by a person. ReadableSTEM assists with accessibility work; "
-        "it does not replace review.</p>\n"
+        f"{esc(authors)} (OpenStax, {esc(page.license_short)}), converted on {esc(date)}. What "
+        "follows are the tool's proposals; the ones marked for review have not been checked "
+        "by a person.</p>\n"
+        f'<p><a href="/">Back to ReadableSTEM</a>.{source}</p>\n'
+        "<details>\n<summary>Source, licence and notes</summary>\n"
         f'<p>Read <a href="{esc(page.page_url, quote=True)}">the original page on '
         "openstax.org</a>. Licensed under "
         f'<a href="{esc(page.license_url, quote=True)}">{esc(page.license_name)}</a> '
         f"({esc(page.license_short)}). Access for free at openstax.org. ReadableSTEM is not "
         "affiliated with or endorsed by OpenStax.</p>\n"
-        f'<p><a href="/">Back to ReadableSTEM</a>.{source}</p>\n'
+        + teacher
+        + "<p>ReadableSTEM assists with accessibility work; it does not replace review.</p>\n"
+        "</details>\n"
         "</aside>\n"
     )
 
@@ -1059,7 +1078,13 @@ def wrap_demo_html(
     placeholder: bool = False,
 ) -> str:
     """Insert the demo note at the start of <body>; wrap a bare fragment in a document."""
-    note = demo_note_html(page, date=date, source_url=source_url, placeholder=placeholder)
+    note = demo_note_html(
+        page,
+        date=date,
+        source_url=source_url,
+        placeholder=placeholder,
+        teacher_support="Teacher Support" in converted_html,
+    )
     style = f"<style>\n{DEMO_NOTE_CSS}</style>\n"
     match = _BODY_OPEN.search(converted_html)
     if match:

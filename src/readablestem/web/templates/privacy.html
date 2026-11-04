@@ -8,6 +8,15 @@
 <p class="hint">This page describes how the beta works today. If it changes in a way that
   matters to you, see "Changes to this notice" below.</p>
 
+<h2 id="retention-at-a-glance">How long a document is kept, at a glance</h2>
+<p>By default it is deleted {{ retention_hours }} hours after you last worked on it. The two
+  boxes on the upload form change that, and you can delete it sooner. The full list is under
+  “What is stored, and for how long”.</p>
+{% from "_table_scroll.html" import table_scroll %}
+{% call table_scroll("How long a document is kept") %}
+{% include "_retention_table.html" %}
+{% endcall %}
+
 <h2>Who runs this</h2>
 <p>ReadableSTEM is a free, open-source beta built and maintained by Harish Manoharan.{% if contact_email %} Contact:
   <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.{% endif %}</p>
@@ -18,8 +27,11 @@
   with students' personal information in it.</p>
 
 <h2>What is stored, and for how long</h2>
+<details>
+<summary>What is stored, and the exact clocks</summary>
 <p>For each upload we store: the PDF{% if office_on %} (for a Word or PowerPoint file, the PDF
-  made from it; the Word or PowerPoint file itself is not kept){% endif %} and its file name, images cut from it (equations and
+  made from it; the Word or PowerPoint file itself is not kept){% endif %}{% if latex_source %}
+  (for LaTeX source, the .tex file or the zip that was uploaded){% endif %} and its file name, images cut from it (equations and
   figures), the conversion result (proposed LaTeX, MathML, alt text and headings), the
   converted HTML, and your review decisions.</p>
 <ul>
@@ -41,8 +53,8 @@
     deleted <strong>{{ opt_in_days }} days</strong> after upload. During that time the people
     who run ReadableSTEM may look at the conversion results to find and fix mistakes in the
     tool. Both boxes
-    start unticked, except that "Keep for 7 days" starts ticked if you saved 7 days as your
-    default in <a href="/account#account-keep">Account</a>.</li>
+    are unticked unless you tick them; “Keep for 7 days” can be made the default for new
+    uploads in <a href="/account">Account</a>.</li>
   <li>Only your own work restarts these times; a person you share with does not keep it longer.</li>
   <li>You can delete a document and everything made from it at any time with
     "Delete now". It is removed from the database straight away.</li>
@@ -65,6 +77,7 @@
     you delete them or your account; they are not deleted with your documents.</li>
   {% endif %}
 </ul>
+</details>
 
 <h2>Who else sees your documents</h2>
 <ul>
@@ -99,6 +112,8 @@
 </ul>
 
 <h2>Your account</h2>
+<details>
+<summary>Account details and deleting your account</summary>
 {% if signup_open %}
 {# SIGNUP_MODE=open. Keep in step with web/auth.py, web/routes/account.py and the checks of
    ops/launch.py (this page must say that the first sign-in makes an account, and how to
@@ -139,6 +154,7 @@
   delete your account yourself from the <a href="/account">Account</a> page once you are
   signed in.</p>
 {% endif %}
+</details>
 
 <h2>Cookies</h2>
 <p>One cookie keeps you signed in (for up to 7 days) and protects forms against forgery.
@@ -158,6 +174,8 @@
 {% endif %}
 
 <h2>What is logged</h2>
+<details>
+<summary>Logs and usage notes</summary>
 {# Platform logs: Railway keeps its own request logs; how long depends on the plan, so the
    sentence does not give a number. #}
 <p>The app's logs record what happened, not what was in your document: event names, random
@@ -178,8 +196,11 @@
   cookies or scripts are used for this. These notes are deleted after {{ event_days }}
   days, or with your account.</p>
 {% endif %}
+</details>
 
 <h2>How it is protected</h2>
+<details>
+<summary>How it is protected</summary>
 {# Every line below is a behaviour the tests exercise (docs/security.md, tests/test_audit_*.py);
    keep it that way when editing. #}
 <ul>
@@ -205,6 +226,8 @@
     refused.</li>
   {% endif %}
 </ul>
+</details>
+
 <h2>Where it is processed</h2>
 <p>The app and its database run on Railway, in its United States region. Images and nearby
   text of equations and figures are sent to {{ recipients|selectattr("gets_documents")|map(attribute="name")|join(" and ") }} in

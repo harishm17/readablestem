@@ -6,11 +6,14 @@
 {# The list of /guides/<slug> pages (web/seo.py GUIDES). Add a guide there and it appears
    here, in the sitemap and in llms.txt. #}
 <h1>Guides</h1>
-<p class="lede">Longer reads for instructors and accessibility staff, each with its sources.</p>
+<p class="lede">Longer reads for instructors and accessibility staff, each with its sources.
+  The <a href="/for-accessibility-offices">page for accessibility offices</a> covers the data
+  and the pilot.</p>
 <ul class="guide-list">
   {% for g in guides %}
   <li>
     <h2><a href="{{ g.guide.path }}">{{ g.guide.title }}</a></h2>
+    {% if g.guide.audience %}<p class="guide-for">{{ g.guide.audience }}</p>{% endif %}
     <p>{{ g.guide.summary }}</p>
     <p class="hint">Last updated <time datetime="{{ g.updated }}">{{ g.updated_text }}</time>.</p>
   </li>
