@@ -198,7 +198,11 @@ log = logging.getLogger(__name__)
 # the equation step reads its crop and the page writes the reading into the table's cell when the
 # table step wrote it as text. TeX-made PDFs with tables on: more equation elements and model
 # calls, and `<math>` in table cells. Results from 0.5.4 load unchanged.
-PIPELINE_VERSION = "0.5.5"
+# 0.5.6 (2026-11-03): a relation set in a maths font before a number (`\approx 0.14`, `\geq 2`,
+# `\geq 90\%`) is one inline formula in a TeX-made PDF (`glyph_math.relation_runs`, docs/layout.md
+# "Short formulas the runs miss"); the run finder had dropped the relation as the tail of a formula.
+# Rarely changes a paper (3 formulas in 25 development papers). Results from 0.5.5 load unchanged.
+PIPELINE_VERSION = "0.5.6"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

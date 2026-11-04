@@ -11,6 +11,7 @@ document is needed. Cases come from the real-world development set
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pymupdf
 
@@ -257,6 +258,57 @@ def test_the_rules_leave_a_document_not_made_by_tex_alone():
     assert equations(analyze(one_page(fill)).elements) == ["t=24"]
     # A browser print sets units inside the maths: its formulas keep the unit.
     assert equations(analyze(one_page(fill, producer="Skia/PDF m120")).elements) == ["t=24h"]
+
+
+# ------------------------------------------------------------------ short formulas the runs miss
+
+
+def relations(text: str, maths: str, script: str = "") -> list[tuple[int, int, str]]:
+    chars = row(text)
+    return glyph_math.relation_runs(chars, [c in maths for c in text], [c in script for c in text])
+
+
+def test_a_relation_in_a_maths_font_and_the_number_after_it_are_a_formula():
+    assert relations("is ≥2 and", "≥") == [(3, 5, glyph_math.RELATION_REASON)]
+    assert relations("about ≈ 0.14,", "≈") == [(6, 12, glyph_math.RELATION_REASON)]
+
+
+def test_a_percent_sign_after_the_number_is_taken_with_it():
+    assert relations("at ≥90% of", "≥") == [(3, 7, glyph_math.RELATION_REASON)]
+
+
+def test_a_relation_after_a_digit_or_a_maths_glyph_is_part_of_a_longer_formula():
+    assert relations("x=3 ≥2 a", "x≥") == []  # a maths glyph comes before the relation
+    assert relations("3 ≥2", "≥") == []  # a digit comes before it
+
+
+def test_a_relation_that_is_no_maths_glyph_or_has_no_number_is_left_alone():
+    assert relations("is ≥2 and", "") == []
+    assert relations("is ≥ n and", "≥") == []
+    assert relations("is ≥2x and", "≥") == []  # not a bare number: something longer follows
+    assert relations("is ≥1.2.3 and", "≥") == []
+
+
+FIXTURE = Path(__file__).parent / "fixtures" / "layout" / "latex" / "short_maths.pdf"
+
+
+def fixture_equations() -> list[str]:
+    return [e.text or "" for e in analyze(FIXTURE.read_bytes()).elements if e.kind == Kind.EQUATION]
+
+
+def test_a_relation_before_a_number_is_inline_maths_in_a_tex_paper():
+    assert fixture_equations() == ["≈0.14", "≥2", "≥90%"]
+
+
+def test_plain_numbers_percentages_years_citations_and_markers_stay_text():
+    """The text of the same paper that looks like short maths: none of it is an equation, and
+    all of it is still in the paragraphs and list items."""
+    layout = analyze(FIXTURE.read_bytes())
+    text = " ".join(e.text or "" for e in layout.elements if e.kind != Kind.EQUATION)
+    for plain in ("95% was reported in 2024", "12 participants", "34.5 years", "5 mg", "[3]"):
+        assert plain in text
+    for plain in ("Figure 3", "Table 2 on page 7", "(Section 4.1)", "25% longer", "10 minutes"):
+        assert plain in text
 
 
 def test_a_word_in_brackets_after_an_indexed_variable_stays_prose():

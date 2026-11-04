@@ -93,6 +93,14 @@ def one(args: tuple[str, str]) -> dict:
         for e in lay.elements
         if e.kind == "equation" and kinds.get(e.parent_id or "") == "table"
     }
+    matched_ids = {p["element_id"] for p in item["pairs"]}
+    by_reason: dict[str, list[int]] = {}
+    for e in lay.elements:
+        if e.kind == "equation" and e.display == "inline":
+            key = e.reasons[0] if e.reasons else "(none)"
+            tally = by_reason.setdefault(key, [0, 0])
+            tally[0] += 1
+            tally[1] += e.id in matched_ids
     rows = []
     for r in records:
         p = paired.get(r["id"])
@@ -129,6 +137,7 @@ def one(args: tuple[str, str]) -> dict:
         "rows": rows,
         "unmatched": unmatched,
         "n_pred_cell": len(cells),
+        "by_reason": by_reason,
         "n_pred_inline": sum(e.display == "inline" for e in lay.elements if e.kind == "equation"),
         "gold_by_id": {g: gold[g].get("display") for g in gold},
     }
@@ -151,7 +160,14 @@ def summarise(papers: list[dict]) -> dict:
     cell_pred = sum(p.get("n_pred_cell", 0) for p in papers)
     cell_found = sum(bool(r.get("pred_cell")) for r in found)
     pred_inline = sum(p["n_pred_inline"] for p in papers)
+    reasons: dict[str, list[int]] = {}
+    for p in papers:
+        for key, (n, m) in p.get("by_reason", {}).items():
+            tally = reasons.setdefault(key, [0, 0])
+            tally[0] += n
+            tally[1] += m
     return {
+        "by_reason": reasons,
         "gold_inline": len(inline),
         "found_inline": len(found),
         "span_wrong": len(wrong),
@@ -185,6 +201,8 @@ def show(label: str, s: dict) -> None:
         "{}/{}".format(*s["float_found"]),
     )
     print("  unaligned inline predictions by reason:", dict(s["unmatched_by_reason"]))
+    for key, (n, m) in sorted(s["by_reason"].items(), key=lambda kv: -kv[1][0])[:14]:
+        print(f"  evidence {key!r}: predicted {n}, aligned {m} (precision {m / n:.3f})")
     if s["cell_pred"]:
         print(
             f"  table-cell equations: {s['cell_pred']} predicted, {s['cell_matched']} aligned "
