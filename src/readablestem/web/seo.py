@@ -86,9 +86,9 @@ GUIDES = (
     ),
     Guide(
         COMPARE_GUIDE,
-        "ReadableSTEM, Mathpix and LaTeXML compared",
-        "What each tool takes in and gives back, what it automates and what it costs, from "
-        "each project's own documentation.",
+        "ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML compared",
+        "What each takes in and gives back, what it automates and what it costs, each fact "
+        "with its source and date.",
     ),
 )
 PUBLIC_PAGES = (
@@ -101,7 +101,7 @@ PUBLIC_PAGES = (
     PublicPage("/terms", "2026-11-03"),
     PublicPage("/for-accessibility-offices", "2026-11-03"),
     PublicPage(ADA_GUIDE, "2026-10-28", "2026-10-28"),
-    PublicPage(COMPARE_GUIDE, "2026-10-28", "2026-10-28"),
+    PublicPage(COMPARE_GUIDE, "2026-11-03", "2026-10-28"),
 )
 PUBLIC_PATHS = frozenset(page.path for page in PUBLIC_PAGES)
 
@@ -223,7 +223,7 @@ def llms_txt(site: str, showcase: bool) -> str:
         f"- [ADA Title II and STEM course materials]({site}{ADA_GUIDE}): "
         "the Justice Department's web rule, its technical standard and dates, with sources, "
         "and what ReadableSTEM does and does not do",
-        f"- [ReadableSTEM, Mathpix and LaTeXML]({site}{COMPARE_GUIDE}): "
+        f"- [ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML]({site}{COMPARE_GUIDE}): "
         "what each takes in and gives back, from each project's own documentation",
         "",
         "## Evidence",
