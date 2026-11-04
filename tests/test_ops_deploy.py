@@ -271,7 +271,7 @@ def test_the_example_file_carries_the_recommended_open_signup_values():
     text = (Path(__file__).resolve().parents[1] / "deploy" / "deploy.env.example").read_text()
     for line in (
         "SIGNUP_MODE=open",
-        "OPEN_TIER_DAILY_PAGE_QUOTA=20",
+        "OPEN_TIER_DAILY_PAGE_QUOTA=150",
         "OPEN_TIER_DAILY_REREADS=30",
         "MAX_NEW_ACCOUNTS_PER_DAY=100",
         "OPEN_TIER_DAILY_SPEND_CAP_USD=4",
