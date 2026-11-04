@@ -324,13 +324,13 @@
   </div>
   {% if t.proposal and t.is_data %}<p class="hint">To change its headers or a cell, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.</p>
   {% elif t.proposal and t.local %}<p class="hint">Use the grid read from the PDF: students get it as a table, as read from the PDF; compare it with the image first.</p>{% endif %}
-  {% set only = not t.proposal and (not t.local or t.local_flat) %}
+  {% set sole_action = not t.proposal and (not t.local or t.local_flat) %}
   <div class="fallback" role="group" aria-labelledby="fallback-title-{{ eid }}">
     <p class="fallback-title" id="fallback-title-{{ eid }}">{{ "If it cannot be used as a table" if t.proposal else "Or leave it as an image" }}</p>
     <div class="fallback-choice">
       <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
         {{ table_fields("list") }}
-        <button type="submit" name="action" value="reject" class="{{ 'button' if only else 'button-secondary' }}"{% if not only %} data-tone="quiet"{% endif %} aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
+        <button type="submit" name="action" value="reject" class="{{ 'button' if sole_action else 'button-secondary' }}"{% if not sole_action %} data-tone="quiet"{% endif %} aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
       </form>
       <p class="hint" id="reject-note-{{ eid }}">{{ item.reject.consequence }}</p>
     </div>

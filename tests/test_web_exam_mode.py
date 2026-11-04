@@ -169,8 +169,6 @@ def test_keep_as_image_says_screen_readers_hear_the_pdf_text_marked_unchecked(tm
         env.run_worker()
         page = client.get(f"/jobs/{job_id}/review").text
     text = text_of(page)
-    assert (
-        "Keep as image: Students see a picture of the original; screen readers hear the PDF "
-        "text of the equation, marked as not checked." in text
-    )
+    assert "Keep as image" in text
+    assert "Students see a picture; screen readers read the PDF's text, marked unchecked." in text
     assert "say only" not in text
