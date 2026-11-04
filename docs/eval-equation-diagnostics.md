@@ -184,6 +184,81 @@ readers; an equation both get wrong the same way shows no sign. Whether a page w
 quote would do better is not measured here. The union and the flag numbers are ceilings of what the recorded chatbot
 answers allow, not what any product reads.
 
+## Inline span edges from glyphs (T11, 2026-11-03)
+
+`scripts/eq_span_edges.py --part PART [--out F] [--compare F]` runs the layout alone (no model, no cost) over the cut PDFs
+of a real-world part, aligns the equations it finds to the gold as the document task does with no model answers, and
+counts for the inline gold equations: detection recall by gold length, precision (aligned predictions over predicted
+inline equations), and span edges. An **edge error** is an aligned pair whose text layer differs from the gold in letters
+or digits (after folding the code points a text layer and a gold spell differently): letters or digits only the span has
+are "ran on", only the gold has "cut short". The 390 aligned pairs of dev2 below text-layer fidelity 0.99 are mostly a
+different print of the same maths (an accent the text layer has no glyph for, scripts in another order): 289 of the 390 are
+"inside" and are not counted as edge errors. The rules are in docs/layout.md ("Inline span edges from glyphs"); the dev2
+errors were read to find them, the other four parts were only measured.
+
+| part | inline gold | recall (found) | edge error, of gold | precision (predicted) |
+|---|---|---|---|---|
+| dev2 (tuned on) | 2,153 | 0.808 to 0.810 (1,739 to 1,745) | 4.7% to 3.9% (101 to 84) | 0.879 to 0.898 (1,978 to 1,944) |
+| held-out | 1,739 | 0.779 to 0.780 (1,355 to 1,357) | 7.5% to 6.8% (130 to 118) | 0.875 to 0.880 (1,549 to 1,542) |
+| fresh2 | 1,555 | 0.748 to 0.752 (1,163 to 1,170) | 4.2% to 4.1% (66 to 64) | 0.883 to 0.892 (1,317 to 1,312) |
+| fresh3 | 1,637 | 0.725 to 0.725 | 2.4% to 2.3% (40 to 38) | 0.892 to 0.892 |
+| fresh4 | 1,513 | 0.658 to 0.660 (996 to 998) | 3.6% to 3.6% (54 to 55) | 0.930 to 0.933 |
+| held-out and fresh2 to 4 (replay only) | 6,444 | 0.730 to 0.731 (4,701 to 4,712) | 4.5% to 4.3% (290 to 275) | 0.893 to 0.897 (5,267 to 5,254) |
+
+On dev2, 6 gold equations are found that were not and none is lost. The papers whose inline predictions change: dev2 10 of 25,
+held-out 2 of 15, fresh2 4, fresh3 2, fresh4 5. In the four replay parts 12 are found that were not (held-out 2, fresh2 8,
+fresh3 0, fresh4 2) and 1 is lost (fresh2, gold `d \sqrt{...}`, whose old prediction `d3T` aligned to it and whose new one does not). The
+first version of the function-name rule took any non-dictionary word before a bracket and lost 7 (`ARFIMA(1, d(m), 1)` against
+gold `d(m)`); it now takes only the names in `glyph_math.OPERATOR_NAMES`, which gives up the all-capitals names of one dev2
+paper (`CTCS(n)`, 8 gold equations) rather than guess. Exact and spoken-equal scores need a model's reading and are not computed here; the formulas read
+are the same glyphs, so only the crop's edges move.
+
+Other layout, 148 PDFs of `scripts/layout_identity.py` (the fixtures, `data/`, the development pages cached for the eval;
+before and after, no model): 146 identical, 2 different, both TeX papers of the table sets. `real-tables/2407.13734`: 197
+to 193 elements, because `x_{1:T}` is one formula (its `T` was an equation element of its own, with two more fragments, a
+paragraph's marker numbers shift); `real-tables-heldout/2311.16525`: `\sim 28%` keeps its percent sign. The letters and
+digits of every page are the same before and after, inline maths included (0 lost, 0 gained).
+
+What this does not show: no model reads the changed spans here, so whether the crop reading improves is the next run's
+question; the gold's edges are the authors' `$`, and about a dozen of the 82 remaining dev2 errors are an author setting a relation as text
+(`G = $6.6 \times 10^{-11}$`), which glyphs cannot tell from one formula; the nuclide rule (`^{20}\mathrm{Mg}` against
+`20Mg`) is a gold convention left as it is (about a dozen dev2 pairs).
+
+## Table-cell maths (T10, 2026-11-03)
+
+`scripts/eq_span_edges.py` also counts the equations layout now makes of table cells (docs/tables.md, "Maths cells from
+glyphs"): how many it predicts and how many align to a gold equation. Layout alone, no model; the cell equations are
+inline equation elements of the tables, aligned to the gold with every other equation. Gold typed in a float (a table,
+a figure or an algorithm: `in_float`) is the nearest the gold has to "typed in a table".
+
+| part | inline gold | recall (found) | gold in floats found | precision (predicted) | cell equations: predicted, aligned |
+|---|---|---|---|---|---|
+| dev2 (tuned on) | 2,153 | 0.810 to 0.839 (1,745 to 1,806) | 186 to 242 of 442 | 0.898 to 0.898 | 67, 62 (0.925) |
+| held-out | 1,739 | 0.780 to 0.818 (1,357 to 1,423) | 94 to 160 of 326 | 0.880 to 0.881 | 74, 67 (0.905) |
+| fresh2 | 1,555 | 0.752 to 0.785 (1,170 to 1,220) | 116 to 165 of 329 | 0.892 to 0.889 | 61, 54 (0.885) |
+| fresh3 | 1,637 | 0.725 to 0.751 (1,187 to 1,230) | 85 to 126 of 473 | 0.892 to 0.893 | 47, 43 (0.915) |
+| fresh4 | 1,513 | 0.660 to 0.675 (998 to 1,021) | 180 to 199 of 583 | 0.933 to 0.905 | 58, 25 (0.431) |
+| held-out and fresh2 to 4 (replay only) | 6,444 | 0.731 to 0.759 (4,712 to 4,894) | 475 to 650 of 1,711 | 0.897 to 0.891 (5,254 to 5,494) | 240, 189 (0.788) |
+
+Only dev2 was read to build the rule. Overall precision of the predicted inline equations falls on one part, fresh4
+(0.933 to 0.905), and the reason is one paper: 2309.04589 sets 39 results as `68.8±0.7`, whose gold types only the
+plus-or-minus sign (`68.8$\pm$0.7`), so each cell is a formula for a reader and none for the gold; they are 39 of the 49
+unaligned cell equations of that part (33 of 58 predictions here). The cells have real maths glyphs (the sign is in a maths font): the precision is
+against the gold's typing, not against what a reader needs. The other unaligned cell equations are a few per paper (a
+number with a star or a bracket: `6.09e-03⋆`, `Ca∗[-]`). A glyph now belongs to one cell and a cell is an equation only when its glyphs spell its own text (before: 73 cells on dev2, one
+with a glyph of its neighbour's `p<0.05` in `65.1±0.4p`).
+
+Layout identity, 148 PDFs of `scripts/layout_identity.py`, before and after, no model: two differ, both TeX-made and both
+because their tables gain cell equations (`beamer_columns_table.pdf`: 6 equation elements for 6 of the table's 8 maths cells;
+`real-tables/2407.13734.pdf`: 4 elements). The comparison was made against a snapshot of the previous change taken before
+its edge rules were gated on a TeX producer, so a third PDF (`real-tables-heldout/2311.16525.pdf`) showed up too: its producer
+is not one `page_type.producer_hint` calls TeX, so the gate returns it to the main-branch output. No element lost, the letters
+and digits of every page equal.
+
+Not measured here: whether the equation step reads these cells right (it needs a model: they go through the same step,
+checks and review as any inline equation), the cost (one model call per cell equation, at most 60 a table: the 307 cells
+of the five parts are about 3.6 a paper) and the effect on exact and spoken-equal scores.
+
 ## Limits
 
 - Counts describe the recorded runs with the code at the time they were made (D1's layout and D4's replay use the code in

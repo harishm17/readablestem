@@ -24,6 +24,43 @@
   MB upload to confirm after the deploy), docs/security.md, docs/operations.md (how much the uploads
   weigh in the database), README, vendor sheet, `.env.example`, `deploy/deploy.env.example`.
 
+## Unreleased: maths in table cells (branch eq/t10-table-cell-maths, on eq/t11-glyph-spans)
+
+- A table cell that is one formula by its glyphs (TeX-made PDFs; the rules that find inline maths in prose, applied to the
+  cell alone) is an inline equation element of the table (`layout._cell_maths`, `TableCell.equation_id`). The equation step
+  reads its crop with its checks and its place in the review, and the page writes the reading into the table's cell when
+  the table step wrote that cell as text (`pipeline/table_math.py`, `assemble.render_html`); a cell the model already
+  wrote as maths, a failed reading and a table kept as a picture are left as they are. With tables off, `run.py` drops
+  the cell equations. docs/tables.md "Maths cells from glyphs".
+- Measured offline (layout alone, no model): gold equations typed in a float found 661 to 892 of 2,153 over the five
+  development and replay parts; overall inline recall 0.731 to 0.759 on held-out and fresh2 to 4 (6,444 gold), precision
+  0.897 to 0.891 (one paper, `68.8±0.7`, holds most of the fall); 146 of 148 layout-identity PDFs identical, the two
+  that differ are TeX-made (the Beamer table deck gains 6 equation elements, `real-tables/2407.13734` 4; no text lost).
+- A cell and its equation are edited as one (`web.review._written_through`): LaTeX typed on the table card is written to the
+  equation with the same checks and an equation edit to the cell, as recorded changes of one write that Undo takes back
+  together; the card marks such a cell "(also an equation)". `tests/test_web_table_cell_equation.py`.
+- `scripts/eq_span_edges.py` also counts the cell equations (predicted, aligned to a gold equation).
+- Tests: `tests/test_table_math.py`; `tests/test_layout_beamer_math.py` (the table-cell test now asserts the equation
+  elements; the inline count of the table deck stays a strict xfail: its two cells with a number set in maths mode and a
+  text-font unit have no glyph that says they are maths).
+- Pipeline version 0.5.4 to 0.5.5: `TableCell.equation_id` is new (left out of the JSON when empty, so a record without it
+  is unchanged); results from 0.5.4 load unchanged.
+
+## Unreleased: inline span edges from glyphs (branch eq/t11-glyph-spans)
+
+- Inline formulas of TeX-made PDFs start and end where the glyphs say (`pipeline/glyph_math.py`, docs/layout.md "Inline
+  span edges from glyphs"): a comma, colon or semicolon set as an index stays in the formula (`\rho_{m,q}(x)` was `q(x)`),
+  a radical is not cut from its radicand, a known upright operator name touching its bracket (`\Pr(A)`, `\mathrm{supp}(\psi)`)
+  and a percent sign after a number are in the formula, and the unit after a number (`24h`, `m^3 kg^{-1}`) is out of it.
+  Nothing becomes a formula that was not one, so no text is lost: letters and digits of all 148 PDFs of
+  `scripts/layout_identity.py` are equal before and after, 146 PDFs identical, 2 TeX papers differ.
+- Measured with the new `scripts/eq_span_edges.py` (layout alone, no model): inline span edge errors on the development
+  gold 4.7% to 3.8% (dev2, 2,153 inline gold), 4.5% to 4.0% on held-out and fresh2 to 4 (6,444, replay only), precision
+  0.893 to 0.902, recall 0.730 to 0.734 (docs/eval-equation-diagnostics.md, "Inline span edges"). No model read the
+  changed spans.
+- Tests: `tests/test_glyph_math.py`.
+- Pipeline version 0.5.3 to 0.5.4: an inline formula's crop, id and marker text can change; results from 0.5.3 load
+  unchanged.
 ## Unreleased: sharing with named people (branch share/g1-named-people)
 
 - An owner can share one finished document with named people by email address (`/jobs/{id}/share`,

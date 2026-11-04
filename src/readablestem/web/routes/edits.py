@@ -690,7 +690,7 @@ def read_cell(
             job_id,
             user,
             version,
-            lambda stored: [_marked_model_read(apply_review(stored, element_id, "edit", form))],
+            lambda stored: _marked_model_read(apply_review(stored, element_id, "edit", form)).every,
             kind="single",
         )
     except ReviewStale:

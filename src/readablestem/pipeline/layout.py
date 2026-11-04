@@ -92,6 +92,7 @@ from readablestem.core.types import (
 from readablestem.pipeline import (
     chem,
     equation_images,
+    glyph_math,
     hyphens,
     outline,
     page_labels,
@@ -2876,9 +2877,16 @@ def _word_lengths(
         word = "".join(c.c for c in chars[i:j]).lower()
         if italic_variables and italic_text and j - i > 1 and word in hyphens.words():
             italic_variables = False
+        named = (
+            _TEX_MADE
+            and not italic_variables
+            and not script[i]
+            and not any(c.italic for c in chars[i:j])
+            and glyph_math.function_name(chars, i, j)
+        )
         for k in range(i, j):
             lengths[k] = 1 if italic_variables else j - i
-            maths_word[k] = word in _MATH_WORDS
+            maths_word[k] = named or word in _MATH_WORDS
         i = j
     return lengths, maths_word
 
@@ -3365,14 +3373,18 @@ def _inline_runs(
                 or (c == "," and (depth > 0 or _ellipsis_comma(chars, i)))
                 or (c in _ELLIPSIS_CHARS and _in_ellipsis(chars, i))
                 or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
+                or (_TEX_MADE and glyph_math.script_punctuation(chars, info.script, i))
+                or (_TEX_MADE and glyph_math.percent_of_number(chars, i))  # the 5% of "phi = 5%"
             )
             accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
             # The degree sign of E°cell or ΔG°, a raised glyph of the text font after a symbol.
             accent = accent or (
                 c in _DEGREE_SIGNS and info.script[i] and i > start and info.mathy(i - 1)
             )
-            if chars[i].blank and (
-                _between_formulas(chars, i) or _word_space_between_operands(chars, info, i)
+            if (
+                chars[i].blank
+                and (_between_formulas(chars, i) or _word_space_between_operands(chars, info, i))
+                and not (_TEX_MADE and glyph_math.touching(chars, i))
             ):
                 break
             if info.mathy(i) or chars[i].blank or inside or accent:
@@ -3761,7 +3773,7 @@ def _reaction_row(row: _Row, info: _CharInfo) -> bool:
 # gap there is a word space of the sentence, and the formula ends before it: "eps(k) (i = 1)" is
 # two formulas, as the author typed them. A thin space ("dx \\, dy", 0.17 em) is narrower.
 WORD_SPACE = 0.25  # x font size: the narrowest gap that is a word space
-_OPERAND_END = frozenset(")]}'\u2032!\u221e")
+_OPERAND_END = frozenset(")]}'\u2032!\u221e%")
 _OPERAND_START = frozenset("([{\u2202\u2207\u221a\u222b\u2211\u220f\u221e")
 
 
@@ -3928,15 +3940,11 @@ def _tail_outside_maths(chars: list[_Char], info: _CharInfo, start: int, end: in
     cite = _CITATION_TAIL.search(text)
     if cite is not None and cite.start() > 0 and text[cite.start() - 1].isspace():
         return start + cite.start()
-    last = end - 1
-    if not (chars[last].c.isalpha() and info.classes[last] == "L" and not chars[last].italic):
-        return None
-    if info.script[last] or chars[last].math or last - 1 < start or not chars[last - 1].blank:
-        return None
-    back = next((k for k in range(last - 1, start - 1, -1) if not chars[k].blank), None)
-    if back is None or not chars[back].c.isdigit():
-        return None
-    return back + 1
+    upright = [
+        c.c.isalpha() and info.classes[k] == "L" and not (c.italic or c.math or info.script[k])
+        for k, c in enumerate(chars)
+    ]
+    return glyph_math.trailing_unit(chars, start, end, upright=upright, script=info.script)
 
 
 def _article(chars: list[_Char], info: _CharInfo, start: int, end: int, blank: int) -> bool:
@@ -7202,6 +7210,8 @@ class _Block:
     label: str | None = None  # display equations: the equation number beside them
     regular: str | None = None  # display equations: `Element.regular_letters`
     table: TableGrid | None = None  # tables: the grid built from the PDF (`_table_blocks`)
+    # tables: the cells that are one formula, as inline equations of the table (`_cell_maths`)
+    cell_inlines: dict[tuple[int, int], _Inline] = field(default_factory=dict)
     code: bool = False  # paragraphs: program code, lines and indentation kept (`_code_text`)
     term_pieces: int | None = None  # glossary entries: how many of `pieces` are the term
     contents_level: int = 0  # list items: an entry of a table of contents, at this level
@@ -8231,6 +8241,7 @@ def _claim_tables(
         cells = _merge_baselines([frags[number][i] for i in sorted(table.lines)], None)
         if any("sub" in _script_glyphs(row)[0] for row in cells if not row.vertical):
             table.reasons.append(LOWERED_CELL_REASON)
+        table.cell_maths = _cell_maths(table.grid, [frags[number][i] for i in sorted(table.lines)])
     frags[number] = [f for i, f in enumerate(frags[number]) if i not in lines]
     paths[number] = [p for i, p in enumerate(paths[number]) if i not in drawn]
     if previous and tables.continues(previous[-1], found[0], page.rect.width):
@@ -8241,6 +8252,103 @@ def _claim_tables(
         if tables.join_split_row(previous[-1], found[0]):
             found = found[1:]
     return found
+
+
+CELL_MATHS_REASON = "table cell maths"
+MAX_CELL_EQUATIONS = 60  # a table with more maths cells than this is left to the table step
+_CELL_SCAN_LIMIT = 2_000_000  # cells x glyphs: a bigger table is not scanned
+
+
+def _letters_of(text: str) -> str:
+    """The letters and digits of `text` as a text layer and a cell spell them alike."""
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    return "".join(c for c in folded if c.isalnum())
+
+
+def _cell_owners(grid: TableGrid, glyphs: Sequence[_Char]) -> list[int | None]:
+    """For each glyph, the index of the one cell it belongs to, or None. Cell boxes of a detected
+    grid overlap by a few points, so a glyph whose centre is in two goes to the cell it overlaps
+    most, and never to both."""
+    boxes = [(i, c.bbox) for i, c in enumerate(grid.cells) if c.bbox is not None]
+    owners: list[int | None] = []
+    for g in glyphs:
+        cx, cy = (g.x0 + g.x1) / 2, (g.y0 + g.y1) / 2
+        best, best_area = None, 0.0
+        for i, (x0, y0, x1, y1) in boxes:
+            if not (x0 <= cx <= x1 and y0 <= cy <= y1):
+                continue
+            area = max(0.0, min(g.x1, x1) - max(g.x0, x0)) * max(0.0, min(g.y1, y1) - max(g.y0, y0))
+            if best is None or area > best_area:
+                best, best_area = i, area
+        owners.append(best)
+    return owners
+
+
+def _cell_maths(grid: TableGrid, rows: Sequence[_Row]) -> dict[tuple[int, int], _Inline]:
+    """The cells of a table whose whole content is one inline formula, by the glyphs.
+
+    A cell of a TeX paper holds maths when the glyphs say it as they do in a line of prose
+    (`_inline_runs`: a maths font, an italic variable with an operator, a script, a relation
+    with operands): the cell's glyphs are read as a row of their own, and the cell counts only
+    when one run covers everything in it. A cell of words with a formula in it, a bare number,
+    a cell of several lines (a stacked fraction is one: left to the table step's model) and a
+    rotated table are not taken. Nothing here reads LaTeX: the cell's crop goes to the equation
+    step like any inline equation, and what it reads is flagged by the same checks.
+    """
+    if not _TEX_MADE or grid.turned or not grid.cells:
+        return {}
+    glyphs = [c for row in rows if not row.vertical and not row.diagonal for c in row.chars]
+    if not glyphs or len(grid.cells) * len(glyphs) > _CELL_SCAN_LIMIT:
+        return {}
+    owned = _cell_owners(grid, glyphs)
+    found: dict[tuple[int, int], _Inline] = {}
+    for index, cell in enumerate(grid.cells):
+        if cell.bbox is None or not cell.text.strip():
+            continue
+        mine = sorted(
+            (c for c, owner in zip(glyphs, owned, strict=True) if owner == index),
+            key=lambda c: (c.x0, c.y0),
+        )
+        ink = [c for c in mine if not c.blank]
+        if not ink or max(c.y1 for c in ink) - min(c.y0 for c in ink) > 1.6 * max(
+            c.size for c in ink
+        ):
+            continue
+        row = _Row(mine)
+        runs = _inline_runs(row)
+        first = next(i for i, c in enumerate(mine) if not c.blank)
+        last = max(i for i, c in enumerate(mine) if not c.blank)
+        if (
+            not runs
+            and len(ink) == 1
+            and ink[0].c.isascii()
+            and ink[0].c.isalpha()
+            and ink[0].italic
+        ):
+            # One italic letter alone in its cell is a variable: nothing in prose stands beside it
+            # to make it a word (`_italic_variables` needs upright text around it).
+            runs = [(first, last + 1, ["italic letter alone in a table cell"])]
+        if len(runs) != 1 or runs[0][0] > first or runs[0][1] < last + 1:
+            continue
+        # A leading or trailing mark the run trims (a comma, a full stop) is punctuation of the
+        # cell, not part of the formula: only a whole cell is taken.
+        span = mine[runs[0][0] : runs[0][1]]
+        text = _clean("".join(c.styled for c in span))
+        if _letters_of(text) != _letters_of(cell.text):
+            continue  # not what the cell says (a glyph of its neighbour, a mark the cell drops)
+        shown = [c for c in span if not c.blank]
+        score, _ = equation_score(
+            text, sorted({c.font for c in shown}), any(c.flags & _SUPERSCRIPT_FLAG for c in shown)
+        )
+        found[(cell.row, cell.col)] = _Inline(
+            _union((c.x0, c.y0, c.x1, c.y1) for c in shown),
+            text,
+            score,
+            [CELL_MATHS_REASON, *runs[0][2]],
+            _dominant_size([row]),
+            _regular_letters(shown),
+        )
+    return found if len(found) <= MAX_CELL_EQUATIONS else {}
 
 
 def _table_blocks(page_tables: Sequence[tables.PageTable]) -> list[_Block]:
@@ -8259,6 +8367,7 @@ def _table_blocks(page_tables: Sequence[tables.PageTable]) -> list[_Block]:
                 caption=found.caption,
                 reasons=list(found.reasons),
                 table=grid,
+                cell_inlines=dict(found.cell_maths),
                 flat_scripts=LOWERED_CELL_REASON in found.reasons,
             )
         )
@@ -10090,6 +10199,25 @@ def _to_elements(
                     else:
                         parts.append(piece)
                 caption_marked = " ".join(script_marks.strip_marks("".join(parts)).split())
+            table = block.table if kind is Kind.TABLE else None
+            if table is not None and block.cell_inlines:
+                # A cell that is one formula is an inline equation of the table: its id goes
+                # on the cell, and the equation step reads the cell's crop.
+                cell_ids: dict[tuple[int, int], str] = {}
+                for key, inline in sorted(block.cell_inlines.items()):
+                    child_id = next(ids)
+                    caption_children.append((child_id, inline))
+                    cell_ids[key] = child_id
+                table = table.model_copy(
+                    update={
+                        "cells": [
+                            c.model_copy(update={"equation_id": cell_ids[(c.row, c.col)]})
+                            if (c.row, c.col) in cell_ids
+                            else c
+                            for c in table.cells
+                        ]
+                    }
+                )
             elements.append(
                 Element(
                     id=element_id,
@@ -10110,7 +10238,7 @@ def _to_elements(
                     regular_letters=block.regular if kind == Kind.EQUATION else None,
                     page_latex=block.page_latex if kind == Kind.EQUATION else None,
                     page_status=block.page_status if kind == Kind.EQUATION else None,
-                    table=block.table if kind == Kind.TABLE else None,
+                    table=table,
                 )
             )
             for child_id, inline in caption_children:
