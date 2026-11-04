@@ -31,6 +31,12 @@
 ## Unreleased: fifth fresh split, registered result (branch eval/fresh5-report)
 ## Unreleased
 
+- LaTeX source is on in production (2026-11-04 13:53 UTC): `FEATURE_LATEX_SOURCE=true` after Railway's start-up sandbox
+  probe passed on the Landlock backend (tini as pid 1; isolation, memory, task, task-growth and real-LaTeXML checks
+  ok). `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` stay off until real decks and course sources have been tried.
+  Docs, the compare guide, `/limits`, the landing page and the upload form say what is taken: a `.tex` file or a zip of a
+  LaTeX project, the PDF still the main path, not Beamer source yet.
+
 ## Pipeline 0.5.9 (2026-11-04)
 
 Everything that was listed as unreleased up to 2026-11-04, grouped by area (newest entry first within an area, as it was

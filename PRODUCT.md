@@ -25,7 +25,7 @@ The converted output and the review step are shown, not claimed: the site shows 
 ## Capabilities and Constraints
 - Input is a PDF (Word and PowerPoint are first turned into PDFs where the server has LibreOffice); output is one HTML file, plus a Canvas zip, Common Cartridge, Word and EPUB downloads.
 - Scanned and handwritten pages are read by a model only when the instructor ticks "Convert scanned or handwritten pages"; every block it writes is a review item.
-- Not a compliance checker, not a general OCR engine, not a general PDF-to-Markdown converter. LaTeX source (and Beamer, and zips of documents) is built but switched off on the hosted service, so it takes PDFs only (docs/deploy-railway.md, "Feature flags in production").
+- Not a compliance checker, not a general OCR engine, not a general PDF-to-Markdown converter. A LaTeX file or a zip of a LaTeX project is also taken on the hosted service since 2026-11-04, but the PDF is the main path; Beamer source and zips of several documents are built and switched off there (docs/deploy-railway.md, "Feature flags in production").
 - Wording rules (CONTRIBUTING.md): the tool assists; no claim of conformance, guaranteed accessibility or checked results; numbers carry their sample size and say what they do not show; no document content in logs.
 - Copy is the owner's. New labels are placeholders until reviewed.
 

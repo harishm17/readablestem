@@ -43,7 +43,9 @@
 <ul>
   <li><strong>You have the LaTeX source.</strong> LaTeXML is the better fit. It converts the
     source itself, so nothing has to be recognized from a PDF. ReadableSTEM starts from the
-    PDF and does not work from LaTeX sources.</li>
+    PDF{% if latex_source %}; it also takes a LaTeX file or a zip of a LaTeX project, which it
+    converts with LaTeXML, but not the source of a Beamer deck{% else %} and does not work from
+    LaTeX sources{% endif %}.</li>
   <li><strong>You have only a PDF and want a web page.</strong> Mathpix and ReadableSTEM both
     do this. Mathpix is a paid service with a free tier. ReadableSTEM is a free beta with a
     review screen for the instructor.</li>
