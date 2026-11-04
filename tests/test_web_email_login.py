@@ -263,3 +263,58 @@ def test_the_login_page_offers_it_only_when_it_is_on(web):
     page = web.browser.get("/login").text
     assert "Email me a sign-in link" in page and 'name="email"' in page
     assert BOB not in page
+
+
+# --------------------------------------------------------------------------- shares (G1)
+
+
+def _shared_with_alice(env) -> str:
+    from readablestem.web.db import Job, JobShare, JobStatus, User
+
+    env.allow(BOB)
+    with session_scope(env.ctx.factory) as session:
+        owner = session.scalar(select(User.id).where(User.email == BOB))
+        job = Job(
+            user_id=owner,
+            filename="f.pdf",
+            page_count=1,
+            status=JobStatus.DONE,
+            retain_until=utcnow() + timedelta(hours=1),
+        )
+        session.add(job)
+        session.flush()
+        session.add(JobShare(job_id=job.id, email=ALICE, role="view"))
+        return job.id
+
+
+def _sign_in_by_link(env, address: str, client) -> None:
+    ask(env, address, client)
+    path = emailed_path()
+    page = client.get(path)
+    token = path.split("token=")[1]
+    response = client.post(
+        "/login/email/confirm", data={"csrf_token": csrf_from(page.text), "token": token}
+    )
+    assert response.status_code == 303
+    OutboxSender.reset()
+
+
+def test_a_link_sent_to_the_account_address_proves_it_for_a_share(web):
+    job_id = _shared_with_alice(web)
+    _sign_in_by_link(web, ALICE, web.browser)
+    assert web.browser.get(f"/jobs/{job_id}/download").status_code == 409  # found, not rendered
+
+
+def test_a_link_sent_to_a_linked_address_proves_nothing_for_the_account(web):
+    job_id = _shared_with_alice(web)
+    with session_scope(web.ctx.factory) as session:
+        linked_emails.link(session, ALICE, PERSONAL)
+    _sign_in_by_link(web, PERSONAL, web.browser)
+    response = web.browser.get(f"/jobs/{job_id}/download")
+    assert response.status_code == 403 and "Sign in again to open this document" in response.text
+
+
+def test_the_link_remembers_the_address_it_was_sent_to(web):
+    ask(web, " Alice@Example.ORG ")
+    with session_scope(web.ctx.factory) as session:
+        assert session.scalar(select(LoginLink.email)) == ALICE

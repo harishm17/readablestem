@@ -2,7 +2,7 @@
 
 The stored result, the structural snapshots in `review_edits` (JSON), the crops of added
 elements, the job row's spend counters and the stale-tab guard behave as on SQLite. The edits
-take the job row lock first (`owned_job(lock=True)`), so two forms drawn at the same version that
+take the job row lock first (`job_access(lock=True)`), so two forms drawn at the same version that
 arrive together are applied once; the spend of a model read is held and settled on the row.
 
 Run with: uv run pytest -m postgres tests/test_web_edit_postgres.py

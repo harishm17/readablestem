@@ -105,7 +105,7 @@ from readablestem.web.review import (
     item_labels,
     item_numbers,
 )
-from readablestem.web.routes.jobs import NOT_FOUND, owned_job, require_done
+from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done
 from readablestem.web.routes.review import (
     GROUP_FLASH,
     HEADING_GROUP_FLASH,
@@ -122,6 +122,7 @@ from readablestem.web.routes.review import (
     times_phrase,
     undo_offer,
 )
+from readablestem.web.shares import REVIEW
 from readablestem.web.speech_diff import SpokenDiff, spoken_diff
 from readablestem.web.views import KIND_LABELS, JobView, last_decision
 
@@ -424,9 +425,9 @@ def _page_count(view: JobView, result: DocumentResult) -> int:
 
 def _owned_page_count(request: Request, job_id: str, user: CurrentUser) -> int:
     """The job's page count, without loading its upload; 404 for someone else's job, a
-    deleted one or one past its retention time (`owned_job`)."""
+    deleted one or one past its retention time (`job_access`)."""
     with session_scope(get_ctx(request).factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, REVIEW)
         require_done(job)
         return job.page_count
 
@@ -435,7 +436,7 @@ def _upload(request: Request, job_id: str, user: CurrentUser) -> bytes:
     """The job's own upload (404 as `_owned_page_count`). Loaded only while a render slot is
     held (`page_images.render_slot`), so waiting requests hold no copy of it."""
     with session_scope(get_ctx(request).factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, REVIEW)
         require_done(job)
         pdf = session.scalar(
             select(Blob.content).where(Blob.job_id == job.id, Blob.kind == "upload")
@@ -483,7 +484,7 @@ def _store_page_sizes(
     """Add the page sizes to a stored result that has none (only that key changes, so
     a result stored before still loads as it did, with its sizes now)."""
     with session_scope(get_ctx(request).factory) as session:
-        job = owned_job(session, job_id, user, lock=True)
+        job = job_access(session, job_id, user, REVIEW, lock=True)
         data = dict(job.result_json or {})
         if data.get("page_sizes"):
             return  # stored meanwhile by another request
@@ -682,7 +683,7 @@ class SplitBuilder:
         from readablestem.web.outcome import job_outcome
 
         with session_scope(get_ctx(self.request).factory) as session:
-            job = owned_job(session, self.job_id, self.user)
+            job = job_access(session, self.job_id, self.user, REVIEW)
             when = last_decision(session, job)
             outcome = job_outcome(
                 status=str(job.status), error_code=job.error_code, result_json=job.result_json

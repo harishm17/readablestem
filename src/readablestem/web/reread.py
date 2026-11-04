@@ -231,7 +231,9 @@ def read_equation(
     context_text: str | None = None,
 ) -> Fix:
     """Read the crop `png` of `element` (an equation) with the equation step. Returns its
-    fix (possibly FAILED or ABSTAINED: the reviewer decides). Raises ReadRefused when a cap
+    fix (possibly FAILED or ABSTAINED: the reviewer decides). The read counts against the job's
+    owner (the day's allowance, spend pool and caps), whoever asked; `user_id` is who is
+    waiting for it, so one person has one read going at a time. Raises ReadRefused when a cap
     or the model's availability stopped it. The caller holds no database lock."""
     from readablestem.pipeline import equation_step
 
@@ -239,7 +241,9 @@ def read_equation(
     job_id = job.id
     GATE.enter(user_id)
     try:
-        _count_against_allowance(request, user_id)
+        _count_against_allowance(
+            request, job.user_id
+        )  # the owner's allowance, not the reviewer's (G1)
         budget = read_budget(request, job)
         client = ctx.client_factory(ctx.settings, budget)
         try:

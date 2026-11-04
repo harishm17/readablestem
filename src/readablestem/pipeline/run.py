@@ -186,7 +186,14 @@ log = logging.getLogger(__name__)
 # repeated on its frame's last page is not read, frame titles are headings, headline furniture is
 # dropped. Every PDF: a ligature's letters come out in order ("Stiffness", not "Stifnf ess"), and
 # UTF-16 page labels are read. Results from 0.5.2 load unchanged.
-PIPELINE_VERSION = "0.5.3"
+# 0.5.4 (2026-11-03): inline formula edges from the glyphs (`pipeline/glyph_math.py`,
+# docs/layout.md "Inline span edges"): a comma, colon or semicolon set as an index belongs to
+# the formula, a radical is not cut from its radicand, an upright function name touching its
+# bracket and a percent sign
+# after a number are in the formula, and the unit after a number ("24 h", "m^3") is out of it. An
+# inline formula of a TeX-made PDF can start or end at another glyph, so its crop, its id and the
+# paragraph's marker text change. Results from 0.5.3 load unchanged.
+PIPELINE_VERSION = "0.5.4"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
