@@ -320,7 +320,7 @@ def test_documents_past_the_limit_are_not_read_at_all(web, monkeypatch):
     assert len(reads) == 10  # ten read and placed; the other twenty only named
 
 
-def test_a_pdf_over_the_upload_limit_is_refused_without_being_read(web, monkeypatch):
+def test_a_zip_holding_a_pdf_over_the_upload_limit_is_refused_without_reading_it(web, monkeypatch):
     from readablestem.web import batch_intake
 
     reads: list[int] = []
@@ -334,10 +334,11 @@ def test_a_pdf_over_the_upload_limit_is_refused_without_being_read(web, monkeypa
     big = b"%PDF-1.7 " + block * (web.settings.upload_limit_bytes // 8192 + 20)
     ok = make_pdf(1)
     url = batch_url(send_zip(web.alice, make_zip({"big.pdf": big, "ok.pdf": ok}), name="b.zip"))
-    text = text_of(web.alice.get(url).text)
-    assert "big.pdf is larger than" in text
-    assert len(reads) == 1  # only ok.pdf was read
-    assert [j.filename for j in jobs(web)] == ["ok.pdf"]
+    # The request budget (never more than the upload limit) is spent by the sizes in the zip's own
+    # directory, so the whole zip is refused before any member is read.
+    assert web.alice.get(url).status_code in (200, 413, 422)
+    assert reads == []
+    assert jobs(web) == []
 
 
 # --------------------------------------------------------------------------- the batch page

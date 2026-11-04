@@ -175,3 +175,17 @@ def test_ten_zips_of_bombs_in_one_request_cannot_hold_more_than_the_budget():
     assert budget.used <= budget.total + 2 * 1024 * 1024 + 1  # the read that crosses it is cut
     assert peak < 3 * 6 * 1024 * 1024  # never the 10 zips' 30 MB at once
     assert held <= 2 * 1024 * 1024
+
+
+MB = 1024 * 1024
+
+
+@pytest.mark.parametrize(
+    ("max_upload_mb", "large_mb", "budget_mb"),
+    [(50, 100, 100), (20, 100, 40), (50, 60, 60), (50, 50, 50), (100, 100, 100)],
+    ids=["defaults", "small-file-limit", "tight-large-limit", "no-large-files", "equal-100"],
+)
+def test_the_request_budget_never_exceeds_a_plain_large_upload(max_upload_mb, large_mb, budget_mb):
+    budget = batch_intake.RequestBudget.for_upload_limit(large_mb * MB, max_upload_mb * MB)
+    assert budget.total == budget_mb * MB
+    assert budget.total <= large_mb * MB

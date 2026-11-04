@@ -1022,16 +1022,18 @@ def _expand_batches(
     one refusal in `placed`.
 
     What one request may cost in memory is bounded here, not per zip: one `RequestBudget`
-    (twice the upload limit) is shared by every zip of the request, the documents are read one at
-    a time when their turn comes (`_loaded`), a PDF over the upload limit is refused without being
-    read, and nothing is read for a document past the person's limit
+    (twice `MAX_UPLOAD_MB`, at most `MAX_LARGE_UPLOAD_MB`) is shared by every zip of the request,
+    the documents are read one at a time when their turn comes (`_loaded`), a PDF over the upload
+    limit is refused without being read, and nothing is read for a document past the person's limit
     (`access.files_per_upload`): those are refused by name, and a zip met after the limit is
     reached is refused whole, unopened."""
     if not ctx.settings.feature_batch_zip:
         return files
     limit = access.files_per_upload(user.access_tier)
     cap = ctx.settings.upload_limit_bytes
-    budget = batch_intake.RequestBudget.for_upload_limit(cap)
+    budget = batch_intake.RequestBudget.for_upload_limit(
+        cap, max_upload_bytes(ctx.settings.max_upload_mb)
+    )
     out: list[Any] = []
     for file in files:
         if not _is_zip_name(file):

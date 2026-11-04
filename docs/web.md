@@ -682,18 +682,20 @@ file goes through (`_place_files`: the probe, the page quota, the caps):
   zip counts once, not once per document, against the upload rate limit (its documents are held to the limits
   by the quota and the cap, and the zip to its bytes);
 - **memory, per request** (`batch_intake.RequestBudget`, `routes.jobs._expand_batches` and `_loaded`): one
-  budget of twice the upload limit (`UNPACKED_FACTOR` times `Settings.upload_limit_bytes`) is shared by every
+  budget of `min(2 x MAX_UPLOAD_MB, MAX_LARGE_UPLOAD_MB)` (`UNPACKED_FACTOR` times the one-file limit,
+  capped at `Settings.upload_limit_bytes`, so 100 MB with the defaults of 50 and 100) is shared by every
   zip of the request; every byte read out of any zip is charged and reading stops where it runs out (the zip
   is then `zip_limits`). Only the `.tex` files are read to find the projects (at most 24 MB, freed at once);
   each PDF and project is then read when its turn comes and let go after it, so a request holds the body
-  (at most the upload limit, zips included), that text, and one document (a PDF over the upload limit is
+  (at most `MAX_LARGE_UPLOAD_MB`, zips included), that text, and one document (a PDF over the upload limit is
   refused by its header without any of it being read; a project is at most the budget) plus the usual
   copies an upload makes. Documents past the person's limit are only named, never read, and a zip met
-  after the limit is reached is refused unopened. With the defaults (20 MB) that is about 150 MB at the
-  peak of a request and 3 requests at once (the upload gate), well under the service's size; with the
-  50 MB limit it is about 350 MB a request (body 50, text 24, one document up to 100 for a project, and the
-  three copies an upload makes), so 3 at once stay near 1.1 GB inside the 2 GB the web service is sized
-  at (1 GiB before the limit was raised). The budgets follow the upload limit, so check this sum against
+  after the limit is reached is refused unopened. With the defaults that is at the peak of a request
+  about 425 MB (the body 100 MB held three times over, 300 MB, the text 24 MB, one document up to
+  100 MB) against 300 MB for a plain large upload, so 3 at once (the upload gate) are about 1.3 GB against
+  900 MB, inside the 2 GB the web service is sized at: **a batch is now the largest consumer**, by that one
+  document and the text. The cap keeps it from growing with the large-upload limit beyond that; check this
+  sum against
   the gate and the memory size whenever it changes;
 - every refusal of a zip (`zip_bad`, `zip_limits`, `zip_unsafe`, `zip_unsupported`, `zip_empty`,
   `batch_limit`) is a category with a sentence (`routes.jobs.batch_messages`), a row on the batch page, and

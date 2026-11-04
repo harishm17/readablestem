@@ -38,9 +38,10 @@ READ_ERRORS = (
     ValueError,
     zipfile.BadZipFile,
 )
-# What one request may unpack, in all its zips together, as a multiple of the upload limit
-# (`Settings.upload_limit_bytes`): `RequestBudget`. Every byte read out of any zip of the request
-# is charged, whatever it is read for, and the request is refused (`zip_limits`) when it is spent.
+# What one request may unpack, in all its zips together: twice `MAX_UPLOAD_MB`, at most
+# `MAX_LARGE_UPLOAD_MB` (`Settings.upload_limit_bytes`): `RequestBudget`. Every byte read out of
+# any zip of the request is charged, whatever it is read for, and the request is refused
+# (`zip_limits`) when it is spent.
 UNPACKED_FACTOR = 2
 # What one request holds in memory at its peak, besides the body itself (at most the upload limit,
 # zips included): the text of the `.tex` files being looked at (`TEXT_TOTAL_BYTES`, freed before
@@ -71,8 +72,15 @@ class RequestBudget:
         self.used = 0
 
     @classmethod
-    def for_upload_limit(cls, upload_limit_bytes: int) -> RequestBudget:
-        return cls(UNPACKED_FACTOR * upload_limit_bytes)
+    def for_upload_limit(
+        cls, upload_limit_bytes: int, max_upload_bytes: int | None = None
+    ) -> RequestBudget:
+        """Twice one file's limit (`max_upload_bytes`, `MAX_UPLOAD_MB`), but never more than the
+        most a request may carry (`upload_limit_bytes`, `MAX_LARGE_UPLOAD_MB`): the document read
+        at any moment is then no bigger than the largest file a plain upload may hold."""
+        if max_upload_bytes is None:
+            return cls(UNPACKED_FACTOR * upload_limit_bytes)
+        return cls(min(UNPACKED_FACTOR * max_upload_bytes, upload_limit_bytes))
 
     @property
     def left(self) -> int:
