@@ -1,11 +1,12 @@
 # Registration of the fifth fresh real-world split (fresh5): the candidate against the chatbot recipe
 
-**DRAFT. UNSIGNED. NOT HASHED.** Nothing in this file is registered until the owner signs it off. Until
-then `REGISTRATION-fresh5.sha256` does not exist, the candidate commit and settings in section 3 are
-open, and no model has been run on any unit of this split. On signing, the candidate commit and
-settings are written into section 3, the file is hashed with
-`scripts/realworld_register.py --set fresh5`, and that is committed before the first request of
-any arm. It follows `PREREGISTRATION-FRESH4.md` (used). What the set is and how its gold is made:
+**Signed off by the owner on 2026-11-04.** The owner's decisions at signing are written into the
+sections they change: the primary score (section 4), stratum D's private use (section 2 D), the slide
+gates (section 2 C), the candidate commit and settings and the strong-prompt arm (section 3), and the
+caps (section 6). This file and what it names are hashed with
+`scripts/realworld_register.py --set fresh5` (`REGISTRATION-fresh5.sha256`), and that is merged to
+`main` before the first request of any arm. No model had been run on any unit of this split when it
+was signed. It follows `PREREGISTRATION-FRESH4.md` (used). What the set is and how its gold is made:
 `docs/eval-realworld.md`.
 
 ## 1. The question
@@ -14,8 +15,9 @@ On documents that no earlier run, tuning step or registration has seen (arXiv pa
 sections and course-style LaTeX including Beamer decks), does the candidate write more equations
 right (as a screen-reader user hears them, section 4) than the Opus chatbot recipe, with fewer
 wrong equations that nobody is asked about?
-The candidate is ReadableSTEM with the equation changes built since fresh4; the control is ReadableSTEM
-as it runs in production today. The set can detect a difference of about 3 points of
+The candidate is ReadableSTEM with the equation changes built since fresh4, as it runs in production
+since 2026-11-04; the control is the same code with those changes off, which is how production ran
+before them (section 3). The set can detect a difference of about 3 points of
 the primary (the per-unit SD of 0.048 was measured on fresh4's `exact_lenient`; 26 units, 80% power, alpha 0.025 with two comparisons);
 a smaller one is not claimed either way. Stratum D (OpenStax chemistry, section 2 D) is outside that count and
 is judged on its own chemistry measure (section 5, stratum D).
@@ -99,7 +101,8 @@ recorded so the signed text can be read against them:
    100 characters and 3 equations, which is the rule of the final draw (`candidates-fresh5-C.json`, 513 visits, all
    compiled in the sandbox: 8 accepted; the Beamer sources that still failed: 77 compile, 31 too few usable pages, 18
    no equations, 13 page count outside 6 to 200, 3 text floor, 2 unconvertible). The notes' gates did not change. The
-   relaxation is a choice made to fill the Beamer slots, and the report states it.
+   relaxation is a choice made to fill the Beamer slots, and the report states it. At signing the owner
+   kept the relaxed rule (100 characters and 3 equations on a slide) rather than a strict redraw.
 4. A review found that compiling downloaded TeX unsandboxed could run code (an rc file) or read local files (an absolute
    `\input`), so every unpacking and compile now goes through `safe_tex.py` (archives with links, unsafe paths or
    more than 20,000 files or 400 MB are refused, which skipped 1 repository; engines run in a bubblewrap sandbox
@@ -136,7 +139,8 @@ the cache outside the repository (`gold/fresh5d-private`) and are never committe
 only section ids, titles, counts and hashes (`selection-fresh5-D.json`). What is published about those sections is
 aggregate numbers (rates over the stratum, with their sample sizes), with the source named (OpenStax, Rice University)
 and the licence named (CC BY-NC-SA 4.0). No book outside the three tiers, and no other non-commercial or
-no-derivatives licence, is touched.
+no-derivatives licence, is touched. At signing the owner accepted this private use of the two CC BY-NC-SA
+sections, and kept 17.3 (the topic rule matches section titles, as written).
 
 *Rule.* A section is out if any earlier set used it (the same rule as stratum B, with the 2e editions folded into the
 first editions they are the second edition of), if a section with its title was used, if it could be in the sealed check
@@ -174,12 +178,25 @@ All Claude, one run each, one machine, every model answer recorded.
 | Arm | What runs |
 |---|---|
 | **Chatbot, Haiku** | `chatbot-haiku-purdue`, `proof.chatbot.record_arms` unchanged: `claude-haiku-5-5`, the PDF, a 150 dpi PNG of every page, the Purdue sentence verbatim, no system prompt |
-| **Chatbot, Opus** | the same on `claude-opus-5-5` |
-| **Control** | ReadableSTEM at the commit that holds this registration with the production settings (document task, provider anthropic, main `claude-opus-5-5` effort medium, cheap `claude-haiku-5-5` low, `FEATURE_TABLES=true`, `FEATURE_NOTATION_MEMORY=true`) and every new equation setting off |
-| **Candidate** | the same code with the new equation settings on (commit SHA and exact settings are written here at signing; no setting changes after the first request) |
+| **Chatbot, Opus** | `chatbot-opus-purdue`: the same on `claude-opus-5-5` |
+| **Chatbot, Opus, strong prompt** | `chatbot-opus-expert`: the same inputs on `claude-opus-5-5` with the `expert` prompt of `src/readablestem/proof/chat_prompts.json` verbatim instead of the Purdue sentence (the file's SHA-256 is `9b7a20b88889c2401b5c76c2ca41e95419e29107ea57ce7aeb61ad0c80c87d54`; it asks for one HTML file with presentation MathML for a screen-reader user), one reply per unit, no system prompt. A reply that stops at the output limit or ends with "CONTINUED IN NEXT REPLY" is scored as it is (status `truncated`) and not continued, as for the other arms. Added at signing on the owner's approval (2026-11-03) so that the baseline is not only the one-sentence recipe |
+| **Control** | ReadableSTEM at commit `949cb1a677ea85517dab80ae1675153a614b437e` (pipeline 0.5.9, `src` tree `6a22753803dd772c7177d5406a09fd479685aa97`) through the document task: provider anthropic, main `claude-opus-5-5` effort medium, cheap `claude-haiku-5-5` effort low, `FEATURE_TABLES=true`, `FEATURE_NOTATION_MEMORY=true`, `EQUATION_LINE_CONTEXT=true` (on in production since fresh4); the equation settings built since fresh4 off: `EQUATION_GLYPH_CHECKS=false`, `FLAG_POLICY=false`, `EQUATION_GLYPH_RECONCILE=false` |
+| **Candidate** | the same commit and `src` tree with the production settings live since 2026-11-04 (deployed at `949cb1a`): as the control plus `EQUATION_GLYPH_CHECKS=true`, `FLAG_POLICY=true`, `EQUATION_GLYPH_RECONCILE=true` |
 
-The control and the candidate share recorded answers, so a request they have in common is answered once.
-No `src/` file changes between the first request of the first arm and the end of the last. The chatbots run
+Both ReadableSTEM arms, every other setting at the code's default and as in production: `FEATURE_PAGE_WITNESS`
+off, `LAYOUT_DISPLAY_GROUPING` off, `FEATURE_PAGE_MATH` off, the second automated check off (it is shadow-only
+and changes no output, as in every earlier registered run). `FEATURE_IMAGE_PAGES` and `FEATURE_LONG_DESCRIPTIONS`
+are on in production but act only when a person asks for them on a job (image pages, long figure
+descriptions), which the document task does not; they are left at their defaults. The settings are passed to
+each run in a clean environment that holds only them and the API key, so no deployed variable reaches it.
+The production values were read from the deployment on 2026-11-04 and checked against `config.py`'s defaults
+and `docs/eval-dev-baseline-2026-11-03.md` ("Reading push").
+
+The control and the candidate share recorded answers, so a request they have in common is answered once
+(the candidate's run starts from the control's answers). No `src/` file changes between the first request
+of the first arm and the end of the last: every arm runs from the `src` tree above; the runner and report
+scripts (`scripts/realworld_run.py`, the report) gain only what reads this split's four strata and the
+strong-prompt arm, and change no scoring. No setting changes after the first request. The chatbots run
 first; their output is not read until both ReadableSTEM arms are recorded.
 
 ## 4. Metrics
@@ -196,6 +213,11 @@ rebuilt table's cells counts as one inline equation).
   aligner and gold apply to every arm. Reason, the owner's: the product is for people who read mathematics
   through a screen reader, so the score that matters is what such a reader hears, and two spellings that sound
   and print alike are not an error. `exact_lenient` is reported beside it as a secondary.
+  OpenStax gold (strata B and D) is MathML with no LaTeX, so it has nothing to fold: there the gold is spoken
+  from its MathML as it is and compared with the prediction as written. A prediction written as MathML
+  (a chatbot that answers in `<math>`, as the strong prompt asks) is spoken from its MathML and compared with
+  the gold as written. Neither is folded then (`spoken_exact_mathml_gold` and the markup case of
+  `spoken_exact` in `scripts/rw_spoken.py`, added before signing; the rest of the scorer is unchanged).
 - **Silent errors:** wrong equations nobody is asked about, per 100 gold, under the primary.
 - **Flag recall:** of the aligned equations whose symbols are wrong, the share that were required decisions;
   and required decisions per page.
@@ -231,7 +253,9 @@ The claim "ReadableSTEM beats the chatbot baseline on its equation evaluation" i
 4. **Unseen loss.** At most the Opus chatbot's, so the claim cannot rest on missing equations.
 5. **Cost.** At most $0.07 per page on this split.
 
-Against Haiku the same primary comparison is reported. For a pair "beats" is written only on the rule in
+Against Haiku and against the strong-prompt Opus arm the same primary comparison is reported, with the
+wording rule below. A paired comparison is over the units both arms answered; when a cap stopped an arm
+(section 6), the units it did not reach are named and the comparison is made on the rest. For a pair "beats" is written only on the rule in
 criterion 1; otherwise "higher by point estimate", "no difference this set can detect" or "lower". A result that
 fails is reported as it is, and the launch rule stands; no setting, scorer, gold or unit changes on this split's
 account.
@@ -245,7 +269,8 @@ its sample size (gold equations and sections):
 - **Primary: chemically right**, end to end (`exact_chem` or an earlier rung), over the chemistry gold **excluding the lone
   multiplication sign** (`chem_right_excl_times`). The lone `×` is a layout mark that the answer keys carry as an equation;
   it is reported separately, and the number with it included (`chem_right`) is printed beside the primary one, so neither
-  replaces the other.
+  replaces the other. The scorer counts every gold equation of the three chemistry sections (123; the 115 above are the
+  ones the selection gate counted as chemistry, and the sections have no lone `×`).
 - **Silent harm:** a chemistry equation that is wrong, was not asked about and is not "input" (`silent_harm_summary`), per 100 gold.
 - Secondary, reported and not the verdict: `exact_lenient`, the symbols scorer, table cells found, flag recall, the notation
   scorer, each per section.
@@ -269,9 +294,22 @@ per-section content of those two.
 
 ## 6. Budget
 
-Caps on this split (stratum D included; it adds no cap of its own), kept in `spend-log.jsonl`: control and candidate $7.5 together, Opus chatbot $10,
-Haiku chatbot $0.3. Each arm stops at its cap and is reported as partial; a cap is
-not raised without asking. The API credit balance is checked before each paid step. Nothing is run twice to
+Caps on this split (stratum D included; it adds no cap of its own), kept in `spend-log.jsonl`, set by the
+owner at signing: control and candidate $7.5 together, Opus chatbot $10, Haiku chatbot $0.3, strong-prompt Opus
+chatbot $9. **Total $26.80.** Spend on the dev runs of this phase before signing (`spend-log.jsonl` since
+2026-11-03) was $13.11. Each arm stops at its cap and is reported as partial; a cap is not raised without asking.
+Small trial runs come first and count toward the caps: offline runs that spend nothing, then one short unit per
+arm, whose answers are kept and not asked again.
+
+The chatbot arms take the units in one registered order, so a cap cuts them the same way: the 26 units of
+strata A to C first, ordered by SHA-256 of `realworld-fresh5-2026-11-02|chat-order|<unit id>` (the unit id is
+`<book>/<page>` of its gold, for example `arxiv/2303.13230`), then the 3 units of stratum D in the same kind of
+order; a unit whose worst case (its counted input plus the full output limit) no longer fits what is left of the
+cap is not run and is named. The ReadableSTEM arms run stratum by stratum (A, B, C, D), the control before the
+candidate. A unit the trial run answered is not asked again. The recorded per-page cost of the Purdue recipe on
+earlier splits (about $0.087 a page on Opus, $0.0023 on Haiku) puts the Opus chatbot's 155 pages near $13.5 and
+Haiku's near $0.36, above their caps, so both are expected to stop before the end of the order; the ReadableSTEM
+arms are expected near $5. The API credit balance is checked before each paid step. Nothing is run twice to
 confirm a number; a crash is repeated only for the jobs that did not finish, and named.
 
 ## 7. What is published, and what it will not say
