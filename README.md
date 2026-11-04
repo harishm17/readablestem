@@ -20,9 +20,10 @@ handwriting are converted only when you ask, by reading each page's picture with
 every converted equation and table is for a person to check and the original page stays in the
 file; without that request those pages are kept as images and flagged. It is not a general PDF-to-Markdown
 converter. It starts from the PDF (a Word or PowerPoint file is first turned into a PDF, on a
-server set up for that). Upload of LaTeX source, Beamer decks and zip batches is built but off
-on readablestem.com: the check that the sandbox for compiling TeX works fails on the host
-(docs/deploy-railway.md, "Feature flags in production").
+server set up for that). Since 2026-11-04 readablestem.com also takes a LaTeX file (.tex) or a zip
+of a LaTeX project, read through LaTeXML in a sandbox (the PDF stays the main path). Beamer source and
+zips of several documents are built but still off there (docs/deploy-railway.md, "Feature flags in
+production").
 
 **Status.** Beta. The service is live at https://readablestem.com as a free beta built and maintained by
 Harish Manoharan. Anyone with a Google account can sign in and try it (the beta runs `SIGNUP_MODE=open`;
@@ -435,9 +436,10 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
   One upload is limited by `MAX_PAGES_PER_JOB` and `MAX_UPLOAD_MB` (100 pages and 50 MB by
   default); a bigger file, up to `MAX_SOURCE_PAGES` and `MAX_LARGE_UPLOAD_MB` (500 pages and
   100 MB), is kept so you can choose which pages to convert, in parts. The live values are on
-  the site's Known limits page. LaTeX source upload (`FEATURE_LATEX_SOURCE`), Beamer decks
-  (`FEATURE_BEAMER_SOURCE`) and zip batches (`FEATURE_BATCH_ZIP`) exist, are off by default,
-  and are off on readablestem.com until the sandbox check passes there.
+  the site's Known limits page. LaTeX source upload (`FEATURE_LATEX_SOURCE`, off by default) is on
+  at readablestem.com since 2026-11-04, after the sandbox check passed there; Beamer source
+  (`FEATURE_BEAMER_SOURCE`) and zips of several documents (`FEATURE_BATCH_ZIP`) are off by default
+  and off there until real decks and course sources have been tried (a Beamer deck is taken as a PDF).
 - **A model is in the loop.** Document images and the text around them are sent to Anthropic's
   Claude API (the beta's provider, `MODEL_PROVIDER=anthropic`), or to OpenAI's API (with
   `store=False`) if you set `MODEL_PROVIDER=openai`; the handwriting readers (off, unused) would send crops to their own company. Models are not deterministic, so two runs on the same file can differ.

@@ -162,10 +162,10 @@ production if a required one is missing, and logs the reason):
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | Defaults 24 hours after the last activity, and 30 days for a document whose owner also lets the developer look at the results; "Keep for 7 days" is a per-upload choice with a fixed length (`web/retention.py`). Neither is named in `railway.ts`, so production uses the defaults. | Leave unset. If you set them, the cron service needs the same values (reference the web service's). |
 | `CLAUDE_CANARY` | Daily drift check of the Claude second check. Only the HTTP cron route runs it, so with the cron service it never runs and this variable does nothing. | Leave unset. |
 | `INSTALL_LIBREOFFICE` | Build argument, see decision 4. | Unset. |
-| `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project (docs/web.md, "LaTeX source"; ADR 0008). Declared on `web` in `railway.ts`. | **Off in production today** (see "LaTeXML" below: the sandbox probe fails on Railway). Turn it on only after the image has LaTeXML (`INSTALL_LATEXML`) and `railway ssh -s web -- readablestem ops sandbox-probe --require-latexml` prints PASS. |
-| `FEATURE_BATCH_ZIP` | Takes a `.zip` of PDFs and LaTeX project folders as a batch of documents (docs/web.md, "Zip of documents and the batch page"). Declared on `web` in `railway.ts`. | **Off in production today.** Zips of LaTeX projects also need `FEATURE_LATEX_SOURCE`, so the sandbox problem below blocks those. |
-| `FEATURE_BEAMER_SOURCE` | Takes Beamer decks within LaTeX source (needs `FEATURE_LATEX_SOURCE`; docs/web.md). Declared on `web` in `railway.ts`. | **Off in production today**; keep it off until a few real decks have been converted and read, and the sandbox probe passes. |
-| `INSTALL_LATEXML` | Build argument: adds LaTeXML, TeX Live's base and ImageMagick (about 270 MB; see "LaTeXML" below). Needed for LaTeX source uploads, which also need the sandbox to pass `readablestem ops sandbox-probe` on this image. Declared on `web` in `.railway/railway.ts` so that `railway config apply` keeps it. | Leave as it is until the probe passes on Railway (it does not today). |
+| `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project (docs/web.md, "LaTeX source"; ADR 0008). Declared on `web` in `railway.ts`. | **On in production since 2026-11-04 13:53 UTC** (the start-up sandbox probe passes on Railway, see "LaTeXML" below). Turn it on only after the image has LaTeXML (`INSTALL_LATEXML`) and `railway ssh -s web -- readablestem ops sandbox-probe --require-latexml` prints PASS. |
+| `FEATURE_BATCH_ZIP` | Takes a `.zip` of PDFs and LaTeX project folders as a batch of documents (docs/web.md, "Zip of documents and the batch page"). Declared on `web` in `railway.ts`. | **Off in production today**; keep it off until real course sources (zips of projects) have been tried. Zips of LaTeX projects also need `FEATURE_LATEX_SOURCE` (on). |
+| `FEATURE_BEAMER_SOURCE` | Takes Beamer decks within LaTeX source (needs `FEATURE_LATEX_SOURCE`; docs/web.md). Declared on `web` in `railway.ts`. | **Off in production today**; keep it off until a few real decks have been converted and read. |
+| `INSTALL_LATEXML` | Build argument: adds LaTeXML, TeX Live's base and ImageMagick (about 270 MB; see "LaTeXML" below). Needed for LaTeX source uploads, which also need the sandbox to pass `readablestem ops sandbox-probe` on this image. Declared on `web` in `.railway/railway.ts` so that `railway config apply` keeps it. | Leave as it is: the probe passes on Railway with it. |
 | `INSTALL_MATH_READER` | Build argument: adds the local handwriting reader's model files (0.6 GB; `docs/math-readers.md`, "The local reader"). Only `IMAGE_PAGES_SECOND_READER=local` makes the pipeline call it, and both it and `MATH_READER_LOCAL_ENABLED` are off. With it, allow 2 GB of memory. | Unset. |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | How long Railway waits between SIGTERM and SIGKILL for the old deployment (its documented default is 0). The worker stops claiming at once on SIGTERM and gives its running job back; uvicorn waits up to 5 s for open connections, then the worker stop up to 3 s. | `10`, set as `deploy.drainingSeconds` on `web` in `.railway/railway.ts` |
 | `TRACING_ENABLED` and the Langfuse keys | Off. | Leave off. |
@@ -198,7 +198,7 @@ As of 2026-11-04 (pipeline version 0.5.9). The values live in Railway, not in th
 | State in production | Settings |
 |---|---|
 | On | `EQUATION_GLYPH_RECONCILE`, `EQUATION_GLYPH_CHECKS`, `EQUATION_LINE_CONTEXT`, `FLAG_POLICY`, `FEATURE_TABLES`, `FEATURE_IMAGE_PAGES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_NOTATION_MEMORY` |
-| Off | `LAYOUT_DISPLAY_GROUPING`; `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE`, `FEATURE_BATCH_ZIP` (the sandbox probe fails on Railway, see "LaTeXML") |
+| Off | `LAYOUT_DISPLAY_GROUPING`; `FEATURE_BEAMER_SOURCE`, `FEATURE_BATCH_ZIP` (until real decks and course sources have been tried, see "LaTeXML") |
 
 The other flags `railway.ts` names (`FEATURE_COLOUR`, `FEATURE_PAGE_WITNESS`, the `IMAGE_PAGES_*`
 settings) are not listed here because this page cannot tell their production values; read them with
@@ -496,9 +496,10 @@ until `readablestem ops sandbox-probe --require-latexml` prints PASS on the depl
 on `/healthz/ops` under `sandbox`, and keeps the source features switched off in effect unless it
 passed, so a flag set by mistake does nothing under a FAIL.
 
-**Status today (2026-11-04).** The LaTeX source, Beamer and zip-batch features exist in the code and
-the image can carry LaTeXML, but all three are off in production until the sandbox probe passes on
-Railway. What the probe found there:
+**Status today (2026-11-04).** `FEATURE_LATEX_SOURCE` is on in production since 13:53 UTC: the
+start-up sandbox probe passes on Railway with the Landlock backend (`init_process=tini` as pid 1; the
+isolation, memory, task, task-growth and real-LaTeXML checks all ok). `FEATURE_BEAMER_SOURCE` and
+`FEATURE_BATCH_ZIP` exist in the code and stay off. How the probe got there:
 
 - **Bubblewrap cannot start on Railway.** The platform gives no unprivileged user namespaces (the
   probe reported `bwrap=ok` but `sandbox_start=fail`), and the container already runs under seccomp
@@ -511,8 +512,7 @@ Railway. What the probe found there:
   below: it exited silently when its parent was pid 1, and the web process is pid 1 in the
   container, so the Landlock backend never started (`landlock_step=no_report`, `landlock_exit=125`).
   Fixed in PR #153 (the launcher now checks its parent is the process that started it, and every
-  launcher-side check has a step code). The fix is verified in the container reproduction, not yet
-  on Railway: the next deploy's start-up probe decides.
+  launcher-side check has a step code), verified in the container reproduction and then on Railway.
 - **Orphans and pid 1.** With the web app as pid 1 of the container, nothing reaps what the
   sandbox leaves when its caller is killed (a deadline kill of the conversion child, a crash): the
   program's orphans and the launcher itself are re-parented to pid 1 and stay as zombies, and a
@@ -538,9 +538,9 @@ Railway. What the probe found there:
   `--cpus=0.5`. A failed probe now also prints `latexml_step=`, `latexml_exit=`,
   `latexml_timed_out=` and `latexml_log=` (the end of LaTeXML's own output for the probe's fixed
   document, paths removed), and `group_cap_forked=`, `group_cap_exit=`, `group_cap_timed_out=`.
-- **When LaTeX source is switched on.** `FEATURE_LATEX_SOURCE` takes effect only after the web
-  process's start-up probe reports PASS (`/healthz/ops`, `sandbox.result`); the flag stays off
-  until a deploy shows PASS there. `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` stay off even
+- **When LaTeX source is switched on.** `FEATURE_LATEX_SOURCE` takes effect only while the web
+  process's start-up probe reports PASS (`/healthz/ops`, `sandbox.result`); it was switched on after
+  a deploy showed PASS there (2026-11-04), and a later FAIL switches it off in effect. `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` stay off even
   then, until real Beamer decks and real course sources (zips of projects) have been tried through
   the Landlock sandbox on the deployed service.
 

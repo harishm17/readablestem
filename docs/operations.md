@@ -673,9 +673,10 @@ itself, in the background, when it starts and LaTeXML is in the image
 <check>=<value> ...` (the probe's own check names and one-word answers, nothing else), and
 `/healthz/ops` shows it under `sandbox`: `state` (`running`, `pass`, `fail`, `timeout`,
 `not_installed` or `not_run`), `result`, `checks`, `bound_mb`, `cgroup`, `seccomp`, `checked_at`.
-Neither start-up nor `/healthz` waits for it. In production (2026-11-04) the probe reports FAIL, so
-`FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` are off; the Landlock
-backend's failure step codes (`landlock_step=`, docs/security.md, "Why it did not start") are being read. `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE` and
+Neither start-up nor `/healthz` waits for it. In production (2026-11-04) the probe reports PASS on the Landlock backend, and
+`FEATURE_LATEX_SOURCE` is on; `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` are off by choice, until real
+decks and course sources have been tried. If it ever fails, the step codes (`landlock_step=`, docs/security.md,
+"Why it did not start") say why. `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE` and
 a `FEATURE_BATCH_ZIP` zip with a LaTeX project take effect only while the state is `pass`; before
 that, after a FAIL and after a timeout, such an upload gets the 503 "cannot read LaTeX source right
 now" answer and the pages do not offer it. A redeploy runs the probe again.

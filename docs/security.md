@@ -272,7 +272,7 @@ cannot see the live header; the log line is the only live check.
 
 ### Running uploaded TeX (sandbox)
 
-A `.tex` file is a program, so a LaTeX upload (the switch is `FEATURE_LATEX_SOURCE`, off in production)
+A `.tex` file is a program, so a LaTeX upload (the switch is `FEATURE_LATEX_SOURCE`, on in production since 2026-11-04)
 runs LaTeXML only inside `core/sandbox.py`: bubblewrap with a minimal read-only root (no
 application, no `/home`, `/proc/1/environ` hidden), the project mounted read-only and one output
 folder writable, a new network namespace (no network), a new pid namespace that dies with the
@@ -300,9 +300,9 @@ fallback (a plain child of the web process shares its user, so it could read the
 files). Whether the platform allows it is checked on the deployed
 image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"; the web process also runs it at start-up and LaTeX source is
 refused with a 503 unless it passed, `web/sandbox_status.py`); a FAIL there means
-LaTeX upload must stay off. In production (2026-11-04) the probe fails, so `FEATURE_LATEX_SOURCE`,
-`FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` are off; the Landlock backend's failure step codes
-("Why it did not start" below) are being read.
+LaTeX upload must stay off. In production (2026-11-04) the probe passes on the Landlock backend, so `FEATURE_LATEX_SOURCE`
+is on; `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` stay off until real decks and course sources
+have been tried. The residual risks below, and under "Residual risks, accepted for the beta", still hold.
 
 **Landlock backend** (`core/landlock_exec.py`, `core/sandbox.py`; `tests/test_sandbox_landlock.py`).
 Chosen automatically when bubblewrap cannot start (`sandbox.backend()`; `READABLESTEM_SANDBOX_BACKEND`

@@ -36,8 +36,7 @@ decided and when, what was not converted, and what was not checked.
   run; version 0.5.9, 4 November 2026; 1,715 equations). 0.79 of equations came out exactly
   right end to end. Scored by how a screen reader reads them, 0.840 against 0.836 for a
   general chatbot: no difference the test can detect. It asked about 46% of its wrong
-  equations (goal 60%). Earlier test (version 0.4.0): headings F1 0.96; a model, not a
-  person, judged 97% of figure descriptions acceptable.
+  equations (goal 60%). Earlier test (version 0.4.0): headings F1 0.96; a model judged 97% of figure descriptions acceptable.
   Chemistry is the weakest area. The tool accepts what its checks pass without a person
   looking; the review record lists those parts.
 - **Scanned and handwritten pages** convert only when the instructor ticks "Convert scanned or
@@ -46,8 +45,8 @@ decided and when, what was not converted, and what was not checked.
   in 3 equations were exactly right. Handwriting: 0.57 on 24 held-out pages.
   Otherwise such pages stay pictures marked "Not converted".
 - **Other limits** are on the Known limits page.
-- **Files:** PDF. Word and PowerPoint are taken only where the server has LibreOffice;
-  readablestem.com takes PDF only. Upload limits: see Known limits.
+- **Files:** PDF, and a LaTeX file or project zip. Word and PowerPoint need LibreOffice on the
+  server; readablestem.com has none. Limits: see Known limits.
 - **Checks look at structure, not meaning:** language, title, headings, lists, tables, links
   and image alt attributes. Nobody has tested the output by listening with NVDA, JAWS or
   VoiceOver, and it has not been tried in a live course site.
