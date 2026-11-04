@@ -1,7 +1,7 @@
 """The stale-tab guard on Postgres (UX review MF12, docs/web.md "Stale tabs").
 
 Two tabs drawn at the same review version that decide at the same moment must not both
-be applied: the job row is locked first (`owned_job(lock=True)`, SELECT ... FOR UPDATE),
+be applied: the job row is locked first (`job_access(lock=True)`, SELECT ... FOR UPDATE),
 so the version check and the count (`web.review.bump_result_version`) are one step. One
 decision is applied, every other one is refused with a 409, and the version counts one
 write.

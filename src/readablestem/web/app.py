@@ -77,6 +77,7 @@ from readablestem.web.routes import (
     record,
     review,
     sample,
+    sharing,
     split,
 )
 from readablestem.web.security import (
@@ -478,6 +479,7 @@ def create_app(
         job_settings,
         split,
         review,
+        sharing,
         edits,
         inventory,
         feedback,

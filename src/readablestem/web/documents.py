@@ -184,7 +184,7 @@ def _live(
     course_id: str | None = None,
     job_ids: Sequence[str] | None = None,
 ):
-    # Expired jobs count as deleted before the purge removes them (`routes.jobs.owned_job`).
+    # Expired jobs count as deleted before the purge removes them (`routes.jobs.job_access`).
     # With `course_id`, only the documents converted for that course (T3-4); with `job_ids`,
     # only those (the batch page, `routes/batch.py`: still only this person's).
     where = (Job.user_id == user_id, Job.retain_until > now)
