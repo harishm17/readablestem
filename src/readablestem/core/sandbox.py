@@ -236,7 +236,8 @@ def backend_failure(name: str) -> tuple[str, str, int] | None:
     when it was not tried or worked. Codes: `abi_below_min`, `landlock_create_ruleset`,
     `landlock_add_rule:<exec|read|write|files_rw|files_read>`, `no_new_privs`,
     `landlock_restrict_self`, `seccomp_install`, `prlimit_<resource>`, `chdir`, `fork`, `exec`,
-    `no_report` (the launcher ended without naming a step), `unavailable`."""
+    `caller_gone`, `supervisor_gone`, `count_tasks`, `launcher_exception`, `no_report` (the
+    launcher ended without naming a step), `unavailable`."""
     return _FAILURES.get(name)
 
 
@@ -620,6 +621,7 @@ def _landlock_spec(
         "seccomp": base64.b64encode(program).decode() if program else "",
         "cmd": command,
         "busy_marker": busy_marker,
+        "parent_pid": os.getpid(),  # the launcher checks its parent is the process that started it
         "step_file": step_file,
     }  # fmt: skip
 

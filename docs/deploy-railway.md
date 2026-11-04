@@ -475,6 +475,27 @@ passed, so a flag set by mistake does nothing under a FAIL. CI builds the image 
 versions and the policy (job `docker build (no push)`); the sandbox itself cannot be probed inside CI's
 Docker, which does not allow user namespaces.
 
+**Reproducing the probe in a container like Railway's** (no shell on Railway; this is how a
+failing probe is found without a deploy). Build the image with LaTeXML, then run the probe as the
+service's user, with a read-only root, the runtime's default seccomp profile, `/proc` as the runtime
+mounts it, and no extra privileges (the app's code is the process that starts the sandbox, and it
+may be pid 1 there, as in a container):
+
+```
+docker build --build-arg INSTALL_LATEXML=true -t readablestem-probe .
+docker run --rm --user 10001:10001 --read-only --tmpfs /tmp:rw,exec --cap-drop=ALL \
+  readablestem-probe readablestem ops sandbox-probe --require-latexml
+```
+
+With podman the same flags work (`podman run`). On a host where unprivileged user namespaces are
+allowed, bubblewrap will start and the Landlock backend is not tried; to see the Landlock path
+there, add `-e READABLESTEM_SANDBOX_BACKEND=landlock`. The output ends in `PASS` or `FAIL`; when the
+Landlock backend does not start, `landlock_step=` names the setup step that failed
+(docs/security.md, "Why it did not start") and `can_<call>=` says whether the container's seccomp
+profile allows each call the launcher needs. The first failure found this way on Railway: the
+launcher exited silently because its parent was pid 1 (the web process), a check that had
+no step code, which showed as `landlock_step=no_report`.
+
 **pandoc.** The Dockerfile installs pandoc from the distribution in every build (no build argument):
 it makes the Word download (docs/output.md, "The Word export"). It adds about 200 MB to the image (the
 installed size of the Ubuntu pandoc 3.7 package is 201,810 kB; the Debian trixie package should be of the

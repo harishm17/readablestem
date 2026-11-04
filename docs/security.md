@@ -390,7 +390,12 @@ What the two layers cover:
   file the program wrote").
 - **Why it did not start.** When the Landlock backend is refused, the launcher reports which
   setup step failed as a fixed code and the errno's name, through a pipe the program never has
-  (close-on-exec) and a file in a folder no grant covers: `abi_below_min`, `chdir`, `fork`,
+  (close-on-exec) and a file in a folder no grant covers. The supervisor's own checks have codes
+  too (`caller_gone`: its parent is not the process that started it, `supervisor_gone`,
+  `count_tasks`: `/proc` could not be read to work out the task limit, `launcher_exception`: a bug
+  in the launcher), so no failure ends silently. The launcher does not assume anything about its
+  caller's pid: the web process can be pid 1 in a container. If the subreaper right is refused, the
+  process group is killed instead (the program cannot leave it). The step codes: `abi_below_min`, `chdir`, `fork`,
   `landlock_create_ruleset`, `landlock_add_rule:<exec|read|write|files_rw|files_read>`,
   `no_new_privs`, `landlock_restrict_self`, `seccomp_install`, `prlimit_<as|cpu|fsize|core|nofile|nproc>`
   or `exec` (`sandbox.backend_failure`). Only text of that shape is read; nothing the program

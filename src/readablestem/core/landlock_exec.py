@@ -135,15 +135,15 @@ def fail(code: str, number: int = 0) -> None:
     os._exit(125)
 
 
-def own_tasks(uid: int) -> int:
+def own_tasks(uid: int, proc: str = "/proc") -> int:
     """Tasks of this user right now (RLIMIT_NPROC compares with every task of the user)."""
     total = 0
     try:
-        for name in os.listdir("/proc"):
+        for name in os.listdir(proc):
             if name.isdigit():
                 try:
-                    if os.stat(f"/proc/{name}").st_uid == uid:
-                        total += len(os.listdir(f"/proc/{name}/task"))
+                    if os.stat(f"{proc}/{name}").st_uid == uid:
+                        total += len(os.listdir(f"{proc}/{name}/task"))
                 except OSError:
                     pass
     except OSError:
@@ -242,11 +242,11 @@ PR_SET_PDEATHSIG = 1
 PR_SET_CHILD_SUBREAPER = 36
 
 
-def confine_and_exec(libc, spec: dict, tasks: int) -> None:
+def confine_and_exec(libc, spec: dict, tasks: int, supervisor: int) -> None:
     """In the child: drop everything, then become the program. Never returns."""
     libc.prctl(PR_SET_PDEATHSIG, signal.SIGKILL, 0, 0, 0)
-    if os.getppid() == 1:  # the supervisor is already gone
-        os._exit(125)
+    if os.getppid() != supervisor:  # the supervisor is already gone
+        fail("supervisor_gone")
     restrict(libc, spec)
     if spec.get("seccomp"):
         install_seccomp(libc, base64.b64decode(spec["seccomp"]))
@@ -265,6 +265,24 @@ def confine_and_exec(libc, spec: dict, tasks: int) -> None:
         os.execve(spec["cmd"][0], spec["cmd"], spec["env"])
     except OSError as exc:
         fail("exec", exc.errno or 0)
+
+
+def kill_group() -> None:
+    """Every other process of this process group is killed (the subreaper right was refused)."""
+    me, group = os.getpid(), os.getpgrp()
+    if group != me:  # not the leader of a group of its own: the group is not ours to kill
+        return
+    with contextlib.suppress(OSError):
+        for name in os.listdir("/proc"):
+            if name.isdigit() and int(name) != me:
+                with contextlib.suppress(OSError, ValueError, IndexError):
+                    with open(f"/proc/{name}/stat") as handle:
+                        line = handle.read()
+                    if int(line[line.rindex(")") + 2 :].split()[2]) == group:
+                        os.kill(int(name), signal.SIGKILL)
+    with contextlib.suppress(ChildProcessError, OSError):
+        while os.waitpid(-1, os.WNOHANG) != (0, 0):
+            pass
 
 
 def kill_descendants() -> None:
@@ -313,10 +331,15 @@ def main() -> None:
     report_read, report_write = os.pipe()  # close-on-exec: the program never has either end
     # The caller is watched by its pid (below), not by PR_SET_PDEATHSIG, which fires when the
     # *thread* that started this process exits, even while the caller lives.
+    # (Not "my parent is pid 1": in a container the web process may itself be pid 1.)
     parent = os.getppid()
-    if parent == 1:
-        os._exit(125)
-    libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0)
+    if "parent_pid" in spec and parent != spec["parent_pid"]:
+        fail("caller_gone")
+    # Without the subreaper right the orphans of the program are not ours to find; the group (which
+    # the program cannot leave: setsid and setpgid are denied) is killed instead.
+    subreaper = libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) == 0
+    if spec.get("no_subreaper"):  # a test of the fallback
+        subreaper = False
 
     def on_term(_signum, _frame) -> None:  # the caller is gone: take the whole group down
         os.killpg(os.getpgrp(), signal.SIGKILL)
@@ -328,7 +351,10 @@ def main() -> None:
     limits = spec["limits"]
     # `nproc_adjust` is only ever negative (a test makes the limit one the user is already
     # over, to see a fork refused for lack of room without filling the machine).
-    tasks = own_tasks(os.getuid()) + limits["pids"] + limits.get("slack", 0)
+    counted = own_tasks(os.getuid(), spec.get("proc_root", "/proc"))  # (the root is a test's)
+    if counted == 0:  # /proc is not readable: the limit cannot be worked out
+        fail("count_tasks")
+    tasks = counted + limits["pids"] + limits.get("slack", 0)
     tasks += min(0, limits.get("nproc_adjust", 0))
     marker = spec.get("busy_marker", "")
     allowance = limits["pids"] + limits.get("slack", 0)
@@ -344,8 +370,8 @@ def main() -> None:
         os.close(report_read)
         REPORT["fd"] = report_write
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
-        confine_and_exec(libc, spec, tasks)
-        os._exit(125)
+        confine_and_exec(libc, spec, tasks, os.getppid())
+        fail("launcher_exception")
     os.close(report_write)
     status = 0
     while True:
@@ -368,7 +394,10 @@ def main() -> None:
             if own_tasks(os.getuid()) >= tasks and program_tasks(os.getpid()) < allowance:
                 starved = True
         time.sleep(0.05)
-    kill_descendants()
+    if subreaper:
+        kill_descendants()
+    else:
+        kill_group()
     if step_file:
         # What the child reported before it became the program: read after it has ended, so
         # the pipe is at its end. Only a code of the fixed shape is passed on.
@@ -388,4 +417,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:  # a bug here must still name itself, never end silently
+        fail("launcher_exception")
