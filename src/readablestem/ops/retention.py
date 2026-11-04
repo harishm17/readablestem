@@ -60,6 +60,7 @@ from readablestem.web.db import (
     ErasureLedger,
     Event,
     Job,
+    JobShare,
     LinkedEmail,
     LoginLink,
     PendingUpload,
@@ -218,6 +219,7 @@ def delete_jobs(
     _count_review_actions(session, day_of)
     blobs = _deleted(session.execute(delete(Blob).where(Blob.job_id.in_(ids))))
     session.execute(delete(ReviewEdit).where(ReviewEdit.job_id.in_(ids)))
+    session.execute(delete(JobShare).where(JobShare.job_id.in_(ids)))
     session.execute(delete(StepRecord).where(StepRecord.job_id.in_(ids)))
     jobs = _deleted(session.execute(delete(Job).where(Job.id.in_(ids))))
     # The student-file images made from the figures are kept in memory for a while
@@ -239,9 +241,10 @@ def erase_user(
 
     Their jobs go through `delete_jobs` (counted first, like any deletion); then, children
     before parents and without relying on ON DELETE CASCADE (see the module docstring):
-    review edits they made on any job, their courses' notation entries, their courses,
-    their usage events, sign-in identities, linked Google addresses, email sign-in links and
-    daily page counts, and the user row.
+    review edits they made on any job, shares of other people's documents that name their
+    address, their courses' notation entries, their courses, their usage events, sign-in
+    identities, linked Google addresses, email sign-in links and daily page counts, and the
+    user row.
     With `tombstone_key`, what the account used today is first recorded under a hash of its
     address (`web.tombstones`), so that signing up again today does not reset the day's limits.
     The erasure is also written to the ledger (`erasure_ledger`: a hash of the user id and the
@@ -260,6 +263,11 @@ def erase_user(
     stats = delete_jobs(session, job_ids, now)
     courses = select(Course.id).where(Course.user_id == user_id).scalar_subquery()
     session.execute(delete(ReviewEdit).where(ReviewEdit.user_id == user_id))
+    # Shares of other people's documents that name this person's address (the shares of their
+    # own documents went with the jobs above).
+    person_email = session.scalar(select(User.email).where(User.id == user_id))
+    if person_email is not None:
+        session.execute(delete(JobShare).where(JobShare.email == person_email.strip().lower()))
     session.execute(delete(PendingUpload).where(PendingUpload.user_id == user_id))
     session.execute(delete(UploadResult).where(UploadResult.user_id == user_id))
     session.execute(delete(CourseNotation).where(CourseNotation.course_id.in_(courses)))

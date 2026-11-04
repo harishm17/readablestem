@@ -430,7 +430,7 @@ and each part's equations, figures and tables as in the part.
 
 - **Which parts.** `web/combine.py` `kept_parts`: the same `part_group`, the same owner
   (`user_id`: another person's part is never in it, whatever the group), finished, not past
-  `retain_until` (an expired part counts as deleted before the purge, as `owned_job` does),
+  `retain_until` (an expired part counts as deleted before the purge, as `job_access` does),
   and whose `part_label` names as many pages as the part has; a part with a decision still
   open is a draft and is held back, as "Download all" holds it back. When two parts name a
   page in common (the same pages converted twice) the newest is kept and the older left out.

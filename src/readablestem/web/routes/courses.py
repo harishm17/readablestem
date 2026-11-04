@@ -39,7 +39,8 @@ from readablestem.web.deps import (
     require_csrf,
 )
 from readablestem.web.logsafe import log_event
-from readablestem.web.routes.jobs import NOT_FOUND, owned_job
+from readablestem.web.routes.jobs import NOT_FOUND, job_access
+from readablestem.web.shares import OWNER, REVIEW
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -324,7 +325,7 @@ def add_suggestions(
         if job:
             if not JOB_ID.match(job):
                 raise PageError(404, *NOT_FOUND)
-            row = owned_job(session, job, user)
+            row = job_access(session, job, user, OWNER)
             if row.course_id != course.id:
                 raise PageError(404, *NOT_FOUND)
             back = f"/jobs/{row.id}#suggestions"
@@ -380,7 +381,7 @@ def remember(
     if canonical is None or canonical != symbol or meaning not in notation.MEANINGS:
         raise PageError(400, "That could not be saved", "Go back and try again.")
     with session_scope(get_ctx(request).factory) as session:
-        owned = owned_job(session, job, user)
+        owned = job_access(session, job, user, OWNER)
         course = _course(session, course_id, user)
         if owned.course_id != course.id:
             raise PageError(404, *NOT_FOUND)
@@ -427,15 +428,16 @@ def review_context(
     last = flashes[-1].get("element_id") if flashes else None
     decided = last if isinstance(last, str) and ELEMENT_ID.match(last) else None
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, REVIEW)
         if job.course_id is None:
             return {}
         fix = result.fix_for(shown) if shown else None
         element = next((e for e in result.elements if e.id == shown), None) if shown else None
         card = notation.card_notation(session, ctx.settings, job, element, fix)
+        # Keeping a letter changes the owner's course, so only the owner is offered it.
         offer = (
             notation.remember_offer(session, ctx.settings, job, result, decided)
-            if decided
+            if decided and job.user_id == user.id
             else None
         )
     return {"course_notation": card, "remember": offer}

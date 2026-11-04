@@ -33,6 +33,7 @@ from readablestem.web.worker import ClientFactory, Converter, Worker
 CSRF_FIELD = "csrf_token"
 SESSION_USER = "uid"
 SESSION_VERSION = "sv"  # users.session_version when the session was signed in
+SESSION_VERIFIED = "ev"  # this sign-in proved the account's own address (shares need it)
 SESSION_CSRF = "csrf"
 SESSION_FLASH = "flash"
 
@@ -85,6 +86,10 @@ class CurrentUser:
     is_admin: bool
     # "invited" or "open" (`web.access`): which daily limits and spend pool apply.
     access_tier: str = "invited"
+    # This session's sign-in proved the address above: Google said it was verified, or the
+    # Microsoft directory did (`xms_edov`). Only then does a share naming it apply
+    # (`web.shares`): `preferred_username` and the email-link sign-in do not count.
+    email_verified: bool = False
 
 
 class PageError(Exception):
@@ -141,6 +146,7 @@ def current_user(request: Request) -> CurrentUser | None:
                     name=row.name,
                     is_admin=row.is_admin,
                     access_tier=row.access_tier,
+                    email_verified=request.session.get(SESSION_VERIFIED) is True,
                 )
         if user is None:  # deleted, removed from the allowlist, blocked or signed out since
             request.session.pop(SESSION_USER, None)
@@ -166,11 +172,14 @@ UserDep = Annotated[CurrentUser, Depends(require_user)]
 AdminDep = Annotated[CurrentUser, Depends(require_admin)]
 
 
-def start_session(request: Request, user_id: str, session_version: int = 0) -> None:
+def start_session(
+    request: Request, user_id: str, session_version: int = 0, email_verified: bool = False
+) -> None:
     """Rotate the session on sign-in (drops any pre-login state, issues a new CSRF token)."""
     request.session.clear()
     request.session[SESSION_USER] = user_id
     request.session[SESSION_VERSION] = session_version
+    request.session[SESSION_VERIFIED] = email_verified
     request.session[SESSION_CSRF] = secrets.token_urlsafe(32)
     if hasattr(request.state, "user"):  # drop the cached anonymous lookup
         del request.state.user

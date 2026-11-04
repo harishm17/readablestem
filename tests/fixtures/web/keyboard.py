@@ -31,8 +31,11 @@ DESCRIBE = """() => {
   const vw = innerWidth, vh = innerHeight;
   const inView = r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 &&
     r.top < vh && r.left < vw;
-  const cx = Math.min(Math.max(r.left + r.width / 2, 0), vw - 1);
-  const cy = Math.min(Math.max(r.top + Math.min(r.height / 2, 8), 0), vh - 1);
+  // An inline link that wraps has a bounding box wider than any one of its lines, and its
+  // centre can lie over a neighbour on the first line: probe the middle of its first line box.
+  const q = el.getClientRects()[0] || r;
+  const cx = Math.min(Math.max(q.left + q.width / 2, 0), vw - 1);
+  const cy = Math.min(Math.max(q.top + Math.min(q.height / 2, 8), 0), vh - 1);
   const top = document.elementFromPoint(cx, cy);
   const covered = !!top && !(el === top || el.contains(top) || top.contains(el));
   const named = (el.getAttribute('aria-label') ||
@@ -262,6 +265,26 @@ def tab_to(page: Any, pattern: str, *, shift: bool = False, limit: int = 150) ->
         if not state.get("body") and rx.search(state["name"]):
             return state
     raise AssertionError(f"Tab never reached a control named {pattern!r}")
+
+
+def choose_file_by_keyboard(page: Any, files: list[dict], *, timeout_ms: int = 4000) -> str:
+    """Give the focused file field its files the way a keyboard user does: Space, then Enter,
+    each with the chooser listener registered first. Headless Chromium under load sometimes
+    does not raise the chooser for a key press; then the files are set on the focused field
+    itself (after checking it is a focused file input) and "set" is returned."""
+    assert page.evaluate("document.activeElement.type === 'file'"), "focus is not on a file field"
+    for key in ("Space", "Enter"):
+        try:
+            with page.expect_file_chooser(timeout=timeout_ms) as chooser:
+                page.keyboard.press(key)
+        except Exception as exc:  # Playwright's TimeoutError: no chooser for this key
+            if type(exc).__name__ != "TimeoutError":
+                raise
+            continue
+        chooser.value.set_files(files)
+        return key
+    page.locator(":focus").set_input_files(files)
+    return "set"
 
 
 def activate(page: Any, key: str = "Enter", *, navigates: bool = True) -> None:
