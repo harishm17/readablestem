@@ -308,7 +308,10 @@ def test_signed_in_pages_put_the_workspace_first_and_have_a_short_footer(tmp_pat
         for x in ('href="/app"', 'href="/courses"', 'href="/account"', 'href="/guides"')
     ]
     assert order == sorted(order)
-    assert 'href="/demo"' not in nav and 'href="/for-accessibility-offices"' not in nav
+    assert 'href="/demo"' not in nav and 'href="/"' not in nav
+    # The public pages stay, after the workspace and quieter.
+    assert nav.index('href="/guides"') < nav.index('href="/for-accessibility-offices"')
+    assert nav.count('class="nav-secondary"') == 2
     footer = page.split("<footer", 1)[1].split("</footer>", 1)[0]
     links = re.findall(r"<li><a ", footer)
     assert len(links) <= 6 and "For accessibility offices" not in footer

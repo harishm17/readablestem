@@ -75,10 +75,9 @@
     </thead>
     <tbody>
       <tr><th scope="row">Heading levels right, of the headings both found</th><td>{{ t.levels_ours }}</td><td>{{ t.levels_chatbot }}</td></tr>
-      <tr><th scope="row">Figure descriptions a model judge found contradicting the picture</th><td>{{ t.errors_ours }}</td><td>{{ t.errors_chatbot }}</td></tr>
+      <tr><th scope="row">Figure descriptions a model judge (not yet checked against people) found contradicting the picture</th><td>{{ t.errors_ours }}</td><td>{{ t.errors_chatbot }}</td></tr>
     </tbody>
   </table>
-  <p class="chart-source">The judge is a model, not yet checked against people.</p>
   {% endif %}
   <p class="chart-source"><a href="/limits#accuracy">Evidence: the four measures, how each was
     measured and what they do not show, with all results including earlier tests</a>.</p>

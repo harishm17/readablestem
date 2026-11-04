@@ -61,25 +61,25 @@
     </section>
   </div>
   <p class="hero-source">From <a href="https://openstax.org/books/physics/pages/2-3-position-vs-time-graphs">OpenStax Physics, 2.3 Position vs. Time Graphs</a>
-    (CC BY 4.0), page 3 of <a href="{{ static_url('demo/source.pdf') }}">the PDF</a>, which has no tags.</p>
+    (CC BY 4.0), page 3 of <a href="{{ static_url('demo/source.pdf') }}">the PDF</a>.</p>
 </section>
 
 <h2 id="compare">How it compares</h2>
 {% from "_proof_chart.html" import proof_chart %}
 {{ proof_chart(proof_facts) }}
-<p><a href="/guides/readablestem-mathpix-latexml">How to choose a tool</a>, including the ones not in this chart.</p>
+<p><a href="/guides/readablestem-mathpix-latexml">How to choose a tool</a>, including ones not in this chart.</p>
 
 <h2 id="handles">What it handles</h2>
 {# One line each; the detail is on /limits ("What it handles, with limits"). #}
 <ul>
   <li><strong>Equations</strong> become MathML a screen reader can speak. What it is unsure of
-    goes to a review screen where you accept, edit or reject it.</li>
-  <li><strong>The rest of the page:</strong> real headings and lists{% if tables_on %}, tables with header cells{% endif %}
-    and short descriptions for figures.</li>
+    goes to you to accept, edit or reject.</li>
+  <li><strong>The rest:</strong> real headings and lists{% if tables_on %}, tables with header cells{% endif %}
+    and described figures.</li>
   <li><strong>Your files:</strong> PDF{% if office_on %}, Word or PowerPoint{% endif %}, up to {{ max_pages }}
     pages at a time{% if image_pages_on %}; scanned and handwritten pages when you ask{% endif %}.
     {% if latex_source %}LaTeX source files (.tex) and project zips are read from the source.
-    {% endif %}You download one HTML file to post in your course
+    {% endif %}You get one HTML file to post
     ({% if word_export %}Word, {% endif %}EPUB and Canvas too).</li>
 </ul>
 <p><a href="/limits">What it does not do yet</a> and
