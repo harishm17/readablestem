@@ -867,6 +867,10 @@ input[type="number"].input-short { width: 6rem; }
 .bulk-confirm .button, .leave-out .button-secondary, .notify-box .button-secondary { min-height: 2.75rem; }
 .filter-fields { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); align-items: flex-start; }
 .decision-filter .field { margin-bottom: var(--space-2); }
+/* A flex item will not shrink below its widest child (the Kind select's longest option), so at 320px with
+   WCAG 1.4.12 text spacing the form ran 4px past the viewport; let it shrink and the select follow. */
+.filter-fields > .field { min-width: 0; max-width: 100%; }
+.filter-fields select { width: 100%; }
 .decision-filter select, .decision-filter input[type="number"] { min-height: 2.75rem; }
 .filter-result { font-weight: 700; }
 .bulk-preview { padding-left: var(--space-5); }
