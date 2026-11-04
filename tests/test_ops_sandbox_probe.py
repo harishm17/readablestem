@@ -64,8 +64,11 @@ def test_real_probe_passes_and_prints_no_secret(monkeypatch, capsys):
     code = main(["ops", "sandbox-probe"])
     out = capsys.readouterr().out
     assert code == 0 and out.strip().splitlines()[-1] == "PASS"
-    for name in ("sandbox_no_secrets", "sandbox_no_network", "sandbox_memory_cap",
-                 "sandbox_wall_cap", "sandbox_output_cap"):  # fmt: skip
+    names = [
+        "sandbox_task_cap", "sandbox_file_cap", "sandbox_no_secrets", "sandbox_no_network",
+        "sandbox_memory_cap", "sandbox_wall_cap", "sandbox_output_cap",
+    ]  # fmt: skip
+    for name in names:
         assert f"{name}=ok" in out
     assert "sk-secret-key" not in out and sandbox_probe.SECRET_VALUE not in out
     assert "seccomp_mode=" in out and "landlock_abi=" in out
@@ -86,3 +89,15 @@ def test_probe_times_a_latexml_run(capsys):
     assert main(["ops", "sandbox-probe", "--require-latexml"]) == 0
     out = capsys.readouterr().out
     assert "latexml=ok" in out and "latexml_seconds=" in out
+
+
+def test_the_probe_reports_the_cgroup_and_the_filter(monkeypatch, capsys):
+    from readablestem.core import seccomp
+
+    if not (shutil.which("bwrap") and shutil.which("prlimit") and sandbox.available()):
+        pytest.skip("needs bubblewrap with user namespaces")
+    monkeypatch.delenv("READABLESTEM_LATEXML_ROOT", raising=False)
+    main(["ops", "sandbox-probe"])
+    out = capsys.readouterr().out
+    assert ("sandbox_cgroup=ok" in out) or ("sandbox_cgroup=unavailable" in out)
+    assert ("sandbox_seccomp=ok" in out) == seccomp.supported()
