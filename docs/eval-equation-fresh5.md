@@ -81,7 +81,7 @@ Silent errors per 100 gold by stratum, candidate / Opus chatbot: A 4.35 / 7.74, 
 | criterion | met | value |
 |---|---|---|
 | 1. primary: candidate minus Opus chatbot positive, 97.5% interval excludes 0, p < 0.025, no stratum below -2 points | no | +0.004 [-0.023, +0.036], p 0.44 |
-| 2. silent errors at most 4.0 per 100, at most half the Opus chatbot's, at most control + 0.5 | no | 5.02 (Opus 9.56, control 6.59): the first part fails, the other two hold |
+| 2. silent errors at most 4.0 per 100, at most half the Opus chatbot's, at most control + 0.5 | no | 5.02 (Opus 9.56, control 6.59): the 4.0 part fails, the half-of-Opus part fails (5.02 > 4.78), the control part holds (5.02 <= 7.09) |
 | 3. flag recall at least 0.60 at at most 4.0 required decisions a page | no | 0.461 at 2.87 a page |
 | 4. unseen loss at most the Opus chatbot's | yes | 11.02 against 16.44 |
 | 5. cost at most $0.07 a page | yes | $0.0209 a page (29 units) |
@@ -162,3 +162,12 @@ This is one run per arm on 26 units (and 3 in D), so it shows no run-to-run vari
 3 points of the primary is not claimed either way. The speech is ReadableSTEM's own (`pipeline.speech`), not a
 particular screen reader's. The result says nothing about scans, handwriting, Word files or maths inside figures.
 The arXiv gold follows the authors' `$` boundaries. Two of the three Beamer decks come from one repository.
+
+## Correction (2026-11-04)
+
+The criteria table first said of criterion 2 that "the first part fails, the other two hold". That was wrong:
+"at most half the Opus chatbot's" also fails, because 5.02 is above 9.56 / 2 = 4.78. Criterion 2 fails on two of
+its three parts (at most 4.0, and at most half the Opus chatbot's); the third part (at most the control's 6.59 plus
+0.5) holds. The verdict did not depend on it, since criterion 2 failed either way. `scripts/fresh5_report.py` computed
+the criterion correctly (it tests all three parts and recorded `met: false`), and
+`data/realworld/results-fresh5.json` is unchanged; only this sentence was wrong. No number changed.
