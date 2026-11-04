@@ -1,0 +1,14 @@
+{# "On this page": the contents of a long page, a list of links to its section headings
+   (the headings carry stable ids). Used by the offices page and the guides; place it after
+   the opening paragraphs, so the introduction still comes first. Styled by .toc in app.css.
+   Use: {% from "_contents.html" import contents %}{{ contents([("id", "Label"), ...]) }} #}
+{% macro contents(items) -%}
+<nav class="toc" aria-label="On this page">
+  <p class="toc-label">On this page</p>
+  <ul>
+    {% for anchor, label in items -%}
+    <li><a href="#{{ anchor }}">{{ label }}</a></li>
+    {% endfor -%}
+  </ul>
+</nav>
+{%- endmacro %}

@@ -555,3 +555,21 @@ def test_render_page_pdf_has_headings_in_its_text_layer(tmp_path, chromium):
         )
         == pdf
     )
+
+
+def test_demo_note_has_its_own_link_colours_in_the_head():
+    """The note is white in every scheme, so its links carry light-scheme and forced-colour
+    rules (the document's `color-scheme: light dark` gave them pale blue on white)."""
+    page = page_source()
+    document = (
+        '<!doctype html><html lang="en"><head><style>p{margin:0}</style></head>'
+        "<body><main><p>x</p></main></body></html>"
+    )
+    wrapped = wrap_demo_html(document, page, date="2026-10-07")
+    head = wrapped[: wrapped.index("</head>")]
+    assert ".demo-note a:link { color: #0b3d91; }" in head
+    assert ".demo-note a:visited" in head and "@media (forced-colors: active)" in head
+    assert wrapped.count("<style>") == 2  # the document's own, then the note's
+    assert 'class="demo-note"' in wrapped[wrapped.index("<aside") :]
+    bare = wrap_demo_html("<main></main>", page, date="2026-10-07")
+    assert bare.index(".demo-note a:link") < bare.index("</head>")

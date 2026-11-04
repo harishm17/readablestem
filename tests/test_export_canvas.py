@@ -117,6 +117,13 @@ def test_the_only_styles_left_behind_are_known(made):
         "@media (min-width: 44rem)",
         "@media print",
         "@media screen and (prefers-color-scheme: dark)",  # Canvas has its own colours
+        # The demo note's link colours (eval/render.py DEMO_NOTE_CSS): state and media rules
+        # Canvas cannot hold; its own link colours apply in the note's white box.
+        ".demo-note a:link",
+        ".demo-note a:visited",
+        ".demo-note a:hover",
+        ".demo-note :focus-visible",
+        "@media (forced-colors: active)",
     }
 
 

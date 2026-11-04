@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: sharing, guides, demo and status polish (branch ux/sharing-guides-demo)
+
+- The "About this demo" note has its own light-scheme, visited, hover, focus and forced-colour
+  link colours (it is a white box in every scheme; its links measured 2.39:1 in the dark scheme).
+  The generator (`eval/render.py`, `DEMO_NOTE_CSS`) and the committed demo carry the same rules; the
+  student output is unchanged. `/demo` is now axe-checked in the dark scheme
+  (`tests/test_web_demo_dark_browser.py`).
+- Sharing page: View and Review are whole-row choices (44 px or more, native radios, each with
+  what it allows); a "Copy link" button with a spoken confirmation (the address stays a
+  selectable field); the document's deletion time and a link to keep it longer beside the address;
+  sign-in wording from the enabled providers; "the same address, letter case aside" instead of "exactly
+  as written"; "Remove" is a danger button.
+- The comparison guide shows, under 52rem, one collapsed native disclosure per topic (ReadableSTEM's answer in the summary; opened, every tool with its source and date); the
+  table stays for wide screens. ADA, comparison and posting guides get the offices page's "On this
+  page" contents (`templates/_contents.html`) and stable heading ids.
+- Status page: "Checked at ...", a "Check again" link and what the 10-minute AI service
+  observation means.
 ## Unreleased: review round fixes (branch ux/review-round-fixes)
 
 - Bulk accept: the button that accepts comes after the list of originals and proposals, which now asks you to compare each proposal with the image of the original; Cancel and Undo are unchanged.
