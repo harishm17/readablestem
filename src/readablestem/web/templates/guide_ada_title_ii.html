@@ -107,9 +107,10 @@
 <h2>What ReadableSTEM does and does not do</h2>
 <p>ReadableSTEM assists instructors who need to turn a STEM course PDF into an accessible web
   page. It reads the PDF, rebuilds equations as MathML a screen reader can speak, restores
-  headings and lists, writes short alt text for figures, and returns one self-contained HTML
-  file. Every change it is unsure about goes to a review screen where the instructor accepts,
-  edits or rejects it.</p>
+  headings and lists{% if tables_on %}, rebuilds tables with header cells{% endif %} and
+  writes alt text for figures. Every change it is unsure about goes to a review screen where
+  the instructor accepts, edits or rejects it. The result is a self-contained web page, with
+  {% if word_export %}Word, {% endif %}EPUB and Canvas versions if wanted.</p>
 <p><strong>It assists; it does not certify.</strong> Nothing here establishes conformance with
   WCAG, the ADA or any other standard, and the output still needs a person to look at it. That
   is what the review screen is for.</p>
@@ -119,7 +120,8 @@
   <li>It makes mistakes, so look over the equations your students rely on.
     <a href="/limits#accuracy">How accurate it is</a> and the
     <a href="/limits">known limits</a>, including scanned and handwritten pages.</li>
-  <li>It starts from a PDF.</li>
+  <li>It starts from a PDF{% if office_on %}, or from a Word or PowerPoint file that it turns
+    into a PDF first{% endif %}. It does not work from LaTeX source files.</li>
 </ul>
 <p>The rule allows a separate accessible version of a page only where it is not possible to
   make the web content directly accessible because of technical or legal limitations (28 CFR

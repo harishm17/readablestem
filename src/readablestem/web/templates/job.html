@@ -195,7 +195,7 @@
 <section aria-labelledby="delete-heading">
   <h2 id="delete-heading">Keeping and deleting this document</h2>
   {% if job.retention_mode == "dev" %}
-  <p>You let the developer look at the results, so this document is kept for
+  <p>You let us look at the results, so this document is kept for
     {{ opt_in_days }} days from upload. It will be deleted automatically on
     {{ job.retain_until|utc }}.</p>
   {% elif job.retention_mode == "week" %}

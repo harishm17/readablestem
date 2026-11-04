@@ -39,8 +39,9 @@
     PDF. Mathpix is the better fit.</li>
   <li><strong>You have other formats, images, handwriting or a large batch.</strong> Mathpix
     takes more kinds of input, has an API for batches, and exports to more formats.
-    ReadableSTEM takes a PDF and returns one HTML file, with a zip for Canvas and a Common
-    Cartridge.</li>
+    ReadableSTEM takes a PDF{% if office_on %} (or a Word or PowerPoint file){% endif %}{% if image_pages_on %},
+    reads scanned and handwritten pages only when you ask{% endif %}, and returns a web page,
+    with {% if word_export %}Word, {% endif %}EPUB, a zip for Canvas and a Common Cartridge.</li>
   <li><strong>You want to check each uncertain change before students see it.</strong>
     ReadableSTEM is built around that step. The Mathpix and LaTeXML pages we read describe no
     such step.</li>
@@ -68,7 +69,7 @@
     <tbody>
       <tr>
         <th scope="row">Takes in</th>
-        <td>A STEM course PDF. {{ src(RS, "2026-11-03") }}</td>
+        <td>A STEM course PDF, including Beamer slide decks{% if office_on %}; also Word (DOCX) and PowerPoint (PPTX), turned into a PDF first{% endif %}{% if image_pages_on %}. Scanned and handwritten pages only when you ask{% endif %}. {{ src(RS, "2026-11-03") }}</td>
         <td>PDF, EPUB, Word (DOCX, DOC), PowerPoint (PPTX), OpenDocument Text (ODT), DjVu, WordPerfect (WPD), Mobipocket (MOBI) and Amazon Kindle (AZW3); also images and handwriting strokes. {{ src(MX, "2026-10-28") }}</td>
         <td>Scanning workflows for PDF, PowerPoint, Word, Excel, LaTeX, images, video captions and web pages; remediation depth varies by format. {{ src(AE, "2026-11-03") }}</td>
         <td>In the recipe we tested: the PDF and a 150 dpi image of every page, with one sentence of prompt. {{ src(PF, "2026-10-14", "PROOF.md") }}</td>
@@ -76,7 +77,7 @@
       </tr>
       <tr>
         <th scope="row">Gives back</th>
-        <td>One self-contained HTML file. Also a zip for a Canvas page and a Common Cartridge. {{ src(RS, "2026-11-03") }}</td>
+        <td>One self-contained HTML file. Also {% if word_export %}Word (DOCX), {% endif %}EPUB, a zip for a Canvas page and a Common Cartridge. {{ src(RS, "2026-11-03") }}</td>
         <td>Mathpix Markdown, DOCX, XLSX, LaTeX, HTML, PDF and PPTX. Also a tagged accessible PDF (PDF/UA) of the PDF you sent. {{ src("https://docs.mathpix.com/guides/accessible-pdf", "2026-10-28") }}</td>
         <td>A revised file and findings to review with your team; its supported fixes are partial and include structure and suggested alt text. {{ src(AE, "2026-11-03") }}</td>
         <td>HTML in the reply. {{ src(PF, "2026-10-14", "PROOF.md") }}</td>
@@ -145,9 +146,10 @@
 <h2 id="readablestem">ReadableSTEM</h2>
 <p>ReadableSTEM assists instructors who need to turn a STEM course PDF into an accessible web
   page. It reads the PDF, rebuilds equations as MathML a screen reader can speak, restores
-  headings and lists, writes short alt text for figures, and returns one self-contained HTML
-  file. Every change it is unsure about goes to a review screen where the instructor accepts,
-  edits or rejects it.</p>
+  headings and lists{% if tables_on %}, rebuilds tables with header cells{% endif %} and
+  writes alt text for figures. Every change it is unsure about goes to a review screen where
+  the instructor accepts, edits or rejects it. The result is one self-contained HTML file,
+  with {% if word_export %}Word, {% endif %}EPUB and Canvas versions if wanted.</p>
 <p><strong>It assists; it does not certify.</strong> Nothing here establishes conformance with
   WCAG, the ADA or any other standard, and the output still needs a person to look at it. That
   is what the review screen is for.</p>

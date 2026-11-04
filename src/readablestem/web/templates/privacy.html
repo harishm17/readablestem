@@ -26,7 +26,7 @@
   {# What the code does (T1-8): the
      24-hour and 7-day clocks restart on every review decision, language, title or contact
      change, and download; "Keep 7 more days" on the job page makes a 24-hour document a
-     7-day one; the developer-look choice is 30 days from upload and does not restart. #}
+     7-day one; the "let us look" choice is 30 days from upload and does not restart. #}
   <li>If you tick neither box on the upload form, all of it is deleted automatically
     <strong>{{ retention_hours }} hours</strong> after you last worked on it: after your
     last review decision or download, or the upload if there is none. From that moment it
@@ -35,9 +35,10 @@
   <li>If you tick "Keep for 7 days, only I can see it", it is deleted
     <strong>7 days</strong> after you last worked on it instead. Nobody else looks at it.
     "Keep 7 more days" on the document's page does the same later.</li>
-  <li>If you also tick "Also let the developer look ({{ opt_in_days }} days)", it is
-    deleted <strong>{{ opt_in_days }} days</strong> after upload. During that time Harish
-    may look at the conversion results to find and fix mistakes in the tool. Both boxes
+  <li>If you also tick "Also let us look at the results ({{ opt_in_days }} days)", it is
+    deleted <strong>{{ opt_in_days }} days</strong> after upload. During that time the people
+    who run ReadableSTEM may look at the conversion results to find and fix mistakes in the
+    tool. Both boxes
     are unticked unless you tick them.</li>
   <li>You can delete a document and everything made from it at any time with
     "Delete now". It is removed from the database straight away.</li>
@@ -139,6 +140,17 @@
   There are no analytics, advertising or third-party tracking cookies. While you type a
   review decision, the text is kept in your browser tab until you save it, close the tab or
   sign out; it is never sent to the server before you save.</p>
+{# web/analytics.py and static/analytics.js: PostHog through this site's /m/ path, a random
+   visitor id in localStorage (no cookie), no autocapture or session replay, the visitor's
+   address not forwarded. Only when ANALYTICS_ENABLED; the offices page says the same. #}
+{% if analytics_on %}
+<p>To see how visitors use the site, page views and a few named events (for example that a
+  document was uploaded, with a page count at most) are sent to PostHog in the United States
+  through this site's own address. A random visitor id is kept in your browser's local
+  storage, not in a cookie. The events never contain document content, file names or email
+  addresses, nobody is identified, and your network address is not passed on. Converted
+  documents, downloads and the demo carry no analytics.</p>
+{% endif %}
 
 <h2>What is logged</h2>
 {# Platform logs: Railway keeps its own request logs; how long depends on the plan, so the

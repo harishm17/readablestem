@@ -18,8 +18,9 @@
   <a href="{{ site_url }}{{ page_path }}">{{ site_url }}{{ page_path }}</a>. This describes the
   beta; it is not a contract or an audit.</p>
 <p>ReadableSTEM assists instructors who turn a STEM course PDF into an accessible web page:
-  equations as MathML, real headings, alt text for figures, one HTML file. The instructor
-  reviews what the tool is unsure about. Built and maintained by Harish Manoharan; the code is
+  equations as MathML, real headings{% if tables_on %} and tables{% endif %}, alt text for figures. The result is a web
+  page, with {% if word_export %}Word, {% endif %}EPUB and Canvas versions if wanted. The instructor reviews what the tool is
+  unsure about. Built and maintained by Harish Manoharan; the code is
   open source ({{ source_url }}).</p>
 
 <h2>Where a document goes</h2>
@@ -46,7 +47,7 @@
 <h2>Retention and training</h2>
 <ul>
   <li>Deleted {{ retention_hours }} hours after the instructor last works on it; 7 days if the
-    instructor keeps it; {{ opt_in_days }} days if the instructor also lets the developer look.
+    instructor keeps it; {{ opt_in_days }} days if the instructor also lets us look at the results.
     Deleting by hand is immediate. Database backups keep a deleted document up to about a week.</li>
   <li>Uploads are not used to train any model. {{ model_names }} states that it does not train
     on API data by default and keeps API data for a limited time; see its own policy.
@@ -64,9 +65,11 @@
 <ul>
   <li>It does not say that a document meets WCAG, the ADA, Section 508 or any other standard or
     law. Proposals can be wrong: in a pre-registered test on 15 textbook sections, about half
-    of the equations (0.50) were exactly right end to end.</li>
+    of the equations (0.50) were exactly right end to end, against 0.62 for a general
+    chatbot.</li>
   <li>Its checks look at structure, not meaning. Not tested by listening with NVDA, JAWS or
-    VoiceOver. No accessibility conformance report (VPAT) and no independent security test yet.</li>
+    VoiceOver. No accessibility conformance report (VPAT) published yet (one is in
+    preparation) and no independent security test.</li>
   <li>Scanned and handwritten pages convert only on request and a person checks them. Chemistry
     is the weakest area.</li>
 </ul>

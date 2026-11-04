@@ -111,19 +111,31 @@
     {% set pdf_error = field_errors.get("pdf") %}
     <div class="field{% if pdf_error %} field-error{% endif %}">
       <label for="pdf">{% if revises|default(none) %}PDF file{% else %}PDF files{% endif %}</label>
-      <p class="hint" id="pdf-hint">{% if revises|default(none) %}Up to {{ max_upload_mb }} MB and {{ max_pages }} pages.
-        {% else %}Choose one or up to {{ max_files }} files; each becomes its own document. Up to {{ max_upload_mb }} MB and
-        {{ max_pages }} pages each. A bigger file, up to {{ upload_limit_mb }} MB and {{ source_pages }} pages
-        (all files together {{ upload_limit_mb }} MB), is kept and you choose which pages to convert.
-        {% endif %}
-        {% if pages_left is not none %}You can convert {{ pages_left }} more
-        {{ "page" if pages_left == 1 else "pages" }} today{% if new_account %} (a new account
-        can convert {{ page_quota }} pages a day){% endif %}; the count starts again at
-        {{ next_reset|utc }}.{% endif %}
-        {% if office_kinds %}Word (.docx){% if "pptx" in office_kinds %} and PowerPoint (.pptx){% endif %}
-        files also work; they are turned into a PDF on the server first, so the page count
-        is the PDF's.{% endif %}
-        Only upload materials you wrote or may adapt, with no student records.</p>
+      {# One fact a line, so it scans; the input's aria-describedby points at the block. #}
+      <div class="hint" id="pdf-hint">
+        <ul>
+          {% if revises|default(none) %}
+          <li>Up to {{ max_upload_mb }} MB and {{ max_pages }} pages.</li>
+          {% else %}
+          <li>Up to {{ max_files }} files at once; each becomes its own document.</li>
+          <li>Up to {{ max_pages }} pages and {{ max_upload_mb }} MB each. A bigger file, up to
+            {{ source_pages }} pages and {{ upload_limit_mb }} MB (all files together
+            {{ upload_limit_mb }} MB), is kept and you choose which pages to convert.</li>
+          {% endif %}
+          {% if office_kinds %}
+          <li>Word (.docx){% if "pptx" in office_kinds %} and PowerPoint (.pptx){% endif %}
+            files also work; they are turned into a PDF on the server first, so the page count
+            is the PDF's.</li>
+          {% endif %}
+          {% if pages_left is not none %}
+          <li>You can convert {{ pages_left }} more
+            {{ "page" if pages_left == 1 else "pages" }} today{% if new_account %} (a new account
+            can convert {{ page_quota }} pages a day){% endif %}; the count starts again at
+            {{ next_reset|utc }}.</li>
+          {% endif %}
+          <li>Only upload materials you wrote or may adapt, with no student records.</li>
+        </ul>
+      </div>
       {% if pdf_error %}
       <p class="error-message" id="pdf-error"><span class="visually-hidden">Error: </span>{{ pdf_error.message }}</p>
       {% endif %}
@@ -176,10 +188,9 @@
       </div>
       <div class="field checkbox-field">
         <input type="checkbox" id="share" name="share" value="on" aria-describedby="share-hint">
-        <label for="share">Also let the developer look ({{ opt_in_days }} days)</label>
-        <p class="hint" id="share-hint">Harish, who runs this beta, may look at the results
-          to find and fix mistakes in the tool. Your document and results are then kept
-          {{ opt_in_days }} days.</p>
+        <label for="share">Also let us look at the results ({{ opt_in_days }} days)</label>
+        <p class="hint" id="share-hint">We may look at the results to find and fix mistakes in
+          the tool. Your document and results are then kept {{ opt_in_days }} days.</p>
       </div>
     </fieldset>
     <p id="upload-status" class="upload-status" role="status"></p>

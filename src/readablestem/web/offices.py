@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from markupsafe import Markup
 
+from readablestem.pipeline import export_docx
 from readablestem.web.recipients import privacy_context
 
 if TYPE_CHECKING:
@@ -38,6 +39,8 @@ def offices_context(settings: Settings, *, tracer_on: bool = False) -> dict[str,
         "model_companies": model_companies,
         "model_names": " and ".join(model_companies),
         "model_company": recipients[0].name,
+        # Word downloads need pandoc on the server; the data flow names the formats.
+        "word_export": export_docx.available(),
     }
     return context
 

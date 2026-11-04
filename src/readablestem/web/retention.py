@@ -5,7 +5,7 @@ Three choices on the upload form, stored as `Job.retention_mode`:
 - `day`: nothing ticked. Deleted `RETENTION_HOURS` (24) after the last activity.
 - `week`: "Keep for 7 days, only I can see it". Deleted 7 days after the last activity;
   nobody else looks at it.
-- `dev`: "Also let the developer look (30 days)". Kept 30 days from upload, and the
+- `dev`: "Also let us look at the results (30 days)". Kept 30 days from upload, and the
   developer may look at the results to find and fix mistakes in the tool
   (`Job.opt_in_retention`, which `ops.export` reads, is true exactly for this mode).
 
@@ -34,7 +34,7 @@ WEEK_DAYS = 7
 
 
 def mode_for_upload(*, keep: bool, share: bool) -> Mode:
-    """The upload form's two boxes. Letting the developer look is the longer choice and
+    """The upload form's two boxes. Letting us look at the results is the longer choice and
     includes keeping the work, whether or not the first box is ticked too."""
     if share:
         return "dev"

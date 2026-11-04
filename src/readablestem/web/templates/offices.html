@@ -12,11 +12,29 @@
    (offices_summary.html) carries the same facts in short. #}
 <h1>For accessibility offices</h1>
 <p class="lede">ReadableSTEM assists instructors who turn a STEM course PDF into an accessible
-  web page. This page is for the office that decides whether instructors may use it: where a
-  document goes, who receives it, how long it is kept, and what the tool does not do.</p>
+  web page. This page is for the office that decides whether instructors may use it.</p>
 <p class="hint">This page describes the beta as it works today. It is not a contract or an
   audit. <a href="{{ summary_path }}" download="{{ summary_filename }}">Download the one-page
   summary</a> (an HTML file that prints on one page).</p>
+
+<h2 id="glance">At a glance</h2>
+<ul>
+  <li>Instructors upload course material they wrote or may adapt. Students never sign in.</li>
+  <li>The app runs on Railway in the United States. Pictures of equations and figures, with a
+    little nearby text, go to {{ model_names }}. No one else receives a document.</li>
+  <li>A document is deleted {{ retention_hours }} hours after the instructor last works on it,
+    unless the instructor chooses to keep it longer.</li>
+  <li>Uploads are not used to train models. Student records are forbidden by the terms, and no
+    data processing agreement is offered.</li>
+  <li>Every change the tool is unsure about goes to the instructor, who decides. In a held-out
+    test about half of the equations came out exactly right end to end, so the review
+    matters.</li>
+  <li>It makes no claim that a document meets WCAG, the ADA or Section 508.</li>
+</ul>
+<p>The sections below give the detail: <a href="#data-flow">where a document goes</a>,
+  <a href="#subprocessors">who receives what</a>, <a href="#retention">how long it is kept</a>,
+  <a href="#ferpa">student records</a>, <a href="#not-certify">what it does not certify</a>
+  and a <a href="#pilot">pilot checklist</a>.</p>
 
 <h2 id="data-flow">Where a document goes</h2>
 <figure class="data-flow-figure">
@@ -35,8 +53,12 @@
     scanned or handwritten pages”, a picture of each such page is sent as well.{% endif %}
     The PDF file itself, its file name and the instructor's email address are not sent.</li>
   <li>Automatic checks compare each proposal with the PDF's own text. The instructor decides
-    what the tool is unsure about on a review screen and can edit anything.</li>
-  <li>The instructor downloads one HTML file and posts it in the course.</li>
+    what the tool is unsure about on a review screen and can edit anything. The instructor can
+    share a document with named colleagues, to view it or to help review it; they must sign in
+    with the exact email address the instructor entered.</li>
+  <li>The instructor downloads the result and posts it in the course: a web page (one HTML
+    file), and if wanted the same document as {% if word_export %}Word, {% endif %}EPUB, a zip
+    for a Canvas page or a Common Cartridge.</li>
   <li>The PDF, the images, the result and the review decisions stay in the database until
     they are deleted on the schedule below.</li>
 </ol>
@@ -90,9 +112,10 @@
     <strong>{{ retention_hours }} hours</strong> after the instructor last worked on it.</li>
   <li>If the instructor chooses “Keep for 7 days”, it is deleted <strong>7 days</strong> after
     the last activity. Only the instructor, and the people the instructor names, can see it.</li>
-  <li>If the instructor also lets the developer look at the results, it is deleted
-    <strong>{{ opt_in_days }} days</strong> after upload, and the developer may look at it to
-    find mistakes in the tool. Both choices are off unless the instructor ticks them.</li>
+  <li>If the instructor also lets us look at the results, it is deleted
+    <strong>{{ opt_in_days }} days</strong> after upload, and the people who run ReadableSTEM may
+    look at it to find mistakes in the tool. Both choices are off unless the instructor ticks
+    them.</li>
   <li>The instructor can delete a document at any time. It leaves the database at once.</li>
   <li>Database backups keep a deleted document for up to about a week. {{ model_names }} may
     keep what it received for the time in the table above.</li>
@@ -134,8 +157,8 @@
     law.</li>
   <li>Its proposals can be wrong. In a pre-registered test on 15 sections of five OpenStax
     textbooks it had not seen (version 0.4.0, 14 October 2026), about half of the equations
-    (0.50) came out exactly right end to end. Real course PDFs, especially ones typeset with
-    LaTeX or exported from Word, may do worse. The tool asks the instructor about the parts it
+    (0.50) came out exactly right end to end, against 0.62 for a general chatbot given the same
+    PDFs. On 15 held-out research papers typeset with LaTeX it was 0.58, against 0.64. The tool asks the instructor about the parts it
     is unsure about and accepts the rest on its own checks.
     <a href="/limits#accuracy">The measured numbers and their limits</a>.</li>
   <li>The automatic checks look at structure (language, title, headings, lists, tables, links,
@@ -143,8 +166,11 @@
     right.</li>
   <li>The output has not been tested by listening with NVDA, JAWS or VoiceOver, and it has not
     been tried in a live course site.</li>
-  <li>There is no accessibility conformance report (VPAT) for the ReadableSTEM web
-    application itself, and no independent security test.</li>
+  <li>There is no accessibility conformance report (VPAT) published for the ReadableSTEM web
+    application itself. A report in the VPAT 2.5 layout (WCAG 2.2, levels A and AA) is in
+    preparation; it will say what has been tested and claim nothing more. Automated tests walk
+    every page of the app with the keyboard alone and run axe-core on the main screens.</li>
+  <li>There has been no independent security test.</li>
   <li>Scanned and handwritten pages are converted only when the instructor asks, and a person
     must check each converted equation and table. Chemistry is the weakest area.
     <a href="/limits">All known limits</a>.</li>

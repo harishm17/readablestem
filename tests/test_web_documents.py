@@ -259,7 +259,7 @@ def test_the_upload_form_carries_what_the_browser_needs_to_check_first(web):
     assert 'data-max-bytes="1048576" data-max-mb="1"' in page
     assert '<div id="pdf-check" aria-live="polite"></div>' in page
     assert '<p id="upload-status" class="upload-status" role="status"></p>' in page
-    # The opt-in says what ticking it lets the developer do.
+    # The opt-in says what ticking it lets us do.
     assert "may look at the results to find and fix mistakes in the tool" in text(page)
 
 
@@ -328,14 +328,18 @@ def test_the_posting_help_says_upload_and_link_never_paste(web):
     assert 'aria-current="page">Posting in your course</a>' in page.text
 
 
-def test_the_landing_page_says_why_now_how_long_and_how_accurate(web):
-    flat = text(web.client().get("/").text)
+def test_the_landing_page_says_why_now_what_it_handles_and_how_accurate(web):
+    page = web.client().get("/").text
+    flat = text(page)
     assert "public universities" in flat
-    assert "one or two per page" in flat and "pre-registered test" in flat
-    assert "about as many equations as a general chatbot" in flat and "It makes mistakes" in flat
-    assert "/blob/main/PROOF.md" in web.client().get("/").text
+    assert "Beamer slide decks, read frame by frame" in flat and "Chemistry" in flat
+    assert "about 1.8 decisions per page" in flat and "It makes mistakes" in flat
+    assert "it does not yet beat a general chatbot" in flat
+    assert "/blob/main/PROOF.md" in page  # the proof tiles link to how they were measured
+    assert 'href="/limits#accuracy"' in page
     assert "How to post it in your course" in flat
-    assert "confidence score" not in flat
+    assert "EPUB" in flat and "Common Cartridge" in flat
+    assert "confidence score" not in flat and "developer" not in flat
 
 
 def test_the_privacy_notice_mentions_usage_events(web):

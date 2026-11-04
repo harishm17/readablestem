@@ -110,14 +110,37 @@ def test_the_landing_page_says_what_review_costs_from_the_settings(tmp_path):
     env = WebEnv(tmp_path, signup_mode="open", open_tier_daily_page_quota=17, max_pages_per_job=30)
     with env.running() as client:
         text = flat(client.get("/").text)
+        limits = flat(client.get("/limits").text)
     assert "about 1.8 decisions per page" in text
     assert "real course PDFs may need more" in text
-    assert (
-        "A document of 30 pages, the most one upload can hold, is then about 54 decisions" in text
-    )
-    assert "A new account can convert 17 pages a day, about 31 decisions" in text
+    assert "Upload up to 30 pages at a time" in text  # max_pages_per_job, not written in
+    assert "New accounts have daily limits: 17 pages a day" in text
     assert "deleted 24 hours after you last work on them" in text
-    assert "all the equations, or all the figures with alt text, in one step" in text
+    # The planning detail lives on /limits.
+    assert "all the equations, or all the figures with alt text, in one step" in limits
+
+
+def test_the_landing_page_lists_only_the_features_this_server_has_on(tmp_path):
+    off = WebEnv(tmp_path / "off")
+    with off.running() as client:
+        plain = flat(client.get("/").text)
+    assert "Scanned and handwritten pages, when you tick a box" not in plain
+    assert "Tables, rebuilt as real tables" not in plain
+    assert "longer description for a chart" not in plain
+    assert "Your course's notation" not in plain
+    on = WebEnv(
+        tmp_path / "on",
+        feature_tables=True,
+        feature_image_pages=True,
+        feature_long_descriptions=True,
+        feature_notation_memory=True,
+    )
+    with on.running() as client:
+        full = flat(client.get("/").text)
+    assert "Scanned and handwritten pages, when you tick a box at upload" in full
+    assert "Tables, rebuilt as real tables with header cells" in full
+    assert "a longer description for a chart or a diagram" in full
+    assert "Your course's notation" in full
 
 
 def test_the_quota_is_read_from_the_settings_not_written_in_the_page(tmp_path):
@@ -125,14 +148,14 @@ def test_the_quota_is_read_from_the_settings_not_written_in_the_page(tmp_path):
         env = WebEnv(tmp_path / str(quota), signup_mode="open", open_tier_daily_page_quota=quota)
         with env.running() as client:
             text = flat(client.get("/").text)
-        assert f"A new account can convert {quota} pages a day" in text
+        assert f"New accounts have daily limits: {quota} pages a day" in text
 
 
 def test_an_invite_only_landing_page_does_not_quote_a_new_accounts_quota(tmp_path):
     env = WebEnv(tmp_path, signup_mode="allowlist", open_tier_daily_page_quota=17)
     with env.running() as client:
         text = flat(client.get("/").text)
-    assert "A new account can convert" not in text and "about 1.8 decisions per page" in text
+    assert "New accounts have daily limits" not in text and "about 1.8 decisions per page" in text
 
 
 def test_the_numbers_are_the_ones_the_limits_page_gives(env):

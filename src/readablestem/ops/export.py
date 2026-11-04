@@ -1,6 +1,6 @@
 """Export opted-in jobs as labelled examples, for error analysis on Harish's machine.
 
-Only jobs whose owner ticked "Also let the developer look (30 days)"
+Only jobs whose owner ticked "Also let us look at the results (30 days)"
 (`Job.opt_in_retention`) are exported, and only finished ones that have not passed
 `retain_until`. For each job, `DIR/<job_id>/` gets:
 

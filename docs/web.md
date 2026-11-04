@@ -80,7 +80,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `MODEL_PROVIDER`, `OPENAI_API_KEY`, `MAIN_MODEL`, `CHEAP_MODEL` | Which provider answers (`openai`, the default) and its key and models |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (`claude-opus-5-5`, `claude-haiku-5-5`), the workspace id an organisation-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
-| `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let the developer look (`web/retention.py`) |
+| `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let us look at the results (`web/retention.py`) |
 | `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`, compared in constant time. Required in production, at least 32 characters, or the purge would never run; the route also guards the daily paid canaries. Every call counts against the cron rate limit, wrong tokens included |
 | `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval |
 | `SOURCE_URL`, `CONTACT_EMAIL` | Footer "Source code" link (the AGPL source offer; the licence sentence is on /terms, ADR 0003 addendum); contact on the 403, privacy and terms pages |
@@ -526,7 +526,7 @@ course notation; with neither, the run uses the settings' flags as before). Figu
 descriptions then say what is shown and never the result (`pipeline/figure_step.py`).
 
 Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep for 7 days, only
-I can see it" (`keep`) and "Also let the developer look (30 days)" (`share`; implies
+I can see it" (`keep`) and "Also let us look at the results (30 days)" (`share`; implies
 keeping). They set `jobs.retention_mode`: `day` (neither), `week` or `dev`; `dev` is also
 `jobs.opt_in_retention`, which `ops.export` reads, so only `dev` jobs can be looked at.
 `retain_until` is a full window from upload: `RETENTION_HOURS`, 7 days, or

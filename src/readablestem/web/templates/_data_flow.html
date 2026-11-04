@@ -4,7 +4,7 @@
    reader that reads the image on its own. Company names come from web/recipients.py. #}
 <svg class="data-flow" viewBox="0 0 360 520" role="img" aria-labelledby="flow-title flow-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif" font-size="14">
   <title id="flow-title">How a document moves through ReadableSTEM</title>
-  <desc id="flow-desc">Four boxes in a column, joined by arrows. The instructor's browser sends the PDF to the ReadableSTEM app and its database, hosted by Railway in the United States. The app sends images of equations and figures, with a little nearby text, to {{ model_names }}. {{ model_names }} returns proposed LaTeX and descriptions. The instructor reviews them and downloads one HTML file. The PDF itself, its file name and the instructor's email address are not sent to {{ model_names }}.</desc>
+  <desc id="flow-desc">Four boxes in a column, joined by arrows. The instructor's browser sends the PDF to the ReadableSTEM app and its database, hosted by Railway in the United States. The app sends images of equations and figures, with a little nearby text, to {{ model_names }}. {{ model_names }} returns proposed LaTeX and descriptions. The instructor reviews them and downloads the result as a web page. The PDF itself, its file name and the instructor's email address are not sent to {{ model_names }}.</desc>
   <defs>
     <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#1a4fa0"/>
@@ -27,7 +27,7 @@
     <text x="36" y="366">Reads the images and a little nearby</text>
     <text x="36" y="384">text; proposes LaTeX and descriptions</text>
     <text x="36" y="476" font-weight="700">4. Instructor reviews and downloads</text>
-    <text x="36" y="498">One HTML file, posted in the course</text>
+    <text x="36" y="498">A web page, posted in the course</text>
   </g>
   <g stroke="#1a4fa0" stroke-width="2.5" fill="none" marker-end="url(#flow-arrow)">
     <path d="M180 86 V144"/>
