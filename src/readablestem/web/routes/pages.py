@@ -301,6 +301,8 @@ def status(request: Request) -> Response:
         "waiting": None,
         "converting": None,
         "next_reset": next_day_start(utcnow()),
+        # When these facts were read: the page does not update itself.
+        "checked_at": utcnow(),
         # The AI service, as this server's own recent requests saw it (web.provider_health).
         "provider_down_since": HEALTH.down_since(),
     }

@@ -17,7 +17,19 @@
   with the equations kept as equations, for students who want it in another app. Post the web
   page as the main version and offer these beside it.</p>
 
-<h2>In Canvas, as a file</h2>
+{% from "_contents.html" import contents %}
+{{ contents([
+  ("canvas-file", "In Canvas, as a file"),
+  ("canvas-page", "In Canvas, as a page"),
+  ("cartridge", "As a Common Cartridge (Canvas, Blackboard, Moodle, D2L)"),
+  ("listen", "Listen before you post"),
+  ("main-version", "Make it the main version"),
+  ("other-systems", "Other course systems"),
+  ("accessibility-office", "Check with your accessibility office"),
+  ("sources", "Sources")
+]) }}
+
+<h2 id="canvas-file">In Canvas, as a file</h2>
 <ol class="steps-list">
   <li>In your course, open <strong>Files</strong> and upload the .html file.</li>
   <li>Link to it where students look for the material: in a module (add an item, then
@@ -38,7 +50,7 @@
   can still open the downloaded file in any browser. If this happens in your course,
   please tell us{% if contact_email %} at <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% endif %}.</p>
 
-<h2>In Canvas, as a page</h2>
+<h2 id="canvas-page">In Canvas, as a page</h2>
 <p>Canvas's page editor keeps the text, headings, lists, tables and equations of pasted
   HTML, but removes style blocks and any image stored inside the page. The job page has a
   second download for this, <strong>For Canvas (zip with images)</strong>: the pictures
@@ -87,7 +99,7 @@
   your device unless you choose an online one; some browsers send the text of an online
   voice to the company that makes the browser.</p>
 
-<h2>Make it the main version</h2>
+<h2 id="main-version">Make it the main version</h2>
 <p>Post the HTML as the main course material, where students look first. If students
   also want to print, you can keep the PDF as a print copy: link it after the HTML and
   call it that, for example “Week 3 notes (PDF, print copy)”.</p>
@@ -97,17 +109,17 @@
   rule says that, usually, there should not be an inaccessible main page with a separate
   accessible version beside it.</p>
 
-<h2>Other course systems</h2>
+<h2 id="other-systems">Other course systems</h2>
 <p>We have not tried Blackboard, Moodle or D2L Brightspace yet. Upload the file and link to
   it there too. Do not paste it into a page: Moodle, for example, removes the equations
   and the images from pasted content.</p>
 
-<h2>Check with your accessibility office</h2>
+<h2 id="accessibility-office">Check with your accessibility office</h2>
 <p>This page is guidance, not legal advice. Your campus accessibility office can say what
   your courses need, and can help with documents this tool does not handle well (see the
   <a href="/limits">known limits</a>).</p>
 
-<h2>Sources</h2>
+<h2 id="sources">Sources</h2>
 <ul>
   <li><a href="https://www.ecfr.gov/current/title-28/chapter-I/part-35/subpart-H/section-35.202">28 CFR 35.202, conforming alternate versions</a> (Electronic Code of Federal Regulations)</li>
   <li><a href="https://www.ada.gov/resources/2024-03-08-web-rule/">Fact sheet: new rule on the accessibility of web content and mobile apps</a> (ADA.gov, U.S. Department of Justice)</li>

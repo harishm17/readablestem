@@ -937,6 +937,64 @@ input[type="number"].input-short { width: 6rem; }
   .cmp-row, .cmp-none, .table-view { border-color: CanvasText; }
 }
 
+/* ===== ux-lane-c: sharing page (templates/share.html) ===================================
+   Role rows: the whole row is the label of a native radio (at least 44px high), with the
+   right's name and what it allows inside it. The copy row holds the address field and the
+   "Copy link" button (static/copy-link.js shows it; the field works alone). */
+.role-list { display: grid; gap: var(--space-2); max-width: 40rem; }
+.field .role-row {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  min-height: 2.75rem; margin: 0; padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--border-control); border-radius: var(--radius-control);
+  background: var(--bg); font-weight: 400; cursor: pointer;
+}
+.role-row input[type="radio"] { flex: none; width: 1.5rem; height: 1.5rem; margin: 0.125rem 0 0; accent-color: var(--accent); }
+.role-text { display: grid; gap: 0.125rem; min-width: 0; }
+.role-name { font-weight: 700; }
+.role-help { color: var(--ink-muted); }
+.field .role-row:hover { border-color: var(--accent-hover); background: var(--accent-tint); }
+.field .role-row:has(input:checked) { border-color: var(--accent); background: var(--accent-tint); }
+.copy-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; max-width: 40rem; }
+.copy-row input[type="text"] { flex: 1 1 16rem; width: auto; min-width: 0; }
+.copy-row [hidden] { display: none; }
+#share-copy-state:empty { display: none; }
+.share-list { list-style: none; margin: 0; padding: 0; }
+.share-list li { padding: var(--space-3) 0; border-bottom: 1px solid var(--border-subtle); }
+.share-person { margin: 0 0 var(--space-2); overflow-wrap: anywhere; }
+.share-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.share-actions button { overflow-wrap: anywhere; }
+@media (forced-colors: active) {
+  .field .role-row, .field .role-row:hover { border-color: CanvasText; }
+  .field .role-row:has(input:checked) { border-color: Highlight; outline: 2px solid Highlight; outline-offset: 1px; }
+}
+/* ===== end ux-lane-c: sharing page ===================================================== */
+
+/* ===== ux-lane-c: comparison guide on a phone (templates/guide_compare.html) ==============
+   The same cells twice: the table from 52rem up, and under it one native <details> per topic.
+   Closed, it shows the topic and ReadableSTEM's answer (as plain text); open, it
+   lists every tool with its source and date. The view that is not shown is not rendered, so a
+   reader of either gets each fact once. No script. */
+.compare-stack { display: none; }
+@media (max-width: 51.99rem) {
+  .compare-wide-view { display: none; }
+  .compare-stack { display: block; }
+  .mode-read main > .compare-stack { max-width: none; }
+  .compare-topic { margin: 0 0 var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--bg); }
+  .compare-topic summary { display: list-item; list-style-position: inside; min-height: 2.75rem; padding: var(--space-3) var(--space-4); cursor: pointer; }
+  .compare-topic-name { font-weight: 700; font-size: var(--step-1); }
+  .compare-lead { display: block; margin-top: var(--space-1); }
+  .compare-lead { color: var(--ink-muted); overflow-wrap: anywhere; }
+  .compare-topic[open] .compare-lead { display: none; }
+  .compare-topic[open] summary { border-bottom: 1px solid var(--border-subtle); }
+  .compare-topic dl { margin: 0; padding: var(--space-3) var(--space-4) var(--space-4); }
+  .compare-topic dt { margin: var(--space-3) 0 var(--space-1); font-weight: 700; }
+  .compare-topic dt:first-child { margin-top: 0; }
+  .compare-topic dd { margin: 0; overflow-wrap: anywhere; }
+  .compare-topic dd .source-note { display: block; margin-top: var(--space-1); color: var(--ink-muted); }
+}
+@media (forced-colors: active) { .compare-topic, .compare-topic[open] summary { border-color: CanvasText; } }
+/* ===== end ux-lane-c: comparison guide ================================================= */
+
 /* The /style page (templates/style.html). */
 .style-display { font-family: var(--font-display); font-weight: 600; font-size: var(--step-5); line-height: var(--lh-display); margin: 0 0 var(--space-3); }
 .style-h1 { font-family: var(--font-display); font-weight: 600; font-size: var(--step-4); line-height: var(--lh-head); margin: 0 0 var(--space-3); }
