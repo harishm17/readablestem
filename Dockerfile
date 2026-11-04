@@ -95,6 +95,30 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && pandoc --version | head -n 1
 
+# LaTeX and Beamer source uploads are converted by LaTeXML, run as a Perl child inside
+# bubblewrap (src/readablestem/core/sandbox.py, src/readablestem/source/). The distribution's
+# `latexml` package (with bubblewrap, the sandbox it runs in, and util-linux's `prlimit`; the
+# build fails when either program is missing) pulls in TeX Live's base (texlive-latex-base), ImageMagick and their Perl
+# bindings. Installed only when asked for:
+#   docker build --build-arg INSTALL_LATEXML=true .
+# (on Railway: the service variable INSTALL_LATEXML=true; docs/deploy-railway.md, "LaTeXML").
+# Without it the app takes no LaTeX source. The measured size is in that section.
+# ImageMagick is locked down right after the install: its policy allows only PNG, JPEG and GIF
+# and names PS, EPS, PDF, XPS, URL and the rest as denied (source/imagemagick-policy.xml). The
+# build fails if no policy file was replaced or the policy does not list the PDF denial.
+ARG INSTALL_LATEXML=false
+COPY src/readablestem/source/imagemagick-policy.xml /opt/imagemagick-policy.xml
+RUN if [ "$INSTALL_LATEXML" = "true" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends latexml bubblewrap util-linux \
+        && rm -rf /var/lib/apt/lists/* \
+        && for dir in $(ls -d /etc/ImageMagick-*); do cp /opt/imagemagick-policy.xml "$dir/policy.xml"; done \
+        && identify -list policy | grep -c 'pattern: PDF' \
+        && command -v bwrap && command -v prlimit \
+        && latexml --VERSION | head -n 1 \
+        && latexmlpost --VERSION | head -n 1; \
+    fi
+
 WORKDIR /app
 # Owned by root and read-only to the app user: the process cannot rewrite its own code.
 COPY --from=build /app /app

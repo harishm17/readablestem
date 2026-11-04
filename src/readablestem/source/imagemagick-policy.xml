@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ImageMagick policy for the image that can run LaTeXML (Dockerfile, INSTALL_LATEXML).
+  LaTeXML's Perl bindings can call ImageMagick on a graphic named in an uploaded document.
+  The conversion already runs without network in a sandbox (core/sandbox.py) and is started
+  with the nographicimages, nopictureimages and nomathimages options, so this is a second lock:
+  nothing is allowed unless listed, and the formats that run Ghostscript or fetch a URL or
+  read another file by name (PS, EPS, PDF, XPS, URL, HTTP, HTTPS, FTP, MVG, MSL, TEXT, and
+  "@file" paths) are named as denied so that a later edit of the allow list cannot enable them
+  by accident. tests/test_latexml_image.py checks this file.
+-->
+<policymap>
+  <policy domain="resource" name="memory" value="256MiB"/>
+  <policy domain="resource" name="map" value="512MiB"/>
+  <policy domain="resource" name="width" value="16KP"/>
+  <policy domain="resource" name="height" value="16KP"/>
+  <policy domain="resource" name="area" value="128MP"/>
+  <policy domain="resource" name="disk" value="1GiB"/>
+  <policy domain="resource" name="time" value="60"/>
+  <policy domain="resource" name="thread" value="1"/>
+  <policy domain="delegate" rights="none" pattern="*"/>
+  <policy domain="filter" rights="none" pattern="*"/>
+  <policy domain="module" rights="none" pattern="*"/>
+  <policy domain="module" rights="read | write" pattern="{GIF,JPEG,JPG,PNG}"/>
+  <policy domain="path" rights="none" pattern="@*"/>
+  <policy domain="coder" rights="none" pattern="*"/>
+  <policy domain="coder" rights="read | write" pattern="{GIF,JPEG,JPG,PNG}"/>
+  <policy domain="coder" rights="none" pattern="PS"/>
+  <policy domain="coder" rights="none" pattern="PS2"/>
+  <policy domain="coder" rights="none" pattern="PS3"/>
+  <policy domain="coder" rights="none" pattern="EPS"/>
+  <policy domain="coder" rights="none" pattern="EPI"/>
+  <policy domain="coder" rights="none" pattern="EPSF"/>
+  <policy domain="coder" rights="none" pattern="PDF"/>
+  <policy domain="coder" rights="none" pattern="XPS"/>
+  <policy domain="coder" rights="none" pattern="URL"/>
+  <policy domain="coder" rights="none" pattern="HTTP"/>
+  <policy domain="coder" rights="none" pattern="HTTPS"/>
+  <policy domain="coder" rights="none" pattern="FTP"/>
+  <policy domain="coder" rights="none" pattern="MVG"/>
+  <policy domain="coder" rights="none" pattern="MSL"/>
+  <policy domain="coder" rights="none" pattern="TEXT"/>
+  <policy domain="coder" rights="none" pattern="LABEL"/>
+  <policy domain="coder" rights="none" pattern="SVG"/>
+</policymap>

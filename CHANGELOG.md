@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: LaTeXML in the image (branch latex/x1-latexml-image)
+
+- Dockerfile: `ARG INSTALL_LATEXML=false` also installs `bubblewrap` and `util-linux` (the sandbox and `prlimit`; the
+  build fails without them). It installs the distribution's `latexml` (0.8.8) with TeX
+  Live's base and ImageMagick, and replaces ImageMagick's `policy.xml` with a deny-by-default one
+  (PNG, JPEG, GIF only; PS, EPS, PDF, XPS, URL and `@file` denied by name:
+  `src/readablestem/source/imagemagick-policy.xml`). Measured on the pinned base: +270 MB
+  (324.3 MB to 594.4 MB). Off by default; nothing in the app uses it yet. `INSTALL_LATEXML` is
+  declared on `web` in `.railway/railway.ts`; CI builds once with the argument and checks the
+  versions and the policy. Docs: docs/deploy-railway.md, "LaTeXML"; THIRD_PARTY_NOTICES.md.
+  Tests: `tests/test_latexml_image.py`.
 ## Unreleased: sandbox probe (branch latex/x0-sandbox-probe)
 
 - `readablestem ops sandbox-probe`: checks on the running image that the sandbox for uploaded TeX
