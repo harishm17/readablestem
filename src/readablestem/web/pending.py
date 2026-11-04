@@ -1,19 +1,20 @@
 """Large files waiting for the instructor to choose which pages to convert (T3-3).
 
-A PDF over the page or size limit (30 pages, 20 MB) is not turned away. It is kept for a
-while as a `PendingUpload`, and the instructor chooses which pages to convert, in parts that
-each fit (`web.routes.parts`). Nothing is converted, counted or sent anywhere until they do:
-no pages are taken from the daily count when the file is put aside.
+A PDF over the page or size limit (`MAX_PAGES_PER_JOB`, `MAX_UPLOAD_MB`) is not turned away.
+It is kept for a while as a `PendingUpload`, and the instructor chooses which pages to
+convert, in parts that each fit (`web.routes.parts`). Nothing is converted, counted or sent
+anywhere until they do: no pages are taken from the daily count when the file is put aside.
 
 What a pending upload is, and is not:
 
-- It holds the uploaded bytes (up to `MAX_LARGE_UPLOAD_MB`, 30 MB), so it is deleted like every
+- It holds the uploaded bytes (up to `MAX_LARGE_UPLOAD_MB`), so it is deleted like every
   other copy of a document: `retain_until` is `RETENTION_HOURS` after it was made, the
   hourly purge deletes it (`ops.retention.purge_pending`), "Discard" deletes it at once, and
   erasing the person deletes it.
 - It is not a job. It is never queued, never charged to the daily budget, and does not count
   toward the documents a person may keep (`intake.MAX_LIVE_JOBS_PER_USER`); the cap on
-  waiting large files is its own (`MAX_PENDING_PER_USER`, because each can be 30 MB).
+  waiting large files is its own (`MAX_PENDING_PER_USER`, because each can be
+  `MAX_LARGE_UPLOAD_MB`).
 - `done_pages` records which pages were already sent to be converted, so choosing the rest
   later (tomorrow, when the daily pages start again) cannot convert a page twice.
 """
@@ -26,10 +27,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from readablestem.config import Settings
+from readablestem.web import storage
 from readablestem.web.database import as_utc
 from readablestem.web.db import PendingUpload, utcnow
 
-# A large file is up to 30 MB, so only a few wait at once per person.
+# A large file is up to `MAX_LARGE_UPLOAD_MB`, so only a few wait at once per person.
 MAX_PENDING_PER_USER = 2
 
 
@@ -67,7 +69,8 @@ def create(
     image_pages: bool = False,
     now: datetime | None = None,
 ) -> PendingUpload:
-    """Keep a large file for the person to choose its pages. Raises `TooManyPending`."""
+    """Keep a large file for the person to choose its pages. Raises `TooManyPending`, or
+    `storage.StorageRefused` / `storage.StorageFull` (`web.storage`)."""
     moment = now or utcnow()
     waiting = session.scalar(
         select(func.count())
@@ -76,6 +79,7 @@ def create(
     )
     if int(waiting or 0) >= MAX_PENDING_PER_USER:
         raise TooManyPending
+    storage.check_room(session, settings, user_id, len(data), moment)
     row = PendingUpload(
         user_id=user_id,
         filename=filename,
