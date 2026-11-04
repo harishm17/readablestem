@@ -21,6 +21,19 @@
 - New `core/sandbox.py` (the bubblewrap runner the probe tests and a later LaTeX upload uses) and
   `source/latexml.py` (the `latexml` and `latexmlpost` calls). Nothing in the app calls them yet.
   Tests: `tests/test_sandbox.py`, `tests/test_ops_sandbox_probe.py`.
+## Unreleased: landing page and proof strip (branch design/d2-landing)
+
+- Landing page: the hero shows a real passage of the demo (OpenStax Physics 2.3, page 3): the PDF crop
+  and what a screen reader gets from its text layer, beside the converted paragraph with live MathML
+  and the reading `pipeline/speech.py` gives it. `scripts/hero_assets.py` builds the crop, text layer,
+  MathML, reading and a 7.8 KB subset of Latin Modern Math from the stored demo; `tests/test_hero_assets.py`
+  regenerates them and compares. Then Upload, review, post; what you get; the numbers; try it;
+  questions (who can use it, what happens to your documents) and about, in the same wording as before.
+- `web/proof_facts.py` reads PROOF.md once into `proof_facts.json` (regenerate with
+  `uv run python -m readablestem.web.proof_facts`); the landing page and /limits show four tiles from it, each with
+  its count, the set, the date, "blind", where a general chatbot scored the same or higher, and a "How it was
+  measured" link to the PROOF.md section. `tests/test_proof_facts.py` fails when the JSON and PROOF.md differ.
+
 ## Unreleased: design system (branch design/d1-tokens-components)
 
 - Site design tokens and components (`static/tokens.css`, `static/app.css`, `DESIGN.md`,

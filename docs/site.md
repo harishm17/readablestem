@@ -136,3 +136,8 @@ endblock %}`: serif h1 and h2, 18px text in a 68ch column. App screens keep Sour
 headings at 16px. Fonts are self-hosted (`web/static/vendor/README.md`); no page makes an
 outside request. `tests/test_design_tokens.py` checks the contrast of every token pair, the
 14px floor and the font budget.
+
+The landing hero is built by `scripts/hero_assets.py` from `web/static/demo/` (crop, text layer, MathML,
+reading, font subset into `web/static/hero/` and `vendor/fonts/`); the app never runs it and
+`tests/test_hero_assets.py` regenerates and compares. The proof tiles on the landing page and /limits
+come from `web/proof_facts.py` (PROOF.md, parsed once into `proof_facts.json`).

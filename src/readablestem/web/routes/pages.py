@@ -4,8 +4,11 @@ status, and the health check."""
 from __future__ import annotations
 
 import html
+import json
 import re
+import struct
 from datetime import date
+from functools import cache
 from pathlib import Path
 
 from fastapi import APIRouter, Request
@@ -13,7 +16,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
-from readablestem.web import analytics, office_convert, offices, seo, storage
+from readablestem.web import analytics, office_convert, offices, proof_facts, seo, storage
 from readablestem.web.assets import cached_html, static_url
 from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
@@ -30,9 +33,23 @@ STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
 DEMO_PAGE = STATIC_DIR / "demo" / "index.html"
 
 
+@cache
+def _hero() -> dict[str, object]:
+    """The landing hero (scripts/hero_assets.py): the committed crop's size, the PDF's text
+    layer, the page's MathML and the reading, all built from the stored demo."""
+    data = json.loads((STATIC_DIR / "hero" / "hero.json").read_text(encoding="utf-8"))
+    png = (STATIC_DIR / "hero" / "before.png").read_bytes()
+    data["crop_width"], data["crop_height"] = struct.unpack(">II", png[16:24])
+    return data
+
+
 @router.get("/")
 def landing(request: Request) -> Response:
-    return render(request, "landing.html", {"active": "home"})
+    return render(
+        request,
+        "landing.html",
+        {"active": "home", "hero": _hero(), "proof_facts": proof_facts.load()},
+    )
 
 
 @router.get("/style")
@@ -182,6 +199,7 @@ def limits(request: Request) -> Response:
         "office_on": bool(office_convert.input_kinds(settings)),
         # The daily page limit of invited people; the open tier's is in every page's context.
         "invited_page_quota": settings.per_user_daily_page_quota,
+        "proof_facts": proof_facts.load(),
         # What one person may keep stored at once (`web.storage`), by tier.
         "storage_mb": settings.storage_per_user_mb,
         "open_storage_mb": settings.storage_open_tier_mb,
