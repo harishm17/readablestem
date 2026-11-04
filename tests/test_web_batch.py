@@ -512,3 +512,38 @@ def test_a_deleted_document_is_a_deleted_row(web):
     assert delete.status_code in {200, 303}
     text = text_of(web.alice.get(url).text)
     assert "1 deleted" in text
+
+
+def test_a_pdf_between_the_two_limits_in_a_zip_is_kept_for_choosing_its_pages(
+    tmp_path, monkeypatch
+):
+    """The same path as a plain upload of that size: kept (not converted whole), with a link on the
+    batch page, and the other documents of the zip still become jobs."""
+    from readablestem.web.db import PendingUpload
+
+    monkeypatch.setattr(latexml, "installed", lambda: True)
+    monkeypatch.setattr(sandbox, "available", lambda: True)
+    env = WebEnv(
+        tmp_path,
+        feature_batch_zip=True,
+        per_user_daily_page_quota=500,
+        max_pages_per_job=5,
+        max_upload_mb=1,
+        max_large_upload_mb=3,
+        max_source_pages=50,
+    )
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        block = __import__("os").urandom(8192)
+        padded = make_pdf(2) + b"\n%" + block * (1_200_000 // 8192)  # over MAX_UPLOAD_MB
+        assert len(padded) > 1024 * 1024
+        zipped = make_zip({"big.pdf": padded, "ok.pdf": make_pdf(1)})
+        url = batch_url(send_zip(client, zipped, name="b.zip"))
+        html = client.get(url).text
+        assert "Choose pages of big.pdf" in text_of(html)
+        assert 'href="/uploads/' in html
+        assert [j.filename for j in jobs(env)] == ["ok.pdf"]  # never converted whole
+        with session_scope(env.ctx.factory) as session:
+            kept = [p.filename for p in session.scalars(select(PendingUpload))]
+        assert kept == ["big.pdf"]
