@@ -14,10 +14,11 @@ Uploads are untrusted bytes from the internet, so:
 - At most `MAX_CONCURRENT_UPLOADS` uploads are taken in at once, and one per user
   (`UploadGate`). An upload is held in memory while it is read, copied once, and read
   again by the probe child, so each costs about three times its size: with the defaults
-  (20 MB, 3 at once) that stays near 200 MB, well inside the 1 GiB the service was sized for,
-  however many requests arrive at once (the limit was set when Cloud Run sent up to 20 at a
-  time). Over the limit the user gets a short "try again in a moment" page before any of the
-  body is read.
+  (3 at once, up to 100 MB each: `MAX_LARGE_UPLOAD_MB`) that is at most about 900 MB when all
+  three are as large as allowed, and near 100 MB for ordinary 5 to 10 MB files, however many
+  requests arrive at once (the limit was set when Cloud Run sent up to 20 at a time); see
+  docs/deploy-railway.md, "Request size", for the memory to allow. Over the limit the user
+  gets a short "try again in a moment" page before any of the body is read.
 
 Every rejection is an `UploadRejected` with a category `code`, safe to log.
 """

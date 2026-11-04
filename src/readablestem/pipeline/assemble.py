@@ -71,6 +71,7 @@ from readablestem.pipeline import (
     inline_text,
     navigation,
     table_html,
+    table_math,
 )
 from readablestem.pipeline.safe_html import MATHML_ATTRIBUTES as MATHML_ATTRIBUTES
 from readablestem.pipeline.safe_html import MATHML_ELEMENTS as MATHML_ELEMENTS
@@ -1553,6 +1554,7 @@ def render_html(
     for fix in fixes:  # first wins, like DocumentResult.fix_for
         first_fix.setdefault(fix.element_id, fix)
     ordered = _kept_prose(ordered, first_fix)
+    first_fix = table_math.with_cell_readings(ordered, first_fix)  # a table's maths cells
     equations = {e.id: e for e in ordered if e.kind is Kind.EQUATION}
     if math_alttext is None:
         math_alttext = get_settings().mathml_alttext
@@ -1570,7 +1572,9 @@ def render_html(
         mark_pages=len({p for e in ordered for p in (e.page, e.last_page or e.page)}) >= 2,
         footnote_ids=set(footnote_ids),
     )
-    renderer.placed = _placed_equations(ordered, renderer, set(equations))
+    renderer.placed = _placed_equations(ordered, renderer, set(equations)) | (
+        table_math.cell_equation_ids(ordered) & set(equations)  # written in their table's cell
+    )
     body = renderer.fill_backlinks(renderer.render_all(ordered))
     kept_pages = [
         e.page
