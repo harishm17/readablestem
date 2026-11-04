@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -21,6 +22,17 @@ def _script(name: str):
 
 
 run = _script("realworld_run")
+
+
+@pytest.fixture(autouse=True)
+def _restore_environment():
+    """The runner writes the registered settings into os.environ (as it must, for the
+    pipeline it starts); put the environment back after each test so no later test in the
+    same worker sees them (FEATURE_NOTATION_MEMORY leaking turned the courses pages on)."""
+    saved = dict(os.environ)
+    yield
+    os.environ.clear()
+    os.environ.update(saved)
 
 
 def test_the_two_readablestem_arms_differ_only_in_the_new_equation_settings() -> None:
