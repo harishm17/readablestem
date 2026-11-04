@@ -415,6 +415,9 @@ line, the glyphs left and right of the box on its row (within half the box's hei
 nearest first) in the region of `crop_line` too (`_line_clip` is the one rule for that region, so the glyphs
 kept are what the model saw): a reading that goes past the box is compared with them. A turned page, and an
 equation with no glyph under its box (a picture), have none. Display equations keep their own glyphs only.
+With `EQUATION_GLYPH_RECONCILE` the context also says whether the PDF is TeX-made with every non-ASCII
+glyph of the span in a TeX font (`tex`), the equation numbers printed at an edge of the box (`labels`) and
+the capitals drawn in an RSFS or EUSM face (`scr`): `docs/steps.md`, "Corrections from the glyphs".
 
 ### Lists
 

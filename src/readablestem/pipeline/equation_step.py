@@ -1111,7 +1111,10 @@ def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
         return False  # the fallback was the main model: nothing better to ask
     if _band_only(candidate, settings):
         return False
-    disagrees = any(not c.passed and c.code not in SPEECH_CODES for c in candidate.checks)
+    disagrees = any(
+        not c.passed and c.code not in SPEECH_CODES and c.code not in glyph_reconcile.CODES
+        for c in candidate.checks
+    )
     return (
         candidate.confidence < _accept_at(candidate, settings) or not candidate.usable or disagrees
     )
@@ -1128,7 +1131,7 @@ def _band_only(candidate: _Candidate, settings: Settings) -> bool:
         and candidate.usable
         and candidate.output is not None
         and candidate.output.is_equation
-        and all(c.passed for c in candidate.checks)
+        and all(c.passed or c.code in glyph_reconcile.CODES for c in candidate.checks)
     )
 
 

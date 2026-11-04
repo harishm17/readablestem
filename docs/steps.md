@@ -416,6 +416,43 @@ glyphs nothing changes.
 
 Measured by replay on the recorded fresh4 run (docs/eval-equation-glyph-checks.md).
 
+### Corrections from the glyphs (`EQUATION_GLYPH_RECONCILE`, off; needs `EQUATION_GLYPH_CHECKS`)
+
+Five deterministic rules after the model, none of which changes a request (so recorded answers
+replay), in `pipeline/glyph_reconcile.py`. Each fires only when the glyphs leave one answer, keeps
+the reading when in doubt (the checks above then decide), and records what it did: a failed
+warning `equation.pdf_correction` with the code of the rule (a note: the fix stays accepted, review
+"optional", and the review screen says it), and `EquationFix.model_latex`, the model's reading
+before the correction. A corrected reading goes through every check again, so a correction that is
+not the PDF's is still flagged.
+
+- **Symbol** (`glyph_reconciled`). A TeX-made PDF whose span has no unnamed glyph (no U+FFFD,
+  private use or `(cid:N)`) and every non-ASCII glyph in a TeX font (`GlyphContext.tex`, set by
+  `layout.line_glyphs` from the producer and the font names): when the letters and digits differ by
+  one pair from a closed table of lookalikes (Greek for Latin: υ/v, ν/v, ι/i, κ/k, ρ/p, χ/x, ω/w),
+  or the relations differ at one place within a group (≍ ≿ ≈ ∼ ≃ ≅, ≲ ≾, ≼ ⪯), or every
+  `\text{^}` of the reading is a `∧` of the glyphs, the glyphs' symbol is written. The symbol must
+  occur once in the reading. Two differences, an unnamed glyph or a pair outside the table: no change.
+- **Unit past the box** (`unit_dropped`, inline). The box's text ends in a digit, the reading ends in
+  one upright unit (`\text{h}`, `\ \text{m}`, `\,\mathrm{m}`) that the box does not have, and the
+  glyphs have that unit in upright type after a digit where layout's own rule
+  (`glyph_math.trailing_unit`) cuts a formula: the author set it outside the dollar signs, and the
+  line-context reading had put it back.
+- **Slash** (`slash_kept`, inline). The reading is one `\frac{A}{B}` (a sign aside), the box's text has
+  one slash, layout found no fraction bar in the box, and the letters and digits of A and B are those
+  on each side of the slash: it is written `A/B`, with the parentheses the glyphs show.
+- **Equation number** (`number_dropped`, display). The reading ends `, (N)` or `\quad (N)`, or starts
+  `(N) \qquad`, and the glyphs have `(N)` at that edge of the box a font-size-wide gap or more from the
+  rest of its row (`GlyphContext.labels`, `glyph_reconcile.edge_labels`): it is taken out and becomes
+  `Element.equation_label` when that is empty. `f(1)` at the end of a formula has neither the
+  separator nor the gap.
+- **Styles** (no note, like `restyle_bold_italic`). A capital the glyphs draw in an RSFS or EUSM face
+  (`GlyphContext.scr`) is written `\mathscr`, CMSY's stay `\mathcal`; and a table's maths cell
+  gets `restyle_bold_italic` against the PDF cell it stands on (`table_step.restyle_cells`), as the
+  crop path always had: `\bm g` in a cell was `\mathbf{g}`.
+
+Measured in docs/eval-dev-baseline-2026-11-03.md, "Reading push".
+
 ### Edges and faces the reading gets from the text layer (2026-10-21)
 
 Two corrections of the model's LaTeX, applied after `clean_latex`, deterministic, so a recorded answer
