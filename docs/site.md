@@ -124,3 +124,15 @@ repository settings with the source set to GitHub Actions. All links in the site
 so it works under `https://<user>.github.io/<repo>/`. The links to the README, `PROOF.md` and
 the docs point at `main` of `REPO_URL` in `site/build.py`; change it there if the repository
 moves. The site is about 8 MB, most of it the stemcheck report and the stored PDFs.
+
+## Design system (the web app)
+
+`DESIGN.md` records the visual system and `PRODUCT.md` the product facts it serves. The tokens
+are `web/static/tokens.css` (fonts, colour in light and dark, type, space, radius, widths); the
+components are in `web/static/app.css` under "Components". `/style` shows every one in the
+visitor's theme (it is `noindex`, not in the sitemap, and nothing links to it). Pages people read
+(landing, guides, help, offices, privacy, terms, limits) set `{% block body_class %}mode-read{%
+endblock %}`: serif h1 and h2, 18px text in a 68ch column. App screens keep Source Sans 3
+headings at 16px. Fonts are self-hosted (`web/static/vendor/README.md`); no page makes an
+outside request. `tests/test_design_tokens.py` checks the contrast of every token pair, the
+14px floor and the font budget.

@@ -8,6 +8,15 @@ Served from our own origin so the Content-Security-Policy can stay `script-src '
 | `htmx-2.0.11.min.js` | `htmx.org` (npm) | 2.0.11 | 0BSD (Zero-Clause BSD) | `https://registry.npmjs.org/htmx.org/-/htmx.org-2.0.11.tgz`, file `package/dist/htmx.min.js` |
 | `fonts/latinmodern-math-1.959.woff2` | Latin Modern Math, the same font repackaged as WOFF2 (see below) | 1.959 (2014-09-05) | GUST Font License (an instance of the LPPL 1.3c) | made from `fonts/latinmodern-math.otf` |
 | `fonts/latinmodern-math.otf` | Latin Modern Math (GUST e-foundry) | 1.959 (2014-09-05) | GUST Font License (an instance of the LPPL 1.3c) | `https://mirrors.ctan.org/fonts/lm-math.zip`, file `lm-math/opentype/latinmodern-math.otf` |
+| `fonts/source-sans-3-5.3.1-{latin,greek}-{400,700}.woff2` | Source Sans 3 (Adobe), from `@fontsource/source-sans-3` | 5.3.1 (Fontsource), upstream v20 | SIL Open Font License 1.1 (`fonts/OFL-source-sans-3.txt`) | `https://registry.npmjs.org/@fontsource/source-sans-3/-/source-sans-3-5.3.1.tgz`, `files/source-sans-3-{latin,greek}-{400,700}-normal.woff2`, renamed |
+| `fonts/source-serif-4-5.3.1-{latin,greek}-600.woff2` | Source Serif 4 (Adobe), from `@fontsource/source-serif-4` | 5.3.1 (Fontsource), upstream v15 | SIL Open Font License 1.1 (`fonts/OFL-source-serif-4.txt`) | `https://registry.npmjs.org/@fontsource/source-serif-4/-/source-serif-4-5.3.1.tgz`, `files/source-serif-4-{latin,greek}-600-normal.woff2`, renamed |
+| `fonts/source-code-pro-5.3.1-latin-400.woff2` | Source Code Pro (Adobe), from `@fontsource/source-code-pro` | 5.3.1 (Fontsource), upstream v32 | SIL Open Font License 1.1 (`fonts/OFL-source-code-pro.txt`) | `https://registry.npmjs.org/@fontsource/source-code-pro/-/source-code-pro-5.3.1.tgz`, `files/source-code-pro-latin-400-normal.woff2`, renamed |
+
+The Source fonts are the Fontsource woff2 files as published (latin and greek subsets, not
+modified; the Greek files are only fetched by a page that has Greek letters, through
+`unicode-range` in `tokens.css`). They are one download each, under 22 KB, and a typical page
+loads about 59 KB of fonts. `tests/test_design_tokens.py` keeps the set under 120 KB. The
+Reserved Font Name clause of the OFL does not apply to unmodified files.
 
 Integrity (checked by `tests/test_web_pages.py`):
 
