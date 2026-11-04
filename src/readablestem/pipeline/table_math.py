@@ -176,6 +176,7 @@ def settle(elements: list[Element], fixes: dict[str, Fix]) -> tuple[list[Element
                     "checks": [*fix.checks, check],
                 }
             )
+    out_fixes = adopt(elements, out_fixes)
     if not drop:
         return elements, out_fixes
     kept = without_cell_equations_of(elements, drop)
@@ -204,3 +205,40 @@ def without_cell_equations_of(elements: list[Element], ids: set[str]) -> list[El
             )
         out.append(element)
     return out
+
+
+def equation_id_of(cell: TableCell, local: TableGrid) -> str | None:
+    """The id of the one equation behind the table step's `cell`, or None (no equation, or the
+    cell spans several local cells with maths in more than one)."""
+    owner = table_step._owners(local)
+    behind = [local.cells[i] for i in table_step._counterparts(cell, owner)]
+    ids = [c.equation_id for c in behind if c.equation_id]
+    if len(ids) != 1 or len([c for c in behind if c.text.strip()]) != 1:
+        return None
+    return ids[0]
+
+
+def tie_of(elements: Iterable[Element], equation_id: str) -> tuple[Element, TableCell] | None:
+    """The table element and its local cell that name `equation_id`, or None."""
+    for element in elements:
+        if element.kind is Kind.TABLE and element.table is not None:
+            for cell in element.table.cells:
+                if cell.equation_id == equation_id:
+                    return element, cell
+    return None
+
+
+def cell_for(grid: TableGrid, local: TableGrid, local_cell: TableCell) -> TableCell | None:
+    """The table step's cell that stands where the local `local_cell` does (and only there)."""
+    owner = table_step._owners(local)
+    for cell in grid.cells:
+        behind = table_step._counterparts(cell, owner)
+        if len(behind) == 1 and local.cells[behind[0]] is local_cell:
+            return cell
+    return None
+
+
+def adopt(elements: list[Element], fixes: dict[str, Fix]) -> dict[str, Fix]:
+    """`fixes` with each rebuilt table's stored cells holding their equations' readings, so the
+    review screen, an edit and the page all start from the same cell."""
+    return with_cell_readings(elements, fixes)
