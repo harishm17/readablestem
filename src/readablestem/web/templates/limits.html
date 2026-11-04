@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block body_class %}mode-read{% endblock %}
 {% block title %}Known limits{% endblock %}
 {% block description %}What ReadableSTEM does not do yet, and how accurate it is: the pages, equations, tables and figures it handles poorly, and the limits on uploads.{% endblock %}
 {% block content %}
@@ -96,6 +97,7 @@
 </ul>
 
 <h2 id="accuracy">How accurate it is</h2>
+{% include "_proof_strip.html" %}
 <p>In a pre-registered test on 15 sections of five OpenStax textbooks it had not seen
   (version 0.4.0, October 2026; <a href="{{ source_url }}/blob/main/PROOF.md">full results</a>):</p>
 <ul>

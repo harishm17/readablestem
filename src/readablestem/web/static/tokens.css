@@ -1,0 +1,193 @@
+/* ReadableSTEM design tokens: fonts, colour, type, space, radius, widths.
+   Shared by the web app (app.css), the error pages and the static showcase (site/), so a
+   change here reaches every page. The system is written up in DESIGN.md.
+
+   - Fonts are self-hosted (static/vendor/fonts, SIL Open Font License; see vendor/README.md):
+     Source Sans 3 for text and for headings on app screens, Source Serif 4 600 for headings
+     on pages people read (landing, guides, help, offices, privacy). No outside requests.
+   - Every text colour is at least 7:1 on the surface it is used on, in light and in dark.
+     Non-text borders on controls are at least 3:1.
+   - Light and dark follow the visitor's setting (prefers-color-scheme); there is no toggle.
+   - Nothing is smaller than 0.875rem (14px). Sizes are in rem so zoom and text-only zoom work. */
+
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("/static/vendor/fonts/source-sans-3-5.3.1-latin-400.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("/static/vendor/fonts/source-sans-3-5.3.1-latin-700.woff2") format("woff2");
+  font-weight: 700; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* Greek (θ, α, Δ) is only fetched when a page has it. */
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("/static/vendor/fonts/source-sans-3-5.3.1-greek-400.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF, U+1F00-1FFF;
+}
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("/static/vendor/fonts/source-sans-3-5.3.1-greek-700.woff2") format("woff2");
+  font-weight: 700; font-style: normal; font-display: swap;
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF, U+1F00-1FFF;
+}
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("/static/vendor/fonts/source-serif-4-5.3.1-latin-600.woff2") format("woff2");
+  font-weight: 600; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("/static/vendor/fonts/source-serif-4-5.3.1-greek-600.woff2") format("woff2");
+  font-weight: 600; font-style: normal; font-display: swap;
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF, U+1F00-1FFF;
+}
+@font-face {
+  font-family: "Source Code Pro";
+  src: url("/static/vendor/fonts/source-code-pro-5.3.1-latin-400.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+
+  --font-sans: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono: "Source Code Pro", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-math: "Latin Modern Math", "STIX Two Math", "Cambria Math", math;
+
+  /* Type scale. step--1 is the floor. */
+  --step--1: 0.875rem;
+  --step-0: 1rem;
+  --step-1: 1.125rem;
+  --step-2: 1.375rem;
+  --step-3: 1.75rem;
+  --step-4: clamp(2rem, 1.6rem + 1.6vw, 2.75rem);
+  --step-5: clamp(2.25rem, 1.7rem + 2.4vw, 3.5rem);
+  --lh-body: 1.6;
+  --lh-ui: 1.4;
+  --lh-head: 1.2;
+  --lh-display: 1.1;
+
+  /* Spacing, a 4px grid. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --space-9: 6rem;
+
+  /* Radius: 4 on controls, tags and code; 8 on framed containers; 0 on full-width bands. No pills. */
+  --radius-control: 4px;
+  --radius-frame: 8px;
+
+  --page-max: 75rem;
+  --review-max: 90rem;
+  --prose-max: 68ch;
+
+  /* Colour, light. */
+  --bg: #ffffff;
+  --surface: #f5f6f8;
+  --surface-2: #eef1f5;
+  --ink: #16181d;
+  --ink-muted: #474c55;
+  --border-control: #767b85;
+  --border-subtle: #d5d9e0;
+  --accent: #1c46ad;
+  --accent-hover: #16388a;
+  --accent-tint: #e8eefb;
+  --on-accent: #ffffff;
+  --visited: #5b2b8c;
+  --focus-outline: #0b3d91;
+  --focus-halo: #ffd33d;
+
+  /* Status: always shown with words. Text colour on its tint is at least 7:1. */
+  --ok: #155a36;
+  --ok-tint: #e6f4ea;
+  --warn: #7a4100;
+  --warn-tint: #fff4e0;
+  --err: #9b1c1c;
+  --err-tint: #fdeceb;
+  --err-strong: #7d1013;
+
+  /* Review marks used in the interface (steps, pills, legend). The marks drawn on the page
+     image use the fixed --pmark-* below, because that image stays white in every theme. */
+  --mark-required: var(--warn);
+  --mark-optional: #3f4c66;
+  --mark-accepted: var(--ok);
+  --mark-current: var(--accent);
+  --on-mark: #ffffff;
+  --desk: #e7e9ee;
+
+  /* Documents drawn as pictures stay white "paper" in dark mode. */
+  --paper: #ffffff;
+  --paper-ink: #16181d;
+  --pmark-required: #7a4b00;
+  --pmark-optional: #4b5a75;
+  --pmark-accepted: #1d6b35;
+  --pmark-current: #1a4fa0;
+  --tint-required: #fdf3e1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --surface: #171a20;
+    --surface-2: #1e222a;
+    --ink: #e9ebef;
+    --ink-muted: #b4bac4;
+    --border-control: #7d8491;
+    --border-subtle: #343944;
+    --accent: #8ab4ff;
+    --accent-hover: #a8c4ff;
+    --accent-tint: #1a2540;
+    --on-accent: #0f1115;
+    --visited: #c9a7f0;
+    --focus-outline: #ffd33d;
+    --focus-halo: #0f1115;
+
+    --ok: #7fd69b;
+    --ok-tint: #12261a;
+    --warn: #ffc46b;
+    --warn-tint: #2a2010;
+    --err: #ff9a92;
+    --err-tint: #2c1515;
+    --err-strong: #ffb8b2;
+
+    --mark-optional: #aab6cc;
+    --on-mark: #0f1115;
+    --desk: #1e222a;
+    --tint-required: #2a2010;
+  }
+}
+
+/* Anything drawn as a picture of a paper document, or shown on white beside it, keeps the
+   light tokens whatever the theme. */
+.paper, .page-frame, .cmp-row, .cmp-none, .table-view {
+  --ink: #16181d;
+  --ink-muted: #474c55;
+  --border-control: #767b85;
+  --border-subtle: #d5d9e0;
+  --accent: #1c46ad;
+  --accent-hover: #16388a;
+  --focus-outline: #0b3d91;
+  --focus-halo: #ffd33d;
+  --err: #9b1c1c;
+  --bg: #ffffff;
+  background: var(--paper);
+  color: var(--paper-ink);
+}
+
+/* Windows high contrast and other forced-colour modes: system colours only. Box shadows
+   (the focus halo) are dropped by the browser, so the outline carries the focus alone. */
+@media (forced-colors: active) {
+  :focus-visible { outline: 3px solid Highlight; box-shadow: none; }
+}

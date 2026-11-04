@@ -50,6 +50,30 @@
   declared on `web` in `.railway/railway.ts`; CI builds once with the argument and checks the
   versions and the policy. Docs: docs/deploy-railway.md, "LaTeXML"; THIRD_PARTY_NOTICES.md.
   Tests: `tests/test_latexml_image.py`.
+## Unreleased: landing page and proof strip (branch design/d2-landing)
+
+- Landing page: the hero shows a real passage of the demo (OpenStax Physics 2.3, page 3): the PDF crop
+  and what a screen reader gets from its text layer, beside the converted paragraph with live MathML
+  and the reading `pipeline/speech.py` gives it. `scripts/hero_assets.py` builds the crop, text layer,
+  MathML, reading and a 7.8 KB subset of Latin Modern Math from the stored demo; `tests/test_hero_assets.py`
+  regenerates them and compares. Then Upload, review, post; what you get; the numbers; try it;
+  questions (who can use it, what happens to your documents) and about, in the same wording as before.
+- `web/proof_facts.py` reads PROOF.md once into `proof_facts.json` (regenerate with
+  `uv run python -m readablestem.web.proof_facts`); the landing page and /limits show four tiles from it, each with
+  its count, the set, the date, "blind", where a general chatbot scored the same or higher, and a "How it was
+  measured" link to the PROOF.md section. `tests/test_proof_facts.py` fails when the JSON and PROOF.md differ.
+
+## Unreleased: design system (branch design/d1-tokens-components)
+
+- Site design tokens and components (`static/tokens.css`, `static/app.css`, `DESIGN.md`,
+  `PRODUCT.md`): self-hosted Source Sans 3, Source Serif 4 and Source Code Pro, one accent
+  (`#1c46ad`), all text at least 7:1 in light and in dark (follows the browser's setting),
+  nothing under 14px, a 4px grid, 4px and 8px radii (no pills), a 75rem page and a 68ch reading
+  column on pages people read. The header has a Sign in button and folds into a Menu disclosure on
+  a narrow screen; the footer is four columns (Product, Trust, Guides, Source) with the same
+  links as before. Forced-colours and reduced-motion rules cover the new components. The app's
+  side-stripe notices and cards became full borders. `/style` (noindex, not in the sitemap) shows
+  every component. Docs: `docs/site.md` "Design system", `static/vendor/README.md`.
 ## Unreleased: higher upload limits (branch limits/raise-upload-limits)
 
 - The limits now fit together. Before, a new account could convert 20 pages a day while one upload

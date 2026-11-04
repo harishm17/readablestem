@@ -701,3 +701,17 @@
     }
   });
 })();
+
+/* The main navigation is a <details> ("Menu"), closed in the markup. A wide screen shows the
+ * links whatever its state (CSS ::details-content); this opens it there for a browser that does
+ * not support that, and closes it again when the window narrows (the Menu button is hidden on a
+ * wide screen). */
+(function () {
+  "use strict";
+  var menu = document.querySelector(".nav-menu");
+  if (!menu || !window.matchMedia) return;
+  var narrow = window.matchMedia("(max-width: 39.99rem)");
+  function sync() { menu.open = !narrow.matches; }
+  sync();
+  if (narrow.addEventListener) narrow.addEventListener("change", sync);
+})();
