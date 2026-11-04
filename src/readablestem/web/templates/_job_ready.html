@@ -9,7 +9,7 @@
   <ul class="actions">
     <li><a class="button" href="/jobs/{{ job.id }}/download">Download the HTML file</a></li>
     <li><a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a></li>
-    {% if not job.is_sample %}<li><a href="/app?revises={{ job.id }}#upload-heading" data-role="revise">Upload a revised version</a></li>{% endif %}
+    {% if not job.is_sample and job.is_owner %}<li><a href="/app?revises={{ job.id }}#upload-heading" data-role="revise">Upload a revised version</a></li>{% endif %}
   </ul>
   {# Word and EPUB (routes/exports.py): plain links to GET routes, so they work without
      JavaScript. Word needs pandoc on the server (`word_export`). #}
@@ -42,7 +42,7 @@
     <a href="/help/posting#cartridge">see the steps</a>.</p>
   {# T3-3: one file from the finished parts of a long source (GET /jobs/{id}/combine,
      web/combine.py). Only on a part, and only when two or more finished parts are kept. #}
-  {% if job.part_label and job.combinable > 1 %}
+  {% if job.part_label and job.combinable > 1 and job.is_owner %}
   <p class="canvas-download"><a href="/jobs/{{ job.id }}/combine">Combine parts</a> into one
     HTML file: the {{ job.combinable }} finished parts of this file that you still have,
     in page order. A part you deleted, or one that is not finished or still has a decision
@@ -56,7 +56,7 @@
     {% if pg.finish.notes %}
     <li>{{ pg.finish.notes }} {{ "item was" if pg.finish.notes == 1 else "items were" }}
       accepted for you with a note. Looking at {{ "it" if pg.finish.notes == 1 else "them" }}
-      is optional: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>.</li>
+      is optional{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>{% endif %}.</li>
     {% endif %}
     {% if pg.finish.not_handled %}
     <li>Some things are not handled in this file: see
