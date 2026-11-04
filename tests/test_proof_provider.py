@@ -106,6 +106,12 @@ def test_identity_of_an_openai_recording_is_what_it_always_was(monkeypatch):
     identity = runner.code_identity(settings)["settings"]
     assert set(identity) == set(runner.IDENTITY_SETTINGS)
     assert identity["main_model"] == "gpt-6.1-sol"
+    # The recordings name a 30-page limit; the production default is 100 (2026-11-03) and
+    # neither it nor MAX_PAGES_PER_JOB in the environment may change what a replay is.
+    assert identity["max_pages_per_job"] == 30
+    monkeypatch.setenv("MAX_PAGES_PER_JOB", "250")
+    assert runner.proof_settings().max_pages_per_job == 30
+    assert runner.proof_settings("anthropic").max_pages_per_job == 30
     # An old recording has no provider in it and means OpenAI.
     assert runner.recorded_settings(identity).model_provider == "openai"
     assert runner.check_identity({"settings": identity, **_same(settings)}, _full(settings)) == []

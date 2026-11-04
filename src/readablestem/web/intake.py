@@ -28,7 +28,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import Settings
-from readablestem.web import access, retention
+from readablestem.web import access, retention, storage
 from readablestem.web.database import utc_today
 from readablestem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 from readablestem.web.quota import pages_left, try_consume_pages
@@ -102,7 +102,8 @@ def store_job(
 ) -> str:
     """Count the pages against today's quota and queue the job, in one transaction.
 
-    Raises `TooManyJobs` ("too_many_active", "too_many_stored") or `QuotaRefused`; nothing
+    Raises `TooManyJobs` ("too_many_active", "too_many_stored"), `QuotaRefused`,
+    `storage.StorageRefused` or `storage.StorageFull`; nothing
     is changed then. `part_group` and `part_label` say that the file is one part of a larger
     one converted in parts (`web.routes.parts`)."""
     now = now or utcnow()  # the caller's clock (the upload route's; tests move it)
@@ -113,6 +114,9 @@ def store_job(
             raise TooManyJobs("too_many_active")
         if live_job_count(session, user_id, now) >= MAX_LIVE_JOBS_PER_USER:
             raise TooManyJobs("too_many_stored")
+        # Before the pages are counted too, in this transaction with the person's row locked:
+        # `StorageRefused` (their own cap) or `StorageFull` (the service's), `web.storage`.
+        storage.check_room(session, settings, user_id, len(data), now)
         quota = access.page_quota(settings, tier)
         if not try_consume_pages(session, user_id, pages, quota=quota, day=utc_today(now)):
             left = pages_left(session, user_id, quota=quota, day=utc_today(now))

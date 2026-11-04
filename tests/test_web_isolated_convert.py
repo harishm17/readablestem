@@ -953,3 +953,48 @@ def test_steps_that_finished_before_a_configuration_error_are_kept_for_the_next_
         wrapper.release.set()
     assert wrapper.asked > 2
     assert len(stored) >= 2  # what was answered (and paid for) before the error is kept
+
+
+# --------------------------------------------------------------------------- a full-size job
+
+
+def test_a_full_size_document_converts_inside_the_default_memory_cap_time_and_job_caps():
+    """100 pages (`MAX_PAGES_PER_JOB`), as dense as the repository's own fixtures, converted in
+    the child under the default address-space cap, with the call and dollar caps a job of that
+    size really gets (`job_caps`): no budget stop, every page done, well inside the job's time
+    limit. Measured 2026-11-03 on one CPU: 31 s, 494 MB resident, 652 calls (docs/web.md)."""
+    import time
+
+    import pymupdf
+
+    from readablestem.web.worker import job_caps, job_time_limit_s
+
+    fixtures = LECTURE_NOTES.parent
+    sources = [pymupdf.open(fixtures / n) for n in ("lecture_notes.pdf", "worked_example.pdf")]
+    doc = pymupdf.open()
+    cursor = 0
+    while doc.page_count < 100:
+        src = sources[cursor % 2]
+        page = (cursor // 2) % src.page_count
+        doc.insert_pdf(src, from_page=page, to_page=page)
+        cursor += 1
+    pdf = doc.tobytes()
+    settings = offline_settings()
+    assert settings.max_pages_per_job == 100 and settings.conversion_memory_mb == 3072
+    usd, calls = job_caps(settings, 100)
+    budget = JobBudget(guard=InMemorySpendGuard(100.0), max_usd=usd, max_calls=calls)
+    client = make_vision_client(settings, budget, fake=True)
+    seen: list[tuple[int, int]] = []
+    started = time.perf_counter()
+    out = convert_isolated(
+        pdf,
+        settings=settings,
+        client=client,
+        limit_s=job_time_limit_s(100, settings),
+        progress=lambda done, total: seen.append((done, total)),
+    )
+    elapsed = time.perf_counter() - started
+    assert out.result.stopped_by is None
+    assert seen and seen[-1] == (100, 100)
+    assert out.result.stats.model_calls > 0
+    assert elapsed < job_time_limit_s(100, settings) / 10

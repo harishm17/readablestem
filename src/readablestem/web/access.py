@@ -67,6 +67,11 @@ def page_quota(settings: Settings, tier: str) -> int | None:
     )
 
 
+def storage_limit_mb(settings: Settings, tier: str) -> int:
+    """Megabytes a person of `tier` may keep stored (`web.storage`)."""
+    return settings.storage_open_tier_mb if is_open(tier) else settings.storage_per_user_mb
+
+
 def reread_allowance(settings: Settings, tier: str) -> int | None:
     """Review re-reads per UTC day for `tier`; None: no allowance beyond the rate limits
     (the invited tier)."""
