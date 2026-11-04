@@ -381,7 +381,11 @@ def d_criteria(d: dict) -> list[tuple[str, bool | None, str]]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--control-tag", default="control", help="a trial run's folder")
+    parser.add_argument("--candidate-tag", default="candidate", help="a trial run's folder")
     args = parser.parse_args()
+    ARMS["Control"] = ("rs", args.control_tag)
+    ARMS[CANDIDATE] = ("rs", args.candidate_tag)
     gold, items, _ = load()
     unit_part = {i["id"]: part for label in ARMS for part in STRATUM for i in items[label][part]}
     result: dict = {"arms": {}, "paired": [], "stratum_d": {}}

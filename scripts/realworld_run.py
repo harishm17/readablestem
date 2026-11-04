@@ -472,6 +472,8 @@ def cmd_chat_fresh5(args: argparse.Namespace) -> int:
         if unknown:
             raise SystemExit(f"not units of fresh5: {unknown}")
         pdfs = {uid: path for uid, path in pdfs.items() if uid in wanted}
+    if args.dry:
+        return chat_dry(arm, pdfs)
     out = runs_dir("fresh5") / "chat" / "systems"
     before = chatbot.recorded_cost(out, [arm.id])
     remaining = round(args.max_usd - before, 6)
@@ -514,6 +516,30 @@ def cmd_chat_fresh5(args: argparse.Namespace) -> int:
     recorded = {run for run in S.load_arms_dir(out).get(arm.id, {})}
     if not args.units and not summary["refused_by_cap"] and set(pdfs) <= recorded:
         (runs_dir("fresh5") / f"{arm.id}.recorded").write_text(dt.date.today().isoformat())
+    return 0
+
+
+def chat_dry(arm: chatbot.ChatArm, pdfs: dict[str, Path]) -> int:
+    """A trial that spends nothing: each unit's message is built as the arm sends it (the PDF,
+    a PNG of every page, the prompt) and its input tokens are counted by the provider's free
+    counting endpoint; no model is asked and nothing is recorded."""
+    client = chatbot.make_client(arm.provider)
+    price = None
+    total_in = 0
+    worst = 0.0
+    for uid, pdf in pdfs.items():
+        pngs = chatbot.page_pngs(pdf)
+        job = chatbot.Job(arm, uid, 1, pdf)
+        _, counted, reserve = chatbot._prepare(job, pngs, client)
+        price = chatbot.pricing.price_for(arm.model).for_prompt(counted)
+        total_in += counted
+        worst += reserve
+        print(f"{uid}: {len(pngs)} pages, {counted} input tokens, worst case ${reserve:.3f}")
+    if price is not None:
+        print(
+            f"{arm.id}: {len(pdfs)} units, {total_in} input tokens "
+            f"(${total_in * price.input / 1e6:.3f} of input), worst case ${worst:.2f}"
+        )
     return 0
 
 
@@ -703,6 +729,10 @@ def main() -> int:
             p.add_argument("--papers", help="comma-separated arXiv ids (default: all of the part)")
             p.add_argument("--first", type=int, help="the first N papers of the registered order")
             p.add_argument("--units", help="fresh5: comma-separated unit ids (a trial run)")
+            p.add_argument(
+                "--dry", action="store_true",
+                help="fresh5: build each message and count its tokens (free); ask nothing",
+            )  # fmt: skip
             p.add_argument("--note", default="")
         p.set_defaults(func=func)
     args = parser.parse_args()
