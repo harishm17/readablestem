@@ -265,6 +265,18 @@ class Settings(BaseSettings):
     office_timeout_s: float = Field(default=90.0, gt=0, le=300)
     # Uploads taken in at once per instance (one per user); see web/uploads.py.
     max_concurrent_uploads: int = Field(default=3, gt=0)
+    # Stored bytes (web/storage.py): uploads live in Postgres on a volume of fixed size (5000 MB,
+    # .railway/railway.ts), and with 50 and 100 MB uploads one person could fill it. Per person,
+    # by tier: everything they have stored (sources, crops, results, kept large files); a new
+    # upload that would pass it is refused. Open sign-up makes 100 accounts a day, so the open
+    # tier is smaller.
+    storage_per_user_mb: int = Field(default=300, gt=0)
+    storage_open_tier_mb: int = Field(default=150, gt=0)
+    # Stored upload bytes of everybody: over it new uploads are refused until the hourly purge
+    # has caught up. 2000 and not more: the daily backup restores the dump into a second
+    # database on the same volume (`restore_check`), so the volume holds about twice the data
+    # while it runs; 2000 MB of uploads twice over, plus overhead, stays inside 5000 MB.
+    storage_global_max_mb: int = Field(default=2000, gt=0)
 
     # --- storage and retention
     database_url: str = "sqlite:///.local/readablestem.db"

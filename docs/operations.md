@@ -72,14 +72,43 @@ to about a week after the purge (deploy-railway.md, "As deployed"); the privacy 
 
 ### How much the uploads weigh
 
-An upload is stored in the database as bytes until its job is deleted: up to `MAX_UPLOAD_MB` (50)
-for a document and up to `MAX_LARGE_UPLOAD_MB` (100) for a large file waiting for its pages (2 a
-person), which were 20 and 30 before 2026-11-03. Ordinary course PDFs are 1 to 10 MB, so the
-database stays small; the worst case for one person is 2.2 GB (40 kept documents and 2 waiting
-files, all at the limit), and every daily backup copies what is stored that day. After the limits
-were raised, look at the size of the Postgres volume and of the `backup` volume in Railway's
-Metrics during the first weeks (docs/deploy-railway.md, "Backups"), and lower the limits or add
-a per-person byte cap if they grow faster than the retention frees them.
+An upload is stored in Postgres as bytes until its job is deleted: up to `MAX_UPLOAD_MB` (50) for
+a document and up to `MAX_LARGE_UPLOAD_MB` (100) for a large file waiting for its pages (2 a
+person), which were 20 and 30 before 2026-11-03. The database is on a 5000 MB volume
+(`.railway/railway.ts`, `postgresVolume`), so two caps keep it from filling (`web/storage.py`):
+
+- **Per person**: `STORAGE_PER_USER_MB` (300) for invited people, `STORAGE_OPEN_TIER_MB` (150) for
+  accounts made by open sign-up. It counts everything of theirs that is not past its deletion
+  time: source PDFs, crops, the HTML and result, and kept large files. A new upload that would
+  go over is refused with "You are storing N MB of the M MB you can keep" and the advice to delete
+  documents; no pages are taken. Open sign-up makes up to 100 accounts a day, so the person cap
+  alone is not enough (100 x 150 MB is 15 GB): the global one is the bound.
+- **Whole service**: `STORAGE_GLOBAL_MAX_MB` (2000) of stored upload bytes. Over it new
+  uploads get a 503 page ("Uploads are paused while storage catches up", logged as
+  `upload_rejected code=storage_full`) and `/healthz/ops` answers 503 with `"stale": ["storage"]`
+  and `"storage": {"stored_mb", "limit_mb", "full"}`, which the GitHub uptime job reads. Why
+  2000 and not 60% of the volume: the daily backup restores its dump into a second database on
+  the same volume (`restore_check`), so the volume holds about twice the data for those minutes.
+  Raise it only with the volume (`allowOnlineResize` is on), and set the three variables in the
+  Railway `web` service (declared in `webOnlyVariables`).
+
+**How retention frees space, and how fast.** A document stops counting at its `retain_until`
+(`RETENTION_HOURS` after the person last worked on it, 24 by default), before the purge runs,
+so uploads resume as soon as enough documents pass their time, not at the next purge. The
+hourly cron (minute 7) then deletes the rows (`blobs`, `pending_uploads`, `jobs`: the large
+bytes are in `blobs.content` and `pending_uploads.content`, deleted with their rows, and
+Postgres deletes their TOAST rows with them), and when it deleted anything it runs a plain
+`VACUUM` of those three tables (`ops.retention.vacuum_after_purge`, log `vacuum_done`). That
+makes the space reusable by new uploads at once, instead of after autovacuum's 20% of dead
+rows, and returns empty pages at the end of a file to the volume. It does not shrink the
+files: **the volume's usage in Railway's Metrics stays near its high-water mark**, which the
+global cap keeps bounded; the live data is what the cap counts. If the Metrics number keeps
+rising while the stored total is flat, that is bloat: run `VACUUM FULL blobs` in a quiet hour
+(it locks the table for its length and needs room for a copy), or `pg_repack`. After a burst
+the stored total falls by what was uploaded 24 hours earlier, an hour at a time. A person can
+free their own space at once by deleting documents ("Delete" on My documents).
+
+Every daily backup copies what is stored that day, so look at the `backup` volume too.
 
 ### Large files waiting for their pages
 

@@ -27,6 +27,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from readablestem.config import Settings
+from readablestem.web import storage
 from readablestem.web.database import as_utc
 from readablestem.web.db import PendingUpload, utcnow
 
@@ -68,7 +69,8 @@ def create(
     image_pages: bool = False,
     now: datetime | None = None,
 ) -> PendingUpload:
-    """Keep a large file for the person to choose its pages. Raises `TooManyPending`."""
+    """Keep a large file for the person to choose its pages. Raises `TooManyPending`, or
+    `storage.StorageRefused` / `storage.StorageFull` (`web.storage`)."""
     moment = now or utcnow()
     waiting = session.scalar(
         select(func.count())
@@ -77,6 +79,7 @@ def create(
     )
     if int(waiting or 0) >= MAX_PENDING_PER_USER:
         raise TooManyPending
+    storage.check_room(session, settings, user_id, len(data), moment)
     row = PendingUpload(
         user_id=user_id,
         filename=filename,

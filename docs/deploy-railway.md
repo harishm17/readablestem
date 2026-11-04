@@ -152,6 +152,7 @@ production if a required one is missing, and logs the reason):
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft sign-in. All three or none. | Next section: "Microsoft sign-in on Railway". |
 | `OPEN_TIER_DAILY_PAGE_QUOTA` | Pages a day for an account that signed itself up. Invited people keep `PER_USER_DAILY_PAGE_QUOTA` (300). | **`150`** (one full-size 100-page document and some handouts a day; the default). |
 | `OPEN_TIER_DAILY_REREADS` | Model reads from the review screen (a marked equation, a table cell) a day for such an account. Each costs model spend that no page count bounds. | **`30`** (the default). |
+| `STORAGE_PER_USER_MB`, `STORAGE_OPEN_TIER_MB`, `STORAGE_GLOBAL_MAX_MB` | Stored-bytes caps (docs/operations.md, "How much the uploads weigh"): per invited person, per open-tier person, and for all uploads together. The database volume is 5000 MB and the nightly backup check restores a second copy on it. | Leave unset: the defaults are **300**, **150** and **2000**. |
 | `MAX_NEW_ACCOUNTS_PER_DAY` | Accounts open sign-up may make per UTC day, for the whole service. When it is used up, new sign-ins get "Sign-ups are full for today"; people with accounts are not affected. `0` pauses sign-up. | **`100`** (the default). |
 | `OPEN_TIER_DAILY_SPEND_CAP_USD` | The part of `DAILY_SPEND_CAP_USD` that documents of such accounts may use together; invited people are not held back when it is spent. It is inside the daily cap, not added to it. | **`4`** (the default; $4 of the $10 day, so strangers can never take the instructors' whole budget). |
 | `SOURCE_URL` | The footer's link to the source (AGPL). The default is the public repository, `https://github.com/harishm17/readablestem`, which has to exist before the first sign-in. | Leave unset, or set it to the deployed commit's URL. |
@@ -427,7 +428,7 @@ web process plus a child of about 0.3-0.5 GB resident. Recommendation:
 converts); with `INSTALL_MATH_READER=true` and the reader enabled, a child that has loaded it holds
 about 1.1 GB resident (measured, 74 crops), so allow 2 GB there too. Railway bills memory by use, not by what is allowed, so a higher allowance costs nothing
 until it is used. Railway's Hobby plan lists up to 48 GB per service in its pricing page;
-a service memory limit is a setting only if you want to cap it (Settings > Resource limits, **confirm**).
+a service memory limit is a setting only if you want to cap it (Settings > Resource limits, **confirm**). `.railway/railway.ts` configures no memory limit for `web` (nor CPU), so there is none to raise: leave it unset, or if you set one, set **2 GB** for `web` (three 100 MB uploads in memory at once are about 900 MB, plus the 0.5 to 0.9 GB of a conversion).
 Watch the Metrics tab during the first real conversions and the first 500-page upload.
 
 **CPU.** One vCPU is enough (deploy.md: about 20 CPU-seconds for a 30-page document, about 25 for 100 pages and 35 for 100 pages with 51 MB of pictures, measured 2026-11-03 on one CPU with fake models: 31 s and 44 s of wall time). Replicas: 1.

@@ -71,6 +71,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `DEV_LOGIN_ENABLED` | Enables `/dev-login` (only with `ENV=dev` or `test`) |
 | `DAILY_SPEND_CAP_USD` | Global model spend per UTC day (`spend_days`) |
 | `PER_USER_DAILY_PAGE_QUOTA` | Pages per invited user per UTC day (`quota_days`); open-tier accounts have `OPEN_TIER_DAILY_PAGE_QUOTA` instead |
+| `STORAGE_PER_USER_MB` (300), `STORAGE_OPEN_TIER_MB` (150), `STORAGE_GLOBAL_MAX_MB` (2000) | Stored-bytes caps (`web/storage.py`, docs/operations.md "How much the uploads weigh"): per person by tier, counted with the quota checks in the job's own transaction, and for the whole service (over it, uploads get a 503 until the purge has caught up) |
 | `MAX_UPLOAD_MB` (50), `MAX_PAGES_PER_JOB` (100), `MAX_CONCURRENT_UPLOADS` (3) | Upload limits (the last: uploads taken in at once per instance, one per user) |
 | `MAX_LARGE_UPLOAD_MB` (100), `MAX_SOURCE_PAGES` (500) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (the old 30 was sized for Cloud Run's 32 MiB request limit, which a Cloud Run deployment still has; Railway documents none). Equal to the limits above, they turn the feature off: such files are refused |
 | `MAX_USD_PER_JOB` ($6.00), `MAX_MODEL_CALLS_PER_JOB` (1200) | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
@@ -172,7 +173,7 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/admin/linked-emails`, `/admin/linked-emails/remove` | admins | Let an allowed instructor also sign in with another Google address, or take that away (T3-10; "Sign-in, sessions and CSRF") |
 | POST `/internal/cron/aggregate-and-purge` | a scheduler (Cloud Scheduler on the Cloud Run path; production runs the `cron` service instead and does not call it) | `X-Cron-Token` header; aggregates, then purges, then runs the daily canaries |
 | GET `/healthz` | anyone | `{"status": "ok"}` after a database ping, else 503 |
-| GET `/healthz/ops` | anyone | `{"status": "ok", "stale": []}`, or 503 `{"status": "stale", "stale": ["backup"]}` naming only the late tasks: the daily backup (older than 26 h) and the hourly cron (older than 2 h), from `ops_heartbeat` (`ops/heartbeat.py`). No setting, no content |
+| GET `/healthz/ops` | anyone | `{"status": "ok", "stale": [], "storage": {"stored_mb": 0, "limit_mb": 2000, "full": false}}`, or 503 `{"status": "stale", "stale": ["backup"], ...}` naming only the late tasks: the daily backup (older than 26 h) and the hourly cron (older than 2 h), from `ops_heartbeat` (`ops/heartbeat.py`), and `storage` while the service holds `STORAGE_GLOBAL_MAX_MB` of uploads. Totals in megabytes only: no setting value but that limit, no content |
 | GET `/readyz` | anyone | `{"status": "ready", "checks": {"database", "worker", "model_provider"}}`, one word per check, 503 `not_ready` if any is not ok (docs/operations.md, "Health, readiness and shutdown") |
 
 Every `/jobs/*` route answers 404 for a job that does not exist or belongs to someone
@@ -396,6 +397,7 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    fits under `DAILY_SPEND_CAP_USD` today (`spend.largest_reservation_usd`, about $0.031:
    a display equation on the main model), a friendly 503 page ("Conversions are paused
    for today"). A smaller threshold admitted uploads that could convert nothing;
+1b. stored bytes (`web/storage.py`): while the service holds `STORAGE_GLOBAL_MAX_MB` of uploads a plain 503 page ("Uploads are paused while storage catches up", `Retry-After` an hour) is answered before the body is read; and per file, in the job's transaction with the person's row locked, an upload that would take the person over `STORAGE_PER_USER_MB` (`STORAGE_OPEN_TIER_MB` for open-tier accounts) is refused with 413 and says how much they store and to delete documents (`storage_user`); a large file kept for its pages and the parts cut from it are held to the same cap, and the parts page keeps the file when a part is refused;
 2. uploads in progress: at most `MAX_CONCURRENT_UPLOADS` (3) per instance and one per
    user (`uploads.UploadGate`). Each upload costs about three times its size in memory
    while it is read, copied and probed, so this keeps uploads to at most about 900 MB (three

@@ -14,6 +14,7 @@
   process"). Production environment values (`PER_USER_DAILY_PAGE_QUOTA`, `OPEN_TIER_DAILY_PAGE_QUOTA`,
   `MAX_USD_PER_JOB`) are set at deploy, not in code: a `MAX_USD_PER_JOB` of 4.70 set for tables is now
   below the $5.71 that 100 pages need (docs/deploy.md, "Spend limits").
+- Stored-bytes caps, because uploads are in Postgres on a 5000 MB volume and one person could now store 2.2 GB: `STORAGE_PER_USER_MB` (300) and `STORAGE_OPEN_TIER_MB` (150) per person, counted with the quota checks in the job's transaction; `STORAGE_GLOBAL_MAX_MB` (2000, not 3000: the nightly backup check restores a second copy on the same volume) for the service, which turns uploads away with a 503 and puts `storage` in `/healthz/ops`. The hourly cron runs a plain `VACUUM` of the upload tables after a purge. The limits page names the cap. Declared in `.railway/railway.ts` (`webOnlyVariables`).
 - `ops launch-check` and the start-up check gain two warnings: an open-tier daily quota under one
   full-size document, and `IMAGE_PAGES_MAX_USD_PER_JOB` under `MAX_USD_PER_JOB`.
 - Word and PowerPoint files: the ZIP checks scale with the upload limit (500 MB unpacked, 250 MB an

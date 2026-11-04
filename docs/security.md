@@ -225,7 +225,8 @@ script injected into an app page is refused by the policy.
 | Pages per upload | `MAX_PAGES_PER_JOB` converted at once, `MAX_SOURCE_PAGES` for a file kept for choosing its pages; the quota counts only the pages converted | the probe, before quota or model |
 | Page size | 5000 pt a side | probe |
 | Uploads in progress | 3 per instance, 1 per person; each is held in memory about three times over, so at most about 900 MB at the largest size (`MAX_LARGE_UPLOAD_MB`) | `UploadGate` |
-| Stored upload bytes per person | Not capped in bytes: 2 large files kept for choosing their pages (100 MB each) plus up to 40 documents kept (`MAX_UPLOAD_MB`, 50 MB each) is 2.2 GB at most, in the database, for `RETENTION_HOURS` (the count of files bounds it, the daily page quota does not, since a 50 MB file may have one page); the daily backup holds it for about a week more. It was 800 MB at the old 20 MB limit | `web/intake.py`, `web/pending.py` |
+| Stored bytes per person | `STORAGE_PER_USER_MB` (300, invited) or `STORAGE_OPEN_TIER_MB` (150, open tier): everything they have stored (source PDFs, crops, results, kept large files) that is not past its deletion time, counted in the same transaction as the job with the person's row locked, so two uploads cannot both pass; a new upload that would go over is refused (413) with how much is used and to delete documents. The old worst case was 2.2 GB a person | `web/storage.py`, `web/intake.py`, `web/pending.py` |
+| Stored upload bytes, whole service | `STORAGE_GLOBAL_MAX_MB` (2000): over it new uploads get a plain 503 before the body is read, and `/healthz/ops` goes 503 naming `storage`, until the hourly purge has deleted enough | `web/storage.py`, `routes/jobs.py`, `web/health.py` |
 | Files in one upload | 10; the request, files together, at most `MAX_LARGE_UPLOAD_MB` (100), so ten files of 10 MB or two of 50; each file after the first counts as an upload for `upload_user`; the probes of one request share 120 s | `web/uploads.py`, `routes/jobs.py` |
 | Large files kept for choosing their pages | 2 per person, up to 100 MB and 500 pages, deleted after `RETENTION_HOURS`; their parts are held to the page quota and the caps below | `web/pending.py`, `web/intake.py` |
 | Zip of ready documents | 25 documents and 80 MB, in memory | `web/bundle.py` |
@@ -468,8 +469,8 @@ Triage of what the scanners reported:
   the recipient's mail provider hold it until it expires or is used, and anyone who reads the
   mailbox can sign in.
 - Rate limits and the upload gate are per instance and in memory.
-- `/healthz/ops` is public and has no rate limit: it reads two rows and answers with at most the
-  words `backup`, `cron` or `database`. Scheduled-task failures are found by a GitHub Actions job
+- `/healthz/ops` is public and has no rate limit: it reads two rows and a sum of stored sizes, and answers with at most the
+  words `backup`, `cron`, `storage` or `database`, and the stored and allowed megabytes (totals, no names). Scheduled-task failures are found by a GitHub Actions job
   that stops after 60 days without a commit to the public repository, unless re-enabled.
 - The session cookie is readable by its owner (signed, not encrypted).
 - A copy of the converted HTML opened from disk has no CSP; it is built to need none.
