@@ -108,7 +108,7 @@ def client_for(env, email: str):
 def test_the_default_is_the_allowlist_and_the_open_tier_has_its_numbers():
     s = Settings(_env_file=None)  # type: ignore[call-arg]
     assert s.signup_mode == "allowlist" and s.signup_open is False
-    assert s.open_tier_daily_page_quota == 20
+    assert s.open_tier_daily_page_quota == 150
     assert s.open_tier_daily_rereads == 30
     assert s.max_new_accounts_per_day == 100
     assert s.open_tier_daily_spend_cap_usd == 4.0
@@ -165,7 +165,9 @@ def test_the_limits_check_names_open_signup_settings_that_do_not_fit(tmp_path):
     )
     tiny = make_settings(tmp_path, signup_mode="open", open_tier_daily_spend_cap_usd=0.001)
     assert any("below one call's reservation" in str(f) for f in spend_findings(tiny))
-    closed = make_settings(tmp_path, signup_mode="open", open_tier_daily_spend_cap_usd=0)
+    closed = make_settings(
+        tmp_path, signup_mode="open", open_tier_daily_spend_cap_usd=0, open_tier_daily_page_quota=10
+    )
     assert not any("OPEN_TIER" in str(f) for f in spend_findings(closed))
     quiet = make_settings(tmp_path, signup_mode="allowlist", daily_spend_cap_usd=2.0)
     assert not any("OPEN_TIER" in str(f) for f in spend_findings(quiet))

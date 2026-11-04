@@ -169,7 +169,38 @@ def aggregate_and_purge(
     except Exception as exc:
         get_logger(__name__).error("aggregate_failed", error_type=type(exc).__name__)
         aggregated = None
-    return aggregated, purge_expired(factory, now)
+    stats = purge_expired(factory, now)
+    vacuum_after_purge(factory, stats)
+    return aggregated, stats
+
+
+# The tables whose rows hold the large bytes (`web.storage`).
+VACUUM_TABLES = ("blobs", "pending_uploads", "jobs")
+
+
+def vacuum_after_purge(factory: sessionmaker[Session], stats: PurgeStats) -> bool:
+    """On Postgres, after a purge that deleted documents, mark the freed space reusable now
+    instead of waiting for autovacuum (which waits for 20% of a table to be dead rows: with
+    100 MB rows that is a lot of volume). A plain `VACUUM` (no lock that stops reads or
+    writes) returns the space to the table and its TOAST table for new rows, and gives back
+    empty pages at the end of the file; it does not shrink the rest, so the volume's use
+    stays near its high-water mark, which `STORAGE_GLOBAL_MAX_MB` keeps bounded. Never
+    raises: the purge has already worked, and autovacuum is the backstop. True if it ran."""
+    if not (stats.jobs_deleted or stats.pending_deleted):
+        return False
+    engine = factory.kw.get("bind")
+    if engine is None or engine.dialect.name != "postgresql":
+        return False
+    log = get_logger(__name__)
+    try:
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
+            for table in VACUUM_TABLES:
+                connection.exec_driver_sql(f"VACUUM {table}")  # a fixed name, never input
+    except Exception as exc:
+        log.warning("vacuum_failed", error_type=type(exc).__name__)
+        return False
+    log.info("vacuum_done", tables=len(VACUUM_TABLES))
+    return True
 
 
 def _as_utc(moment: datetime) -> datetime:

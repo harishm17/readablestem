@@ -116,7 +116,7 @@ development-sample checks that priced the run (Addendum 7).
   0.23 on the development sample, plus 0.55 optional notes per page. Of the required decisions,
   230 are repeated heading labels and 216 headings with weak evidence, 351 below the
   acceptance threshold and 296 symbol mismatches (a fix can have several reasons). At that rate a
-  30-page document, the most the app takes, comes with about 53 decisions, the number
+  100-page document, the most the app takes at once, comes with about 176 decisions, the number
   to weigh the others against.
 - **Headings: ReadableSTEM leads, by less than the intervals need.** F1 0.961 against 0.910 to
   0.932 for the others. The paired comparisons at the registered level (k = 8, 99.4%)
@@ -388,7 +388,7 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
 ## Limits
 
 - **PDF in, HTML out.** Word and PowerPoint files must be exported to PDF first. Uploads are
-  limited to 30 pages and 20 MB by default; a bigger file (up to 300 pages and 30 MB) is kept so
+  limited to 100 pages and 50 MB by default; a bigger file (up to 500 pages and 100 MB) is kept so
   you can choose which pages to convert, in parts.
 - **A model is in the loop.** Document images and the text around them are sent to Anthropic's
   Claude API (the beta's provider, `MODEL_PROVIDER=anthropic`), or to OpenAI's API (with
