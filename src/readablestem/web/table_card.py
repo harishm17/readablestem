@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from markupsafe import Markup
 
 from readablestem.core.types import Element, Fix, TableCell, TableGrid, grid_problems
+from readablestem.pipeline import table_math
 from readablestem.pipeline.assemble_tables import (
     flattened_cells,
     id_prefix,
@@ -56,6 +57,9 @@ class CellChoice:
     value: str  # its text, or its LaTeX for a maths cell
     flat: str = ""  # the PDF's flattened text of a cell to be written as LaTeX
     readable: bool = False  # a maths cell the equation step can read from the page (T3-11)
+    # The cell is also an equation of the document (`TableCell.equation_id`): the two are one
+    # reading, and a change to one is made to the other.
+    tied: bool = False
 
 
 @dataclass
@@ -106,14 +110,20 @@ def cell_choices(
             continue  # a second cell at the same place (a broken grid): never reachable
         position = cell_label(cell)
         maths = is_maths_cell(grid, cell)
+        tied = (
+            element is not None
+            and element.table is not None
+            and table_math.equation_id_of(cell, element.table) is not None
+        )
         out.append(
             CellChoice(
                 ref=f"r{cell.row}c{cell.col}",
                 row=cell.row,
                 col=cell.col,
                 position=position,
-                label=f"{position}: {_preview(cell)}",
+                label=f"{position}: {_preview(cell)}{' (also an equation)' if tied else ''}",
                 maths=maths,
+                tied=tied,
                 value=(cell.latex or "") if maths else cell.text,
                 flat=cell.text if id(cell) in flat else "",
                 readable=maths

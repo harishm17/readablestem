@@ -171,3 +171,44 @@ def percent_of_number(chars: Sequence[Glyph], i: int) -> bool:
     """Is the glyph at `i` a percent sign set right after a digit ("5%")? In a formula it is the
     unit of the number, `\\phi = 5\\%`; a run that ends before it drops the sign."""
     return chars[i].c == "%" and i > 0 and chars[i - 1].c.isdigit()
+
+
+# ---------------------------------------------------------------- short formulas the runs miss
+
+RELATION_REASON = "relation symbol before a number"
+# The relations a TeX author sets in a maths font in front of a number: approximately, at least,
+# at most, much more or less than, less than, more than.
+_NUMBER_RELATIONS = frozenset("\u2248\u223c\u2264\u2265\u226a\u226b<>")
+_AFTER_NUMBER = frozenset(",.;:)]")
+
+
+def relation_runs(
+    chars: Sequence[Glyph], maths: Sequence[bool], script: Sequence[bool]
+) -> list[tuple[int, int, str]]:
+    """A relation glyph in a maths font and the number after it (`\\approx 0.14`, `\\ge 2`,
+    `\\geq 90\\%`), when the glyph before the relation is no maths: the formula starts at the
+    relation, and the run finder drops a leading relation as the tail of a formula that a line
+    break cut. A relation after a digit or another maths glyph is part of a longer formula."""
+    found: list[tuple[int, int, str]] = []
+    for i, ch in enumerate(chars):
+        if ch.c not in _NUMBER_RELATIONS or not maths[i] or script[i]:
+            continue
+        before = next((k for k in range(i - 1, -1, -1) if not chars[k].blank), None)
+        if before is not None and (maths[before] or chars[before].c.isdigit()):
+            continue
+        k = i + 1
+        while k < len(chars) and chars[k].blank:
+            k += 1
+        j = k
+        while j < len(chars) and (chars[j].c.isdigit() or chars[j].c == "."):
+            j += 1
+        number = "".join(c.c for c in chars[k:j])
+        if not number or not number[0].isdigit() or number.endswith(".") or number.count(".") > 1:
+            continue
+        if j < len(chars) and chars[j].c == "%":
+            j += 1  # `\geq 90\%`
+        after = chars[j].c if j < len(chars) else " "
+        if not (after.isspace() or after in _AFTER_NUMBER):
+            continue
+        found.append((i, j, RELATION_REASON))
+    return found

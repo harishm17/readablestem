@@ -147,6 +147,7 @@ from readablestem.pipeline import (
     page_math_reconcile,
     page_type,
     page_witness,
+    table_math,
     table_step,
     tagged,
     text_pass,
@@ -193,7 +194,21 @@ log = logging.getLogger(__name__)
 # after a number are in the formula, and the unit after a number ("24 h", "m^3") is out of it. An
 # inline formula of a TeX-made PDF can start or end at another glyph, so its crop, its id and the
 # paragraph's marker text change. Results from 0.5.3 load unchanged.
-PIPELINE_VERSION = "0.5.4"
+# 0.5.5 (2026-11-03): a table cell that is one formula by its glyphs is an inline equation of the
+# table (`layout._cell_maths`, `pipeline/table_math.py`, docs/tables.md "Maths cells from glyphs"):
+# the equation step reads its crop and the page writes the reading into the table's cell when the
+# table step wrote it as text. TeX-made PDFs with tables on: more equation elements and model
+# calls, and `<math>` in table cells. Results from 0.5.4 load unchanged.
+# 0.5.6 (2026-11-03): a relation set in a maths font before a number (`\approx 0.14`, `\geq 2`,
+# `\geq 90\%`) is one inline formula in a TeX-made PDF (`glyph_math.relation_runs`, docs/layout.md
+# "Short formulas the runs miss"); the run finder had dropped the relation as the tail of a formula.
+# Rarely changes a paper (3 formulas in 25 development papers). Results from 0.5.5 load unchanged.
+# 0.5.7 (2026-11-03): a PDF is TeX-made when its producer or creator names TeX as a whole word
+# (`page_type.TEX_PRODUCER`): XeLaTeX and Tectonic (`xdvipdfmx`), LuaTeX, dvips and dvipdfm(x) now
+# get the TeX reading rules, and Quartz ("PDFContext") and iText no longer do. TeX files with
+# those producers read differently: units out of a formula, table-cell and inline-formula edges.
+# Results from 0.5.6 load unchanged.
+PIPELINE_VERSION = "0.5.7"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -1700,6 +1715,8 @@ def _convert(
             elements = sorted(
                 doc.elements if witnessed is None else witnessed, key=lambda e: e.order
             )
+            if not options.tables:  # a table kept as its picture has no cell to write maths in
+                elements = table_math.without_cell_equations(elements)
             kept: dict[int, str] = dict(getattr(doc, "kept_pages", None) or {})
             sizes = dict(zip(doc.pages, getattr(doc, "page_sizes", None) or [], strict=False))
             boxes = _page_boxes(pdf_bytes, kept, sizes)
@@ -1817,6 +1834,7 @@ def _convert(
                     )
         if settings.image_pages_maths_always_required and image_built:
             image_page.enforce_maths_required(elements, run.fixes)
+        elements, run.fixes = table_math.settle(elements, run.fixes)
         ordered = _ordered_fixes(elements, run.fixes)
         labels = _page_labels(pdf_bytes, page_list)
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]
