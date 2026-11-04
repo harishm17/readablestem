@@ -19,6 +19,15 @@ disk matches the manifest, and when that arm has not been recorded on the held-o
 marker file is written when the run finishes). `--offline` replays an existing recording and
 spends nothing.
 
+The fifth fresh split (`PREREGISTRATION-FRESH5.md`) has four strata in five gold folders:
+`fresh5a` (arXiv), `fresh5b` (OpenStax, printed PDFs), `fresh5c` (course LaTeX), `fresh5d` and
+`fresh5d-private` (OpenStax chemistry; the private folder never enters the repository). `rs` runs
+one folder with `--settings fresh5-control` or `fresh5-candidate` (the registered settings, in a
+clean environment), and `--cap-group` holds the two ReadableSTEM arms to one cap together. The
+chatbots run with `--part fresh5`: every unit of the split in the registered order (strata A to
+C, then D) within one cap, answers under `runs/fresh5/chat/systems`; `chat-items --part fresh5a`
+(and so on) scores one folder from them. The strong-prompt arm is `chatbot-opus-expert`.
+
 Each live run appends to `data/realworld/spend-log.jsonl` (the estimate it was given, its cap, what
 it cost, from the recorded answers). Keys come from the environment (ANTHROPIC_API_KEY).
 """
@@ -37,6 +46,7 @@ from pathlib import Path
 
 from readablestem.eval import pipeline_eval as pe
 from readablestem.eval.realworld_media import RealWorldMedia
+from readablestem.eval.render import RenderError
 from readablestem.proof import chatbot
 from readablestem.proof import systems as S
 
@@ -46,7 +56,49 @@ DATA = REPO / "data" / "realworld"
 SPEND_LOG = DATA / "spend-log.jsonl"
 # Per PDF page, list price, used only to size a run before it is paid for (from the OpenStax
 # held-out runs, 2026-10-14 and 2026-10-21); the real figure is measured and logged.
-ESTIMATE_PER_PAGE = {"rs": 0.035, "chatbot-haiku-purdue": 0.003, "chatbot-opus-purdue": 0.060}
+ESTIMATE_PER_PAGE = {
+    "rs": 0.035,
+    "chatbot-haiku-purdue": 0.003,
+    "chatbot-opus-purdue": 0.060,
+    "chatbot-opus-expert": 0.090,
+}
+# The strong-prompt Opus arm of fresh5 (registration section 3): the `expert` prompt of
+# `proof/chat_prompts.json` on the Opus model, one reply, no system prompt.
+STRONG_ARM = chatbot.ChatArm(
+    "chatbot-opus-expert", "claude-opus-5-5", "expert", 1, "secondary", "anthropic"
+)
+ARM_BY_ID = {**chatbot.ARM_BY_ID, STRONG_ARM.id: STRONG_ARM}
+FRESH5_PARTS = ("fresh5a", "fresh5b", "fresh5c", "fresh5d", "fresh5d-private")
+FRESH5_PRIMARY = ("fresh5a", "fresh5b", "fresh5c")
+FRESH5_SEED = "realworld-fresh5-2026-11-02"
+PARTS = ("dev", "dev2", "heldout", "fresh", "fresh2", "fresh3", "fresh4", *FRESH5_PARTS)
+# The registered settings of the two ReadableSTEM arms of fresh5 (registration section 3); a
+# run gets these and nothing else from its environment but the key.
+_FRESH5_COMMON = {
+    "FEATURE_TABLES": "true",
+    "FEATURE_NOTATION_MEMORY": "true",
+    "EQUATION_LINE_CONTEXT": "true",
+    "FEATURE_PAGE_WITNESS": "false",
+    "LAYOUT_DISPLAY_GROUPING": "false",
+    "FEATURE_PAGE_MATH": "false",
+    "CLAUDE_SECOND_CHECK": "off",
+    "ANTHROPIC_MAIN_MODEL": "claude-opus-5-5",
+    "ANTHROPIC_CHEAP_MODEL": "claude-haiku-5-5",
+    "ANTHROPIC_EFFORT_MAIN": "medium",
+    "ANTHROPIC_EFFORT_CHEAP": "low",
+}
+FRESH5_SETTINGS = {
+    "fresh5-control": _FRESH5_COMMON
+    | {
+        "EQUATION_GLYPH_CHECKS": "false",
+        "FLAG_POLICY": "false",
+        "EQUATION_GLYPH_RECONCILE": "false",
+    },
+    "fresh5-candidate": _FRESH5_COMMON
+    | {"EQUATION_GLYPH_CHECKS": "true", "FLAG_POLICY": "true", "EQUATION_GLYPH_RECONCILE": "true"},
+}
+# What a registered fresh5 run may carry from its environment besides its settings.
+ENV_KEEP = ("PATH", "HOME", "ANTHROPIC_API_KEY", "LANG", "TMPDIR", "UV_CACHE_DIR", "VIRTUAL_ENV")
 
 
 def gold_dir(part: str) -> Path:
@@ -65,8 +117,51 @@ def manifest(part: str) -> dict:
     return json.loads((gold_dir(part) / "manifest.json").read_text(encoding="utf-8"))
 
 
+def is_openstax_part(part: str) -> bool:
+    """A folder of OpenStax gold whose pages were printed beforehand (fresh5 strata B and D)."""
+    return part in ("fresh5b", "fresh5d", "fresh5d-private")
+
+
+def openstax_sections(part: str) -> list[dict]:
+    """The registered sections of an OpenStax folder (`selection-fresh5-B.json`, `-D.json`):
+    book, section, gold and PDF hashes. D's public section is in `fresh5d`, its private ones in
+    `fresh5d-private`."""
+    name = "selection-fresh5-B.json" if part == "fresh5b" else "selection-fresh5-D.json"
+    sections = json.loads((DATA / name).read_text(encoding="utf-8"))["sections"]
+    if part == "fresh5d":
+        sections = [s for s in sections if s.get("licence_tier") == "public"]
+    elif part == "fresh5d-private":
+        sections = [s for s in sections if s.get("licence_tier") == "private"]
+    return sections
+
+
+def openstax_pdf(part: str, book: str, section: str) -> Path:
+    return gold_dir(part) / "pdfs" / f"{book}-{section}.pdf"
+
+
+def n_pages(part: str) -> int:
+    if is_openstax_part(part):
+        return sum(
+            chatbot.pdf_page_count(openstax_pdf(part, s["book"], s["section"]))
+            for s in openstax_sections(part)
+        )
+    return int(manifest(part)["n_pages"])
+
+
 def verify_gold(part: str) -> None:
-    """The gold and the cut PDFs on disk are the ones the manifest names."""
+    """The gold and the cut PDFs on disk are the ones the manifest names (an OpenStax folder:
+    the ones its registered selection names)."""
+    if is_openstax_part(part):
+        sections = openstax_sections(part)
+        if not sections:
+            raise SystemExit(f"{part}: no registered sections")
+        for s in sections:
+            gold = gold_dir(part) / "openstax" / s["book"] / f"{s['section']}.jsonl"
+            if sha256(gold) != s["gold_sha256"]:
+                raise SystemExit(f"gold of {s['book']}/{s['section']} differs from the selection")
+            if sha256(openstax_pdf(part, s["book"], s["section"])) != s["pdf_sha256"]:
+                raise SystemExit(f"PDF of {s['book']}/{s['section']} differs from the selection")
+        return
     m = manifest(part)
     for paper in m["papers"]:
         slug = paper["id"].replace("/", "_")
@@ -82,6 +177,7 @@ REGISTRATIONS = {
     "fresh2": "REGISTRATION-fresh2.sha256",
     "fresh3": "REGISTRATION-fresh3.sha256",
     "fresh4": "REGISTRATION-fresh4.sha256",
+    **{part: "REGISTRATION-fresh5.sha256" for part in (*FRESH5_PARTS, "fresh5")},
 }
 
 
@@ -103,7 +199,8 @@ def require_registration(part: str, arm: str, offline: bool) -> None:
 def registered_arm(args: argparse.Namespace) -> str:
     """The name a registered run is recorded under: `rs` on the held-out part, the tag on the
     fresh part (two arms of one registration)."""
-    return args.tag if args.part in ("fresh", "fresh2", "fresh3", "fresh4") else "rs"
+    fresh = ("fresh", "fresh2", "fresh3", "fresh4", *FRESH5_PARTS)
+    return args.tag if args.part in fresh else "rs"
 
 
 def papers(part: str) -> list[dict]:
@@ -137,9 +234,8 @@ def log_spend(entry: dict) -> None:
 
 
 def cmd_estimate(args: argparse.Namespace) -> int:
-    m = manifest(args.part)
-    pages = m["n_pages"]
-    print(f"{args.part}: {m['n_papers']} papers, {pages} pages, {m['n_equations']} equations")
+    pages = n_pages(args.part)
+    print(f"{args.part}: {len(unit_pdfs(args.part))} units, {pages} pages")
     for arm, per_page in ESTIMATE_PER_PAGE.items():
         print(f"  {arm:24s} ${pages * per_page:6.2f}  (at ${per_page}/page)")
     return 0
@@ -148,7 +244,64 @@ def cmd_estimate(args: argparse.Namespace) -> int:
 # ------------------------------------------------------------------------------ ReadableSTEM
 
 
+class PrintedOpenStaxMedia(RealWorldMedia):
+    """An OpenStax folder of fresh5: each section's page is the Letter PDF printed when the
+    split was built (`pdfs/<book>-<section>.pdf`, hashed in its selection file), not a new
+    print of the archive."""
+
+    def page_pdf(self, page_records: list[dict]) -> bytes:
+        first = page_records[0]
+        path = self.gold_dir / "pdfs" / f"{first['book_slug']}-{first['page_slug']}.pdf"
+        if not path.is_file():
+            raise RenderError(f"PDF {path.name} is missing under {self.gold_dir}")
+        return path.read_bytes()
+
+
+def apply_registered_settings(name: str) -> None:
+    """Put the registered settings of a fresh5 arm in the environment, after checking that
+    nothing else could reach the settings: no `.env` file here and no other setting variable."""
+    from readablestem.config import Settings
+
+    preset = FRESH5_SETTINGS[name]
+    fields = {f.upper() for f in Settings.model_fields}
+    stray = sorted(k for k in os.environ if k.upper() in fields and k not in preset)
+    stray = [k for k in stray if k not in ENV_KEEP]
+    if stray:
+        raise SystemExit(f"--settings {name}: other settings in the environment: {stray}")
+    if Path(".env").exists():
+        raise SystemExit(f"--settings {name}: a .env file here would add settings")
+    os.environ.update(preset)
+
+
+def answers_spent(paths: list[Path]) -> float:
+    """What the answers in these files cost, each answer (by its key) counted once: a run that
+    started from another's answers holds copies of them."""
+    seen: set[str] = set()
+    total = 0.0
+    for path in paths:
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            key = row.get("k") or line
+            if key in seen:
+                continue
+            seen.add(key)
+            total += float((row.get("call") or {}).get("cost_usd") or 0.0)
+    return total
+
+
+def group_answers(tags: list[str]) -> list[Path]:
+    return [runs_dir(part) / tag / "answers.jsonl" for part in FRESH5_PARTS for tag in tags]
+
+
 def cmd_rs(args: argparse.Namespace) -> int:
+    if args.settings:
+        if args.part not in FRESH5_PARTS:
+            raise SystemExit("--settings is for the fresh5 folders")
+        apply_registered_settings(args.settings)
     # No second automated check: it is shadow-only (it changes no output) and costs model calls,
     # and the registered OpenStax run had none either.
     os.environ["CLAUDE_SECOND_CHECK"] = "off"
@@ -175,6 +328,18 @@ def cmd_rs(args: argparse.Namespace) -> int:
 
     verify_gold(args.part)
     require_registration(args.part, registered_arm(args), args.offline)
+    max_usd = args.max_usd
+    if args.group_cap is not None:
+        # the arms of one cap together (fresh5: control and candidate $7.5): this start may
+        # spend what the group has left
+        spent = answers_spent(group_answers(args.cap_group))
+        max_usd = round(min(max_usd, args.group_cap - spent), 4)
+        print(
+            f"group {args.cap_group}: spent ${spent:.4f} of ${args.group_cap}; "
+            f"this start ${max_usd}"
+        )
+        if max_usd <= 0 and not args.offline:
+            raise SystemExit("the group's cap is spent")
     out_dir = runs_dir(args.part) / args.tag
     out_dir.mkdir(parents=True, exist_ok=True)
     answers = out_dir / "answers.jsonl"
@@ -189,12 +354,14 @@ def cmd_rs(args: argparse.Namespace) -> int:
         "--answers", str(answers), "--items", str(items), "--out", str(report),
         "--section-workers", str(args.section_workers),
         "--concurrency", str(args.concurrency), "--cache", str(out_dir / "cache"),
-        "--max-usd", str(args.max_usd),
+        "--max-usd", str(max(max_usd, 0.01)),
     ]  # fmt: skip
     if args.offline:
         argv.append("--answers-offline")
     if args.papers:
         argv += ["--sections", *(f"arxiv/{i.replace('/', '_')}" for i in args.papers.split(","))]
+    if args.units:
+        argv += ["--sections", *args.units.split(",")]
     ns = build_parser().parse_args(argv)
     before = answers_cost(answers)
     code = eval_cli._run_pipeline(
@@ -202,7 +369,7 @@ def cmd_rs(args: argparse.Namespace) -> int:
         gold_dir(args.part),
         report,
         gold_label=f"realworld ({args.part})",
-        media_cls=RealWorldMedia,
+        media_cls=PrintedOpenStaxMedia if is_openstax_part(args.part) else RealWorldMedia,
         cache_dir=out_dir / "cache",
         openstax_cache=out_dir / "cache",
     )
@@ -211,11 +378,15 @@ def cmd_rs(args: argparse.Namespace) -> int:
         log_spend(
             {
                 "part": args.part, "arm": "rs", "tag": args.tag,
-                "estimate_usd": round(manifest(args.part)["n_pages"] * ESTIMATE_PER_PAGE["rs"], 2),
-                "cap_usd": args.max_usd, "actual_usd": round(spent, 4), "note": args.note,
+                "estimate_usd": round(n_pages(args.part) * ESTIMATE_PER_PAGE["rs"], 2),
+                "cap_usd": max_usd, "actual_usd": round(spent, 4), "note": args.note,
+                **({"settings": args.settings} if args.settings else {}),
+                **({"cap_group": args.cap_group, "group_cap_usd": args.group_cap}
+                   if args.group_cap is not None else {}),
+                **({"units": args.units} if args.units else {}),
             }
         )  # fmt: skip
-        if args.part in REGISTRATIONS:
+        if args.part in REGISTRATIONS and not args.units:
             marker = runs_dir(args.part) / f"{registered_arm(args)}.recorded"
             marker.write_text(dt.date.today().isoformat())
     print(f"spent this start: ${spent:.4f}")
@@ -244,6 +415,37 @@ def chat_order(part: str) -> list[str]:
     return sorted(ids, key=lambda i: hashlib.sha256(f"{seed}|chat-order|{i}".encode()).hexdigest())
 
 
+def unit_pdfs(part: str) -> dict[str, Path]:
+    """Unit id (`<book>/<page>` of its gold, the document task's id) -> its PDF, for one folder."""
+    found: dict[str, Path] = {}
+    for unit in pe.group_pages(pe.load_gold(gold_dir(part))):
+        uid = pe._page_id(unit)
+        first = unit[0]
+        if is_openstax_part(part):
+            found[uid] = openstax_pdf(part, first["book_slug"], first["page_slug"])
+        else:
+            found[uid] = gold_dir(part) / first["pdf"]
+    return found
+
+
+def fresh5_order() -> list[tuple[str, str]]:
+    """(folder, unit id) of every unit of fresh5 in the registered order (section 6): strata
+    A to C by SHA-256 of seed, "chat-order" and the unit id, then stratum D the same way."""
+
+    def key(uid: str) -> str:
+        return hashlib.sha256(f"{FRESH5_SEED}|chat-order|{uid}".encode()).hexdigest()
+
+    def ordered(parts: tuple[str, ...]) -> list[tuple[str, str]]:
+        units = [(part, uid) for part in parts for uid in unit_pdfs(part)]
+        return sorted(units, key=lambda pu: key(pu[1]))
+
+    return ordered(FRESH5_PRIMARY) + ordered(("fresh5d", "fresh5d-private"))
+
+
+def part_of_unit(uid: str) -> str:
+    return next(part for part, u in fresh5_order() if u == uid)
+
+
 def pdfs_of(part: str, only: list[str] | None = None) -> dict[str, Path]:
     found = {}
     for paper in papers(part):
@@ -254,9 +456,72 @@ def pdfs_of(part: str, only: list[str] | None = None) -> dict[str, Path]:
     return found
 
 
+def cmd_chat_fresh5(args: argparse.Namespace) -> int:
+    """A chatbot arm on every unit of fresh5, in the registered order, within the arm's cap
+    (what the arm has already spent on the split counts against it)."""
+    arm = ARM_BY_ID[args.arm]
+    for part in FRESH5_PARTS:
+        verify_gold(part)
+    require_registration("fresh5", arm.id, False)
+    order = fresh5_order()
+    paths = {part: unit_pdfs(part) for part in FRESH5_PARTS}
+    pdfs = {uid: paths[part][uid] for part, uid in order}
+    if args.units:
+        wanted = args.units.split(",")
+        unknown = [u for u in wanted if u not in pdfs]
+        if unknown:
+            raise SystemExit(f"not units of fresh5: {unknown}")
+        pdfs = {uid: path for uid, path in pdfs.items() if uid in wanted}
+    out = runs_dir("fresh5") / "chat" / "systems"
+    before = chatbot.recorded_cost(out, [arm.id])
+    remaining = round(args.max_usd - before, 6)
+    pages = sum(chatbot.pdf_page_count(p) for p in pdfs.values())
+    estimate = pages * ESTIMATE_PER_PAGE[arm.id]
+    print(
+        f"{arm.id}: {len(pdfs)} units, {pages} pages, estimate ${estimate:.2f}; "
+        f"arm cap ${args.max_usd}, spent ${before:.4f}, left ${remaining:.4f}",
+        flush=True,
+    )
+    if remaining <= 0:
+        raise SystemExit("the arm's cap is spent")
+    client = chatbot.make_client(arm.provider)
+    summary: dict = {}
+    for attempt in range(4):  # a connection error while counting tokens ends one start
+        try:
+            summary = chatbot.record_arms(
+                pdfs, out, arms=[arm], max_usd=remaining, client=client,
+                workers=args.workers, runs=1,
+            )  # fmt: skip
+            break
+        except Exception as exc:  # recorded jobs are skipped on the next start
+            print(f"start {attempt + 1} stopped: {type(exc).__name__}", flush=True)
+            time.sleep(30)
+            client = chatbot.make_client(arm.provider)
+            remaining = round(args.max_usd - chatbot.recorded_cost(out, [arm.id]), 6)
+    else:
+        raise SystemExit("the arm could not be recorded after 4 starts")
+    spent = chatbot.recorded_cost(out, [arm.id]) - before
+    print(json.dumps(summary))
+    log_spend(
+        {
+            "part": "fresh5", "arm": arm.id, "papers": len(pdfs), "pages": pages,
+            "estimate_usd": round(estimate, 2), "cap_usd": args.max_usd,
+            "spent_before_usd": round(before, 4), "actual_usd": round(spent, 4),
+            "refused_by_cap": summary["refused_by_cap"], "note": args.note,
+            **({"units": args.units} if args.units else {}),
+        }
+    )  # fmt: skip
+    recorded = {run for run in S.load_arms_dir(out).get(arm.id, {})}
+    if not args.units and not summary["refused_by_cap"] and set(pdfs) <= recorded:
+        (runs_dir("fresh5") / f"{arm.id}.recorded").write_text(dt.date.today().isoformat())
+    return 0
+
+
 def cmd_chat(args: argparse.Namespace) -> int:
+    if args.part == "fresh5":
+        return cmd_chat_fresh5(args)
     verify_gold(args.part)
-    arm = chatbot.ARM_BY_ID[args.arm]
+    arm = ARM_BY_ID[args.arm]
     require_registration(args.part, arm.id, False)
     only = args.papers.split(",") if args.papers else None
     if args.first:
@@ -303,7 +568,8 @@ def cmd_chat(args: argparse.Namespace) -> int:
 def chat_items(part: str, arm_id: str) -> list[dict]:
     """The document task's item of every paper the arm answered (a paper it was not run on has
     no item; a paper whose run failed is scored as found nothing)."""
-    arms = S.load_arms_dir(runs_dir(part) / "chat" / "systems")
+    where = "fresh5" if part in FRESH5_PARTS else part
+    arms = S.load_arms_dir(runs_dir(where) / "chat" / "systems")
     runs = arms.get(arm_id, {})
     records = pe.load_gold(gold_dir(part))
     items = []
@@ -345,7 +611,7 @@ def cmd_tally(args: argparse.Namespace) -> int:
     run's answers (`--seed-answers-from`) holds copies of them: each answer is counted once,
     under the first run that holds it (`rs` first, then by tag)."""
     rows = []
-    for part in ("dev", "dev2", "heldout", "fresh", "fresh2", "fresh3", "fresh4"):
+    for part in (*PARTS, "fresh5"):
         counted: set[str] = set()
         for tag_dir in sorted(
             runs_dir(part).glob("*/answers.jsonl"),
@@ -388,11 +654,8 @@ def main() -> int:
     ):
         p = sub.add_parser(name)
         if name != "tally":
-            p.add_argument(
-                "--part",
-                choices=["dev", "dev2", "heldout", "fresh", "fresh2", "fresh3", "fresh4"],
-                required=True,
-            )
+            choices = [*PARTS, "fresh5"] if name == "chat" else list(PARTS)
+            p.add_argument("--part", choices=choices, required=True)
         if name == "rs":
             p.add_argument("--max-usd", type=float, required=True)
             p.add_argument("--tag", default="rs")
@@ -415,6 +678,17 @@ def main() -> int:
             )
             p.add_argument("--papers", help="comma-separated arXiv ids (default: all of the part)")
             p.add_argument(
+                "--units", help="comma-separated unit ids (`<book>/<page>`): a trial run"
+            )
+            p.add_argument(
+                "--settings", choices=sorted(FRESH5_SETTINGS), help="a registered fresh5 arm"
+            )
+            p.add_argument(
+                "--cap-group", nargs="+", default=["control", "candidate"],
+                help="tags that share --group-cap (their answers over all fresh5 folders)",
+            )  # fmt: skip
+            p.add_argument("--group-cap", type=float, help="the cap of the --cap-group tags")
+            p.add_argument(
                 "--section-workers", type=int, default=3, help="papers converted at once"
             )
             p.add_argument(
@@ -422,12 +696,13 @@ def main() -> int:
             )
             p.add_argument("--note", default="")
         if name in ("chat", "chat-items"):
-            p.add_argument("--arm", choices=sorted(chatbot.ARM_BY_ID), required=True)
+            p.add_argument("--arm", choices=sorted(ARM_BY_ID), required=True)
         if name == "chat":
             p.add_argument("--max-usd", type=float, required=True)
             p.add_argument("--workers", type=int, default=2)
             p.add_argument("--papers", help="comma-separated arXiv ids (default: all of the part)")
             p.add_argument("--first", type=int, help="the first N papers of the registered order")
+            p.add_argument("--units", help="fresh5: comma-separated unit ids (a trial run)")
             p.add_argument("--note", default="")
         p.set_defaults(func=func)
     args = parser.parse_args()
