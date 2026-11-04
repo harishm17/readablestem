@@ -330,8 +330,8 @@ def test_buttons_name_the_fix_they_act_on(web):
     # "Reject" is named for what it does, with what that means under it.
     assert 'Keep without a description<span class="visually-hidden"> (figure 1)</span>' in figure
     assert "I understand: screen reader users get no description." in figure
-    assert 'Accept<span class="visually-hidden"> figure 1 as written</span>' in figure
-    assert 'Save and accept<span class="visually-hidden"> figure 1</span>' in figure
+    assert 'Accept<span class="visually-hidden"> figure 1</span>' in figure
+    assert 'Save and accept<span class="visually-hidden"> (figure 1)</span>' in figure
 
 
 def test_decided_fixes_are_folded_away(web):
