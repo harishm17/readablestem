@@ -1301,6 +1301,73 @@ a.finding-action { display: inline-flex; align-items: center; min-height: 2.25re
 .symbols-example-name { font-weight: 700; }
 /* ==== end ux2-lane-b ======================================================================= */
 
+/* ==== ux2-lane-a: upload, My documents, the job page's groups, waiting ====================
+   Flat: 1px rules and the existing tints, no cards inside cards, no new colours. */
+
+/* The page heading with an action beside it ("Upload another file"). */
+.page-heading h1 { margin-right: auto; }
+.page-heading { align-items: center; }
+
+/* Upload: the file and its button are the form; the two option groups between them are one
+   line each until opened. A group's summary is its name, "Change", and what is set now. */
+.upload-form .file-field { margin-bottom: var(--space-3); }
+.main-file-detail { margin: 0 0 var(--space-3); }
+.option-groups { border-top: 1px solid var(--border-subtle); margin: var(--space-4) 0 0; }
+details.option-group { border-bottom: 1px solid var(--border-subtle); }
+details.option-group > summary { display: list-item; cursor: pointer; padding: var(--space-3) 0; min-height: 2.75rem; }
+details.option-group > summary::marker { color: var(--accent); }
+.group-name { font-weight: 700; margin-right: var(--space-3); }
+.group-change { color: var(--accent); text-decoration: underline; text-underline-offset: 0.18em; }
+details.option-group[open] .group-change { display: none; }
+.group-state { display: block; font-weight: 400; color: var(--ink-muted); margin-top: var(--space-1); max-width: var(--prose-max); }
+.group-body { padding: 0 0 var(--space-3) var(--space-5); }
+.group-body .field:last-child { margin-bottom: var(--space-2); }
+.submit-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-top: var(--space-5); }
+.submit-row .upload-status { margin: 0; }
+
+/* My documents: a row leads with the file name; the title is a quiet line under it; one next
+   step and Delete in the last column. */
+.doc-table th:nth-child(1) { width: 40%; }
+.doc-table th:nth-child(2) { width: 22%; }
+.doc-table th:nth-child(4) { width: 9.5rem; }
+.doc-table .doc-file { margin: var(--space-1) 0 0; }
+.doc-table td.row-actions > a { margin: 0 var(--space-4) 0 0; }
+.row-primary { font-weight: 700; }
+
+/* The job page: links to its groups, then each group under one heading with a rule above. */
+.jump-links { margin: var(--space-4) 0 var(--space-2); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.jump-links ul { list-style: none; margin: 0; padding: var(--space-2) 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); }
+.jump-links a { display: inline-flex; align-items: center; min-height: 1.75rem; }
+.job-group { margin-top: var(--space-7); border-top: 1px solid var(--border-subtle); }
+.job-group > h2 { margin-top: var(--space-4); }
+#review-and-download { margin-top: var(--space-5); border-top: 0; }
+#review-and-download > section > h2 { margin-top: var(--space-2); }
+section.job-group { padding-top: 0; }
+#results-line { max-width: var(--prose-max); }
+#counts-detail { margin: 0 0 var(--space-4); }
+#counts-detail .summary-list { margin-top: var(--space-3); }
+
+/* "Where will you post it?": one flat list, each way with its own link, the recommended one
+   first. */
+.routes { list-style: none; margin: var(--space-2) 0 var(--space-5); padding: 0; max-width: var(--prose-max); }
+.route { border-top: 1px solid var(--border-subtle); padding: var(--space-3) 0; }
+.route:last-child { border-bottom: 1px solid var(--border-subtle); }
+.route h4 { margin: 0 0 var(--space-1); display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); align-items: baseline; }
+.route p { margin: 0 0 var(--space-2); }
+.route .canvas-download { margin: var(--space-3) 0 0; }
+.route form.canvas-download { margin: 0; }
+
+/* How long a document has been waiting, and the plain note when it is longer than usual. */
+.wait-note { margin: var(--space-2) 0 var(--space-3); }
+.wait-note p { margin: var(--space-1) 0; }
+.wait-elapsed { color: var(--ink-muted); }
+.wait-slow { border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--accent-tint); padding: var(--space-2) var(--space-4); max-width: var(--prose-max); }
+.wait-slow[hidden] { display: none; }
+@media (forced-colors: active) {
+  .wait-slow, .jump-links, .option-groups, details.option-group, .route, .job-group { border-color: CanvasText; }
+}
+/* ==== end ux2-lane-a ==================================================================== */
+
 /* ==== ux2-lane-c: confirmations, account, sharing, courses, page picking, batch ===========
    Everything below belongs to the second UX round, lane C. Same tokens, no new colours.
    Confirmations: the danger button names its object and "No, keep it" is a button of the same

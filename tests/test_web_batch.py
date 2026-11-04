@@ -94,7 +94,7 @@ def test_without_the_switch_a_zip_is_not_a_pdf(tmp_path):
 
 def test_the_form_offers_zips_and_says_how_many_documents(web):
     page = text_of(web.alice.get("/app").text)
-    assert "A zip of PDFs and LaTeX project folders also works" in page
+    assert "A zip of PDFs and LaTeX projects works" in page
     assert "30 at a time" in page
     raw = web.alice.get("/app").text
     assert 'data-zip="1"' in raw and ".zip,application/zip" in raw

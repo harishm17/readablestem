@@ -128,32 +128,53 @@ FAILED_MESSAGES = {
     # probe refuses these first; a job sees them only when the probe could not tell.
     # Never "run OCR": OCR'd scans are what these are.
     "scanned": "Every page of this PDF is a scanned image, so this tool cannot convert it. "
-    "It has no text this tool can use. If you have the original file (LaTeX, Word or "
-    "PowerPoint), export a PDF from it and upload that instead.",
+    "It has no text this tool can use. Export a PDF from the original file (LaTeX, Word or "
+    "PowerPoint) and upload that instead.",
     "scanned_ocr": "Every page of this PDF is a scanned image, so this tool cannot convert "
-    "it. Its text was guessed from the images by a text recognition (OCR) program. OCR "
-    "text is often wrong, most of all in maths, so this tool does not use it, and running "
-    "OCR again will not help. If you have the original file (LaTeX, Word or PowerPoint), "
-    "export a PDF from it and upload that instead.",
-    "handwritten": "This PDF is handwritten, so this tool cannot convert it. It also holds "
-    "hidden text that a tablet or a text recognition (OCR) program guessed from the "
-    "handwriting. That text is often wrong, most of all in maths, so this tool does not "
-    "use it. If you have a typed version (LaTeX, Word or PowerPoint), export a PDF from it "
-    "and upload that instead.",
+    "it. Its text was guessed by OCR, which is often wrong in maths, so it is not used. "
+    "Export a PDF from the original file (LaTeX, Word or PowerPoint) and upload that instead.",
+    "handwritten": "This PDF is handwritten, so this tool cannot convert it. Its hidden text, "
+    "guessed from the handwriting, is often wrong in maths, so it is not used. Export a PDF "
+    "from a typed version (LaTeX, Word or PowerPoint) and upload that instead.",
     "handwritten_no_text": "This PDF is handwritten, so this tool cannot convert it. "
-    "It has no text this tool can use. If you have a typed version (LaTeX, Word or "
-    "PowerPoint), export a PDF from it and upload that instead.",
+    "It has no text this tool can use. Export a PDF from a typed version (LaTeX, Word or "
+    "PowerPoint) and upload that instead.",
     "no_content": "This PDF has no text, equations or figures that could be converted.",
-    "model_not_configured": "Conversions are not set up on this server yet, so nothing "
-    "was converted and nothing was sent anywhere. Please tell the person who runs this "
-    "site.",
+    "model_not_configured": "Conversions are not set up on this server yet. Nothing was "
+    "converted or sent anywhere. Tell the person who runs this site.",
     "access_removed": "Your access to this tool was removed, so this document was not converted.",
     "page_too_large": "The PDF has a page that is too large to convert.",
-    "too_complex": "A page of this PDF is drawn with so many separate shapes (tens of "
-    "thousands of strokes or points) that reading it takes more time or memory than a "
-    "conversion may use. Nothing was converted. Export the PDF again as a flattened or "
-    "simpler PDF, or split the page off and upload the rest.",
+    "too_complex": "A page of this PDF has so many separate shapes that reading it takes more "
+    "time or memory than a conversion may use. Nothing was converted. Export a simpler or "
+    "flattened PDF, or split the page off and upload the rest.",
 }
+
+
+# The refusals of a PDF that is only scans or handwriting, and what each says the PDF is. When
+# the deployment offers "Convert scanned or handwritten pages" (ADR 0007, FEATURE_IMAGE_PAGES)
+# the message does not say the tool cannot convert it: it says such pages are read only when
+# asked for, and offers that route.
+IMAGE_PAGE_FAILS = {
+    "scanned": "Every page of this PDF is a scanned image",
+    "scanned_ocr": "Every page of this PDF is a scanned image",
+    "handwritten": "This PDF is handwritten",
+    "handwritten_no_text": "This PDF is handwritten",
+}
+OPT_IN_ROUTE = (
+    "Upload it again with “Convert scanned or handwritten pages” ticked, or export a PDF from "
+    "the original."
+)
+
+
+def failed_message(code: str, *, image_pages_offered: bool = False) -> str | None:
+    """The message of a stopped job's error code, or None for a code with no message here.
+    `image_pages_offered`: the deployment offers to convert scanned and handwritten pages, so
+    a PDF of only such pages was not converted because the option was not ticked."""
+    if image_pages_offered and code in IMAGE_PAGE_FAILS:
+        what = IMAGE_PAGE_FAILS[code]
+        lead = f"{what}, so it was not converted: such pages are read only when you ask."
+        return f"{lead} {OPT_IN_ROUTE}"
+    return FAILED_MESSAGES.get(code)
 
 
 def job_outcome(
@@ -162,8 +183,10 @@ def job_outcome(
     error_code: str | None,
     result_json: dict[str, Any] | None = None,
     budget_closed: bool = False,
+    image_pages_offered: bool = False,
 ) -> JobOutcome | None:
-    """The outcome to show for a job, or None when its status says it all."""
+    """The outcome to show for a job, or None when its status says it all.
+    `image_pages_offered`: see `failed_message`."""
     if status == JobStatus.QUEUED and budget_closed:
         return JobOutcome(
             "waiting_budget",
@@ -173,7 +196,8 @@ def job_outcome(
             "this page.",
         )
     if status == JobStatus.FAILED and error_code in FAILED_MESSAGES:
-        return JobOutcome(error_code, "Stopped", FAILED_MESSAGES[error_code])
+        message = failed_message(error_code, image_pages_offered=image_pages_offered)
+        return JobOutcome(error_code, "Stopped", message or FAILED_MESSAGES[error_code])
     if status == JobStatus.DONE and not error_code and (outage := _outage(result_json)):
         n, total, kinds = outage
         message = (

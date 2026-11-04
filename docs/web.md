@@ -120,7 +120,7 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/account` | signed in | The address and name held, the access tier, today's limits, and the "Delete my account" link ("Sign-up modes and access tiers") |
 | GET, POST `/account/delete` | signed in | "Delete your account?" confirmation; only a POST with `confirm=yes` (and the CSRF token) erases the account and everything of theirs, signs them out and goes to `/` |
 | POST `/logout` | signed in | Clears the session |
-| GET `/app?revises=` | signed in | My documents as a to-do list (below; each finished row has "Upload a revised version"), then the upload form; with `revises=<job id>` of the person's own finished document, the form for a revised version of it ("Revised versions" below) |
+| GET `/app?revises=` | signed in | My documents as a to-do list (below; the revised-version link is on the document's own page), then the upload form; with `revises=<job id>` of the person's own finished document, the form for a revised version of it ("Revised versions" below) |
 | GET `/app/documents?v=&course=` | signed in | The documents list alone, polled by htmx while a document is waiting or converting (204 while unchanged); with `course=` only that course's documents (the course page polls it) |
 | POST `/jobs` | signed in | Upload of one file or up to 30 (10 for an account made by open sign-up), or a zip of documents: checks, quota, queue, one job each; 303 to `/jobs/{id}` for one file, to `/uploads/{id}` when it is kept for choosing its pages, 303 to `/app/batch/{id}` (the batch page) for several or for a zip of documents ("Uploads and limits") |
 | GET `/app/batch/{id}` | owner | The batch page: each document of one upload with its status now, a live summary line, the large files waiting for their pages and the files not uploaded; polled by htmx while anything is unfinished (204 while unchanged); 404 for anyone else's, a stale and a malformed id ("Zip of documents and the batch page") |
@@ -144,8 +144,8 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back; `?format=docx` or `?format=epub` gives the joined file as Word or EPUB, recorded in that file type); 409 with fewer than two such parts, 404 for another person's or an expired document |
 | GET `/jobs/{id}/download/canvas` | view | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
 | GET `/jobs/{id}/download/cartridge` | view | The same page as an IMS Common Cartridge 1.3 package, `.imscc` (`pipeline/export_cartridge.py`, docs/output.md "The Common Cartridge export"). Same errors and recording as the Canvas zip; a plain link on the job page |
-| GET `/jobs/{id}/download.docx` | view | The document as a Word file with native equations (`pipeline/export_docx.py`, docs/output.md "The Word export"). The same rules as `/download`: another user's or an expired job is 404, one that is not done 409, the file is made again first when a review write left it out of date, the deletion clock restarts, and it is recorded as a download (code `open` when decisions were still open) with the file type `docx`. 503 when pandoc is not installed or two Word files are already being made; 409 with a plain page when the file cannot be made (the HTML stays available). A plain link under "Other file types" on the finish line, shown only when pandoc is installed |
-| GET `/jobs/{id}/download.epub` | view | The document as an EPUB 3 publication (`pipeline/export_epub.py`). Same rules, errors and recording as the Word file (file type `epub`); a plain link under "Other file types" |
+| GET `/jobs/{id}/download.docx` | view | The document as a Word file with native equations (`pipeline/export_docx.py`, docs/output.md "The Word export"). The same rules as `/download`: another user's or an expired job is 404, one that is not done 409, the file is made again first when a review write left it out of date, the deletion clock restarts, and it is recorded as a download (code `open` when decisions were still open) with the file type `docx`. 503 when pandoc is not installed or two Word files are already being made; 409 with a plain page when the file cannot be made (the HTML stays available). A plain link in the Word route of "Where will you post it?" on the finish line, shown only when pandoc is installed |
+| GET `/jobs/{id}/download.epub` | view | The document as an EPUB 3 publication (`pipeline/export_epub.py`). Same rules, errors and recording as the Word file (file type `epub`); a plain link in the EPUB route of "Where will you post it?" |
 | GET `/jobs/{id}/share` | owner | Who can open this document (G1, "Sharing a document" below): the people and their right, the form to add one, the document's address to copy. 404 for a sample or an unfinished document |
 | POST `/jobs/{id}/share` | owner | Give a person (`email`, in full) the right `role` (`view` or `review`), or change theirs; 422 with the reason beside the field for an address that is not one, your own, a right that does not exist, or an eleventh person. CSRF-checked, nothing is sent |
 | POST `/jobs/{id}/share/{share_id}/revoke` | owner | Remove one person's access; it stops on their next request. CSRF-checked |
@@ -195,11 +195,16 @@ Every `/jobs/*` route answers 404 for a job that does not exist or belongs to so
 else, admins included, so job ids cannot be probed and admins never see documents. Its
 owner, though, is told what happened to a document that is gone (UX review MF10): a job
 past its `retain_until` (not purged yet) shows "This document has been deleted. It was
-deleted automatically 24 hours after upload, as promised" (the time the job was kept, whatever the choice), and
-once the purge has removed the row, the owner's own `uploaded` event still says the id
-was theirs, so the page says it was deleted and when documents are. Anyone else gets the
-plain "There is no document at this address" page, which no longer says "or it is not
-yours to see". It is a 404 either way. The
+deleted automatically after 24 hours in
+all" (the time the job was kept, whatever the choice; not "after upload", since the time
+slides with the owner's work), and once the purge has removed the row, the owner's own
+`uploaded` event still says the id was theirs, so the page says it was deleted. Both say
+how long documents are kept now (24 hours, 7 days, 30 days from upload) and offer
+"Upload the PDF again" (`/app#upload-heading`). Anyone else gets the plain "There is no
+document at this address that this account can open" page, with the same help for every
+case (check the address and the signed-in account, ask the sender; it may also have been
+deleted), so a revoked share, an expired document and an id that never existed read the
+same. It is a 404 either way. The
 `/courses/*` routes do the same for courses.
 
 ## Sign-in, sessions and CSRF
@@ -543,14 +548,33 @@ A third box, off by default: "Exam or quiz: describe figures without giving answ
 course notation; with neither, the run uses the settings' flags as before). Figure
 descriptions then say what is shown and never the result (`pipeline/figure_step.py`).
 
+**The form's shape** (`_upload_form.html`, ux2-lane-a): the file field with its facts, then two
+groups that are one line each until opened, then "Upload and convert". "How to convert it" (course,
+exam or quiz, scanned and handwritten pages when offered) and "How long to keep it" each say what
+is set now ("No course · Figures described normally · Scanned pages kept as pictures"; "Deleted 24
+hours after you last work on it."); static/app.js rewrites that line as boxes change, and a group opens by itself when it
+holds a choice that is not its default. The scan box says first what it is for: needed for a PDF
+that is all scans or handwriting (refused without it), while a mixed PDF keeps its scanned pages
+as pictures marked "Not converted" unless it is ticked. "Main file of a zip" is offered only with
+LaTeX source on, inside a disclosure. When an upload is refused, the form comes back before the
+documents list with every choice kept (`routes/jobs.form_values`; only the file has to be chosen
+again), the error summary takes focus, as on every form, and its link goes to the file chooser right
+under it (to the scan box for a scan refusal, which is the step to take), and the message says
+what is unavailable and offers the PDF route (LaTeX source on a server that cannot run it:
+"Compile it to a PDF and choose that here instead").
+
 Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep for 7 days"
 (`keep`; deleted 7 days after the last activity) and "Also let us look at the results (30 days)" (`share`; implies
 keeping). They set `jobs.retention_mode`: `day` (neither), `week` or `dev`; `dev` is also
 `jobs.opt_in_retention`, which `ops.export` reads, so only `dev` jobs can be looked at.
 The Account page has "Keep new documents for 7 days by default" (`users.keep_week_default`,
 `POST /account/keep-default`): when it is on, the `keep` box starts ticked; each upload still
-decides. The job page says when the document will be deleted once, under its review and download
-actions (`_job_retention.html`), with "Keep for 7 days" (the same `POST /jobs/{id}/keep`) and
+decides. The upload form says it as "Make this the default in Account" beside the box (or
+"Ticked because of your account setting"). The job page says when the document will be
+deleted once, in its Delete group (`_job_retention.html`: the real date, that the time runs
+from the owner's last work, that what the owner does restarts it and what people the
+document is shared with do does not, `retention.restart_clock` / `restart_owner_clock`),
+with "Keep for 7 days" (the same `POST /jobs/{id}/keep`) and
 the day it would then be deleted (`retention.keep_offer`: not offered for a `dev` job or when
 the document is already kept that long). "Keep for 7 days" is the one wording on the upload
 form, the job page, the Account page, the notices and the privacy page.
@@ -867,8 +891,8 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
 
 ### The sample document (`web/sample.py`)
 
-My documents offers "Try a sample first" (before the upload form for someone with no
-document of their own, after it otherwise). `POST /sample` (token, rate limited) puts a
+My documents offers "Try a sample first" (after the upload form for someone with no
+document of their own, who is shown the form first; after the list otherwise). `POST /sample` (token, rate limited) puts a
 finished **recorded conversion** in the person's list and sends them to its page; opening it
 again returns the same one. It is OpenStax *Physics* 2.3 (CC BY 4.0, 13 pages, the committed
 `static/demo/report.json` and `source.pdf`: a real run with the models), with the pictures
@@ -894,12 +918,17 @@ day and is deleted with its day.
 still open, oldest first, with a "Review next" button to the first one's review
 screen), then "Ready to download" (newest first), then "Converting, waiting or stopped".
 A summary line counts them ("2 documents need your decisions (5 decisions in all) · 1
-ready to download · 1 converting"). Each row shows the document's title (the stored
-result's title, else the file name), the file name, pages and upload time under it, the
-status in words with its one next step (Review or Download), when it is deleted
-automatically, and a Delete link to the confirmation page. A partly converted result
-says so first ("Stopped early, 2 decisions to make"). When there are documents the list
-comes before the upload form.
+ready to download · 1 converting"). Each row leads with the file name that was uploaded
+(`DocumentRow.name`; "book.pdf, pages 31-59" for a part), because generated titles repeat
+across a course's files; the document's title sits under it ("Titled “…”") when it says
+something else, with pages and upload time. A title the person chose themselves (T1-7)
+and the recorded sample lead with the title. The row then has the status in words, when
+it is deleted automatically, and one next step (Review or Download) beside a Delete link
+to the confirmation page; "Upload a revised version" is on the document's own page, not
+repeated in every row. A partly converted result says so first ("Stopped early, 2
+decisions to make"). When there are documents the list comes before the upload form, and
+"Upload another file" beside the heading jumps to it; after a refused upload, and for
+someone with no documents, the form comes first.
 
 Only the title and the fixes are read from each stored result, through JSON paths, and
 only for finished jobs. While a document is waiting or converting, htmx polls
@@ -1591,13 +1620,13 @@ From top to bottom:
 
    | State | Label | Sentence |
    |---|---|---|
-   | queued | Waiting | "2 documents ahead of yours (1 is yours), about 3 minutes to go. You can leave this page; it keeps its place." |
+   | queued | Waiting | "2 documents ahead of yours (1 is yours), about 3 minutes to go (an estimate). You can leave this page; it keeps its place." |
    | queued, today's budget spent | Waiting | the `waiting_budget` outcome |
    | converting | Converting | the step it is on: "Reading the equations and checking each against your PDF's text." |
    | stopped by a spend cap | Stopped early | the outcome's message (and the open decisions) |
    | AI service outage | Stopped: the AI service did not answer | "... Nothing is wrong with your PDF ..." |
    | pages kept as images | Finished, with pages not converted | which pages and why (handwritten, scanned, nothing readable); hidden text not used |
-   | decisions open | Converted | "3 decisions need you before you share it." |
+   | decisions open | Converted | "3 decisions need you before you give it to students." |
    | no decision open, parts shown as images | Ready | "1 equation is shown as an image that screen readers cannot read." |
    | nothing left | Ready to share | "Everything was converted." |
    | failed | Stopped | why (the failure codes above) |
@@ -1605,8 +1634,17 @@ From top to bottom:
    The tab title follows the label. The estimate while waiting is the pages ahead (in
    the worker's claim order), what is left of the jobs converting and the job's own
    pages, at the pace of the last 20 finished jobs (start to finish, per page; 10 s a
-   page with none to go by: `views.seconds_per_page`). The box changes per step, not
-   per element, so a screen reader hears each step once.
+   page with none to go by: `views.seconds_per_page`); the sentence says it is an
+   estimate and can run longer. The box changes per step, not per element, so a screen
+   reader hears each step once. Under it, outside the live region, a waiting or
+   converting document says how long it has been ("Waiting for 3 minutes.", "Converting for
+   4 minutes."; a waiting job that was tried again says nothing, since its upload is not
+   when it began; `_wait_note.html`, `JobView.waiting_since`). static/app.js keeps the time
+   current every half minute. Past ten minutes, or twice its own estimate, whichever is
+   more (`job_page.slow_after`), a plain note appears in its own polite region: "Taking
+   longer than usual. Nothing is lost." with links to the service status and an email link.
+   There is no percentage and no finish time. The batch page includes the same part
+   ("Uploaded 4 minutes ago.", slow after 15 minutes).
 2. **The steps**, outside the live region and polled on their own: "Reading the layout:
    16 pages", "Found 21 equations, 7 figures and 52 headings", "Equations: 14 of 21 read
    and checked against your PDF's text", "Figures: 5 of 7 described", "Tables: ...",
@@ -1621,16 +1659,35 @@ From top to bottom:
    decision as soon as the job finishes ("Start the review"), so it is one click from
    finished to deciding. With none open, **Ready to share** (BW1, MF9): "You made 3
    decisions on 9 October." (or "Nothing in this file needed your decision."), the
-   download as the main button, the student version, "Other file types" (plain links: "Download as Word (.docx)",
-   only when pandoc is installed, and "Download as EPUB"), "Before you share" (read it
-   through; the notes, optional; what is not handled) and "Put it in your course"
-   ("How to post it in your course" links the Canvas steps on `/help/posting`; upload it
-   as a file and link it where the PDF was, as the main version, the PDF kept only as a
-   labelled print copy, as the help page says; do not paste it into a page editor; for a
-   Canvas page, "For Canvas (zip with images)" below the download, a plain form with an optional
-   course number; the
-   Canvas and Blackboard steps are stated as not yet tried in a live course), then the two questions after a download ("After a
+   download as the main button, the student version, then **"Where will you post it?"**
+   (ux2-lane-a): one flat list of the ways the file leaves the tool, each with its own
+   link and the recommended one first. "A course site or any web page (Recommended)" is
+   the HTML file above: upload it as a file and link it where the PDF was, as the main
+   version, the PDF kept only as a labelled print copy, and do not paste it into a page
+   editor, as the help page (`/help/posting`, linked there once) says. "For Canvas" is a
+   plain form with an optional course number ("For Canvas (zip with images)", one sentence
+   of help) with the Common Cartridge link under it, both stated as not yet tried in a
+   live course. "Word" (only when pandoc is installed) and "EPUB" are plain links. Then
+   "Before you share" once (read the student version through and listen to it; the notes,
+   optional; what is not handled), then the two questions after a download ("After a
    download"). Deleting is a quiet button at the end of the page.
+
+   The page is **five groups**, each under one heading, with links to them under the
+   status box when a document is finished: Review and download (the status label's heading),
+   Results and checks, For students (language, notation found in the document, the title
+   students hear and the contact line, as sub-headings), Settings and sharing (sharing with
+   a colleague, which says it is not how students get the file; and "If you change the PDF"),
+   Record, and Delete (the one place retention is explained, with the real deletion date).
+   Someone a document is shared with sees only the groups that are theirs. The results
+   are one line ("Found 19 equations, 7 figures and 36 headings on 13 pages.") with "Counts in
+   detail" for the rest (list items, pages kept as images, decisions to make and made).
+
+   A stopped job's explanation is in the status box, once; under it "What you can do" has
+   "Try again" where it can help (`web/retry.py`) and always "Upload it again", "Back to My
+   documents", "Service status" and an email link. A scanned or handwritten PDF's message
+   is feature-aware (`outcome.failed_message`): with "Convert scanned or handwritten pages"
+   offered it says such pages are read only when asked for and gives that route, and does not
+   say the tool cannot convert them; without the option it says it cannot.
 4. **Not handled in this file** and **Worth checking**: `pipeline.notices.current(result)`
    (notices derived again from the fixes as they are now, plus the stored ones of other
    codes), one sentence each from `messages.NOTICE_MESSAGES`, with the page ("Page 3:",
@@ -1707,7 +1764,7 @@ From top to bottom:
    the error under the field and the typed text kept. Neither is logged.
 9. **Deleting**: "Delete now" at the end of the page, styled as a danger entry point
    (`button-danger-outline`); the confirmation page's button is the filled `button-danger`.
-   When the document will be deleted, and "Keep for 7 days", are under the actions (above).
+   When the document will be deleted, and "Keep for 7 days", are in this group (above).
 
 ## Review screen
 
@@ -2640,7 +2697,7 @@ HTML file that did not pass, each as a sentence from `web/messages.py` with its 
 ("All 11 checks passed" otherwise). An incomplete or failed job's outcome
 (`web/outcome.py`: "Stopped early", "Finished, with pages not converted", a scanned or
 empty PDF) replaces the plain status in the page title, the status box and the
-"Why the conversion stopped" section, and a finished but incomplete job gets a note at
+status box (once; the section under it, "What you can do", has the retry or the safe ways on), and a finished but incomplete job gets a note at
 the top of its results.
 
 **Messages.** `web/messages.py` maps every `(Check.name, Check.code)` pair and every

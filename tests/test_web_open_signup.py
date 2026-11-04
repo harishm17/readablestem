@@ -462,7 +462,7 @@ def test_an_open_tier_account_has_the_open_quota_and_is_told_the_number(open_web
 def test_the_upload_form_tells_a_new_account_its_limit(open_web):
     login(open_web.browser, CAROL)
     page = " ".join(open_web.browser.get("/app").text.split())
-    assert "You can convert 3 more pages today (a new account can convert 3 pages a day)" in page
+    assert "3 pages left today (a new account can convert 3 pages a day)" in page
 
 
 def test_an_invited_person_keeps_the_normal_quota_in_open_mode(open_web):

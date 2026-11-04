@@ -19,8 +19,7 @@
   {% set minutes_error = fb_errors.get("minutes-saved") %}
   <div class="field{% if minutes_error %} field-error{% endif %}">
     <label for="minutes-saved">About how many minutes did this save you?</label>
-    <p class="hint" id="minutes-hint">A rough guess is fine, as a whole number. Leave it
-      empty if you are not sure.</p>
+    <p class="hint" id="minutes-hint">A rough whole number, or leave it empty.</p>
     {% if minutes_error %}
     <p class="error-message" id="minutes-error"><span class="visually-hidden">Error: </span>{{ minutes_error }}</p>
     {% endif %}

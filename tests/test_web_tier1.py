@@ -105,7 +105,7 @@ def test_the_upload_form_has_two_separate_choices_both_off(ux):
         assert label in html
         tag = re.search(rf'<input[^>]*id="{box}"[^>]*>', html)
         assert tag and "checked" not in tag.group(0)
-    assert "<legend>How long to keep it, and who may look</legend>" in html
+    assert '<span class="group-name">How long to keep it</span>' in html
 
 
 @pytest.mark.parametrize(
@@ -275,7 +275,8 @@ def test_the_title_field_starts_with_the_pdf_title_without_its_section_number(ti
 
 def test_the_list_download_name_and_delete_page_use_the_same_title(titled):
     listing = titled.browser.get("/app").text
-    assert ">Derivatives</a>" in listing and "1 Derivatives" not in text_of(listing)
+    assert "Titled “Derivatives”" in text_of(listing) and "1 Derivatives" not in text_of(listing)
+    assert ">week3.pdf</a>" in listing  # a generated title is under the file name, not over it
     response = titled.browser.get(f"/jobs/{titled.job_id}/download")
     assert 'filename="derivatives-' in response.headers["content-disposition"]
     confirm = titled.browser.get(f"/jobs/{titled.job_id}/delete").text
@@ -727,4 +728,4 @@ def test_the_checks_disclosure_counts_the_checks_that_ran(tmp_path):
         env.run_worker()
         html = page(env)
     block = text_of(html[html.index('id="checks-ran"') :].split("</details>")[0])
-    assert "Ran on this file: 1 checks of its structure" in block
+    assert "Ran on this file: 1 structure check." in block

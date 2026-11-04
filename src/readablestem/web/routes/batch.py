@@ -36,6 +36,7 @@ from readablestem.web import documents, upload_result
 from readablestem.web.database import as_utc
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import JOB_ID, PageError, UserDep, conversions_closed, get_ctx, render
+from readablestem.web.job_page import elapsed_words
 from readablestem.web.routes.bundle import _zip_response
 from readablestem.web.routes.jobs import (
     UPLOAD_RESULT_GONE,
@@ -107,14 +108,9 @@ def _state(row: documents.DocumentRow | None) -> str:
 
 def _elapsed(minutes: int) -> str:
     """How long ago the batch was uploaded, in words: "less than a minute", "4 minutes",
-    "1 hour 5 minutes". The time since the upload, not an estimate of what is left."""
-    if minutes < 1:
-        return "less than a minute"
-    if minutes < 60:
-        return _word(minutes, "minute", "minutes")
-    hours, rest = divmod(minutes, 60)
-    text = _word(hours, "hour", "hours")
-    return text + (f" {_word(rest, 'minute', 'minutes')}" if rest else "")
+    "1 hour 5 minutes" (the job page's words, `job_page.elapsed_words`). The time since the
+    upload, not an estimate of what is left."""
+    return elapsed_words(minutes * 60)
 
 
 def _next_step(rows: list[dict[str, Any]]) -> dict[str, str]:

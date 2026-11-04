@@ -98,7 +98,7 @@ def test_the_job_page_links_to_the_record(web):
     page = web.browser.get(f"/jobs/{web.job_id}").text
     assert f'href="/jobs/{web.job_id}/record"' in page
     assert f'href="/jobs/{web.job_id}/record.csv"' in page
-    assert "It is a record, not a verdict." in text_of(page)
+    assert "A record, not a verdict" in text_of(page)
 
 
 # --------------------------------------------------------------------------- the CSV

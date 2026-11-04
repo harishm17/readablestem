@@ -55,11 +55,11 @@ def test_the_form_is_named_and_works_from_the_keyboard(site, browser):
     assert field.get_attribute("inputmode") == "numeric"
     button = page.get_by_role("button", name=BUTTON)
     assert button.get_attribute("aria-describedby") == "canvas-help"
-    assert "keeps each picture as its own file" in page.locator("#canvas-help").inner_text()
+    assert "keeps each as a file" in page.locator("#canvas-help").inner_text()
 
-    # Tab order: the form follows the links of the download area (download, preview, upload a
-    # revised version, then the other file types with EPUB last), field before button.
-    page.get_by_role("link", name="Download as EPUB").first.focus()
+    # Tab order: the Canvas form follows the recommended route's posting link (download,
+    # preview, listen, then the routes), field before button.
+    page.get_by_role("link", name="How to post it in your course").first.focus()
     page.keyboard.press("Tab")
     assert page.evaluate("document.activeElement.id") == "canvas-course"
     page.keyboard.type("48213")

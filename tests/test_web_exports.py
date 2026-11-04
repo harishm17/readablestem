@@ -230,7 +230,9 @@ def test_a_failed_epub_export_is_a_plain_page(web):  # noqa: F811
 def test_the_job_page_offers_both_files_as_plain_links(web):  # noqa: F811
     job_id = ready_job(web)
     ready = ready_section(web.browser.get(f"/jobs/{job_id}").text)
-    assert 'id="formats-heading"' in ready and 'aria-labelledby="formats-heading"' in ready
+    # "Where will you post it?": one list of routes, the web page first and recommended
+    assert 'id="post-heading"' in ready and 'aria-labelledby="post-heading"' in ready
+    assert ready.index('id="route-web"') < ready.index('id="route-word"')
     assert (
         f'<a class="button-secondary" href="/jobs/{job_id}/download.docx">'
         "Download as Word (.docx)</a>" in ready
@@ -239,9 +241,10 @@ def test_the_job_page_offers_both_files_as_plain_links(web):  # noqa: F811
         f'<a class="button-secondary" href="/jobs/{job_id}/download.epub">'
         "Download as EPUB</a>" in ready
     )
-    # after the HTML download, before the Canvas form
+    # after the HTML download; Canvas, then Word, then EPUB, each with its own link
     assert ready.index("Download the HTML file") < ready.index("Download as Word")
-    assert ready.index("Download as EPUB") < ready.index("For Canvas")
+    assert ready.index("For Canvas") < ready.index("Download as Word")
+    assert ready.index("Download as Word") < ready.index("Download as EPUB")
 
 
 def test_a_document_with_decisions_open_offers_neither(web):  # noqa: F811
