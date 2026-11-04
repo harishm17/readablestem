@@ -31,7 +31,9 @@ def test_latexml_is_a_build_argument_that_defaults_off():
     assert "ARG INSTALL_LATEXML=false" in text
     run = text[text.index('if [ "$INSTALL_LATEXML" = "true" ]') :]
     run = run[: run.index("fi\n")]
-    assert "apt-get install -y --no-install-recommends latexml" in run
+    assert "apt-get install -y --no-install-recommends latexml bubblewrap util-linux" in run
+    # the sandbox's programs are checked in the same layer: no bubblewrap, no image
+    assert "command -v bwrap && command -v prlimit" in run
     assert "rm -rf /var/lib/apt/lists/*" in run
     # the policy is replaced in the same layer, and the build fails when it did not take
     assert "imagemagick-policy.xml" in run

@@ -55,12 +55,18 @@
   the kernel's seccomp mode, Landlock ABI and same-UID `/proc/<pid>/environ` readability, and
   prints PASS or FAIL (exit 1). Nothing it prints is document content. Docs: docs/operations.md,
   "Sandbox probe"; docs/security.md, "Running uploaded TeX".
+- The sandbox also caps tasks and open files (`prlimit --nproc --nofile`), puts a seccomp filter in front of the
+  program (`core/seccomp.py`, built without libseccomp), counts the program's own output against the output budget,
+  and uses a cgroup v2 memory and pids limit for the whole group when the container allows one; the probe reports
+  `sandbox_task_cap`, `sandbox_file_cap`, `sandbox_seccomp` and `sandbox_cgroup`. docs/security.md says what is
+  capped per process and what in total.
 - New `core/sandbox.py` (the bubblewrap runner the probe tests and a later LaTeX upload uses) and
   `source/latexml.py` (the `latexml` and `latexmlpost` calls). Nothing in the app calls them yet.
   Tests: `tests/test_sandbox.py`, `tests/test_ops_sandbox_probe.py`.
 ## Unreleased: LaTeXML in the image (branch latex/x1-latexml-image)
 
-- Dockerfile: `ARG INSTALL_LATEXML=false` installs the distribution's `latexml` (0.8.8) with TeX
+- Dockerfile: `ARG INSTALL_LATEXML=false` also installs `bubblewrap` and `util-linux` (the sandbox and `prlimit`; the
+  build fails without them). It installs the distribution's `latexml` (0.8.8) with TeX
   Live's base and ImageMagick, and replaces ImageMagick's `policy.xml` with a deny-by-default one
   (PNG, JPEG, GIF only; PS, EPS, PDF, XPS, URL and `@file` denied by name:
   `src/readablestem/source/imagemagick-policy.xml`). Measured on the pinned base: +270 MB
