@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: site copy rewrite (branch content/site-rewrite)
+
+- Every public and signed-in page says what the service does today. The landing page lists what it
+  handles (Beamer decks frame by frame, chemistry, and tables, long descriptions, scanned and
+  handwritten pages and course notation only where their flags are on, `routes/pages.py`
+  `_features`), what you download (HTML, Word, EPUB, Canvas zip, Common Cartridge, the review
+  record) and a short accuracy block that says it does not yet beat the chatbot on equations.
+- /limits holds every measured result with its sample size: the registered held-out test first,
+  the real-world held-out papers, the not-blind re-measurement, the development baseline
+  (labelled development), chemistry and handwriting. The old Physics chapter 2 sample is gone.
+- /for-accessibility-offices gains an "At a glance" list, names the downloads and sharing, and
+  says a conformance report is in preparation (not published). /privacy describes PostHog
+  analytics when `ANALYTICS_ENABLED` is on. "Also let the developer look" is now "Also let us
+  look at the results" everywhere. The upload hint is a list. Guides, README, the showcase,
+  `docs/vendor-information.md` and llms.txt are updated to match.
+
 ## Unreleased: design polish (branch design/d6-polish)
 
 - Fixes from the Impeccable audit and critique of the redesign: paragraphs, hints and list items are capped at 75ch;
