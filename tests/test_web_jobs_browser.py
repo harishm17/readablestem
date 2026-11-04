@@ -283,13 +283,13 @@ def test_choosing_too_many_files_is_said_at_once_and_nothing_is_sent(site, brows
     page.goto(f"{site.base}/app")
     files = [
         {"name": f"f{n}.pdf", "mimeType": "application/pdf", "buffer": make_pdf(1)}
-        for n in range(11)
+        for n in range(31)  # invited people take 30 files at a time, the open tier 10
     ]
     page.get_by_label("PDF files").set_input_files(files=files)
-    expect(page.locator("#pdf-check")).to_contain_text("You chose 11 files. Upload 10 or fewer")
+    expect(page.locator("#pdf-check")).to_contain_text("You chose 31 files. Upload 30 or fewer")
     page.get_by_role("button", name="Upload and convert").click()
     expect(page).to_have_url(f"{site.base}/app")
-    expect(page.locator("#pdf-check")).to_contain_text("You chose 11 files")
+    expect(page.locator("#pdf-check")).to_contain_text("You chose 31 files")
     context.close()
 
 
@@ -312,6 +312,36 @@ def test_the_results_of_an_upload_of_several_files_pass_axe(site, browser, axe_s
     expect(page.get_by_role("heading", name="Not uploaded")).to_be_visible()
     clean(page, axe_source, "results of several files")
     shoot(page, "upload-results", viewport)
+    assert not sideways_overflow(page)
+    context.close()
+
+
+@SIZES
+def test_the_batch_page_passes_axe_and_its_live_region_is_polite(
+    site, browser, axe_source, viewport
+):
+    """The batch page (routes/batch.py): axe at both sizes, a stable polite live region, a table
+    of the documents, no sideways scroll. The polling itself is covered with the test client
+    (tests/test_web_batch.py)."""
+    context, page = open_page(browser, site, viewport=viewport)
+    page.goto(f"{site.base}/app")
+    files = [
+        {"name": "week1.pdf", "mimeType": "application/pdf", "buffer": make_pdf(1)},
+        {"name": "week2.pdf", "mimeType": "application/pdf", "buffer": make_pdf(2)},
+    ]
+    page.get_by_label("PDF files").set_input_files(files=files)
+    page.get_by_role("button", name="Upload and convert").click()
+    page.wait_for_selector("h1")
+    assert page.url.startswith(f"{site.base}/app/batch/")
+    expect(page.get_by_role("heading", level=1)).to_contain_text("2 of 2 files uploaded")
+    summary = page.locator("#batch-summary")
+    expect(summary).to_have_attribute("role", "status")
+    expect(summary).to_have_attribute("aria-live", "polite")
+    expect(summary).to_contain_text("2 documents: 2 waiting.")
+    expect(page.get_by_role("table")).to_be_visible()
+    expect(page.get_by_role("columnheader", name="Document")).to_be_visible()
+    clean(page, axe_source, "batch page")
+    shoot(page, "batch-page", viewport)
     assert not sideways_overflow(page)
     context.close()
 

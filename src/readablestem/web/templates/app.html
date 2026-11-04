@@ -126,6 +126,10 @@
             files also work; they are turned into a PDF on the server first, so the page count
             is the PDF's.</li>
           {% endif %}
+          {% if batch_zip and not revises|default(none) %}
+          <li>A zip of PDFs and LaTeX project folders also works: each PDF and each project in
+            it becomes a document ({{ max_files }} at a time).</li>
+          {% endif %}
           {% if latex_source and not revises|default(none) %}
           <li>A LaTeX file (.tex) or a zip of a LaTeX project also works (up to 100 MB unpacked
             and 500 files). Its equations are read from the source, and its length is counted as
@@ -147,8 +151,8 @@
          wrong here, before anything is sent (UX review MF21). #}
       <div id="pdf-check" aria-live="polite"></div>
       <input type="file" id="pdf" name="pdf"{% if not revises|default(none) %} multiple{% endif %}
-             accept="application/pdf,.pdf{% if latex_source and not revises|default(none) %},.tex,.zip,application/zip{% endif %}{% if "docx" in office_kinds %},.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document{% endif %}{% if "pptx" in office_kinds %},.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation{% endif %}"
-             {% if latex_source and not revises|default(none) %}data-latex="1" {% endif %}{% if office_kinds %}data-office="{{ office_kinds|join(' ') }}" data-office-what="{{ office_what }}" data-office-choose="{{ office_choose }}" {% endif %}data-max-bytes="{{ max_upload_mb * 1024 * 1024 }}" data-max-mb="{{ max_upload_mb }}"
+             accept="application/pdf,.pdf{% if latex_source and not revises|default(none) %},.tex,.zip,application/zip{% elif batch_zip and not revises|default(none) %},.zip,application/zip{% endif %}{% if "docx" in office_kinds %},.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document{% endif %}{% if "pptx" in office_kinds %},.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation{% endif %}"
+             {% if latex_source and not revises|default(none) %}data-latex="1" {% endif %}{% if batch_zip and not revises|default(none) %}data-zip="1" {% endif %}{% if office_kinds %}data-office="{{ office_kinds|join(' ') }}" data-office-what="{{ office_what }}" data-office-choose="{{ office_choose }}" {% endif %}data-max-bytes="{{ max_upload_mb * 1024 * 1024 }}" data-max-mb="{{ max_upload_mb }}"
              data-limit-bytes="{{ upload_limit_mb * 1024 * 1024 }}" data-limit-mb="{{ upload_limit_mb }}"
              data-max-files="{{ 1 if revises|default(none) else max_files }}"
              aria-describedby="pdf-hint{% if pdf_error %} pdf-error{% endif %}"{% if pdf_error %} aria-invalid="true"{% endif %}>

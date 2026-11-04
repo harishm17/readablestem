@@ -1,0 +1,36 @@
+\documentclass{beamer}
+\usepackage{amsmath,graphicx}
+\title{Simple Circuits}
+\author{B. Author}
+\begin{document}
+\begin{frame}\titlepage\end{frame}
+\begin{frame}{Ohm's law}
+  \begin{theorem}[Ohm]
+    The current through a resistor is $I = V/R$.
+  \end{theorem}
+  \begin{proof}
+    Experiment shows $V \propto I$.
+  \end{proof}
+\end{frame}
+\begin{frame}{Resistors in series}
+  \begin{enumerate}
+    \item The same current flows through each: $I_1 = I_2$.
+    \item The voltages add: $V = V_1 + V_2$.
+    \item So $R_\mathrm{eq} = R_1 + R_2$.
+  \end{enumerate}
+  \alert{Remember} to check units.
+\end{frame}
+\begin{frame}{A figure}
+  \begin{figure}
+    \includegraphics[width=0.4\textwidth]{circuit.png}
+    \caption{A series circuit.}
+  \end{figure}
+\end{frame}
+\begin{frame}{Values}
+  \begin{tabular}{lcc}
+    Part & $R$ & $V$ \\ \hline
+    A & 10 & 5 \\
+    B & 20 & 10
+  \end{tabular}
+\end{frame}
+\end{document}

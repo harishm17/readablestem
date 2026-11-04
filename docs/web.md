@@ -75,6 +75,8 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `MAX_UPLOAD_MB` (50), `MAX_PAGES_PER_JOB` (100), `MAX_CONCURRENT_UPLOADS` (3) | Upload limits (the last: uploads taken in at once per instance, one per user) |
 | `MAX_LARGE_UPLOAD_MB` (100), `MAX_SOURCE_PAGES` (500) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (the old 30 was sized for Cloud Run's 32 MiB request limit, which a Cloud Run deployment still has; Railway documents none). Equal to the limits above, they turn the feature off: such files are refused |
 | `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project ("LaTeX source" below, ADR 0008). Off by default; needs the image built with `INSTALL_LATEXML` and a PASS from `readablestem ops sandbox-probe` |
+| `FEATURE_BEAMER_SOURCE` | Takes Beamer decks within LaTeX source ("LaTeX source" below). Off by default; needs `FEATURE_LATEX_SOURCE` |
+| `FEATURE_BATCH_ZIP` | Takes a `.zip` of documents as a batch ("Zip of documents and the batch page" below). Off by default |
 | `MAX_USD_PER_JOB` ($6.00), `MAX_MODEL_CALLS_PER_JOB` (1200) | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
 | `FEATURE_IMAGE_PAGES`, `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE` ($0.25), `IMAGE_PAGES_MAX_USD_PER_JOB` ($7.50), `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`, `IMAGE_PAGES_OMISSION_CHECK` (default on), `IMAGE_PAGES_RECOVER_OMISSIONS` (default on), `IMAGE_PAGES_VECTOR_CROPS` (default off, unmeasured: on a handwritten page whose ink is vector, the pictures of expressions are drawn from the pen strokes) and `IMAGE_PAGES_VECTOR_CHECKS` (default on: a letter in the other case, a power lost, added or moved, and ink no block accounts for are flagged by comparing the reading with the strokes, docs/layout.md), `IMAGE_PAGES_SECOND_READING` (default off), `IMAGE_PAGES_ACCEPT_AGREED` (default off), `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED` (default on), `IMAGE_PAGES_SECOND_READER` (`off`, `local`, `claude`, `openai`; default `off`), `IMAGE_PAGES_SECOND_READER_TIME_S` (120) | Scanned and handwritten pages read from an image of the page (ADR 0007, "Scanned and handwritten pages on request" below); the omission check makes writing the reading left out a required decision, and the recovery reads such a stretch from a picture of just that part so it is converted instead; the second reading reads each `medium` block with a formula again from a picture of its line and records whether the two agree, and acceptance lets a block whose two readings agree, the second sure of every symbol, be an optional note (off: docs/eval-handwriting.md, "Root causes and fixes"); the last makes every block of a page read from an image that holds maths (a display equation, or a paragraph, list item or heading with a formula) a required decision whatever the reader's confidence (ADR 0007, point 12; typed pages and prose-only blocks are not affected); the second reader (`docs/math-readers.md`, "Using a reader in the pipeline") reads the crop of each handwritten display equation and compares it with the page's reading, so the review card can offer the differences as choices (it must also be enabled with its `MATH_READER_*_ENABLED`). The flag only offers the upload option; the model is the main one unless `IMAGE_PAGES_MODEL` says otherwise; a job that asked may spend `IMAGE_PAGES_USD_PER_PAGE` a page, at most `IMAGE_PAGES_MAX_USD_PER_JOB`, when that is more than `MAX_USD_PER_JOB` and `MAX_USD_PER_PAGE` allow |
@@ -118,7 +120,10 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/logout` | signed in | Clears the session |
 | GET `/app?revises=` | signed in | My documents as a to-do list (below; each finished row has "Upload a revised version"), then the upload form; with `revises=<job id>` of the person's own finished document, the form for a revised version of it ("Revised versions" below) |
 | GET `/app/documents?v=&course=` | signed in | The documents list alone, polled by htmx while a document is waiting or converting (204 while unchanged); with `course=` only that course's documents (the course page polls it) |
-| POST `/jobs` | signed in | Upload of one file or up to 10: checks, quota, queue, one job each; 303 to `/jobs/{id}` for one file, to `/uploads/{id}` when it is kept for choosing its pages, 303 to `/app/upload/{id}` (the results page) for several ("Uploads and limits") |
+| POST `/jobs` | signed in | Upload of one file or up to 30 (10 for an account made by open sign-up), or a zip of documents: checks, quota, queue, one job each; 303 to `/jobs/{id}` for one file, to `/uploads/{id}` when it is kept for choosing its pages, 303 to `/app/batch/{id}` (the batch page) for several or for a zip of documents ("Uploads and limits") |
+| GET `/app/batch/{id}` | owner | The batch page: each document of one upload with its status now, a live summary line, the large files waiting for their pages and the files not uploaded; polled by htmx while anything is unfinished (204 while unchanged); 404 for anyone else's, a stale and a malformed id ("Zip of documents and the batch page") |
+| GET `/app/batch/{id}/download` | owner | One zip of that batch's documents that are ready to share (finished, no decision open); 409 when none is; 404 as above |
+| GET `/app/upload/{id}` | owner | The old address of the answer to an upload of several files: 303 to `/app/batch/{id}` for the owner, 404 for anyone else |
 | GET `/app/download` | signed in | One zip of the person's ready documents ("Several files, courses and download all"); `?format=docx` or `?format=epub` makes the zip of Word or EPUB files (400 for any other value, 503 for Word without pandoc) |
 | POST `/sample` | signed in | Opens the person's sample document, made from the recorded conversion; 303 to its job page ("The sample document") |
 | GET `/uploads/{id}` | owner | A large file kept for choosing its pages: the suggested parts, the box to change them, "Shrink large pictures first" ("Large files in parts") |
@@ -586,13 +591,31 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   paragraphs, lists, tables, exact equations (LaTeXML's MathML through the sanitiser, accepted),
   and figures with the project's own picture through the ordinary figure step. A formula
   LaTeXML could not read, and a figure with no picture, are required decisions.
+- **Beamer** (`FEATURE_BEAMER_SOURCE`, off by default, needs `FEATURE_LATEX_SOURCE`): a deck is
+  read through LaTeXML's `beamer.cls` binding, which writes one `ltx_slide` per overlay step. A
+  frame is a heading (its title) and its content: sections are the top level, frames sit one level
+  below the section they are in (the title page's title is the document title). Of a frame's
+  steps only the last is written, plus any earlier step that shows something the last one does
+  not (`\only`, `\alt`, a formula or picture that changes), headed "(step 2 of 3)": the rule of
+  the PDF path's slide decks (docs/layout.md, "Slide decks"). Text a step covers (`\pause`,
+  `\uncover`, `\visible`) is not written for that step, and a list item a pause reveals is an
+  item of its own. LaTeXML 0.8.8's binding has no `block`, `alertblock`, `exampleblock`,
+  `columns`, `column` or `\institute`: `source/beamer_compat.tex` gives them as plain text and is
+  read first for a deck (`--preload`, mounted read-only in the sandbox). A deck counts one page
+  per frame (or per figure), not by characters; `DocumentResult.origin` is `beamer` and the student
+  note says "a slide deck". The spike behind it (E2) used five decks written for the purpose
+  (`tests/fixtures/source/beamer/`: 20 frames, 3 to 5 overlay steps in two of them): with the
+  compat file none of the 20 frames hit an unknown command (without it 3 did, 15 percent: a
+  block, a column and a block with `\institute`); **no real decks were tried**, which is why the
+  switch stays off.
+||||||| 2c0fc253
 - **One at a time.** A source conversion takes a machine-wide lock (`sandbox.exclusive`, an `flock`)
   before LaTeXML starts and others wait for it, so the sandbox's limits (4 tasks, 512 MB of address
   space each) bound the whole server and not each conversion; the worker already runs one job at a
   time, and the lock also covers a job whose abandoned conversion is still ending.
 - **TeX Live is not read.** LaTeXML finds a package's own TeX with `kpsewhich`. With TeX Live's base
   installed (the image has `texlive-latex-base`, which `latexml` depends on) it then reads raw TeX for a
-  package it has a binding for and runs expl3 under its own interpreter: `\\usepackage{siunitx}` took 72 s
+  package it has a binding for and runs expl3 under its own interpreter: `\usepackage{siunitx}` took 72 s
   and ended in over 100 errors (found by the CI job that runs the real sandbox). The sandbox puts an empty
   file over `kpsewhich` (`sandbox.run(hide=)`, `latexml.HIDDEN_FILES`), so LaTeXML uses only its own
   bindings, as it does where TeX Live is not installed: 2 s and the right answer. A package it has no
@@ -606,7 +629,7 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
 
 ### Several files in one upload
 
-The upload field takes up to `MAX_FILES_PER_UPLOAD` (10) files (`<input type="file" multiple>`;
+The upload field takes up to `access.files_per_upload(tier)` files (30 for invited people and pilots, 10 for an account made by open sign-up; `<input type="file" multiple>`;
 `app.js` checks the number, each file and the total as soon as they are chosen). Each file
 becomes **a job of its own**, with the course, exam and keeping choices of the form
 (`routes.jobs._place_files`, `intake.store_job`), and each is held to every control an upload has:
@@ -614,21 +637,22 @@ becomes **a job of its own**, with the course, exam and keeping choices of the f
 - the probe, in a child process with its own 30 s (all the probes of one request share
   120 s, so ten files that hang cannot hold the person's upload slot for five minutes);
 - the daily pages (`quota_days`, one conditional UPDATE in the job's own transaction), the
-  10 documents waiting or converting and 40 kept (`intake`), checked per file: a file that
+  documents waiting or converting (the same 30 or 10) and 40 kept (`intake`), checked per file: a file that
   does not fit is refused and the others still go in;
 - the rate limits: the request counts once against the address (`upload`) and once per file
   against the person (`upload_user`), so ten files cost ten of the fifteen uploads a person
-  may make in ten minutes;
+  may make in ten minutes (a zip counts once: below);
 - the token, once, and the upload gate (one request in progress per person).
 
 One file is answered as before (303 to its job page, or the upload form again with the
 reason). Several files are answered by **post-redirect-get**: the outcome of each file is
 stored for an hour under the person (`upload_results`, `web/upload_result.py`; names and
 numbers, no document content, deleted with the person and by the hourly purge) and the POST
-answers 303 to `GET /app/upload/{id}` (`upload_results.html`, status 200 whatever came of the
-files, owner only, 404 for another person's or an old one). The page lists the documents
-that are converting, the large files waiting for their pages, and the files that were not
-uploaded with the reason for each ("It did not use any of your pages"). A refresh, the back
+answers 303 to `GET /app/batch/{id}` (`batch.html`, status 200 whatever came of the files,
+owner only, 404 for another person's or an old one; `GET /app/upload/{id}` is the old address and
+redirects). The page lists the documents with their status, the large files waiting for their
+pages, and the files that were not uploaded with the reason for each ("It did not use any of
+your pages"). A refresh, the back
 button or a bookmark opens the page again and uploads nothing; before, the page was the POST's
 own response and a refresh sent every file again. The outcomes are stored, not carried in the
 URL or the session cookie, because the reasons name the files and a file name never goes in a
@@ -645,6 +669,60 @@ A Word file whose PDF is over the page or size limit of one conversion is kept f
 pages like a large PDF, as the PDF (never the Word file): its parts are named as PDFs
 ("Long notes (pages 1-5).pdf"). A PDF over `MAX_LARGE_UPLOAD_MB` is `too_large`. A Word file can
 be a revised version if it fits one conversion; a large one cannot.
+
+### Zip of documents and the batch page (`FEATURE_BATCH_ZIP`, `web/batch_intake.py`, `web/routes/batch.py`)
+
+With `FEATURE_BATCH_ZIP` on, a `.zip` upload is read (`web/archive_intake.py`: the upload limit zipped,
+500 entries, no links, no absolute or `..` paths, no nested zip, EPS or SVG, an
+extension allowlist) and **each document in it becomes a job of its own**, through exactly what an uploaded
+file goes through (`_place_files`: the probe, the page quota, the caps):
+
+- a zip with a main `.tex` file at its root is **one LaTeX project** (the LaTeX source path takes it, docs/web.md "LaTeX source");
+- otherwise every PDF is a document, and every folder with a main `.tex` file is a LaTeX project, re-zipped
+  from its own files and checked again as any project is; a PDF inside a project is its figure. Anything else
+  (a stray `.tex`, a picture outside a project, `.txt`) is left out, not refused; a zip with no document is
+  refused ("has no PDF and no LaTeX project in it");
+- **limits by tier**: one upload takes 30 documents for invited people and pilots and 10 for an account made
+  by open sign-up (`access.files_per_upload`); the same number is the cap on documents waiting or converting
+  at once (`intake.store_job`). Documents past the limit are refused one by one, by name, and cost nothing; a
+  zip counts once, not once per document, against the upload rate limit (its documents are held to the limits
+  by the quota and the cap, and the zip to its bytes);
+- **memory, per request** (`batch_intake.RequestBudget`, `routes.jobs._expand_batches` and `_loaded`): one
+  budget of `min(2 x MAX_UPLOAD_MB, MAX_LARGE_UPLOAD_MB)` (`UNPACKED_FACTOR` times the one-file limit,
+  capped at `Settings.upload_limit_bytes`, so 100 MB with the defaults of 50 and 100) is shared by every
+  zip of the request; every byte read out of any zip is charged and reading stops where it runs out (the zip
+  is then `zip_limits`). Only the `.tex` files are read to find the projects (at most 24 MB, freed at once);
+  each PDF and project is then read when its turn comes and let go after it, so a request holds the body
+  (at most `MAX_LARGE_UPLOAD_MB`, zips included), that text, and one document (a PDF over the upload limit is
+  refused by name from its header size, without being read and without counting against the budget,
+  while the zip's other documents are still converted; a project is at most the budget) plus the usual
+  copies an upload makes. Documents past the person's limit are only named, never read, and a zip met
+  after the limit is reached is refused unopened. With the defaults that is at the peak of a request
+  about 425 MB (the body 100 MB held three times over, 300 MB, the text 24 MB, one document up to
+  100 MB) against 300 MB for a plain large upload, so 3 at once (the upload gate) are about 1.3 GB against
+  900 MB, inside the 2 GB the web service is sized at: **a batch is now the largest consumer**, by that one
+  document and the text. The cap keeps it from growing with the large-upload limit beyond that; check this
+  sum against
+  the gate and the memory size whenever it changes;
+- every refusal of a zip (`zip_bad`, `zip_limits`, `zip_unsafe`, `zip_unsupported`, `zip_empty`,
+  `batch_limit`) is a category with a sentence (`routes.jobs.batch_messages`), a row on the batch page, and
+  costs nothing.
+
+**The batch page** (`GET /app/batch/{id}`, `batch.html`, `_batch_rows.html`): the answer to an upload of
+several files or a zip of documents (a zip of documents is answered by it even when it held one). One row per
+document in the order sent, with its status as it is now (`documents.DocumentRow`: "Waiting", "Converting: 2 of 5 pages done",
+"3 decisions to make" with a Review link, "Ready to download" with a Download link, "Stopped", "Deleted"), then
+the large files waiting for their pages and the files not uploaded. `#batch-summary` is a **polite live
+region** (`role="status"`) with the counts in one sentence ("5 documents: 2 ready to download, 1 needs your
+decisions, 1 converting, 1 waiting. 1 file was not uploaded."); no names. While a document is waiting or
+converting, htmx polls the page with the version of what it drew (`documents.list_version` over the batch's ids):
+204 while nothing changed, else the rows and the "Download all" block, with the summary rewritten **out of band**
+(`hx-swap-oob="innerHTML"`), so the live region node stays and the new counts are spoken. When nothing is
+unfinished the polling stops. **Download all** (`/app/batch/{id}/download`, `routes/bundle._zip_response` for
+the batch's ids) is offered once nothing is waiting or converting: one zip of the batch's documents with no
+decision open (the same rules as "Download all" on My documents), and the page says how many were left out for
+their decisions. The outcomes are kept an hour (`upload_results`); past it the page is 404 and the documents
+are on My documents. Axe passes on the page at 1280 and 375 CSS px (`tests/test_web_jobs_browser.py`).
 
 ### Large files in parts (`web/pending.py`, `web/routes/parts.py`, `web/ranges.py`)
 
@@ -2596,7 +2674,7 @@ its own `MAX_UPLOAD_MB` limit the same way.
 Sign-in starts and callbacks, uploads and the cron route are rate limited per address (and
 uploads per person) in memory (`web/abuse.py`; the numbers are in [security.md](security.md)).
 The address is read from `X-Forwarded-For` counting `TRUSTED_PROXY_HOPS` entries from the
-right; more entries than `TRUSTED_PROXY_HOPS + 1` logs `proxy_hops_unexpected` once (counts only). A person may have 10 documents waiting or running and 40 kept at once.
+right; more entries than `TRUSTED_PROXY_HOPS + 1` logs `proxy_hops_unexpected` once (counts only). A person may have 30 documents waiting or running (10 for an account made by open sign-up) and 40 kept at once.
 
 The converted document (`/view`, `/download`, `/demo`) gets its own policy instead:
 `sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'`. It may carry

@@ -136,7 +136,7 @@ def test_a_streamed_body_with_no_length_is_cut_off_at_the_limit(tmp_path):
 
 def test_too_many_parts_or_files_is_a_bad_form_not_a_crash(web):
     csrf = token(web.browser)
-    from readablestem.web.uploads import MAX_FILES_PER_UPLOAD
+    from readablestem.web.access import INVITED_FILES_PER_UPLOAD as MAX_FILES_PER_UPLOAD
 
     # Several files are allowed (T3-4, tests/test_web_multiupload.py); a flood of them is not.
     files = [
@@ -383,10 +383,14 @@ def test_hostile_names_are_shown_escaped_and_never_reach_headers(web):
 # --------------------------------------------------------------------------- quotas
 
 
-def test_one_person_cannot_queue_without_limit(web):
+def test_one_person_cannot_queue_without_limit(web, monkeypatch):
     """At most a few conversions wait or run at once for one person: a long queue of
-    their own files must not push everyone else back."""
-    from readablestem.web.routes.jobs import MAX_ACTIVE_JOBS_PER_USER
+    their own files must not push everyone else back. (The invited tier's cap is lowered to
+    10 here: the address's own rate limit is 30 uploads in ten minutes.)"""
+    from readablestem.web import access
+
+    monkeypatch.setattr(access, "INVITED_FILES_PER_UPLOAD", 10)
+    MAX_ACTIVE_JOBS_PER_USER = 10
 
     queued = 0
     for _ in range(MAX_ACTIVE_JOBS_PER_USER + 3):

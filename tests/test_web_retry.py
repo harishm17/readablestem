@@ -461,8 +461,11 @@ def test_a_job_can_be_tried_again_only_a_few_times(site):
     )
 
 
-def test_a_person_with_a_full_queue_cannot_add_to_it_by_trying_again(site):
-    from readablestem.web.routes.jobs import MAX_ACTIVE_JOBS_PER_USER
+def test_a_person_with_a_full_queue_cannot_add_to_it_by_trying_again(site, monkeypatch):
+    from readablestem.web import access
+
+    monkeypatch.setattr(access, "INVITED_FILES_PER_UPLOAD", 10)  # a smaller queue to fill
+    MAX_ACTIVE_JOBS_PER_USER = 10
 
     site.state["fatal_after"] = 1
     stopped = job_id_from(upload(site.browser, PDF.read_bytes()))

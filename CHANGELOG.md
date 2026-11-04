@@ -49,6 +49,38 @@
   upload form's 7-day box ticked; each upload still decides. The job page says near the top when
   the document will be deleted, with a one-click "Keep it for 7 days". Retention wording says the
   clock restarts on each decision or download.
+## Unreleased: zip intake and tiered batch limits (branch batch/b2-zip-intake)
+
+- A `.zip` of documents is a batch (`FEATURE_BATCH_ZIP`, off by default, `web/batch_intake.py`): each PDF and each
+  folder with a main `.tex` file (a LaTeX project, re-zipped and checked again by the LaTeX source path) becomes a
+  document of its own through the ordinary upload checks; a zip with a main file at its root is one project; strays
+  are left out; a zip with no document, a link, a bad path, a nested zip, EPS or SVG, or over the limits (the LaTeX
+  source's, with 80 MB unpacked) is refused. The zip counts once for the upload rate limit.
+- Memory: the unpacked budget of a batch is one per request (twice the upload limit, shared by every zip in it, not
+  80 MB per zip), the documents of a zip are read one at a time when their turn comes, a PDF over the upload limit
+  is refused by its header unread, and documents past the person's limit are named, never read (a zip met after
+  the limit is refused unopened). `batch_intake.split` returns lazy `Member`s.
+- Limits by tier: one upload takes 30 documents for invited people and pilots and 10 for an account made by open
+  sign-up (`access.files_per_upload`), and the same number is the cap on documents waiting or converting at once
+  (it was 10 for everyone). The upload form and the messages say the number for the person.
+- The batch page `/app/batch/{id}` (`routes/batch.py`) replaces the results page of an upload of several files
+  (`/app/upload/{id}` redirects to it): a row per document with its status now, a polite live summary line, polling
+  with 204 while nothing changed, "Download all" (`/app/batch/{id}/download`) once nothing is waiting, the large
+  files and the refusals as before. `documents.documents` and `list_version` take a list of job ids.
+- Tests: `tests/test_batch_intake.py`, `tests/test_web_batch.py`, the batch page in `tests/test_web_jobs_browser.py`
+  (axe at 1280 and 375); the tests that fixed 10 now use the tier.
+
+## Unreleased: Beamer source (branch latex/e2-beamer-source)
+
+- Beamer decks within LaTeX source (`FEATURE_BEAMER_SOURCE`, off by default, needs `FEATURE_LATEX_SOURCE`): frames
+  become headings with their content (sections the top level, frames below them), an overlay step is written only
+  when it shows something the frame's last step does not ("(step 2 of 3)"; the rule of the PDF slide decks), text a
+  step covers is not written, a list item a pause reveals is an item of its own, a title page drawn by Beamer is read
+  for its blocks. `source/beamer_compat.tex` gives LaTeXML 0.8.8's binding the block, column and `\institute`
+  definitions it lacks (read first, read-only in the sandbox). A deck counts a page per frame. Spike on five decks
+  written for it: 20 frames, none with an unknown command (3 had one without the compat file); no
+  real deck tried. `DocumentResult.origin` `beamer`, the student note says "a slide deck". Tests:
+  `tests/test_source_beamer.py`; fixtures `tests/fixtures/source/beamer/`.
 
 ## Unreleased: LaTeX source upload (branch latex/e1-source-intake)
 

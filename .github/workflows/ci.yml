@@ -232,7 +232,8 @@ jobs:
           uv run pytest -n auto -rs
           tests/test_sandbox.py tests/test_ops_sandbox_probe.py tests/test_archive_intake.py
           tests/test_source_intake.py tests/test_source_reader.py tests/test_source_convert.py
-          tests/test_source_escapes.py tests/test_source_child.py tests/test_web_source.py
+          tests/test_source_escapes.py tests/test_source_child.py tests/test_source_beamer.py
+          tests/test_web_source.py
 
   # One name for branch protection to require instead of each job above: it fails when any
   # job that ran failed or was cancelled, and passes when the rest were skipped by design.

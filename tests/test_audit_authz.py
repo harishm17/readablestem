@@ -162,8 +162,11 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/uploads/{upload_id}"): USER,
     ("POST", "/uploads/{upload_id}"): USER,  # CSRF, rate limited, quota and caps as an upload
     ("POST", "/uploads/{upload_id}/delete"): USER,  # asks first (confirm=yes)
-    # T3-4: the answer to an upload of several files, a page of its own for an hour
+    # T3-4: the answer to an upload of several files, a page of its own for an hour: the batch
+    # page (live status, "Download all"); the old address redirects to it
     ("GET", "/app/upload/{result_id}"): USER,
+    ("GET", "/app/batch/{result_id}"): USER,
+    ("GET", "/app/batch/{result_id}/download"): USER,
 }
 
 
@@ -225,7 +228,7 @@ def site(tmp_path):
                 ("pdf", ("b.pdf", b"not a pdf", "application/pdf")),
             ],
         )
-        assert several.status_code == 303 and "/app/upload/" in several.headers["location"]
+        assert several.status_code == 303 and "/app/batch/" in several.headers["location"]
         result_id = several.headers["location"].rsplit("/", 1)[-1]
         env.ids = {
             "upload_id": upload_id,

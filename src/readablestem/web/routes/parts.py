@@ -45,7 +45,6 @@ from readablestem.web.deps import (
     require_csrf,
 )
 from readablestem.web.intake import (
-    MAX_ACTIVE_JOBS_PER_USER,
     QuotaRefused,
     TooManyJobs,
     store_job,
@@ -233,7 +232,8 @@ def _start_parts(
             break
         except TooManyJobs as exc:
             out.error = (
-                f"You already have {MAX_ACTIVE_JOBS_PER_USER} documents waiting or being converted."
+                f"You already have {access.files_per_upload(user.access_tier)} documents waiting "
+                "or being converted."
                 if exc.code == "too_many_active"
                 else "You are keeping the most documents allowed."
             ) + (
