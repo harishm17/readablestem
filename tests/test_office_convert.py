@@ -192,11 +192,26 @@ def test_size_and_count_limits(monkeypatch):
     )
 
 
+def test_the_zip_limits_leave_room_for_the_largest_upload():
+    """A Word file at the upload limit is not refused for its size alone: the unpacked limit
+    is several times the request limit, and the PDF it makes may be as large as a request."""
+    from readablestem.config import Settings
+
+    s = Settings(_env_file=None)  # type: ignore[call-arg]
+    limit = s.upload_limit_bytes
+    assert limit * 4 <= office_convert.MAX_UNPACKED_BYTES
+    assert limit <= office_convert.MAX_ENTRY_BYTES
+    assert limit <= office_convert.MAX_PDF_BYTES
+
+
 def test_a_decompression_bomb_is_refused_without_being_unpacked():
+    # entries each under the entry limit, together over the unpacked limit, whatever those are
+    size = office_convert.MAX_ENTRY_BYTES * 4 // 5
+    count = office_convert.MAX_UNPACKED_BYTES // size + 1
     bomb = office.rebuild(
-        office.docx_parts(), add={f"media/{n}.bin": bytes(60_000_000) for n in range(4)}
+        office.docx_parts(), add={f"media/{n}.bin": bytes(size) for n in range(count)}
     )
-    assert len(bomb) < 2_000_000
+    assert len(bomb) < 2_000_000 * count
     assert refused(bomb) == "office_unsafe"
 
 

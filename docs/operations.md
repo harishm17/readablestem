@@ -70,6 +70,17 @@ dump a day and keeps the last 6, and there are no point-in-time-recovery logs, s
 to about a week after the purge (deploy-railway.md, "As deployed"); the privacy page says so
 ("about 6 days", "up to about a week") and has to keep saying so if the schedule changes.
 
+### How much the uploads weigh
+
+An upload is stored in the database as bytes until its job is deleted: up to `MAX_UPLOAD_MB` (50)
+for a document and up to `MAX_LARGE_UPLOAD_MB` (100) for a large file waiting for its pages (2 a
+person), which were 20 and 30 before 2026-11-03. Ordinary course PDFs are 1 to 10 MB, so the
+database stays small; the worst case for one person is 2.2 GB (40 kept documents and 2 waiting
+files, all at the limit), and every daily backup copies what is stored that day. After the limits
+were raised, look at the size of the Postgres volume and of the `backup` volume in Railway's
+Metrics during the first weeks (docs/deploy-railway.md, "Backups"), and lower the limits or add
+a per-person byte cap if they grow faster than the retention frees them.
+
 ### Large files waiting for their pages
 
 A PDF over the page or size limit is kept as a `pending_uploads` row (`web/pending.py`, docs/web.md
@@ -403,7 +414,7 @@ leaves nothing running.
 readablestem.web.conversion_child`, started by `web/isolated_convert.py`), so a PDF that crashes,
 exhausts memory or hangs MuPDF fails that one job and the web process, its sessions and the
 worker go on. The child is limited to `CONVERSION_MEMORY_MB` of address space (default 3072, plus
-twice the PDF; resident memory is far lower, 330-460 MB measured) and 4 times the job's time limit
+twice the PDF; resident memory is far lower: 330-460 MB measured on short documents, 494 MB for 100 pages and 745 MB for 100 pages with 51 MB of pictures) and 4 times the job's time limit
 in CPU seconds, and is killed at the job's time limit, when the job is deleted or taken over, and
 at shutdown. Web service and child share the service's RAM: while a job converts, expect the web
 process plus one child; a service limit below about 1 GB would not hold both (docs/deploy-railway.md,

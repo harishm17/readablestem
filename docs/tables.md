@@ -843,7 +843,9 @@ papers was labelled, so how many real tables 17 is cannot be said.
    reservation of a table call is $0.53 and `ops launch-check` (`ops/limits.py`) refuses a
    `MAX_USD_PER_PAGE` under $0.53 and warns about a `MAX_USD_PER_JOB` under **$4.66** (a 30-page
    document's $0.45 plus eight calls held at once, $4.21), not $2.60: run on 2026-10-21 with the
-   job cap at $4.65 it reports one blocker, at $4.66 none. The measured cost is $0.0123 a table,
+   job cap at $4.65 it reports one blocker, at $4.66 none (2026-11-03: with the page limit raised
+   from 30 to 100 the figure is **$5.71**, $1.50 plus the same $4.21; the default job cap is now
+   $6.00). The measured cost is $0.0123 a table,
    about 40 times less than the reservation; the caps only have to hold the reservations.
 4. **`\ce` in a table cell: closed without a prompt change.** The table prompt does not teach
    mhchem, so a model rarely writes it; if one does, `table_step._cell` now writes it out as
@@ -864,13 +866,14 @@ other deployment behave as before), with, for `MODEL_PROVIDER=anthropic`:
 ```
 FEATURE_TABLES=true
 MAX_USD_PER_PAGE=2.20
-MAX_USD_PER_JOB=4.70
+MAX_USD_PER_JOB=6.00
 ```
 
-`ops launch-check` with these and the daily cap of $10 and quota of 90 pages: `launch_blockers=0`.
-The minimum it accepts is $0.53 and $4.66; the page cap is $2.20 so that a one-page job holds four
+`ops launch-check` with these and the daily cap of $10 and quota of 300 pages: `launch_blockers=0`
+(on 2026-10-21 with 30 pages a job, `MAX_USD_PER_JOB=4.70` and a quota of 90). The minimum it
+accepts is $0.53 and $5.71; the page cap is $2.20 so that a one-page job holds four
 calls at once (at $0.53 its table and equation steps would run one after another), the job cap
-$4.70 is the minimum rounded up. Nothing else needs to move; the tests of the step with the flag
+$6.00 is the default. Nothing else needs to move; the tests of the step with the flag
 on (`tests/test_steps_table.py`, "a conversion with the flag on") already cover it. What to look
 at in the first week: the share of tables that need a decision (0.30 expected), `table_not_rebuilt`
 gone, `local_grid` (a model outage), the review screen's table card, and how many tables of
@@ -899,7 +902,7 @@ The first real-document measurement ("The blockers", item 1 above) found precisi
 full-extent recall 0.560 (14 of 25) on `data/real-tables`, against a floor of 0.85. This is where each
 of the 11 misses was dropped, the root causes behind them, what was changed, and what it did. No
 model is called anywhere in it: detection is free, nothing was spent, and the spend caps
-(`FEATURE_TABLES=true`, `MAX_USD_PER_PAGE=2.20`, `MAX_USD_PER_JOB=4.70`) still pass `ops launch-check`
+(`FEATURE_TABLES=true`, `MAX_USD_PER_PAGE=2.20`, `MAX_USD_PER_JOB=4.70`, with the 30-page limit of the time) still pass `ops launch-check`
 (`launch_blockers=0`); the only cost effect is that more tables are found and rebuilt (about
 $0.012 to $0.033 each, "The tables task" and "On real papers" above). Time: `layout.analyze` on the
 64 pages of `data/real-tables` took 0.49 s a page before and 0.52 s after, on the 58 held-out pages
