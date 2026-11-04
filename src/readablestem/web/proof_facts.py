@@ -157,7 +157,9 @@ def parse_first_test(proof: str) -> FirstTest:
     return FirstTest(
         set_label="15 OpenStax sections, 242 pages, October 2026, version 0.4.0",
         levels_ours=f"{levels[0]} of {levels[1]} ({100 * int(levels[0]) // int(levels[1])}%)",
-        levels_chatbot=f"{levels[2]} of {levels[3]} ({round(100 * int(levels[2]) / int(levels[3]))}%)",
+        levels_chatbot=(
+            f"{levels[2]} of {levels[3]} ({round(100 * int(levels[2]) / int(levels[3]))}%)"
+        ),
         errors_ours=f"{errors[0]} of {errors[1]}",
         errors_chatbot=f"{errors[2]} of {errors[3]}",
     )

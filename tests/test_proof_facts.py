@@ -86,7 +86,9 @@ def test_the_chart_is_the_registered_results_file_and_says_what_a_listener_hears
     assert names == ["ReadableSTEM", "Chatbot on Opus", "Chatbot on Haiku"]
     by_key = {key: words for key, words, *_ in proof_facts.MEASURES}
     for key, words in by_key.items():
-        for arm, line in zip(("Candidate", "Chatbot, Opus", "Chatbot, Haiku"), shown[words].lines):
+        for arm, line in zip(
+            ("Candidate", "Chatbot, Opus", "Chatbot, Haiku"), shown[words].lines, strict=True
+        ):
             point = results["arms"][arm][key]["point"]
             if key.startswith("flag recall") and point == 0:
                 assert line.value == "never asks" and line.width == 0
