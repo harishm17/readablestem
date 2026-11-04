@@ -362,6 +362,9 @@ class PageTable:
     column_edges: list[float] = field(default_factory=list)  # for continued tables
     caption_above: bool = False  # its caption is printed above it (`_attach_captions`)
     layout_grid: bool = False  # text set out in boxes (`is_layout_grid`): data only if captioned
+    # Cells whose whole content layout read as one formula from its glyphs, by (row, col)
+    # (`layout._cell_maths`); each value is layout's inline-equation record of the cell.
+    cell_maths: dict[tuple[int, int], Any] = field(default_factory=dict)
 
 
 # ============================================================================ the detector
