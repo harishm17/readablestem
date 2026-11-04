@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: display grouping (branch eq/display-grouping)
+
+- New setting `LAYOUT_DISPLAY_GROUPING` (off; output byte-identical to before when off, no pipeline bump until it is turned on).
+  When on, layout joins pieces of one printed display: two formulas with a connective word between them
+  ("P_A = ... and P_B = ...", "0 < p < 1 for all i") are one display element holding the word and
+  the one equation number, where the word was a paragraph read after both equations; the right
+  half of a long aligned row and a row that starts with "=" join the display above them; a
+  trailing ellipsis ("j = 1, 2, 3, ...", "0 > s_1 > s_2 > ...") stays in an inline formula.
+  Conservative: any other word, two numbered equations, or a fraction far from the row keep the old
+  reading. `docs/layout.md` "One printed display, one element"; `scripts/layout_identity.py` lists
+  what changed on 149 repository PDFs and the development, fresh and held-out papers.
 ## Unreleased: upload, job page and My documents (branch ux/upload-job-documents)
 
 - A person a document was shared with who can only view it is no longer told "N decisions need

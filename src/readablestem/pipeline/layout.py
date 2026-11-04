@@ -453,6 +453,7 @@ def analyze(
     pages: list[int] | None = None,
     max_pages: int | None = None,
     page_math: Any = None,
+    display_grouping: bool = False,
 ) -> Layout:
     """Elements of the given 0-based pages (all by default), ids "p{page+1}-e{index}".
 
@@ -468,6 +469,9 @@ def analyze(
     `after_regions(number, rows)` (`pipeline.page_math_reconcile.PageMathHook`). It is shown
     each page's text rows before the display equations are grouped, and may return them
     cut and marked by a verified plan. None (the default) is layout's own rules alone.
+
+    `display_grouping` (`LAYOUT_DISPLAY_GROUPING`, off): the rules of "One printed display, one
+    element" in docs/layout.md. Off, the output is what it was before they existed.
     """
     with _LOCK:
         _quiet_mupdf()
@@ -476,12 +480,12 @@ def analyze(
             try:
                 selected = _select_pages(doc.page_count, pages, max_pages)
                 _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
-                return _analyze_document(doc, selected, page_math)
+                return _analyze_document(doc, selected, page_math, display_grouping)
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
             finally:
-                global _TEX_MADE, _SLIDE_DECK, _COMPOUNDS, _WHOLE_WORDS
-                _TEX_MADE = _SLIDE_DECK = False
+                global _TEX_MADE, _SLIDE_DECK, _COMPOUNDS, _WHOLE_WORDS, _GROUPING
+                _TEX_MADE = _SLIDE_DECK = _GROUPING = False
                 _COMPOUNDS = _WHOLE_WORDS = frozenset()
                 doc.close()
         finally:
@@ -3263,9 +3267,10 @@ def _loose_scripts(
     return left_flat
 
 
-def _prose_words(row: _Row, info: _CharInfo) -> int:
-    """Words that read as English: 3+ plain letters (not sin/log/...) or "is", "if", ..."""
-    count = 0
+def _prose_spans(row: _Row, info: _CharInfo) -> list[tuple[int, int, str]]:
+    """Words that read as English: 3+ plain letters (not sin/log/...) or "is", "if", ...
+    as (first character, end, lower-case word)."""
+    found: list[tuple[int, int, str]] = []
     i = 0
     chars = row.chars
     while i < len(chars):
@@ -3280,9 +3285,40 @@ def _prose_words(row: _Row, info: _CharInfo) -> int:
         if not variables and (
             (len(word) >= 3 and word not in _MATH_WORDS) or word in _PROSE_TWO_LETTER
         ):
-            count += 1
+            found.append((i, j, word))
         i = j
-    return count
+    return found
+
+
+def _prose_words(row: _Row, info: _CharInfo) -> int:
+    return len(_prose_spans(row, info))
+
+
+def _joined_formulas(row: _Row, info: _CharInfo) -> bool:
+    """Is the row two formulas joined by one connective word ("P(A) = 1 and P(B) = 2,")?
+
+    A display set so has a prose word in it, which keeps `_classify_row` from reading it as
+    maths. The row is one when its only English words are one connective (`_CONNECTIVES`:
+    "and", "or", "for all" ...), each side of it is a relation with something on both
+    sides (after "for" a short condition), and the rest of it is maths. Any other word
+    ("where x = 1 and y = 2 hold") leaves the row text.
+    """
+    spans = _prose_spans(row, info)
+    spoken = " ".join(word for _, _, word in spans)
+    if not spans or spoken not in _CONNECTIVES:
+        return False
+    chars = row.chars
+    left = [c for c in chars[: spans[0][0]] if not c.blank]
+    right = [c for c in chars[spans[-1][1] :] if not c.blank]
+    if not left or not right:
+        return False
+
+    def whole(side: list[_Char]) -> bool:
+        body = [c for c in side if c.c not in ",.;:"]
+        return any(c.c in _ROW_RELATIONS and 0 < k < len(body) - 1 for k, c in enumerate(body))
+
+    short = len([c for c in right if c.c not in ",.;:"]) <= 3
+    return whole(left) and (whole(right) or (spoken.startswith("for") and short))
 
 
 def _is_equation_number(text: str) -> bool:
@@ -3321,6 +3357,9 @@ def _classify_row(row: _Row) -> None:
         row.score = max(row.score, EQUATION_THRESHOLD)
     elif prose == 0 and row.score >= EQUATION_THRESHOLD and ratio >= 0.5:
         row.kind = "math"
+    elif _GROUPING and prose >= 1 and ratio >= 0.5 and _joined_formulas(row, info):
+        row.kind = "math"  # "P(A) = 1 and P(B) = 2": two formulas of one display
+        row.reasons = [*row.reasons, JOINED_REASON]
     elif prose == 0 and ratio >= 0.6 and len(ink) <= 40:
         row.kind = "frag"
     else:
@@ -3898,12 +3937,33 @@ def _between_formulas(chars: list[_Char], i: int) -> bool:
     )
 
 
+def _trailing_ellipsis(chars: list[_Char], start: int, end: int) -> bool:
+    """Do the last three glyphs of the run `[start, end)` make an ellipsis of its own, set
+    after a comma or a relation or operator ("j = 1, 2, 3, ...", "0 > s1 > s2 > ...")?
+
+    The list or chain goes on, and the dots are part of the formula, not the full stop of a
+    sentence: trimming them left "j = 1, 2, 3" for a reader who needs to know it continues.
+    Exactly three dots (a fourth is the sentence's full stop, which still goes), and only
+    after one of those signs.
+    """
+    dots = [k for k in range(end - 1, start - 1, -1) if not chars[k].blank][:4]
+    if len(dots) < 4 or any(chars[k].c not in ".·" for k in dots[:3]):
+        return False
+    return chars[dots[3]].c in ",<>=≤≥≠+−-×"  # noqa: RUF001
+
+
 def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tuple[int, int]:
     """Drop surrounding spaces, trailing operators/punctuation and unmatched brackets."""
     changed = True
     while changed and end > start:
         changed = False
-        while end > start and (chars[end - 1].blank or chars[end - 1].c in ",.;:"):
+        while end > start and (
+            chars[end - 1].blank
+            or (
+                chars[end - 1].c in ",.;:"
+                and not (_GROUPING and _trailing_ellipsis(chars, start, end))
+            )
+        ):
             end -= 1
             changed = True
         while end > start and chars[start].blank:
@@ -5535,6 +5595,14 @@ _CONTINUATION_SIGNS = _ROW_RELATIONS | frozenset("+-\u2212\u00b1\u2213\u00d7\u22
 MAX_LINE_GAP = 0.8  # x font size: widest vertical gap between lines of one display equation
 TABLE_ROW_GAP = 0.7  # x font size: widest gap between whole equations that are rows of a table
 MAX_COLUMN_GAP = 6.0  # x font size: widest gap between the columns of an aligned row
+# Widest gap between a display's formula and the connective word set between two formulas of
+# one printed line ("P_A = ... and P_B = ...": `\hfill`, `\quad` and `\qquad` all give an em
+# or more; a centred "and" between two columns can stand 7 font sizes from either).
+CONNECTIVE_GAP = 9.0
+_CONNECTIVES = frozenset(
+    {"and", "or", "for", "for all", "for any", "for every", "for each", "where", "with", "if",
+     "when", "otherwise"}
+)  # fmt: skip
 
 
 def _split_labels(rows: list[_Row]) -> list[_Row]:
@@ -5950,6 +6018,41 @@ def _punctuation_only(row: _Row) -> bool:
     return all(c.c in ",.;:" for c in row.ink)
 
 
+_GROUPING = False  # set by `analyze(display_grouping=...)` for the length of one call
+JOINED_REASON = "formulas joined by a word"
+JOINED_INDENT = 2.5  # x font size: least space on each side of a display line of two formulas
+
+
+def _demote_joined_rows(rows: Sequence[_Row]) -> None:
+    """Take back the display reading of a row of two formulas and a word ("x = 1 and y = 2")
+    that is not set off like a display.
+
+    `_joined_formulas` reads such a row from its characters alone, and a line of a sentence
+    can look so too: the tail of a paragraph that goes on over a page break ("... rate = k[A]
+    with k = 6.7"). A display line is centred or indented with space on both sides: the row
+    must start and end at least `JOINED_INDENT` font sizes inside the text of its column (the
+    leftmost and rightmost ends of its running text lines); with no text to measure against,
+    it stays text.
+    """
+    for row in rows:
+        if row.kind != "math" or JOINED_REASON not in row.reasons:
+            continue
+        text = [
+            t
+            for t in rows
+            if t.kind == "text" and t.column == row.column and not t.absorbed and len(t.clean) >= 30
+        ]
+        if text:
+            left, right = min(t.x0 for t in text), max(t.x1 for t in text)
+            if (
+                row.x0 - left >= JOINED_INDENT * row.size
+                and right - row.x1 >= JOINED_INDENT * row.size
+            ):
+                continue
+        row.kind = "text"
+        row.reasons = [r for r in row.reasons if r != JOINED_REASON]
+
+
 def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
     """Group the page's maths rows into display equations; sets `row.region`.
 
@@ -5965,6 +6068,7 @@ def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
        aligned (the rows of an aligned derivation). Two whole equations stacked close
        together but centred on their own ("time = d / v" over "d = v t") stay apart.
     """
+    _demote_joined_rows(rows)
     maths = [
         r
         for r in rows
@@ -6017,6 +6121,8 @@ def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
         _Line(members, list({id(p): p for r in members for p in on_rule.get(id(r), [])}.values()))
         for members in groups.values()
     ]
+    if _GROUPING:
+        lines = _join_connectives(lines, rows)
     for label in labels:
         centre = (label.y0 + label.y1) / 2
         beside = [
@@ -6032,6 +6138,73 @@ def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
         else:
             lines.append(_Line([label], []))  # a number inside the maths, not beside it
     return _stack_lines(lines)
+
+
+def _join_connectives(lines: list[_Line], rows: Sequence[_Row]) -> list[_Line]:
+    """Join two display formulas set on one line with a connective word between them.
+
+    "P_A = c / c   and   P_B = c / c ," is one printed display with one number. The word
+    is a row of its own (a text font, a gap of an em or more on either side), so it ends
+    the line on its left and the line on its right starts a new one, and the "and" is left
+    in the text after both: the reader meets the two equations and then "and". A connective
+    (`_CONNECTIVES`, alone in its row) joins the formula before it and the formula after it
+    when both stand on its baseline within `CONNECTIVE_GAP` font sizes, the first is a whole
+    equation, and the second is one too (or, after "for", a short condition: "for all i").
+    The word becomes a maths row of the line, so the display's crop, text layer and reading
+    hold it.
+    """
+    for word in rows:
+        if (
+            word.kind != "text"
+            or word.absorbed
+            or word.vertical
+            or word.marker is not None
+            or word.region is not None
+            or _clean(word.text).strip(" ,;.").lower() not in _CONNECTIVES
+        ):
+            continue
+        size = max(word.size, 1.0)
+
+        def level(line: _Line, word: _Row = word, size: float = size) -> bool:
+            """The word sits at the height of the line's middle (a fraction's bar, a row's
+            centre), inside its vertical extent."""
+            middle = (line.box[1] + line.box[3]) / 2
+            return (
+                line.rows[0].column == word.column
+                and word.y0 >= line.box[1] - 0.5 * size
+                and word.y1 <= line.box[3] + 0.5 * size
+                and abs((word.y0 + word.y1) / 2 - middle)
+                <= max(0.6 * size, 0.2 * (line.box[3] - line.box[1]))
+            )
+
+        before = [
+            ln
+            for ln in lines
+            if level(ln) and 0 <= word.x0 - ln.box[2] <= CONNECTIVE_GAP * size and ln.complete
+        ]
+        after = [
+            ln
+            for ln in lines
+            if level(ln) and 0 <= ln.box[0] - word.x1 <= CONNECTIVE_GAP * size and ln.ink
+        ]
+        if not before or not after:
+            continue
+        left = min(before, key=lambda ln: word.x0 - ln.box[2])
+        right = min(after, key=lambda ln: ln.box[0] - word.x1)
+        condition = _clean(word.text).lower().startswith("for") and len(right.ink) <= 3
+        if left is right or not (right.complete or condition):
+            continue
+        if left.labels and right.labels:
+            continue  # two numbered equations
+        word.kind = "math"
+        merged = _Line(
+            [*left.rows, word, *right.rows],
+            [*left.rules, *(p for p in right.rules if p not in left.rules)],
+            [*left.labels, *right.labels],
+        )
+        lines = [ln for ln in lines if ln is not left and ln is not right]
+        lines.append(merged)
+    return lines
 
 
 def _joins_line(above: _Line, box: BBox, line: _Line, earlier: Sequence[_Line] = ()) -> bool:
@@ -6085,7 +6258,8 @@ def _stack_lines(lines: list[_Line]) -> list[_Region]:
     """Join lines into display equations top to bottom (see `_equation_regions`)."""
     regions: list[_Region] = []
     last: list[_Line] = []  # the lowest line of each region so far
-    peers: list[list[_Line]] = []  # every line of each region so far
+    peers: list[list[_Line]] = []  # the lines of each region so far, but its first
+    first: list[_Line] = []  # the first line of each region
     active: list[int] = []  # regions whose bottom is still within reach
     for line in sorted(lines, key=lambda ln: (ln.box[1], ln.box[0])):
         reach = line.box[1] - 2 * MAX_LINE_GAP * line.size  # beyond any _joins_line reach
@@ -6097,6 +6271,7 @@ def _stack_lines(lines: list[_Line]) -> list[_Region]:
         if host is None:
             regions.append(_Region(box=line.box))
             last.append(line)
+            first.append(line)
             peers.append([])
             active.append(len(regions) - 1)
             host = len(regions) - 1
@@ -6108,10 +6283,105 @@ def _stack_lines(lines: list[_Line]) -> list[_Region]:
         region.box = _union([region.box, line.box])
         if any(c.c.isalnum() for c in line.ink) or not last[host].ink:
             last[host] = line  # a stray mark does not stand for the line above
+    if _GROUPING:
+        regions = _merge_continued_regions(
+            regions, [[f, *p] for f, p in zip(first, peers, strict=True)]
+        )
     for region in regions:
         for row in [*region.rows, *region.labels]:
             row.region = region
     return regions
+
+
+def _merge_continued_regions(regions: list[_Region], members: list[list[_Line]]) -> list[_Region]:
+    """Join a region that starts with "=" or an operator to the display equation above it.
+
+    Lines are stacked top to bottom, one by one, and the pieces of one printed row do not
+    all reach the equation above: the right half of a long row ("... ds + ∫ ...") starts
+    clear of the box of the row above, so it opens a region of its own, and the left piece
+    of the row, the "= -1" that starts it, then joins that region (it is the most recent
+    one). A region whose leftmost top line starts with a relation or operator is the next
+    row of the display above when it sits within the usual line gap of that display (or
+    overlaps its box: limits and numerators hang below), shares its column, overlaps it
+    horizontally, and the two do not both carry an equation number.
+
+    The same order leaves the right half of a row alone when that half is a bare fraction
+    (no main row on the baseline to chain it to the rest): it opens a region of its own
+    to the right of the row above it. It joins the region whose line ends level with it
+    and at most `MAX_COLUMN_GAP` font sizes to its left (the reach of the columns of an
+    aligned row), when at least one of the two lines is not a whole equation.
+    """
+    merged: set[int] = set()
+    for j, region in enumerate(regions):
+        lines = members[j]
+        if region.forced or not lines or id(region) in merged:
+            continue
+        top = min(ln.box[1] for ln in lines)
+        band = [ln for ln in lines if ln.box[1] <= top + 0.8 * ln.size and not ln.opens_system]
+        lead = min(band, key=lambda ln: ln.box[0], default=None)
+        size = max(ln.size for ln in lines)
+        reach = MAX_LINE_GAP * 1.5 * size
+        hosts = [
+            i
+            for i, above in enumerate(regions)
+            if i != j
+            and id(above) not in merged
+            and not above.forced
+            and members[i][0].rows[0].column == lines[0].rows[0].column
+            and not (above.labels and region.labels)
+            and (
+                (
+                    lead is not None
+                    and lead.continues
+                    and _continues_below(above, region, lead, size, reach)
+                )
+                or _beside_row(members[i], lines, size)
+            )
+        ]
+        if not hosts:
+            continue
+        host = max(hosts, key=lambda i: regions[i].box[3])
+        target = regions[host]
+        target.rows.extend(region.rows)
+        target.rules.extend(p for p in region.rules if p not in target.rules)
+        target.labels.extend(region.labels)
+        target.box = _union([target.box, region.box])
+        members[host].extend(lines)
+        merged.add(id(region))
+    return [r for r in regions if id(r) not in merged]
+
+
+def _continues_below(
+    above: _Region, region: _Region, lead: _Line, size: float, reach: float
+) -> bool:
+    """`region` starts with a continuation sign under `above`, in its column's reach."""
+    return (
+        above.box[1] + 0.5 * size <= region.box[1]
+        and region.box[1] - above.box[3] <= reach
+        and above.box[1] < region.box[1]
+        and region.box[0] <= above.box[2] + size
+        and region.box[2] >= above.box[0] - size
+        and lead.box[1] >= above.box[1] + 0.5 * size
+    )
+
+
+def _beside_row(host: Sequence[_Line], lines: Sequence[_Line], size: float) -> bool:
+    """Does a line of `lines` start level with, and close to the right of, a line of `host`
+    (at most `MAX_COLUMN_GAP` sizes), with one of the two not a whole equation?"""
+    for m in host:
+        for x in lines:
+            if any(_is_equation_number(r.clean) for ln in (m, x) for r in ln.rows):
+                continue  # a number beside a display is not a column of it
+            gap = x.box[0] - m.box[2]
+            level = m.box[1] <= (x.box[1] + x.box[3]) / 2 <= m.box[3]
+            if (
+                0 <= gap <= MAX_COLUMN_GAP * size
+                and level
+                and m.box[1] < x.box[1] + 0.5 * size
+                and not (m.complete and x.complete)
+            ):
+                return True
+    return False
 
 
 def _contiguous_regions(ordered: list[_Row]) -> list[_Row]:
@@ -9603,14 +9873,20 @@ def _read_page(
     return rows, _page_paths(page, drawings, seen), kind
 
 
-def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any = None) -> Layout:
+def _analyze_document(
+    doc: pymupdf.Document,
+    selected: list[int],
+    page_math: Any = None,
+    display_grouping: bool = False,
+) -> Layout:
     frags: dict[int, list[_Row]] = {}
     paths: dict[int, list[_Path]] = {}
     types: dict[int, page_type.PageTypeResult] = {}
     budget = page_type.InkBudget()
     producer = page_type.producer_hint(doc)
-    global _TEX_MADE
+    global _TEX_MADE, _GROUPING
     _TEX_MADE = producer == "tex"
+    _GROUPING = display_grouping
     for number in selected:
         frags[number], paths[number], types[number] = _read_page(doc[number], budget, producer)
         if _kept_whole(types[number]):
