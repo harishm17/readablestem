@@ -830,6 +830,8 @@ NOTICE_CODES = frozenset(
         # no reading for some equations: `count` of them, one notice for the document.
         "second_reader_unavailable",
         "second_reader_budget",
+        # LaTeX source: text LaTeXML could not read (an unknown command), kept as written.
+        "source_error",
     }
 )
 
@@ -1102,6 +1104,12 @@ class DocumentResult(BaseModel):
     page_witness: PageWitnessSummary | None = Field(default=None, exclude_if=lambda v: v is None)
     # The image page pass (ADR 0007); None when the flag was off, and left out of the JSON.
     image_pages: ImagePagesSummary | None = Field(default=None, exclude_if=lambda v: v is None)
+    # Where the document came from: "pdf" (every result before this field), "latex" (a LaTeX
+    # source converted by `readablestem.source`, which has no pages to show) or "beamer". Left
+    # out of the JSON for a PDF, so a stored result reads the same.
+    origin: Literal["pdf", "latex", "beamer"] = Field(
+        default="pdf", exclude_if=lambda v: v == "pdf"
+    )
 
     @property
     def omitted_pages(self) -> list[int]:

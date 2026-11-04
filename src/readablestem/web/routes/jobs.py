@@ -29,6 +29,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from readablestem.core import sandbox
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline import (
     export_canvas,
@@ -38,6 +39,9 @@ from readablestem.pipeline import (
     text_pass,
 )
 from readablestem.pipeline import language as languages
+from readablestem.source import envelope as source_envelope
+from readablestem.source import intake as source_intake
+from readablestem.source import latexml
 from readablestem.web import (
     access,
     analytics,
@@ -251,6 +255,7 @@ def upload_error_message(
         "too_many_active": f"You already have {MAX_ACTIVE_JOBS_PER_USER} documents waiting or "
         f"still being converted. Wait for one to finish, then upload {name} again. Nothing was "
         "uploaded.",
+        **source_messages(name, s.max_pages_per_job),
         "too_many_stored": f"You are keeping {MAX_LIVE_JOBS_PER_USER} documents, the most "
         f"allowed. Delete one you no longer need, then upload {name} again. Nothing was "
         "uploaded.",
@@ -263,6 +268,39 @@ def upload_error_message(
     if code in IMAGE_PAGE_REFUSALS and s.feature_image_pages:
         message += " " + IMAGE_PAGES_ADVICE
     return message
+
+
+def source_messages(name: str, max_pages: int) -> dict[str, str]:
+    """What went wrong with a LaTeX source upload (`source.intake`, `_place_source`). Every
+    refusal says what to do next, and nothing was converted or counted."""
+    pdf = "upload the PDF instead."
+    return {
+        "source_unavailable": f"{name} is LaTeX source, and this server cannot read that right "
+        f"now. Upload the PDF instead. {NOTHING_TAKEN}",
+        "source_revises": "A revised version takes a PDF. Upload the LaTeX source as a new "
+        "document.",
+        "source_bad_zip": f"{name} could not be opened as a zip file. It may be damaged or "
+        f"protected with a password. Zip the project again without a password, or {pdf}",
+        "source_zip_limits": f"{name} is too big or has too many files. A project zip may be up "
+        "to 20 MB, 100 MB unpacked and 500 files. Remove what the document does not use, or "
+        f"{pdf}",
+        "source_unsafe_zip": f"{name} has a file with a path or a link this tool will not open. "
+        f"Zip the project again with plain files only, or {pdf}",
+        "source_unsupported_file": f"{name} has a kind of file this tool does not read (such as "
+        "an .eps picture or another zip). Convert pictures to PNG, JPEG or PDF and zip the "
+        f"project again, or {pdf}",
+        "source_unsafe": f"{name} uses something this tool will not run: a command that starts "
+        "a program or writes a file, or a path that leaves the project. Remove it, or "
+        f"{pdf}",
+        "source_no_main": f"No main file was found in {name}. It needs a .tex file with a "
+        f"document class and a document body. Check the project, or {pdf}",
+        "source_many_mains": f"{name} has more than one main file. Type the name of the one to "
+        "convert in “Main file” and upload it again.",
+        "source_beamer": f"{name} is a Beamer slide deck, which this tool cannot convert from "
+        "source yet. Upload the compiled PDF.",
+        "source_too_many_pages": f"{name} is longer than one conversion takes (about "
+        f"{max_pages} pages). Split the project into parts, or {pdf}",
+    }
 
 
 def upload_error_summary(message: str) -> str:
@@ -511,6 +549,8 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "office_kinds": kinds,
         # "Convert scanned or handwritten pages" is offered (ADR 0007, FEATURE_IMAGE_PAGES).
         "image_pages_offered": ctx.settings.feature_image_pages,
+        # `.tex` files and zips of a LaTeX project are taken (FEATURE_LATEX_SOURCE).
+        "latex_source": ctx.settings.feature_latex_source,
         "office_what": phrases[0],
         "office_choose": phrases[1],
         "keep_default": keep_default,
@@ -768,8 +808,9 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     # "Convert scanned or handwritten pages" (ADR 0007): offered by FEATURE_IMAGE_PAGES, used
     # only for a file whose probe finds such pages.
     image_pages = form.fields.get("image_pages") == "on" and s.feature_image_pages
+    main_file = (form.fields.get("main_file") or "").strip()[:200] or None
     placed = await run_in_threadpool(
-        _place_files, ctx, user, form.files, mode, course_id, exam, revises, image_pages
+        _place_files, ctx, user, form.files, mode, course_id, exam, revises, image_pages, main_file
     )
     for item in placed:  # product analytics (web.analytics): counts only, never a file name
         if item.job_id or item.pending_id:
@@ -793,6 +834,7 @@ def _place_files(
     exam: bool,
     revises: str | None,
     image_pages: bool = False,
+    main_file: str | None = None,
 ) -> list[Placed]:
     """Check each file and queue it, or keep it for choosing its pages, or say why not.
     A refusal of one file does not stop the others: each is its own document."""
@@ -801,6 +843,15 @@ def _place_files(
     office_left = OFFICE_BUDGET_S
     placed: list[Placed] = []
     for file in files:
+        # A LaTeX source (a .tex file or a zip of a project) is converted by LaTeXML in a
+        # sandbox (`readablestem.source`); it has its own checks and never becomes a PDF.
+        if s.feature_latex_source and source_intake.kind_of(file.filename, file.data):
+            placed.append(
+                _place_source(
+                    ctx, user, file, mode, course_id, exam, revises, main_file, len(files)
+                )
+            )
+            continue
         # A Word or PowerPoint file is made into a tagged PDF first (T3-30); from here on the
         # PDF is what is probed, stored, split into parts and converted, as for any upload.
         data, office = file.data, False
@@ -934,6 +985,69 @@ def _place_files(
         )
         placed.append(Placed(file.filename, pages, job_id=job_id, office=office))
     return placed
+
+
+# The upload route's status for each refusal of a LaTeX source (`source.intake`).
+SOURCE_STATUS = {"source_zip_limits": 413, "source_unavailable": 503}
+
+
+def _place_source(
+    ctx: AppContext,
+    user: CurrentUser,
+    file: UploadedFile,
+    mode: str,
+    course_id: str | None,
+    exam: bool,
+    revises: str | None,
+    main_file: str | None,
+    files: int,
+) -> Placed:
+    """Check a `.tex` or `.zip` and queue it as a job, or say why not. The pages counted
+    against the day's quota are an estimate made from the source (`source.intake`)."""
+    s = ctx.settings
+    if revises is not None:
+        return Placed(file.filename, code="source_revises", status=400)
+    if not (latexml.installed() and sandbox.available()):
+        return Placed(file.filename, code="source_unavailable", status=503, retry_after="3600")
+    try:
+        info = source_intake.inspect(
+            file.filename, file.data, main=main_file, max_pages=s.max_pages_per_job
+        )
+    except source_intake.SourceRefused as exc:
+        return Placed(file.filename, code=exc.code, status=SOURCE_STATUS.get(exc.code, 422))
+    blob = source_envelope.wrap(info.kind, file.filename, info.main, file.data)
+    try:
+        job_id = store_job(
+            ctx.factory,
+            s,
+            user.id,
+            file.filename,
+            blob,
+            info.pages,
+            mode,
+            course_id=course_id,
+            exam=exam,
+            now=utcnow(),
+            media_type=SOURCE_MEDIA_TYPES[info.kind],
+        )
+    except TooManyJobs as exc:
+        return Placed(file.filename, code=exc.code, status=429, retry_after="60")
+    except QuotaRefused as exc:
+        return Placed(
+            file.filename, exc.pages, code="page_quota", status=429, left=exc.left,
+            retry_after="3600",
+        )  # fmt: skip
+    log_event(
+        logger, "job_created", job_id=job_id, pages=info.pages, source=info.kind,
+        opt_in=mode == "dev", retention=mode, files=files,
+    )  # fmt: skip
+    return Placed(file.filename, info.pages, job_id=job_id)
+
+
+SOURCE_MEDIA_TYPES = {
+    "tex": "application/x-readablestem-tex",
+    "zip": "application/x-readablestem-zip",
+}
 
 
 def _keep_for_parts(

@@ -1,5 +1,5 @@
 """CLI commands: readablestem ops aggregate|purge|cron|launch-check|backup-check|restore-drill|
-report|export-opted-in|decisions-canary|claude-canary|replay-erasures.
+report|export-opted-in|decisions-canary|claude-canary|replay-erasures|sandbox-probe.
 
 The same tasks the web app runs on its hourly cron call, for running by hand or as the
 Railway `cron` service (`readablestem ops cron`). Output is counts only, as `key=value` pairs on
@@ -58,6 +58,17 @@ def register(
         help="list what is unfinished before real users: draft pages, demo, eval baseline, "
         "production settings and spend limits",
     ).set_defaults(func=_cmd_launch_check)
+    probe = sub.add_parser(
+        "sandbox-probe",
+        help="check on this machine that the sandbox for uploaded TeX works (bubblewrap, user "
+        "namespaces, no network, caps) and time a tiny LaTeXML run; prints PASS or FAIL",
+    )
+    probe.add_argument(
+        "--require-latexml",
+        action="store_true",
+        help="fail when LaTeXML is not installed (the default only reports it)",
+    )
+    probe.set_defaults(func=_cmd_sandbox_probe)
     sub.add_parser(
         "backup-check",
         help="read DATABASE_URL (a restored copy) and say whether the app could run on it: "
@@ -235,6 +246,16 @@ def _cmd_replay_erasures(args: argparse.Namespace) -> int:
         return _db_error(exc)
     print(f"ledger_imported={imported} accounts_erased={erased}")
     return 0
+
+
+def _cmd_sandbox_probe(args: argparse.Namespace) -> int:
+    """Exit 1 unless the sandbox for uploaded TeX works here (ops.sandbox_probe)."""
+    from readablestem.ops.sandbox_probe import probe
+
+    report = probe(require_latexml=args.require_latexml)
+    for line in report.lines():
+        print(line)
+    return 0 if report.passed else 1
 
 
 def _cmd_launch_check(args: argparse.Namespace) -> int:

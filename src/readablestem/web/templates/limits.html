@@ -88,9 +88,11 @@
   <li><strong>Maths in headings</strong> stays as plain characters in the
     text, not as MathML equations: check how it reads.</li>
   <li><strong>File types.</strong> {% if office_on %}PDF files, and Word (.docx) or PowerPoint
-    (.pptx) files, which are turned into a PDF first.{% else %}Only PDF files are taken. For a Word
-    or PowerPoint file, save a copy as a PDF first.{% endif %} It works from the PDF, not from
-    LaTeX source files.</li>
+    (.pptx) files, which are turned into a PDF first.{% elif latex_source %}PDF files. For a Word or
+    PowerPoint file, save a copy as a PDF first.{% else %}Only PDF files are taken. For a Word
+    or PowerPoint file, save a copy as a PDF first.{% endif %}{% if latex_source %} A LaTeX file
+    (.tex) or a zip of a LaTeX project is also taken, and its equations are read from the
+    source.{% else %} It works from the PDF, not from LaTeX source files.{% endif %}</li>
   <li><strong>The checks look at structure, not meaning.</strong> Every file is checked for
     structure (language, title, headings, lists, image text alternatives). The full axe-core
     accessibility test runs on our own test documents, not on yours, and nothing here

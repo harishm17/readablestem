@@ -199,11 +199,46 @@ jobs:
           mkdir r314 && cp reports/*/shard-3.14-*.json r314/
           python3 scripts/check_shards.py r314 "$SHARDS"
 
+  # LaTeX source (docs/security.md, "Running uploaded TeX"): the escape suite runs hostile TeX
+  # through the real LaTeXML in the real bubblewrap sandbox, which the sharded jobs above skip
+  # (this runner needs user namespaces switched on for bubblewrap). Here a missing sandbox fails.
+  latex-source:
+    name: latex source (LaTeXML + bubblewrap)
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install (locked)
+        run: uv sync --locked --all-extras
+      - name: Install LaTeXML and bubblewrap, allow user namespaces
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends latexml bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          latexml --VERSION | head -n 1
+      - name: Sandbox probe (what the deployed image is asked)
+        run: uv run readablestem ops sandbox-probe --require-latexml
+      - name: Source tests
+        env:
+          READABLESTEM_REQUIRE_SANDBOX_TESTS: "1"
+        run: >
+          uv run pytest -n auto -rs
+          tests/test_sandbox.py tests/test_ops_sandbox_probe.py tests/test_archive_intake.py
+          tests/test_source_intake.py tests/test_source_reader.py tests/test_source_convert.py
+          tests/test_source_escapes.py tests/test_source_child.py tests/test_web_source.py
+
   # One name for branch protection to require instead of each job above: it fails when any
   # job that ran failed or was cancelled, and passes when the rest were skipped by design.
   ci-passed:
     name: CI passed
-    needs: [changes, static, pytest, shard-coverage, proof-replay, site, postgres, browser, dependency-audit, docker, eval-gate, secret-scan]
+    needs: [changes, static, pytest, shard-coverage, proof-replay, site, postgres, browser, dependency-audit, docker, eval-gate, secret-scan, latex-source]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -471,6 +506,16 @@ jobs:
           docker run --rm readablestem:ci readablestem --version
           docker run --rm readablestem:ci readablestem ops --help
           test "$(docker run --rm readablestem:ci id -u)" = "10001"
+      # The LaTeXML build argument (docs/deploy-railway.md, "LaTeXML"): the packages install, the
+      # versions print, and ImageMagick's policy is the locked-down one. The sandbox itself is
+      # probed on the deployed image (`readablestem ops sandbox-probe`), not here.
+      - name: Build with LaTeXML and check its policy
+        run: |
+          docker build --build-arg INSTALL_LATEXML=true --tag readablestem:latexml .
+          docker run --rm readablestem:latexml latexml --VERSION
+          docker run --rm readablestem:latexml latexmlpost --VERSION
+          docker run --rm readablestem:latexml identify -list policy | grep -B1 'pattern: PDF' | grep -q 'rights: None'
+          docker images readablestem --format '{{.Tag}} {{.Size}}'
 
   eval-gate:
     name: eval gate (when a baseline exists)

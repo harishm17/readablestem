@@ -284,3 +284,17 @@ def test_the_stylesheet_gives_undo_a_44_px_target():
         seo.Path(__file__).resolve().parent.parent / "src/readablestem/web/static/app.css"
     ).read_text()
     assert re.search(r"\.undo-form \.link-button \{[^}]*min-height: 44px; min-width: 44px", css)
+
+
+def test_latex_source_is_listed_only_when_its_flag_is_on(tmp_path):
+    off = WebEnv(tmp_path / "off")
+    with off.running() as client:
+        landing, limits = flat(client.get("/").text), flat(client.get("/limits").text)
+    assert "LaTeX source files (.tex) and project zips" not in landing
+    assert "It works from the PDF, not from LaTeX source files." in limits
+    on = WebEnv(tmp_path / "on", feature_latex_source=True)
+    with on.running() as client:
+        landing, limits = flat(client.get("/").text), flat(client.get("/limits").text)
+    assert "LaTeX source files (.tex) and project zips" in landing
+    assert "A LaTeX file (.tex) or a zip of a LaTeX project is also taken" in limits
+    assert "Only PDF files are taken" not in limits

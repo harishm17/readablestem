@@ -39,6 +39,16 @@ compiled only through `src/readablestem/gold/safe_tex.py`, which needs [bubblewr
 cache). A compile has no network, no rc file, no shell escape and sees only the TeX Live tree, the source as a discarded
 overlay and an output folder. Nothing else needs any of this; the compile tests in `tests/test_safe_tex.py` skip without it.
 
+LaTeX source tests (`tests/test_source_*.py`, `tests/test_web_source.py`, `tests/test_sandbox.py`) run the
+real LaTeXML in the real bubblewrap sandbox, with no mocks, and skip where either is missing (CI's `docker` job
+builds the image with `INSTALL_LATEXML`; the sandbox cannot start inside Docker's default seccomp, so the escape
+suite runs on a developer machine or a host with user namespaces). Install `latexml` and `bubblewrap` from your
+distribution (`apt install latexml bubblewrap`), or, without root, unpack the packages and point at them:
+`apt-get download latexml <its dependencies>`, `dpkg -x` each into one folder, and set
+`READABLESTEM_LATEXML_ROOT` to it (it needs a `usr/` folder; the folder is mounted read-only in the sandbox and
+Perl is pointed at it; production never sets it). `uv run readablestem ops sandbox-probe` says whether the sandbox
+works on the machine.
+
 CLI:
 
 ```

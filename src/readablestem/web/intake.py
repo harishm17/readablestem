@@ -97,6 +97,7 @@ def store_job(
     part_group: str | None = None,
     part_label: str | None = None,
     now: datetime | None = None,
+    media_type: str = "application/pdf",
 ) -> str:
     """Count the pages against today's quota and queue the job, in one transaction.
 
@@ -136,5 +137,5 @@ def store_job(
         )
         session.add(job)
         session.flush()
-        session.add(Blob(job_id=job.id, kind="upload", media_type="application/pdf", content=data))
+        session.add(Blob(job_id=job.id, kind="upload", media_type=media_type, content=data))
         return job.id

@@ -60,6 +60,7 @@ def _features(request: Request) -> dict[str, object]:
         "notation_on": settings.feature_notation_memory,
         "office_on": bool(office_convert.input_kinds(settings)),
         "word_export": export_docx.available(),  # Word downloads need pandoc on the server
+        "latex_source": settings.feature_latex_source,  # .tex and project zips (off by default)
     }
 
 

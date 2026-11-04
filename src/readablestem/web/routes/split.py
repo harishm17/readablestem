@@ -38,7 +38,7 @@ from typing import Annotated, Any
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 from markupsafe import Markup
 from pydantic import TypeAdapter
 from sqlalchemy import select
@@ -1471,6 +1471,9 @@ def review_screen(
     `tools` ("1"): the page tools are open; `change`: the text open in them; `add`, `left`,
     `top`, `right`, `bottom`: the region being described for something to add."""
     shown = accepted == "1"
+    _, loaded, _ = _load(request, job_id, user)
+    if loaded.origin != "pdf":  # a LaTeX source has no page to show beside its decisions
+        return RedirectResponse(f"/jobs/{job_id}/review/list", status_code=303)
     response = split_page(
         request,
         job_id,

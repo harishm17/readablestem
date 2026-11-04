@@ -398,9 +398,11 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
 
 - **PDF in, web page out** (with Word, EPUB, Canvas zip and Common Cartridge downloads). Word and
   PowerPoint files are taken only on a server with LibreOffice (readablestem.com takes PDF only).
-  One upload is limited by `MAX_PAGES_PER_JOB` and `MAX_UPLOAD_MB`; a bigger file, up to
-  `MAX_SOURCE_PAGES` and `MAX_LARGE_UPLOAD_MB`, is kept so you can choose which pages to convert,
-  in parts. The live values are on the site's Known limits page. LaTeX source is not taken.
+  One upload is limited by `MAX_PAGES_PER_JOB` and `MAX_UPLOAD_MB` (100 pages and 50 MB by
+  default); a bigger file, up to `MAX_SOURCE_PAGES` and `MAX_LARGE_UPLOAD_MB` (500 pages and
+  100 MB), is kept so you can choose which pages to convert, in parts. The live values are on
+  the site's Known limits page. LaTeX source upload exists behind `FEATURE_LATEX_SOURCE`, off by
+  default and on no public server.
 - **A model is in the loop.** Document images and the text around them are sent to Anthropic's
   Claude API (the beta's provider, `MODEL_PROVIDER=anthropic`), or to OpenAI's API (with
   `store=False`) if you set `MODEL_PROVIDER=openai`; the handwriting readers (off, unused) would send crops to their own company. Models are not deterministic, so two runs on the same file can differ.

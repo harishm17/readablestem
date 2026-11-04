@@ -1,0 +1,17 @@
+\documentclass{article}
+\usepackage{multirow,booktabs}
+\begin{document}
+\section{Tables}
+\begin{table}
+\caption{Grouped data}
+\begin{tabular}{llr}
+\toprule
+Group & Item & Count \\
+\midrule
+\multirow{2}{*}{Fruit} & Apple & 3 \\
+ & Pear & 5 \\
+Other & \multicolumn{2}{c}{none} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{document}

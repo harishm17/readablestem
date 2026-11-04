@@ -50,6 +50,23 @@
   the document will be deleted, with a one-click "Keep it for 7 days". Retention wording says the
   clock restarts on each decision or download.
 
+## Unreleased: LaTeX source upload (branch latex/e1-source-intake)
+
+- LaTeX source (`FEATURE_LATEX_SOURCE`, off by default; ADR 0008): a `.tex` file or a `.zip` of a project is
+  converted by LaTeXML in the bubblewrap sandbox of the sandbox probe change, into the document a PDF becomes. Equations
+  come from the source (LaTeXML's MathML through the sanitiser, the source's own LaTeX), figures use the
+  project's pictures and the ordinary figure step, tables become grids, headings, lists and links are read as
+  written. A formula LaTeXML cannot read and a figure with no picture are required decisions; a source that cannot be
+  converted fails the job with "Upload the PDF instead" and keeps nothing. The review is the list view. New
+  `web/archive_intake.py` (zip limits: 20 MB, 100 MB unpacked, 500 entries, no links, absolute or `..` paths,
+  nested zips, EPS or SVG; a header that lies is caught), `source/` (`intake`, `lint`, `envelope`, `latexml`,
+  `ltx_reader`, `figures`, `convert`), a one-line hook in `pipeline/run.py` (`convert_pdf`), `DocumentResult.origin`,
+  `render_html(origin=)` (the student note says "a LaTeX document"), `INSTALL_LATEXML` and `FEATURE_LATEX_SOURCE` in
+  `railway.ts`. LaTeXML runs with `kpsewhich` hidden in the sandbox: where TeX Live's base is installed (the image) it
+  otherwise read raw TeX for packages and spent over a minute failing on `siunitx`. Beamer decks are refused until their own change. Docs: docs/web.md "LaTeX source",
+  docs/security.md "Running uploaded TeX", docs/development.md. Tests: `tests/test_archive_intake.py`,
+  `test_source_intake.py`, `test_source_reader.py`, `test_source_convert.py`, `test_source_escapes.py` (hostile
+  files through the real sandbox), `test_source_child.py`, `test_web_source.py`.
 ## Unreleased: design polish (branch design/d6-polish)
 
 - Fixes from the Impeccable audit and critique of the redesign: paragraphs, hints and list items are capped at 75ch;
@@ -74,6 +91,40 @@
   footer has the same four columns, and the showcase follows light and dark. The converted output and the PDF
   pages stay on white paper. The `/demo` page is the stored converted document and is not restyled.
 
+## Unreleased: LaTeXML in the image (branch latex/x1-latexml-image)
+
+## Unreleased: sandbox probe (branch latex/x0-sandbox-probe)
+
+- `readablestem ops sandbox-probe`: checks on the running image that the sandbox for uploaded TeX
+  works (bubblewrap, user namespaces, no network, empty environment, hidden `/proc/1/environ`,
+  memory, wall-clock and output caps), times a tiny LaTeXML run when LaTeXML is installed, reports
+  the kernel's seccomp mode, Landlock ABI and same-UID `/proc/<pid>/environ` readability, and
+  prints PASS or FAIL (exit 1). Nothing it prints is document content. Docs: docs/operations.md,
+  "Sandbox probe"; docs/security.md, "Running uploaded TeX".
+- The sandbox joins its cgroup before bubblewrap starts (a wrapper, not a move afterwards, so no child escapes it),
+  and without a cgroup the total is bounded by arithmetic: LaTeXML gets 4 tasks (it needs 3) and 512 MB of address
+  space each (`source.latexml.LIMITS`), one source conversion runs at a time on the machine (`sandbox.exclusive`),
+  and `ops sandbox-probe` prints `sandbox_total_bound_mb` and fails `--require-latexml` over
+  `SOURCE_SANDBOX_MAX_TOTAL_MB` (2048). The upload comment now assumes a 2 GB web service.
+- The sandbox also caps tasks and open files (`prlimit --nproc --nofile`), puts a seccomp filter in front of the
+  program (`core/seccomp.py`, built without libseccomp), counts the program's own output against the output budget,
+  and uses a cgroup v2 memory and pids limit for the whole group when the container allows one; the probe reports
+  `sandbox_task_cap`, `sandbox_file_cap`, `sandbox_seccomp` and `sandbox_cgroup`. docs/security.md says what is
+  capped per process and what in total.
+- New `core/sandbox.py` (the bubblewrap runner the probe tests and a later LaTeX upload uses) and
+  `source/latexml.py` (the `latexml` and `latexmlpost` calls). Nothing in the app calls them yet.
+  Tests: `tests/test_sandbox.py`, `tests/test_ops_sandbox_probe.py`.
+## Unreleased: LaTeXML in the image (branch latex/x1-latexml-image)
+
+- Dockerfile: `ARG INSTALL_LATEXML=false` also installs `bubblewrap` and `util-linux` (the sandbox and `prlimit`; the
+  build fails without them). It installs the distribution's `latexml` (0.8.8) with TeX
+  Live's base and ImageMagick, and replaces ImageMagick's `policy.xml` with a deny-by-default one
+  (PNG, JPEG, GIF only; PS, EPS, PDF, XPS, URL and `@file` denied by name:
+  `src/readablestem/source/imagemagick-policy.xml`). Measured on the pinned base: +270 MB
+  (324.3 MB to 594.4 MB). Off by default; nothing in the app uses it yet. `INSTALL_LATEXML` is
+  declared on `web` in `.railway/railway.ts`; CI builds once with the argument and checks the
+  versions and the policy. Docs: docs/deploy-railway.md, "LaTeXML"; THIRD_PARTY_NOTICES.md.
+  Tests: `tests/test_latexml_image.py`.
 ## Unreleased: landing page and proof strip (branch design/d2-landing)
 
 - Landing page: the hero shows a real passage of the demo (OpenStax Physics 2.3, page 3): the PDF crop
