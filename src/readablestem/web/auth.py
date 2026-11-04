@@ -44,6 +44,7 @@ from readablestem.web import access, analytics, events, linked_emails, microsoft
 from readablestem.web.database import rowcount
 from readablestem.web.db import Job, JobStatus, User, session_scope, utcnow
 from readablestem.web.deps import (
+    AppContext,
     PageError,
     current_user,
     enforce,
@@ -281,7 +282,20 @@ def finish_login(
         return refused_page(request, result, provider)
     if identity is not None:
         remember(ctx.factory, result.user_id, identity)
-    return signed_in(request, result.user_id, result.session_version, provider, result.created)
+    verified = provider in {GOOGLE, "dev"} and _is_account_address(ctx, result.user_id, email)
+    return signed_in(
+        request, result.user_id, result.session_version, provider, result.created, verified
+    )
+
+
+def _is_account_address(ctx: AppContext, user_id: str, email: str | None) -> bool:
+    """The address this sign-in proved is the account's own (not a linked one, not a different
+    one the token carried)."""
+    if email is None:
+        return False
+    with session_scope(ctx.factory) as session:
+        own = session.scalar(select(User.email).where(User.id == user_id))
+    return own is not None and own.strip().lower() == email
 
 
 def refused_page(request: Request, result: SignIn, provider: str) -> Response:
@@ -337,17 +351,26 @@ def finish_microsoft_login(request: Request, account: microsoft.MicrosoftAccount
         )
     if result.user_id is None:
         return refused_page(request, result, MICROSOFT)
-    return signed_in(request, result.user_id, result.session_version, MICROSOFT, result.created)
+    proved = normalise_email(account.verified_email)  # `xms_edov`, never preferred_username
+    verified = _is_account_address(ctx, result.user_id, proved)
+    return signed_in(
+        request, result.user_id, result.session_version, MICROSOFT, result.created, verified
+    )
 
 
 def signed_in(
-    request: Request, user_id: str, version: int, provider: str, created: bool = False
+    request: Request,
+    user_id: str,
+    version: int,
+    provider: str,
+    created: bool = False,
+    email_verified: bool = False,
 ) -> Response:
     """The end of every sign-in (Google, Microsoft, dev): back to the page that asked for
     it (`web.return_to`), and the usage event. `created`: the sign-in made the account."""
     ctx = get_ctx(request)
     target = take_return(request)  # before the session is rotated (web.return_to)
-    start_session(request, user_id, version)
+    start_session(request, user_id, version, email_verified)
     log_event(logger, "login", user_id=user_id, provider=provider)
     if created:
         log_event(logger, "signup", user_id=user_id, provider=provider)
