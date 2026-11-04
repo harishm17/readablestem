@@ -510,10 +510,10 @@ def test_changing_the_language_keeps_the_date_of_the_last_decision(web):
 # --------------------------------------------------------------------------- delete
 
 
-def test_delete_is_a_quiet_action_at_the_end(web):
+def test_delete_is_a_danger_action_at_the_end(web):
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
     delete = section(html, "delete-heading")
-    assert '<button type="submit" class="button-secondary">Delete now</button>' in delete
-    assert "button-danger" not in html
+    assert '<button type="submit" class="button-danger-outline">Delete now</button>' in delete
+    assert 'button-secondary">Delete' not in html  # never styled like Keep or Save
     assert html.index('id="delete-heading"') > html.index('id="results-heading"')

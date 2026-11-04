@@ -244,7 +244,7 @@ script injected into an app page is refused by the policy.
 | New accounts (open sign-up) | `MAX_NEW_ACCOUNTS_PER_DAY` a UTC day for the service, not given back when an account is deleted; 5 an hour per address; an address deleted today comes back with the day's pages, reads and place already used (a keyed hash of the address, kept to the end of the day) | `web/quota.py` (`try_take_signup`), `web/abuse.py` (`signup`), `web/tombstones.py` |
 | Spend holds of a dead process | Recorded per hold (`spend_holds`) and given back by job when a lease runs out and by age at start-up | `web/spend.py` (`release_holds`), `web/worker.py` |
 | Waiting or running documents per person | 10 | `web/intake.py` (every route that makes a job: the upload and the parts of a large file) |
-| Kept documents per person | 40 (the sample document does not count) | `web/intake.py`; "Keep 7 more days" (`routes/job_settings.py`) refuses with a 429 page when it would exceed it |
+| Kept documents per person | 40 (the sample document does not count) | `web/intake.py`; "Keep for 7 days" (`routes/job_settings.py`) refuses with a 429 page when it would exceed it |
 | Daily and per-job model spend | `DAILY_SPEND_CAP_USD`, per-job caps | `web/spend.py` |
 | Daily spend of open-tier accounts | `OPEN_TIER_DAILY_SPEND_CAP_USD`, a pool inside the daily cap, held and settled by the same conditional UPDATE; their queued jobs wait when it is spent | `web/spend.py`, `web/worker.py` |
 | Tries again of one document | 3 | `web/retry.py`; "Try again" never touches the page quota, the job's spend caps cover all tries |

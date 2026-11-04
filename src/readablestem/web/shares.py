@@ -166,7 +166,7 @@ class SharedDocument:
     title_override: str | None
     result_title: str | None
     role: str
-    owner: str  # the owner's name, else "The owner": never their address
+    owner: str  # the owner's name, else "": never their address
 
 
 def shared_with(session: Session, user: Any, now) -> list[SharedDocument]:
@@ -192,4 +192,4 @@ def shared_with(session: Session, user: Any, now) -> list[SharedDocument]:
         )
         .order_by(Job.created_at.desc(), Job.id)
     ).all()
-    return [SharedDocument(r[0], r[1], r[2], r[3], r[4], r[5] or "The owner") for r in rows]
+    return [SharedDocument(r[0], r[1], r[2], r[3], r[4], r[5] or "") for r in rows]

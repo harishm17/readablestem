@@ -30,22 +30,6 @@
 <div id="job-status-region" role="status">
   {% include "_job_status.html" %}
 </div>
-{# When this document will be deleted, near the top, and the one-click way to keep it a week
-   (web/retention.py; the same POST as "Keep 7 more days" under "Keeping and deleting"). #}
-{% if job.is_owner and not job.is_sample and job.retain_until %}
-<div class="retention-line" id="retention-line">
-  <p>{% if job.retention_mode == "dev" %}Kept until {{ job.retain_until|utc }}, {{ opt_in_days }} days after upload, because you let us look at the results.
-    {%- elif job.retention_mode == "week" %}Deleted automatically on {{ job.retain_until|utc }}, 7 days after you last work on it.
-    {%- else %}Deleted automatically on {{ job.retain_until|utc }}, {{ retention_hours }} hours after you last work on it.{% endif %}
-    <a href="#delete-heading">Keeping and deleting</a></p>
-  {% if job.retention_mode == "day" %}
-  <form method="post" action="/jobs/{{ job.id }}/keep" class="inline-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <button type="submit" class="button-secondary button-small">Keep it for 7 days</button>
-  </form>
-  {% endif %}
-</div>
-{% endif %}
 {% if not job.finished %}
 {% include "_job_progress.html" %}
 {# Opt-in browser notice when the conversion finishes (static/app.js "When a job finishes").
@@ -68,6 +52,7 @@
     until the conversion finishes</a></p>
   {% endif %}
 </noscript>
+{% include "_job_retention.html" %}
 {% endif %}
 
 {% if job.status == "done" and job.summary and job.page %}
@@ -90,6 +75,7 @@
 {% else %}
 {% include "_job_ready.html" %}
 {% endif %}
+{% include "_job_retention.html" %}
 
 {% if job.carry and job.is_owner %}
 {% include "_job_carry.html" %}
@@ -127,8 +113,8 @@
     {% if s.by_kind.get("page") %}<div><dt>Pages kept as images</dt><dd>{{ s.by_kind["page"] }}</dd></div>{% endif %}
     {% if s.by_kind.get("handwriting") %}<div><dt>Handwriting kept as images</dt><dd>{{ s.by_kind["handwriting"] }}</dd></div>{% endif %}
     <div><dt>List items</dt><dd>{{ s.list_items }}</dd></div>
-    <div><dt>Decisions to make</dt><dd>{{ c.decisions }}</dd></div>
-    <div><dt>Decisions you made</dt><dd>{{ c.decided_units }}</dd></div>
+    <div><dt>{{ "Decisions to make" if job.can_review else "Decisions still open" }}</dt><dd>{{ c.decisions }}</dd></div>
+    <div><dt>Decisions made</dt><dd>{{ c.decided_units }}</dd></div>
   </dl>
   {% if c.as_image %}<p id="items-count">{{ c.as_image_sentence }}</p>{% endif %}
   {% if c.notes %}
@@ -194,6 +180,7 @@
     <p>Error code: <code>{{ job.error_code or "unknown" }}</code></p>
   </details>
 </section>
+{% include "_job_retention.html" %}
 {% endif %}
 
 {% if job.status == "done" and not job.is_sample and job.is_owner %}
@@ -205,34 +192,16 @@
 </section>
 {% endif %}
 
-{# A secondary action, last on the page (MF17): deleting is confirmed on its own page.
-   How long the document is kept is T1-8 (web/retention.py): the clock restarts on a
-   decision, a change or a download; "Keep 7 more days" makes it a 7-day document. #}
+{# Last on the page (MF17): deleting is confirmed on its own page (/jobs/{id}/delete). How
+   long the document is kept, and the one way to keep it longer, is `_job_retention.html`,
+   under the actions near the top (web/retention.py). #}
 {% if job.is_owner %}
 <section aria-labelledby="delete-heading">
-  <h2 id="delete-heading">Keeping and deleting this document</h2>
-  {% if job.retention_mode == "dev" %}
-  <p>You let us look at the results, so this document is kept for
-    {{ opt_in_days }} days from upload. It will be deleted automatically on
-    {{ job.retain_until|utc }}.</p>
-  {% elif job.retention_mode == "week" %}
-  <p>This document is kept for 7 days, and only you and the people you share it with can see it. It will be deleted
-    automatically on {{ job.retain_until|utc }}. Working on it or downloading it starts the
-    7 days again.</p>
-  {% else %}
-  <p>This document and everything made from it will be deleted automatically on
-    {{ job.retain_until|utc }}, {{ retention_hours }} hours after you last worked on it.
-    Working on it or downloading it starts the {{ retention_hours }} hours again.</p>
-  {% endif %}
-  {% if job.retention_mode != "dev" %}
-  <form method="post" action="/jobs/{{ job.id }}/keep" class="inline-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <button type="submit" class="button-secondary">Keep 7 more days</button>
-  </form>
-  {% endif %}
+  <h2 id="delete-heading">Delete this document</h2>
+  <p>This deletes the uploaded PDF and everything made from it, now. You are asked to confirm first.</p>
   <form method="post" action="/jobs/{{ job.id }}/delete" class="inline-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <button type="submit" class="button-secondary">Delete now</button>
+    <button type="submit" class="button-danger-outline">Delete now</button>
   </form>
 </section>
 {% endif %}

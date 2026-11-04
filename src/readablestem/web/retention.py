@@ -3,7 +3,7 @@
 Three choices on the upload form, stored as `Job.retention_mode`:
 
 - `day`: nothing ticked. Deleted `RETENTION_HOURS` (24) after the last activity.
-- `week`: "Keep it for 7 days after I last work on it". Deleted 7 days after the last activity;
+- `week`: "Keep for 7 days". Deleted 7 days after the last activity;
   nobody else looks at it.
 - `dev`: "Also let us look at the results (30 days)". Kept 30 days from upload, and the
   developer may look at the results to find and fix mistakes in the tool
@@ -12,7 +12,7 @@ Three choices on the upload form, stored as `Job.retention_mode`:
 Activity is a review decision, a language, title or contact change, and a download: it moves
 `retain_until` to a full window from now for `day` and `week`, never earlier than it was.
 `dev` keeps its 30 days from upload, because the developer's permission was given for that
-long. "Keep 7 more days" on the job page makes a `day` job a `week` job and starts its
+long. "Keep for 7 days" on the job page makes a `day` job a `week` job and starts its
 seven days now; for a `dev` job it changes nothing.
 
 The purge (`ops.retention.purge_expired`) deletes by `retain_until` and knows nothing of
@@ -69,12 +69,28 @@ def restart_clock(job: Job, settings: Settings, now: datetime | None = None) -> 
 
 
 def can_keep_longer(job: Job) -> bool:
-    """The job page offers "Keep 7 more days" unless the developer's 30 days apply."""
+    """The job page offers "Keep for 7 days" unless the developer's 30 days apply."""
     return job.retention_mode != "dev"
 
 
+def keep_offer(
+    mode: str, retain_until: datetime | None, now: datetime | None = None
+) -> datetime | None:
+    """When the document would be deleted after "Keep for 7 days" (seven days from now), or
+    None when the button would change nothing: the developer's 30 days apply, or the
+    document is already kept at least that long (an hour of margin, so a 7-day document
+    worked on a moment ago does not offer it again)."""
+    if mode == "dev":
+        return None
+    target = (now or utcnow()) + timedelta(days=WEEK_DAYS)
+    current = as_utc(retain_until)
+    if current is not None and current >= target - timedelta(hours=1):
+        return None
+    return target
+
+
 def keep_seven_more_days(job: Job, now: datetime | None = None) -> bool:
-    """ "Keep 7 more days": from now, only the owner sees it. A `day` job becomes a `week`
+    """ "Keep for 7 days": from now, only the owner sees it. A `day` job becomes a `week`
     job. False (nothing changed) for a `dev` job."""
     if job.retention_mode == "dev":
         return False

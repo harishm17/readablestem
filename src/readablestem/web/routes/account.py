@@ -83,17 +83,17 @@ def account_page(request: Request, user: UserDep) -> Response:
     return render(request, "account.html", _context(request, user))
 
 
-KEEP_ON = "New uploads now start with “Keep it for 7 days” ticked."
-KEEP_OFF = "New uploads now start with “Keep it for 7 days” unticked."
+KEEP_ON = "New uploads now start with “Keep for 7 days” ticked."
+KEEP_OFF = "New uploads now start with “Keep for 7 days” unticked."
 
 
 @router.post("/account/keep-default", dependencies=[Depends(require_csrf)])
 def save_keep_default(
     request: Request, user: UserDep, keep_default: Annotated[str, Form()] = ""
 ) -> Response:
-    """The "Keep my documents for 7 days by default" setting: remembered on the account, read by the
-    upload form (`routes/jobs.app_context`) as the starting state of its 7-day box. It changes
-    no document already uploaded."""
+    """The "Keep new documents for 7 days by default" setting: remembered on the account, read
+    by the upload form (`routes/jobs.app_context`) as the starting state of its 7-day box.
+    It changes no document already uploaded."""
     on = keep_default == "on"
     with session_scope(get_ctx(request).factory) as session:
         row = session.get(User, user.id)

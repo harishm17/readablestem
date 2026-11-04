@@ -148,9 +148,9 @@ def test_the_option_is_a_labelled_unchecked_checkbox_with_its_explanation(browse
     assert label.strip() == OFFER  # short; the cost is the first thing the hint says
     hint = " ".join(page.locator("#image-pages-hint").inner_text().split())
     assert hint.startswith("Slower, and you check every converted equation and table.")
-    assert "does nothing for a PDF that has no scanned or handwritten pages" in " ".join(
-        page.locator("#image-pages-hint").inner_text().split()
-    )
+    # the long explanation is disclosed under the option, in the same group
+    more = " ".join(page.locator(".image-pages-choice .more-detail").text_content().split())
+    assert "does nothing for a PDF that has no scanned or handwritten pages" in more
     described = box.get_attribute("aria-describedby")
     assert described == "image-pages-hint"
     context.close()

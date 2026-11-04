@@ -72,8 +72,8 @@ def offer(
     if status == JobStatus.FAILED and error_code in RETRYABLE_FAILURES:
         return Offer(
             "Try again",
-            "Your document is queued again. Nothing is counted against your daily pages, "
-            "and anything that was already converted is kept.",
+            "Try again puts your document back in the queue. Nothing is counted against your "
+            "daily pages, and anything that was already converted is kept.",
             left,
         )
     if status == JobStatus.DONE and (error_code in RETRYABLE_STOPS or is_outage(result_json)):

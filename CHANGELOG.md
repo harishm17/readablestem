@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased: upload, job page and My documents (branch ux/upload-job-documents)
+
+- A person a document was shared with who can only view it is no longer told "N decisions need
+  you": the status says the decisions are still open and only the owner or a reviewer can make
+  them (a reviewer is told they can review them). The results tile reads "Decisions made" and,
+  for a viewer, "Decisions still open". In My documents a document whose owner has no name is
+  "shared with you" instead of "shared by The owner".
+- "Try again" says what it will do ("puts your document back in the queue"); the confirmation
+  comes after it worked.
+- Times in My documents stay in the reader's time zone after the list refreshes itself.
+- One wording for keeping a document, "Keep for 7 days", on the upload form, job page, Account
+  page, notices and the privacy page. The job page shows the deletion time once, under the
+  review and download actions, with the day "Keep for 7 days" would delete it. Delete entry
+  points (a document, a course, an account, a waiting file) have a red outline style
+  (`button-danger-outline`, `danger-link`), the confirmation pages keep the filled button.
+- Upload form: shorter, in three groups (file, how to convert it, how long to keep it) with one
+  line of consequence beside each option and the long text in disclosures. A refused scanned PDF
+  says to tick "Convert scanned or handwritten pages" and choose the file again.
+- Choosing pages: sizes under 0.1 MB show in KB (`pending.size_text`), the range examples follow
+  the active page limit and the file, and a suggestion cut off at 20 parts says which pages it
+  leaves out.
+- My documents has a compact "Practise on the sample" link beside "Convert a PDF"; signed-in
+  pages get a compact footer of trust and help links (public pages keep the full footer).
 ## Unreleased: spoken-equal scorer reads one print as one speech (branch eval/spoken-scorer-fix)
 
 - Evaluation only; the product's speech and `math_canonical.compare` are unchanged. The spoken-equal scorer
