@@ -253,7 +253,7 @@ def guide_ada_title_ii(request: Request) -> Response:
 
 @router.get(seo.COMPARE_GUIDE)
 def guide_compare(request: Request) -> Response:
-    """ReadableSTEM beside Mathpix and LaTeXML, from each project's own documentation."""
+    """ReadableSTEM beside Mathpix, Aelira, chatbots and LaTeXML, each fact with source and date."""
     path = seo.COMPARE_GUIDE
     return render(request, "guide_compare.html", _guide_context(path, "guide-compare"))
 
