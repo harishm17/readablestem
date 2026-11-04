@@ -105,6 +105,9 @@ def test_remove_is_a_danger_button_and_copy_link_is_hidden_until_script(tmp_path
         )
         page = owner.get(f"/jobs/{job_id}/share").text
     assert re.search(r'class="button-danger">Remove carol@example\.org<', page)
-    assert 'data-copy-target="share-address" data-copy-state="share-copy-state" hidden>Copy link' in page
+    assert (
+        'data-copy-target="share-address" data-copy-state="share-copy-state" hidden>Copy link'
+        in page
+    )
     assert 'id="share-address" readonly value=' in page  # still selectable without script
     assert 'role="status"' in page and "/static/copy-link." in page

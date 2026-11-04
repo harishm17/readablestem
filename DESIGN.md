@@ -122,7 +122,7 @@ Flat. Depth comes from 1px borders and surface tints, not shadows. The only shad
 
 ## Components
 
-Header (brand, nav, Sign in as a secondary button, Menu disclosure), column footer (Product, Trust, Guides, Source), buttons (primary filled, secondary outlined, danger, small), tags (status in words), notices, form fields with hint and error, card, stat tile (number, label, set and date, a "how measured" link), two-pane before/after, comparison table, FAQ in native details. The focus ring is a 3px dark outline with a 5px yellow halo (yellow outline with a dark gap in dark mode, `Highlight` outline in forced colours) and is not to be changed. All are shown on `/style`.
+Header (brand, nav, Sign in as a secondary button, Menu disclosure), column footer (Product, Trust, Guides, Source), buttons (primary filled, secondary outlined, danger, small), tags (status in words), notices, form fields with hint and error, card, stat tile (number, label, set and date, a "how measured" link), two-pane before/after, comparison table (stacked by topic under 52rem), choice rows (a native radio inside a whole-row label, with its description), "On this page" contents, FAQ in native details. The focus ring is a 3px dark outline with a 5px yellow halo (yellow outline with a dark gap in dark mode, `Highlight` outline in forced colours) and is not to be changed. All are shown on `/style`.
 
 Motion: none by default; 120ms colour transitions only under `prefers-reduced-motion: no-preference`.
 

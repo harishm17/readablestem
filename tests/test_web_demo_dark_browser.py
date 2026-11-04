@@ -8,8 +8,9 @@ and measured 2.39:1 on the white (five axe `color-contrast` failures).
 from __future__ import annotations
 
 import pytest
-from test_web_browser import axe_violations, browser, describe, site  # noqa: F401
+
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
+from test_web_browser import axe_violations, browser, describe, site  # noqa: F401
 
 pytestmark = pytest.mark.browser
 

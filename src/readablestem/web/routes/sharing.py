@@ -5,7 +5,8 @@ a person or changing their right (`POST /jobs/{id}/share`), and removing one
 (`POST /jobs/{id}/share/{share_id}/revoke`). Both POSTs are CSRF-checked and work without
 JavaScript. Nothing is sent to the person: the page shows the document's address for the
 owner to copy (a "Copy link" button with script, a selectable field without), and when the
-document will be deleted, which ends every share. The address works for nobody who is not signed in with the shared address.
+document will be deleted, which ends every share. The address works for nobody who is not signed
+in with the shared address.
 
 No address is written to a log, a flash notice (it lives in the session cookie) or an event.
 """
@@ -85,9 +86,7 @@ def _page(
         "doc_title": title,
         "shares": listed,
         "address": f"{ctx.settings.base_url.rstrip('/')}/jobs/{job_id}",
-        "roles": [
-            (role, shares.ROLE_WORDS[role], shares.ROLE_HELP[role]) for role in shares.ROLES
-        ],
+        "roles": [(role, shares.ROLE_WORDS[role], shares.ROLE_HELP[role]) for role in shares.ROLES],
         "sign_in_words": sign_in_words(
             google=ctx.sign_in_client("google") is not None,
             microsoft=ctx.sign_in_client("microsoft") is not None,
