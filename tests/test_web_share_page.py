@@ -64,15 +64,16 @@ def test_the_rule_says_the_same_address_and_that_case_does_not_matter(tmp_path):
     page, _ = share_page(tmp_path)
     text = " ".join(re.sub(r"<[^>]+>", " ", page).split())
     assert "exactly as it is written" not in text
-    assert "Letter case does not matter, but it has to be the same address" in text
-    assert "an alias" in text
+    assert "exactly this address (case does not matter)" in text
+    assert "an alias does not match" in text
 
 
 def test_the_deletion_time_and_a_way_to_keep_it_longer_sit_by_the_address(tmp_path):
     page, job_id = share_page(tmp_path)
     block = page[page.index('id="address-heading"') :]
     assert 'id="share-expiry"' in block
-    assert "deleted automatically on" in block and '<time class="local-time"' in block
+    assert "Deleted automatically on" in block and '<time class="local-time"' in block
+    assert "Access ends" in page
     assert f'href="/jobs/{job_id}#delete-heading">Keep it longer</a>' in block
 
 

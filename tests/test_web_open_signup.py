@@ -756,9 +756,9 @@ def test_the_account_page_shows_what_is_held_the_limits_and_the_delete_link(open
     upload(open_web.browser, make_pdf(1))
     page = " ".join(open_web.browser.get("/account").text.split())
     assert "carol@example.org" in page and "Documents kept now</dt><dd>1" in page
-    assert "You signed yourself up, so the limits for new accounts apply" in page
-    assert "Pages you can convert today: 2 of 3" in page
-    assert "of 30 left today" in page  # the model reads from review
+    assert "New-account limits" in page
+    assert "Pages today: 2 of 3" in page
+    assert "Model reads from the review screen: 30 of 30" in page
     assert 'href="/account/delete"' in page and "Delete my account" in page
     assert 'href="/account"' in open_web.browser.get("/app").text  # in the main navigation
 
@@ -767,9 +767,9 @@ def test_an_invited_person_sees_their_own_limits_and_no_reread_line(open_web):
     open_web.allow(BOB)
     login(open_web.browser, BOB)
     page = " ".join(open_web.browser.get("/account").text.split())
-    assert "You were invited, so the limits for invited people apply" in page
-    assert "Pages you can convert today: 20 of 20" in page
-    assert "Reads with the model" not in page
+    assert "Invited-account limits" in page
+    assert "Pages today: 20 of 20" in page
+    assert "Model reads" not in page
 
 
 def test_the_account_pages_need_a_signed_in_person(open_web):
@@ -783,12 +783,16 @@ def test_deleting_an_account_asks_first_and_changes_nothing_until_confirmed(open
     client = client_for(open_web, CAROL)
     confirm = client.get("/account/delete")
     assert confirm.status_code == 200 and "Delete your account?" in confirm.text
-    assert "If you sign in again later, you get a new, empty account" in confirm.text
+    assert "Signing in again makes a new, empty account" in confirm.text
     assert "invitation list" not in confirm.text
     csrf = csrf_from(confirm.text)
     # A POST without the confirmation is only the confirmation page again.
     again = client.post("/account/delete", data={"csrf_token": csrf})
-    assert again.status_code == 200 and "Yes, delete my account" in again.text
+    assert (
+        again.status_code == 200
+        and "Delete my account" in again.text
+        and "No, keep it" in again.text
+    )
     assert rows_of(open_web, uid)["users"] == 1 and rows_of(open_web, uid)["jobs"] == 1
     # The form needs the CSRF token.
     assert client.post("/account/delete", data={"confirm": "yes"}).status_code == 403
@@ -835,7 +839,7 @@ def test_in_invitation_mode_the_confirmation_says_deleting_leaves_the_list(close
     closed_web.allow(BOB)
     client = client_for(closed_web, BOB)
     page = " ".join(client.get("/account/delete").text.split())
-    assert "Deleting your account takes you off it, so you would need to be invited again" in page
+    assert "Deleting removes you from it." in page
     delete_account(client)
     assert user_row(closed_web, BOB) is None
     assert login(closed_web.client(), BOB).status_code == 403

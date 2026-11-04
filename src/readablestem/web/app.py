@@ -13,9 +13,10 @@ from __future__ import annotations
 import functools
 import logging
 import secrets
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
+from html import escape as html_escape
 from pathlib import Path
 from typing import Any
 
@@ -259,8 +260,25 @@ def _on_validation_error(request: Request, exc: Exception) -> Response:
     return _error_page(request, 400, *ERROR_TEXT[400])
 
 
-def _plain_500_page() -> Response:
-    return HTMLResponse((TEMPLATES_DIR / "500.html").read_text(encoding="utf-8"), status_code=500)
+def _static_error_page(
+    name: str, status: int, contact_email: str | None, headers: dict[str, str] | None = None
+) -> Response:
+    """One of the fixed pages (500.html, 503.html), read as it is: they answer when the normal
+    pages cannot, so no template is rendered and nothing is looked up. The only fill-in is
+    the support link, from the settings."""
+    html = (TEMPLATES_DIR / name).read_text(encoding="utf-8")
+    support = (
+        f'<li><a href="mailto:{html_escape(contact_email, quote=True)}">Email for help</a></li>'
+        if contact_email
+        else ""
+    )
+    return HTMLResponse(
+        html.replace("<!--support-->", support), status_code=status, headers=headers
+    )
+
+
+def _plain_500_page_for(contact_email: str | None) -> Callable[[], Response]:
+    return lambda: _static_error_page("500.html", 500, contact_email)
 
 
 def _on_database_unavailable(request: Request, exc: Exception) -> Response:
@@ -269,11 +287,8 @@ def _on_database_unavailable(request: Request, exc: Exception) -> Response:
     that database. Only the exception type is logged, never its message (it can hold the
     connection string)."""
     log_exception(logger, "database_unavailable", exc, route=route_of(request))
-    return HTMLResponse(
-        (TEMPLATES_DIR / "503.html").read_text(encoding="utf-8"),
-        status_code=503,
-        headers={"Retry-After": "30"},
-    )
+    contact = request.app.state.ctx.settings.contact_email
+    return _static_error_page("503.html", 503, contact, headers={"Retry-After": "30"})
 
 
 def route_of(request: Request) -> str:
@@ -468,7 +483,7 @@ def create_app(
         https_only=settings.env == "prod",
     )
     app.add_middleware(RequestSizeLimitMiddleware)
-    app.add_middleware(SafeErrorMiddleware, error_page=_plain_500_page)
+    app.add_middleware(SafeErrorMiddleware, error_page=_plain_500_page_for(settings.contact_email))
     app.add_middleware(SecurityHeadersMiddleware, hsts=settings.env == "prod")
     # Outermost: logs method, route template, status and latency only (no query, headers).
     app.middleware("http")(request_logging_middleware)

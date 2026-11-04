@@ -27,6 +27,7 @@ import unicodedata
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session, sessionmaker
@@ -44,7 +45,7 @@ from readablestem.core.types import (
     Status,
 )
 from readablestem.pipeline import notation_memory, notation_suggest
-from readablestem.web.db import Course, CourseNotation, Job, JobStatus, ReviewEdit
+from readablestem.web.db import Course, CourseNotation, Job, JobStatus, ReviewEdit, utcnow
 
 MAX_NAME_CHARS = 200  # courses.name
 MAX_NOTE_CHARS = 200  # notation_entries.note
@@ -65,6 +66,18 @@ MEANINGS: dict[str, str] = {
 SYMBOL_EXAMPLES = (
     "“bold d”, “\\mathbf{d}”, “\U0001d41d”, “bold omega”, “double-struck R” or “v with an arrow”"
 )
+# A small starter set for an empty course, offered as editable rows (`add_starter`):
+# the symbols most STEM courses write bold. The instructor ticks the ones the course uses and can
+# change each symbol and its meaning; nothing is added until they press the button.
+STARTER: tuple[tuple[str, str], ...] = (
+    ("bold v", "vector"),
+    ("bold a", "vector"),
+    ("bold F", "vector"),
+    ("bold r", "vector"),
+    ("bold A", "matrix"),
+    ("bold B", "matrix"),
+)
+MAX_ATTACH = 50  # documents added to a course at once
 # What a decision that settled a style suggests the letter means.
 _REMEMBERED_MEANING = {"bold": "vector", "double-struck": "set"}
 
@@ -99,6 +112,7 @@ class CourseView:
     id: str
     name: str
     entries: int
+    documents: int = 0  # live documents converted for or added to the course
 
 
 @dataclass(frozen=True)
@@ -138,20 +152,27 @@ def owned_course(session: Session, course_id: str, user_id: str) -> Course | Non
     return course if course is not None and course.user_id == user_id else None
 
 
-def list_courses(session: Session, user_id: str) -> list[CourseView]:
-    """The user's courses, by name, with how many entries each has."""
+def list_courses(session: Session, user_id: str, now: datetime | None = None) -> list[CourseView]:
+    """The user's courses, by name, with how many symbols and live documents each has."""
     counts = (
         select(CourseNotation.course_id, func.count().label("n"))
         .group_by(CourseNotation.course_id)
         .subquery()
     )
+    docs = (
+        select(Job.course_id, func.count().label("n"))
+        .where(Job.user_id == user_id, Job.retain_until > (now or utcnow()))
+        .group_by(Job.course_id)
+        .subquery()
+    )
     rows = session.execute(
-        select(Course.id, Course.name, func.coalesce(counts.c.n, 0))
+        select(Course.id, Course.name, func.coalesce(counts.c.n, 0), func.coalesce(docs.c.n, 0))
         .outerjoin(counts, counts.c.course_id == Course.id)
+        .outerjoin(docs, docs.c.course_id == Course.id)
         .where(Course.user_id == user_id)
         .order_by(func.lower(Course.name), Course.created_at)
     ).all()
-    return [CourseView(id=r[0], name=r[1], entries=int(r[2])) for r in rows]
+    return [CourseView(id=r[0], name=r[1], entries=int(r[2]), documents=int(r[3])) for r in rows]
 
 
 def entries(course: Course) -> list[EntryView]:
@@ -306,6 +327,51 @@ def update_entry(session: Session, course: Course, row: CourseNotation, entry: E
 
 def _values(entry: EntryInput) -> dict[str, str]:
     return {"symbol": entry.symbol, "meaning": entry.meaning, "note": entry.note or ""}
+
+
+def add_starter(
+    session: Session, course: Course, rows: list[tuple[str, str]]
+) -> tuple[list[str], list[str]]:
+    """Add the starter rows the instructor ticked, each as typed: (symbol, meaning). Returns
+    (what was added, as phrases; the symbols as typed that could not be added: not a symbol this
+    tool reads, already in the course, or no room). Nothing here is added unasked."""
+    added: list[str] = []
+    refused: list[str] = []
+    for symbol, meaning in rows:
+        try:
+            entry = parse_entry(symbol, meaning, "")
+            add_entry(session, course, entry)
+        except NotationInvalid:
+            refused.append(" ".join(symbol.split())[:MAX_SYMBOL_CHARS] or "(empty)")
+            continue
+        added.append(notation_memory.phrase(entry.canonical, entry.meaning))
+    return added, refused
+
+
+def attach_documents(
+    session: Session, course: Course, job_ids: list[str], now: datetime | None = None
+) -> int:
+    """Put the owner's finished documents that belong to no course yet into `course` (they are
+    listed under it, and their review screen and edit checks use its notation). Not redone:
+    the conversion they have was made without it. A document that is not the owner's, is not
+    finished, is a sample, has passed its deletion time or already has a course is skipped.
+    Returns how many were added."""
+    moment = now or utcnow()
+    if not job_ids:
+        return 0
+    result = session.execute(
+        update(Job)
+        .where(
+            Job.id.in_(job_ids[:MAX_ATTACH]),
+            Job.user_id == course.user_id,
+            Job.course_id.is_(None),
+            Job.status == JobStatus.DONE,
+            Job.is_sample.is_(False),
+            Job.retain_until > moment,
+        )
+        .values(course_id=course.id)
+    )
+    return int(getattr(result, "rowcount", 0) or 0)
 
 
 # --------------------------------------------------------------------------- suggestions

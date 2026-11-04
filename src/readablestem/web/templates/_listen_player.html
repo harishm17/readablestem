@@ -2,33 +2,56 @@
    component for a job's page, the demo and the showcase site's examples (site/build.py
    loads this folder too), so it takes only `items` and uses no app global. Without
    JavaScript, or in a browser that cannot speak, the transcript is still plain text: the
-   controls are hidden until the script has found a speech engine. #}
+   controls are hidden until the script has found a speech engine. Play, Previous and Next
+   are the whole transport; everything else is under "More controls". Play starts at the
+   lesson (past the title, notices and licence); "Play from the beginning" is in the
+   disclosure. #}
+{% set lesson = namespace(at=0) %}
+{% for item in items %}{% if not lesson.at and item.role.startswith("Main landmark") %}{% set lesson.at = loop.index %}{% endif %}{% endfor %}
+{% set before = lesson.at - 1 if lesson.at > 1 else 0 %}
+{% macro entries(rows, start, label_id) %}
+<ol class="listen-transcript" role="list" start="{{ start }}" aria-labelledby="{{ label_id }}">
+  {% for item in rows %}
+  {% set n = start + loop.index0 %}
+  <li class="listen-item" id="item-{{ n }}" data-listen-item data-kinds="{{ item.kinds|join(' ') }}"{% if item.say != item.text %} data-say="{{ item.say }}"{% endif %}{% if item.lang and not item.lang.lower().startswith('en') %} lang="{{ item.lang }}"{% endif %}>
+    <span class="listen-role">{{ item.role }}</span>{% if item.text %}<span class="visually-hidden">: </span> <span class="listen-text">{{ item.text }}</span>{% endif %}
+
+  </li>
+  {% endfor %}
+</ol>
+{% endmacro %}
 <div data-listen-player>
   <h2 id="player-heading">Play it</h2>
-  <p class="hint" id="player-hint">Playing is optional. If you use a screen reader, read the transcript below with it instead.</p>
-  <noscript><p>Playing needs JavaScript. The transcript below can be read as it is.</p></noscript>
-  <p data-listen-unsupported hidden>This browser cannot speak text, so there is nothing to play. The transcript below can be read as it is.</p>
+  <p class="hint" id="player-hint">Optional: a screen reader can read the transcript instead.</p>
+  <noscript><p>Playing needs JavaScript. The transcript still reads.</p></noscript>
+  <p data-listen-unsupported hidden>This browser cannot speak text. <a href="#transcript-heading">Read the transcript</a> instead.</p>
   {# The transport stays in view while the transcript scrolls (listen.css, sticky): a direct
-     child of the player, hidden like the rest of the controls until a speech engine is found. #}
+     child of the player, hidden like the rest of the controls until a speech engine is found.
+     Only the three buttons that are used all the time live here, so it stays short. #}
   <div class="listen-transport" data-listen-transport hidden role="group" aria-labelledby="player-heading" aria-describedby="player-hint">
-      <div class="listen-row">
-        <button type="button" class="button button-small" data-listen="play" aria-describedby="listen-voice-note">Play</button>
-        <button type="button" class="button-secondary button-small" data-listen="pause" aria-disabled="true">Pause</button>
-        <button type="button" class="button-secondary button-small" data-listen="stop" aria-disabled="true">Stop</button>
-        <button type="button" class="button-secondary button-small" data-listen="prev">Previous item</button>
-        <button type="button" class="button-secondary button-small" data-listen="next">Next item</button>
-      </div>
-      <div class="listen-row">
-        <button type="button" class="button-secondary button-small" data-listen="heading">Next heading</button>
-        <button type="button" class="button-secondary button-small" data-listen="equation">Next equation</button>
-        <button type="button" class="button-secondary button-small" data-listen="lesson">Start at the lesson</button>
-        <label class="listen-follow"><input type="checkbox" data-listen-follow checked> Follow along</label>
-        <span class="listen-position" data-listen-position></span>
-      </div>
+    <div class="listen-row">
+      <button type="button" class="button button-small" data-listen="play" aria-describedby="listen-voice-note">Play</button>
+      <button type="button" class="button-secondary button-small" data-listen="prev">Previous</button>
+      <button type="button" class="button-secondary button-small" data-listen="next">Next</button>
+      <span class="listen-position" data-listen-position></span>
+    </div>
+    {# Why Play is off, right beside it: no voice, or only online voices. #}
+    <p class="listen-voice-note" id="listen-voice-note" data-listen-voice-note hidden>
+      <span data-listen-voice-text></span>
+      <button type="button" class="link-button" data-listen-choose-voice hidden>Choose a voice</button>
+      <a href="#transcript-heading" data-listen-read-link hidden>Read the transcript</a>
+    </p>
   </div>
   <div class="listen-controls" data-listen-controls hidden>
     <details class="listen-more">
-      <summary>Speed, voice and keyboard shortcuts</summary>
+      <summary>More controls</summary>
+      <div class="listen-row">
+        <button type="button" class="button-secondary button-small" data-listen="stop" aria-disabled="true">Stop</button>
+        <button type="button" class="button-secondary button-small" data-listen="beginning">Play from the beginning</button>
+        <button type="button" class="button-secondary button-small" data-listen="heading">Next heading</button>
+        <button type="button" class="button-secondary button-small" data-listen="equation">Next equation</button>
+        <label class="listen-follow"><input type="checkbox" data-listen-follow checked> Follow along</label>
+      </div>
       <div class="listen-row listen-settings">
         <div class="field">
           <label for="listen-rate">Speed</label>
@@ -45,32 +68,64 @@
           <select id="listen-voice" data-listen-voice aria-describedby="listen-voice-note"></select>
         </div>
       </div>
-      <p class="hint" id="listen-voice-note" data-listen-voice-note hidden></p>
-      <div class="listen-keys">
-        <p>These work while focus is on this page's content and you are not in a menu. A screen reader in browse mode may keep these keys for itself: the buttons do the same.</p>
-        <dl>
-          <dt><kbd>p</kbd></dt><dd>Play or pause</dd>
-          <dt><kbd>s</kbd> or <kbd>Esc</kbd></dt><dd>Stop</dd>
-          <dt><kbd>[</kbd> and <kbd>]</kbd></dt><dd>Previous and next item</dd>
-          <dt><kbd>h</kbd></dt><dd>Next heading</dd>
-          <dt><kbd>e</kbd></dt><dd>Next equation</dd>
-        </dl>
-      </div>
+      <p class="listen-keys">Keys: <kbd>p</kbd> play or pause, <kbd>s</kbd> stop, <kbd>[</kbd> <kbd>]</kbd> previous or next, <kbd>h</kbd> heading, <kbd>e</kbd> equation. A screen reader may keep them; the buttons do the same.</p>
     </details>
     <p class="visually-hidden" data-listen-status role="status"></p>
   </div>
 
   <h2 id="transcript-heading">Transcript</h2>
-  <p class="hint" id="transcript-hint">{{ items|length }} {{ "item" if items|length == 1 else "items" }}, in reading order. Each starts with what it is.</p>
-  {% set lesson = namespace(at=0) %}
-  {% for item in items %}{% if not lesson.at and item.role.startswith("Main landmark") %}{% set lesson.at = loop.index %}{% endif %}{% endfor %}
-  {% if lesson.at > 1 %}<p class="hint"><a href="#item-{{ lesson.at }}">Skip to the lesson</a> (past the title, notices and licence).</p>{% endif %}
-  <ol class="listen-transcript" role="list" data-listen-transcript aria-labelledby="transcript-heading" aria-describedby="transcript-hint">
-    {% for item in items %}
-    <li class="listen-item" id="item-{{ loop.index }}" data-listen-item data-kinds="{{ item.kinds|join(' ') }}"{% if item.say != item.text %} data-say="{{ item.say }}"{% endif %}{% if item.lang and not item.lang.lower().startswith('en') %} lang="{{ item.lang }}"{% endif %}>
-      <span class="listen-role">{{ item.role }}</span>{% if item.text %}<span class="visually-hidden">: </span> <span class="listen-text">{{ item.text }}</span>{% endif %}
-
-    </li>
-    {% endfor %}
-  </ol>
+  <p class="hint" id="transcript-hint">{{ items|length }} {{ "item" if items|length == 1 else "items" }}.
+    {%- if before %} Play starts at the lesson.{% endif %}</p>
+  {# A compact index of plain links (it works without script) and a filter (needs script, so
+     it stays hidden until the controls are shown). #}
+  {% set headings = [] %}{% set equations = [] %}
+  {% for item in items %}
+    {% if item.kinds[0] == "heading" %}{% set _ = headings.append((loop.index, item)) %}{% endif %}
+    {% if item.kinds[0] == "equation" %}{% set _ = equations.append((loop.index, item)) %}{% endif %}
+  {% endfor %}
+  {% if headings or equations %}
+  <details class="listen-index">
+    <summary>Index: {{ headings|length }} {{ "heading" if headings|length == 1 else "headings" }}{% if equations %}, {{ equations|length }} {{ "equation" if equations|length == 1 else "equations" }}{% endif %}</summary>
+    {% if headings %}
+    <h3 id="index-headings">Headings</h3>
+    <ul class="listen-index-list" aria-labelledby="index-headings">
+      {% for n, item in headings %}<li><a href="#item-{{ n }}">{{ item.text }}<span class="visually-hidden">, {{ item.role|lower }}</span></a></li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% if equations %}
+    <h3 id="index-equations">Equations</h3>
+    <ul class="listen-index-list" aria-labelledby="index-equations">
+      {% for n, item in equations %}<li><a href="#item-{{ n }}">{{ item.text|truncate(70, True, "…") }}</a></li>{% endfor %}
+    </ul>
+    {% endif %}
+  </details>
+  {% endif %}
+  <div class="listen-filter" data-listen-filter hidden>
+    <div class="field">
+      <label for="listen-find">Find in the transcript</label>
+      <input type="search" id="listen-find" data-listen-find autocomplete="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label for="listen-kind">Show</label>
+      <select id="listen-kind" data-listen-kind>
+        <option value="">All items</option>
+        <option value="heading">Headings</option>
+        <option value="equation">Equations</option>
+        <option value="figure">Figures</option>
+        <option value="table">Tables</option>
+      </select>
+    </div>
+    <p class="hint listen-filter-count" data-listen-filter-count role="status"></p>
+  </div>
+  <div data-listen-transcript>
+    {% if before %}
+    <details class="listen-before" data-listen-before>
+      <summary id="before-heading">Before the lesson ({{ before }})</summary>
+      {{ entries(items[:before], 1, "before-heading") }}
+    </details>
+    {{ entries(items[before:], lesson.at, "transcript-heading") }}
+    {% else %}
+    {{ entries(items, 1, "transcript-heading") }}
+    {% endif %}
+  </div>
 </div>

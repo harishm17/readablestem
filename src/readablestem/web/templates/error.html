@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {# No page address on error pages: a 404 for someone else's job must match the 404 for a
-   made-up id byte for byte, so it says nothing about what exists. #}
+   made-up id byte for byte, so it says nothing about what exists. The recovery below is
+   chosen from the part of the address that names the kind of page (/jobs, /courses,
+   /uploads, /app/batch), never from the rest of it. #}
 {% set hide_page_url = true %}
+{% set path = request.url.path %}
+{% set area = "course" if path.startswith("/courses") else "job" if path.startswith("/jobs") else "upload" if (path.startswith("/uploads") or path.startswith("/app/batch")) else "" %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
 <h1>{{ title }}</h1>
@@ -13,11 +17,20 @@
 {% include "_signin.html" %}
 {% elif status == 403 and contact_email %}
 <p>If you think this is a mistake, email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.</p>
+{% elif status == 404 %}
+{% if area == "job" or area == "upload" %}<p>A deleted document, or one not shared with you, looks like this too.</p>{% elif area == "course" %}<p>A deleted course looks like this too.</p>{% endif %}
+{% elif status|default(0) >= 500 %}
+<p>See the <a href="/status">service status</a>{% if contact_email %} or <a href="mailto:{{ contact_email }}">email us</a>{% endif %}.</p>
+{% endif %}
+{% set primary_href = back_href|default(none) or ("/jobs/" ~ job_id if job_id else none) %}
+{% if not primary_href and user %}{% set primary_href = "/courses" if (area == "course" and courses_enabled) else "/app" %}{% endif %}
+{% set primary_label = "Back to the decision" if back_href|default(none) else "Back to the document's status" if job_id else ("Go to your courses" if primary_href == "/courses" else "Go to my documents") %}
+{% if primary_href %}
+<p class="button-row"><a class="button" href="{{ primary_href }}">{{ primary_label }}</a></p>
 {% endif %}
 <ul class="actions">
-  {% if back_href|default(none) %}<li><a href="{{ back_href }}">Back to the decision</a></li>{% endif %}
-  {% if job_id %}<li><a href="/jobs/{{ job_id }}">Back to the document's status</a></li>{% endif %}
-  {% if user %}<li><a href="/app">Go to my documents</a></li>{% endif %}
+  {% if back_href|default(none) and job_id %}<li><a href="/jobs/{{ job_id }}">Back to the document's status</a></li>{% endif %}
+  {% if user and primary_href != "/app" %}<li><a href="/app">Go to my documents</a></li>{% endif %}
   <li><a href="/">Go to the home page</a></li>
 </ul>
 {% endblock %}

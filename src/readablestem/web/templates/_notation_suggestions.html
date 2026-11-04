@@ -7,11 +7,9 @@
 {% if suggestions|default([]) %}
 <section aria-labelledby="suggest-heading" id="suggestions">
   <h2 id="suggest-heading">Symbols found in {{ "this document" if suggest_job else "your documents" }}</h2>
-  <p>{{ "This document uses" if suggest_job else "The documents you converted for this course use" }}
-    {{ suggestions|length }} {{ "symbol" if suggestions|length == 1 else "symbols" }} that
-    {{ course.name }} does not have yet. Tick the ones to add. The meaning is a guess from
-    how the symbol is written, so change it where it is wrong. Nothing is added until you
-    press the button.</p>
+  <p>{{ "This document uses" if suggest_job else "Your documents use" }}
+    {{ suggestions|length }} {{ "symbol" if suggestions|length == 1 else "symbols" }} not in
+    {{ course.name }} yet. Tick the ones to add; the meaning is a guess, so correct it.</p>
   <form method="post" action="/courses/{{ course.id }}/suggestions" class="suggestion-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     {% if suggest_job %}<input type="hidden" name="job" value="{{ suggest_job }}">{% endif %}

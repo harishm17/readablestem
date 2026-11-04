@@ -25,13 +25,16 @@ Owner only: someone else's id, a stale one and a malformed one all answer the sa
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
+from sqlalchemy import func, select
 
 from readablestem.web import documents, upload_result
-from readablestem.web.db import JobStatus, session_scope, utcnow
+from readablestem.web.database import as_utc
+from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import JOB_ID, PageError, UserDep, conversions_closed, get_ctx, render
 from readablestem.web.routes.bundle import _zip_response
 from readablestem.web.routes.jobs import (
@@ -102,6 +105,42 @@ def _state(row: documents.DocumentRow | None) -> str:
     return "decide" if row.open_decisions else "ready"
 
 
+def _elapsed(minutes: int) -> str:
+    """How long ago the batch was uploaded, in words: "less than a minute", "4 minutes",
+    "1 hour 5 minutes". The time since the upload, not an estimate of what is left."""
+    if minutes < 1:
+        return "less than a minute"
+    if minutes < 60:
+        return _word(minutes, "minute", "minutes")
+    hours, rest = divmod(minutes, 60)
+    text = _word(hours, "hour", "hours")
+    return text + (f" {_word(rest, 'minute', 'minutes')}" if rest else "")
+
+
+def _next_step(rows: list[dict[str, Any]]) -> dict[str, str]:
+    """What to do next to finish the batch: wait (nothing yet), review the documents that
+    need decisions (the first one), look at the stopped ones, or download. `href` and `label`
+    are set when there is a link."""
+    states = [r["state"] for r in rows]
+    if any(s in {"waiting", "converting"} for s in states):
+        return {"text": "Nothing to do yet: you can leave, and documents keep converting."}
+    decide = [r for r in rows if r["state"] == "decide"]
+    if decide:
+        many = len(decide) > 1
+        return {
+            "text": f"{_word(len(decide), 'document needs', 'documents need')} your decisions "
+            "before sharing.",
+            "href": f"/jobs/{decide[0]['id']}/review",
+            "label": "Review the first one" if many else "Review it",
+        }
+    stopped = states.count("stopped")
+    if stopped:
+        return {"text": f"{_word(stopped, 'document', 'documents')} stopped. Open it to see why."}
+    if states.count("ready"):
+        return {"text": "Every document is ready."}
+    return {}
+
+
 def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
     """Everything the page draws; None when the batch is unchanged since `?v=`."""
     ctx = get_ctx(request)
@@ -113,20 +152,32 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
         version = documents.list_version(
             session, user.id, now=now, budget_closed=closed, job_ids=ids
         )
+        began = as_utc(
+            session.scalar(select(func.min(Job.created_at)).where(Job.id.in_(ids))) if ids else None
+        )
+        minutes = int((now - began).total_seconds() // 60) if began else 0
+        # The minute is part of the version, so a batch still converting is drawn again once a
+        # minute and "Started 4 minutes ago" is never stale (a finished one is not polled).
+        version = hashlib.sha256(f"{version}.{minutes}".encode()).hexdigest()[:16]
         if seen and seen == version and request.headers.get("HX-Request") == "true":
             return None
         listing = documents.documents(session, user.id, now=now, budget_closed=closed, job_ids=ids)
     by_id = {row.id: row for row in listing.rows}
+    titles = [r.title for r in listing.rows]
     rows: list[dict[str, Any]] = []
     for item in placed:
         if not item.job_id:
             continue
         row = by_id.get(item.job_id)
+        name = row.title if row else item.filename
+        # Files that came out with the same title (a slide deck's every part, say) are told
+        # apart by their file names: the file name leads and the title follows it.
+        same = bool(row) and titles.count(name) > 1 and name != item.filename
         rows.append(
             {
                 "id": item.job_id,
-                "name": row.title if row else item.filename,
-                "filename": item.filename,
+                "name": item.filename if same else name,
+                "also": name if same else (item.filename if name != item.filename else ""),
                 "pages": item.pages,
                 "label": row.label if row else "Deleted",
                 "badge": row.badge if row else "failed",
@@ -153,6 +204,8 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
     unfinished = any(r["state"] in {"waiting", "converting"} for r in rows)
     ready = sum(r["state"] == "ready" for r in rows)
     return {
+        "elapsed": _elapsed(minutes) if began else "",
+        "next_step": {"text": "", "href": "", "label": "", **_next_step(rows)},
         "result_id": result_id,
         "rows": rows,
         "choose": [{"id": i.pending_id, "filename": i.filename, "pages": i.pages} for i in choose],

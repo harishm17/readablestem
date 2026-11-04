@@ -175,7 +175,7 @@ def test_deleting_an_account_works_without_javascript(site, browser):
     page.get_by_role("link", name="No, keep it").click()
     assert page.url.endswith("/account")
     page.get_by_role("link", name="Delete my account").click()
-    page.get_by_role("button", name="Yes, delete my account").click()
+    page.get_by_role("button", name="Delete my account").click()
     page.wait_for_url(site.base + "/")
     assert "Your account and everything in it have been deleted." in page.content()
     # Signed out: the documents page sends the person to sign in.

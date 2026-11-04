@@ -124,7 +124,11 @@ def chooser_context(
     suggested = ranges.suggest_parts(row.pages, s.max_pages_per_job, done)
     left_out_pages = ranges.left_out(row.pages, done, suggested)
     heavy = row.size_bytes > s.max_upload_mb * 1024 * 1024
+    shown_text = ranges.suggestion_text(suggested) if typed is None else typed
+    rows = ranges.preview(shown_text, total=row.pages, limit=s.max_pages_per_job, taken=done)
     context: dict[str, Any] = {
+        "preview_rows": rows,
+        "preview_summary": preview_summary(rows, left),
         "pending": row,
         "size_text": pending.size_text(row.size_bytes),
         "examples": ranges.examples(s.max_pages_per_job, row.pages),
@@ -137,7 +141,7 @@ def chooser_context(
         "done_count": len(done),
         "pages_left": left,
         "next_reset": next_day_start(now),
-        "typed_parts": ranges.suggestion_text(suggested) if typed is None else typed,
+        "typed_parts": shown_text,
         "suggestion_lines": len(suggested),
         "shrink": heavy if shrink is None else shrink,
         "heavy": heavy,
@@ -151,9 +155,45 @@ def chooser_context(
     return context
 
 
+def preview_summary(rows: list[ranges.PreviewRow], left: int | None) -> str:
+    """The preview in one line: how many parts and pages, what needs fixing, and where today's
+    pages run out ("Parts that do not fit today are not started" is what `_start_parts` does:
+    it stops at the first part that does not fit and the file stays)."""
+    if not rows:
+        return "No parts yet."
+    good = [r for r in rows if not r.error]
+    bad = len(rows) - len(good)
+    pages = sum(r.count for r in good)
+    parts_word = "part" if len(good) == 1 else "parts"
+    text = f"{len(good)} {parts_word}, {pages} {'page' if pages == 1 else 'pages'}."
+    if bad:
+        text += f" Fix {bad} before converting."
+    elif left is not None and pages > left:
+        fits, used = 0, 0
+        for r in good:
+            if used + r.count > left:
+                break
+            used += r.count
+            fits += 1
+        text += f" Only {left} pages are left today: " + (
+            f"the first {fits} {'part starts' if fits == 1 else 'parts start'}, the rest wait here."
+            if fits
+            else "none starts today; they wait here."
+        )
+    return text
+
+
 @router.get("/uploads/{upload_id}")
 def choose(request: Request, upload_id: str, user: UserDep) -> Response:
     return render(request, "upload_parts.html", chooser_context(get_ctx(request), user, upload_id))
+
+
+@router.get("/uploads/{upload_id}/preview")
+def preview(request: Request, upload_id: str, user: UserDep, parts: str = "") -> Response:
+    """The parts as typed, with their page counts: what the chooser's preview swaps in while
+    the person types (htmx). Only page numbers are sent; nothing is stored or logged."""
+    context = chooser_context(get_ctx(request), user, upload_id, typed=parts[:2000])
+    return render(request, "_parts_preview.html", context | {"oob": True})
 
 
 # --------------------------------------------------------------------------- converting parts

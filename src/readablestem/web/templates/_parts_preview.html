@@ -1,0 +1,25 @@
+{# The parts as they will be converted, one row each with its page count (web/ranges.py
+   `preview`). Drawn with the page and, while the person types, fetched again by htmx
+   (GET /uploads/{id}/preview, routes/parts.py) and swapped in place; the summary line is a
+   live region that is never replaced, updated out of band like the batch page's. Without
+   script it is the server's reading of what was typed, after each send. A row that cannot
+   be used says why, in the words the error uses. #}
+<div id="parts-preview" class="parts-preview">
+  {% if oob|default(false) %}<p id="parts-summary" class="parts-summary" hx-swap-oob="innerHTML">{{ preview_summary }}</p>{% endif %}
+  {% if preview_rows %}
+  <ol class="parts-list" aria-label="Parts to convert">
+    {% for row in preview_rows %}
+    <li class="parts-row{% if row.error %} parts-row-error{% endif %}">
+      <span class="parts-name">Part {{ row.number }}</span>
+      {% if row.error %}
+      <span class="parts-problem"><span class="visually-hidden">Problem: </span>{{ row.error }}</span>
+      {% else %}
+      <span class="parts-pages">{{ row.label }}</span>
+      <span class="parts-count">{{ row.count }} {{ "page" if row.count == 1 else "pages" }}</span>
+      {% endif %}
+      {% if row.number <= max_parts %}<button type="button" class="link-button" data-remove-part="{{ row.number }}" hidden>Remove<span class="visually-hidden"> part {{ row.number }}</span></button>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</div>
