@@ -144,6 +144,42 @@ def test_the_comparison_guide_stacks_on_a_phone_and_keeps_its_table_wide(
     assert not violations, describe(violations)
 
 
+@pytest.mark.parametrize("scheme", ["light", "dark"])
+def test_the_phone_comparison_topics_are_keyboard_disclosures(site, browser, axe_source, scheme):
+    path = "/guides/readablestem-mathpix-latexml"
+    context, page = open_as(browser, site, path, scheme=scheme, viewport=PHONE, signed_in=False)
+    topics = page.locator("details.compare-topic")
+    assert topics.count() == 9
+    assert page.locator("details.compare-topic[open]").count() == 0  # collapsed by default
+    first = topics.first
+    summary = first.locator("summary")
+    box = summary.bounding_box()
+    assert box and box["height"] >= 44
+    # Closed: the topic and ReadableSTEM's answer show; the other tools do not.
+    assert "Takes in" in summary.inner_text() and "STEM course PDF" in summary.inner_text()
+    assert "Source" not in summary.inner_text()
+    assert not first.locator("dt", has_text="Mathpix").is_visible()
+    # Keyboard: focus the summary, Enter opens, Space closes.
+    summary.focus()
+    page.keyboard.press("Enter")
+    assert first.get_attribute("open") is not None
+    for tool in ("ReadableSTEM", "Mathpix", "Aelira", "Chatbots", "LaTeXML"):
+        assert first.locator("dt", has_text=tool).is_visible()
+    assert first.locator("dd a", has_text="Source").first.is_visible()
+    assert not first.locator(".compare-lead").is_visible()
+    violations = axe_violations(page, axe_source)  # open
+    assert not violations, describe(violations)
+    page.keyboard.press("Space")
+    assert first.get_attribute("open") is None
+    # Tab moves on to the next topic's summary, not into closed content.
+    page.keyboard.press("Tab")
+    assert page.evaluate("document.activeElement.closest('details') !== null")
+    assert page.evaluate("document.activeElement.tagName") == "SUMMARY"
+    violations = axe_violations(page, axe_source)  # closed
+    context.close()
+    assert not violations, describe(violations)
+
+
 @pytest.mark.parametrize(
     "path",
     [

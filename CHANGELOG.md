@@ -12,7 +12,7 @@
   selectable field); the document's deletion time and a link to keep it longer beside the address;
   sign-in wording from the enabled providers; "the same address, letter case aside" instead of "exactly
   as written"; "Remove" is a danger button.
-- The comparison guide shows one block per topic with the tool named on each line under 52rem; the
+- The comparison guide shows, under 52rem, one collapsed native disclosure per topic (ReadableSTEM's answer in the summary; opened, every tool with its source and date); the
   table stays for wide screens. ADA, comparison and posting guides get the offices page's "On this
   page" contents (`templates/_contents.html`) and stable heading ids.
 - Status page: "Checked at ...", a "Check again" link and what the 10-minute AI service

@@ -159,7 +159,7 @@
 {% set tools = ["ReadableSTEM", "Mathpix", "Aelira", "Chatbots", "LaTeXML"] %}
 {# Two views of the same cells, so the text exists once in the source: the table below
    52rem (kept for wide screens and for readers who move by table cell), and, under it, one
-   short list per topic with the tool named on every line, because six columns of prose do
+   collapsed <details> per topic whose opened list names the tool on every line, because six columns of prose do
    not fit a phone. The browser shows one of them; the other is not rendered, so a screen
    reader reads the facts once. (app.css, "ux-lane-c: comparison guide") #}
 <div class="table-scroll compare-wide-view" role="group" aria-label="ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML side by side" tabindex="0">
@@ -180,15 +180,20 @@
 </div>
 <div class="compare-stack">
   {% for topic, cell in topics %}
-  <section class="compare-topic" aria-labelledby="topic-{{ loop.index }}">
-    <h3 id="topic-{{ loop.index }}">{{ topic }}</h3>
+  {# Closed: the topic and ReadableSTEM's answer as plain text (no links inside a summary;
+     its source note is in the list). Open: every tool, each with its source and date. Native, no script. #}
+  <details class="compare-topic">
+    <summary>
+      <span class="compare-topic-name">{{ topic }}</span>
+      <span class="compare-lead">{{ (cell(0)|string).split('<span class="source-note">')[0]|striptags }}</span>
+    </summary>
     <dl>
       {% for n in range(5) %}
       <dt>{{ tools[n] }}</dt>
       <dd>{{ cell(n) }}</dd>
       {% endfor %}
     </dl>
-  </section>
+  </details>
   {% endfor %}
 </div>
 

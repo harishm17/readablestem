@@ -1006,26 +1006,29 @@ input[type="number"].input-short { width: 6rem; }
 /* ===== end ux-lane-c: sharing page ===================================================== */
 
 /* ===== ux-lane-c: comparison guide on a phone (templates/guide_compare.html) ==============
-   The same cells twice: the table from 52rem up, and under it one block per topic with the
-   tool named on every line. The one that is not shown is not rendered, so a reader of either
-   gets each fact once. */
+   The same cells twice: the table from 52rem up, and under it one native <details> per topic.
+   Closed, it shows the topic and ReadableSTEM's answer (as plain text); open, it
+   lists every tool with its source and date. The view that is not shown is not rendered, so a
+   reader of either gets each fact once. No script. */
 .compare-stack { display: none; }
 @media (max-width: 51.99rem) {
   .compare-wide-view { display: none; }
   .compare-stack { display: block; }
   .mode-read main > .compare-stack { max-width: none; }
-  .compare-topic { margin: 0 0 var(--space-5); padding: var(--space-3) var(--space-4); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--bg); }
-  .compare-topic h3 { margin: 0 0 var(--space-2); font-size: var(--step-1); }
-  .compare-topic dl { margin: 0; }
+  .compare-topic { margin: 0 0 var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--bg); }
+  .compare-topic summary { display: list-item; list-style-position: inside; min-height: 2.75rem; padding: var(--space-3) var(--space-4); cursor: pointer; }
+  .compare-topic-name { font-weight: 700; font-size: var(--step-1); }
+  .compare-lead { display: block; margin-top: var(--space-1); }
+  .compare-lead { color: var(--ink-muted); overflow-wrap: anywhere; }
+  .compare-topic[open] .compare-lead { display: none; }
+  .compare-topic[open] summary { border-bottom: 1px solid var(--border-subtle); }
+  .compare-topic dl { margin: 0; padding: var(--space-3) var(--space-4) var(--space-4); }
   .compare-topic dt { margin: var(--space-3) 0 var(--space-1); font-weight: 700; }
   .compare-topic dt:first-child { margin-top: 0; }
   .compare-topic dd { margin: 0; overflow-wrap: anywhere; }
-  .compare-topic dt:first-child, .compare-topic dt:first-child + dd { background: var(--surface); }
-  .compare-topic dt:first-child { padding: var(--space-1) var(--space-2) 0; border-radius: var(--radius-control) var(--radius-control) 0 0; }
-  .compare-topic dt:first-child + dd { padding: 0 var(--space-2) var(--space-1); border-radius: 0 0 var(--radius-control) var(--radius-control); }
-  .compare-topic .source-note { display: block; margin-top: var(--space-1); color: var(--ink-muted); }
+  .compare-topic dd .source-note { display: block; margin-top: var(--space-1); color: var(--ink-muted); }
 }
-@media (forced-colors: active) { .compare-topic { border-color: CanvasText; } }
+@media (forced-colors: active) { .compare-topic, .compare-topic[open] summary { border-color: CanvasText; } }
 /* ===== end ux-lane-c: comparison guide ================================================= */
 
 /* The /style page (templates/style.html). */

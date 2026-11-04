@@ -4,6 +4,7 @@ phones that carries every fact, source link and date the table does."""
 
 from __future__ import annotations
 
+import html as html_lib
 import re
 
 import pytest
@@ -65,11 +66,18 @@ def test_the_comparison_stack_carries_every_fact_source_and_date_of_the_table(en
     assert len(cells) == len(entries) == 45  # nine topics, five tools
     norm = lambda parts: [" ".join(p.split()) for p in parts]  # noqa: E731
     assert norm(entries) == norm(cells)  # the very same cells, so every link and date is kept
-    for part in (table, stack):
-        assert part.count("<time ") == len(re.findall(r"<time ", table))
-    assert len(re.findall(r"<time ", stack)) >= 30
-    # Each topic is a heading, and each line names its tool.
-    assert len(re.findall(r"<h3 ", stack)) == 9
+    # The dates are the table's too (the closed summary's copy is extra and hidden).
+    assert sum(e.count("<time ") for e in entries) == sum(c.count("<time ") for c in cells)
+    assert sum(e.count("<a ") for e in entries) == sum(c.count("<a ") for c in cells)
+    # Each topic is a collapsed native disclosure naming the topic and ReadableSTEM's answer.
+    assert len(re.findall(r"<details class=\"compare-topic\">", stack)) == 9
+    assert '<details class="compare-topic" open' not in stack
+    leads = re.findall(r'<span class="compare-lead"[^>]*>(.*?)</span>\s*</summary>', stack, re.S)
+    squash = lambda t: "".join(html_lib.unescape(t).split())  # noqa: E731
+    plain = [squash(re.sub(r"<[^>]+>", "", c)) for c in cells[0::5]]
+    assert len(leads) == 9
+    for lead, full in zip(leads, plain, strict=True):
+        assert "<" not in lead and lead.strip() and full.startswith(squash(lead))
     assert re.findall(r"<dt>(.*?)</dt>", stack)[:5] == [
         "ReadableSTEM",
         "Mathpix",
