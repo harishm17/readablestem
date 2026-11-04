@@ -611,3 +611,16 @@ uv run python scripts/realworld_report.py --part dev --tag base-0508 --rescore-c
 # add --neutral or --spoken, or drop --reading cells for reading A
 uv run python scripts/dev_miss_places.py --part dev --tag base-0508
 ```
+
+## Display grouping (`LAYOUT_DISPLAY_GROUPING`): not enabled; revisit after fresh5
+
+Layout cut 42 of the dev papers' found-but-wrong equations at display boundaries (the 42 of the "layout split" row above). Read crop by crop, 28 are real layout errors and 14 are gold or scorer conventions (aligned rows the gold writes one by one, comma lists in one `$...$`, words in the text font outside the gold formula). The 28: two formulas joined by "and" or "for all i" (4), pieces of one long display (12), a formula cut at a text-font word (6), inline lists cut at an ellipsis or a line wrap (5), two numbered equations in one element (1).
+
+The change (docs/layout.md "One printed display, one element") joins connective-word displays, the right half of a long aligned row and a row that starts with "=", and keeps a trailing ellipsis in an inline formula. It is behind `LAYOUT_DISPLAY_GROUPING`, default off.
+
+- **Off:** output identical to main on the 149 repository PDFs and on the dev, dev2, fresh2-4 and held-out PDFs (`scripts/layout_identity.py`).
+- **On, layout:** 16 of the 149 PDFs differ (matrix bracket pieces rejoined 3, a trailing ellipsis 1, one "with" display 1, OpenStax pages 11 files: Cramer's rule, Gaussian elimination, partial fractions, rational expressions); 21 of the dev, fresh and held-out PDFs differ (8 dev, 13 fresh and held-out). No text lost in any (character multiset of all element text equal).
+- **On, dev (offline replay of base-0508 + $0.1172 live for 52 new requests, fixed spoken scorer):** spoken-equal 1,928 to 1,939 (0.820 to 0.825), exact 1,747 to 1,757, unflagged wrong 226 to 221; 23 equations wrong to right, 1 right to wrong (2412.12319 eq-082: the gold writes the second row of an aligned display alone, we now emit one array).
+- **On, fresh2-4 and held-out:** not demonstrable at $0. Those recordings are pipeline 0.5.0, so most equation requests have no recorded answer; the replay showed 0 right-to-wrong readings and 1 right-to-unanswered (fresh3 2406.01324 eq-075, a merged display with no recorded answer).
+
+Why it stays off: the OpenStax merges and the aligned-row merges can cost points where the gold lists rows separately (like eq-082), and fresh5's candidate must not move. Turning it on needs a `PIPELINE_VERSION` bump (0.5.10 or later; 0.5.9 is eq/read-push).
