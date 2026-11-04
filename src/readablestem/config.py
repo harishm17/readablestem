@@ -222,7 +222,7 @@ class Settings(BaseSettings):
     # production values: they only apply in open mode, and the first three only to accounts
     # that were not invited ("open tier"). Invited people keep PER_USER_DAILY_PAGE_QUOTA.
     # Pages an open-tier account may submit per UTC day.
-    open_tier_daily_page_quota: int = Field(default=250, gt=0)
+    open_tier_daily_page_quota: int = Field(default=150, gt=0)
     # Model reads from review (a marked equation region, a table cell read as maths) an
     # open-tier account may start per UTC day. Each one costs model spend that no page count
     # bounds. 0 turns them off for that tier.
