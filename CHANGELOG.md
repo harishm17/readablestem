@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased: inline span edges from glyphs (branch eq/t11-glyph-spans)
+
+- Inline formulas of TeX-made PDFs start and end where the glyphs say (`pipeline/glyph_math.py`, docs/layout.md "Inline
+  span edges from glyphs"): a comma, colon or semicolon set as an index stays in the formula (`\rho_{m,q}(x)` was `q(x)`),
+  a radical is not cut from its radicand, a known upright operator name touching its bracket (`\Pr(A)`, `\mathrm{supp}(\psi)`)
+  and a percent sign after a number are in the formula, and the unit after a number (`24h`, `m^3 kg^{-1}`) is out of it.
+  Nothing becomes a formula that was not one, so no text is lost: letters and digits of all 148 PDFs of
+  `scripts/layout_identity.py` are equal before and after, 146 PDFs identical, 2 TeX papers differ.
+- Measured with the new `scripts/eq_span_edges.py` (layout alone, no model): inline span edge errors on the development
+  gold 4.7% to 3.8% (dev2, 2,153 inline gold), 4.5% to 4.0% on held-out and fresh2 to 4 (6,444, replay only), precision
+  0.893 to 0.902, recall 0.730 to 0.734 (docs/eval-equation-diagnostics.md, "Inline span edges"). No model read the
+  changed spans.
+- Tests: `tests/test_glyph_math.py`.
+- Pipeline version 0.5.3 to 0.5.4: an inline formula's crop, id and marker text can change; results from 0.5.3 load
+  unchanged.
 ## Unreleased: sharing with named people (branch share/g1-named-people)
 
 - An owner can share one finished document with named people by email address (`/jobs/{id}/share`,

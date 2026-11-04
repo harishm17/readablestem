@@ -184,6 +184,46 @@ readers; an equation both get wrong the same way shows no sign. Whether a page w
 quote would do better is not measured here. The union and the flag numbers are ceilings of what the recorded chatbot
 answers allow, not what any product reads.
 
+## Inline span edges from glyphs (T11, 2026-11-03)
+
+`scripts/eq_span_edges.py --part PART [--out F] [--compare F]` runs the layout alone (no model, no cost) over the cut PDFs
+of a real-world part, aligns the equations it finds to the gold as the document task does with no model answers, and
+counts for the inline gold equations: detection recall by gold length, precision (aligned predictions over predicted
+inline equations), and span edges. An **edge error** is an aligned pair whose text layer differs from the gold in letters
+or digits (after folding the code points a text layer and a gold spell differently): letters or digits only the span has
+are "ran on", only the gold has "cut short". The 390 aligned pairs of dev2 below text-layer fidelity 0.99 are mostly a
+different print of the same maths (an accent the text layer has no glyph for, scripts in another order): 289 of the 390 are
+"inside" and are not counted as edge errors. The rules are in docs/layout.md ("Inline span edges from glyphs"); the dev2
+errors were read to find them, the other four parts were only measured.
+
+| part | inline gold | recall (found) | edge error, of gold | precision (predicted) |
+|---|---|---|---|---|
+| dev2 (tuned on) | 2,153 | 0.808 to 0.810 (1,739 to 1,745) | 4.7% to 3.9% (101 to 84) | 0.879 to 0.898 (1,978 to 1,944) |
+| held-out | 1,739 | 0.779 to 0.780 (1,355 to 1,357) | 7.5% to 6.8% (130 to 118) | 0.875 to 0.880 (1,549 to 1,542) |
+| fresh2 | 1,555 | 0.748 to 0.752 (1,163 to 1,170) | 4.2% to 4.1% (66 to 64) | 0.883 to 0.892 (1,317 to 1,312) |
+| fresh3 | 1,637 | 0.725 to 0.725 | 2.4% to 2.3% (40 to 38) | 0.892 to 0.892 |
+| fresh4 | 1,513 | 0.658 to 0.660 (996 to 998) | 3.6% to 3.6% (54 to 55) | 0.930 to 0.933 |
+| held-out and fresh2 to 4 (replay only) | 6,444 | 0.730 to 0.731 (4,701 to 4,712) | 4.5% to 4.3% (290 to 275) | 0.893 to 0.897 (5,267 to 5,254) |
+
+On dev2, 6 gold equations are found that were not and none is lost. The papers whose inline predictions change: dev2 10 of 25,
+held-out 2 of 15, fresh2 4, fresh3 2, fresh4 5. In the four replay parts 12 are found that were not (held-out 2, fresh2 8,
+fresh3 0, fresh4 2) and 1 is lost (fresh2, gold `d \sqrt{...}`, whose old prediction `d3T` aligned to it and whose new one does not). The
+first version of the function-name rule took any non-dictionary word before a bracket and lost 7 (`ARFIMA(1, d(m), 1)` against
+gold `d(m)`); it now takes only the names in `glyph_math.OPERATOR_NAMES`, which gives up the all-capitals names of one dev2
+paper (`CTCS(n)`, 8 gold equations) rather than guess. Exact and spoken-equal scores need a model's reading and are not computed here; the formulas read
+are the same glyphs, so only the crop's edges move.
+
+Other layout, 148 PDFs of `scripts/layout_identity.py` (the fixtures, `data/`, the development pages cached for the eval;
+before and after, no model): 146 identical, 2 different, both TeX papers of the table sets. `real-tables/2407.13734`: 197
+to 193 elements, because `x_{1:T}` is one formula (its `T` was an equation element of its own, with two more fragments, a
+paragraph's marker numbers shift); `real-tables-heldout/2311.16525`: `\sim 28%` keeps its percent sign. The letters and
+digits of every page are the same before and after, inline maths included (0 lost, 0 gained).
+
+What this does not show: no model reads the changed spans here, so whether the crop reading improves is the next run's
+question; the gold's edges are the authors' `$`, and about a dozen of the 82 remaining dev2 errors are an author setting a relation as text
+(`G = $6.6 \times 10^{-11}$`), which glyphs cannot tell from one formula; the nuclide rule (`^{20}\mathrm{Mg}` against
+`20Mg`) is a gold convention left as it is (about a dozen dev2 pairs).
+
 ## Limits
 
 - Counts describe the recorded runs with the code at the time they were made (D1's layout and D4's replay use the code in
