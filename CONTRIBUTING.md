@@ -23,7 +23,7 @@ is.
 
 - **Tests are offline by default.** They use the fake model client and PDFs generated in
   the repository. A test that calls a real model is marked `live_model` and is opt-in; use
-  your own key with a spend cap, and never commit a key. Model requests are sent with
+  your own key with a spend cap, and never commit a key. OpenAI requests are sent with
   `store=False`; do not change that.
 - **Only inputs that can be published.** Test and example documents must be your own work
   (contributed under MIT) or OpenStax material from books published under CC BY, with

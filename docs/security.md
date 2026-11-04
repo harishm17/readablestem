@@ -243,7 +243,7 @@ script injected into an app page is refused by the policy.
 | Model reads from review per person per day (open tier) | `OPEN_TIER_DAILY_REREADS`, counted before the read and not given back | `web/quota.py` (`try_consume_reread`), `web/reread.py` |
 | New accounts (open sign-up) | `MAX_NEW_ACCOUNTS_PER_DAY` a UTC day for the service, not given back when an account is deleted; 5 an hour per address; an address deleted today comes back with the day's pages, reads and place already used (a keyed hash of the address, kept to the end of the day) | `web/quota.py` (`try_take_signup`), `web/abuse.py` (`signup`), `web/tombstones.py` |
 | Spend holds of a dead process | Recorded per hold (`spend_holds`) and given back by job when a lease runs out and by age at start-up | `web/spend.py` (`release_holds`), `web/worker.py` |
-| Waiting or running documents per person | 10 | `web/intake.py` (every route that makes a job: the upload and the parts of a large file) |
+| Waiting or running documents per person | 30 for invited people and pilots, 10 for an account made by open sign-up (`access.files_per_upload`) | `web/intake.py` (every route that makes a job: the upload and the parts of a large file) |
 | Kept documents per person | 40 (the sample document does not count) | `web/intake.py`; "Keep for 7 days" (`routes/job_settings.py`) refuses with a 429 page when it would exceed it |
 | Daily and per-job model spend | `DAILY_SPEND_CAP_USD`, per-job caps | `web/spend.py` |
 | Daily spend of open-tier accounts | `OPEN_TIER_DAILY_SPEND_CAP_USD`, a pool inside the daily cap, held and settled by the same conditional UPDATE; their queued jobs wait when it is spent | `web/spend.py`, `web/worker.py` |
@@ -272,7 +272,7 @@ cannot see the live header; the log line is the only live check.
 
 ### Running uploaded TeX (sandbox)
 
-A `.tex` file is a program, so a LaTeX upload (a later change; the switch is `FEATURE_LATEX_SOURCE`)
+A `.tex` file is a program, so a LaTeX upload (the switch is `FEATURE_LATEX_SOURCE`, off in production)
 runs LaTeXML only inside `core/sandbox.py`: bubblewrap with a minimal read-only root (no
 application, no `/home`, `/proc/1/environ` hidden), the project mounted read-only and one output
 folder writable, a new network namespace (no network), a new pid namespace that dies with the
@@ -300,7 +300,9 @@ fallback (a plain child of the web process shares its user, so it could read the
 files). Whether the platform allows it is checked on the deployed
 image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"; the web process also runs it at start-up and LaTeX source is
 refused with a 503 unless it passed, `web/sandbox_status.py`); a FAIL there means
-LaTeX upload must stay off.
+LaTeX upload must stay off. In production (2026-11-04) the probe fails, so `FEATURE_LATEX_SOURCE`,
+`FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` are off; the Landlock backend's failure step codes
+("Why it did not start" below) are being read.
 
 **Landlock backend** (`core/landlock_exec.py`, `core/sandbox.py`; `tests/test_sandbox_landlock.py`).
 Chosen automatically when bubblewrap cannot start (`sandbox.backend()`; `READABLESTEM_SANDBOX_BACKEND`
@@ -551,7 +553,7 @@ a wrong alt text or equation, which the instructor reviews.
   download, failure and deletion and finds the markers in no log record, stdout line, cookie,
   response header, event, aggregate or quota row. `test_web_ops.py` does the same for logs
   alone.
-- Retention: 24 hours by default, 30 days with the opt-in checkbox. A document past its time
+- Retention: 24 hours by default (`RETENTION_HOURS`), 7 days when the person ticks "Keep for 7 days" (or sets it as the default on the Account page), 30 days with the opt-in checkbox. A document past its time
   answers 404 immediately, and the hourly purge (cron, with the worker as a backstop) deletes
   the job, its blobs and review edits. `test_audit_privacy.py` moves a clock through the
   upload route, the job page and the cron endpoint to check 23 h 59 min, 24 h 1 min, 29 days
@@ -584,7 +586,7 @@ a wrong alt text or equation, which the instructor reviews.
 | Recipient | What | How long |
 |---|---|---|
 | Railway (the web service, Railway Postgres and the `backup` volume) | The PDF, results and HTML while retained; sessions; logs without content | Until the retention time; backups up to about a week more |
-| The model provider (`MODEL_PROVIDER`) | Images cut from the page (equations, figures, and tables when enabled) with a short fenced piece of nearby text; a course's notation when that feature is on. No file name, no email, never the whole PDF | OpenAI: requests are sent with `store=False`. Anthropic: per its published policy, deleted from its systems within 30 days (longer for material its safety systems flag); zero retention only by agreement |
+| The model provider (`MODEL_PROVIDER`; production runs Anthropic) | Images cut from the page (equations, figures, and tables when enabled) with a short fenced piece of nearby text; a course's notation when that feature is on. No file name, no email, never the whole PDF | OpenAI: requests are sent with `store=False`. Anthropic: per its published policy, deleted from its systems within 30 days (longer for material its safety systems flag); zero retention only by agreement |
 | A handwriting reader (`MATH_READER_CLAUDE_ENABLED`, `MATH_READER_OPENAI_ENABLED`; off; the pipeline calls one only when `IMAGE_PAGES_SECOND_READER` names it, and in the hosted conversion child only the local reader can run) | One tight crop of an expression, no text | Anthropic: deleted within 30 days (longer if flagged). OpenAI: sent with `store=False`. Turning one on can add a recipient to this table and to the privacy page (`docs/math-readers.md`). The local reader (`MATH_READER_LOCAL_ENABLED`) runs in the conversion child, sends nothing and adds no recipient |
 | Langfuse (only if tracing is on) | Timings, model names, token counts, costs, error categories, random ids; payloads are masked | Set in the Langfuse project |
 
@@ -601,20 +603,22 @@ can remain at the provider for up to 30 days.
 
 ## Pre-launch audit: findings
 
+This section and "Scanners" are a dated record of the audit, kept as history: the numbers and addresses in them are those of 2026-10-14 and are not re-measured. The current limits are in "Uploads and abuse limits".
+
 Audit date 2026-10-14, branch `feat/launch-audit`, from `feat/public-proof`. Findings 1 to 6
 have regression tests; 7 to 9 are wording.
 
 | # | Severity | Finding | Fix |
 |---|---|---|---|
 | 1 | Medium | No rate limit anywhere: sign-in starts and callbacks, uploads (each non-PDF still costs a probe process) and the cron token were unlimited | Per-address and per-person limits (`web/abuse.py`), 429 page with `Retry-After`; `test_audit_ratelimit.py` |
-| 2 | Medium | One person could queue or keep any number of documents (bounded only by the daily page count, which one-page files stretch) | Caps of 10 waiting or running and 40 kept; `test_audit_uploads.py` |
+| 2 | Medium | One person could queue or keep any number of documents (bounded only by the daily page count, which one-page files stretch) | Caps of 10 waiting or running and 40 kept (waiting or running is now 30 invited, 10 open tier); `test_audit_uploads.py` |
 | 3 | Low | The three child processes that read untrusted PDFs inherited the server's whole environment (session secret, API keys, database URL) | `core/childenv.py`: a minimal environment; `test_audit_uploads.py` |
 | 4 | Low | Setting `ANTHROPIC_LOG=debug` or `OPENAI_LOG=debug` makes the SDKs log whole request bodies (document text and images); the Anthropic logger was not clamped | Variables removed and the loggers clamped at start; `test_audit_privacy.py` |
 | 5 | Low | The session cookie had no `__Host-` prefix in production | Prefix in production; `test_audit_headers.py` |
 | 6 | Low | No `Cross-Origin-Resource-Policy` | Added; `test_audit_headers.py` |
 | 7 | Low | The privacy page did not say that a document deleted here can remain with Anthropic for up to 30 days | Stated; the wording is final for the beta |
 | 8 | Info | The privacy page had no "how it is protected", "where it is processed" or "changes" section, and the terms had no accounts, institution or changes section | Sections added; the defaults are now the wording |
-| 9 | Info | SECURITY.md names a different email address (outlook) from the project metadata (gmail) | Left for Harish to confirm |
+| 9 | Info | SECURITY.md names a different email address (outlook) from the project metadata (gmail) | Left for Harish to confirm (on 2026-11-04 SECURITY.md and `pyproject.toml` name the same address) |
 
 Checked and found sound (tests added as regression guards, no code change): headers on
 every response kind; CSRF on every state-changing route; owner checks and IDOR on all 29
@@ -670,7 +674,7 @@ Triage of what the scanners reported:
 - The session cookie is readable by its owner (signed, not encrypted).
 - A copy of the converted HTML opened from disk has no CSP; it is built to need none.
 - Ingress is the public internet; nothing here is behind an identity-aware proxy.
-- Deleted documents live on in the database's dead rows and the daily backup for up to about a day,
+- Deleted documents live on in the database's dead rows and in the daily backups for up to about a week (the last 6 dumps are kept),
   and at the model provider for up to 30 days.
 - Prompt injection in a PDF can degrade a conversion (not leak or act); review catches it.
 

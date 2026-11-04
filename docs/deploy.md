@@ -79,7 +79,7 @@ $EDITOR deploy/.env.deploy
 Fill `PROJECT_ID`, `REGION` (`us-central1` supports domain mappings), `BASE_URL` (the
 run.app URL from item 4), `GOOGLE_CLIENT_ID`, `CONTACT_EMAIL`, `ADMIN_EMAILS` (you),
 `ALERT_EMAIL`, `BILLING_ACCOUNT_ID` (item 2). Leave `MODEL_PROVIDER=anthropic`,
-`DAILY_SPEND_CAP_USD=10`, `PER_USER_DAILY_PAGE_QUOTA=90`, the feature switches and the sizing
+`DAILY_SPEND_CAP_USD=10`, `PER_USER_DAILY_PAGE_QUOTA=300`, the feature switches and the sizing
 as shipped ("Spend limits", "Content features", "Sizing"). Leave every secret empty.
 
 **6. HARISH: run the deploy** (15-20 minutes, mostly the Cloud SQL instance). It checks the
@@ -311,9 +311,9 @@ document. Turning on `FEATURE_TABLES` makes the reservation $0.53 a call. The ch
 refuses a `MAX_USD_PER_PAGE` under $0.53 and warns about a `MAX_USD_PER_JOB` under $5.71, a
 100-page document's $1.50 spent plus eight calls held at once ($4.21); checked 2026-11-03 by
 running `python -m readablestem.ops.limits` with tables on: $5.70 gives one warning, $5.71 and the default $6.00 none. Before the page limit was raised the figure was $4.66 (a 30-page document), checked 2026-10-21. An earlier version of this
-page said $2.60: that was wrong. Production, tables on: `MAX_USD_PER_PAGE=2.20` (a one-page job
+page said $2.60: that was wrong. With tables on, `MAX_USD_PER_PAGE=2.20` (a one-page job
 then holds four calls at once; $0.53 would make its table and equation steps run one after
-another) and `MAX_USD_PER_JOB` is the default $6.00 (the old 4.70 is below $5.71, so it must be changed or unset); the daily cap of $10 stays and the quota is 300 pages.
+another; the Claude default $1.00 holds one) and `MAX_USD_PER_JOB` the default $6.00 (the old 4.70 is below $5.71, so it must be changed or unset); the daily cap of $10 stays and the quota is 300 pages.
 
 To measure again: `uv run --env-file .env readablestem convert FILE.pdf --out out.html
 --max-usd 1.5`. Without `--concurrency` the command runs as many steps at once as the cap
@@ -354,8 +354,9 @@ at the next deploy: put it in the file. Choices for the beta, and why:
 |---|---|---|
 | `FEATURE_LONG_DESCRIPTIONS` | on | Long descriptions and data tables for charts are what a blind student needs from a figure. Cost: figures about twice as dear ($0.13 to $0.21 for 30 pages) and one more review decision per such figure |
 | `FEATURE_NOTATION_MEMORY` | on | A course's second chapter reads its notation hints. It stores course names and notation; the privacy page says so (`launch-check` verifies) |
-| `FEATURE_TABLES` | **on** | The owner's decision of 2026-10-21 (docs/tables.md, "The decision"). Off, a table stays an image with a required decision and its formulas are lost. On: real `<table>` for $0.007 each, but the worst-case reservation rises to $0.53 a call, so with it set `MAX_USD_PER_PAGE=2.20` and `MAX_USD_PER_JOB=6.00`, the default (the minimum `launch-check` accepts is $0.53 and $5.71). Known: tables of unruled lists and of long wrapped text are missed (real-document recall 0.56), which stay as they were with the flag off |
+| `FEATURE_TABLES` | **on** | The owner's decision of 2026-10-21 (docs/tables.md, "The decision"). Off, a table stays an image with a required decision and its formulas are lost. On: real `<table>` for $0.007 each, but the worst-case reservation rises to $0.53 a call, so the page cap must be at least $0.53 and the job cap at least $5.71 (the Claude defaults, $1.00 and $6.00, pass; `deploy/deploy.env.example` sets `MAX_USD_PER_PAGE=2.20`, which lets a one-page job hold four calls at once). Known: tables of unruled lists and of long wrapped text are missed (real-document recall 0.56), which stay as they were with the flag off |
 | `FEATURE_COLOUR` | off | No eval has turned it on |
+| Everything else | Railway only | `deploy.sh` passes only the switches in this table. The settings added later (`FEATURE_IMAGE_PAGES`, `FEATURE_PAGE_WITNESS`, `EQUATION_GLYPH_RECONCILE`, `EQUATION_GLYPH_CHECKS`, `EQUATION_LINE_CONTEXT`, `FLAG_POLICY`, `LAYOUT_DISPLAY_GROUPING`, `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE`, `FEATURE_BATCH_ZIP`) are not in the script's list, so a Cloud Run deployment runs with their code defaults (all off). Which are on in production today: deploy-railway.md, "Feature flags in production" |
 | `DECISIONS_*` | off with Claude | The Decisions API is OpenAI's. With `MODEL_PROVIDER=anthropic` the script writes the three switches as `false`; the app ignores them for that provider either way |
 | `FEEDBACK_URL` | empty | The footer then links to an email to `CONTACT_EMAIL`. A form service is a new data processor; name it on the privacy page first |
 
@@ -711,8 +712,9 @@ A second instance (`--max-instances=2`) only runs, and costs, under load.
 
 - **Uptime from outside Google**: repository variable `LIVE_URL` (Settings > Secrets
   and variables > Actions > Variables) = `https://readablestem.com`. The weekly
-  `uptime.yml` workflow then fetches `/readyz` and `/demo` and fails (GitHub emails you)
-  if either does not answer 2xx. In a public repository GitHub disables scheduled
+  `uptime.yml` workflow then fetches `/readyz` every 5 minutes, and `/healthz/ops` and `/demo`
+  every 3 hours, and fails (GitHub emails you) if one does not answer 2xx (`/healthz/ops` is
+  503 until the hourly cron and the daily backup have both reported). In a public repository GitHub disables scheduled
   workflows after 60 days without activity; re-enable it from the Actions tab.
 - **Live eval**: repository secret `ANTHROPIC_API_KEY`, from a separate Anthropic workspace
   with its own small hard limit (the weekly run spends at most $2.95, about $0.70 expected).
@@ -721,11 +723,11 @@ A second instance (`--max-instances=2`) only runs, and costs, under load.
 
 ## Before the first real users
 
-TODO(Harish): none of this has run yet; the code and CI are ready for it. In order:
+This list was written for the first deploy on Google Cloud and was not run there; the beta is live on
+Railway (deploy-railway.md). It applies if you deploy on Cloud Run. In order:
 
-1. Push `feat/beta-app` as a pull request so every CI job (static and pytest on 3.12 and 3.14,
-   postgres, browser, docker, eval-gate, gitleaks) runs on the beta code once. Run
-   `make ci-local` first.
+1. Run `make ci-local` and push the commit as a pull request so every CI job (static and pytest
+   on 3.12 and 3.14, postgres, browser, docker, eval-gate, secret scan) runs on it once.
 2. Set the model provider's hard monthly limit (step 2) before the first deploy.
 3. Deploy once to a throwaway staging project (`./deploy/deploy.sh`, all steps), sign in
    at the run.app URL, convert one PDF, run the cron by hand and check the three alert

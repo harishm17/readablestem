@@ -586,7 +586,7 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   other side of the bar gets the reason `"half a fraction"` (`_flag_half_fractions`). The
   equation step adds the warning `equation.region: half_fraction`, holds the confidence
   under the accept bar and never accepts without a decision.
-- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off; bump `PIPELINE_VERSION` when it is turned on).** Three patterns cut one printed
+- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Three patterns cut one printed
   formula into several elements, and each is joined on evidence from the page; anything less
   clear keeps the old behaviour.
   1. *Two formulas and a word.* "P_A = ... and P_B = ...", "0 < p < 1 for all i": a connective
@@ -1369,7 +1369,7 @@ into the same hole, and the app's own advice for scans ("run OCR and upload agai
 produced exactly those files. There is **no handwriting or scan conversion by default**
 (decided 2026-10-09): such pages are kept as page images, marked "Not converted", with a
 decision. On request, per upload (the box "Convert scanned or handwritten pages", offered by
-`FEATURE_IMAGE_PAGES`, default off; [ADR 0007](decisions/0007-image-pages.md), measured in
+`FEATURE_IMAGE_PAGES`, default off in code, on in production; [ADR 0007](decisions/0007-image-pages.md), measured in
 [eval-image-pages.md](eval-image-pages.md)) a page the types below call
 `scan_no_text`, `scan_ocr`, `handwritten` or `handwritten_ocr` (kept reasons `scanned_page` and
 `handwritten_page`, and a picture under a text layer that does not cover it, `unread_page`

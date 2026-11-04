@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Accepted** (Harish, 2026-10-07) |
+| Status | **Accepted** (Harish, 2026-10-07); the single-service design is current, the Cloud Run hosting is not (see the update below) |
 | Date | 2026-10-07 |
 | Decider | Harish |
 
@@ -29,6 +29,8 @@ Postgres is Railway Postgres. The hourly cron is a separate Railway `cron` servi
 `readablestem ops cron`; nothing calls `/internal/cron/aggregate-and-purge`, so the daily
 canaries that only that route runs are off in production. A `backup` service takes the daily
 database dump. See [deploy-railway.md](../deploy-railway.md). The rest of the decision stands.
+
+**Update (2026-11-04).** Sign-in also offers Microsoft accounts for universities listed in `MS_ALLOWED_TENANTS` ([deploy-railway.md](../deploy-railway.md), "Microsoft sign-in on Railway"); the allowlist or `SIGNUP_MODE=open` decides who may then use the app.
 
 ## Consequences
 
