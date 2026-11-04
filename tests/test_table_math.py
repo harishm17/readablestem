@@ -155,10 +155,12 @@ def test_a_cell_the_model_wrote_as_text_takes_the_equation_steps_reading():
     assert (cell.latex, cell.mathml, cell.text) == ("m", MATHML, "m")
 
 
-def test_a_cell_the_model_already_wrote_as_maths_is_not_changed():
-    own = TableCell(row=1, col=0, text="m", latex="\\mu", mathml=MATHML.replace("m<", "μ<"))
-    out = merged([table_fix(model_grid(own)), equation_fix()])
-    assert out["p1-e1"].table.grid.cells[2].latex == "\\mu"
+def test_the_equation_is_the_one_source_of_a_cells_maths():
+    """A reviewer edit of the cell equation is what the table shows, whatever the model wrote."""
+    own = TableCell(row=1, col=0, text="m", latex="\\mu", mathml=MATHML.replace("m<", "\u03bc<"))
+    edited = equation_fix(Status.EDITED, latex="M")
+    out = merged([table_fix(model_grid(own)), edited])
+    assert out["p1-e1"].table.grid.cells[2].latex == "M"
 
 
 def test_a_failed_or_rejected_reading_leaves_the_cell_as_it_is():
@@ -264,3 +266,74 @@ def test_with_tables_off_the_cell_equations_are_never_asked(steps):
     done = convert(feature_tables=False)
     assert steps == []
     assert all(e.kind is not Kind.EQUATION for e in done.result.elements)
+
+
+# ------------------------------------------------------------------ a glyph belongs to one cell
+
+
+def _glyphs(text: str, x: float, font: str = "CMR10", y: float = 100.0) -> list:
+    from readablestem.pipeline.layout import _Char
+
+    out = []
+    for ch in text:
+        out.append(_Char(ch, x, y, x + 5, y + 10, y + 8, 10.0, font, 4))
+        x += 5
+    return out
+
+
+def test_a_glyph_in_two_overlapping_cell_boxes_goes_to_the_cell_it_overlaps_most(monkeypatch):
+    from readablestem.pipeline import layout
+    from readablestem.pipeline.layout import _Row
+
+    monkeypatch.setattr(layout, "_TEX_MADE", True)
+    left = _glyphs("65.1", 100) + _glyphs("±", 120, "CMSY10") + _glyphs("0.4", 125)
+    right = _glyphs("p", 138, "CMMI10") + _glyphs("<", 143, "CMMI10") + _glyphs("0.05", 148)
+    cells = [
+        TableCell(row=0, col=0, text="65.1±0.4", bbox=(95, 95, 142, 115)),  # reaches 4 pt in
+        TableCell(row=0, col=1, text="p<0.05", bbox=(136, 95, 190, 115)),
+    ]
+    grid = TableGrid(rows=1, cols=2, cells=cells, source="local")
+    found = layout._cell_maths(grid, [_Row(left), _Row(right)])
+    assert found[(0, 0)].text.replace(" ", "") == "65.1±0.4"  # no `p` from its neighbour
+    assert found[(0, 1)].text.replace(" ", "") == "p<0.05"
+
+
+def test_a_cell_whose_glyphs_are_not_its_text_is_not_an_equation(monkeypatch):
+    from readablestem.pipeline import layout
+    from readablestem.pipeline.layout import _Row
+
+    monkeypatch.setattr(layout, "_TEX_MADE", True)
+    glyphs = _glyphs("65.1", 100) + _glyphs("±", 120, "CMSY10") + _glyphs("0.4", 125)
+    cell = TableCell(row=0, col=0, text="65.1 ± 0.5", bbox=(95, 95, 150, 115))
+    grid = TableGrid(rows=1, cols=1, cells=[cell], source="local")
+    assert layout._cell_maths(grid, [_Row(glyphs)]) == {}
+
+
+# ------------------------------------------------------------------ settle
+
+
+def settled(fixes: list[Fix], elements: list[Element] | None = None):
+    elements = elements or [table(local_cells()), cell_equation()]
+    return table_math.settle(elements, {f.element_id: f for f in fixes})
+
+
+def test_a_table_reading_that_differs_from_the_equations_makes_the_equation_a_decision():
+    own = TableCell(row=1, col=0, text="m", latex="\\mu", mathml=MATHML)
+    _, fixes = settled([table_fix(model_grid(own)), equation_fix(latex="m")])
+    flagged = fixes["p1-e2"]
+    assert flagged.review == "required" and flagged.status is Status.NEEDS_REVIEW
+    assert any(c.code == "differs_from_table_reading" and not c.passed for c in flagged.checks)
+
+
+def test_the_same_reading_twice_asks_nobody():
+    own = TableCell(row=1, col=0, text="m", latex="m", mathml=MATHML)
+    _, fixes = settled([table_fix(model_grid(own)), equation_fix(latex="m")])
+    assert fixes["p1-e2"].review == "none"
+
+
+def test_an_equation_of_a_table_that_is_not_written_as_a_table_is_dropped_with_its_fix():
+    kept = table_fix(model_grid()).model_copy(update={"status": Status.ABSTAINED})
+    elements, fixes = settled([kept, equation_fix()])
+    assert [e.id for e in elements] == ["p1-e1"]
+    assert "p1-e2" not in fixes
+    assert all(c.equation_id is None for c in elements[0].table.cells)

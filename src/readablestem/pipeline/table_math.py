@@ -12,11 +12,14 @@ Rules, all on the grids and fixes (no model, no text layer):
 
 - only a table the table step rebuilt (`fix.table`), and only when its grid has the size of the
   grid read from the PDF, so a cell stands where its counterpart does (`table_step._counterparts`);
-- a cell the model already wrote as maths keeps its LaTeX: what works today is not touched;
-- a cell with no maths from the model takes the equation step's reading when the equation has
-  MathML (a reading that is flagged for review is still the reading: the equation has its
-  own decision, as an inline formula of a paragraph does); a failed or refused equation leaves
-  the cell as the model wrote it, text that is what the PDF has;
+- the equation of a cell is the one source of the cell's maths: when it has LaTeX and MathML the
+  cell shows them (a reading flagged for review is still the reading: the equation has its own
+  decision, as an inline formula of a paragraph does, and a reviewer's edit of it is the cell's);
+  a failed, abstained or rejected equation leaves the cell as the table step wrote it;
+- where the table step wrote LaTeX that differs from the equation's reading (canonical
+  comparison), `settle` makes the equation a required decision, so neither is kept silently;
+- an equation whose table is not written as a table (kept as a picture, a grid of another size)
+  is dropped by `settle`: no review item for something nothing shows;
 - nothing else of the cell changes: its text, its header, its span.
 
 The element of a cell is never written on its own (`assemble._placed_equations`).
@@ -50,19 +53,16 @@ def cell_equation_ids(elements: Iterable[Element]) -> set[str]:
 
 
 def _with_readings(grid: TableGrid, local: TableGrid, fixes: Mapping[str, Fix]) -> TableGrid | None:
-    """`grid` with the equation step's reading in each cell that has none, or None when no cell
-    takes one."""
+    """`grid` with the equation step's reading in each cell that has one (the equation is the one
+    source of a cell's maths: a reviewer's edit of it is the cell's), or None when none changes."""
     if (grid.rows, grid.cols) != (local.rows, local.cols):
         return None
     owner = table_step._owners(local)
     cells: list[TableCell] = []
     changed = False
     for cell in grid.cells:
-        if cell.latex or cell.mathml:
-            cells.append(cell)
-            continue
         reading = _reading(cell, local, owner, fixes)
-        if reading is None:
+        if reading is None or (cell.latex, cell.mathml) == reading:
             cells.append(cell)
             continue
         latex, mathml = reading
@@ -114,15 +114,93 @@ def without_cell_equations(elements: list[Element]) -> list[Element]:
     tables feature off a table is kept as its picture, so nothing would write these equations and
     the equation step would read them for nothing."""
     ids = cell_equation_ids(elements)
-    if not ids:
-        return elements
+    return without_cell_equations_of(elements, ids) if ids else elements
+
+
+def _placed(element: Element, fix: Fix | None) -> TableGrid | None:
+    """The table step's grid when this table is written as a table and its cells stand where the
+    PDF's do (the cell equations have a place), else None."""
+    if fix is None or fix.table is None or fix.status in KEPT_ORIGINAL_STATUSES:
+        return None
+    grid, local = fix.table.grid, element.table
+    if local is None or not grid.is_data or (grid.rows, grid.cols) != (local.rows, local.cols):
+        return None
+    return grid
+
+
+def settle(elements: list[Element], fixes: dict[str, Fix]) -> tuple[list[Element], dict[str, Fix]]:
+    """Make the cell equations consistent with their tables once every step is done.
+
+    An equation of a table that is not written as a table is dropped with its fix and its cell's
+    id. Where a placed table's own LaTeX for a cell differs from the equation's reading, the
+    equation is a required decision with a failed check, so the page never keeps one silently."""
+    from readablestem.core.types import Check, Status
+    from readablestem.pipeline import math_canonical
+
+    out_fixes = dict(fixes)
+    drop: set[str] = set()
+    for element in elements:
+        if element.kind is not Kind.TABLE or element.table is None:
+            continue
+        ids = {c.equation_id for c in element.table.cells if c.equation_id}
+        if not ids:
+            continue
+        grid = _placed(element, fixes.get(element.id))
+        if grid is None:
+            drop |= ids
+            continue
+        owner = table_step._owners(element.table)
+        for cell in grid.cells:
+            reading = _reading(cell, element.table, owner, fixes)
+            if reading is None or not (cell.latex or "").strip():
+                continue
+            behind = table_step._counterparts(cell, owner)
+            eq_id = next(
+                (
+                    element.table.cells[i].equation_id
+                    for i in behind
+                    if element.table.cells[i].equation_id
+                ),
+                None,
+            )
+            fix = out_fixes.get(eq_id or "")
+            if fix is None or math_canonical.compare(cell.latex or "", reading[0]).equal:
+                continue
+            check = Check(
+                name="table.cell_reading", passed=False, code="differs_from_table_reading"
+            )
+            out_fixes[fix.element_id] = fix.model_copy(
+                update={
+                    "status": Status.NEEDS_REVIEW if fix.status is Status.ACCEPTED else fix.status,
+                    "review": "required",
+                    "checks": [*fix.checks, check],
+                }
+            )
+    if not drop:
+        return elements, out_fixes
+    kept = without_cell_equations_of(elements, drop)
+    for eq_id in drop:
+        out_fixes.pop(eq_id, None)
+    return kept, out_fixes
+
+
+def without_cell_equations_of(elements: list[Element], ids: set[str]) -> list[Element]:
+    """`elements` without the equations in `ids`, and the cells that named them without the id."""
     out: list[Element] = []
     for element in elements:
         if element.id in ids:
             continue
-        if element.kind is Kind.TABLE and element.table is not None:
-            cells = [c.model_copy(update={"equation_id": None}) for c in element.table.cells]
-            grid = element.table.model_copy(update={"cells": cells})
-            element = element.model_copy(update={"table": grid})
+        if (
+            element.kind is Kind.TABLE
+            and element.table is not None
+            and any(c.equation_id in ids for c in element.table.cells)
+        ):
+            cells = [
+                c.model_copy(update={"equation_id": None}) if c.equation_id in ids else c
+                for c in element.table.cells
+            ]
+            element = element.model_copy(
+                update={"table": element.table.model_copy(update={"cells": cells})}
+            )
         out.append(element)
     return out

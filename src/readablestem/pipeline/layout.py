@@ -8259,6 +8259,31 @@ MAX_CELL_EQUATIONS = 60  # a table with more maths cells than this is left to th
 _CELL_SCAN_LIMIT = 2_000_000  # cells x glyphs: a bigger table is not scanned
 
 
+def _letters_of(text: str) -> str:
+    """The letters and digits of `text` as a text layer and a cell spell them alike."""
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    return "".join(c for c in folded if c.isalnum())
+
+
+def _cell_owners(grid: TableGrid, glyphs: Sequence[_Char]) -> list[int | None]:
+    """For each glyph, the index of the one cell it belongs to, or None. Cell boxes of a detected
+    grid overlap by a few points, so a glyph whose centre is in two goes to the cell it overlaps
+    most, and never to both."""
+    boxes = [(i, c.bbox) for i, c in enumerate(grid.cells) if c.bbox is not None]
+    owners: list[int | None] = []
+    for g in glyphs:
+        cx, cy = (g.x0 + g.x1) / 2, (g.y0 + g.y1) / 2
+        best, best_area = None, 0.0
+        for i, (x0, y0, x1, y1) in boxes:
+            if not (x0 <= cx <= x1 and y0 <= cy <= y1):
+                continue
+            area = max(0.0, min(g.x1, x1) - max(g.x0, x0)) * max(0.0, min(g.y1, y1) - max(g.y0, y0))
+            if best is None or area > best_area:
+                best, best_area = i, area
+        owners.append(best)
+    return owners
+
+
 def _cell_maths(grid: TableGrid, rows: Sequence[_Row]) -> dict[tuple[int, int], _Inline]:
     """The cells of a table whose whole content is one inline formula, by the glyphs.
 
@@ -8275,13 +8300,13 @@ def _cell_maths(grid: TableGrid, rows: Sequence[_Row]) -> dict[tuple[int, int], 
     glyphs = [c for row in rows if not row.vertical and not row.diagonal for c in row.chars]
     if not glyphs or len(grid.cells) * len(glyphs) > _CELL_SCAN_LIMIT:
         return {}
+    owned = _cell_owners(grid, glyphs)
     found: dict[tuple[int, int], _Inline] = {}
-    for cell in grid.cells:
+    for index, cell in enumerate(grid.cells):
         if cell.bbox is None or not cell.text.strip():
             continue
-        x0, y0, x1, y1 = cell.bbox
         mine = sorted(
-            (c for c in glyphs if x0 <= (c.x0 + c.x1) / 2 <= x1 and y0 <= (c.y0 + c.y1) / 2 <= y1),
+            (c for c, owner in zip(glyphs, owned, strict=True) if owner == index),
             key=lambda c: (c.x0, c.y0),
         )
         ink = [c for c in mine if not c.blank]
@@ -8309,6 +8334,8 @@ def _cell_maths(grid: TableGrid, rows: Sequence[_Row]) -> dict[tuple[int, int], 
         # cell, not part of the formula: only a whole cell is taken.
         span = mine[runs[0][0] : runs[0][1]]
         text = _clean("".join(c.styled for c in span))
+        if _letters_of(text) != _letters_of(cell.text):
+            continue  # not what the cell says (a glyph of its neighbour, a mark the cell drops)
         shown = [c for c in span if not c.blank]
         score, _ = equation_score(
             text, sorted({c.font for c in shown}), any(c.flags & _SUPERSCRIPT_FLAG for c in shown)

@@ -1807,6 +1807,7 @@ def _convert(
                     )
         if settings.image_pages_maths_always_required and image_built:
             image_page.enforce_maths_required(elements, run.fixes)
+        elements, run.fixes = table_math.settle(elements, run.fixes)
         ordered = _ordered_fixes(elements, run.fixes)
         labels = _page_labels(pdf_bytes, page_list)
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]
