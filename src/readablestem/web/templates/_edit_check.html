@@ -7,7 +7,7 @@
 {% if mathml %}
 <p class="cmp-label">Your edit</p>
 <div class="cmp-row" tabindex="0" role="group" aria-label="Your edit of {{ label|lower }}"><div class="cmp-math cmp-math-plain">{{ mathml }}</div></div>
-{% if check.speech %}<p class="speech"><span class="speech-label">Read aloud roughly as:</span> “{{ check.speech }}”</p>{% endif %}
+{% if check.speech|speakable %}<p class="speech"><span class="speech-label">Read aloud roughly as:</span> “{{ check.speech|speakable }}”</p>{% endif %}
 {% endif %}
 {% if check.blocking or check.meaning or check.notes %}
 <ul class="live-results">

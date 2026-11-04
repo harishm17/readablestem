@@ -79,7 +79,7 @@
     {% else %}
     <p>No proposal: type the LaTeX below, or reject to keep the image.</p>
     {% endif %}
-    {% if item.speech %}<p><strong>Read aloud roughly as:</strong> {{ item.speech }}</p>{% endif %}
+    {% if item.speech|speakable %}<p><strong>Read aloud roughly as:</strong> {{ item.speech|speakable }}</p>{% endif %}
     {# What a screen reader gets from the PDF itself: its text layer (owner only). #}
     {% if item.text_layer %}<p><strong>From your PDF a screen reader gets:</strong> “<span class="text-layer">{{ item.text_layer }}</span>”</p>
     {% else %}<p><strong>From your PDF a screen reader gets</strong> nothing here: the PDF has no text for this equation.</p>{% endif %}
