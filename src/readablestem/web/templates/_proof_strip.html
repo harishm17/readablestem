@@ -1,15 +1,24 @@
 {# The proof numbers, from web/proof_facts.py (read from PROOF.md once). Each tile names what it
    counts, its sample size, where a general chatbot did better or the number means less than it
-   seems, and links to how it was measured. The set, date and whether it is blind come first. #}
+   seems, and links to how it was measured. The set, date and whether it is blind come first.
+   A page for a general reader (the landing page) sets `plain`: the set line, and each tile's
+   label and note, in plain words keyed by the tile's label; the numbers and counts are the
+   same, and the technical terms stay on /limits. #}
+{% set plain = plain|default({}) %}
 <div class="proof-strip">
+  {% if plain.set_line is defined %}
+  <p class="proof-set">{{ plain.set_line }}</p>
+  {% else %}
   <p class="proof-set">{{ proof_facts.set_label[0]|upper }}{{ proof_facts.set_label[1:] }}, run recorded {{ proof_facts.date }}
     ({{ proof_facts.pipeline }}). {{ proof_facts.blind }}</p>
+  {% endif %}
   <ul class="stat-row">
     {% for fact in proof_facts.facts %}
+    {% set words = plain.get(fact.label, [fact.label, fact.caveat]) %}
     <li class="stat">
       <p class="stat-value">{{ fact.value }}</p>
-      <p class="stat-label">{{ fact.label }}</p>
-      <p class="stat-note">{{ fact.count }}. {{ fact.caveat }} <a href="{{ fact.href }}">How it was measured</a></p>
+      <p class="stat-label">{{ words[0] }}</p>
+      <p class="stat-note">{{ fact.count }}. {{ words[1] }} <a href="{{ fact.href }}">How it was measured</a></p>
     </li>
     {% endfor %}
   </ul>

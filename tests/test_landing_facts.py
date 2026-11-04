@@ -1,9 +1,12 @@
-"""The landing page's numbers and licence wording agree with PROOF.md and the README.
+"""The public pages' numbers and licence wording agree with PROOF.md, the README and the eval
+reports.
 
 PROOF.md is written by `make proof` from the recorded held-out run (CI replays it and fails on
 any difference), so it is the source of the registered numbers. The re-measurement numbers
-are the README's. The landing page states them in prose; these tests fail when the page
-and those files drift, and when a number that is not blind is shown without saying so.
+are the README's; the real-world, development, chemistry and handwriting numbers are their own
+reports' (docs/eval-*.md). /limits states them all in prose and the landing page a short
+summary; these tests fail when a page and those files drift, when a number that is not blind
+is shown without saying so, and when a development number is not labelled as one.
 """
 
 from __future__ import annotations
@@ -18,6 +21,10 @@ from fixtures.web.support import WebEnv
 ROOT = Path(__file__).resolve().parent.parent
 PROOF = (ROOT / "PROOF.md").read_text(encoding="utf-8")
 README = (ROOT / "README.md").read_text(encoding="utf-8")
+REALWORLD = (ROOT / "docs/eval-realworld.md").read_text(encoding="utf-8")
+DEV_BASELINE = (ROOT / "docs/eval-dev-baseline-2026-11-03.md").read_text(encoding="utf-8")
+CHEMISTRY = (ROOT / "docs/eval-chemistry-heldout.md").read_text(encoding="utf-8")
+HANDWRITING = (ROOT / "docs/eval-handwriting.md").read_text(encoding="utf-8")
 
 LICENCE_SENTENCE = (
     "The code is MIT. The hosted service links PyMuPDF, which is AGPL-3.0, so the service is "
@@ -46,25 +53,23 @@ def proof_field(name: str) -> str:
 def pages(tmp_path_factory) -> dict[str, str]:
     env = WebEnv(tmp_path_factory.mktemp("landing"))
     with env.running() as anon:
-        return {path: anon.get(path).text for path in ("/", "/terms")}
+        return {path: anon.get(path).text for path in ("/", "/terms", "/limits")}
 
 
-def test_landing_registered_numbers_match_proof_md(pages):
-    text = squash(pages["/"])
-    assert (
-        f"run on {proof_field('Run recorded on')}, version {proof_field('Pipeline version')}"
-        in text
-    )
-    assert f"({round(proof_cell('detection_recall') * 100)}%)" in text
+def test_limits_registered_numbers_match_proof_md(pages):
+    text = squash(pages["/limits"])
+    assert proof_field("Pipeline version") == "0.4.0" and "version 0.4.0, October 2026" in text
+    assert proof_field("Run recorded on").startswith("2026-10")
+    assert f"{round(proof_cell('detection_recall') * 100)}% of them in both cases" in text
     assert 0.45 <= proof_cell("end_to_end_exact_lenient (all gold equations)") <= 0.55
-    assert "about half" in text
+    assert "about half (0.50) against 0.62 for the chatbot" in text
     equations_alone = float(re.search(r"^\| exact_lenient \| ([0-9.]+)", PROOF, re.M).group(1))  # type: ignore[union-attr]
-    assert 0.62 <= equations_alone <= 0.71 and "about two in three" in text
-    assert f"Headings scored {proof_cell('heading F1'):.2f}" in text
-    assert f"passed a model judge {round(proof_cell('judge_pass_rate') * 100)}%" in text
+    assert 0.62 <= equations_alone <= 0.71 and "about two in three were right (0.68)" in text
+    assert f"Headings: F1 {proof_cell('heading F1'):.2f}" in text
+    assert f"{round(proof_cell('judge_pass_rate') * 100)}% passed a model judge" in text
 
 
-def test_landing_remeasurement_matches_readme_and_says_not_blind(pages):
+def test_limits_remeasurement_matches_readme_and_says_not_blind(pages):
     row = re.search(
         r"^\| Equations right, end to end \(primary\) \| ([0-9.]+) [^|]*\| \*\*([0-9.]+)\*\*",
         README,
@@ -73,12 +78,64 @@ def test_landing_remeasurement_matches_readme_and_says_not_blind(pages):
     assert row, "the README's re-measurement table changed shape"
     registered, remeasured = row.groups()
     assert registered == f"{proof_cell('end_to_end_exact_lenient (all gold equations)'):.3f}"
-    text = squash(pages["/"])
+    text = squash(pages["/limits"])
     assert f"{remeasured} of equations exactly right end to end, against {registered}" in text
     assert "not a blind result" in text
     assert "not a blind result" in README.lower()
-    assert "#re-measurement-on-the-same-sections-2026-10-21-not-a-blind-result" in pages["/"]
+    assert "#re-measurement-on-the-same-sections-2026-10-21-not-a-blind-result" in pages["/limits"]
     assert "### Re-measurement on the same sections, 2026-10-21 (not a blind result)" in README
+
+
+def test_the_other_results_match_their_reports_and_development_is_labelled(pages):
+    text = squash(pages["/limits"])
+    # Real-world held-out part (docs/eval-realworld.md, "The short version").
+    assert "15 held-out papers (71 pages, 1,826 gold equations" in REALWORLD
+    assert "0.583" in REALWORLD and "on Opus 0.641" in REALWORLD and "on Haiku 0.641" in REALWORLD
+    assert "15 arXiv papers, 71 pages, 1,826 equations" in text
+    assert "0.58 of equations exactly right end to end, against 0.64" in text
+    # Development baseline: labelled as development, never as held out.
+    assert "0.735" in DEV_BASELINE and "0.675" in DEV_BASELINE
+    assert "0.764" in DEV_BASELINE and "Opus 0.784" in DEV_BASELINE
+    assert "Development set, not held out (25 arXiv papers, 114 pages, 2,350 equations" in text
+    assert "0.735 exactly right end to end, against 0.675" in text
+    assert "0.764 against 0.784" in text
+    # Chemistry and handwriting.
+    assert "**211 (0.560)**" in CHEMISTRY and "377 gold equations, 5 sections" in CHEMISTRY
+    assert "5 OpenStax chemistry sections, 377 equations): 0.56 right as chemistry" in text
+    assert "24 pages of real human handwriting (205 expressions, held-out)" in HANDWRITING
+    assert "**0.566**" in HANDWRITING
+    assert "Handwriting, held out (24 pages, 205 expressions): 0.57" in text
+
+
+def test_the_landing_page_summarises_without_overclaiming(pages):
+    landing = squash(pages["/"])
+    # The registered held-out tiles are the headline, and the gap to the chatbot is said.
+    assert 'class="proof-strip"' in pages["/"]
+    assert "it does not yet beat a general chatbot" in landing
+    assert "64% against its 58% on 15 research papers made with LaTeX (1,826 equations)" in landing
+    assert (
+        "“Exactly right” means the whole equation matches the original symbol for symbol" in landing
+    )
+    # One decisions-per-page figure per kind of document, the same as /limits gives.
+    limits = squash(pages["/limits"])
+    for line, figure in (
+        (
+            "Textbook sections: about 1.8 decisions a page (15 OpenStax sections, 242 pages)",
+            "textbook sections, about 1.8 decisions a page (15 OpenStax sections, 242 pages)",
+        ),
+        (
+            "about 5.6 decisions a page (15 arXiv papers, 71 pages)",
+            "about 5.6 a page (15 arXiv papers, 71 pages)",
+        ),
+    ):
+        assert line in landing and figure in limits
+    assert "about 5.6 things per page" in REALWORLD and "5.7 decisions per page" in HANDWRITING
+    assert "**242**" in PROOF
+    assert 'href="/limits#accuracy"' in pages["/"]
+    # Development numbers stay on /limits, labelled there.
+    assert "0.735" not in landing and "development set" not in landing.lower()
+    for claim in ("compliant", "conforms", "guarantee"):
+        assert claim not in landing.lower(), claim
 
 
 def test_licence_is_worded_the_same_way_everywhere(pages):

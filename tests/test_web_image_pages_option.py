@@ -28,10 +28,7 @@ from readablestem.web.pdf_probe import ProbeRejected, inspect, probe
 from readablestem.web.uploads import UploadRejected, inspect_pdf_detail
 from readablestem.web.worker import job_caps
 
-OFFER = (
-    "Convert scanned or handwritten pages "
-    "(slower; every converted equation and table needs your check)"
-)
+OFFER = "Convert scanned or handwritten pages</label>"
 IMAGE_REASONS = {"scanned_page", "handwritten_page"}
 
 

@@ -4,7 +4,7 @@
 decision first):
 
 - the decision at hand ("Decision 1 of 3"), with what to look at: for an equation the
-  PDF and the proposal at the same size, the differing symbol outlined in both and the
+  PDF and the proposal at the same scale, the differing symbol outlined in both and the
   difference as a short table (`web.compare`); for a figure its image and the alt text
   field; for a table its image and the table as the student would get it, with what can
   be changed (`web.table_card`, `templates/_table_card.html`; after a change to a table

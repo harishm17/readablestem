@@ -49,7 +49,7 @@ SHOWCASE_PREFIX = "/showcase/"
 # text (the Physics 2.3 one is /demo), and the stemcheck sample is a generated report.
 SHOWCASE_NOINDEX = ("converted.html", "sample-report.html")
 # The date the showcase's text last changed (site/templates, site/examples, PROOF.md).
-SHOWCASE_UPDATED = "2026-10-28"
+SHOWCASE_UPDATED = "2026-11-03"
 
 
 @dataclass(frozen=True)
@@ -94,13 +94,13 @@ GUIDES = (
 PUBLIC_PAGES = (
     PublicPage("/", "2026-11-03"),
     PublicPage("/demo", "2026-10-14"),
-    PublicPage("/limits", "2026-10-22"),
+    PublicPage("/limits", "2026-11-03"),
     PublicPage(GUIDES_INDEX, "2026-11-02"),
-    PublicPage("/help/posting", "2026-10-27"),
+    PublicPage("/help/posting", "2026-11-03"),
     PublicPage("/privacy", "2026-11-03"),
     PublicPage("/terms", "2026-11-03"),
     PublicPage("/for-accessibility-offices", "2026-11-03"),
-    PublicPage(ADA_GUIDE, "2026-10-28", "2026-10-28"),
+    PublicPage(ADA_GUIDE, "2026-11-03", "2026-10-28"),
     PublicPage(COMPARE_GUIDE, "2026-11-03", "2026-10-28"),
 )
 PUBLIC_PATHS = frozenset(page.path for page in PUBLIC_PAGES)
@@ -197,9 +197,11 @@ def llms_txt(site: str, showcase: bool) -> str:
         "",
         "> ReadableSTEM assists instructors who need to turn a STEM course PDF into an "
         "accessible web page. It reads the PDF, rebuilds equations as MathML a screen reader "
-        "can speak, restores headings and lists, writes short alt text for figures, and "
-        "returns one self-contained HTML file. Every change it is unsure about goes to a "
-        "review screen where the instructor accepts, edits or rejects it.",
+        "can speak, restores headings and lists, rebuilds tables and describes figures. It "
+        "reads lecture notes, problem sets and Beamer slide decks, and scanned or handwritten "
+        "pages when the instructor asks. Every change it is unsure about goes to a review "
+        "screen where the instructor accepts, edits or rejects it. The result is one "
+        "self-contained HTML file, with Word, EPUB and Canvas versions.",
         "",
         "It assists; it does not certify. Nothing here establishes conformance with WCAG, the "
         "ADA or any other standard, and the output still needs a person to look at it. "
@@ -208,9 +210,11 @@ def llms_txt(site: str, showcase: bool) -> str:
         "",
         "## The service",
         "",
-        f"- [Home]({site}/): what it does, how long it takes, how accurate it is, who can use it",
+        f"- [Home]({site}/): what it handles, what you download, how accurate it is, who can "
+        "use it",
         f"- [Demo]({site}/demo): OpenStax Physics 2.3 converted, no sign-in needed",
-        f"- [Known limits]({site}/limits): what it does not do yet",
+        f"- [Known limits]({site}/limits): what it does not do yet, and every measured result "
+        "with its sample size",
         f"- [Posting in your course]({site}/help/posting): sharing the HTML file with students",
         f"- [Privacy]({site}/privacy): what happens to uploaded documents",
         f"- [Terms]({site}/terms)",
@@ -304,8 +308,12 @@ def structured_data(
         "featureList": [
             "Equations as MathML that a screen reader reads aloud",
             "Real headings, in a repaired outline",
-            "Short alt text for figures, or a clear flag where a description is still needed",
+            "Short alt text for figures, and longer descriptions for charts and diagrams",
+            "Tables rebuilt with header cells",
+            "Beamer slide decks read frame by frame",
+            "Scanned and handwritten pages converted on request, each equation checked",
             "A short review by the instructor of what could change what a student reads",
+            "Downloads as HTML, Word, EPUB, a Canvas zip and a Common Cartridge",
         ],
         "author": {"@id": AUTHOR_ID},
         "publisher": {"@id": f"{site}/#organization"},

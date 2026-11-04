@@ -78,6 +78,9 @@ def walk(browser, site, job: str, page, check) -> None:
     page.goto(url)
     wait_images(page)
     check(page, "readings, the differing symbol marked")
+    page.locator("details.edit-box:has(#latex-p1-e2)").evaluate(
+        "d => { d.open = true; }"
+    )  # closed by default
     field = page.get_by_label("LaTeX for equation 1")
     field.fill(r"{\omega}")
     page.locator("#live-check-p1-e2 .live-results").wait_for()
@@ -210,6 +213,9 @@ def test_the_edit_is_checked_while_typing_and_said_briefly(site, browser, job):
     checks: list[str] = []
     page.on("request", lambda r: checks.append(r.url) if r.url.endswith("/check") else None)
     page.goto(f"{site.base}/jobs/{job}/review")
+    page.locator("details.edit-box:has(#latex-p1-e2)").evaluate(
+        "d => { d.open = true; }"
+    )  # closed by default
     field = page.get_by_label("LaTeX for equation 1")
     status = page.locator("#live-status-p1-e2")
     assert status.get_attribute("role") == "status"
@@ -256,6 +262,9 @@ def test_stale_undo_and_anyway_work_without_javascript(site, browser, job):
         other.get_by_role("button", name="Undo this decision").click()
     other.close()
     page.goto(url)
+    page.locator("details.edit-box:has(#latex-p1-e2)").evaluate(
+        "d => { d.open = true; }"
+    )  # closed by default
     page.get_by_label("LaTeX for equation 1").fill(r"{\omega}")
     page.get_by_role("button", name="Save edit to equation 1").click()
     page.get_by_role("button", name="Use my edit anyway for equation 1").click()

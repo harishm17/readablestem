@@ -11,7 +11,8 @@
 
 <h2>What it is</h2>
 <div class="prose">
-  <p>An instructor uploads a PDF. ReadableSTEM reads it and returns one self-contained HTML file.</p>
+  <p>An instructor uploads a PDF. ReadableSTEM reads it and returns one self-contained HTML file, which
+    can also be downloaded as Word or EPUB, or packaged for Canvas.</p>
   <ul>
     <li><strong>Equations</strong> become MathML, which a screen reader can speak. A model reads
       each equation and proposes LaTeX. Checks then compare it with the PDF's own text.</li>
@@ -40,8 +41,8 @@
   <li>It reads scans and handwriting only when you ask, and can misread them (small symbols, a
     handwritten number); every converted equation and table needs your check. Without the request,
     those pages are kept as images and flagged.</li>
-  <li>It is not a general PDF-to-Markdown converter. It starts from a PDF, not from Word, LaTeX or
-    PowerPoint.</li>
+  <li>It is not a general PDF-to-Markdown converter. It starts from a PDF, not from LaTeX source (a
+    Word or PowerPoint file is turned into a PDF first, on a server set up for that).</li>
   <li>It does not remove the need for review. A model can be wrong, and some wrong answers agree
     with the PDF's text and are not flagged.</li>
 </ul>

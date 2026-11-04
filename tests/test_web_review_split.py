@@ -131,13 +131,14 @@ def test_the_first_decision_is_the_equation_with_a_same_size_compare(split):
     row = text_of(section(table, "<tbody>", "</tbody>"))
     assert row == "𝛚 style bold plain Yes"
     # It changes the meaning, so the fix comes first: one button that makes the omega bold
-    # (posted as an edit, its own form), the edit box open, and Accept only "anyway".
+    # (posted as an edit, its own form), the edit box closed (one click away, since the button
+    # is the fix), and Accept only "anyway".
     suggest = section(body, '<form method="post"', "</form>")
     assert 'class="suggest"' in suggest
     assert 'name="action" value="edit"' in suggest
     assert 'name="latex" value="\\boldsymbol{\\omega}"' in suggest
     assert re.search(r'class="button" data-role="suggest"[^>]*>Use bold ω<', suggest)
-    assert '<details class="edit-box" open>' in body and "Edit the LaTeX" in body
+    assert '<details class="edit-box">' in body and "Edit the LaTeX" in body
     assert re.search(
         r'value="accept" class="button-secondary" data-role="accept"'
         r' data-tone="caution">Accept anyway<',

@@ -236,7 +236,9 @@ a different job; [docs/eval-image-pages.md](docs/eval-image-pages.md), [ADR 0007
   by eye only: the main model read them well, and a cheaper model misread two section numbers with
   full confidence. Five photographed notebook pages were looked at by eye later (2026-11-03): the
   pass read the two physics pages well and the three linear-algebra pages mostly right; so nine
-  handwritten pages in all, none with an answer key.
+  handwritten pages in all, none with an answer key. A held-out answer key of 24 pages of real
+  handwriting (205 expressions) was measured afterwards: 0.566 exactly right end to end, no wrong
+  equation without a decision, 5.7 decisions a page ([docs/eval-handwriting.md](docs/eval-handwriting.md)).
 - **Real papers as scans, never used to build the feature** (the real-world held-out set, 9 of 15
   papers because the $9 spending cap for the run was reached; 42 pages, 1,147 equations, registered
   before the run): 0.66 exactly right (0.69 on the symbols score) against 0.62 (0.66) for the typed
@@ -245,8 +247,8 @@ a different job; [docs/eval-image-pages.md](docs/eval-image-pages.md), [ADR 0007
   with maths is a decision, and a replay of the same recorded answers left none unasked
   (docs/eval-image-pages.md, "Update: maths always required"); $0.136 a page.
 - It is slower (about 20 to 30 seconds a page), it costs four to six times a typed page, and a
-  model can misread handwriting and small symbols; the measurement is on synthetic scans, nine
-  papers and eight real pages, with no measurement of how long checking takes.
+  model can misread handwriting and small symbols; the measurements are on synthetic scans, nine
+  papers and 24 held-out handwritten pages, with no measurement of how long checking takes.
 
 ### Development sample (pipeline 0.4.0, 2026-10-12)
 
@@ -296,9 +298,16 @@ Method, definitions and every table: [docs/eval.md](docs/eval.md).
   descriptions are built when `FEATURE_LONG_DESCRIPTIONS` is on (on in the beta, off by default in the code).
 - **Tables** are detected and rebuilt with header cells behind a feature flag
   (`FEATURE_TABLES`): on in the beta since 2026-10-21, off by default in the code.
+- **Chemistry** formulas, ions and reactions are written as mhchem (`\ce{...}`), converted to
+  MathML and read aloud as chemistry (docs/chemistry.md). It is the weakest area.
+- **Slides.** A Beamer deck is read frame by frame: overlay steps that only add are dropped and
+  each frame title is a heading (docs/layout.md, "TeX and beamer").
 - **Scans and handwriting** can be converted on request (an upload option, slower, every converted
   equation and table checked by a person, the original kept); without the request they are kept as
   images with a note, not guessed at.
+- **Downloads and sharing.** One self-contained HTML file, the same document as Word (.docx)
+  and EPUB (also "Download all"), a zip for a Canvas page and an IMS Common Cartridge. A document
+  can be shared with named people, to view or to review it.
 
 ## How it works
 
@@ -387,9 +396,13 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
 
 ## Limits
 
-- **PDF in, HTML out.** Word and PowerPoint files must be exported to PDF first. Uploads are
-  limited to 100 pages and 50 MB by default; a bigger file (up to 500 pages and 100 MB) is kept so
-  you can choose which pages to convert, in parts.
+- **PDF in, web page out** (with Word, EPUB, Canvas zip and Common Cartridge downloads). Word and
+  PowerPoint files are taken only on a server with LibreOffice (readablestem.com takes PDF only).
+  One upload is limited by `MAX_PAGES_PER_JOB` and `MAX_UPLOAD_MB` (100 pages and 50 MB by
+  default); a bigger file, up to `MAX_SOURCE_PAGES` and `MAX_LARGE_UPLOAD_MB` (500 pages and
+  100 MB), is kept so you can choose which pages to convert, in parts. The live values are on
+  the site's Known limits page. LaTeX source upload exists behind `FEATURE_LATEX_SOURCE`, off by
+  default and on no public server.
 - **A model is in the loop.** Document images and the text around them are sent to Anthropic's
   Claude API (the beta's provider, `MODEL_PROVIDER=anthropic`), or to OpenAI's API (with
   `store=False`) if you set `MODEL_PROVIDER=openai`; the handwriting readers (off, unused) would send crops to their own company. Models are not deterministic, so two runs on the same file can differ.
@@ -403,14 +416,15 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
 - **Scans and handwriting** are converted only on request (an upload option): a model reads the
   page's picture and can misread handwriting and small symbols, so every converted equation and table
   is for a person to check and the original page stays in the file; the accuracy is measured on synthetic
-  scans, nine papers and eight real pages ([docs/eval-image-pages.md](docs/eval-image-pages.md)).
+  scans, nine papers and 24 held-out handwritten pages ([docs/eval-image-pages.md](docs/eval-image-pages.md),
+  [docs/eval-handwriting.md](docs/eval-handwriting.md)).
   Without the request, and for drawings, such pages are kept as images and flagged.
 - **Tables** are on in the beta (off by default in the code) and have been checked on a local
   benchmark, the sample and a small set of real documents (full-extent recall 0.56): a table the
   detector misses stays as it was with the flag off, paragraph text or a picture
   ([docs/tables.md](docs/tables.md)).
-- **Figure alt text is short.** It describes; it does not replace a long description for a
-  complex diagram.
+- **Figure alt text is short.** Long descriptions and chart data tables are on in the beta
+  (`FEATURE_LONG_DESCRIPTIONS`), and have not yet been measured on a held-out set.
 - **Beta.** Sign-in is open to anyone with a Google account (or, with `SIGNUP_MODE=allowlist`,
   by invitation), with spend caps and daily limits, lower ones for new accounts than for
   invited people. The privacy, terms and known-limits pages are the beta wording, and they

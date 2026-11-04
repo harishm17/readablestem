@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
+from readablestem.pipeline import export_docx
 from readablestem.web import analytics, office_convert, offices, proof_facts, seo, storage
 from readablestem.web.assets import cached_html, static_url
 from readablestem.web.database import ping
@@ -43,12 +44,28 @@ def _hero() -> dict[str, object]:
     return data
 
 
+def _features(request: Request) -> dict[str, object]:
+    """Which content features this server has on, so a public page lists only what it does
+    (the landing page, /limits and the guides read the same flags)."""
+    settings = get_ctx(request).settings
+    return {
+        "tables_on": settings.feature_tables,
+        "image_pages_on": settings.feature_image_pages,
+        "long_on": settings.feature_long_descriptions,
+        "colour_on": settings.feature_colour,
+        "notation_on": settings.feature_notation_memory,
+        "office_on": bool(office_convert.input_kinds(settings)),
+        "word_export": export_docx.available(),  # Word downloads need pandoc on the server
+        "latex_source": settings.feature_latex_source,  # .tex and project zips (off by default)
+    }
+
+
 @router.get("/")
 def landing(request: Request) -> Response:
     return render(
         request,
         "landing.html",
-        {"active": "home", "hero": _hero(), "proof_facts": proof_facts.load()},
+        {"active": "home", "hero": _hero(), "proof_facts": proof_facts.load()} | _features(request),
     )
 
 
@@ -192,18 +209,13 @@ def limits(request: Request) -> Response:
         or settings.source_page_limit > settings.max_pages_per_job,
         "upload_limit_mb": settings.upload_limit_mb,
         "source_pages": settings.source_page_limit,
-        # Which content features are on, so the page describes what this server does.
-        "tables_on": settings.feature_tables,
-        "colour_on": settings.feature_colour,
-        "image_pages_on": settings.feature_image_pages,
-        "office_on": bool(office_convert.input_kinds(settings)),
         # The daily page limit of invited people; the open tier's is in every page's context.
         "invited_page_quota": settings.per_user_daily_page_quota,
         "proof_facts": proof_facts.load(),
         # What one person may keep stored at once (`web.storage`), by tier.
         "storage_mb": settings.storage_per_user_mb,
         "open_storage_mb": settings.storage_open_tier_mb,
-    }
+    } | _features(request)
     return render(request, "limits.html", context)
 
 
@@ -211,7 +223,7 @@ def limits(request: Request) -> Response:
 def posting_help(request: Request) -> Response:
     """How to put the file in front of students (UX review MF11): upload it and link it,
     never paste it into an LMS page. Public, so an accessibility office can read it."""
-    return render(request, "help_posting.html", {"active": "posting"})
+    return render(request, "help_posting.html", {"active": "posting"} | _features(request))
 
 
 def _guide_context(path: str, active: str) -> dict[str, object]:
@@ -248,14 +260,16 @@ def guide_ada_title_ii(request: Request) -> Response:
     """What the Justice Department's web rule asks of STEM course materials, with sources
     and the dates as checked on the day it was written. Public, like /help/posting."""
     path = seo.ADA_GUIDE
-    return render(request, "guide_ada_title_ii.html", _guide_context(path, "guide-ada"))
+    context = _guide_context(path, "guide-ada") | _features(request)
+    return render(request, "guide_ada_title_ii.html", context)
 
 
 @router.get(seo.COMPARE_GUIDE)
 def guide_compare(request: Request) -> Response:
     """ReadableSTEM beside Mathpix, Aelira, chatbots and LaTeXML, each fact with source and date."""
     path = seo.COMPARE_GUIDE
-    return render(request, "guide_compare.html", _guide_context(path, "guide-compare"))
+    context = _guide_context(path, "guide-compare") | _features(request)
+    return render(request, "guide_compare.html", context)
 
 
 @router.get("/status")

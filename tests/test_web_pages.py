@@ -249,8 +249,10 @@ def test_limits_page_lists_the_facts_that_hold_today(pages):
     assert "Handwritten notes and scanned pages are not converted." in limits
     assert "Hidden text is never used." in limits and "Run OCR" not in limits
     assert "Up to 5 pages and 1 MB per upload." in limits  # from the settings
-    assert "23 of 30 came out exactly right" in limits and 'id="accuracy"' in limits
-    for topic in ("Tables.", "Links.", "Colour.", "Language.", "File types.", "Maths in headings"):
+    assert "about half (0.50) against 0.62 for the chatbot" in limits and 'id="accuracy"' in limits
+    assert "Development set, not held out" in limits  # a development number says so
+    topics = ("Tables.", "Links.", "Colour.", "Language.", "File types.", "Maths in headings")
+    for topic in (*topics, "Slides.", "Figures.", "Equations."):
         assert topic in limits
     assert "Only PDF files are taken" in limits or "turned into a PDF first" in limits
 

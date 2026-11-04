@@ -84,7 +84,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `MODEL_PROVIDER`, `OPENAI_API_KEY`, `MAIN_MODEL`, `CHEAP_MODEL` | Which provider answers (`openai`, the default) and its key and models |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (`claude-opus-5-5`, `claude-haiku-5-5`), the workspace id an organisation-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
-| `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let the developer look (`web/retention.py`) |
+| `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let us look at the results (`web/retention.py`) |
 | `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`, compared in constant time. Required in production, at least 32 characters, or the purge would never run; the route also guards the daily paid canaries. Every call counts against the cron rate limit, wrong tokens included |
 | `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval |
 | `SOURCE_URL`, `CONTACT_EMAIL` | Footer "Source code" link (the AGPL source offer; the licence sentence is on /terms, ADR 0003 addendum); contact on the 403, privacy and terms pages |
@@ -534,10 +534,14 @@ A third box, off by default: "Exam or quiz: describe figures without giving answ
 course notation; with neither, the run uses the settings' flags as before). Figure
 descriptions then say what is shown and never the result (`pipeline/figure_step.py`).
 
-Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep for 7 days, only
-I can see it" (`keep`) and "Also let the developer look (30 days)" (`share`; implies
+Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep it for 7 days after
+I last work on it" (`keep`) and "Also let us look at the results (30 days)" (`share`; implies
 keeping). They set `jobs.retention_mode`: `day` (neither), `week` or `dev`; `dev` is also
 `jobs.opt_in_retention`, which `ops.export` reads, so only `dev` jobs can be looked at.
+The Account page has "Keep my documents for 7 days by default" (`users.keep_week_default`,
+`POST /account/keep-default`): when it is on, the `keep` box starts ticked; each upload still
+decides. The job page says near the top when the document will be deleted, with "Keep it for 7
+days" (the same `POST /jobs/{id}/keep`) while it is a 24-hour document.
 `retain_until` is a full window from upload: `RETENTION_HOURS`, 7 days, or
 `OPT_IN_RETENTION_DAYS`. For `day` and `week` jobs the window restarts on activity (a
 review write, a language, title or contact change, a download), never earlier than it
@@ -1680,7 +1684,7 @@ the results".
 ("Equation 5, page 1, in a sentence"), its state in words ("Needs your decision",
 "Decided: Edited by you"), then one sentence that says what to look at, and the item:
 
-- *Equation*: the PDF and the proposal at the same size. The PDF row is a crop a little
+- *Equation*: the PDF and the proposal at the same scale. The PDF row is a crop a little
   wider than the equation (`compare.context_clip`: four font sizes of words on each side
   of an inline one), so the weight of a letter can be judged against the body text (a
   word the crop's side edges cut is painted over in the child, `--trim`, so only whole

@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased: site copy rewrite (branch content/site-rewrite)
+
+- Every public and signed-in page says what the service does today. The landing page lists what it
+  handles (Beamer decks frame by frame, chemistry, and tables, long descriptions, scanned and
+  handwritten pages and course notation only where their flags are on, `routes/pages.py`
+  `_features`), what you download (HTML, Word, EPUB, Canvas zip, Common Cartridge, the review
+  record) and a short accuracy block that says it does not yet beat the chatbot on equations.
+- /limits holds every measured result with its sample size: the registered held-out test first,
+  the real-world held-out papers, the not-blind re-measurement, the development baseline
+  (labelled development), chemistry and handwriting. The old Physics chapter 2 sample is gone.
+- /for-accessibility-offices gains an "At a glance" list, names the downloads and sharing, and
+  says a conformance report is in preparation (not published). /privacy describes PostHog
+  analytics when `ANALYTICS_ENABLED` is on. "Also let the developer look" is now "Also let us
+  look at the results" everywhere. The upload hint is a list. Guides, README, the showcase,
+  `docs/vendor-information.md` and llms.txt are updated to match.
+- Second round, from a blind review: the landing page's lists are one line an item in plain
+  words (MathML, F1, model judge, held-out and Common Cartridge are glossed or left to
+  /limits; the proof strip takes plain labels through `plain`), a line says what "exactly
+  right" means, the chatbot comparison is its own sentence, and one decisions-per-page figure
+  per kind of document (textbook 1.8, LaTeX papers 5.6, handwriting 5.7) is given on the
+  landing page and /limits alike, with the job page's exact count. The calls to action are
+  "Sign in and convert a PDF" and the demo; the two FAQs a newcomer needs open by default. The
+  upload form's limits sentence, scanned-pages label and keep options are plainer, and the
+  redundant "Convert another PDF" link is gone. The ADA guide starts with "What to do this
+  term". On the review screen "Edit the LaTeX" is closed when a one-click fix is offered, and
+  the compare box says "at the same scale". `scripts/design_shots.py` uses the production
+  limits.
+- Footer: "Built and maintained by Harish Manoharan. Open source · Contact". The offices page
+  has "Support and continuity" (open source and self-hostable, every result downloadable, no
+  service-level agreement, how to report a problem).
+- Retention: an account setting "Keep my documents for 7 days by default"
+  (`users.keep_week_default`, migration `5d8e1f2a7c39`, `POST /account/keep-default`) starts the
+  upload form's 7-day box ticked; each upload still decides. The job page says near the top when
+  the document will be deleted, with a one-click "Keep it for 7 days". Retention wording says the
+  clock restarts on each decision or download.
 ## Unreleased: zip intake and tiered batch limits (branch batch/b2-zip-intake)
 
 - A `.zip` of documents is a batch (`FEATURE_BATCH_ZIP`, off by default, `web/batch_intake.py`): each PDF and each

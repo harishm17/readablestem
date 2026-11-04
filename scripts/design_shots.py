@@ -42,7 +42,14 @@ PRODUCTION_LIKE = {
     "google_client_id": "readablestem.apps.googleusercontent.com",
     "google_client_secret": "not-a-real-secret",
     "contact_email": "help@readablestem.com",
-    "per_user_daily_page_quota": 1000,
+    # The production limits (limits/raise-upload-limits): what a visitor reads on every page.
+    "max_pages_per_job": 100,
+    "max_upload_mb": 50,
+    "max_large_upload_mb": 100,
+    "max_source_pages": 500,
+    "open_tier_daily_page_quota": 150,
+    "per_user_daily_page_quota": 300,
+    "max_usd_per_job": 6.0,
 }
 PUBLIC = {
     "landing": "/",

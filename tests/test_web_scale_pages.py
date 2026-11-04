@@ -110,14 +110,38 @@ def test_the_landing_page_says_what_review_costs_from_the_settings(tmp_path):
     env = WebEnv(tmp_path, signup_mode="open", open_tier_daily_page_quota=17, max_pages_per_job=30)
     with env.running() as client:
         text = flat(client.get("/").text)
-    assert "about 1.8 decisions per page" in text
-    assert "real course PDFs may need more" in text
-    assert (
-        "A document of 30 pages, the most one upload can hold, is then about 54 decisions" in text
-    )
-    assert "A new account can convert 17 pages a day, about 31 decisions" in text
+        limits = flat(client.get("/limits").text)
+    assert "about 1.8 decisions a page" in text
+    assert "its page tells you exactly how many decisions it needs" in text
+    assert "Upload up to 30 pages at a time" in text  # max_pages_per_job, not written in
+    assert "New accounts have daily limits: 17 pages a day" in text
     assert "deleted 24 hours after you last work on them" in text
-    assert "all the equations, or all the figures with alt text, in one step" in text
+    # The planning detail lives on /limits.
+    assert "all the equations, or all the figures with alt text, in one step" in limits
+
+
+def test_the_landing_page_lists_only_the_features_this_server_has_on(tmp_path):
+    off = WebEnv(tmp_path / "off")
+    with off.running() as client:
+        plain = flat(client.get("/").text)
+    assert "Scanned and handwritten pages, when you ask" not in plain
+    assert "Tables, rebuilt with proper header cells" not in plain
+    assert "longer ones for charts and diagrams" not in plain
+    assert "Your course's own notation" not in plain
+    on = WebEnv(
+        tmp_path / "on",
+        feature_tables=True,
+        feature_image_pages=True,
+        feature_long_descriptions=True,
+        feature_notation_memory=True,
+    )
+    with on.running() as client:
+        full = flat(client.get("/").text)
+    assert "Scanned and handwritten pages, when you ask for them" in full
+    assert "Handwritten notes: about 5.7 decisions a page" in full
+    assert "Tables, rebuilt with proper header cells" in full
+    assert "longer ones for charts and diagrams" in full
+    assert "Your course's own notation" in full
 
 
 def test_the_quota_is_read_from_the_settings_not_written_in_the_page(tmp_path):
@@ -125,19 +149,19 @@ def test_the_quota_is_read_from_the_settings_not_written_in_the_page(tmp_path):
         env = WebEnv(tmp_path / str(quota), signup_mode="open", open_tier_daily_page_quota=quota)
         with env.running() as client:
             text = flat(client.get("/").text)
-        assert f"A new account can convert {quota} pages a day" in text
+        assert f"New accounts have daily limits: {quota} pages a day" in text
 
 
 def test_an_invite_only_landing_page_does_not_quote_a_new_accounts_quota(tmp_path):
     env = WebEnv(tmp_path, signup_mode="allowlist", open_tier_daily_page_quota=17)
     with env.running() as client:
         text = flat(client.get("/").text)
-    assert "A new account can convert" not in text and "about 1.8 decisions per page" in text
+    assert "New accounts have daily limits" not in text and "about 1.8 decisions a page" in text
 
 
 def test_the_numbers_are_the_ones_the_limits_page_gives(env):
     assert "about 1.8 per page" in flat(env.get("/limits").text)
-    assert "about 1.8 decisions per page" in flat(env.get("/").text)
+    assert "about 1.8 decisions a page" in flat(env.get("/").text)
 
 
 # --------------------------------------------------------------------------- revised version
@@ -260,3 +284,17 @@ def test_the_stylesheet_gives_undo_a_44_px_target():
         seo.Path(__file__).resolve().parent.parent / "src/readablestem/web/static/app.css"
     ).read_text()
     assert re.search(r"\.undo-form \.link-button \{[^}]*min-height: 44px; min-width: 44px", css)
+
+
+def test_latex_source_is_listed_only_when_its_flag_is_on(tmp_path):
+    off = WebEnv(tmp_path / "off")
+    with off.running() as client:
+        landing, limits = flat(client.get("/").text), flat(client.get("/limits").text)
+    assert "LaTeX source files (.tex) and project zips" not in landing
+    assert "It works from the PDF, not from LaTeX source files." in limits
+    on = WebEnv(tmp_path / "on", feature_latex_source=True)
+    with on.running() as client:
+        landing, limits = flat(client.get("/").text), flat(client.get("/limits").text)
+    assert "LaTeX source files (.tex) and project zips" in landing
+    assert "A LaTeX file (.tex) or a zip of a LaTeX project is also taken" in limits
+    assert "Only PDF files are taken" not in limits

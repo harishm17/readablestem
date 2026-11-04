@@ -51,6 +51,13 @@ def pages(tmp_path_factory):
 def test_the_pages_show_the_strip_with_set_date_and_how_measured_links(pages, path):
     page = " ".join(pages[path].split())
     assert 'class="proof-strip"' in page
-    assert "Held-out set, 15 OpenStax sections, run recorded 2026-10-14" in page
+    if path == "/limits":
+        assert "Held-out set, 15 OpenStax sections, run recorded 2026-10-14" in page
+        assert "heading F1" in page and "passed a model judge" in page
+    else:  # the landing page says the same set and numbers in plain words
+        assert "15 textbook sections the tool had never seen" in page
+        assert "October 2026, version 0.4.0" in page
+        assert "heading F1" not in page and "model judge" not in page
     assert page.count("How it was measured") >= 4
     assert "89%" in page and "2,434 of 2,738" in page
+    assert "50%" in page and "0.96" in page and "97%" in page
