@@ -984,6 +984,25 @@ _BODY_OPEN = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
 PLACEHOLDER_ATTR = 'data-readablestem-demo="placeholder"'
 
 
+# The note is a light box (white, black text) in every colour scheme, so its links get their
+# own light-scheme colours: the document's `color-scheme: light dark` would otherwise give
+# them the dark scheme's pale blue on this white box (2.39:1). In forced colours the system
+# link colours apply; the box's own colours then drop out too. Only the note is styled here;
+# the converted document keeps its own CSS.
+DEMO_NOTE_CSS = """\
+.demo-note a:link { color: #0b3d91; }
+.demo-note a:visited { color: #5b2a86; }
+.demo-note a:hover { color: #072b66; }
+.demo-note :focus-visible { outline: 3px solid #0b3d91; outline-offset: 2px; }
+@media (forced-colors: active) {
+  .demo-note a:link { color: LinkText; }
+  .demo-note a:visited { color: VisitedText; }
+  .demo-note :focus-visible { outline-color: Highlight; }
+}
+"""
+_HEAD_CLOSE = re.compile(r"</head\s*>", re.IGNORECASE)
+
+
 def demo_note_html(
     page: PageSource, *, date: str, source_url: str | None = None, placeholder: bool = False
 ) -> str:
@@ -1011,7 +1030,7 @@ def demo_note_html(
     # Descriptive link text (WCAG 2.4.4) instead of raw URLs, and overflow-wrap so nothing
     # in the note can widen the page at 320 CSS px (WCAG 1.4.10).
     return (
-        '<aside aria-label="About this demo" style="border:2px solid #1a4f8b;'
+        '<aside aria-label="About this demo" class="demo-note" style="border:2px solid #1a4f8b;'
         "padding:0.75em 1em;margin:0 0 1.5em;background:#fff;color:#000;"
         'overflow-wrap:anywhere;">\n'
         + fake
@@ -1041,11 +1060,20 @@ def wrap_demo_html(
 ) -> str:
     """Insert the demo note at the start of <body>; wrap a bare fragment in a document."""
     note = demo_note_html(page, date=date, source_url=source_url, placeholder=placeholder)
+    style = f"<style>\n{DEMO_NOTE_CSS}</style>\n"
     match = _BODY_OPEN.search(converted_html)
     if match:
-        return converted_html[: match.end()] + "\n" + note + converted_html[match.end() :]
+        head_close = _HEAD_CLOSE.search(converted_html, 0, match.start())
+        if head_close:  # the note's link colours sit in the head, with the document's own CSS
+            converted_html = (
+                converted_html[: head_close.start()] + style + converted_html[head_close.start() :]
+            )
+            match = _BODY_OPEN.search(converted_html)
+            assert match is not None
+            style = ""
+        return converted_html[: match.end()] + "\n" + style + note + converted_html[match.end() :]
     title = html.escape(f"Demo: {page.page_title}")
     return (
         f'<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>{title}'
-        f"</title></head><body>\n{note}{converted_html}\n</body></html>\n"
+        f"</title>{style}</head><body>\n{note}{converted_html}\n</body></html>\n"
     )

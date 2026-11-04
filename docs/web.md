@@ -107,7 +107,7 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/for-accessibility-offices/summary` | anyone | The same facts on one printable page, a self-contained HTML file sent as a download (`offices_summary.html`, inline style, no script, `VIEW_CSP`); not indexed |
 | GET `/limits` | anyone | Known limits: the facts that hold today (including tables, links, colour, language and file types, as this server is set up) and the measured accuracy |
 | GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make the HTML the main version and keep the PDF only as a labelled print copy (28 CFR 35.202, the DOJ fact sheet); check with your accessibility office; guidance, not legal advice |
-| GET `/status` | anyone | Service status: up, conversions open or paused for today, whether the AI service is answering (from this server's own last requests), documents waiting and converting (numbers only; 503 when the database does not answer) |
+| GET `/status` | anyone | Service status: up, conversions open or paused for today, whether the AI service is answering (from this server's own last requests), documents waiting and converting (numbers only; 503 when the database does not answer). It says when it was checked (a local-time `<time>`), links to itself as "Check again", and says that the AI service line is the last 10 minutes of this server's own requests (no requests: no problem shown, not a test) |
 | GET `/login` | anyone | Sign-in page |
 | POST `/login` | anyone | Redirects to Google (CSRF-checked form) |
 | GET `/auth/callback` | Google | Finishes sign-in; with open sign-up a new verified address gets an account (303 to `/app`); 403 page if not allowlisted (allowlist mode), blocked (open mode) or email not verified; 503 "Sign-ups are full for today" when the day's new accounts are used up; 429 when one address has made too many accounts |
@@ -800,11 +800,17 @@ The owner of a finished document can let named people open it (G1). It is for an
 wants a colleague or an accessibility coordinator to read it or to review it with them.
 
 - **The owner's side.** The job page's "Share this document" opens `/jobs/{id}/share`: the
-  people with access and their right, a form (email address, View or Review), "Change ... to"
-  and "Remove ..." per person, and the document's address to copy. Nothing is emailed; the
+  people with access and their right, a form (email address; View or Review as whole-row
+  choices, each with what it allows), "Change ... to" and "Remove ..." (a danger button) per
+  person, and the document's address to copy: a selectable field, plus a "Copy link" button
+  that `static/copy-link.js` shows (with a polite confirmation; without script the field is
+  copied by hand). Beside the address the page says when the document is deleted (every share
+  ends then) and links to the job page's keep controls. The sign-in wording names only the
+  providers this server has (`routes.sharing.sign_in_words`). Nothing is emailed; the
   owner sends the address. At most 10 people per document; the sample document and an
   unfinished one cannot be shared; the owner's own address is refused. The address is stored in
-  lower case and must be a whole address (`shares._ADDRESS`: no `*` or `?`, a dotted domain);
+  lower case, matched ignoring letter case but as the same whole address (an alias or another
+  account of the person does not match), and must be a whole address (`shares._ADDRESS`: no `*` or `?`, a dotted domain);
   there is no domain rule and no `+tag` folding.
 - **The shared person's side.** They sign in as usual (Google, Microsoft, or an emailed link sent to that address) with
   that exact address, and see the document under "Shared with you" on My documents and at its
