@@ -388,6 +388,20 @@ What the two layers cover:
   Under a cgroup the bound is the cgroup's limit and none of this applies. The native code
   that makes the burst fast is the loader residual below ("The dynamic loader can run a
   file the program wrote").
+- **Why it did not start.** When the Landlock backend is refused, the launcher reports which
+  setup step failed as a fixed code and the errno's name, through a pipe the program never has
+  (close-on-exec) and a file in a folder no grant covers: `abi_below_min`, `chdir`, `fork`,
+  `landlock_create_ruleset`, `landlock_add_rule:<exec|read|write|files_rw|files_read>`,
+  `no_new_privs`, `landlock_restrict_self`, `seccomp_install`, `prlimit_<as|cpu|fsize|core|nofile|nproc>`
+  or `exec` (`sandbox.backend_failure`). Only text of that shape is read; nothing the program
+  prints or exits with can set it. The probe shows it as `landlock_step=`, `landlock_errno=` and
+  `landlock_exit=` (`landlock_step=no_report` when the launcher ended without naming a step,
+  `not_tried` when bubblewrap worked first) and tries each call the launcher needs once in a
+  throwaway child that inherits this container's own seccomp filter: `can_landlock_create_ruleset`,
+  `can_landlock_restrict_self`, `can_no_new_privs`, `can_seccomp_syscall`, `can_seccomp_prctl`
+  and `can_prlimit_self`, each `yes` or `no` with `can_<name>_errno=`. All are information: they
+  change nothing about what the sandbox allows or what the probe requires, and they go to the
+  log line and to `/healthz/ops` with the other checks.
 - **Probe.** `backend=bwrap|landlock`, and from inside the sandbox that `/etc/passwd`,
   `/etc/shadow` and `/app` cannot be read, `/proc/1/environ` and the parent's are unreadable, a TCP
   connect fails, nothing beside the job's folder can be written, a denied call answers `EPERM`
