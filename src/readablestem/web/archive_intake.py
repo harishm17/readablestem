@@ -74,6 +74,9 @@ class ArchiveLimits:
     ratio_floor_bytes: int = 1024 * 1024  # small members are not judged by their ratio
     max_depth: int = 8
     max_name_chars: int = 200
+    # A `.pdf` member declared bigger than this is neither counted nor refused here: the caller
+    # names it as refused and never reads it (`web.batch_intake`). None: no such exemption.
+    unread_pdf_over_bytes: int | None = None
 
 
 DEFAULT_LIMITS = ArchiveLimits()
@@ -162,6 +165,14 @@ def plan(
             seen.add(key)
             if info.file_size < 0 or info.compress_size < 0:
                 raise ArchiveRefused("bad_zip")
+            unread = (
+                limits.unread_pdf_over_bytes is not None
+                and path.suffix.lower() == ".pdf"
+                and info.file_size > limits.unread_pdf_over_bytes
+            )
+            if unread:
+                chosen.append((info, Entry(path.as_posix(), info.file_size)))
+                continue
             total += info.file_size
             if total > limits.max_unpacked_bytes or info.file_size > limits.max_file_bytes:
                 raise ArchiveRefused("unpacked_too_large")

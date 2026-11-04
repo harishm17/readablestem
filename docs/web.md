@@ -688,7 +688,8 @@ file goes through (`_place_files`: the probe, the page quota, the caps):
   is then `zip_limits`). Only the `.tex` files are read to find the projects (at most 24 MB, freed at once);
   each PDF and project is then read when its turn comes and let go after it, so a request holds the body
   (at most `MAX_LARGE_UPLOAD_MB`, zips included), that text, and one document (a PDF over the upload limit is
-  refused by its header without any of it being read; a project is at most the budget) plus the usual
+  refused by name from its header size, without being read and without counting against the budget,
+  while the zip's other documents are still converted; a project is at most the budget) plus the usual
   copies an upload makes. Documents past the person's limit are only named, never read, and a zip met
   after the limit is reached is refused unopened. With the defaults that is at the peak of a request
   about 425 MB (the body 100 MB held three times over, 300 MB, the text 24 MB, one document up to

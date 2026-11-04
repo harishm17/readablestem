@@ -143,8 +143,10 @@ def split(
     if not arc.looks_like_zip(data):
         return None
     spend = budget or RequestBudget.for_upload_limit(max(len(data), 1))
-    limits = limits or arc.ArchiveLimits(max_unpacked_bytes=spend.total)
-    cap = member_cap or limits.max_file_bytes
+    cap = member_cap or (limits or arc.DEFAULT_LIMITS).max_file_bytes
+    limits = limits or arc.ArchiveLimits(
+        max_unpacked_bytes=spend.total, max_file_bytes=cap, unread_pdf_over_bytes=cap
+    )
     try:
         archive, chosen = arc.plan(data, limits)
     except arc.ArchiveRefused as exc:
