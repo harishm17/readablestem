@@ -120,7 +120,8 @@ def data_items(context: dict[str, Any]) -> list[DataItem]:
         DataItem(
             "The result and the review decisions",
             ("Railway",),
-            f"The same schedule; database backups keep a deleted document up to about {BACKUP_DAYS} days",
+            "The same schedule; database backups keep a deleted document up to about "
+            f"{BACKUP_DAYS} days",
         ),
         DataItem(
             "The instructor's email address, name and sign-in id",

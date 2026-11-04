@@ -1251,8 +1251,10 @@ fieldset.option-group > .hint { margin-top: var(--space-1); }
 .hero-hint { margin: 0 0 var(--space-6); }
 @media (max-width: 39.99rem) { .hero-hint { margin-bottom: var(--space-5); } }
 
-/* Cancel and keep actions beside a button: links with a target of at least 44px. */
-.cancel-link { display: inline-flex; align-items: center; min-height: 2.75rem; }
+/* Cancel and keep actions beside a button ("No, keep it" under a delete confirmation, the
+   table cell and notation forms' Cancel): links with a target of at least 44px. The selectors
+   cover the pages without touching their templates; `.cancel-link` is for a new one. */
+.cancel-link, .inline-form + p > a:only-child, .inline-controls > a:not([class]), .actions > li > a:not([class]) { display: inline-flex; align-items: center; min-height: 2.75rem; }
 
 /* /style: every demonstration control is an inert example, and the three states are shown. */
 .style-example { margin: 0 0 var(--space-5); padding: var(--space-4); border: 1px dashed var(--border-control); border-radius: var(--radius-frame); }

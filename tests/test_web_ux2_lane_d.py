@@ -98,7 +98,9 @@ def test_a_feature_that_is_off_is_in_neither_page_nor_the_summary(tmp_path):
     assert "tables" not in joined and "scanned" not in joined and "notation" not in joined
     assert "PostHog" not in " ".join(c for item in items for c in item.sent_to)
     for path in (offices.PAGE_PATH, offices.SUMMARY_PATH):
-        assert "scanned or handwritten page, only if" not in text_of(get(tmp_path / path[-7:], path))
+        assert "scanned or handwritten page, only if" not in text_of(
+            get(tmp_path / path[-7:], path)
+        )
 
 
 def test_the_model_companies_keeping_times_match_the_privacy_notices_wording():
@@ -124,7 +126,10 @@ def test_the_summary_has_no_raw_url_and_links_back_to_the_live_page(tmp_path):
     assert ">Open the live page</a>" in summary
     assert "print" in (STATIC / "offices-summary.css").read_text(encoding="utf-8")
     css = (STATIC / "offices-summary.css").read_text(encoding="utf-8")
-    h1, h2 = re.findall(r"h1 \{ font-size: ([\d.]+)rem", css), re.findall(r"h2 \{ font-size: ([\d.]+)rem", css)
+    h1, h2 = (
+        re.findall(r"h1 \{ font-size: ([\d.]+)rem", css),
+        re.findall(r"h2 \{ font-size: ([\d.]+)rem", css),
+    )
     body = 1.0
     assert float(h1[0]) >= 1.4 * float(h2[0]) >= 1.4 * 1.2 * body  # a clear step at each level
 
@@ -158,7 +163,9 @@ def test_every_scrolling_table_box_in_the_templates_is_focusable_and_named():
                 path.read_text(encoding="utf-8"),
             ):
                 named = "aria-label=" in tag or "aria-labelledby=" in tag
-                if not ('tabindex="0"' in tag and re.search(r'role="(group|region)"', tag) and named):
+                if not (
+                    'tabindex="0"' in tag and re.search(r'role="(group|region)"', tag) and named
+                ):
                     bad.append((path.name, tag))
     macro = (TEMPLATES / "_table_scroll.html").read_text(encoding="utf-8")
     assert 'tabindex="0"' in macro and 'role="group"' in macro and "aria-label" in macro
@@ -192,7 +199,9 @@ def test_privacy_leads_with_a_retention_table_and_terms_with_a_summary(tmp_path)
 
 def test_limits_puts_the_upload_limits_before_the_evidence(tmp_path):
     page = get(tmp_path, "/limits", max_pages_per_job=77, max_upload_mb=66)
-    order = [page.index(f'id="{x}"') for x in ("use", "handles", "not-yet", "review-time", "accuracy")]
+    order = [
+        page.index(f'id="{x}"') for x in ("use", "handles", "not-yet", "review-time", "accuracy")
+    ]
     assert order == sorted(order)
     head = page.split('id="handles"', 1)[0]
     for term in ("File types", "Size", "Daily limits", "Storage", "How long it is kept"):
@@ -226,7 +235,7 @@ def test_the_comparison_leads_with_a_decision_list_and_names_latex_source(tmp_pa
     page = get(tmp_path, seo.COMPARE_GUIDE, feature_latex_source=latex)
     assert "<h1>Choosing a tool for STEM course files</h1>" in page
     assert page.index('class="decision-list"') < page.index("compare-table")
-    inputs = page.split("<th scope=\"row\">Takes in</th>", 1)[1].split("</tr>", 1)[0]
+    inputs = page.split('<th scope="row">Takes in</th>', 1)[1].split("</tr>", 1)[0]
     if latex:
         assert "LaTeX source (a .tex file or a zip of a LaTeX project" in inputs
         assert "converted with LaTeXML" in inputs
@@ -294,7 +303,10 @@ def test_signed_in_pages_put_the_workspace_first_and_have_a_short_footer(tmp_pat
         login(client, ALICE)
         page = client.get("/app").text
     nav = page.split('aria-label="Main"', 1)[1].split("</nav>", 1)[0]
-    order = [nav.index(x) for x in ('href="/app"', 'href="/courses"', 'href="/account"', 'href="/guides"')]
+    order = [
+        nav.index(x)
+        for x in ('href="/app"', 'href="/courses"', 'href="/account"', 'href="/guides"')
+    ]
     assert order == sorted(order)
     assert 'href="/demo"' not in nav and 'href="/for-accessibility-offices"' not in nav
     footer = page.split("<footer", 1)[1].split("</footer>", 1)[0]
@@ -313,7 +325,7 @@ def test_footer_links_are_44px_targets():
     css = (STATIC / "app.css").read_text(encoding="utf-8")
     assert re.search(r"\.footer-cols a \{[^}]*min-height: 2\.75rem", css)
     assert re.search(r"\.footer-compact-links a \{[^}]*min-height: 2\.75rem", css)
-    assert re.search(r"\.cancel-link \{[^}]*min-height: 2\.75rem", css)
+    assert re.search(r"\.cancel-link[^{]*\{[^}]*min-height: 2\.75rem", css)
 
 
 # ------------------------------------------------------------------ style page
@@ -334,7 +346,9 @@ def test_every_demo_control_on_the_style_page_is_labelled_an_inert_example(tmp_p
 
 def test_the_style_pages_dark_preview_carries_the_dark_tokens():
     tokens = (STATIC / "tokens.css").read_text(encoding="utf-8")
-    dark = tokens.split("@media (prefers-color-scheme: dark)", 1)[1].split("/* Anything drawn", 1)[0]
+    dark = tokens.split("@media (prefers-color-scheme: dark)", 1)[1].split("/* Anything drawn", 1)[
+        0
+    ]
     wanted = dict(re.findall(r"(--[a-z0-9-]+):\s*(#[0-9a-fA-F]{6})", dark))
     css = (STATIC / "app.css").read_text(encoding="utf-8")
     preview = css.split(".style-scheme-dark {", 1)[1].split("}", 1)[0]

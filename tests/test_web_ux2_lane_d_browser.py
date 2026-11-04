@@ -16,6 +16,7 @@ from readablestem.web import offices
 from test_web_browser import WCAG_TAGS, describe, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
+from test_web_browser import finished_job as finished_job  # fixture, re-exported for pytest
 from test_web_browser import site as site  # fixture, re-exported for pytest
 
 pytestmark = pytest.mark.browser
@@ -151,7 +152,22 @@ def test_the_one_page_summary_prints_on_one_letter_and_one_a4_page(tmp_path, bro
     # The headings step down: title, section, text (computed in print).
     page.emulate_media(media="print")
     sizes = page.evaluate(
-        """() => ['h1', 'h2', 'p'].map(t => parseFloat(getComputedStyle(document.querySelector('main ' + t)).fontSize))"""
+        """() => ['h1', 'h2', 'p'].map(
+            t => parseFloat(getComputedStyle(document.querySelector('main ' + t)).fontSize))"""
     )
     page.close()
     assert sizes[0] >= 1.4 * sizes[1] and sizes[1] >= 1.35 * sizes[2], sizes
+
+
+def test_the_keep_it_link_on_the_delete_confirmation_is_a_44px_target(site, browser, finished_job):
+    for width in (1280, 390):
+        context = browser.new_context(viewport={"width": width, "height": 800})
+        page = context.new_page()
+        sign_in(page, site.base, ALICE)
+        page.goto(f"{site.base}/jobs/{finished_job}/delete")
+        height = page.evaluate(
+            """() => Math.round([...document.querySelectorAll('main a')]
+                .find(a => a.textContent.includes('keep it')).getBoundingClientRect().height)"""
+        )
+        context.close()
+        assert height >= 44, (width, height)

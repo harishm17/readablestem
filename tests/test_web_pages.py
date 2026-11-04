@@ -117,12 +117,8 @@ def test_every_page_has_the_shared_accessible_layout(pages):
         # The short footers (signed-in pages, sign-in) keep the trust links and "Open source";
         # the source-code and accessibility-office links are in the full footer and the header.
         if "site-footer-compact" not in html:
-            assert (
-                'href="https://github.com/harishm17/readablestem">Source code</a>' in html
-            ), name
-            assert (
-                'href="/for-accessibility-offices">For accessibility offices</a>' in html
-            ), name
+            assert 'href="https://github.com/harishm17/readablestem">Source code</a>' in html, name
+            assert 'href="/for-accessibility-offices">For accessibility offices</a>' in html, name
 
 
 def test_every_form_control_has_a_label(pages):
