@@ -64,16 +64,17 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `FEEDBACK_URL` | Where the footer's "Send feedback" link goes (http or https only). Unset: an email to `CONTACT_EMAIL`. A form service here is a new data processor: name it in the privacy notice first |
 | `BASE_URL` | Builds the OAuth redirect URIs, `${BASE_URL}/auth/callback` (Google) and `${BASE_URL}/auth/microsoft/callback` (Microsoft). Production: `https://readablestem.com`, so Google's redirect URI is `https://readablestem.com/auth/callback` |
 | `SIGNUP_MODE` | `allowlist` (the default: only people an admin added may sign in) or `open` (anyone with a verified Google identity, or an allowed Microsoft one, gets an account at the first sign-in). See "Sign-up modes and access tiers" |
-| `OPEN_TIER_DAILY_PAGE_QUOTA` (20), `OPEN_TIER_DAILY_REREADS` (30) | What an open-tier account may do per UTC day: pages to convert, and model reads from the review screen (a region marked as an equation, a table cell read as maths). Invited accounts keep `PER_USER_DAILY_PAGE_QUOTA` and have no read allowance beyond the rate limits |
+| `OPEN_TIER_DAILY_PAGE_QUOTA` (150), `OPEN_TIER_DAILY_REREADS` (30) | What an open-tier account may do per UTC day: pages to convert, and model reads from the review screen (a region marked as an equation, a table cell read as maths). Invited accounts keep `PER_USER_DAILY_PAGE_QUOTA` and have no read allowance beyond the rate limits |
 | `MAX_NEW_ACCOUNTS_PER_DAY` (100) | Accounts open sign-up may make per UTC day, for the whole service (`signup_days`). 0 pauses sign-up |
 | `OPEN_TIER_DAILY_SPEND_CAP_USD` (4.00) | The pool of the day's model spend that open-tier accounts' documents share. It sits inside `DAILY_SPEND_CAP_USD`, not on top of it. 0 closes it |
 | `ADMIN_EMAILS` | Comma-separated; made allowed admins at every start-up |
 | `DEV_LOGIN_ENABLED` | Enables `/dev-login` (only with `ENV=dev` or `test`) |
 | `DAILY_SPEND_CAP_USD` | Global model spend per UTC day (`spend_days`) |
 | `PER_USER_DAILY_PAGE_QUOTA` | Pages per invited user per UTC day (`quota_days`); open-tier accounts have `OPEN_TIER_DAILY_PAGE_QUOTA` instead |
-| `MAX_UPLOAD_MB`, `MAX_PAGES_PER_JOB`, `MAX_CONCURRENT_UPLOADS` | Upload limits (the last: uploads taken in at once per instance, one per user) |
-| `MAX_LARGE_UPLOAD_MB` (30), `MAX_SOURCE_PAGES` (300) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (30 was sized for Cloud Run's 32 MiB request limit; Railway documents none). Equal to the limits above, they turn the feature off: such files are refused |
-| `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
+| `STORAGE_PER_USER_MB` (300), `STORAGE_OPEN_TIER_MB` (250), `STORAGE_GLOBAL_MAX_MB` (2000) | Stored-bytes caps (`web/storage.py`, docs/operations.md "How much the uploads weigh"): per person by tier, counted with the quota checks in the job's own transaction, and for the whole service (over it, uploads get a 503 until the purge has caught up) |
+| `MAX_UPLOAD_MB` (50), `MAX_PAGES_PER_JOB` (100), `MAX_CONCURRENT_UPLOADS` (3) | Upload limits (the last: uploads taken in at once per instance, one per user) |
+| `MAX_LARGE_UPLOAD_MB` (100), `MAX_SOURCE_PAGES` (500) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (the old 30 was sized for Cloud Run's 32 MiB request limit, which a Cloud Run deployment still has; Railway documents none). Equal to the limits above, they turn the feature off: such files are refused |
+| `MAX_USD_PER_JOB` ($6.00), `MAX_MODEL_CALLS_PER_JOB` (1200) | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
 | `FEATURE_IMAGE_PAGES`, `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE` ($0.25), `IMAGE_PAGES_MAX_USD_PER_JOB` ($7.50), `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`, `IMAGE_PAGES_OMISSION_CHECK` (default on), `IMAGE_PAGES_RECOVER_OMISSIONS` (default on), `IMAGE_PAGES_VECTOR_CROPS` (default off, unmeasured: on a handwritten page whose ink is vector, the pictures of expressions are drawn from the pen strokes) and `IMAGE_PAGES_VECTOR_CHECKS` (default on: a letter in the other case, a power lost, added or moved, and ink no block accounts for are flagged by comparing the reading with the strokes, docs/layout.md), `IMAGE_PAGES_SECOND_READING` (default off), `IMAGE_PAGES_ACCEPT_AGREED` (default off), `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED` (default on), `IMAGE_PAGES_SECOND_READER` (`off`, `local`, `claude`, `openai`; default `off`), `IMAGE_PAGES_SECOND_READER_TIME_S` (120) | Scanned and handwritten pages read from an image of the page (ADR 0007, "Scanned and handwritten pages on request" below); the omission check makes writing the reading left out a required decision, and the recovery reads such a stretch from a picture of just that part so it is converted instead; the second reading reads each `medium` block with a formula again from a picture of its line and records whether the two agree, and acceptance lets a block whose two readings agree, the second sure of every symbol, be an optional note (off: docs/eval-handwriting.md, "Root causes and fixes"); the last makes every block of a page read from an image that holds maths (a display equation, or a paragraph, list item or heading with a formula) a required decision whatever the reader's confidence (ADR 0007, point 12; typed pages and prose-only blocks are not affected); the second reader (`docs/math-readers.md`, "Using a reader in the pipeline") reads the crop of each handwritten display equation and compares it with the page's reading, so the review card can offer the differences as choices (it must also be enabled with its `MATH_READER_*_ENABLED`). The flag only offers the upload option; the model is the main one unless `IMAGE_PAGES_MODEL` says otherwise; a job that asked may spend `IMAGE_PAGES_USD_PER_PAGE` a page, at most `IMAGE_PAGES_MAX_USD_PER_JOB`, when that is more than `MAX_USD_PER_JOB` and `MAX_USD_PER_PAGE` allow |
 | `DECISIONS_FIGURE_VERIFY`, `DECISIONS_EQUATION_SHADOW`, `DECISIONS_CANARY` (and thresholds) | The second automated check (ADR 0005): an optional note on accepted figures, a shadow on equations, a daily drift canary that only the HTTP cron route runs (docs/steps.md, docs/operations.md). All on by default in code; the Decisions ones do nothing with `MODEL_PROVIDER=anthropic` |
@@ -172,7 +173,7 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/admin/linked-emails`, `/admin/linked-emails/remove` | admins | Let an allowed instructor also sign in with another Google address, or take that away (T3-10; "Sign-in, sessions and CSRF") |
 | POST `/internal/cron/aggregate-and-purge` | a scheduler (Cloud Scheduler on the Cloud Run path; production runs the `cron` service instead and does not call it) | `X-Cron-Token` header; aggregates, then purges, then runs the daily canaries |
 | GET `/healthz` | anyone | `{"status": "ok"}` after a database ping, else 503 |
-| GET `/healthz/ops` | anyone | `{"status": "ok", "stale": []}`, or 503 `{"status": "stale", "stale": ["backup"]}` naming only the late tasks: the daily backup (older than 26 h) and the hourly cron (older than 2 h), from `ops_heartbeat` (`ops/heartbeat.py`). No setting, no content |
+| GET `/healthz/ops` | anyone | `{"status": "ok", "stale": [], "storage": {"stored_mb": 0, "limit_mb": 2000, "full": false}}`, or 503 `{"status": "stale", "stale": ["backup"], ...}` naming only the late tasks: the daily backup (older than 26 h) and the hourly cron (older than 2 h), from `ops_heartbeat` (`ops/heartbeat.py`), and `storage` while the service holds `STORAGE_GLOBAL_MAX_MB` of uploads. Totals in megabytes only: no setting value but that limit, no content |
 | GET `/readyz` | anyone | `{"status": "ready", "checks": {"database", "worker", "model_provider"}}`, one word per check, 503 `not_ready` if any is not ok (docs/operations.md, "Health, readiness and shutdown") |
 
 Every `/jobs/*` route answers 404 for a job that does not exist or belongs to someone
@@ -396,11 +397,13 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    fits under `DAILY_SPEND_CAP_USD` today (`spend.largest_reservation_usd`, about $0.031:
    a display equation on the main model), a friendly 503 page ("Conversions are paused
    for today"). A smaller threshold admitted uploads that could convert nothing;
+1b. stored bytes (`web/storage.py`): while the service holds `STORAGE_GLOBAL_MAX_MB` of uploads a plain 503 page ("Uploads are paused while storage catches up", `Retry-After` an hour) is answered before the body is read; and per file, in the job's transaction with the person's row locked, an upload that would take the person over `STORAGE_PER_USER_MB` (`STORAGE_OPEN_TIER_MB` for open-tier accounts) is refused with 413 and says how much they store and to delete documents (`storage_user`); a large file kept for its pages and the parts cut from it are held to the same cap, and the parts page keeps the file when a part is refused;
 2. uploads in progress: at most `MAX_CONCURRENT_UPLOADS` (3) per instance and one per
    user (`uploads.UploadGate`). Each upload costs about three times its size in memory
-   while it is read, copied and probed, so this keeps uploads near 200 MB however many
-   requests arrive at once (the limit was set for Cloud Run's `--concurrency=20` and a 1 GiB
-   instance). Over the limit: a 503
+   while it is read, copied and probed, so this keeps uploads to at most about 900 MB (three
+   of the largest allowed, 100 MB each; near 100 MB for ordinary files) however many
+   requests arrive at once (the limit was set for Cloud Run's `--concurrency=20`; it was near
+   200 MB with 20 MB uploads, and the service now needs 2 GB: docs/deploy-railway.md, "Memory, CPU and request size"). Over the limit: a 503
    (busy) or 429 (your own upload is still in progress) page with `Retry-After`, before
    the body is read;
 3. size: a declared `Content-Length` over the limit is refused before reading, and the
@@ -494,7 +497,7 @@ readablestem.web.office_convert SOFFICE TIMEOUT`, file on stdin, a JSON line and
 PDF on stdout; a minimal environment (`core/childenv.py`); its own address-space cap; one
 at a time per instance (a second waits five seconds and is told to try again, 503). Before
 LibreOffice sees the file the child refuses, with a category: a ZIP that is damaged,
-encrypted, has more than 3000 entries or more than 200 MB unpacked (`office_unsafe`); one
+encrypted, has more than 3000 entries or more than 500 MB unpacked (one entry at most 250 MB) (`office_unsafe`); one
 that is not exactly one Word document or one presentation (`office_unsupported`); an old
 binary `.doc` or `.ppt` or a password-protected file (`office_old_or_locked`); macros
 (`vbaProject.bin`, macro-enabled content types); a DOCTYPE or ENTITY declaration or UTF-16
@@ -540,7 +543,7 @@ this unchanged. The privacy page's three lines are the beta wording.
 When today's budget is spent, the upload form is replaced by a notice saying when
 uploads open again (the next midnight UTC, shown in the reader's time), instead of a form
 that would send the whole file to be refused (UX review MF20). The same goes for a
-person's daily page limit once no page is left ("You have converted all 20 pages you can
+person's daily page limit once no page is left ("You have converted all 150 pages you can
 today. Uploads open again at ..."); before that, the hint under the file field says how
 many pages are left and when the count starts again.
 
@@ -1145,8 +1148,11 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   whose lease ran out; after 3 attempts a job is failed with `lease_expired` instead.
   On shutdown (`Worker.stop`) the running conversion is cancelled and its lease ended at
   once, so another instance requeues the job straight away.
-- **Time limit.** `JOB_BASE_S + JOB_PER_PAGE_S * pages` (300 s + 90 s per page, so
-  50 minutes for 30 pages; constants in `web/worker.py`, not settings yet). Past it the
+- **Time limit.** `JOB_BASE_S + JOB_PER_PAGE_S * pages` (180 s + 30 s per page, so
+  53 minutes for 100 pages; constants in `web/worker.py`, not settings yet). A 100-page
+  document of the repository's own fixtures converted in 31 s (fake models, one CPU) and in
+  193 s with a simulated 2 s of model latency a call (8 at once), so the limit is 16 times
+  the slower figure (2026-11-03). Past it the
   worker stops extending the lease, cancels the conversion, fails the job with `timeout`
   and goes on to the next job.
 - **Cancellation.** When the job stops being this worker's (the user pressed "Delete
@@ -1302,7 +1308,10 @@ is `convert_isolated`, which has `convert_pdf`'s signature.
   timings (`tests/test_web_isolated_convert.py`). A model call still running when the child is
   killed finishes and settles in the parent; its spend counts, as an abandoned thread's did.
 - *Limits.* Address space `CONVERSION_MEMORY_MB` (default 3072; measured peak of a conversion is
-  1.6-1.8 GB of address space, 330-460 MB resident, on 4 documents of 2, 7, 7 and 11 pages with
+  1.6-1.8 GB of address space, 330-460 MB resident, on 4 documents of 2, 7, 7 and 11 pages; and, sampled
+  from `/proc` on 2026-11-03, 0.77 GB of address space and 494 MB resident on 100 pages
+  of the repository's fixtures (3.5 MB), 1.1 GB and 745 MB on 100 pages carrying 51 MB of
+  pictures, both inside the default; all with
   `glibc` arenas capped at 2 (`MALLOC_ARENA_MAX`; without it the same runs peaked at 4.7-6 GB of
   address space); below about 1.5 GB the ONNX runtime of the table
   detector hangs instead of failing, which ends as `timeout`), plus twice the PDF; CPU time
@@ -2306,7 +2315,8 @@ and each shown before it is done: **Accept all clean tables** (T3-11, `POST
 #### Review at scale (`web/bulk_accept.py`, `routes/bulk.py`)
 
 The measured load is about 1.8 decisions per page (the 15 held-out sections; `/limits`), so a
-300-page document would ask for about 540 single decisions. Two kinds of decision wait only
+500-page source in five parts would ask for about 900 single decisions, and one
+100-page document for about 180. Two kinds of decision wait only
 because the model was not sure enough to accept them itself:
 
 - **Accept all remaining equations whose checks passed**: equations still undecided
