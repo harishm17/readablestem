@@ -312,6 +312,8 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs/{job_id}/retry",  # try a stopped document again (T3-1)
         "/jobs/{job_id}/review/{element_id}",
         "/jobs/{job_id}/review/{element_id}/check",  # changes nothing, but sends LaTeX
+        "/jobs/{job_id}/share",  # give a named person access, or change their right (G1)
+        "/jobs/{job_id}/share/{share_id}/revoke",  # take it away (G1)
         "/jobs/{job_id}/symbols",
         "/jobs/{job_id}/tables/accept-clean",  # the clean tables, in one write (T3-11)
         "/jobs/{job_id}/tables/{element_id}/read-cell",  # a maths cell read by the model (T3-11)
@@ -329,7 +331,11 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
     for path in posts:
         url = path.replace("{job_id}", JOB).replace("{element_id}", "p1-e1")
         url = url.replace("{course_id}", JOB).replace("{entry_id}", JOB).replace("{number}", "1")
-        url = url.replace("{upload_id}", JOB).replace("{slug}", "equations")
+        url = (
+            url.replace("{upload_id}", JOB)
+            .replace("{slug}", "equations")
+            .replace("{share_id}", JOB)
+        )
         if path == "/jobs":
             response = web.browser.post(
                 url, data={"csrf_token": "forged"}, files={"pdf": ("a.pdf", b"%PDF-1.4", "x")}

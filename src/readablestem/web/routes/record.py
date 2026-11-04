@@ -19,10 +19,11 @@ from readablestem.web.deps import CurrentUser, UserDep, get_ctx, render
 from readablestem.web.routes.jobs import (
     content_disposition,
     current_html,
-    owned_job,
+    job_access,
     require_done,
     slug,
 )
+from readablestem.web.shares import VIEW
 
 router = APIRouter()
 
@@ -31,7 +32,7 @@ def _record(request: Request, job_id: str, user: CurrentUser) -> tuple[record.Re
     """The job's record, and the base of its file name."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, VIEW)
         require_done(job)
         # The automatic checks it lists are those of the file as it is now: a review write
         # only marks the file out of date, and it is made again here (`jobs.current_html`).
@@ -39,15 +40,26 @@ def _record(request: Request, job_id: str, user: CurrentUser) -> tuple[record.Re
         job = current_html(ctx, session, job)
         result = DocumentResult.model_validate(job.result_json or {})
         edits = list(session.scalars(select(ReviewEdit).where(ReviewEdit.job_id == job.id)))
-        person = session.get(User, job.user_id)
-        owner = user.email
-        if person is not None:
-            owner = f"{person.name} ({person.email})" if person.name else person.email
+        is_owner = job.user_id == user.id
+        owner = user.email if is_owner else "the owner"
+        # Who made each edit: the owner, and anyone the document was shared with for review.
+        # A person whose account is gone has no edits left (they go with it), so every
+        # edit's author is found.
+        who: dict[str, str] = {}
+        for person in session.scalars(
+            select(User).where(User.id.in_({job.user_id, *(e.user_id for e in edits)}))
+        ):
+            if is_owner:  # only the owner sees addresses
+                who[person.id] = f"{person.name} ({person.email})" if person.name else person.email
+            else:  # everyone else sees names, and "the owner" or "a reviewer" for no name
+                fallback = "the owner" if person.id == job.user_id else "a reviewer"
+                who[person.id] = person.name or fallback
+        owner = who.get(job.user_id, owner)
         title = documents.display_title(result.title, job.filename, job.title_override)
         made = record.build(
             result=result,
             edits=edits,
-            who={job.user_id: owner},
+            who=who,
             owner=owner,
             filename=job.filename,
             title=title,

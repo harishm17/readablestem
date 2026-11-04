@@ -20,7 +20,7 @@
   {% if results_link|default(false) %}
   {# Only in the polled fragment: the full page shows the results itself. From here the
      first decision is one click away (MF17). #}
-  <p>{% if counts and counts.decisions %}<a href="/jobs/{{ job.id }}/review">Start the review</a> or {% endif %}<a href="/jobs/{{ job.id }}">{{ "show the results" if counts and counts.decisions else ("Show the results" if job.status == "done" else "Show why it stopped") }}</a></p>
+  <p>{% if counts and counts.decisions and job.can_review %}<a href="/jobs/{{ job.id }}/review">Start the review</a> or {% endif %}<a href="/jobs/{{ job.id }}">{{ "show the results" if counts and counts.decisions else ("Show the results" if job.status == "done" else "Show why it stopped") }}</a></p>
   {% endif %}
   {# Product analytics (web/analytics.py): the person has just seen the job finish. The
      loader sends it once per job in this browser. Counts and a status, nothing else. #}
