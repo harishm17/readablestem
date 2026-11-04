@@ -9,6 +9,11 @@ from has no docs folder, so `parse()` turns the report into `proof_facts.json` b
 `tests/test_proof_facts.py` fails when the JSON and the report differ, so a new registered result
 cannot leave the pages on old numbers.
 
+The comparison chart (`chart`) is read from `data/realworld/results-fresh5.json`, the same run's
+numbers, and the small headings-and-figures block (`first_test`) from the first registered test's
+tables in `PROOF.md`, so the pages draw their bars and counts from the reports and cannot drift
+from them (`tests/test_proof_facts.py` compares the snapshot with both).
+
 Every fact names its set, its date, that it is a registered result, its count, and a link to how
 it was measured. Nothing here says one tool beats another: each fact gives the chatbot's number
 beside ReadableSTEM's and says where a goal registered before the run was not met.
@@ -25,6 +30,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 REPORT = ROOT / "docs" / "eval-equation-fresh5.md"
+RESULTS = ROOT / "data" / "realworld" / "results-fresh5.json"
+PROOF = ROOT / "PROOF.md"
 SNAPSHOT = Path(__file__).with_name("proof_facts.json")
 SOURCE = "https://github.com/harishm17/readablestem/blob/main/docs/eval-equation-fresh5.md"
 HREF = SOURCE + "#primary-and-secondaries-strata-a-to-c-pooled"
@@ -41,12 +48,121 @@ class Fact:
 
 
 @dataclass(frozen=True)
+class ChartLine:
+    system: str  # "ReadableSTEM", "Chatbot on Opus", "Chatbot on Haiku"
+    value: str  # as shown: "0.793", "5.0", "$0.022", "never asks"
+    width: float  # the bar's length, percent of the row's axis
+
+
+@dataclass(frozen=True)
+class ChartRow:
+    measure: str  # what is counted, in plain words
+    better: str  # "Higher is better" or "Lower is better"
+    lines: list[ChartLine]
+
+
+@dataclass(frozen=True)
+class FirstTest:
+    """The first registered test (PROOF.md): headings and figure descriptions, with counts."""
+
+    set_label: str  # "15 OpenStax sections, 242 pages, October 2026, version 0.4.0"
+    levels_ours: str  # "497 of 497 (100%)"
+    levels_chatbot: str  # "320 of 939 (34%)"
+    errors_ours: str  # "0 of 138"
+    errors_chatbot: str  # "3 of 134"
+
+
+@dataclass(frozen=True)
 class ProofFacts:
     set_label: str  # "fresh5 set, 26 documents"
     date: str  # "2026-11-04"
     blind: str  # "Registered before the run; one run."
     pipeline: str  # "version 0.5.9"
     facts: list[Fact]
+    chart: list[ChartRow]
+    first_test: FirstTest
+
+
+SYSTEMS = (
+    ("Candidate", "ReadableSTEM"),
+    ("Chatbot, Opus", "Chatbot on Opus"),
+    ("Chatbot, Haiku", "Chatbot on Haiku"),
+)
+# (key in the results file, plain words, direction, the axis the bars are drawn against, format)
+MEASURES = (
+    (
+        "spoken-equal, end to end (primary)",
+        "Reads the same to a listener as the original",
+        True,
+        1.0,
+        "{:.3f}",
+    ),
+    ("exact_lenient (secondary)", "Exactly right, symbol for symbol", True, 1.0, "{:.3f}"),
+    (
+        "silent errors per 100 gold (wrong under the primary, not asked)",
+        "Wrong, and nobody is asked, per 100 equations",
+        False,
+        20.0,
+        "{:.1f}",
+    ),
+    (
+        "unseen loss per 100 gold (silent plus undetected)",
+        "Wrong and not flagged, or not found at all, per 100 equations",
+        False,
+        20.0,
+        "{:.1f}",
+    ),
+    ("cost per PDF page (USD)", "Cost per page", False, 0.08, "${:.3f}"),
+    (
+        "flag recall (symbols-wrong aligned equations that were a required decision)",
+        "Wrong equations the tool asks you about",
+        True,
+        1.0,
+        "{:.2f}",
+    ),
+)
+
+
+def parse_chart(results: dict) -> list[ChartRow]:
+    """The bars, from the registered run's results file (one row per measure, one line per
+    system). A chatbot never asks: its flag recall is 0 and the page says so in words."""
+    rows = []
+    for key, words, higher, axis, fmt in MEASURES:
+        lines = []
+        for arm, name in SYSTEMS:
+            point = float(results["arms"][arm][key]["point"])
+            assert point <= axis, (key, point)
+            shown = (
+                "never asks" if key.startswith("flag recall") and point == 0 else fmt.format(point)
+            )
+            lines.append(ChartLine(name, shown, round(100 * point / axis, 1)))
+        rows.append(ChartRow(words, "Higher is better" if higher else "Lower is better", lines))
+    return rows
+
+
+def parse_first_test(proof: str) -> FirstTest:
+    """Heading levels and figure-description errors of the first registered test, from the
+    counts table of PROOF.md: ReadableSTEM, then the chatbot recipe on Opus."""
+    levels = _found(
+        proof,
+        r"^\| heading level_accuracy \(among matched\) \| (\d+)/(\d+) \| (\d+)/(\d+) \|",
+        re.M,
+    ).groups()
+    errors = _found(
+        proof,
+        r"^\| figure judge_factual_error_rate \(among judged\) \| (\d+)/(\d+) \| (\d+)/(\d+) \|",
+        re.M,
+    ).groups()
+    assert "Fifteen sections of five OpenStax books (242 Letter pages)" in proof
+    return FirstTest(
+        set_label="15 OpenStax sections, 242 pages, October 2026, version 0.4.0",
+        levels_ours=f"{levels[0]} of {levels[1]} ({100 * int(levels[0]) // int(levels[1])}%)",
+        levels_chatbot=(
+            f"{levels[2]} of {levels[3]} ({round(100 * int(levels[2]) / int(levels[3]))}%)"
+        ),
+        errors_ours=f"{errors[0]} of {errors[1]}",
+        errors_chatbot=f"{errors[2]} of {errors[3]}",
+    )
 
 
 def _row(section: str, label: str) -> list[str]:
@@ -69,7 +185,11 @@ def _found(text: str, pattern: str, flags: int = 0) -> re.Match[str]:
     return match
 
 
-def parse(report: str) -> ProofFacts:
+def parse(report: str, results: dict | None = None, proof: str | None = None) -> ProofFacts:
+    if results is None:
+        results = json.loads(RESULTS.read_text(encoding="utf-8"))
+    if proof is None:
+        proof = PROOF.read_text(encoding="utf-8")
     assert "no difference this set can detect" in report
     assert "beats the chatbot baseline on its equation" in report and "is not made" in report
     section = report[report.index(TABLE) : report.index("## Paired differences")]
@@ -122,6 +242,8 @@ def parse(report: str) -> ProofFacts:
                 HREF,
             ),
         ],
+        chart=parse_chart(results),
+        first_test=parse_first_test(proof),
     )
 
 
@@ -141,6 +263,11 @@ def load() -> ProofFacts:
         blind=data["blind"],
         pipeline=data["pipeline"],
         facts=[Fact(**fact) for fact in data["facts"]],
+        chart=[
+            ChartRow(r["measure"], r["better"], [ChartLine(**line) for line in r["lines"]])
+            for r in data["chart"]
+        ],
+        first_test=FirstTest(**data["first_test"]),
     )
 
 

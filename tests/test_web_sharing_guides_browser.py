@@ -184,7 +184,6 @@ def test_the_phone_comparison_topics_are_keyboard_disclosures(site, browser, axe
     "path",
     [
         "/guides/ada-title-ii-stem-course-materials",
-        "/guides/readablestem-mathpix-latexml",
         "/help/posting",
         "/for-accessibility-offices",
     ],

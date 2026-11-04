@@ -120,7 +120,7 @@ def test_the_limits_page_names_the_daily_pages_in_allowlist_mode_too(tmp_path):
     env = WebEnv(tmp_path, signup_mode="allowlist", per_user_daily_page_quota=90, **GOOGLE)
     limits = page(env, "/limits")
     assert "You can convert 90 pages a day." in limits
-    assert "new account" not in limits.split("Daily limits.")[1].split("Size.")[0]
+    assert "new account" not in limits.split("Daily limits", 1)[1].split("Storage", 1)[0]
 
 
 def test_the_privacy_notice_says_the_first_sign_in_makes_an_account_and_how_to_delete_it(tmp_path):

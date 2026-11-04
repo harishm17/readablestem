@@ -111,11 +111,14 @@ def test_every_page_has_the_shared_accessible_layout(pages):
         assert page.count("header") == 1 and page.count("footer") == 1, name
         for link in ('href="/privacy"', 'href="/terms"', 'href="/limits"', 'href="/status"'):
             assert link in html, (name, link)
-        assert 'href="https://github.com/harishm17/readablestem">Source code</a>' in html, name
         # The licence sentence is on the Terms page; every footer has a plain link to it.
         assert "offered under AGPL-3.0 terms" not in html or name == "/terms", name
         assert 'href="/terms#open-source">Open source</a>' in html, name
-        assert 'href="/for-accessibility-offices">For accessibility offices</a>' in html, name
+        # The short footers (signed-in pages, sign-in) keep the trust links and "Open source";
+        # the source-code and accessibility-office links are in the full footer and the header.
+        if "site-footer-compact" not in html:
+            assert 'href="https://github.com/harishm17/readablestem">Source code</a>' in html, name
+            assert 'href="/for-accessibility-offices">For accessibility offices</a>' in html, name
 
 
 def test_every_form_control_has_a_label(pages):
@@ -137,7 +140,7 @@ def test_landing_page_says_assists_and_links_the_demo(pages):
     html = pages["/"]
     assert "assists" in html
     assert 'href="/demo"' in html
-    assert 'href="/dev-login"' in html  # the sign-in option on this test server
+    assert 'href="/login"' in html  # the one call to action; the buttons are on /login
 
 
 def test_privacy_and_terms_describe_real_behaviour(pages):
@@ -251,7 +254,7 @@ def test_limits_page_lists_the_facts_that_hold_today(pages):
     assert "Up to 5 pages and 1 MB per upload." in limits  # from the settings
     assert "about half (0.50) against 0.62 for the chatbot" in limits and 'id="accuracy"' in limits
     assert "Development set, not held out" in limits  # a development number says so
-    topics = ("Tables.", "Links.", "Colour.", "Language.", "File types.", "Maths in headings")
+    topics = ("Tables.", "Links.", "Colour.", "Language.", "File types", "Maths in headings")
     for topic in (*topics, "Slides.", "Figures.", "Equations."):
         assert topic in limits
     assert "Only PDF files are taken" in limits or "turned into a PDF first" in limits

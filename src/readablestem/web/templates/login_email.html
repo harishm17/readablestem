@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set footer_mode = "minimal" %}
 {% block title %}{% if error %}Error: {% endif %}{% if sent %}Check your email{% else %}Sign in by email{% endif %}{% endblock %}
 {% block content %}
 {% if sent %}

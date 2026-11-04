@@ -32,5 +32,140 @@
       "caveat": "The goal registered before the run was 0.60, so it was not met. A chatbot asks nothing.",
       "href": "https://github.com/harishm17/readablestem/blob/main/docs/eval-equation-fresh5.md#primary-and-secondaries-strata-a-to-c-pooled"
     }
-  ]
+  ],
+  "chart": [
+    {
+      "measure": "Reads the same to a listener as the original",
+      "better": "Higher is better",
+      "lines": [
+        {
+          "system": "ReadableSTEM",
+          "value": "0.840",
+          "width": 84.0
+        },
+        {
+          "system": "Chatbot on Opus",
+          "value": "0.836",
+          "width": 83.6
+        },
+        {
+          "system": "Chatbot on Haiku",
+          "value": "0.816",
+          "width": 81.6
+        }
+      ]
+    },
+    {
+      "measure": "Exactly right, symbol for symbol",
+      "better": "Higher is better",
+      "lines": [
+        {
+          "system": "ReadableSTEM",
+          "value": "0.793",
+          "width": 79.3
+        },
+        {
+          "system": "Chatbot on Opus",
+          "value": "0.770",
+          "width": 77.0
+        },
+        {
+          "system": "Chatbot on Haiku",
+          "value": "0.732",
+          "width": 73.2
+        }
+      ]
+    },
+    {
+      "measure": "Wrong, and nobody is asked, per 100 equations",
+      "better": "Lower is better",
+      "lines": [
+        {
+          "system": "ReadableSTEM",
+          "value": "5.0",
+          "width": 25.1
+        },
+        {
+          "system": "Chatbot on Opus",
+          "value": "9.6",
+          "width": 47.8
+        },
+        {
+          "system": "Chatbot on Haiku",
+          "value": "11.9",
+          "width": 59.5
+        }
+      ]
+    },
+    {
+      "measure": "Wrong and not flagged, or not found at all, per 100 equations",
+      "better": "Lower is better",
+      "lines": [
+        {
+          "system": "ReadableSTEM",
+          "value": "11.0",
+          "width": 55.1
+        },
+        {
+          "system": "Chatbot on Opus",
+          "value": "16.4",
+          "width": 82.2
+        },
+        {
+          "system": "Chatbot on Haiku",
+          "value": "18.4",
+          "width": 92.1
+        }
+      ]
+    },
+    {
+      "measure": "Cost per page",
+      "better": "Lower is better",
+      "lines": [
+        {
+          "system": "ReadableSTEM",
+          "value": "$0.022",
+          "width": 27.7
+        },
+        {
+          "system": "Chatbot on Opus",
+          "value": "$0.068",
+          "width": 85.1
+        },
+        {
+          "system": "Chatbot on Haiku",
+          "value": "$0.002",
+          "width": 2.1
+        }
+      ]
+    },
+    {
+      "measure": "Wrong equations the tool asks you about",
+      "better": "Higher is better",
+      "lines": [
+        {
+          "system": "ReadableSTEM",
+          "value": "0.46",
+          "width": 46.1
+        },
+        {
+          "system": "Chatbot on Opus",
+          "value": "never asks",
+          "width": 0.0
+        },
+        {
+          "system": "Chatbot on Haiku",
+          "value": "never asks",
+          "width": 0.0
+        }
+      ]
+    }
+  ],
+  "first_test": {
+    "set_label": "15 OpenStax sections, 242 pages, October 2026, version 0.4.0",
+    "levels_ours": "497 of 497 (100%)",
+    "levels_chatbot": "320 of 939 (34%)",
+    "errors_ours": "0 of 138",
+    "errors_chatbot": "3 of 134"
+  }
 }
