@@ -98,7 +98,13 @@
   }
 
   localise();
-  document.addEventListener("htmx:afterSettle", localise);
+  // Whatever htmx swaps in (the documents list refreshes every 5 seconds) is rewritten the
+  // moment it is inserted, before the browser paints it, so a refreshed list never shows
+  // UTC where the first render showed the reader's time zone.
+  if (window.MutationObserver) {
+    new MutationObserver(localise).observe(document.body, { childList: true, subtree: true });
+  }
+  document.addEventListener("htmx:load", localise);
 })();
 
 /* Upload form (app.html, UX review MF21). Says at once when a chosen file is not a PDF,

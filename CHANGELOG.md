@@ -26,6 +26,40 @@
   (new message: "The server is busy right now ... Try again in a few minutes, or upload the
   PDF instead."); running a written file through the dynamic loader is documented as a
   residual (the loader's execute right cannot be withheld).
+## Unreleased: upload, job page and My documents (branch ux/upload-job-documents)
+
+- A person a document was shared with who can only view it is no longer told "N decisions need
+  you": the status says the decisions are still open and only the owner or a reviewer can make
+  them (a reviewer is told they can review them). The results tile reads "Decisions made" and,
+  for a viewer, "Decisions still open". In My documents a document whose owner has no name is
+  "shared with you" instead of "shared by The owner".
+- "Try again" says what it will do ("puts your document back in the queue"); the confirmation
+  comes after it worked.
+- Times in My documents stay in the reader's time zone after the list refreshes itself.
+- One wording for keeping a document, "Keep for 7 days", on the upload form, job page, Account
+  page, notices and the privacy page. The job page shows the deletion time once, under the
+  review and download actions, with the day "Keep for 7 days" would delete it. Delete entry
+  points (a document, a course, an account, a waiting file) have a red outline style
+  (`button-danger-outline`, `danger-link`), the confirmation pages keep the filled button.
+- Upload form: shorter, in three groups (file, how to convert it, how long to keep it) with one
+  line of consequence beside each option and the long text in disclosures. A refused scanned PDF
+  says to tick "Convert scanned or handwritten pages" and choose the file again.
+- Choosing pages: sizes under 0.1 MB show in KB (`pending.size_text`), the range examples follow
+  the active page limit and the file, and a suggestion cut off at 20 parts says which pages it
+  leaves out.
+- My documents has a compact "Practise on the sample" link beside "Convert a PDF"; signed-in
+  pages get a compact footer of trust and help links (public pages keep the full footer).
+## Unreleased: spoken-equal scorer reads one print as one speech (branch eval/spoken-scorer-fix)
+
+- Evaluation only; the product's speech and `math_canonical.compare` are unchanged. The spoken-equal scorer
+  (`scripts/rw_spoken.py`) spoke 71 of the 2,350 development gold equations differently from a reading that
+  prints the same (`\mathrm{in}` against `\text{in}`, gold `\textbf` without its bold, `\min` against
+  `\text{min}`, `\bigl(`, `...`, `\backslash`, scripts and accents). `math_canonical.repair_converter_gaps`
+  and `speakable_latex` now write each print one way on both sides for every arm; a pair right before stays
+  right. 68 of the 71 became equal; ReadableSTEM base-0508 on development 0.792 to 0.820, Opus 0.728 to 0.755,
+  Haiku 0.723 to 0.749 (`docs/eval-realworld.md`). Guard tests: `tests/test_math_canonical_spoken.py`.
+- `PREREGISTRATION-FRESH5.md` section 4: the primary is spoken-equal, `exact_lenient` a secondary. The scorer,
+  its folding and the speech files are in `FRESH5_FILES`, to be hashed at signing.
 ## Unreleased: sharing, guides, demo and status polish (branch ux/sharing-guides-demo)
 
 - The "About this demo" note has its own light-scheme, visited, hover, focus and forced-colour

@@ -39,6 +39,14 @@ class TooManyPending(Exception):
     """The person already has `MAX_PENDING_PER_USER` large files waiting."""
 
 
+def size_text(size_bytes: int) -> str:
+    """A file's size for the pages: "84 KB" below 0.1 MB (it used to read "0.0 MB"), else
+    "2.4 MB". The one formatter for every place a size is shown."""
+    if size_bytes < 0.1 * 1024 * 1024:
+        return f"{max(1, round(size_bytes / 1024))} KB"
+    return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+
 def retain_until(settings: Settings, now: datetime | None = None) -> datetime:
     return (now or utcnow()) + timedelta(hours=settings.retention_hours)
 

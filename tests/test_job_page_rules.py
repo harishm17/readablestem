@@ -486,3 +486,18 @@ def test_plural_losses_take_are():
     assert job_page._lost_sentence(["rows"]) == "The rows and columns are gone."
     assert job_page._lost_sentence(["limits"]) == "The limits above and below are gone."
     assert job_page._lost_sentence(["power"]) == "The power is gone."
+
+
+def test_the_open_decisions_line_says_what_the_reader_may_do():
+    waiting = job_page.Breakdown(items=3, decided=0, decisions=2)
+    owner = job_page.headline("done", "", None, waiting).message
+    reviewer = job_page.headline("done", "", None, waiting, "review").message
+    viewer = job_page.headline("done", "", None, waiting, "view").message
+    assert owner == "2 decisions need you before you share it."
+    assert reviewer == "2 decisions are still open. You can review them."
+    assert viewer.startswith("2 decisions are still open. Only the owner or a reviewer")
+    assert "need you" not in reviewer and "need you" not in viewer
+    one = job_page.Breakdown(items=1, decided=0, decisions=1)
+    assert job_page.headline("done", "", None, one, "view").message.startswith(
+        "1 decision is still open."
+    )

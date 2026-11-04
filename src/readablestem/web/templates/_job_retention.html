@@ -1,0 +1,19 @@
+{# When this document will be deleted and the one way to keep it 7 days (web/retention.py),
+   once, below the actions of the page (job.html includes it after them). `keep_until` is when
+   "Keep for 7 days" would delete it, or none when the button would change nothing. The same
+   POST and wording as the upload form's box, the account setting and the privacy page. #}
+{% if job.is_owner and not job.is_sample and job.retain_until %}
+<div class="retention-line" id="retention-line">
+  <p>{% if job.retention_mode == "dev" %}Kept until {{ job.retain_until|utc }}, {{ opt_in_days }} days after upload, because you let us look at the results.
+    {%- elif job.retention_mode == "week" %}Deleted automatically on {{ job.retain_until|utc }}, 7 days after you last work on it.
+    {%- else %}Deleted automatically on {{ job.retain_until|utc }}, {{ retention_hours }} hours after you last work on it.{% endif %}
+    {%- if job.retention_mode != "dev" %} Each decision or download starts that time again.{% endif %}</p>
+  {% if keep_until|default(none) %}
+  <form method="post" action="/jobs/{{ job.id }}/keep" class="inline-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <button type="submit" class="button-secondary button-small" aria-describedby="keep-result">Keep for 7 days</button>
+    <span class="hint" id="keep-result">Then it is deleted on {{ keep_until|utc }}.</span>
+  </form>
+  {% endif %}
+</div>
+{% endif %}

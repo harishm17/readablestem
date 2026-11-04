@@ -45,7 +45,7 @@
           {% endif %}
         </td>
         <td role="cell" data-label="Deleted automatically">{{ row.retain_until|utc }}</td>
-        <td role="cell"><a id="del-{{ row.id }}" href="/jobs/{{ row.id }}/delete?from=app">Delete<span class="visually-hidden"> {{ row.title }}</span></a></td>
+        <td role="cell"><a id="del-{{ row.id }}" class="danger-link" href="/jobs/{{ row.id }}/delete?from=app">Delete<span class="visually-hidden"> {{ row.title }}</span></a></td>
       </tr>
       {% endfor %}
     </tbody>

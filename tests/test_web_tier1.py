@@ -98,14 +98,14 @@ def retain_in(env) -> timedelta:
 def test_the_upload_form_has_two_separate_choices_both_off(ux):
     html = ux.browser.get("/app").text
     for box, label in (
-        ("keep", "Keep it for 7 days after I last work on it"),
+        ("keep", "Keep for 7 days"),
         ("share", "Also let us look at the results (30 days)"),
     ):
         assert f'id="{box}"' in html and f'name="{box}"' in html
         assert label in html
         tag = re.search(rf'<input[^>]*id="{box}"[^>]*>', html)
         assert tag and "checked" not in tag.group(0)
-    assert "<legend>How long to keep my document</legend>" in html
+    assert "<legend>How long to keep it, and who may look</legend>" in html
 
 
 @pytest.mark.parametrize(
@@ -168,16 +168,17 @@ def test_the_developer_look_choice_keeps_its_30_days_from_upload(ux):
 
 def test_keep_7_more_days_on_the_job_page(ux):
     html = page(ux)
-    assert "Keep 7 more days" in html
-    assert f'action="/jobs/{ux.job_id}/keep"' in html
+    assert "Keep for 7 days" in html and "Then it is deleted on" in html
+    assert html.count(f'action="/jobs/{ux.job_id}/keep"') == 1  # once, not repeated below
+    assert (
+        html.index('id="retention-line"') > html.index('id="next-actions"') or "Review" not in html
+    )
     set_retain_until(ux, utcnow() + timedelta(hours=1))
     post(ux, "/keep")
     job = stored_job(ux)
     assert (job.retention_mode, job.opt_in_retention) == ("week", False)
     assert timedelta(days=6, hours=23) < retain_in(ux) <= timedelta(days=7)
-    assert "kept for 7 days, and only you and the people you share it with can see it" in text_of(
-        page(ux)
-    )
+    assert "7 days after you last work on it" in text_of(page(ux))
 
 
 def test_a_developer_look_job_is_not_offered_more_days(ux):
@@ -185,7 +186,7 @@ def test_a_developer_look_job_is_not_offered_more_days(ux):
         job = session.get(Job, ux.job_id)
         assert job is not None
         job.retention_mode, job.opt_in_retention = "dev", True
-    assert "Keep 7 more days" not in page(ux)
+    assert "Keep for 7 days" not in page(ux)
     before = stored_job(ux).retain_until
     post(ux, "/keep")
     assert stored_job(ux).retain_until == before and stored_job(ux).retention_mode == "dev"
@@ -415,11 +416,11 @@ def test_no_model_cost_or_internal_codes_on_the_job_page(ux):
 
 def test_the_job_page_counts_decisions_and_nothing_else(ux):
     text = text_of(page(ux))
-    assert "Decisions to make 3" in text and "Decisions you made 0" in text
+    assert "Decisions to make 3" in text and "Decisions made 0" in text
     assert "Accepted for you" not in text and "Of the" not in text
     decide(ux, GROUP, action="reject")
     text = text_of(page(ux))
-    assert "Decisions to make 2" in text and "Decisions you made 1" in text
+    assert "Decisions to make 2" in text and "Decisions made 1" in text
 
 
 def test_the_list_view_has_no_codes_or_confidence_and_no_model_cost(ux):

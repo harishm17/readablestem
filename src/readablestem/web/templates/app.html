@@ -28,7 +28,7 @@
   <h2 id="shared-heading">Shared with you</h2>
   <ul>
     {% for item in shared_documents %}
-    <li><a href="/jobs/{{ item.id }}">{{ item.title }}</a>: shared by {{ item.owner }}, you can {{ "review" if item.role == "Review" else "view" }} it.</li>
+    <li><a href="/jobs/{{ item.id }}">{{ item.title }}</a>: {% if item.owner %}shared by {{ item.owner }}{% else %}shared with you{% endif %}, you can {{ "review" if item.role == "Review" else "view" }} it.</li>
     {% endfor %}
   </ul>
 </section>
@@ -43,7 +43,7 @@
   <ul>
     {% for item in pending %}
     <li><a href="/uploads/{{ item.id }}">Choose the pages of {{ item.filename }}</a>,
-      {{ item.pages }} pages, {{ item.size_mb }} MB. Kept until {{ item.retain_until|utc }}.</li>
+      {{ item.pages }} pages, {{ item.size_text }}. Kept until {{ item.retain_until|utc }}.</li>
     {% endfor %}
   </ul>
 </section>
@@ -51,9 +51,10 @@
 
 {% if not own_documents|default(false) %}
 {% if sample_available|default(false) %}
-{# T3-9: a recorded sample to practise on before a real file is risked (web/sample.py). #}
+{# T3-9: a recorded sample to practise on before a real file is risked (web/sample.py). For
+   someone with documents it is the compact link beside "Convert a PDF" below. #}
 <section aria-labelledby="sample-heading" id="sample">
-  <h2 id="sample-heading">{% if own_documents %}Practise on the sample{% else %}Try a sample first{% endif %}</h2>
+  <h2 id="sample-heading">Try a sample first</h2>
   <p>See the review screen on a real conversion before you upload your own file. The sample is a
     section of a physics textbook (OpenStax <em>Physics</em> 2.3, CC BY 4.0), converted ahead of
     time. Opening it uses none of your pages and sends nothing to an AI service.</p>
@@ -62,7 +63,7 @@
   {% else %}
   <form method="post" action="/sample" class="inline-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <button type="submit" class="{% if own_documents %}button-secondary{% else %}button{% endif %}">Open the sample document</button>
+    <button type="submit" class="button">Open the sample document</button>
   </form>
   {% endif %}
 </section>
@@ -79,7 +80,20 @@
     that are exactly the same. Anything that changed, and anything new, asks you again.
     <a href="/app#upload-heading">Convert a different PDF instead</a></p>
   {% else %}
-  <h2 id="upload-heading">Convert a PDF</h2>
+  <div class="heading-row">
+    <h2 id="upload-heading">Convert a PDF</h2>
+    {# ux-lane-b: for someone who has documents, the sample is a compact link here. #}
+    {% if own_documents|default(false) and sample_available|default(false) %}
+    {% if sample_job %}
+    <a class="sample-link" href="/jobs/{{ sample_job }}">Practise on the sample</a>
+    {% else %}
+    <form method="post" action="/sample" class="inline-form sample-link">
+      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      <button type="submit" class="link-button">Practise on the sample</button>
+    </form>
+    {% endif %}
+    {% endif %}
+  </div>
   {% endif %}
   {% if spend_closed %}
   {# The form would only send the whole file to be refused (UX review MF20): say when
@@ -108,32 +122,21 @@
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     {% if revises|default(none) %}<input type="hidden" name="revises" value="{{ revises.id }}">{% endif %}
     {% set pdf_error = field_errors.get("pdf") %}
+    {# ux-lane-b: three groups, in the order they are decided: the file, how it is converted
+       (course, exam, scanned pages), and how long it is kept and who may look. Each option has
+       one line of consequence beside it; the long explanations are in a disclosure under it. #}
     <div class="field{% if pdf_error %} field-error{% endif %}">
       <label for="pdf">{% if revises|default(none) %}PDF file{% else %}PDF files{% endif %}</label>
       {# One fact a line, so it scans; the input's aria-describedby points at the block. #}
       <div class="hint" id="pdf-hint">
         <ul>
-          {% if revises|default(none) %}
-          <li>Up to {{ max_upload_mb }} MB and {{ max_pages }} pages.</li>
-          {% else %}
+          {% if not revises|default(none) %}
           <li>Up to {{ max_files }} files at once; each becomes its own document.</li>
-          <li>Up to {{ max_pages }} pages and {{ max_upload_mb }} MB each. A bigger file, up to
-            {{ source_pages }} pages and {{ upload_limit_mb }} MB, is kept so you can choose
-            which pages to convert.</li>
           {% endif %}
+          <li>Up to {{ max_pages }} pages and {{ max_upload_mb }} MB {% if not revises|default(none) %}each{% else %}for the file{% endif %}.</li>
           {% if office_kinds %}
           <li>Word (.docx){% if "pptx" in office_kinds %} and PowerPoint (.pptx){% endif %}
-            files also work; they are turned into a PDF on the server first, so the page count
-            is the PDF's.</li>
-          {% endif %}
-          {% if batch_zip and not revises|default(none) %}
-          <li>A zip of PDFs and LaTeX project folders also works: each PDF and each project in
-            it becomes a document ({{ max_files }} at a time).</li>
-          {% endif %}
-          {% if latex_source and not revises|default(none) %}
-          <li>A LaTeX file (.tex) or a zip of a LaTeX project also works (up to 100 MB unpacked
-            and 500 files). Its equations are read from the source, and its length is counted as
-            one page for every 3,000 characters or figure.</li>
+            files also work.</li>
           {% endif %}
           {% if pages_left is not none %}
           <li>You can convert {{ pages_left }} more
@@ -144,6 +147,28 @@
           <li>Only upload materials you wrote or may adapt, with no student records.</li>
         </ul>
       </div>
+      <details class="more-detail" id="pdf-more">
+        <summary>More about file types and size</summary>
+        <ul>
+          {% if not revises|default(none) %}
+          <li>A bigger file, up to {{ source_pages }} pages and {{ upload_limit_mb }} MB, is kept
+            so you can choose which pages to convert.</li>
+          {% endif %}
+          {% if office_kinds %}
+          <li>Word and PowerPoint files are turned into a PDF on the server first, so the page
+            count is the PDF's.</li>
+          {% endif %}
+          {% if batch_zip and not revises|default(none) %}
+          <li>A zip of PDFs and LaTeX project folders also works: each PDF and each project in
+            it becomes a document ({{ max_files }} at a time).</li>
+          {% endif %}
+          {% if latex_source and not revises|default(none) %}
+          <li>A LaTeX file (.tex) or a zip of a LaTeX project also works (up to 100 MB unpacked
+            and 500 files). Its equations are read from the source, and its length is counted as
+            one page for every 3,000 characters or figure.</li>
+          {% endif %}
+        </ul>
+      </details>
       {% if pdf_error %}
       <p class="error-message" id="pdf-error"><span class="visually-hidden">Error: </span>{{ pdf_error.message }}</p>
       {% endif %}
@@ -163,52 +188,56 @@
       <input type="text" id="main_file" name="main_file" maxlength="200" autocomplete="off">
     </div>
     {% endif %}
-    {% include "_course_choice.html" %}
-    {# T1-14: exam mode. Per job (Job.exam_mode); the figure step then describes what is
-       shown and never the result. #}
-    <div class="field checkbox-field exam-choice">
-      <input type="checkbox" id="exam" name="exam" value="on" aria-describedby="exam-hint"{% if exam_default|default(false) %} checked{% endif %}>
-      <label for="exam">Exam or quiz: describe figures without giving answers</label>
-      <p class="hint" id="exam-hint">Figure descriptions then say what is shown, such as the
-        axes and labels, and leave out values, trends and results a student is asked to work
-        out.</p>
-    </div>
-    {# ADR 0007: scanned and handwritten pages are read from an image of the page when the
-       owner asks (Job.image_pages). Offered by FEATURE_IMAGE_PAGES; used only for a PDF the
-       server finds scanned or handwritten pages in. #}
-    {% if image_pages_offered|default(false) %}
-    <div class="field checkbox-field image-pages-choice">
-      <input type="checkbox" id="image_pages" name="image_pages" value="on" aria-describedby="image-pages-hint"{% if image_pages_default|default(false) %} checked{% endif %}>
-      <label for="image_pages">Convert scanned or handwritten pages</label>
-      <p class="hint" id="image-pages-hint">Slower, and you check every converted equation and
-        table. Without this, such pages are kept as pictures marked
-        “Not converted”, and a PDF that is only scans or handwriting is refused. With it, each
-        page is read from its picture, and the original page stays in the file for checking. A
-        tool can misread handwriting and small symbols: you decide each equation and table
-        before you share. It does nothing for a PDF that has no scanned or handwritten
-        pages.</p>
-    </div>
-    {% endif %}
+    <fieldset class="field option-group conversion-options">
+      <legend>How to convert it</legend>
+      {% include "_course_choice.html" %}
+      {# T1-14: exam mode. Per job (Job.exam_mode); the figure step then describes what is
+         shown and never the result. #}
+      <div class="field checkbox-field exam-choice">
+        <input type="checkbox" id="exam" name="exam" value="on" aria-describedby="exam-hint"{% if exam_default|default(false) %} checked{% endif %}>
+        <label for="exam">Exam or quiz: describe figures without giving answers</label>
+        <p class="hint" id="exam-hint">Figure descriptions say what is shown, not values, trends
+          or results a student is asked to work out.</p>
+      </div>
+      {# ADR 0007: scanned and handwritten pages are read from an image of the page when the
+         owner asks (Job.image_pages). Offered by FEATURE_IMAGE_PAGES; used only for a PDF the
+         server finds scanned or handwritten pages in. #}
+      {% if image_pages_offered|default(false) %}
+      <div class="field checkbox-field image-pages-choice">
+        <input type="checkbox" id="image_pages" name="image_pages" value="on" aria-describedby="image-pages-hint"{% if image_pages_default|default(false) %} checked{% endif %}>
+        <label for="image_pages">Convert scanned or handwritten pages</label>
+        <p class="hint" id="image-pages-hint">Slower, and you check every converted equation and
+          table. Without it, such pages stay as pictures marked “Not converted”.</p>
+        <details class="more-detail">
+          <summary>What this does</summary>
+          <p>A PDF that is only scans or handwriting is refused unless this is ticked. With it,
+            each page is read from its picture, and the original page stays in the file for
+            checking. A tool can misread handwriting and small symbols: you decide each equation
+            and table before you share. It does nothing for a PDF that has no scanned or
+            handwritten pages. If an upload is refused, tick the box and choose the file again.</p>
+        </details>
+      </div>
+      {% endif %}
+    </fieldset>
     {# T1-8: two separate choices (UX review MF10 part 1). Neither ticked: deleted
-       `retention_hours` after the last activity. One checkbox for the beta;
-       the privacy page (privacy.html) says the same. #}
-    <fieldset class="field retention-choices">
-      <legend>How long to keep my document</legend>
-      <p class="hint" id="keep-hint">If you tick neither box, your document, results and
-        decisions are deleted {{ retention_hours }} hours after you last work on them; each
-        decision or download starts the clock again. We do not use your uploads to train models.</p>
+       `retention_hours` after the last activity. The privacy page (privacy.html) says the
+       same. One wording for the 7 days everywhere: "Keep for 7 days". #}
+    <fieldset class="field option-group retention-choices">
+      <legend>How long to keep it, and who may look</legend>
+      <p class="hint" id="keep-hint">If you tick neither box, your document is deleted
+        {{ retention_hours }} hours after you last work on it. We do not use your uploads to train
+        models.</p>
       <div class="field checkbox-field">
         <input type="checkbox" id="keep" name="keep" value="on" aria-describedby="keep-hint keep-who"{% if keep_default|default(false) %} checked{% endif %}>
-        <label for="keep">Keep it for 7 days after I last work on it</label>
-        <p class="hint" id="keep-who">Only you, and anyone you share it with, can see it.
-          {% if keep_default|default(false) %}Ticked because of your <a href="/account#account-keep">account setting</a>; untick it for this upload if you like.{% else %}To have this ticked every time, use your <a href="/account#account-keep">account setting</a>.{% endif %}</p>
+        <label for="keep">Keep for 7 days</label>
+        <p class="hint" id="keep-who">Deleted 7 days after you last work on it. Only you, and anyone you share it with, can see it.
+          {% if keep_default|default(false) %}Ticked because of your <a href="/account#account-keep">account setting</a>.{% else %}<a href="/account#account-keep">Tick it every time</a> in your account.{% endif %}</p>
       </div>
       <div class="field checkbox-field">
         <input type="checkbox" id="share" name="share" value="on" aria-describedby="share-hint">
         <label for="share">Also let us look at the results ({{ opt_in_days }} days)</label>
         <p class="hint" id="share-hint">We may look at the results to find and fix mistakes in
-          the tool. Your document is then kept {{ opt_in_days }} days from upload, whichever
-          box you ticked.</p>
+          the tool. Kept {{ opt_in_days }} days from upload, whichever box you ticked.</p>
       </div>
     </fieldset>
     <p id="upload-status" class="upload-status" role="status"></p>
@@ -216,27 +245,6 @@
   </form>
   {% endif %}
 </section>
-
-{% if own_documents|default(false) %}
-{% if sample_available|default(false) %}
-{# T3-9: a recorded sample to practise on before a real file is risked (web/sample.py). #}
-<section aria-labelledby="sample-heading" id="sample">
-  <h2 id="sample-heading">{% if own_documents %}Practise on the sample{% else %}Try a sample first{% endif %}</h2>
-  <p>See the review screen on a real conversion before you upload your own file. The sample is a
-    section of a physics textbook (OpenStax <em>Physics</em> 2.3, CC BY 4.0), converted ahead of
-    time. Opening it uses none of your pages and sends nothing to an AI service.</p>
-  {% if sample_job %}
-  <p><a class="button-secondary" href="/jobs/{{ sample_job }}">Open your sample document</a></p>
-  {% else %}
-  <form method="post" action="/sample" class="inline-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <button type="submit" class="{% if own_documents %}button-secondary{% else %}button{% endif %}">Open the sample document</button>
-  </form>
-  {% endif %}
-</section>
-{% endif %}
-
-{% endif %}
 
 {% if not documents.rows %}
 <section aria-labelledby="jobs-heading">
