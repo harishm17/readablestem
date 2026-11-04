@@ -504,6 +504,13 @@ script (set under the word in display style), `\mathrm{x_1}` is not text, a rais
 `''`. `tests/test_math_canonical_spoken.py` holds same-print pairs that must become equal and different-print
 pairs, among them recorded wrong readings, that must not. `compare` and the product's speech are unchanged.
 
+Two sides have no LaTeX to fold. OpenStax gold (fresh5 strata B and D) is MathML only: it is spoken from its
+MathML as it is and compared with the prediction as written (`spoken_exact_mathml_gold`). A prediction written
+as a MathML element (a chatbot answering in `<math>`, as the strong prompt asks; `<x` stays LaTeX) is spoken
+from its MathML and compared with the gold as written. Neither is folded, so such a pair is credited only when
+the two are said in the same words as written. In the recorded development item files of the Purdue arms, 3
+aligned pairs of each arm have a MathML prediction.
+
 Result on development (reading B, `--rescore-chat`, 25 papers, 2,350 gold; 68 of the 71 became equal, and
 no pair that was right became wrong; the same papers, the same answers, only the scorer changed):
 
