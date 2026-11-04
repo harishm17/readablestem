@@ -15,6 +15,18 @@
   analytics when `ANALYTICS_ENABLED` is on. "Also let the developer look" is now "Also let us
   look at the results" everywhere. The upload hint is a list. Guides, README, the showcase,
   `docs/vendor-information.md` and llms.txt are updated to match.
+- Second round, from a blind review: the landing page's lists are one line an item in plain
+  words (MathML, F1, model judge, held-out and Common Cartridge are glossed or left to
+  /limits; the proof strip takes plain labels through `plain`), a line says what "exactly
+  right" means, the chatbot comparison is its own sentence, and one decisions-per-page figure
+  per kind of document (textbook 1.8, LaTeX papers 5.6, handwriting 5.7) is given on the
+  landing page and /limits alike, with the job page's exact count. The calls to action are
+  "Sign in and convert a PDF" and the demo; the two FAQs a newcomer needs open by default. The
+  upload form's limits sentence, scanned-pages label and keep options are plainer, and the
+  redundant "Convert another PDF" link is gone. The ADA guide starts with "What to do this
+  term". On the review screen "Edit the LaTeX" is closed when a one-click fix is offered, and
+  the compare box says "at the same scale". `scripts/design_shots.py` uses the production
+  limits.
 
 ## Unreleased: design polish (branch design/d6-polish)
 

@@ -48,7 +48,7 @@
     the original page”, for checking. A tool can misread handwriting and small symbols. On 24
     pages of real handwriting that were not used to build the feature, 57% of the equations
     came out exactly right, every wrong one had a decision, and it asked for about 5.7
-    decisions a page (typed pages: about 1.4). On nine real papers made into scans, about 2 in
+    decisions a page. On nine real papers made into scans, about 2 in
     3 equations came out exactly right. A page whose only text is a watermark, a stamp or a
     page number over a picture or handwriting counts as scanned or handwritten too. Without the
     tick, a PDF made only of scans or handwriting is refused before it counts against your
@@ -122,10 +122,13 @@
   <li><strong>Your documents are deleted</strong> {{ retention_hours }} hours after you last
     worked on them (7 days if you choose to keep them, {{ opt_in_days }} if you also let us look
     at the results). Download the file before then.</li>
-  <li><strong>Review time.</strong> In the held-out test below it asked for about 1.8 decisions
-    per page; real course PDFs may need more, and handwritten pages need about 5.7. Where the
-    checks found nothing wrong, you can accept all the equations, or all the figures with alt
-    text, in one step after seeing the list.</li>
+  <li><strong>Review time.</strong> How many decisions a document needs depends on what it is.
+    In the held-out tests below: textbook sections, about 1.8 decisions a page (15 OpenStax
+    sections, 242 pages); research papers made with LaTeX, about 5.6 a page (15 arXiv papers,
+    71 pages){% if image_pages_on %}; handwritten notes, about 5.7 a page (24 pages){% endif %}.
+    Once your document is converted, its page tells you the exact count. Where the checks
+    found nothing wrong, you can accept all the equations, or all the figures with alt text, in
+    one step after seeing the list.</li>
 </ul>
 
 <h2 id="accuracy">How accurate it is</h2>
@@ -138,8 +141,10 @@
     sentence), 89% of them in both cases, but fewer came out exactly right end to end: about
     half (0.50) against 0.62 for the chatbot. Given each equation on its own, about two in
     three were right (0.68).</li>
-  <li>Headings: F1 0.96, with every matched heading at the right level.</li>
-  <li>Figure descriptions: 97% passed a model judge (not yet checked by people).</li>
+  <li>Headings: F1 0.96, with every matched heading at the right level. (F1 is a score out of 1
+    that counts both headings missed and headings invented.)</li>
+  <li>Figure descriptions: 97% passed a model judge, a second AI model asked whether each
+    description is right (not yet checked by people).</li>
   <li>Decisions it asked for: about 1.8 per page; it asked about only a third of the
     equations that were wrong.</li>
 </ul>

@@ -1,0 +1,4 @@
+{# One line on how to sign in, for the landing page's calls to action. Microsoft is named only
+   when this server has Microsoft sign-in configured (MS_*). #}
+{% if google_login %}Sign in with any Google account, including a university Google account{% if microsoft_login %},
+  or with your university's Microsoft account if your university is set up for it{% endif %}.{% elif microsoft_login %}Sign in with your university's Microsoft account.{% endif %}{% if signup_open %} Free during the beta.{% endif %}

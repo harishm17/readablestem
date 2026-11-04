@@ -112,7 +112,25 @@ def test_the_landing_page_summarises_without_overclaiming(pages):
     # The registered held-out tiles are the headline, and the gap to the chatbot is said.
     assert 'class="proof-strip"' in pages["/"]
     assert "it does not yet beat a general chatbot" in landing
-    assert "1,826 equations) it wrote 58% exactly right, against 64%" in landing
+    assert "64% against its 58% on 15 research papers made with LaTeX (1,826 equations)" in landing
+    assert (
+        "“Exactly right” means the whole equation matches the original symbol for symbol" in landing
+    )
+    # One decisions-per-page figure per kind of document, the same as /limits gives.
+    limits = squash(pages["/limits"])
+    for line, figure in (
+        (
+            "Textbook sections: about 1.8 decisions a page (15 OpenStax sections, 242 pages)",
+            "textbook sections, about 1.8 decisions a page (15 OpenStax sections, 242 pages)",
+        ),
+        (
+            "about 5.6 decisions a page (15 arXiv papers, 71 pages)",
+            "about 5.6 a page (15 arXiv papers, 71 pages)",
+        ),
+    ):
+        assert line in landing and figure in limits
+    assert "about 5.6 things per page" in REALWORLD and "5.7 decisions per page" in HANDWRITING
+    assert "**242**" in PROOF
     assert 'href="/limits#accuracy"' in pages["/"]
     # Development numbers stay on /limits, labelled there.
     assert "0.735" not in landing and "development set" not in landing.lower()

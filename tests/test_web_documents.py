@@ -332,13 +332,15 @@ def test_the_landing_page_says_why_now_what_it_handles_and_how_accurate(web):
     page = web.client().get("/").text
     flat = text(page)
     assert "public universities" in flat
-    assert "Beamer slide decks, read frame by frame" in flat and "Chemistry" in flat
-    assert "about 1.8 decisions per page" in flat and "It makes mistakes" in flat
+    assert "Beamer slide decks, one slide per frame" in flat and "Chemistry" in flat
+    assert "about 1.8 decisions a page" in flat and "flag the ones that disagree" in flat
     assert "it does not yet beat a general chatbot" in flat
     assert "/blob/main/PROOF.md" in page  # the proof tiles link to how they were measured
     assert 'href="/limits#accuracy"' in page
     assert "How to post it in your course" in flat
-    assert "EPUB" in flat and "Common Cartridge" in flat
+    assert "EPUB" in flat and "Canvas, Blackboard, Moodle or D2L" in flat
+    main = text(page.split("<main", 1)[1].split("</main>", 1)[0])
+    assert "Common Cartridge" not in main and "held-out" not in main  # plain words here
     assert "confidence score" not in flat and "developer" not in flat
 
 

@@ -525,8 +525,8 @@ A third box, off by default: "Exam or quiz: describe figures without giving answ
 course notation; with neither, the run uses the settings' flags as before). Figure
 descriptions then say what is shown and never the result (`pipeline/figure_step.py`).
 
-Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep for 7 days, only
-I can see it" (`keep`) and "Also let us look at the results (30 days)" (`share`; implies
+Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep it for 7 days after
+I last work on it" (`keep`) and "Also let us look at the results (30 days)" (`share`; implies
 keeping). They set `jobs.retention_mode`: `day` (neither), `week` or `dev`; `dev` is also
 `jobs.opt_in_retention`, which `ops.export` reads, so only `dev` jobs can be looked at.
 `retain_until` is a full window from upload: `RETENTION_HOURS`, 7 days, or
@@ -1542,7 +1542,7 @@ the results".
 ("Equation 5, page 1, in a sentence"), its state in words ("Needs your decision",
 "Decided: Edited by you"), then one sentence that says what to look at, and the item:
 
-- *Equation*: the PDF and the proposal at the same size. The PDF row is a crop a little
+- *Equation*: the PDF and the proposal at the same scale. The PDF row is a crop a little
   wider than the equation (`compare.context_clip`: four font sizes of words on each side
   of an inline one), so the weight of a letter can be judged against the body text (a
   word the crop's side edges cut is painted over in the child, `--trim`, so only whole

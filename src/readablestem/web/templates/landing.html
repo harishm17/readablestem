@@ -15,8 +15,8 @@
      should only be added once it is checked against it and the university's own page
      (UX review BW9). #}
   <p class="lede">Upload your lecture notes, slides or problem sets. ReadableSTEM rebuilds each
-    equation as MathML that a screen reader can speak, restores the headings and describes the
-    figures.</p>
+    equation as real maths (MathML) that a screen reader can speak, restores the headings and
+    describes the figures.</p>
   <p class="hero-rest">When it is unsure about something, it asks you on a review screen, where
     you accept, edit or reject the change. Then you download a web page to post in your
     course.</p>
@@ -24,10 +24,14 @@
     {% if user %}
     <a class="button" href="/app">Go to my documents</a>
     {% else %}
-    <a class="button" href="#try">Try it</a>
+    <a class="button" href="/login">Sign in and convert a PDF</a>
     {% endif %}
-    <a class="button-secondary" href="/demo">Look at an example conversion</a>
+    <a class="button-secondary" href="/demo">See an example first (no sign-in)</a>
   </p>
+  {% if not user %}
+  <p class="hint">{% include "_signin_line.html" %} <a href="#who">Who can use it</a> and
+    <a href="#documents">what happens to your documents</a>.</p>
+  {% endif %}
 
   {# The real passage from the demo (OpenStax Physics 2.3, page 3), built by
      scripts/hero_assets.py and checked by tests/test_hero_assets.py. The right pane holds
@@ -64,35 +68,19 @@
 </section>
 
 <h2 id="handles">What it handles</h2>
+{# One line an item; the detail of each is on /limits ("What it handles, with limits"). #}
 <ul>
-  <li>PDFs typeset with LaTeX or exported from Word{% if office_on %}, and Word (.docx) and
-    PowerPoint (.pptx) files, which it turns into a PDF first{% endif %}.</li>
-  <li>Equations in running text and on their own line. Each becomes MathML, so a screen reader
-    says “v equals d over t” and a student can step through it.</li>
-  <li>Chemistry: formulas, ions and reactions are written as chemistry, and the review screen
-    reads them the way a chemistry teacher says them: “2 H 2 plus O 2 reacts to form 2 H 2 O”.
-    This is its weakest area, so check each one.</li>
-  <li>Beamer slide decks, read frame by frame. Overlay steps that only add a line are merged into
-    one slide, and each frame title becomes a heading.</li>
-  {% if tables_on %}
-  <li>Tables, rebuilt as real tables with header cells. A table it cannot read stays a picture
-    of the original, and it asks you about it.</li>
-  {% endif %}
-  <li>Figures, with short alt text{% if long_on %}, and a longer description for a chart or a
-    diagram that needs one{% endif %}. For an exam or quiz, descriptions leave out the
-    answers.</li>
-  {% if image_pages_on %}
-  <li>Scanned and handwritten pages, when you tick a box at upload. Each page is read from its
-    picture, and you check every equation before you share the file.</li>
-  {% endif %}
-  {% if notation_on %}
-  <li>Your course's notation. Tell it once what your symbols mean, and every document you
-    upload for that course uses it.</li>
-  {% endif %}
+  <li>Lecture notes and problem sets made with LaTeX or Word{% if office_on %}, as PDF, Word or PowerPoint files{% endif %}.</li>
+  <li>Equations, which a screen reader can read aloud and step through.</li>
+  <li>Chemistry formulas and reactions (its weakest area: check each one).</li>
+  <li>Beamer slide decks, one slide per frame.</li>
+  {% if tables_on %}<li>Tables, rebuilt with proper header cells.</li>{% endif %}
+  <li>Figures, with short descriptions{% if long_on %}, and longer ones for charts and diagrams{% endif %}.</li>
+  {% if image_pages_on %}<li>Scanned and handwritten pages, when you ask for them.</li>{% endif %}
+  {% if notation_on %}<li>Your course's own notation, once you describe it.</li>{% endif %}
   {# When LaTeX source upload is turned on (latex_source_on), list it here. #}
 </ul>
-<p>Some things it does not do yet, such as maths in headings or a table without ruled lines.
-  <a href="/limits">See the known limits</a>.</p>
+<p><a href="/limits#handles">How each works, and what it does not do yet</a>.</p>
 
 <section class="steps-section" aria-labelledby="steps-title">
   <h2 id="steps-title">Upload, review, post</h2>
@@ -104,9 +92,9 @@
     </li>
     <li>
       <h3>Review</h3>
-      <p>You decide only what could change what a student reads. On textbook sections that was
-        about 1.8 decisions per page; real course PDFs may need more. Everything else is
-        accepted and listed for you to look over.</p>
+      <p>You decide only what could change what a student reads. Everything else is accepted
+        and listed for you to look over. Once your document is converted, its page tells you
+        exactly how many decisions it needs.</p>
     </li>
     <li>
       <h3>Post</h3>
@@ -116,62 +104,80 @@
   </ol>
 </section>
 
+<h2 id="review-time">How much review it needs</h2>
+{# The same three figures as /limits ("Review time"): PROOF.md (1.8), docs/eval-realworld.md
+   (5.6), docs/eval-handwriting.md (5.7). tests/test_landing_facts.py keeps them in step. #}
+<ul>
+  <li>Textbook sections: about 1.8 decisions a page (15 OpenStax sections, 242 pages).</li>
+  <li>Research papers made with LaTeX: about 5.6 decisions a page (15 arXiv papers, 71
+    pages).</li>
+  {% if image_pages_on %}<li>Handwritten notes: about 5.7 decisions a page (24 pages).</li>{% endif %}
+</ul>
+<p>These are averages from our tests. Your document's page gives the exact count after it is
+  converted.</p>
+
 <h2 id="download">What you download</h2>
 <ul>
-  <li>A web page: one .html file with the text, equations and pictures inside it. This is the
-    version to post.</li>
-  <li>The same document as {% if word_export %}Word (.docx) or {% endif %}EPUB, with the
-    equations kept as equations. “Download all” puts every finished document in one
-    file.</li>
-  <li>A zip for a Canvas page, and a Common Cartridge to import into Canvas, Blackboard, Moodle
-    or D2L. Neither has been tried in a live course yet.</li>
-  <li>A record of the review, to print or open as a CSV: what the tool proposed and what you
-    decided.</li>
+  <li>A web page to post in your course, with the text, equations and pictures inside it.</li>
+  <li>The same document as {% if word_export %}a Word file or {% endif %}an e-book (EPUB).</li>
+  <li>Packages to import into Canvas, Blackboard, Moodle or D2L (not yet tried in a live course).</li>
+  <li>A record of the review that you can print: what the tool proposed and what you decided.</li>
 </ul>
-<p>You can share a document with a colleague or a TA by email address. They can view it, or
-  help you review it.</p>
+<p>You can share a document with a colleague or a TA by email address, to view it or to help
+  you review it.</p>
 
 <h2 id="accuracy">How accurate it is</h2>
+{# The registered held-out test stays the headline (PROOF.md, via proof_facts), in plain words
+   here; /limits gives the same tiles with their technical names. The real-world numbers are
+   the registered held-out part of docs/eval-realworld.md (15 arXiv papers, 1,826 equations);
+   tests/test_landing_facts.py checks them against that file. #}
+{% set plain = {
+  "set_line": "Measured on 15 textbook sections the tool had never seen, in a test set up before it ran (October 2026, version 0.4.0).",
+  "of equations found": ["of equations found", "A general chatbot given the same PDFs also found 89%."],
+  "of equations exactly right, end to end": ["of equations exactly right, symbol for symbol", "A general chatbot got 62% on the same sections."],
+  "heading F1": ["score for headings, out of 1: found, and at the right level", "A general chatbot scored about the same."],
+  "of figure descriptions passed a model judge": ["of figure descriptions judged acceptable by a second AI model", "People have not checked them yet."],
+} %}
 {% include "_proof_strip.html" %}
-{# The registered held-out test stays the headline (PROOF.md, via proof_facts). The real-world
-   numbers are the registered held-out part of docs/eval-realworld.md (15 arXiv papers,
-   1,826 equations); tests/test_landing_facts.py checks them against that file. #}
-<p>It makes mistakes, so check the equations your students rely on. On equations it does not
-  yet beat a general chatbot given the same PDF: the tile above shows the gap. On 15 held-out
-  research papers typeset with LaTeX (1,826 equations) it wrote 58% exactly right, against 64%
-  for the chatbot, a difference that set is too small to detect. Its checks compare each
-  equation with the PDF's own text and ask you about the ones that disagree. They catch some
-  wrong equations, not all.</p>
-<p><a href="/limits#accuracy">All the results, with sample sizes and what they do not
-  show</a>.</p>
+<p>“Exactly right” means the whole equation matches the original symbol for symbol, so a
+  screen reader reads it as the author wrote it. The rest is why you review the equations the
+  tool flags.</p>
+<p><strong>On equations it does not yet beat a general chatbot.</strong> Given the same PDFs,
+  a chatbot (Claude) got 62% exactly right against its 50% on these textbook sections, and 64%
+  against its 58% on 15 research papers made with LaTeX (1,826 equations).</p>
+<p>Its checks compare each equation with the PDF's own text and flag the ones that disagree.
+  They catch some wrong equations, not all. <a href="/limits#accuracy">All the results, how they
+  were measured and what they do not show</a>.</p>
 
-<h2 id="try">Try it</h2>
+<h2 id="try">Sign in and convert a PDF</h2>
 {% if user %}
 <p><a class="button" href="/app">Go to my documents</a></p>
 {% else %}
+<p>{% include "_signin_line.html" %}</p>
 {% include "_signin.html" %}
 {% endif %}
 <p>Or <a href="/demo">look at an example conversion</a> first (no sign-in needed).</p>
 
 <h2>Questions</h2>
 <div class="faq">
-  <details>
+  <details id="who" open>
     <summary>Who can use it</summary>
     {% if signup_open %}
-    <p>ReadableSTEM is a free beta. Anyone with a Google account can sign in and try it{% if microsoft_login %},
-      and so can people with a Microsoft account from a university that is set up for it{% endif %}.
-      Signing in the first time makes your account. New accounts have daily limits:
-      {{ open_page_quota }} pages a day, and the service pauses for the day when its budget for
-      AI model calls is used up. The example conversion needs no sign-in. Upload only materials
-      you wrote or have the right to adapt.
-      Never upload student records or anything with students' personal information in it.</p>
+    <p>ReadableSTEM is a free beta. Anyone with a Google account can sign in and try it,
+      including a university Google account{% if microsoft_login %}, and so can people with a
+      Microsoft account from a university that is set up for it{% endif %}. Signing in the first
+      time makes your account. New accounts have daily limits: {{ open_page_quota }} pages a day,
+      and the service pauses for the day when its budget for AI model calls is used up. The
+      example conversion needs no sign-in. Upload only materials you wrote or have the right to
+      adapt. Never upload student records or anything with students' personal information in
+      it.</p>
     {% else %}
     <p>The beta is open to a small group of instructors, by invitation. Upload only materials
       you wrote or have the right to adapt. Never upload student records or anything with
       students' personal information in it.</p>
     {% endif %}
   </details>
-  <details>
+  <details id="documents" open>
     <summary>What happens to your documents</summary>
     <p>Your file and everything made from it are deleted {{ retention_hours }} hours after you
       last work on them, so finish the review and download within that time. You can choose to

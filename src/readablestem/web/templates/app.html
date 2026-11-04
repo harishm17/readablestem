@@ -19,7 +19,6 @@
   <p><a id="download-all" href="/app/download">Download all {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} (zip)</a></p>
   {% set download_all_url = "/app/download" %}{% include "_download_all_formats.html" %}
   {% endif %}
-  <p><a href="#upload-heading">Convert another PDF</a></p>
 </section>
 {% endif %}
 
@@ -119,8 +118,8 @@
           {% else %}
           <li>Up to {{ max_files }} files at once; each becomes its own document.</li>
           <li>Up to {{ max_pages }} pages and {{ max_upload_mb }} MB each. A bigger file, up to
-            {{ source_pages }} pages and {{ upload_limit_mb }} MB (all files together
-            {{ upload_limit_mb }} MB), is kept and you choose which pages to convert.</li>
+            {{ source_pages }} pages and {{ upload_limit_mb }} MB, is kept so you can choose
+            which pages to convert.</li>
           {% endif %}
           {% if office_kinds %}
           <li>Word (.docx){% if "pptx" in office_kinds %} and PowerPoint (.pptx){% endif %}
@@ -165,8 +164,9 @@
     {% if image_pages_offered|default(false) %}
     <div class="field checkbox-field image-pages-choice">
       <input type="checkbox" id="image_pages" name="image_pages" value="on" aria-describedby="image-pages-hint"{% if image_pages_default|default(false) %} checked{% endif %}>
-      <label for="image_pages">Convert scanned or handwritten pages (slower; every converted equation and table needs your check)</label>
-      <p class="hint" id="image-pages-hint">Without this, such pages are kept as pictures marked
+      <label for="image_pages">Convert scanned or handwritten pages</label>
+      <p class="hint" id="image-pages-hint">Slower, and you check every converted equation and
+        table. Without this, such pages are kept as pictures marked
         “Not converted”, and a PDF that is only scans or handwriting is refused. With it, each
         page is read from its picture, and the original page stays in the file for checking. A
         tool can misread handwriting and small symbols: you decide each equation and table
@@ -180,17 +180,19 @@
     <fieldset class="field retention-choices">
       <legend>How long to keep my document</legend>
       <p class="hint" id="keep-hint">If you tick neither box, your document, results and
-        decisions are deleted {{ retention_hours }} hours after you last worked on them.
+        decisions are deleted {{ retention_hours }} hours after you last work on them.
         We do not use your uploads to train models.</p>
       <div class="field checkbox-field">
-        <input type="checkbox" id="keep" name="keep" value="on" aria-describedby="keep-hint">
-        <label for="keep">Keep for 7 days, only I can see it</label>
+        <input type="checkbox" id="keep" name="keep" value="on" aria-describedby="keep-hint keep-who">
+        <label for="keep">Keep it for 7 days after I last work on it</label>
+        <p class="hint" id="keep-who">Only you, and anyone you share it with, can see it.</p>
       </div>
       <div class="field checkbox-field">
         <input type="checkbox" id="share" name="share" value="on" aria-describedby="share-hint">
         <label for="share">Also let us look at the results ({{ opt_in_days }} days)</label>
         <p class="hint" id="share-hint">We may look at the results to find and fix mistakes in
-          the tool. Your document and results are then kept {{ opt_in_days }} days.</p>
+          the tool. Your document is then kept {{ opt_in_days }} days from upload, whichever
+          box you ticked.</p>
       </div>
     </fieldset>
     <p id="upload-status" class="upload-status" role="status"></p>

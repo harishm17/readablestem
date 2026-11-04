@@ -111,8 +111,8 @@ def test_the_landing_page_says_what_review_costs_from_the_settings(tmp_path):
     with env.running() as client:
         text = flat(client.get("/").text)
         limits = flat(client.get("/limits").text)
-    assert "about 1.8 decisions per page" in text
-    assert "real course PDFs may need more" in text
+    assert "about 1.8 decisions a page" in text
+    assert "its page tells you exactly how many decisions it needs" in text
     assert "Upload up to 30 pages at a time" in text  # max_pages_per_job, not written in
     assert "New accounts have daily limits: 17 pages a day" in text
     assert "deleted 24 hours after you last work on them" in text
@@ -124,10 +124,10 @@ def test_the_landing_page_lists_only_the_features_this_server_has_on(tmp_path):
     off = WebEnv(tmp_path / "off")
     with off.running() as client:
         plain = flat(client.get("/").text)
-    assert "Scanned and handwritten pages, when you tick a box" not in plain
-    assert "Tables, rebuilt as real tables" not in plain
-    assert "longer description for a chart" not in plain
-    assert "Your course's notation" not in plain
+    assert "Scanned and handwritten pages, when you ask" not in plain
+    assert "Tables, rebuilt with proper header cells" not in plain
+    assert "longer ones for charts and diagrams" not in plain
+    assert "Your course's own notation" not in plain
     on = WebEnv(
         tmp_path / "on",
         feature_tables=True,
@@ -137,10 +137,11 @@ def test_the_landing_page_lists_only_the_features_this_server_has_on(tmp_path):
     )
     with on.running() as client:
         full = flat(client.get("/").text)
-    assert "Scanned and handwritten pages, when you tick a box at upload" in full
-    assert "Tables, rebuilt as real tables with header cells" in full
-    assert "a longer description for a chart or a diagram" in full
-    assert "Your course's notation" in full
+    assert "Scanned and handwritten pages, when you ask for them" in full
+    assert "Handwritten notes: about 5.7 decisions a page" in full
+    assert "Tables, rebuilt with proper header cells" in full
+    assert "longer ones for charts and diagrams" in full
+    assert "Your course's own notation" in full
 
 
 def test_the_quota_is_read_from_the_settings_not_written_in_the_page(tmp_path):
@@ -155,12 +156,12 @@ def test_an_invite_only_landing_page_does_not_quote_a_new_accounts_quota(tmp_pat
     env = WebEnv(tmp_path, signup_mode="allowlist", open_tier_daily_page_quota=17)
     with env.running() as client:
         text = flat(client.get("/").text)
-    assert "New accounts have daily limits" not in text and "about 1.8 decisions per page" in text
+    assert "New accounts have daily limits" not in text and "about 1.8 decisions a page" in text
 
 
 def test_the_numbers_are_the_ones_the_limits_page_gives(env):
     assert "about 1.8 per page" in flat(env.get("/limits").text)
-    assert "about 1.8 decisions per page" in flat(env.get("/").text)
+    assert "about 1.8 decisions a page" in flat(env.get("/").text)
 
 
 # --------------------------------------------------------------------------- revised version

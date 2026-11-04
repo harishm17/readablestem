@@ -145,7 +145,9 @@ def test_the_option_is_a_labelled_unchecked_checkbox_with_its_explanation(browse
     box = page.get_by_label(OFFER)
     assert box.count() == 1 and not box.is_checked()
     label = page.locator("label[for=image_pages]").inner_text()
-    assert "slower" in label and "every converted equation and table needs your check" in label
+    assert label.strip() == OFFER  # short; the cost is the first thing the hint says
+    hint = " ".join(page.locator("#image-pages-hint").inner_text().split())
+    assert hint.startswith("Slower, and you check every converted equation and table.")
     assert "does nothing for a PDF that has no scanned or handwritten pages" in " ".join(
         page.locator("#image-pages-hint").inner_text().split()
     )

@@ -93,7 +93,7 @@ def test_the_keep_checkboxes_are_off_by_default(web):
         assert f'id="{box}"' in page
         checkbox = page[page.index(f'id="{box}"') - 60 : page.index(f'id="{box}"') + 120]
         assert "checked" not in checkbox
-    assert "Keep for 7 days, only I can see it" in page
+    assert "Keep it for 7 days after I last work on it" in page
     assert "Also let us look at the results (30 days)" in page
 
 

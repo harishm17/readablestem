@@ -120,6 +120,9 @@ def walk(page, site, job: str, check) -> None:
     page.goto(f"{url}?accepted=1")
     check("accepted shown")
     page.goto(url)
+    page.locator("details.edit-box:has(#latex-p1-e2)").evaluate(
+        "d => { d.open = true; }"
+    )  # closed by default
     page.get_by_label("LaTeX for equation 1").fill(r"\notacommand{x}")
     page.get_by_role("button", name="Save edit to equation 1").click()
     page.locator(".error-summary").wait_for()
@@ -329,6 +332,9 @@ def test_typing_a_fix_then_pressing_accept_keeps_the_fix_without_javascript(site
     context, page = open_page(browser, site, javascript=False)
     url = f"{site.base}/jobs/{job}/review"
     page.goto(url)
+    page.locator("details.edit-box:has(#latex-p1-e2)").evaluate(
+        "d => { d.open = true; }"
+    )  # closed by default
     field = page.get_by_label("LaTeX for equation 1")
     field.fill(r"\boldsymbol{\omega}")
     page.get_by_role("button", name="Accept anyway equation 1").click()
@@ -452,7 +458,10 @@ def test_keyboard_shortcuts_are_opt_in_and_never_fire_while_typing(site, browser
     assert page.url == url  # off by default
     page.locator("#shortcuts summary").click()
     page.get_by_label("Use keyboard shortcuts on this screen").check()
-    field = page.get_by_label("LaTeX for equation 1")  # open: the meaning changes
+    page.locator("details.edit-box:has(#latex-p1-e2)").evaluate(
+        "d => { d.open = true; }"
+    )  # closed by default
+    field = page.get_by_label("LaTeX for equation 1")
     field.focus()
     page.keyboard.type("n a p")
     assert page.url == url and "n a p" in field.input_value()

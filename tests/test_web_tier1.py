@@ -98,7 +98,7 @@ def retain_in(env) -> timedelta:
 def test_the_upload_form_has_two_separate_choices_both_off(ux):
     html = ux.browser.get("/app").text
     for box, label in (
-        ("keep", "Keep for 7 days, only I can see it"),
+        ("keep", "Keep it for 7 days after I last work on it"),
         ("share", "Also let us look at the results (30 days)"),
     ):
         assert f'id="{box}"' in html and f'name="{box}"' in html

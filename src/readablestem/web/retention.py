@@ -3,7 +3,7 @@
 Three choices on the upload form, stored as `Job.retention_mode`:
 
 - `day`: nothing ticked. Deleted `RETENTION_HOURS` (24) after the last activity.
-- `week`: "Keep for 7 days, only I can see it". Deleted 7 days after the last activity;
+- `week`: "Keep it for 7 days after I last work on it". Deleted 7 days after the last activity;
   nobody else looks at it.
 - `dev`: "Also let us look at the results (30 days)". Kept 30 days from upload, and the
   developer may look at the results to find and fix mistakes in the tool
