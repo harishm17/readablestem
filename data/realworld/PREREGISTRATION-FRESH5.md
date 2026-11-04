@@ -12,10 +12,11 @@ any arm. It follows `PREREGISTRATION-FRESH4.md` (used). What the set is and how 
 
 On documents that no earlier run, tuning step or registration has seen (arXiv papers, OpenStax
 sections and course-style LaTeX including Beamer decks), does the candidate write more equations
-exactly right than the Opus chatbot recipe, with fewer wrong equations that nobody is asked about?
+right (as a screen-reader user hears them, section 4) than the Opus chatbot recipe, with fewer
+wrong equations that nobody is asked about?
 The candidate is ReadableSTEM with the equation changes built since fresh4; the control is ReadableSTEM
 as it runs in production today. The set can detect a difference of about 3 points of
-`exact_lenient` (per-unit SD 0.048 from fresh4, 26 units, 80% power, alpha 0.025 with two comparisons);
+the primary (the per-unit SD of 0.048 was measured on fresh4's `exact_lenient`; 26 units, 80% power, alpha 0.025 with two comparisons);
 a smaller one is not claimed either way. Stratum D (OpenStax chemistry, section 2 D) is outside that count and
 is judged on its own chemistry measure (section 5, stratum D).
 
@@ -184,17 +185,36 @@ first; their output is not read until both ReadableSTEM arms are recorded.
 ## 4. Metrics
 
 Per unit, by the document task's scorer (`eval/pipeline_eval.document_page_item`; the chatbots' output by
-`proof/systems.equation_item`), over every gold equation, aligner and `exact_lenient` unchanged, reading B
-(each formula in a rebuilt table's cells counts as one inline equation).
+`proof/systems.equation_item`), over every gold equation, aligner unchanged, reading B (each formula in a
+rebuilt table's cells counts as one inline equation).
 
-- **Primary: `exact_lenient`, end to end, reading B, pooled over units.**
-- **Silent errors:** wrong equations nobody is asked about, per 100 gold.
+- **Primary: spoken-equal, end to end, reading B, pooled over units.** An aligned equation counts as right when
+  its tree equals the gold's (`exact_lenient`) or when the speech rules say the prediction and the gold in the
+  same words (`scripts/rw_spoken.py`, run as `realworld_report.py --spoken`; the speech is
+  `pipeline.speech.mathml_to_speech` with no course readings, and both sides are written one way for prints that
+  look alike by `pipeline/math_canonical.py`: `repair_converter_gaps` and `speakable_latex`). The same scorer,
+  aligner and gold apply to every arm. Reason, the owner's: the product is for people who read mathematics
+  through a screen reader, so the score that matters is what such a reader hears, and two spellings that sound
+  and print alike are not an error. `exact_lenient` is reported beside it as a secondary.
+- **Silent errors:** wrong equations nobody is asked about, per 100 gold, under the primary.
 - **Flag recall:** of the aligned equations whose symbols are wrong, the share that were required decisions;
   and required decisions per page.
 - **Unseen loss:** silent wrong equations plus undetected ones, per 100 gold.
 - **Cost per page** from the recorded usage.
-- Secondary, reported and not the verdict: notation-neutral (`scripts/rw_notation_neutral.py`), spoken-equal,
+- Secondary, reported and not the verdict: `exact_lenient`, notation-neutral (`scripts/rw_notation_neutral.py`),
   symbols credited, each per stratum and for display, inline and table maths, and invented equations.
+
+The spoken scorer is fixed before signing: `scripts/rw_spoken.py`, `pipeline/math_canonical.py` and the speech
+files it asks (`pipeline/speech.py`, `speech_chem.py`, `speech_nuclides.py`, `speech_units.py`) are hashed with
+this registration (`FRESH5_FILES` in `scripts/realworld_register.py`), with `gold/arxiv_gold.py`, the gold's
+converter step. The fix is measured on the development papers
+(`docs/eval-realworld.md`, "The spoken-equal scorer"): 68 of 71 equations that print as the gold does but were
+spoken differently became equal, every arm's score moved by about 3 points, and no pair that prints differently became equal.
+The scorer's converter (`equation_step.clean_latex`, `validate.safe_latex_to_mathml` and the modules that shape
+its MathML: `core/latex_groups.py`, `core/mathchars.py`, `pipeline/chem.py`, `chem_mathml.py`,
+`mathml_shape.py`, and the speech helpers `core/mathml_intent.py`, `core/notation.py`, `eval/equations.py`) is
+the one at the signed candidate commit and is hashed with the rest, so gold and every arm are converted and
+spoken by the same code. Neither the scorer, the converter nor the speech rules change after the first request.
 
 ## 5. Analysis and success criteria
 
