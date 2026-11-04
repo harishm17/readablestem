@@ -1036,7 +1036,6 @@ input[type="number"].input-short { width: 6rem; }
   .sheet, .reading dd, .three-steps li { border-color: CanvasText; }
   .sheet { forced-color-adjust: none; }
 }
-||||||| d8e5e99c
 
 /* Review choices: the primary action is filled; "Accept anyway" (the proposal changes the
    meaning) is cautioned in the warning colours, and the option that keeps the original
