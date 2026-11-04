@@ -151,6 +151,7 @@ def current(page) -> str:
 def test_play_pause_next_and_stop_work_with_a_stubbed_voice(site, browser, job):
     context, page = open_listen(browser, site, f"/jobs/{job}/listen")
     page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
     play, pause = page.get_by_role("button", name="Play"), page.get_by_role("button", name="Pause")
     stop = page.get_by_role("button", name="Stop")
     assert pause.is_disabled() and stop.is_disabled()
@@ -200,6 +201,7 @@ def test_the_whole_transcript_plays_through_to_the_end(site, browser, job):
         browser, site, f"/jobs/{job}/listen", init="window.__auto = true;\n" + STUB, bypass_csp=True
     )
     page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
     page.get_by_role("button", name="Play").click()
     page.wait_for_function("window.__spoken.length >= 5", timeout=5000)
     items = page.locator("[data-listen-item]").count()
@@ -214,6 +216,7 @@ def test_the_whole_transcript_plays_through_to_the_end(site, browser, job):
 def test_speed_and_voice_are_used(site, browser, job):
     context, page = open_listen(browser, site, f"/jobs/{job}/listen")
     page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
     page.get_by_label("Speed").select_option("1.5")
     page.get_by_role("button", name="Play").click()
     assert page.evaluate("window.__spoken.at(-1).rate") == 1.5
@@ -225,6 +228,7 @@ def test_speed_and_voice_are_used(site, browser, job):
 def test_keyboard_shortcuts_work_inside_the_page_and_ignore_modifiers(site, browser, job):
     context, page = open_listen(browser, site, f"/jobs/{job}/listen")
     page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
     page.get_by_role("button", name="Play").focus()
     page.keyboard.press("h")
     assert spoken(page)[-1] == "Heading level 1: Kinematics"
@@ -249,6 +253,7 @@ def test_a_screen_reader_user_is_not_interrupted(site, browser, job):
     is a polite live region (not assertive, not one line per item)."""
     context, page = open_listen(browser, site, f"/jobs/{job}/listen")
     page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
     assert spoken(page) == []
     assert page.locator("[data-listen-status]").get_attribute("role") == "status"
     page.get_by_role("button", name="Play").click()
@@ -263,6 +268,7 @@ def test_scrolling_follows_prefers_reduced_motion(site, browser, job):
     for reduce, expected in (("reduce", "auto"), ("no-preference", "smooth")):
         context, page = open_listen(browser, site, f"/jobs/{job}/listen", reduced_motion=reduce)
         page.wait_for_selector("[data-listen-controls]:not([hidden])")
+        page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
         page.get_by_role("button", name="Play").click()
         assert page.evaluate("window.__scrolls.at(-1).behavior") == expected
         context.close()
@@ -271,6 +277,7 @@ def test_scrolling_follows_prefers_reduced_motion(site, browser, job):
 def test_online_voices_alone_need_an_explicit_choice(site, browser, job):
     context, page = open_listen(browser, site, f"/jobs/{job}/listen", init=ONLINE_ONLY + STUB)
     page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
     note = page.locator("[data-listen-voice-note]")
     assert "only online voices" in note.inner_text()
     assert page.get_by_role("button", name="Play").is_disabled()
@@ -288,6 +295,7 @@ def test_with_no_voice_at_all_the_menu_goes_and_a_line_says_why(site, browser, j
         browser, site, f"/jobs/{job}/listen", init="window.__voices = [];\n" + STUB
     )
     page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
     page.wait_for_timeout(1500)  # the page waits a moment for voices to turn up
     assert page.locator("[data-listen-voice-field]").is_hidden()
     assert "No voice on this device" in page.locator("[data-listen-voice-note]").inner_text()
@@ -369,6 +377,7 @@ def test_the_landing_hero_plays_both_readings(site, browser):
 def test_the_demo_listen_page_is_public_and_plays(site, browser):
     context, page = open_listen(browser, site, "/demo/listen", signed_in=False)
     page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
     page.get_by_role("button", name="Next equation").click()
     assert spoken(page)[-1].startswith("Graphs in this text have perpendicular axes")
     assert "y equals m x plus b" in current(page)
@@ -402,3 +411,39 @@ def test_the_pages_pass_axe(site, browser, job, axe_source, where, viewport):
     violations = [v for v in results["violations"] if v["impact"] in STRICT]
     context.close()
     assert not violations, describe(violations)
+
+
+def test_the_transport_stays_in_view_while_the_page_scrolls(site, browser, job):
+    context, page = open_listen(browser, site, f"/jobs/{job}/listen")
+    page.wait_for_selector("[data-listen-transport]:not([hidden])")
+    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    box = page.locator("[data-listen-transport]").bounding_box()
+    assert box is not None and 0 <= box["y"] < 40 and box["y"] + box["height"] <= 300
+    assert page.get_by_role("button", name="Pause").is_visible()
+    context.close()
+
+
+def test_follow_along_is_on_by_default_can_be_turned_off_and_is_remembered(site, browser, job):
+    context, page = open_listen(
+        browser, site, f"/jobs/{job}/listen", init="window.__auto = true;\n" + STUB, bypass_csp=True
+    )
+    page.wait_for_selector("[data-listen-transport]:not([hidden])")
+    follow = page.get_by_label("Follow along")
+    assert follow.is_checked()
+    follow.uncheck()
+    page.get_by_role("button", name="Play").click()
+    page.wait_for_function("window.__spoken.length >= 3", timeout=5000)
+    assert page.evaluate("window.scrollY") == 0  # it did not scroll after the speech
+    page.reload()
+    page.wait_for_selector("[data-listen-transport]:not([hidden])")
+    assert not page.get_by_label("Follow along").is_checked()
+    context.close()
+
+
+def test_start_at_the_lesson_skips_the_title_and_notices(site, browser, job):
+    context, page = open_listen(browser, site, f"/jobs/{job}/listen")
+    page.wait_for_selector("[data-listen-transport]:not([hidden])")
+    page.get_by_role("button", name="Start at the lesson").click()
+    first = page.evaluate("window.__spoken[0].text")
+    assert first and not first.lower().startswith(("title", "language"))
+    context.close()

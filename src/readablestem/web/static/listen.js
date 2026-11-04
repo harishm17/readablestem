@@ -142,6 +142,7 @@
 
   function initPlayer(root) {
     var controls = root.querySelector("[data-listen-controls]");
+    var transport = root.querySelector("[data-listen-transport]");
     var list = root.querySelector("[data-listen-transcript]");
     var status = root.querySelector("[data-listen-status]");
     var position = root.querySelector("[data-listen-position]");
@@ -149,7 +150,7 @@
     var voiceSelect = root.querySelector("[data-listen-voice]");
     var rateSelect = root.querySelector("[data-listen-rate]");
     var voiceField = root.querySelector("[data-listen-voice-field]");
-    if (!controls || !list) return;
+    if (!controls || !transport || !list) return;
     if (!supported) {
       // The transcript stays as it is; say so once, where the controls would have been.
       var plain = root.querySelector("[data-listen-unsupported]");
@@ -158,9 +159,30 @@
     }
     var items = Array.prototype.slice.call(list.querySelectorAll("[data-listen-item]"));
     var button = {};
-    ["play", "pause", "stop", "prev", "next", "heading", "equation"].forEach(function (name) {
-      button[name] = controls.querySelector('[data-listen="' + name + '"]');
+    ["play", "pause", "stop", "prev", "next", "heading", "equation", "lesson"].forEach(function (name) {
+      button[name] = transport.querySelector('[data-listen="' + name + '"]');
     });
+
+    // "Follow along": the transcript scrolls to the item being spoken. On by default (the person
+    // can turn it off, and the choice is kept in this browser); with prefers-reduced-motion
+    // the scroll is a jump, not an animation.
+    var follow = root.querySelector("[data-listen-follow]");
+    var FOLLOW_KEY = "readablestem.listen.follow";
+    if (follow) {
+      try {
+        if (window.localStorage.getItem(FOLLOW_KEY) === "off") follow.checked = false;
+      } catch (e) {
+        /* storage blocked: the default stays */
+      }
+      follow.addEventListener("change", function () {
+        try {
+          window.localStorage.setItem(FOLLOW_KEY, follow.checked ? "on" : "off");
+        } catch (e) {
+          /* not kept */
+        }
+        say(status, follow.checked ? "Following along." : "Not following along.");
+      });
+    }
 
     var state = "idle"; // idle, playing, paused
     var index = -1;
@@ -199,8 +221,8 @@
       enable(button.play, ready() && state !== "playing");
       enable(button.pause, state === "playing");
       enable(button.stop, state !== "idle");
-      ["prev", "next", "heading", "equation"].forEach(function (name) {
-        button[name].disabled = !ready();
+      ["prev", "next", "heading", "equation", "lesson"].forEach(function (name) {
+        if (button[name]) button[name].disabled = !ready();
       });
       position.textContent = index >= 0 ? "Item " + (index + 1) + " of " + items.length : "";
     }
@@ -214,6 +236,7 @@
       var el = items[i];
       el.classList.add("is-current");
       el.setAttribute("aria-current", "true");
+      if (follow && !follow.checked) return;
       el.scrollIntoView({
         block: "center",
         behavior: motion && motion.matches ? "auto" : "smooth",
@@ -329,6 +352,26 @@
     button.next.addEventListener("click", function () { step(1); });
     button.heading.addEventListener("click", function () { jump("heading", "Heading"); });
     button.equation.addEventListener("click", function () { jump("equation", "Equation"); });
+    if (button.lesson) {
+      // Skip the title, language, the page's notices and licence: start at the main content.
+      button.lesson.addEventListener("click", function () {
+        var at = -1;
+        items.forEach(function (el, i) {
+          var role = el.querySelector(".listen-role");
+          if (at < 0 && role && /^Main landmark/.test(role.textContent.trim())) at = i;
+        });
+        if (at < 0) {
+          items.forEach(function (el, i) {
+            if (at < 0 && (el.getAttribute("data-kinds") || "").split(" ")[0] === "heading") at = i;
+          });
+        }
+        if (at < 0) return say(status, "No separate lesson start was found.");
+        var keep = state !== "idle";
+        state = "playing";
+        speakItem(at, true);
+        say(status, "Starting at the lesson, item " + (at + 1) + " of " + items.length + ".");
+      });
+    }
 
     rateSelect.addEventListener("change", function () {
       rate = parseFloat(rateSelect.value) || 1;
@@ -424,6 +467,7 @@
     window.addEventListener("pagehide", function () { synth.cancel(); });
 
     controls.hidden = false;
+    transport.hidden = false;
     rateSelect.value = "1";
     paint();
     whenVoices(fill);

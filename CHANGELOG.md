@@ -26,6 +26,15 @@
   (new message: "The server is busy right now ... Try again in a few minutes, or upload the
   PDF instead."); running a written file through the dynamic loader is documented as a
   residual (the loader's execute right cannot be withheld).
+## Unreleased: review round fixes (branch ux/review-round-fixes)
+
+- Bulk accept: the button that accepts comes after the list of originals and proposals, which now asks you to compare each proposal with the image of the original; Cancel and Undo are unchanged.
+- Review split: on a wide screen the row of choices (Accept, Keep as image) sticks to the bottom of the window while the decision is longer than the window; on a phone the page has a "Back to the decision" link and says it scrolls sideways, with edge shadows where more of it is. The toolbar above the page image is `.page-bar` (it shared `.page-tools` with the "Change page" disclosure).
+- "Hear this" on an equation with no usable stored reading speaks it from its MathML, as the transcript does.
+- Review list: with more than three waiting in a group each is a compact row (what it is, page, status); one editor is open at a time when a row is opened by hand; the first, and any just worked on, starts open.
+- Symbols: beside "Change all" a line says how many places it changes and how many are left as they are, and follows the places ticked to be left out.
+- Listening: a compact transport (Play, Pause, Stop, previous and next, next heading and equation, Start at the lesson, Follow along) stays in view while the transcript scrolls; Follow along is on by default, is remembered in the browser and scrolls without animation under reduced motion; speed, voice and shortcuts are in a disclosure; a "Skip to the lesson" link works without scripts. Start at the lesson skips the title, language, notices and licence.
+- Code: `controls.css` holds the buttons for the app, the listening player and the showcase (listen.css no longer repeats them); spacing and type sizes in `app.css` are on the tokens; the unavailable sans weight 600 is 700.
 
 ## Unreleased: equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
 
