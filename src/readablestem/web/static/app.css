@@ -1296,8 +1296,6 @@ a.finding-action { display: inline-flex; align-items: center; min-height: 2.25re
 .symbols-example-card p { margin: 0 0 var(--space-1); }
 .symbols-example-name { font-weight: 700; }
 /* ==== end ux2-lane-b ======================================================================= */
-||||||| d585276e
-||||||| 65140fdf
 
 /* ==== ux2-lane-c: confirmations, account, sharing, courses, page picking, batch ===========
    Everything below belongs to the second UX round, lane C. Same tokens, no new colours.
