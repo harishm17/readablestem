@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: spoken-equal scorer reads one print as one speech (branch eval/spoken-scorer-fix)
+
+- Evaluation only; the product's speech and `math_canonical.compare` are unchanged. The spoken-equal scorer
+  (`scripts/rw_spoken.py`) spoke 71 of the 2,350 development gold equations differently from a reading that
+  prints the same (`\mathrm{in}` against `\text{in}`, gold `\textbf` without its bold, `\min` against
+  `\text{min}`, `\bigl(`, `...`, `\backslash`, scripts and accents). `math_canonical.repair_converter_gaps`
+  and `speakable_latex` now write each print one way on both sides for every arm; a pair right before stays
+  right. 68 of the 71 became equal; ReadableSTEM base-0508 on development 0.792 to 0.820, Opus 0.728 to 0.755,
+  Haiku 0.723 to 0.749 (`docs/eval-realworld.md`). Guard tests: `tests/test_math_canonical_spoken.py`.
+- `PREREGISTRATION-FRESH5.md` section 4: the primary is spoken-equal, `exact_lenient` a secondary. The scorer,
+  its folding and the speech files are in `FRESH5_FILES`, to be hashed at signing.
+
 ## Unreleased: equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
 
 - Pipeline 0.5.8. arXiv PDFs built by arXiv's own `tex2pdf` ("arXiv GenPDF (tex2pdf:...)") and VTeX

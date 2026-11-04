@@ -484,6 +484,44 @@ against 300 and 5); the draft registration records why. At most 2 documents per 
 The licence of a repository does not cover
 third-party material inside a document (figures, quotations); the gold holds equations only.
 
+## The spoken-equal scorer, fixed so that one print is one speech
+
+`scripts/rw_spoken.py` (`--spoken` on `realworld_report.py`) is the primary score of the fifth fresh split: an
+aligned equation is right when its tree matches the gold's (`exact_lenient`) or when the speech rules say it in
+the same words. Applied to the 25 development papers, it spoke 71 of the 2,350 gold equations differently from
+a reading that prints identically: `\mathrm{in}` spelled letter by letter against `\text{in}` read as a word,
+gold `\textbf{R}` read without its bold (the converter drops it), `\min` "minimum" against `\text{min}` "min",
+`\bigl(` not converted, `...` read as periods, `\backslash` against `\setminus`, a double script, a prime after
+a subscript, an accent order. They were a property of the scorer, not of any arm.
+
+The repair is two functions in `pipeline/math_canonical.py`, applied to both sides of every pair for every arm:
+`repair_converter_gaps` (sized delimiters dropped, `\textbf` and `{\bf }` written `\mathbf`: the converter
+reads those wrongly) and `speakable_latex` (each print written one way: upright words as `\text`, operator
+names as `\text` unless a script follows them, ellipses, `\backslash`, a script on a script, primes, an accent
+order, `\text{$1$r}`, a row gap). A pair is right when it is spoken alike as written (with the repair) or after
+the fold, so a pair right before stays right. A fold never joins two different prints: `\min_x` keeps its
+script (set under the word in display style), `\mathrm{x_1}` is not text, a raised `*` is not `*`, `'` is not
+`''`. `tests/test_math_canonical_spoken.py` holds same-print pairs that must become equal and different-print
+pairs, among them recorded wrong readings, that must not. `compare` and the product's speech are unchanged.
+
+Result on development (reading B, `--rescore-chat`, 25 papers, 2,350 gold; 68 of the 71 became equal, and
+no pair that was right became wrong; the same papers, the same answers, only the scorer changed):
+
+| spoken-equal | before | after |
+|---|---|---|
+| ReadableSTEM (base-0508) | 0.792 [0.733, 0.839] | 0.820 [0.761, 0.866] |
+| Chatbot, Opus | 0.728 [0.633, 0.808] | 0.755 [0.656, 0.836] |
+| Chatbot, Haiku | 0.723 [0.655, 0.782] | 0.749 [0.683, 0.806] |
+| ReadableSTEM minus Opus (paired, 25 papers) | +0.063 [-0.006, +0.146] | +0.065 [-0.003, +0.149] |
+| ReadableSTEM minus Haiku | +0.069 [+0.021, +0.121] | +0.072 [+0.028, +0.121] |
+
+Three stay apart, for the reason in each: a gold typo with unbalanced brackets, a gold `^{*}` against our
+baseline `*`, and a gold `u_\theta '^2` the converter reads as a different structure. The same pass over the
+recorded fresh2-4 and held-out scores made 444 more aligned pairs equal (counted per arm and run; every one the same print, reviewed against
+a normaliser) and none unequal. Reports committed before this change used the as-written reading;
+rerun them with `--spoken` to compare. Intervals are 95% cluster bootstraps over papers; they say nothing
+about papers other than these 25.
+
 ## What it does not say
 
 The registered difference is not significant, and one run per arm gives no run-to-run noise. The papers are 15 (and 25) of ten fields,

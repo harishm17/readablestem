@@ -35,6 +35,13 @@ FRESH5_FILES = (  # hashed when the owner signs PREREGISTRATION-FRESH5.md, not b
     "../../src/readablestem/pipeline/math_canonical.py",
     "../../src/readablestem/gold/arxiv_gold.py",
     "../../scripts/rw_notation_neutral.py",
+    # the primary score (spoken-equal, section 4): the scorer, its LaTeX folding and the speech
+    # rules it asks (the gold's own converter step is `gold/arxiv_gold.py`, above)
+    "../../scripts/rw_spoken.py",
+    "../../src/readablestem/pipeline/speech.py",
+    "../../src/readablestem/pipeline/speech_chem.py",
+    "../../src/readablestem/pipeline/speech_nuclides.py",
+    "../../src/readablestem/pipeline/speech_units.py",
 )
 FRESH4_FILES = (
     "PREREGISTRATION-FRESH4.md",
