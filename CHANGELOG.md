@@ -11,6 +11,51 @@
   declared on `web` in `.railway/railway.ts`; CI builds once with the argument and checks the
   versions and the policy. Docs: docs/deploy-railway.md, "LaTeXML"; THIRD_PARTY_NOTICES.md.
   Tests: `tests/test_latexml_image.py`.
+## Unreleased: sandbox probe (branch latex/x0-sandbox-probe)
+
+- `readablestem ops sandbox-probe`: checks on the running image that the sandbox for uploaded TeX
+  works (bubblewrap, user namespaces, no network, empty environment, hidden `/proc/1/environ`,
+  memory, wall-clock and output caps), times a tiny LaTeXML run when LaTeXML is installed, reports
+  the kernel's seccomp mode, Landlock ABI and same-UID `/proc/<pid>/environ` readability, and
+  prints PASS or FAIL (exit 1). Nothing it prints is document content. Docs: docs/operations.md,
+  "Sandbox probe"; docs/security.md, "Running uploaded TeX".
+- The sandbox joins its cgroup before bubblewrap starts (a wrapper, not a move afterwards, so no child escapes it),
+  and without a cgroup the total is bounded by arithmetic: LaTeXML gets 4 tasks (it needs 3) and 512 MB of address
+  space each (`source.latexml.LIMITS`), one source conversion runs at a time on the machine (`sandbox.exclusive`),
+  and `ops sandbox-probe` prints `sandbox_total_bound_mb` and fails `--require-latexml` over
+  `SOURCE_SANDBOX_MAX_TOTAL_MB` (2048). The upload comment now assumes a 2 GB web service.
+- The sandbox also caps tasks and open files (`prlimit --nproc --nofile`), puts a seccomp filter in front of the
+  program (`core/seccomp.py`, built without libseccomp), counts the program's own output against the output budget,
+  and uses a cgroup v2 memory and pids limit for the whole group when the container allows one; the probe reports
+  `sandbox_task_cap`, `sandbox_file_cap`, `sandbox_seccomp` and `sandbox_cgroup`. docs/security.md says what is
+  capped per process and what in total.
+- New `core/sandbox.py` (the bubblewrap runner the probe tests and a later LaTeX upload uses) and
+  `source/latexml.py` (the `latexml` and `latexmlpost` calls). Nothing in the app calls them yet.
+  Tests: `tests/test_sandbox.py`, `tests/test_ops_sandbox_probe.py`.
+## Unreleased: higher upload limits (branch limits/raise-upload-limits)
+
+- The limits now fit together. Before, a new account could convert 20 pages a day while one upload
+  could hold 30. Defaults: `MAX_PAGES_PER_JOB` 30 to 100, `MAX_UPLOAD_MB` 20 to 50,
+  `MAX_LARGE_UPLOAD_MB` 30 to 100 (also the most one upload request carries, files together),
+  `MAX_SOURCE_PAGES` 300 to 500, `OPEN_TIER_DAILY_PAGE_QUOTA` 20 to 150, `MAX_USD_PER_JOB` 2.00 (OpenAI)
+  and 3.00 (Claude) to 6.00 for both, `MAX_MODEL_CALLS_PER_JOB` 400 to 1200 (our densest 100-page test
+  document makes 652 calls). Not changed: `DAILY_SPEND_CAP_USD`, `OPEN_TIER_DAILY_SPEND_CAP_USD`,
+  `IMAGE_PAGES_*` caps, `CONVERSION_MEMORY_MB` and the job time limit (a 100-page document converts well
+  inside both: 31 s and 494 MB resident with fake models on one CPU, 193 s with 2 s of simulated model
+  latency a call; with 51 MB of pictures 44 s and 745 MB; docs/web.md, "The conversion runs in a child
+  process"). Production environment values (`PER_USER_DAILY_PAGE_QUOTA`, `OPEN_TIER_DAILY_PAGE_QUOTA`,
+  `MAX_USD_PER_JOB`) are set at deploy, not in code: a `MAX_USD_PER_JOB` of 4.70 set for tables is now
+  below the $5.71 that 100 pages need (docs/deploy.md, "Spend limits").
+- Stored-bytes caps, because uploads are in Postgres on a 5000 MB volume and one person could now store 2.2 GB: `STORAGE_PER_USER_MB` (300) and `STORAGE_OPEN_TIER_MB` (250) per person, counted with the quota checks in the job's transaction; `STORAGE_GLOBAL_MAX_MB` (2000, not 3000: the nightly backup check restores a second copy on the same volume) for the service, which turns uploads away with a 503 and puts `storage` in `/healthz/ops`. The hourly cron runs a plain `VACUUM` of the upload tables after a purge. The limits page names the cap. Declared in `.railway/railway.ts` (`webOnlyVariables`).
+- `ops launch-check` and the start-up check gain two warnings: an open-tier daily quota under one
+  full-size document, and `IMAGE_PAGES_MAX_USD_PER_JOB` under `MAX_USD_PER_JOB`.
+- Word and PowerPoint files: the ZIP checks scale with the upload limit (500 MB unpacked, 250 MB an
+  entry; were 200 and 100). A 100-page Word file became a PDF in 1.4 s here (PowerPoint could not be timed:
+  Impress is not installed on the box).
+- The parts page and its error message use `1-10` as the example range instead of `1-30`, which read
+  as a limit. docs/web.md, docs/deploy.md, docs/deploy-railway.md (the service should be allowed 2 GB; a 95
+  MB upload to confirm after the deploy), docs/security.md, docs/operations.md (how much the uploads
+  weigh in the database), README, vendor sheet, `.env.example`, `deploy/deploy.env.example`.
 ## Unreleased: TeX producers (branch eq/tex-producer-xetex, on eq/inline-simple-maths)
 
 - `page_type.producer_hint` calls a PDF TeX-made when its producer or creator names TeX as a whole word

@@ -73,7 +73,9 @@ load_config() {
   BUDGET_USD=${BUDGET_USD:-90}
   CRON_SCHEDULE=${CRON_SCHEDULE:-0 * * * *}
   # Cloud Run sizing, from the measurements in docs/deploy.md ("Sizing"): a 30-page dense
-  # document takes about 20 CPU-seconds and 0.5 GB at its peak, one job at a time.
+  # document takes about 20 CPU-seconds and 0.5 GB at its peak, one job at a time (a 100-page
+  # one about 25 CPU-seconds and 0.5 GB; 1Gi is enough, 2Gi when uploads of 50 MB or more are
+  # allowed: an upload is held in memory about three times over).
   CPU=${CPU:-1}
   MEMORY=${MEMORY:-1Gi}
   MIN_INSTANCES=${MIN_INSTANCES:-1}
