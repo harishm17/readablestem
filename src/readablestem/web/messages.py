@@ -186,6 +186,15 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.region", "half_fraction"): "The part of the page this equation was read "
     "from ends at a fraction bar and may hold only the top or the bottom of a fraction, so "
     "compare it with the page and write the whole fraction if part is missing.",
+    ("equation.pdf_correction", "glyph_reconciled"): "One symbol was corrected from the PDF's "
+    "text, which names it exactly, and the reading before the correction is kept in the record.",
+    ("equation.pdf_correction", "unit_dropped"): "A unit that the PDF sets outside the "
+    "formula was taken out of the reading, which is kept as it was in the record.",
+    ("equation.pdf_correction", "slash_kept"): "The PDF prints a slash here, so it is written as "
+    "a slash and not as a fraction, and the reading before is kept in the record.",
+    ("equation.pdf_correction", "number_dropped"): "The equation number printed beside this "
+    "display was taken out of the formula and kept as its number, and the reading before is kept "
+    "in the record.",
     ("equation.single_reading", "single_reading"): "The model read this equation once, "
     "and its answer passed every check, so no second reading was made and it was accepted "
     "as it stands.",

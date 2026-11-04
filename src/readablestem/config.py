@@ -116,6 +116,14 @@ class Settings(BaseSettings):
     # bold italic, script, double-struck) against the glyph's font. Off until the review load it
     # adds has been looked at (docs/steps.md, "Letter styles from the glyphs").
     equation_glyph_checks: bool = False
+    # A reading is corrected from the PDF's own glyphs where they are plain (`pipeline/
+    # glyph_reconcile.py`, needs EQUATION_GLYPH_CHECKS): one named lookalike symbol of a TeX-made
+    # PDF, a unit the line context added after the box, a printed slash kept as a slash, a
+    # display's equation number taken out of its LaTeX, a script face written `\mathscr`, and a
+    # bold-italic letter of a table's maths cell. No request changes. Each correction is a note
+    # on the fix and keeps the reading before it. Off until measured (docs/eval-dev-baseline-
+    # 2026-11-03.md, "Reading push").
+    equation_glyph_reconcile: bool = False
     # One printed display, one element (`layout.analyze(display_grouping=True)`, docs/layout.md):
     # two formulas joined by "and"/"for all", the right half of a long aligned row, a row that
     # starts with "=", and a trailing ellipsis stay together. Off: output is byte-identical to
