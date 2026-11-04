@@ -53,6 +53,11 @@ typography:
     fontSize: "1.6rem"
     fontWeight: 400
     lineHeight: 1.3
+  hero-math:
+    fontFamily: "LM Math Hero, Latin Modern Math, STIX Two Math, math"
+    fontSize: "1.5em"
+    fontWeight: 400
+    lineHeight: 1.3
   label:
     fontFamily: "Source Sans 3, system-ui, sans-serif"
     fontSize: "0.875rem"
