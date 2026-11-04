@@ -24,6 +24,7 @@ README = (ROOT / "README.md").read_text(encoding="utf-8")
 REALWORLD = (ROOT / "docs/eval-realworld.md").read_text(encoding="utf-8")
 DEV_BASELINE = (ROOT / "docs/eval-dev-baseline-2026-11-03.md").read_text(encoding="utf-8")
 CHEMISTRY = (ROOT / "docs/eval-chemistry-heldout.md").read_text(encoding="utf-8")
+FRESH5 = (ROOT / "docs/eval-equation-fresh5.md").read_text(encoding="utf-8")
 HANDWRITING = (ROOT / "docs/eval-handwriting.md").read_text(encoding="utf-8")
 
 LICENCE_SENTENCE = (
@@ -56,9 +57,33 @@ def pages(tmp_path_factory) -> dict[str, str]:
         return {path: anon.get(path).text for path in ("/", "/terms", "/limits")}
 
 
-def test_limits_registered_numbers_match_proof_md(pages):
+def test_limits_latest_registered_numbers_match_the_fresh5_report(pages):
     text = squash(pages["/limits"])
-    assert proof_field("Pipeline version") == "0.4.0" and "version 0.4.0, October 2026" in text
+    assert "run once on 2026-11-04 with version 0.5.9" in text
+    for number in ("0.840", "0.836", "+0.004", "−0.023 to +0.036", "0.793", "0.770"):
+        assert number in text, number
+    for report_cell in (
+        "0.840** [0.791, 0.876]",
+        "0.836 [0.778, 0.878]",
+        "+0.004 | [-0.023, +0.036]",
+        "5.02 [3.55, 6.39]",
+        "9.56 [5.86, 14.55]",
+        "0.461 [0.309, 0.613]",
+        "0.333 (41/123)",
+    ):
+        assert report_cell in FRESH5, report_cell
+    assert "no difference this set can detect" in text
+    assert "so it was not met" in text and "do not claim that ReadableSTEM does better" in text
+    assert "26 / 1,715 / 131" in FRESH5 and "26 documents" in text and "1,715" in text
+    assert "0.33 right as chemistry" in text and "not measured" in text
+    # PROOF.md is the replayed report of the first registered result and says nothing of fresh5.
+    assert "fresh5" not in PROOF
+
+
+def test_limits_first_registered_result_is_history_and_matches_proof_md(pages):
+    text = squash(pages["/limits"])
+    assert proof_field("Pipeline version") == "0.4.0"
+    assert "version 0.4.0, October 2026" in text and "Earlier results, kept as history" in text
     assert proof_field("Run recorded on").startswith("2026-10")
     assert f"{round(proof_cell('detection_recall') * 100)}% of them in both cases" in text
     assert 0.45 <= proof_cell("end_to_end_exact_lenient (all gold equations)") <= 0.55
@@ -111,8 +136,14 @@ def test_the_landing_page_summarises_without_overclaiming(pages):
     landing = squash(pages["/"])
     # The registered held-out tiles are the headline, and the gap to the chatbot is said.
     assert 'class="proof-strip"' in pages["/"]
-    assert "it does not yet beat a general chatbot" in landing
-    assert "64% against its 58% on 15 research papers made with LaTeX (1,826 equations)" in landing
+    assert (
+        "this test found no difference it could detect between ReadableSTEM and a general chatbot"
+        in landing
+    )
+    assert "0.836 against 0.840 for ReadableSTEM (26 documents, 1,715 equations)" in landing
+    assert "5.0 against 9.6 per 100" in landing and "so it was not met" in landing
+    assert "0.62 against 0.50" in landing  # the earlier result is not hidden
+    assert "beat" not in landing.lower().replace("beats", "")
     assert (
         "“Exactly right” means the whole equation matches the original symbol for symbol" in landing
     )

@@ -14,7 +14,7 @@ Please report privately, not in a public issue or pull request.
 
 1. Preferred: use GitHub's private vulnerability reporting (the repository's Security tab,
    "Report a vulnerability").
-2. Otherwise email harishmanoharan17@gmail.com with "ReadableSTEM security" in the subject.
+2. Otherwise email hello@readablestem.com with "ReadableSTEM security" in the subject.
 
 Include the commit you tested, the steps to reproduce, and what an attacker gains. Please
 do not attach real student records or anyone else's documents; a small synthetic PDF is
@@ -24,7 +24,7 @@ level.
 
 Please test against a local checkout (`docs/web.md`, "Run it locally") rather than the
 hosted beta whenever you can, and do not run load tests against the hosted beta or touch
-documents that are not yours. The hosted beta may be open to anyone with a Google account, so
+documents that are not yours. The hosted beta is open to anyone with a Google account (and, for some universities, a Microsoft one), so
 you can make an account of your own to test with; make one, not many, and delete it from the
 Account page when you are done.
 
@@ -69,9 +69,11 @@ These are design statements that the tests exercise; they are not guarantees.
 - **Uploads are short-lived.** They live in the database, never on disk, and are deleted
   24 hours after the last activity (7 days if the user keeps it, 30 days from upload if they also let the developer look).
 - **Spend is capped** per job and per day, and every model request reserves its worst-case
-  cost before it is sent. Model requests are sent with `store=False`.
+  cost before it is sent. OpenAI requests are sent with `store=False`; Anthropic's retention
+  is described in `docs/security.md`.
 - **Secrets stay out of the repository.** `.env` is git-ignored, CI scans the full history
-  with gitleaks, and production secrets live in Secret Manager (`docs/deploy.md`).
+  with gitleaks, and production secrets live in Railway's service variables (`docs/deploy-railway.md`; Secret
+  Manager on the Google Cloud path, `docs/deploy.md`).
 
 ## Dependencies
 

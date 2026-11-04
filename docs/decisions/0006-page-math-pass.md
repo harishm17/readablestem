@@ -132,6 +132,10 @@ variant that only compares readings and never changes spans was not built or mea
 - **When to revisit.** If the page pass drops or moves more spans than it fixes on a fresh
   set, or if layout's own rules close the gap (docs/layout.md), remove it.
 
+## Update 2026-11-04: still not on
+
+`FEATURE_PAGE_MATH` is still off by default in code and is not among the flags that are on in production ([deploy-railway.md](../deploy-railway.md), "Feature flags in production"). The status above stands: Proposed. Equation work since then went into other settings (`EQUATION_LINE_CONTEXT`, `EQUATION_GLYPH_CHECKS`, `EQUATION_GLYPH_RECONCILE`, `FLAG_POLICY`), which are on in production.
+
 ## Update 2026-10-21: real LaTeX PDFs
 
 On arXiv papers compiled by their authors (docs/eval-realworld.md) the pass does what it was built for: with

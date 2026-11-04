@@ -130,24 +130,27 @@
   you review it.</p>
 
 <h2 id="accuracy">How accurate it is</h2>
-{# The registered held-out test stays the headline (PROOF.md, via proof_facts), in plain words
-   here; /limits gives the same tiles with their technical names. The real-world numbers are
-   the registered held-out part of docs/eval-realworld.md (15 arXiv papers, 1,826 equations);
-   tests/test_landing_facts.py checks them against that file. #}
+{# The newest registered held-out test is the headline (PROOF.md, via proof_facts), in plain
+   words here; /limits gives the same tiles with their technical names. The earlier numbers are
+   history and stay on /limits. tests/test_landing_facts.py checks the text against the reports. #}
 {% set plain = {
-  "set_line": "Measured on 15 textbook sections the tool had never seen, in a test set up before it ran (October 2026, version 0.4.0).",
-  "of equations found": ["of equations found", "A general chatbot given the same PDFs also found 89%."],
-  "of equations exactly right, end to end": ["of equations exactly right, symbol for symbol", "A general chatbot got 62% on the same sections."],
-  "heading F1": ["score for headings, out of 1: found, and at the right level", "A general chatbot scored about the same."],
-  "of figure descriptions passed a model judge": ["of figure descriptions judged acceptable by a second AI model", "People have not checked them yet."],
+  "set_line": "Measured on 26 documents the tool had never seen (arXiv papers, textbook sections and course notes made with LaTeX), in a test set up before it ran (4 November 2026, version 0.5.9).",
+  "spoken-equal, end to end": ["score, out of 1, for equations that a screen reader reads the same as the original", "A general chatbot (Claude Opus) scored 0.836: this set can detect no difference between them."],
+  "exactly right, end to end": ["score, out of 1, for equations exactly right, symbol for symbol", "A general chatbot (Claude Opus) scored 0.770."],
+  "wrong equations nobody is asked about, per 100": ["wrong equations left without a question to you, per 100", "A general chatbot (Claude Opus): 9.6. Our goal, set before the run, was 4.0 or fewer, so it was not met."],
+  "of wrong equations the review screen asks about": ["of the wrong equations are among the ones the tool asks you about", "Our goal, set before the run, was 0.60, so it was not met. A chatbot asks nothing."],
 } %}
 {% include "_proof_strip.html" %}
-<p>“Exactly right” means the whole equation matches the original symbol for symbol, so a
-  screen reader reads it as the author wrote it. The rest is why you review the equations the
-  tool flags.</p>
-<p><strong>On equations it does not yet beat a general chatbot.</strong> Given the same PDFs,
-  a chatbot (Claude) got 62% exactly right against its 50% on these textbook sections, and 64%
-  against its 58% on 15 research papers made with LaTeX (1,826 equations).</p>
+<p>“Exactly right” means the whole equation matches the original symbol for symbol. The
+  first score also counts an equation as right when a screen reader reads it the same way as
+  the original. The rest is why you review the equations the tool flags.</p>
+<p><strong>On equations, this test found no difference it could detect between ReadableSTEM
+  and a general chatbot.</strong> Given the same PDFs, a chatbot (Claude Opus) scored 0.836
+  against 0.840 for ReadableSTEM (26 documents, 1,715 equations). ReadableSTEM left fewer wrong
+  equations without a question to you (5.0 against 9.6 per 100), but not as few as the goal we
+  set, and it asked about 46% of its wrong equations against a goal of 60%. In 3 chemistry
+  sections, 0.33 of the equations were right as chemistry, against a goal of 0.80. The earlier test, on 15 textbook sections (October
+  2026, version 0.4.0), had the chatbot ahead on equations exactly right, 0.62 against 0.50.</p>
 <p>Its checks compare each equation with the PDF's own text and flag the ones that disagree.
   They catch some wrong equations, not all. <a href="/limits#accuracy">All the results, how they
   were measured and what they do not show</a>.</p>

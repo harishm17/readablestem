@@ -1,8 +1,7 @@
 # ReadableSTEM: information sheet for an accessibility or procurement office
 
-One page. It describes the beta as it is on 3 November 2026; it is not a contract or an audit.
-Where it differs from the live pages (`/for-accessibility-offices`, `/privacy`, `/terms`,
-`/limits`), those are right. The repository is `harishm17/readablestem`.
+One page. It describes the beta as it is on 4 November 2026; it is not a contract or an audit.
+Where it differs from the live pages, those are right. The repository is `harishm17/readablestem`.
 
 ## What it does
 
@@ -33,12 +32,12 @@ decided and when, what was not converted, and what was not checked.
 
 ## Where it falls short
 
-- **Accuracy was measured on 15 sections of five OpenStax textbooks** the tool had not seen
-  (pre-registered; version 0.4.0, 14 October 2026; 1,369 equations). About half of the
-  equations (0.50) came out exactly right end to end, and about two in three (0.68) when each
-  was given alone. Headings scored F1 0.96. A model judge passed 97% of figure descriptions;
-  people have not checked them. A general chatbot got 0.62 on the same PDFs. LaTeX papers: 0.58 against
-  0.64.
+- **Accuracy was measured on 26 documents** the tool had not seen (registered before the
+  run; version 0.5.9, 4 November 2026; 1,715 equations). 0.79 of equations came out exactly
+  right end to end. Scored by how a screen reader reads them, 0.840 against 0.836 for a
+  general chatbot: no difference the test can detect. It asked about 46% of its wrong
+  equations (goal 60%). Earlier test (version 0.4.0): headings F1 0.96; a model, not a
+  person, judged 97% of figure descriptions acceptable.
   Chemistry is the weakest area. The tool accepts what its checks pass without a person
   looking; the review record lists those parts.
 - **Scanned and handwritten pages** convert only when the instructor ticks "Convert scanned or

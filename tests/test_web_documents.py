@@ -337,8 +337,9 @@ def test_the_landing_page_says_why_now_what_it_handles_and_how_accurate(web):
     assert "public universities" in flat
     assert "Beamer slide decks, one slide per frame" in flat and "Chemistry" in flat
     assert "about 1.8 decisions a page" in flat and "flag the ones that disagree" in flat
-    assert "it does not yet beat a general chatbot" in flat
-    assert "/blob/main/PROOF.md" in page  # the proof tiles link to how they were measured
+    assert "found no difference it could detect between ReadableSTEM and a general chatbot" in flat
+    # the proof tiles link to how they were measured
+    assert "/blob/main/docs/eval-equation-fresh5.md" in page
     assert 'href="/limits#accuracy"' in page
     assert "How to post it in your course" in flat
     assert "EPUB" in flat and "Canvas, Blackboard, Moodle or D2L" in flat

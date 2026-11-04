@@ -65,3 +65,15 @@ holds the model API keys and the database address in its environment, in the sam
 - A source job has no pages to show beside its decisions, so its review is the list view
   (`/jobs/{id}/review/list`); the split view redirects there.
 - Every refusal and failure is a content-free code with a plain message that says what to do.
+
+## Update 2026-11-04
+
+Status: still accepted, and still not in use. `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE` and
+`FEATURE_BATCH_ZIP` are off in production, because decision 3's condition is not met: the sandbox
+probe fails on Railway, where bubblewrap cannot start. Since this record a second sandbox backend
+was added, Landlock with a seccomp filter (`core/landlock_exec.py`, `core/sandbox.py`;
+docs/security.md, "Landlock backend"), which the sandbox uses where bubblewrap cannot start; the
+probe reports which of its steps fails (`landlock_step`, `landlock_errno`, `can_<call>` on
+`/healthz/ops`). Until a probe passes on the deployed image the switches stay off, and the sentence in
+decision 2 that the sandbox is bubblewrap should be read as "bubblewrap or Landlock". The alternative
+named in decision 3 (a separate service with no secrets) is still not built.

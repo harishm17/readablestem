@@ -21,8 +21,9 @@
     A mistake that agrees with the PDF's text, or a PDF with no usable text layer, can still
     get through. Maths inside a table cell or a figure is often missed.</li>
   <li><strong>Chemistry</strong> formulas and reactions are found and read out as formulas, but it is
-    the weakest area: on a fresh set of textbook sections about half of the equations were right
-    as chemistry. Check every one.</li>
+    the weakest area: in tests on textbook sections, 0.33 of the equations were right
+    as chemistry in the newest (3 sections) and 0.56 in an earlier one (5 sections). Check
+    every one.</li>
   <li><strong>Slides.</strong> A Beamer deck is read frame by frame: overlay steps that only add
     to a frame are merged, and each frame title becomes a heading. Lists in themes that draw
     their bullets as pictures (Warsaw, Madrid) come out as one paragraph, and a sidebar theme's
@@ -139,23 +140,45 @@
 
 <h2 id="accuracy">How accurate it is</h2>
 {% include "_proof_strip.html" %}
-<p>The main result is a pre-registered test on 15 sections of five OpenStax textbooks that the
-  tool had not seen (version 0.4.0, October 2026; <a href="{{ source_url }}/blob/main/PROOF.md">full
-  results</a>):</p>
+<p>The main result is the newest registered test: 26 documents the tool had not seen (12 arXiv
+  papers, 6 OpenStax sections and 8 course documents made with LaTeX, 131 pages, 1,715
+  equations), run once on 2026-11-04 with version 0.5.9 and the settings the live service uses
+  (<a href="{{ source_url }}/blob/main/docs/eval-equation-fresh5.md">the full
+  report</a>):</p>
 <ul>
-  <li>Equations: it found about as many as a general chatbot (Claude Opus given the PDF and one
-    sentence), 89% of them in both cases, but fewer came out exactly right end to end: about
-    half (0.50) against 0.62 for the chatbot. Given each equation on its own, about two in
-    three were right (0.68).</li>
-  <li>Headings: F1 0.96, with every matched heading at the right level. (F1 is a score out of 1
-    that counts both headings missed and headings invented.)</li>
-  <li>Figure descriptions: 97% passed a model judge, a second AI model asked whether each
-    description is right (not yet checked by people).</li>
-  <li>Decisions it asked for: about 1.8 per page; it asked about only a third of the
-    equations that were wrong.</li>
+  <li>Equations, scored by whether a screen reader reads each one the same as the original:
+    0.840 for ReadableSTEM against 0.836 for the chatbot on Claude Opus (given the PDF and one
+    sentence). The registered wording is <strong>no difference this set can detect</strong>
+    (difference +0.004, 97.5% interval −0.023 to +0.036). The set could show a difference of
+    about 3 points.</li>
+  <li>Equations exactly right, symbol for symbol: 0.793 against 0.770.</li>
+  <li>Wrong equations that no decision pointed at: 5.0 per 100 equations against 9.6 for the
+    chatbot. The goal we registered before the run was 4.0 or fewer, so it was not met.</li>
+  <li>Decisions it asked for: 2.9 per page. It asked about 46% of the wrong equations; the goal
+    was 60%, so it was not met.</li>
+  <li>Cost: about $0.02 a page for ReadableSTEM, $0.07 for the chatbot on Opus.</li>
+  <li>By kind of document (point estimates): arXiv papers 0.848 against 0.860 for the chatbot,
+    OpenStax sections 0.704 against 0.667, course documents made with LaTeX 0.896 against
+    0.880.</li>
+  <li>Chemistry (3 OpenStax sections, 123 equations): 0.33 right as chemistry, against a goal
+    of 0.80, so it was not met. The chatbot comparison for chemistry is not measured: the
+    scorer does not read the chatbots' chemistry notation.</li>
 </ul>
-<p>On equations it does not yet beat the chatbot end to end. The other measurements:</p>
+<p>We therefore do not claim that ReadableSTEM does better than a general chatbot on
+  equations. This was one run on 26 documents; it says nothing about scans, handwriting, Word
+  files or maths inside figures.</p>
+<p>Earlier results, kept as history (older versions of the tool):</p>
 <ul>
+  <li><strong>The first registered test</strong> (15 sections of five OpenStax textbooks, 242
+    pages, 2,738 equations, version 0.4.0, October 2026; <a href="{{ source_url }}/blob/main/PROOF.md">full
+    results</a>). Equations: it found about as many as the chatbot (Claude Opus given the PDF
+    and one sentence), 89% of them in both cases, but fewer came out exactly right end to end:
+    about half (0.50) against 0.62 for the chatbot. Given each equation on its own, about two in
+    three were right (0.68). Headings: F1 0.96, with every matched heading at the right level.
+    (F1 is a score out of 1 that counts both headings missed and headings invented.) Figure
+    descriptions: 97% passed a model judge, a second AI model asked whether each description is
+    right (not yet checked by people). Decisions it asked for: about 1.8 per page; it
+    asked about only a third of the equations that were wrong.</li>
   <li><strong>Research papers typeset with LaTeX, held out</strong> (15 arXiv papers, 71
     pages, 1,826 equations, registered before the run): 0.58 of equations exactly right end to
     end, against 0.64 for the chatbot on Opus and on Haiku. The set is too small to show a

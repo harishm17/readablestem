@@ -36,6 +36,7 @@ When a public page's text changes, update its date in `PUBLIC_PAGES` (or `SHOWCA
 | `examples/index.html` | The worked examples in one table |
 | `examples/<id>/index.html` | For one document: the PDF pages beside the HTML they became, what the checks found, the decisions a person would see (a static view of the review screen), how some equations are read aloud, the files and the credit |
 | `examples/<id>/converted.html` | The tool's full output page, as stored |
+| `examples/<id>/listen.html` | The listening transcript of the document: each equation's stored speech beside the player (`web.listen`) |
 | `before-after/index.html` | For the chosen equations: the PDF's text layer and its reading, beside the HTML's MathML and its reading |
 | `stemcheck/index.html`, `stemcheck/sample-report.html` | A short explanation of [stemcheck](https://github.com/harishm17/stemcheck) and one report it wrote |
 | `method/index.html` | How the numbers and the examples were made, and the limits (read from `PROOF.md` and `proof/sets/`) |
@@ -116,15 +117,14 @@ made this way: one `h1`, the dark colour scheme and the labelled "About this ver
   sideways scrolling at 320 px, text spacing, scrollable regions reachable by keyboard, the
   skip link, and every page with JavaScript off.
 
-## Publishing later
+## Publishing
 
-Nothing here publishes. When the repository is public, add a workflow that runs `make site` and
-publishes `site/_build` with GitHub Pages (the `upload-pages-artifact` and `deploy-pages`
-actions, with `pages: write` and `id-token: write` for that job only), and turn Pages on in the
-repository settings with the source set to GitHub Actions. All links in the site are relative,
-so it works under `https://<user>.github.io/<repo>/`. The links to the README, `PROOF.md` and
-the docs point at `main` of `REPO_URL` in `site/build.py`; change it there if the repository
-moves. The site is about 8 MB, most of it the stemcheck report and the stored PDFs.
+The hosted app serves the build at `https://readablestem.com/showcase/` ("Where it is served"
+above); that is how it is published. No GitHub Pages workflow exists, and `make site` itself
+publishes nothing. All links inside the site are relative, so a copy also works from any folder or
+host. The links to the README, `PROOF.md` and the docs point at `main` of `REPO_URL` in
+`site/build.py`; change it there if the repository moves. The site is about 8 MB, most of it the
+stemcheck report and the stored PDFs.
 
 ## Design system (the web app)
 

@@ -107,35 +107,36 @@ class Settings(BaseSettings):
     # An inline equation is also sent as its whole line with the span boxed, and the model writes
     # the formula the box is part of (`layout.crop_line`, prompt `equation_line`): the text
     # layer's span is cut where its characters are (a radical, an integral sign or the left side
-    # of a relation on a line object of its own), the author's formula is not. Off until a
-    # registered real-world test says otherwise (docs/eval-equation-round3.md).
+    # of a relation on a line object of its own), the author's formula is not. Off by
+    # default in code, on in production since 2026-11-03 (docs/eval-equation-round3.md).
     equation_line_context: bool = False
     # The glyphs of an equation are read with it (`layout.line_glyphs`, `Element.glyphs`): a
     # reading that reaches past the box (the line context's) is checked against the glyphs it
     # covers, not the box's text, and each letter's style in the reading (italic, upright, bold,
-    # bold italic, script, double-struck) against the glyph's font. Off until the review load it
-    # adds has been looked at (docs/steps.md, "Letter styles from the glyphs").
+    # bold italic, script, double-struck) against the glyph's font. Off by default in code, on in
+    # production since 2026-11-03 (docs/steps.md, "Letter styles from the glyphs").
     equation_glyph_checks: bool = False
     # A reading is corrected from the PDF's own glyphs where they are plain (`pipeline/
     # glyph_reconcile.py`, needs EQUATION_GLYPH_CHECKS): one named lookalike symbol of a TeX-made
     # PDF, a unit the line context added after the box, a printed slash kept as a slash, a
     # display's equation number taken out of its LaTeX, a script face written `\mathscr`, and a
     # bold-italic letter of a table's maths cell. No request changes. Each correction is a note
-    # on the fix and keeps the reading before it. Off until measured (docs/eval-dev-baseline-
-    # 2026-11-03.md, "Reading push").
+    # on the fix and keeps the reading before it. Off by default in code, on in
+    # production since 2026-11-04 (docs/eval-dev-baseline-2026-11-03.md, "Reading push").
     equation_glyph_reconcile: bool = False
     # One printed display, one element (`layout.analyze(display_grouping=True)`, docs/layout.md):
     # two formulas joined by "and"/"for all", the right half of a long aligned row, a row that
     # starts with "=", and a trailing ellipsis stay together. Off: output is byte-identical to
-    # before. Not enabled; revisit after fresh5. Turning it on changes equation crops and
+    # before. Off in production too.
+    # Turning it on changes equation crops and
     # requests on TeX papers with such displays, so PIPELINE_VERSION must be bumped (0.5.10 or
     # later) in the change that enables it.
     layout_display_grouping: bool = False
     # A calibrated rule on top of the checks (`pipeline/flag_policy.py`): an accepted equation
     # that looks like the readings that turned out wrong (a small logistic model over content-free
     # features, fitted on the development splits) becomes a required decision. It only adds
-    # decisions. Off until someone decides the added review load is worth it
-    # (docs/eval-flag-policy.md).
+    # decisions. Off by default in code, on in
+    # production since 2026-11-03 (docs/eval-flag-policy.md).
     flag_policy: bool = False
     # A figure crop is scaled down to this many pixels on its long side before it goes to the
     # model (T3-24); review and the HTML keep the full crop. None: sent as it is.
@@ -423,8 +424,9 @@ class Settings(BaseSettings):
     # are left with a note and no second reading (a read has its own time budget besides).
     image_pages_second_reader_time_s: float = Field(default=120.0, gt=0, le=1800)
 
-    # --- content features. Each is off until its eval
-    # says it helps; ConversionOptions.from_settings reads them for every conversion.
+    # --- content features. Each is off by default in code until its eval
+    # says it helps (production turns several on, docs/deploy-railway.md);
+    # ConversionOptions.from_settings reads them for every conversion.
     # Rebuild data tables as <table> (off: a detected table is kept as an image of the
     # table with a required decision, "table not rebuilt").
     feature_tables: bool = False

@@ -57,9 +57,10 @@ def test_no_cell_claims_conformance_and_accuracy_appears_only_where_measured(pag
     text = " ".join(" ".join(row) for row in cells(page)).lower()
     for word in ("conforms", "compliant", "certified", "guarantee"):
         assert word not in text, word
-    # The only accuracy numbers are ReadableSTEM's and the chatbot recipe's, from PROOF.md.
+    # The only accuracy numbers are ReadableSTEM's and the chatbot recipe's (the fresh5 report).
     rows = cells(page)
-    accuracy = next(row for row in rows if "50% exactly right" in row[0])
-    assert "PROOF.md" in accuracy[0] and "62% exactly right" in accuracy[3]
+    accuracy = next(row for row in rows if "0.793 exactly right" in row[0])
+    assert "eval-equation-fresh5.md" in accuracy[0]
+    assert "0.770" in accuracy[3] and "0.836" in accuracy[3]
     for index in (1, 2, 4):
         assert "%" not in re.sub(r"<[^>]+>", "", accuracy[index]).replace("not run", "")

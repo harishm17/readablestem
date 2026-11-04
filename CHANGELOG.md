@@ -11,26 +11,19 @@
   default seccomp profile (docs/deploy-railway.md). No change to what the sandbox allows.
 
 ## Unreleased: fifth fresh split, registered result (branch eval/fresh5-report)
+## Unreleased
 
-- `docs/eval-equation-fresh5.md`: the fresh5 run (registration PR #149). The candidate and the Opus chatbot
-  show no difference this set can detect on spoken-equal end to end (0.840 against 0.836, 26 units, 1,715 gold
-  equations). The candidate has fewer silent errors (5.0 against 9.6 per 100 gold), but the registered claim is
-  not made, because silent errors are above 4.0 and flag recall is 0.46. Stratum D (chemistry) is not a success.
-- `scripts/realworld_run.py` reads the four fresh5 strata. It adds the registered settings in a clean environment
-  (`--settings`), one cap for the two ReadableSTEM arms (`--group-cap`), chatbot runs over the split in the
-  registered order (`--part fresh5`), a free token-count dry mode (`--dry`) and the strong-prompt arm
-  (`chatbot-opus-expert`). `scripts/fresh5_report.py` writes the registered tables.
+## Pipeline 0.5.9 (2026-11-04)
 
-## Unreleased: which Landlock step failed (branch latex/probe-step-codes)
+Everything that was listed as unreleased up to 2026-11-04, grouped by area (newest entry first within an area, as it was
+written). Each entry keeps the branch it came from. The pipeline is version 0.5.9. LaTeX source, Beamer and zip-batch upload
+are in the code and off on readablestem.com until the sandbox check passes there.
+A setting an entry calls "off" is off by default in the code; which ones production turns on is in
+[docs/deploy-railway.md](docs/deploy-railway.md), "Feature flags in production".
 
-- New: when the Landlock launcher fails to start, it reports the failing setup step as a fixed
-  code and the errno's name; `ops sandbox-probe`, the `sandbox_probe` log line and
-  `/healthz/ops` show `landlock_step=`, `landlock_errno=`, `landlock_exit=` and
-  `can_<call>=yes|no` for each system call the launcher needs, tried once in a throwaway child
-  under the container's own seccomp filter. Information only: no change to what the sandbox
-  allows.
+### Equations and speech
 
-## Unreleased: equation reading push (branch eq/read-push)
+#### Equation reading push (branch eq/read-push)
 
 - Pipeline 0.5.9. New setting `EQUATION_GLYPH_RECONCILE` (off; needs `EQUATION_GLYPH_CHECKS`):
   an equation's reading is corrected from the PDF's own glyphs where they leave one answer: one
@@ -41,34 +34,7 @@
   (`EquationFix.model_latex`). No request or prompt changes (`docs/steps.md`, "Corrections from
   the glyphs"; `docs/eval-dev-baseline-2026-11-03.md`, "Reading push").
 
-## Earlier: equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
-## Unreleased: Landlock sandbox backend (branch latex/landlock-sandbox)
-
-- New: a second sandbox for LaTeX source where bubblewrap cannot start (no user namespaces,
-  as on Railway): Landlock (read and execute on the system trees, read on the input, read and
-  write on the output and a private scratch folder, nothing else, not `/proc`) with a strict
-  seccomp filter (no sockets, no `setsid`, no `landlock_*`), `no_new_privs`, rlimits, the
-  one-at-a-time lock, a polled memory cap for the whole process group, and a launcher that is
-  the subreaper and dies with its caller. Chosen automatically; the same probe gates it
-  (`backend=bwrap|landlock`, new in-sandbox checks). The web process and the conversion child
-  call `PR_SET_DUMPABLE=0`. `tests/test_source_escapes.py` runs on both backends.
-- Hardened after review: Landlock ABI 6 is required (signal and abstract-socket scopes); the
-  strict filter also denies calls that name another process of the user (`prlimit64` and the
-  scheduler calls except on pid 0, `setpriority`, `ioprio_set`, pidfds, `kcmp`), memory and disk
-  outside the counters (`memfd_create`, System V and POSIX IPC, `execveat` of an open file), and
-  changes to file mode, owner, times and extended attributes; unlinked-but-open files count
-  against the output budget and the entries in the writable folders are capped; the task bound
-  is 4 x 512 MB and the probe fails over `SOURCE_SANDBOX_MAX_TOTAL_MB`; the memory poll is
-  every 0.1 s; the supervisor watches its caller's pid instead of `PR_SET_PDEATHSIG`.
-- Final review: `source_busy` is decided by the launcher's own observation (the user's task
-  count at the limit while the program has not used its allowance, written to a marker the
-  program cannot reach), no longer from the program's output, which a document could spoof.
-- Second review: `fallocate` denied, the output budget counts blocks and deleted files that are
-  still mapped, a fork that fails for lack of room fails the conversion as `source_busy`
-  (new message: "The server is busy right now ... Try again in a few minutes, or upload the
-  PDF instead."); running a written file through the dynamic loader is documented as a
-  residual (the loader's execute right cannot be withheld).
-## Unreleased: display grouping (branch eq/display-grouping)
+#### Display grouping (branch eq/display-grouping)
 
 - New setting `LAYOUT_DISPLAY_GROUPING` (off; output byte-identical to before when off, no pipeline bump until it is turned on).
   When on, layout joins pieces of one printed display: two formulas with a connective word between them
@@ -79,68 +45,8 @@
   Conservative: any other word, two numbered equations, or a fraction far from the row keep the old
   reading. `docs/layout.md` "One printed display, one element"; `scripts/layout_identity.py` lists
   what changed on 149 repository PDFs and the development, fresh and held-out papers.
-## Unreleased: upload, job page and My documents (branch ux/upload-job-documents)
 
-- A person a document was shared with who can only view it is no longer told "N decisions need
-  you": the status says the decisions are still open and only the owner or a reviewer can make
-  them (a reviewer is told they can review them). The results tile reads "Decisions made" and,
-  for a viewer, "Decisions still open". In My documents a document whose owner has no name is
-  "shared with you" instead of "shared by The owner".
-- "Try again" says what it will do ("puts your document back in the queue"); the confirmation
-  comes after it worked.
-- Times in My documents stay in the reader's time zone after the list refreshes itself.
-- One wording for keeping a document, "Keep for 7 days", on the upload form, job page, Account
-  page, notices and the privacy page. The job page shows the deletion time once, under the
-  review and download actions, with the day "Keep for 7 days" would delete it. Delete entry
-  points (a document, a course, an account, a waiting file) have a red outline style
-  (`button-danger-outline`, `danger-link`), the confirmation pages keep the filled button.
-- Upload form: shorter, in three groups (file, how to convert it, how long to keep it) with one
-  line of consequence beside each option and the long text in disclosures. A refused scanned PDF
-  says to tick "Convert scanned or handwritten pages" and choose the file again.
-- Choosing pages: sizes under 0.1 MB show in KB (`pending.size_text`), the range examples follow
-  the active page limit and the file, and a suggestion cut off at 20 parts says which pages it
-  leaves out.
-- My documents has a compact "Practise on the sample" link beside "Convert a PDF"; signed-in
-  pages get a compact footer of trust and help links (public pages keep the full footer).
-## Unreleased: spoken-equal scorer reads one print as one speech (branch eval/spoken-scorer-fix)
-
-- Evaluation only; the product's speech and `math_canonical.compare` are unchanged. The spoken-equal scorer
-  (`scripts/rw_spoken.py`) spoke 71 of the 2,350 development gold equations differently from a reading that
-  prints the same (`\mathrm{in}` against `\text{in}`, gold `\textbf` without its bold, `\min` against
-  `\text{min}`, `\bigl(`, `...`, `\backslash`, scripts and accents). `math_canonical.repair_converter_gaps`
-  and `speakable_latex` now write each print one way on both sides for every arm; a pair right before stays
-  right. 68 of the 71 became equal; ReadableSTEM base-0508 on development 0.792 to 0.820, Opus 0.728 to 0.755,
-  Haiku 0.723 to 0.749 (`docs/eval-realworld.md`). Guard tests: `tests/test_math_canonical_spoken.py`.
-- `PREREGISTRATION-FRESH5.md` section 4: the primary is spoken-equal, `exact_lenient` a secondary. The scorer,
-  its folding and the speech files are in `FRESH5_FILES`, to be hashed at signing.
-## Unreleased: sharing, guides, demo and status polish (branch ux/sharing-guides-demo)
-
-- The "About this demo" note has its own light-scheme, visited, hover, focus and forced-colour
-  link colours (it is a white box in every scheme; its links measured 2.39:1 in the dark scheme).
-  The generator (`eval/render.py`, `DEMO_NOTE_CSS`) and the committed demo carry the same rules; the
-  student output is unchanged. `/demo` is now axe-checked in the dark scheme
-  (`tests/test_web_demo_dark_browser.py`).
-- Sharing page: View and Review are whole-row choices (44 px or more, native radios, each with
-  what it allows); a "Copy link" button with a spoken confirmation (the address stays a
-  selectable field); the document's deletion time and a link to keep it longer beside the address;
-  sign-in wording from the enabled providers; "the same address, letter case aside" instead of "exactly
-  as written"; "Remove" is a danger button.
-- The comparison guide shows, under 52rem, one collapsed native disclosure per topic (ReadableSTEM's answer in the summary; opened, every tool with its source and date); the
-  table stays for wide screens. ADA, comparison and posting guides get the offices page's "On this
-  page" contents (`templates/_contents.html`) and stable heading ids.
-- Status page: "Checked at ...", a "Check again" link and what the 10-minute AI service
-  observation means.
-## Unreleased: review round fixes (branch ux/review-round-fixes)
-
-- Bulk accept: the button that accepts comes after the list of originals and proposals, which now asks you to compare each proposal with the image of the original; Cancel and Undo are unchanged.
-- Review split: on a wide screen the row of choices (Accept, Keep as image) sticks to the bottom of the window while the decision is longer than the window; on a phone the page has a "Back to the decision" link and says it scrolls sideways, with edge shadows where more of it is. The toolbar above the page image is `.page-bar` (it shared `.page-tools` with the "Change page" disclosure).
-- "Hear this" on an equation with no usable stored reading speaks it from its MathML, as the transcript does.
-- Review list: with more than three waiting in a group each is a compact row (what it is, page, status); one editor is open at a time when a row is opened by hand; the first, and any just worked on, starts open.
-- Symbols: beside "Change all" a line says how many places it changes and how many are left as they are, and follows the places ticked to be left out.
-- Listening: a compact transport (Play, Pause, Stop, previous and next, next heading and equation, Start at the lesson, Follow along) stays in view while the transcript scrolls; Follow along is on by default, is remembered in the browser and scrolls without animation under reduced motion; speed, voice and shortcuts are in a disclosure; a "Skip to the lesson" link works without scripts. Start at the lesson skips the title, language, notices and licence.
-- Code: `controls.css` holds the buttons for the app, the listening player and the showcase (listen.css no longer repeats them); spacing and type sizes in `app.css` are on the tokens; the unavailable sans weight 600 is 700.
-
-## Unreleased: equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
+#### Equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
 
 - Pipeline 0.5.8. arXiv PDFs built by arXiv's own `tex2pdf` ("arXiv GenPDF (tex2pdf:...)") and VTeX
   files are TeX-made again (0.5.7's whole-word producer match had lost them, so they got no unit
@@ -151,222 +57,8 @@
   (`docs/tables.md`). Bullets and Dingbats are not taken.
 - A cell equation's line crop and glyph context are cut to its own column, not the table's width
   (the next column's "(5)" was read into `S^3`).
-## Unreleased: sandbox probe at start-up (branch latex/probe-at-startup)
 
-- New: when the web process starts and LaTeXML is in the image it runs the sandbox probe
-  (`--require-latexml`) in the background, logs `sandbox_probe result=PASS|FAIL ...` once, and
-  shows the result on `/healthz/ops` under `sandbox` (state, checks, bound_mb, cgroup, seccomp,
-  checked_at; `not_installed` when there is no LaTeXML). `FEATURE_LATEX_SOURCE`,
-  `FEATURE_BEAMER_SOURCE` and a `FEATURE_BATCH_ZIP` zip with a LaTeX project take effect only
-  while the last probe passed: otherwise the existing 503 `source_unavailable` answer. Settings
-  `SANDBOX_PROBE_AT_STARTUP` and `SANDBOX_PROBE_TIMEOUT_S`.
-
-## Unreleased: Listen as a student (branch preview/listen-as-student)
-
-- New: an instructor can hear roughly what a screen reader will say for a converted document
-  before sharing it. `GET /jobs/{id}/listen` (owners and anyone it is shared with) and
-  `GET /demo/listen` (public) show a transcript built from the final HTML, in reading order
-  (landmarks, headings with their level, lists, links, equations spoken by the same speech rules
-  as the review screen, figures, tables with their headers, pictures kept as images, language
-  changes; never LaTeX), with an optional Play, Pause, Stop, speed, previous and next item, next
-  heading and next equation, using the browser's own voice (a voice on the device by default;
-  online voices only on request). The job page, the review screen (a "Hear this" button
-  beside an equation plays the proposal and how the PDF's text layer reads), the landing hero,
-  the demo, the showcase examples and `/help/posting` offer it. Not part of any download.
-  See docs/web.md, "Listen as a student".
-
-## Unreleased: site copy rewrite (branch content/site-rewrite)
-
-- Every public and signed-in page says what the service does today. The landing page lists what it
-  handles (Beamer decks frame by frame, chemistry, and tables, long descriptions, scanned and
-  handwritten pages and course notation only where their flags are on, `routes/pages.py`
-  `_features`), what you download (HTML, Word, EPUB, Canvas zip, Common Cartridge, the review
-  record) and a short accuracy block that says it does not yet beat the chatbot on equations.
-- /limits holds every measured result with its sample size: the registered held-out test first,
-  the real-world held-out papers, the not-blind re-measurement, the development baseline
-  (labelled development), chemistry and handwriting. The old Physics chapter 2 sample is gone.
-- /for-accessibility-offices gains an "At a glance" list, names the downloads and sharing, and
-  says a conformance report is in preparation (not published). /privacy describes PostHog
-  analytics when `ANALYTICS_ENABLED` is on. "Also let the developer look" is now "Also let us
-  look at the results" everywhere. The upload hint is a list. Guides, README, the showcase,
-  `docs/vendor-information.md` and llms.txt are updated to match.
-- Second round, from a blind review: the landing page's lists are one line an item in plain
-  words (MathML, F1, model judge, held-out and Common Cartridge are glossed or left to
-  /limits; the proof strip takes plain labels through `plain`), a line says what "exactly
-  right" means, the chatbot comparison is its own sentence, and one decisions-per-page figure
-  per kind of document (textbook 1.8, LaTeX papers 5.6, handwriting 5.7) is given on the
-  landing page and /limits alike, with the job page's exact count. The calls to action are
-  "Sign in and convert a PDF" and the demo; the two FAQs a newcomer needs open by default. The
-  upload form's limits sentence, scanned-pages label and keep options are plainer, and the
-  redundant "Convert another PDF" link is gone. The ADA guide starts with "What to do this
-  term". On the review screen "Edit the LaTeX" is closed when a one-click fix is offered, and
-  the compare box says "at the same scale". `scripts/design_shots.py` uses the production
-  limits.
-- Footer: "Built and maintained by Harish Manoharan. Open source · Contact". The offices page
-  has "Support and continuity" (open source and self-hostable, every result downloadable, no
-  service-level agreement, how to report a problem).
-- Retention: an account setting "Keep my documents for 7 days by default"
-  (`users.keep_week_default`, migration `5d8e1f2a7c39`, `POST /account/keep-default`) starts the
-  upload form's 7-day box ticked; each upload still decides. The job page says near the top when
-  the document will be deleted, with a one-click "Keep it for 7 days". Retention wording says the
-  clock restarts on each decision or download.
-## Unreleased: zip intake and tiered batch limits (branch batch/b2-zip-intake)
-
-- A `.zip` of documents is a batch (`FEATURE_BATCH_ZIP`, off by default, `web/batch_intake.py`): each PDF and each
-  folder with a main `.tex` file (a LaTeX project, re-zipped and checked again by the LaTeX source path) becomes a
-  document of its own through the ordinary upload checks; a zip with a main file at its root is one project; strays
-  are left out; a zip with no document, a link, a bad path, a nested zip, EPS or SVG, or over the limits (the LaTeX
-  source's, with 80 MB unpacked) is refused. The zip counts once for the upload rate limit.
-- Memory: the unpacked budget of a batch is one per request (twice the upload limit, shared by every zip in it, not
-  80 MB per zip), the documents of a zip are read one at a time when their turn comes, a PDF over the upload limit
-  is refused by its header unread, and documents past the person's limit are named, never read (a zip met after
-  the limit is refused unopened). `batch_intake.split` returns lazy `Member`s.
-- Limits by tier: one upload takes 30 documents for invited people and pilots and 10 for an account made by open
-  sign-up (`access.files_per_upload`), and the same number is the cap on documents waiting or converting at once
-  (it was 10 for everyone). The upload form and the messages say the number for the person.
-- The batch page `/app/batch/{id}` (`routes/batch.py`) replaces the results page of an upload of several files
-  (`/app/upload/{id}` redirects to it): a row per document with its status now, a polite live summary line, polling
-  with 204 while nothing changed, "Download all" (`/app/batch/{id}/download`) once nothing is waiting, the large
-  files and the refusals as before. `documents.documents` and `list_version` take a list of job ids.
-- Tests: `tests/test_batch_intake.py`, `tests/test_web_batch.py`, the batch page in `tests/test_web_jobs_browser.py`
-  (axe at 1280 and 375); the tests that fixed 10 now use the tier.
-
-## Unreleased: Beamer source (branch latex/e2-beamer-source)
-
-- Beamer decks within LaTeX source (`FEATURE_BEAMER_SOURCE`, off by default, needs `FEATURE_LATEX_SOURCE`): frames
-  become headings with their content (sections the top level, frames below them), an overlay step is written only
-  when it shows something the frame's last step does not ("(step 2 of 3)"; the rule of the PDF slide decks), text a
-  step covers is not written, a list item a pause reveals is an item of its own, a title page drawn by Beamer is read
-  for its blocks. `source/beamer_compat.tex` gives LaTeXML 0.8.8's binding the block, column and `\institute`
-  definitions it lacks (read first, read-only in the sandbox). A deck counts a page per frame. Spike on five decks
-  written for it: 20 frames, none with an unknown command (3 had one without the compat file); no
-  real deck tried. `DocumentResult.origin` `beamer`, the student note says "a slide deck". Tests:
-  `tests/test_source_beamer.py`; fixtures `tests/fixtures/source/beamer/`.
-
-## Unreleased: LaTeX source upload (branch latex/e1-source-intake)
-
-- LaTeX source (`FEATURE_LATEX_SOURCE`, off by default; ADR 0008): a `.tex` file or a `.zip` of a project is
-  converted by LaTeXML in the bubblewrap sandbox of the sandbox probe change, into the document a PDF becomes. Equations
-  come from the source (LaTeXML's MathML through the sanitiser, the source's own LaTeX), figures use the
-  project's pictures and the ordinary figure step, tables become grids, headings, lists and links are read as
-  written. A formula LaTeXML cannot read and a figure with no picture are required decisions; a source that cannot be
-  converted fails the job with "Upload the PDF instead" and keeps nothing. The review is the list view. New
-  `web/archive_intake.py` (zip limits: 20 MB, 100 MB unpacked, 500 entries, no links, absolute or `..` paths,
-  nested zips, EPS or SVG; a header that lies is caught), `source/` (`intake`, `lint`, `envelope`, `latexml`,
-  `ltx_reader`, `figures`, `convert`), a one-line hook in `pipeline/run.py` (`convert_pdf`), `DocumentResult.origin`,
-  `render_html(origin=)` (the student note says "a LaTeX document"), `INSTALL_LATEXML` and `FEATURE_LATEX_SOURCE` in
-  `railway.ts`. LaTeXML runs with `kpsewhich` hidden in the sandbox: where TeX Live's base is installed (the image) it
-  otherwise read raw TeX for packages and spent over a minute failing on `siunitx`. Beamer decks are refused until their own change. Docs: docs/web.md "LaTeX source",
-  docs/security.md "Running uploaded TeX", docs/development.md. Tests: `tests/test_archive_intake.py`,
-  `test_source_intake.py`, `test_source_reader.py`, `test_source_convert.py`, `test_source_escapes.py` (hostile
-  files through the real sandbox), `test_source_child.py`, `test_web_source.py`.
-## Unreleased: design polish (branch design/d6-polish)
-
-- Fixes from the Impeccable audit and critique of the redesign: paragraphs, hints and list items are capped at 75ch;
-  Sign out, document-row links and check boxes meet the 24px target floor (header buttons 44px); the review screen's
-  desk colour is lighter so its links have 7.3:1; the current step on the review screen keeps the two-tone focus
-  ring; the three fonts the first view needs are preloaded (no layout shift on a phone); buttons and the page tools'
-  forms never overflow at 320px or 200% zoom; the file chooser button is styled as a secondary button; the
-  comparison table keeps its topic column in view and tints the ReadableSTEM column; a few legacy radii and an
-  off-token colour moved onto the tokens. The focus-style test reads the new tokens, light and dark.
-
-## Unreleased: comparison table and showcase on the tokens (branch design/d4-compare-showcase)
-
-- The comparison guide (`/guides/readablestem-mathpix-latexml`) now compares five tools: ReadableSTEM, Mathpix,
-  Aelira, general chatbots and LaTeXML, on what each takes in and gives back, its maths, what it automates,
-  review by a person, where the file goes, cost and licence, a published test of equations and its version.
-  Every cell names its source and the day it was read (Aelira's own page and Mathpix's pages for them; the
-  chatbot column is the recipe tested in PROOF.md, not a claim about any product); accuracy appears only where
-  we measured it (ReadableSTEM and the chatbot recipe). `tests/test_compare_table.py` checks the sources and
-  that no cell claims conformance. The title, `/guides`, the footer label and `llms.txt` name the five tools.
-- The static showcase (`site/`) is built on the web app's tokens: `build.py` copies `tokens.css` and its
-  fonts into `assets/` (no outside request; it still opens from a folder), `site.css` uses the tokens, the
-  footer has the same four columns, and the showcase follows light and dark. The converted output and the PDF
-  pages stay on white paper. The `/demo` page is the stored converted document and is not restyled.
-
-## Unreleased: LaTeXML in the image (branch latex/x1-latexml-image)
-
-## Unreleased: sandbox probe (branch latex/x0-sandbox-probe)
-
-- `readablestem ops sandbox-probe`: checks on the running image that the sandbox for uploaded TeX
-  works (bubblewrap, user namespaces, no network, empty environment, hidden `/proc/1/environ`,
-  memory, wall-clock and output caps), times a tiny LaTeXML run when LaTeXML is installed, reports
-  the kernel's seccomp mode, Landlock ABI and same-UID `/proc/<pid>/environ` readability, and
-  prints PASS or FAIL (exit 1). Nothing it prints is document content. Docs: docs/operations.md,
-  "Sandbox probe"; docs/security.md, "Running uploaded TeX".
-- The sandbox joins its cgroup before bubblewrap starts (a wrapper, not a move afterwards, so no child escapes it),
-  and without a cgroup the total is bounded by arithmetic: LaTeXML gets 4 tasks (it needs 3) and 512 MB of address
-  space each (`source.latexml.LIMITS`), one source conversion runs at a time on the machine (`sandbox.exclusive`),
-  and `ops sandbox-probe` prints `sandbox_total_bound_mb` and fails `--require-latexml` over
-  `SOURCE_SANDBOX_MAX_TOTAL_MB` (2048). The upload comment now assumes a 2 GB web service.
-- The sandbox also caps tasks and open files (`prlimit --nproc --nofile`), puts a seccomp filter in front of the
-  program (`core/seccomp.py`, built without libseccomp), counts the program's own output against the output budget,
-  and uses a cgroup v2 memory and pids limit for the whole group when the container allows one; the probe reports
-  `sandbox_task_cap`, `sandbox_file_cap`, `sandbox_seccomp` and `sandbox_cgroup`. docs/security.md says what is
-  capped per process and what in total.
-- New `core/sandbox.py` (the bubblewrap runner the probe tests and a later LaTeX upload uses) and
-  `source/latexml.py` (the `latexml` and `latexmlpost` calls). Nothing in the app calls them yet.
-  Tests: `tests/test_sandbox.py`, `tests/test_ops_sandbox_probe.py`.
-## Unreleased: LaTeXML in the image (branch latex/x1-latexml-image)
-
-- Dockerfile: `ARG INSTALL_LATEXML=false` also installs `bubblewrap` and `util-linux` (the sandbox and `prlimit`; the
-  build fails without them). It installs the distribution's `latexml` (0.8.8) with TeX
-  Live's base and ImageMagick, and replaces ImageMagick's `policy.xml` with a deny-by-default one
-  (PNG, JPEG, GIF only; PS, EPS, PDF, XPS, URL and `@file` denied by name:
-  `src/readablestem/source/imagemagick-policy.xml`). Measured on the pinned base: +270 MB
-  (324.3 MB to 594.4 MB). Off by default; nothing in the app uses it yet. `INSTALL_LATEXML` is
-  declared on `web` in `.railway/railway.ts`; CI builds once with the argument and checks the
-  versions and the policy. Docs: docs/deploy-railway.md, "LaTeXML"; THIRD_PARTY_NOTICES.md.
-  Tests: `tests/test_latexml_image.py`.
-## Unreleased: landing page and proof strip (branch design/d2-landing)
-
-- Landing page: the hero shows a real passage of the demo (OpenStax Physics 2.3, page 3): the PDF crop
-  and what a screen reader gets from its text layer, beside the converted paragraph with live MathML
-  and the reading `pipeline/speech.py` gives it. `scripts/hero_assets.py` builds the crop, text layer,
-  MathML, reading and a 7.8 KB subset of Latin Modern Math from the stored demo; `tests/test_hero_assets.py`
-  regenerates them and compares. Then Upload, review, post; what you get; the numbers; try it;
-  questions (who can use it, what happens to your documents) and about, in the same wording as before.
-- `web/proof_facts.py` reads PROOF.md once into `proof_facts.json` (regenerate with
-  `uv run python -m readablestem.web.proof_facts`); the landing page and /limits show four tiles from it, each with
-  its count, the set, the date, "blind", where a general chatbot scored the same or higher, and a "How it was
-  measured" link to the PROOF.md section. `tests/test_proof_facts.py` fails when the JSON and PROOF.md differ.
-
-## Unreleased: design system (branch design/d1-tokens-components)
-
-- Site design tokens and components (`static/tokens.css`, `static/app.css`, `DESIGN.md`,
-  `PRODUCT.md`): self-hosted Source Sans 3, Source Serif 4 and Source Code Pro, one accent
-  (`#1c46ad`), all text at least 7:1 in light and in dark (follows the browser's setting),
-  nothing under 14px, a 4px grid, 4px and 8px radii (no pills), a 75rem page and a 68ch reading
-  column on pages people read. The header has a Sign in button and folds into a Menu disclosure on
-  a narrow screen; the footer is four columns (Product, Trust, Guides, Source) with the same
-  links as before. Forced-colours and reduced-motion rules cover the new components. The app's
-  side-stripe notices and cards became full borders. `/style` (noindex, not in the sitemap) shows
-  every component. Docs: `docs/site.md` "Design system", `static/vendor/README.md`.
-## Unreleased: higher upload limits (branch limits/raise-upload-limits)
-
-- The limits now fit together. Before, a new account could convert 20 pages a day while one upload
-  could hold 30. Defaults: `MAX_PAGES_PER_JOB` 30 to 100, `MAX_UPLOAD_MB` 20 to 50,
-  `MAX_LARGE_UPLOAD_MB` 30 to 100 (also the most one upload request carries, files together),
-  `MAX_SOURCE_PAGES` 300 to 500, `OPEN_TIER_DAILY_PAGE_QUOTA` 20 to 150, `MAX_USD_PER_JOB` 2.00 (OpenAI)
-  and 3.00 (Claude) to 6.00 for both, `MAX_MODEL_CALLS_PER_JOB` 400 to 1200 (our densest 100-page test
-  document makes 652 calls). Not changed: `DAILY_SPEND_CAP_USD`, `OPEN_TIER_DAILY_SPEND_CAP_USD`,
-  `IMAGE_PAGES_*` caps, `CONVERSION_MEMORY_MB` and the job time limit (a 100-page document converts well
-  inside both: 31 s and 494 MB resident with fake models on one CPU, 193 s with 2 s of simulated model
-  latency a call; with 51 MB of pictures 44 s and 745 MB; docs/web.md, "The conversion runs in a child
-  process"). Production environment values (`PER_USER_DAILY_PAGE_QUOTA`, `OPEN_TIER_DAILY_PAGE_QUOTA`,
-  `MAX_USD_PER_JOB`) are set at deploy, not in code: a `MAX_USD_PER_JOB` of 4.70 set for tables is now
-  below the $5.71 that 100 pages need (docs/deploy.md, "Spend limits").
-- Stored-bytes caps, because uploads are in Postgres on a 5000 MB volume and one person could now store 2.2 GB: `STORAGE_PER_USER_MB` (300) and `STORAGE_OPEN_TIER_MB` (250) per person, counted with the quota checks in the job's transaction; `STORAGE_GLOBAL_MAX_MB` (2000, not 3000: the nightly backup check restores a second copy on the same volume) for the service, which turns uploads away with a 503 and puts `storage` in `/healthz/ops`. The hourly cron runs a plain `VACUUM` of the upload tables after a purge. The limits page names the cap. Declared in `.railway/railway.ts` (`webOnlyVariables`).
-- `ops launch-check` and the start-up check gain two warnings: an open-tier daily quota under one
-  full-size document, and `IMAGE_PAGES_MAX_USD_PER_JOB` under `MAX_USD_PER_JOB`.
-- Word and PowerPoint files: the ZIP checks scale with the upload limit (500 MB unpacked, 250 MB an
-  entry; were 200 and 100). A 100-page Word file became a PDF in 1.4 s here (PowerPoint could not be timed:
-  Impress is not installed on the box).
-- The parts page and its error message use `1-10` as the example range instead of `1-30`, which read
-  as a limit. docs/web.md, docs/deploy.md, docs/deploy-railway.md (the service should be allowed 2 GB; a 95
-  MB upload to confirm after the deploy), docs/security.md, docs/operations.md (how much the uploads
-  weigh in the database), README, vendor sheet, `.env.example`, `deploy/deploy.env.example`.
-## Unreleased: TeX producers (branch eq/tex-producer-xetex, on eq/inline-simple-maths)
+#### TeX producers (branch eq/tex-producer-xetex, on eq/inline-simple-maths)
 
 - `page_type.producer_hint` calls a PDF TeX-made when its producer or creator names TeX as a whole word
   (`page_type.TEX_PRODUCER`): pdfTeX, XeTeX and XeLaTeX (`xdvipdfmx`, offered by Overleaf), LuaTeX, LuaHBTeX, dvips,
@@ -382,7 +74,7 @@
 - Tests: `tests/test_producer_hint.py`.
 - Pipeline version 0.5.6 to 0.5.7; results from 0.5.6 load unchanged.
 
-## Unreleased: short inline maths from glyphs (branch eq/inline-simple-maths, on eq/t10-table-cell-maths)
+#### Short inline maths from glyphs (branch eq/inline-simple-maths, on eq/t10-table-cell-maths)
 
 - A relation set in a maths font before a number (`\approx 0.14`, `\geq 2`, `\geq 90\%`) is one inline formula in a
   TeX-made PDF (`glyph_math.relation_runs`); the run finder had dropped the relation as the tail of a cut formula and the
@@ -397,7 +89,7 @@
   missed (what the glyphs there are); `scripts/eq_span_edges.py` prints precision by evidence.
 - Pipeline version 0.5.5 to 0.5.6; results from 0.5.5 load unchanged.
 
-## Unreleased: maths in table cells (branch eq/t10-table-cell-maths, on eq/t11-glyph-spans)
+#### Maths in table cells (branch eq/t10-table-cell-maths, on eq/t11-glyph-spans)
 
 - A table cell that is one formula by its glyphs (TeX-made PDFs; the rules that find inline maths in prose, applied to the
   cell alone) is an inline equation element of the table (`layout._cell_maths`, `TableCell.equation_id`). The equation step
@@ -419,7 +111,7 @@
 - Pipeline version 0.5.4 to 0.5.5: `TableCell.equation_id` is new (left out of the JSON when empty, so a record without it
   is unchanged); results from 0.5.4 load unchanged.
 
-## Unreleased: inline span edges from glyphs (branch eq/t11-glyph-spans)
+#### Inline span edges from glyphs (branch eq/t11-glyph-spans)
 
 - Inline formulas of TeX-made PDFs start and end where the glyphs say (`pipeline/glyph_math.py`, docs/layout.md "Inline
   span edges from glyphs"): a comma, colon or semicolon set as an index stays in the formula (`\rho_{m,q}(x)` was `q(x)`),
@@ -434,146 +126,8 @@
 - Tests: `tests/test_glyph_math.py`.
 - Pipeline version 0.5.3 to 0.5.4: an inline formula's crop, id and marker text can change; results from 0.5.3 load
   unchanged.
-## Unreleased: sharing with named people (branch share/g1-named-people)
 
-- An owner can share one finished document with named people by email address (`/jobs/{id}/share`,
-  `web/shares.py`, `routes/sharing.py`; migration `b7112167eb0d`, table `job_shares`). They must sign in with
-  that exact address (matched in lower case and in full; no domain rule, no public link, nothing is emailed:
-  the owner copies the address). Two rights: `view` (job page, preview, downloads, review record) and
-  `review` (also the review screen and every decision and edit, each recorded under the reviewer's name in the
-  review record). The owner alone can delete, retry, change settings, upload a revision, combine parts, share
-  further or remove a share; removing one works on the next request. A shared document is listed under "Shared
-  with you" on My documents.
-- One access check, `routes.jobs.job_access(session, job_id, user, need)` with `need` `view`, `review` or
-  `owner`, replaces `owned_job` at every call site (about 50). A stranger or a removed person still gets the same
-  404 as for a made-up id; a shared person asking for more than their right gets a 403 page.
-- Quotas and spend stay the owner's: a model re-read a reviewer asks for counts against the owner's day allowance
-  and the document's caps. A viewer's download does not restart the owner's deletion clock.
-- Deleting a document deletes its shares; erasing an account deletes the shares that name its address.
-- A share applies only to a sign-in that proved the address (Google's verified email, Microsoft's `xms_edov`, or
-  an emailed single-use link sent to that address; migration `ecb0b22515e0` adds `login_links.email`). **After
-  this deploy, people who use a shared document sign in once more** (sessions from before it carry no proof);
-  until they do, the document's address shows a page telling them to sign in again.
-- Wording: the privacy notice, the accessibility-office page, the landing page and the job page no longer say
-  that only the owner can see a document. docs/web.md, docs/security.md. Test: `tests/test_job_shares.py` (every
-  job route against the owner, a viewer, a reviewer, a removed person and a stranger).
-## Unreleased: keyboard walk and draft ACR
-
-- New keyboard-only walk of the web app (`tests/test_web_keyboard_browser.py`, browser-marked,
-  helpers in `tests/fixtures/web/keyboard.py`): Tab through every page at 1280, 390 and 320 CSS px
-  (skip link, focus visible and not covered, names, no trap, no change on focus, landmark order)
-  and the main flows by key alone, with where focus lands after each redirect.
-  `tests/test_web_focus_style.py` checks the focus ring's colours offline.
-- Fix (found by the walk): after leaving a page out, putting it back, or choosing a line to change
-  in the page tools, focus stayed on the page itself because the redirect named a fragment that was
-  not focusable (a browser skips `autofocus` when the address has a fragment). The redirects and
-  links now name `#page-tools-summary`, and the tool sections take focus (`tabindex="-1"`).
-- Draft accessibility conformance report in `docs/acr/` (VPAT 2.5Rev WCAG edition layout, WCAG 2.2
-  A and AA), not published and not a claim of conformance: each row names its test or code, and
-  rows that need a screen reader session are "Not yet evaluated". `tests/test_acr_draft.py` holds
-  the report to its own rules.
-## Unreleased: development baseline (branch eval/dev-baseline-2026-11-03)
-
-- Measurement report `docs/eval-dev-baseline-2026-11-03.md`: ReadableSTEM at pipeline 0.5.3 with production flags on the 25
-  real-world development papers, against the recorded Opus (6 papers) and Haiku (25) chatbot answers. One
-  run, $0.1186 of model spend; no code, prompt or setting changed.
-## Unreleased: figures spot check
-
-- `eval figures-spotcheck` (`eval/figures_spotcheck.py`, docs/eval.md "Figure spot check"): offline,
-  no model call. From a figures run with long descriptions on, writes a blind sheet of every
-  long-judge fail plus a seeded sample of 10 passes for a person to label, and scores the labels
-  against a key (judge fails confirmed, sampled passes the person would fail, each with n and a
-  Wilson interval). Tests: `tests/test_eval_figures_spotcheck.py`.
-## Unreleased: fair queue
-
-- The worker takes queued jobs round-robin by person (`web/fair_queue.py`, docs/web.md "Worker"):
-  fewest attempts first as before, then the owner served longest ago, then oldest. Someone with ten
-  queued documents no longer keeps another person's single one waiting behind all ten; a person
-  alone is served in the same order as before. The job page's "documents ahead of yours" replays the
-  same order. Tests: `tests/test_web_fair_queue.py`, one Postgres test in `tests/test_web_postgres.py`.
-## Unreleased: Word and EPUB in "Download all" (branch export/w3-download-all-formats)
-
-- "Download all" (My documents and the course page) and "Combine parts" offer Word (.docx, where pandoc is
-  installed) and EPUB as well as HTML: `?format=docx` or `?format=epub` on `/app/download`,
-  `/courses/{id}/download` and `/jobs/{id}/combine`. Same wording and pattern as the single downloads
-  ("Other file types"). A Word zip holds at most 10 documents (each is a pandoc run); a document that cannot
-  be made in the file type is left out and counted in `contents.txt`. Each document counts as downloaded in
-  that file type, so the review record lists it. The HTML zip no longer restarts the deletion clock of ready
-  documents it left out for the 25-document cap. docs/output.md, docs/web.md, docs/security.md.
-
-## Unreleased: slide decks (branch layout/beamer-slides)
-
-- Slide decks (`pipeline/slides.py`, docs/layout.md "Slide decks"): a Beamer file, or a slide-shaped
-  file whose pages share labels, is read frame by frame. An overlay step whose every line and
-  picture is also on the frame's last page is not read at all (no crop, no model call, not in the
-  output); a step that differs (`\only`) stays and its heading says "(step 1 of 2)". Frame titles
-  are headings again (they were dropped as running headers), a theme's headline text and bar and a
-  lone slide number are dropped, two-column frames are read left then right, and a bullet that
-  wraps onto a line of maths ("... zero at" / "x = 0.") is not a display equation. On the Beamer
-  fixtures: `beamer_overlay` 6 pages to 2, the new `slides_steps` 13 to 6; no line of a last step is lost.
-- Fix (every PDF): a ligature's characters (`ff`, `fi`, `ffi`) come out in order. MuPDF boxes the second
-  letter with no width, and everything that sorts by position put it after the next letter ("Stifnf ess",
-  "Ofcfi e", "Specifci"). Found on the repo's PDFs: table cells of five files.
-- Fix: a PDF page label that the PDF writes as UTF-16 (xdvipdfmx, so every Tectonic deck) is read
-  (`page_labels.pdf_label`); it was refused as "<FEFF0031>" and the page markers fell back to the
-  footline number.
-- Tests: `tests/test_layout_slides.py` and `tests/fixtures/layout/latex/slides_steps.tex` with its
-  PDF; six of the strict xfails of `tests/test_layout_beamer_math.py` now pass (one test was reworded: a frame's title is a heading once).
-- Pipeline version 0.5.2 to 0.5.3: deck output and ligature text change; results from 0.5.2 load
-  unchanged.
-## Unreleased: redirects built from owned rows (branch sec/redirects-from-owned-job)
-
-- Every redirect in the review, edit, bulk, course, job-settings, feedback and job routes takes its job or course id
-  from the row the ownership check returned, never from the request's path or form. `write_review` and
-  `write_structure` return that id, and the `ReviewStale` and `ReviewInvalid` they raise carry it. The item a form
-  names is looked up in the stored result before it is put in an address. No change for a visitor; it removes the
-  CodeQL `py/url-redirection` alerts at the root. Test: `tests/test_web_redirects_owned.py`.
-
-## Unreleased: symbol inventory (branch hw/symbol-inventory)
-
-- Symbols screen (`GET/POST /jobs/{id}/symbols`, `web/inventory.py`, `routes/inventory.py`): for a document
-  with handwritten equations, every symbol read in them grouped with the ones that look alike, with counts,
-  small pictures and places; one symbol can be changed to another of its family everywhere at once, with
-  checkboxes to leave places out. Applied as one write through the edit checks per equation, never an accept
-  (each equation stays a required decision), one `relabel` review record per equation shown as one row in the
-  review record, one Undo. Linked from the review screen and the list view. docs/web.md, docs/eval-handwriting.md.
-## Unreleased: Word and EPUB downloads (branch export/word-and-buttons)
-
-- Word export (`pipeline/export_docx.py`, `readablestem export docx FILE.html OUT.docx`): the finished HTML through
-  pandoc in a child process (60 s, minimal environment, CPU, size and heap limits), then checked and fixed in
-  `word/document.xml`. Equations are native Word equations (OMML; the file must hold as many as the HTML has
-  `<math>`, else the export fails), headings are Heading 1 to 6, each picture's alt text is written where Word reads it
-  (pandoc wrote the picture's address there), a table's header row repeats and is marked `w:tblHeader`, lists and links
-  are Word's, the language and title are set, a long description follows its figure, page markers are left out and a
-  figure without a picture is paragraphs, not a layout table. Remote pictures, scripts and forms are not carried
-  (the same sanitiser as the EPUB). docs/output.md, "The Word export".
-- `GET /jobs/{id}/download.docx` and `/download.epub` (`web/routes/exports.py`) and an "Other file types" block on the
-  job page's finish line (plain links; the Word one only when pandoc is installed). Both follow the HTML download:
-  owner only, clock restarts, recorded as a download (with the decisions that were open), and offered only when no
-  decision is open. At most two Word files are made at once; a third request waits up to 20 s, then gets a 503 asking
-  to try again. "Download all" stays HTML only.
-- Usage events: a `download_format` event (`html`, `canvas`, `cartridge`, `docx`, `epub`) beside each `downloaded`; the
-  review record and its CSV list the file types downloaded, and its "what was not checked" says nobody has checked the
-  Word and EPUB files in Word or a reading app.
-- Fix: the Canvas zip and the Common Cartridge downloads did not restart the deletion clock, though docs/security.md
-  says a download does; they do now. The two questions after a download also open for the Common Cartridge link.
-- Docker image: pandoc from the distribution (about 200 MB on disk), always installed; `python-docx` joins the dev
-  group for the tests; THIRD_PARTY_NOTICES.md lists both.
-## Unreleased: wording and a page for accessibility offices (branch trust/wording-and-offices)
-
-- Copy: the "individual developer" and "not a company or a university" framing is gone from the landing, privacy,
-  terms and login pages, `llms.txt` and the README; the landing page has an About block ("Built and maintained by
-  Harish Manoharan. The code is open source."). The listed strings are in the pull request.
-- Licence wording (ADR 0003 addendum): the PyMuPDF/AGPL sentence moved from every footer to the Terms
-  ("Open source", `/terms#open-source`); the footer keeps the "Source code" link and gains an "Open source" link.
-  The demo and showcase notes link the source without the sentence.
-- New public page `/for-accessibility-offices` (`web/offices.py`): data flow with a text equivalent, the
-  companies that receive data (from `web/recipients.py`, as `/privacy`), retention from the settings, no training
-  and `store`, student records (FERPA), what the tool does not do, a pilot checklist, and a one-page summary to
-  download (`/for-accessibility-offices/summary`). Footer link, sitemap, `llms.txt`.
-- `docs/vendor-information.md` refreshed: current accuracy numbers with sample size, scanned and handwritten
-  pages, files, no conformance report, no claim of conformance (kept under 900 words).
-## Unreleased: page witness, why it changed nothing (branch eq/witness-diagnosis)
+#### Page witness, why it changed nothing (branch eq/witness-diagnosis)
 
 - Page witness (off: `FEATURE_PAGE_WITNESS`): when the crop's reading and the witness's tie on the letters, digits
   and Greek letters of the glyphs (23 of the 24 disagreements of the E1 dev run did, so the crop's reading always
@@ -583,7 +137,7 @@
   wrong 8.58 per 100 gold and decisions a page 4.35 unchanged. `scripts/eq_dev_run.py` has an offline arm
   `witness-sonnet-r2` for it and passes the two flags `realworld_run` gained. docs/eval-equation-round5.md.
 
-## Unreleased: page witness dev run (branch eq/e1-witness-dev)
+#### Page witness dev run (branch eq/e1-witness-dev)
 
 - `scripts/eq_dev_run.py` (new): the page witness on or off over twelve development papers, crop answers
   replayed, with a report and a pair-by-pair `witness` summary; `scripts/realworld_run.py rs` takes
@@ -594,7 +148,8 @@
   its whole reservation; `PAGE_WITNESS_TIMEOUT_S` (default 240) is set on the request.
 - Fix: `eval pipeline` left the witness's cost out of an item's `cost_usd`; items now carry `page_witness`
   and `page_witness_cost_usd`, and the cost block `page_witness_usd` and `page_witness_per_pdf_page_usd`.
-## Unreleased: calibrated flag policy (branch eq/flag-policy)
+
+#### Calibrated flag policy (branch eq/flag-policy)
 
 - Flag policy (off: `FLAG_POLICY`): `pipeline/flag_policy.py` turns an accepted equation that nobody is asked
   about into a required decision when a small logistic model over content-free features (second reading, notes,
@@ -605,7 +160,8 @@
   `--flag-policy`. Replayed on the recorded runs: on fresh2 to fresh4 (validation, 45 papers, 5,018 gold) silent wrong
   8.83 to 7.77 per 100 gold, flag recall 0.29 to 0.38, decisions a page 3.55 to 3.92; the goal (silent 4 per 100 at
   4 decisions a page) is not reachable with these features. docs/eval-flag-policy.md, docs/steps.md.
-## Unreleased: both readings on the review card (branch eq/review-both-readings)
+
+#### Both readings on the review card (branch eq/review-both-readings)
 
 - Review card: a typed equation the page witness read differently (`witness_mismatch`,
   `witness_extent_differs`) shows "The other reading" under the proposal: its formula, how it is read
@@ -613,7 +169,8 @@
   chips handwritten cards have (`web/reading_chips.py`, built on `reading_alternatives.from_reading`).
   Ordinary edits (checks, Undo), none preselected, audited as `page_witness_choice`. Nothing shows with
   `FEATURE_PAGE_WITNESS` off. Documented in docs/web.md and docs/steps.md.
-## Unreleased: glyph checks for equations (branch eq/bag-extended-extent)
+
+#### Glyph checks for equations (branch eq/bag-extended-extent)
 
 - `EQUATION_GLYPH_CHECKS` (off): the glyphs under an equation's box, and for an inline equation read with
   its line the glyphs beside it, are kept with the element (`Element.glyphs`, `core.types.GlyphContext`; read
@@ -631,7 +188,7 @@
   says only "bold". Measured by replay of the recorded fresh4 run in docs/eval-equation-glyph-checks.md.
 - `scripts/realworld_run.py rs --glyph-checks` turns the setting on for a replay.
 
-## Unreleased: page witness (branch eq/page-witness)
+#### Page witness (branch eq/page-witness)
 
 - Page witness (off: `FEATURE_PAGE_WITNESS`): one call per maths page to `PAGE_WITNESS_MODEL`
   (`claude-opus-5-5`, output limit 12,288) reads every formula on the page, table cells, captions and
@@ -644,109 +201,8 @@
   a formula only the witness read, with maths-glyph evidence and clear of other elements, is a new
   element and a required decision. New fields: `Element.witness_latex`, `witness_status`,
   `EquationFix.other_latex`, `other_source`, `DocumentResult.page_witness`. Documented in docs/steps.md. Not measured (E1 is a later step).
-## Unreleased: pen strokes check handwritten vector pages (branch hw/stroke-checks)
 
-- `pipeline/image_page_vector.py` (new): on a page `page_type` calls handwritten and `ink_strokes`
-  analysed, the image page pass now (1) draws the picture of each display equation, prose block
-  and left-out stretch from the strokes alone (300 dpi, black on white, cut to the ink) for the
-  model, the review screen and the student file; (2) checks each equation's reading against the
-  strokes: a letter in the other case (c o s u v w x z), a script lost, added or moved; (3)
-  compares the page's stroke groups with the blocks' boxes, so ink the reading left out becomes
-  the existing omission decision, including pale ink. Checks add failed warnings
-  (`image_page.case_check`, `image_page.script_check`; sentences in `web/messages.py`) to the
-  equation's fix and never change its required decision. Pages with no strokes, and every scan,
-  are read as before.
-- Settings `IMAGE_PAGES_VECTOR_CROPS` and `IMAGE_PAGES_VECTOR_CHECKS`, `VECTOR_CROPS` off until measured, `VECTOR_CHECKS` on. `layout.page_ink`
-  reads a page's strokes under the document lock; `run.recrop` can take the pages' kinds so a stored
-  vector page is drawn the way it was converted.
-- `scripts/handwriting_vector_checks.py` measures the checks on built vector sets at no cost
-  (put-in errors in the gold readings). Held-out (318 expressions): raised scripts taken out are
-  named 27 of 65 times at 12 of 172 false alarms, a case flip 21 of 37 at 6 of 25, a dropped
-  block 314 of 318 at 0 of 54 pages (the raster check: 290 of 318 at 11 of 54, and 0 on pale ink).
-  Not measured: real iPad ink, or the reader on the drawn pictures (docs/eval-handwriting.md,
-  "Checks from strokes").
-
-## Unreleased: agreement oracle on the recorded chatbot answers (branch eq/agreement-oracle)
-
-- `scripts/eq_oracle_agreement.py` and a D2 section of docs/eval-equation-diagnostics.md: how often
-  a second whole-page reading (the recorded Opus chatbot answers) is right where ours is wrong, how
-  often our reading is right when the two agree under `math_canonical`, how well disagreement
-  flags our wrong readings, and how many of our undetected equations it found. Measurement only,
-  offline, no change to the product.
-
-## Unreleased: a second reader's reading and choices on the review card (branch hw/reconcile-and-chips)
-
-- `pipeline/image_page_reconcile.py`: with `IMAGE_PAGES_SECOND_READER` set (`local`, `claude` or
-  `openai`; default `off`, and the reader must also be enabled), the crop of each handwritten display
-  equation is read by that reader and compared with the page's reading. Agreement is a note and the
-  item stays a required decision; a difference is a note and, where it is a few symbols, fills
-  `Element.alternatives`; an unavailable reader, a spent time share (`IMAGE_PAGES_SECOND_READER_TIME_S`)
-  or a spent reader budget leaves the item as it was and adds one notice for the document
-  (`second_reader_unavailable`, `second_reader_budget`) instead of a line on every equation. A read
-  is not started unless it fits the share, which never outlasts the job's own time limit (it now
-  reaches the child). The reader's own spend limit is never a failed fix, so it cannot stop the job.
-  In the hosted conversion child only the local reader can run: a production start is refused with
-  `claude` or `openai`, or with `local` and no model files (also in `ops launch-check`). The child's
-  counts come back in `ImagePagesSummary.second_reader` and the worker logs `second_reader_job`.
-- Image-page equations and tables are explicitly never part of a bulk accept.
-- A chosen reading is recorded in the review record as a choice.
-- Review card: a handwritten equation whose second reading differed shows one-click choices
-  ("Use capital X") under the proposal; each posts an ordinary edit (checks, record, Undo), none is
-  chosen for the person, and nothing changes while there are no alternatives. Keyboard, 44 px targets,
-  forced-colors and axe are tested.
-- The two reader prompts moved under `models/prompts/` (`math_reader.md`, `math_reader_claude.md`),
-  text unchanged, so the eval guard sees them (mapped to `latest-image-pages.json`).
-- New check messages for the agree and differ notes (`image_page.second_reader`) and two notice messages.
-- Not measured: how often the choices contain the right reading, or whether decisions per page fall
-  (docs/eval-handwriting.md).
-## Unreleased: a local handwriting reader (branch hw/local-reader)
-
-- New reader B, `local` (`models/math_readers/local_reader.py`): TexTeller on CPU with ONNX
-  Runtime, no key, no network, nothing leaves the server, so it is not a recipient and the
-  privacy page and production check are unchanged. Off (`MATH_READER_LOCAL_ENABLED=false`),
-  not called by the pipeline, built by `build_readers` like the Claude and OpenAI readers.
-  Settings: `MATH_READER_LOCAL_DIR`, `_THREADS` (2), `_TIME_S` (20, a read past it returns no
-  candidates with the outcome `timeout`).
-- Model files by `python -m readablestem.models.math_readers.local_weights` and, in the image,
-  by `--build-arg INSTALL_MATH_READER=true` (default off): five files at a pinned revision, each
-  refused unless its SHA-256 matches, the three ONNX files rewritten with int8 weights (0.6 GB
-  instead of 2.1 GB; about 1.1 GB resident in the conversion child, address space 2.1 GB under
-  the 3 GB cap). Measured on 74 expressions: 1.07 s a crop on two threads, exact 0.554 (float32
-  0.649); as a flag against the page pass it catches 18 of 21 wrong readings with 15 right ones
-  flagged (the page pass's required review: 10 and 17). The weights are Apache-2.0; the training
-  data and the practice set overlap in ways `docs/math-readers.md` lists.
-## Unreleased: page type reads per-sample pen ink (branch hw/page-type-dotted-ink)
-
-- `page_type` now calls vector handwriting drawn as one small filled disc per pen sample
-  `handwritten` (it was `vector_no_text`). Its ink analysis uses `ink_strokes`'s own rule for a
-  stroke made of samples (`sample_run_end`, `dot_grid_members`) instead of a second one. Dot-grid
-  paper, scatter-plot markers and stippled shading are still not handwriting. On the 846-page
-  labelled corpus no page changes its kind. Documented in docs/layout.md.
-
-## Unreleased: other readings of a formula as choices on its symbols (branch hw/schema-prompt)
-
-- `Element.alternatives` (`ReadingAlternatives`, `SymbolAlternative` in `core/types.py`): the doubtful
-  symbols of a reading as spans of the stored LaTeX, each with other LaTeX it may be, for a review to
-  offer as choices. Optional and empty everywhere today; results stored before it load as they were.
-- `pipeline/reading_alternatives.py` makes it from any other reading of the same expression
-  (`from_reading`, for a second reader) or from named doubts (`resolve_doubts`): spans are found in
-  the LaTeX as stored, an option is kept only when it converts, at most 3 doubts of 3 options.
-- Eval guard: the image page prompts, `IMAGE_PAGES_MODEL` and `ANTHROPIC_EFFORT_IMAGE_PAGES` need
-  `data/eval/latest-image-pages.json` (the document task never calls the image page pass). No such
-  report is committed yet.
-- No prompt changed. A prompt that made the page reader list its own doubts was measured and not
-  shipped: on 74 expressions it read 44 exactly against 49 for the current prompt, 50 carried
-  alternatives, and the right reading was one choice away for 7 of 18 one-symbol errors. docs/eval-handwriting.md,
-  "Doubtful symbols: tried, not shipped".
-## Unreleased: a vector-ink handwriting dev set (branch hw/vector-devset)
-
-- `scripts/handwriting_accuracy.py build-vector` and `eval/handwriting_vector.py` build a dev set of
-  MathWriting expressions drawn into PDFs as vector ink (stroked paths, filled per-sample shapes,
-  filled pen outlines), on plain and ruled paper, some with a typed header, with gold LaTeX per
-  expression and a manifest with a rebuild hash. The pages stay in `~/.cache/readablestem`; the
-  ink is CC BY-NC-SA. No model is called. Documented in docs/eval-handwriting.md.
-
-## Unreleased: the MathML shape for screen readers (branch mathml/screenreader-shape)
+#### The MathML shape for screen readers (branch mathml/screenreader-shape)
 
 - Chemistry MathML is shaped for MathCAT (NVDA, JAWS) at the one place MathML is made from LaTeX
   (`validate.safe_latex_to_mathml`, new `pipeline/chem_mathml.py`): one `mi` per element
@@ -794,7 +250,24 @@
   symbol like an `mtext` one; the primary scorer reads `mmultiscripts` as the answer keys' shape.
   The five golden HTML files gain one stylesheet line.
 
-## Unreleased: chemistry species check against the text layer (branch chem/species-check)
+#### Canonical comparator for two readings (branch eq/math-canonical)
+
+- `pipeline/math_canonical.py`: one comparator for "is this the same formula" (tree, notation-neutral,
+  spoken-equal, symbols) with a reason when it is not. The registered scorer scripts are untouched;
+  tests check the library agrees with them. `tests/test_realworld_registration.py` runs
+  `realworld_register.py --check` for every registered set. No product behaviour changes yet
+  ([docs/steps.md](docs/steps.md), "Comparing two readings").
+
+#### 
+
+- Equation diagnostics on the recorded real-world runs, no model and no cost: `scripts/eq_diag_tables.py` (why maths in
+  table cells is missed), `scripts/eq_diag_glyphs.py` (glyph evidence of undetected and span-wrong equations),
+  `scripts/eq_diag_unflagged.py` (why wrong equations with other symbols were not flagged). Counts and sample sizes in
+  [docs/eval-equation-diagnostics.md](docs/eval-equation-diagnostics.md). No product behaviour changes.
+
+### Chemistry
+
+#### Chemistry species check against the text layer (branch chem/species-check)
 
 - New check `equation.text_layer_species` (code `species_mismatch`, `pipeline/chem_check.py`): a
   chemistry reading's species (coefficient, formula with counts, charge, state) and arrows are
@@ -806,7 +279,8 @@
   reviewer's edit gets it too, and the compare table has "Species" rows. Numbers and the
   replay: [docs/steps.md](docs/steps.md), "Chemistry species check";
   `scripts/chem_check_replay.py`; tests in `tests/test_chem_check.py`.
-## Unreleased: chemistry spans in the layout (branch chem/layout-spans)
+
+#### Chemistry spans in the layout (branch chem/layout-spans)
 
 - Chemistry lists are cut into their items: `CO3 2−, F−` is two inline equations and
   `(a) A ⇌ B; (b) C ⇌ D` one inline equation per reaction (without the list marker), not one span
@@ -817,17 +291,8 @@
   `scripts/layout_identity.py` 135 are identical and the 8 that differ are chemistry sections;
   details and the replay in [docs/chemistry.md](docs/chemistry.md) ("Spans") and
   [docs/layout.md](docs/layout.md). Tests: `tests/test_layout_chemistry.py`.
-## Unreleased: speech under screen-reader engines (branch sr/speech-oracle)
 
-- `scripts/screenreader_speech.py` and `eval/speech_oracle.py` run any set's MathML (ours and the
-  gold's: OpenStax, authored, chemistry, handwriting, arXiv) through MathCAT 0.7.7 (NVDA 2026.1,
-  JAWS; ClearSpeak and SimpleSpeak) and Speech Rule Engine 4.1.5 (MathJax, ChromeVox). Per
-  equation: the spoken strings, whether MathCAT recognised chemistry, a word diff. Per set: the
-  share of ours that sounds like the gold under each engine, with an interval, and the worst
-  classes. `eval pipeline --speech` adds the aggregates to an equations or document report.
-  `scripts/speech_oracles/build.sh` builds the engines (rustup into `~/.cargo`, no sudo); without
-  them everything skips with a message. Offline, $0. See `docs/eval.md`, `docs/chemistry.md`.
-## Unreleased: `\ce` subset and `\ce` on every LaTeX path (branch chem/ce-subset)
+#### `\ce` subset and `\ce` on every LaTeX path (branch chem/ce-subset)
 
 - The `\ce{...}` subset (`pipeline/chem.py`) now reads a condition in a state symbol
   (`(aq, 0.10 M)`), the excited state of a nuclide (`^{60}_{28}Ni^*`) and gas and precipitate marks (`CO2 ^`, `AgCl v`);
@@ -837,7 +302,8 @@
   through `equation_step.read_latex`. A `\ce` outside the subset fails the LaTeX check with the new
   code `unsupported_ce` (was `unknown_command`) and the edit box says so in words. See
   [docs/chemistry.md](docs/chemistry.md).
-## Unreleased: chemistry speech fixes
+
+#### Chemistry speech fixes
 
 - The review screen's "read aloud roughly as" text (and the checks that compare readings) now
   reads a state with conditions, `(aq, 0.10 M)`, as "aqueous, 0.10 molar"; a redox couple
@@ -846,225 +312,10 @@
   an excited nuclide `⁶⁰₂₈Ni*` as "nickel 60, atomic number 28, excited state"; and units after a
   decimal in a chemistry row consistently (`0.000 V − 0.0592 V` both "volts"; `mol L⁻¹ s⁻¹` as one unit).
   Speech for sets that are not chemistry is unchanged (`docs/chemistry.md`, "Reading it aloud").
-## Unreleased: handwriting error classifier (branch hw/error-analysis)
 
-- `scripts/handwriting_errors.py` classifies every handwriting error in the recorded answers: kind
-  (case, Greek against Latin, other letter, digit against letter, `z` against `2`, `x` against `×`,
-  minus against dash, lost or added script, fraction, root, structure, left out), edit distance in
-  symbols, and whether the product's speech code reads the answer and the label alike. Text table
-  plus JSON with examples per arm; tests in `tests/test_handwriting_errors.py`; usage in
-  docs/eval-handwriting.md. It calls no model and changes no product behaviour.
-## Unreleased: vector ink to strokes (branch hw/ink-strokes)
+### Layout and output
 
-- New `pipeline/ink_strokes.py`: reads a PDF page's vector ink into ordered strokes (stroked
-  paths, one filled shape per pen sample, filled outlines), keeps colour and paint order, drops
-  page furniture (ruled and squared paper, dot grids, dashed lines, frames, backgrounds), groups
-  strokes into lines and regions, and writes each region as normalised point lists or InkML.
-  It uses `page_type`'s caps and `InkBudget` and groups with a grid hash (near linear), so a
-  hostile page cannot stall a worker. Nothing in the pipeline calls it yet, so conversions are
-  unchanged. What is read and the limits:
-  [docs/layout.md](docs/layout.md), "Vector ink and strokes" (`tests/test_ink_strokes.py`).
-## Unreleased: text layers that do not cover the page, and the maths rule as a guard (branch fix/handwriting-skip-and-flags)
-
-- A visible text layer no longer makes a page "typed" when it does not cover the page's content
-  (`page_type.TEXT_NOT_COVERING`, classifier page-type-v5.5). A watermark, a header, a stamp or a page
-  number over a page-sized picture (a photographed notebook page) made the page typed: it skipped the image page pass and came out "Not converted"
-  with only that text. Three of five real photographed pages hit it. Such a page is now scanned or
-  handwritten and read by the pass when asked; its visible text is still read when the pass is off, and
-  the pass's reading replaces it when on (`page_type.keeps_text`, `layout._analyze_document`,
-  `run.convert_pdf`). A background picture repeated on the pages, a plain one, or one with nothing on
-  it is not content. Details, thresholds and what was measured: docs/layout.md, "Hidden text and page
-  types"; ADR 0007 point 13. `tests/test_page_type_text_coverage.py`.
-- `scripts/page_type_corpus_compare.py` compares the classifier with and without these rules on a
-  labelled corpus (0 pages worse of 846 on the author's corpus; a test runs it when the corpus is there).
-- Production refuses `FEATURE_IMAGE_PAGES` or `IMAGE_PAGES_ACCEPT_AGREED` with
-  `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED=false` (`Settings.check_production`).
-- The review card of a page that was tried from an image and stayed an image says why (`reading_note`).
-- `image_page.enforce_maths_required` runs after every step: any equation or table read from an image
-  whose governing decision is not a required one is lifted to one (a no-op when every path kept
-  ADR 0007 point 12). A practice-set run that seemed to show 14 of 25 and 16 of 30 wrong readings not
-  flagged counted an inline formula's own `review`; counted by its paragraph's decision, as the eval
-  does, all were asked about (replayed at $0: docs/eval-handwriting.md, "Note, 2026-11-03").
-  `tests/test_image_page_maths_required.py`.
-- Copy: `limits.html`, README, docs/vendor-information.md (list in the pull request).
-## Unreleased: eval runs keep their recordings; chemistry report fields (branch chem/eval-metric)
-
-- Every eval run that calls a real model (`eval pipeline` on any set and task, `eval sample`,
-  `eval calibrate --probes`) now writes `answers.jsonl`, `items.jsonl`, `report.json` and `run.json`
-  (the commit) under `~/.cache/readablestem/<set>/runs/<timestamp>/`, and the report names the folder
-  and the commit under `recording`. `--answers` and `--items` still override. Fake runs, replays and
-  the sealed check part keep nothing. `scripts/dev_chatbot.py score` always writes its items.
-- `scripts/dev_chem_classes.py`: reads a run folder, prints how many gold equations harm a listener,
-  and with `--speech` the spoken comparison and the silent harm per 100 gold.
-- Document reports with chemistry gold gain a `chemistry` block: `chem_right_excl_times` (lone `×`
-  left out, reported beside the count that keeps it) and `silent_harm` (wrong, not asked, heard
-  differently), counts only. Report fields only; the primary scorer, the gate and committed reports
-  are unchanged, and no gate reads them.
-- Recordings are private (folders 0700, files 0600). `eval prune --older-than DAYS [--set NAME] [--dry-run]`
-  deletes old runs and keeps any a committed report names. `scripts/dev_chem_classes.py` refuses
-  held-out and sealed run folders.
-## Unreleased: a kit for collecting hand-copied OpenStax examples (branch hw/copy-set-kit)
-
-- `scripts/handwriting_copy_set.py` and `data/handwriting-copy/README.md`: a kit for a small set of
-  real iPad handwriting whose answer key nobody types. It draws OpenStax worked examples with a
-  written, seeded rule behind a CC BY licence gate (the committed table, then the live archive and CMS
-  records), writes each volunteer a brief, matches the PDFs they return to passages (counts only in
-  reports; a folder inside the repository is refused), builds the gold from the passage's published
-  MathML, and writes a manifest in which a page is published only if its writer's yes is recorded; the
-  other pages are counts. A person must look at every page (`review`) before it can be published; published PDFs are rebuilt with page content only and checked, failing closed; unpublished pages can be purged. Tests in
-  `tests/test_handwriting_copy_set.py`; no page has been collected yet, so there is no result.
-## Unreleased: reader B adapters for handwritten expressions (branch hw/math-readers)
-
-- `models/math_readers/`: one small `MathReader` protocol (a PNG crop in, LaTeX candidates with
-  reported confidences out) and two adapters, a Claude reader built to differ from the page pass
-  (another model, its own instructions, one high-resolution crop, no page text) and an OpenAI
-  vision reader (`store: false`). Worst-case reservation before every send, timeout, retries,
-  refusal and error mapping as in the step clients, no content in logs. Settings
-  `MATH_READER_CLAUDE_*` and `MATH_READER_OPENAI_*`, all off; nothing in the pipeline calls them
-  yet (`docs/math-readers.md`).
-- One list of who receives what (`web/recipients.py`) now writes the privacy page (its provider
-  items, "Where it is processed" and the account deletion notes), so a reader's company is named as
-  soon as the reader is on, whichever `MODEL_PROVIDER` is set. A production start is refused while a
-  reader is on and the rendered page does not name every company that receives pictures; the
-  launch checks (model provider, analytics, tables, notation, Microsoft, sign-up) now read the
-  rendered page, not the template source. `MATH_READER_MAX_USD_PER_JOB` caps all readers of a job
-  together. The vendor sheet and `docs/security.md` are updated to match.
-## Unreleased: handwriting harness for private handwritten notes
-
-- `scripts/handwriting_own.py`: intake of PDFs from a folder outside the repo, a hash-based dev and
-  held-out split registered privately, a blank answer-key form served on 127.0.0.1
-  (`scripts/handwriting_gold_form.html`, no model draft) and a `run` command capped by `--max-usd`
-  (at most 2.00 in total across restarts). `run` sends the PDFs to the model provider. Every command
-  refuses a path inside a git repository; `.gitignore` guards the usual private folder names.
-  Use: [docs/eval-handwriting.md](docs/eval-handwriting.md), "Your own handwritten notes".
-## Unreleased: canonical comparator for two readings (branch eq/math-canonical)
-
-- `pipeline/math_canonical.py`: one comparator for "is this the same formula" (tree, notation-neutral,
-  spoken-equal, symbols) with a reason when it is not. The registered scorer scripts are untouched;
-  tests check the library agrees with them. `tests/test_realworld_registration.py` runs
-  `realworld_register.py --check` for every registered set. No product behaviour changes yet
-  ([docs/steps.md](docs/steps.md), "Comparing two readings").
-## Unreleased
-
-- Equation diagnostics on the recorded real-world runs, no model and no cost: `scripts/eq_diag_tables.py` (why maths in
-  table cells is missed), `scripts/eq_diag_glyphs.py` (glyph evidence of undetected and span-wrong equations),
-  `scripts/eq_diag_unflagged.py` (why wrong equations with other symbols were not flagged). Counts and sample sizes in
-  [docs/eval-equation-diagnostics.md](docs/eval-equation-diagnostics.md). No product behaviour changes.
-## Unreleased: finished steps are kept when a configuration error ends the run
-
-- When a configuration error (a model that is not set up) ended a conversion while other
-  steps were still being answered, those steps were not kept for "Try again" if the error
-  reached the scheduler first; they are now (`pipeline/run.py`, `_Run.collect`). The tests
-  for this and for the worker and child-process suites no longer depend on timing luck, and
-  the end-to-end content test renders from the stored result the way the review screen does
-  (page markers included).
-
-## Unreleased: conversions run in a child process (branch fix/worker-child-process)
-
-- The whole conversion (`convert_pdf`) now runs in a child process the worker can kill
-  (`web/isolated_convert.py`, `web/conversion_child.py`), with an address-space cap
-  (`CONVERSION_MEMORY_MB`, default 3072), a CPU limit and the job's wall-clock limit. A PDF that
-  passes the upload probe and still crashes, exhausts memory or hangs MuPDF now fails that one job
-  (`conversion_crashed`, `conversion_oom`, `timeout`) instead of taking the web process, every
-  session and the worker down, three times over. The child has no keys or database URL: model
-  requests, spend reservations, progress and the step cache stay in the web process, so spend
-  accounting and the database writes are as before. Results are unchanged
-  (`tests/test_web_isolated_convert.py`). `PRELOAD_TABLE_MODELS` no longer loads models in the web
-  process. Details and measurements: [docs/web.md](docs/web.md), "The conversion runs in a child process".
-## Unreleased: faster CI
-
-- The pytest job is split into four shards balanced by recorded durations (`--shard i/4`,
-  `tests/shard_durations.json`), with a check that every test ran in exactly one shard. Python
-  3.14 runs the full suite on main, nightly and on dependency or workflow changes, and a smoke
-  (ruff, ty, import of every module, one shard in eight) on other pull requests. The browser job
-  runs in two shards of three xdist workers each and caches Chromium and axe-core; the axe-core download is written
-  atomically. Pull request runs cancel when superseded, main runs do not. Job names changed:
-  `ruff + ty + pytest (Python 3.x)` is now `ruff + ty (Python 3.x)` plus `pytest (...)` shards; a
-  `CI passed` job summarises them. See [docs/development.md](docs/development.md), "CI".
-
-## Unreleased: dependency and CI hardening
-
-- Locked dependencies upgraded for known advisories: pillow 12.3.0 to 13.0.0 (floor now `>=13.0`),
-  certifi to 2026.10.23, joserfc to 1.7.7.
-- CI: a `dependency-audit` job (`pip-audit` over the exported lock), a CodeQL workflow (Python and
-  GitHub Actions; push to main, pull requests, weekly), `alembic upgrade head` plus `alembic check` in
-  the `postgres` job, which now runs Postgres 18 (the backup image's major). Zero collected tests in the
-  `postgres` and `browser` jobs now fails them. The main `pytest` step runs in parallel (`-n auto`).
-- `make test-fast`; pytest-xdist and pytest-timeout in the dev group. The review-UX browser tests wait
-  with Playwright's `expect` and have a 120 s per-test timeout.
-## The interim held-out report is replayed at the tag, and CI runs it (2026-11-02, branch fix/proof-interim-repro)
-
-- `tests/test_proof_interim.py` used to rebuild the registered report with the current scorer, and
-  skipped without the held-out key, which CI never fetches. With the key it failed on main: the
-  chemistry converter change moved one parser's exact equations (238 to 241 of 1,369) and the rename
-  of Addendum 8 moved coverage by 210 6-grams. It now replays `report.py` at the tag
-  `proof-heldout-2026-10` with the key the tag's code fetches (`make heldout-gold-at-tag`) and
-  requires the registered bytes. No registered number or file changed.
-- `make proof-interim` writes `proof/interim/rebuilt-here.md` instead of the registered file.
-- `.github/workflows/proof-interim.yml` fetches the key and runs the test (a missing key fails) on
-  pull requests touching `proof/`, the scorer modules, the dependencies or the test, and weekly.
-## Unreleased: security hardening
-
-- The `/m/` analytics relay is rate limited per address (`analytics`, 300 per 10 minutes) and no
-  longer forwards the visitor's address to PostHog.
-- Production refuses `ANALYTICS_ENABLED=true` until the privacy notice names PostHog and no
-  longer says there are no analytics. The notice text is unchanged.
-- Production requires a `CRON_TOKEN` of at least 32 characters.
-- A one-time `proxy_hops_unexpected` log line when `X-Forwarded-For` has more entries than
-  `TRUSTED_PROXY_HOPS + 1`; `launch-check` flags `TRUSTED_PROXY_HOPS=0` in production.
-- `SESSION_SECRET_PREVIOUS`: earlier session secrets accepted for verification only, so the
-  secret can be rotated without signing everyone out ([docs/security.md](docs/security.md)).
-## Unreleased: review at scale, finish notice, guides, caching
-
-- Review: "Accept all remaining equations whose checks passed" and "Accept all figures that have
-  generated alt text", each after a list of what would be accepted; one write, one Undo
-  (`web/bulk_accept.py`). The list view's decisions can be filtered by kind and by page. Every card
-  has "Report this item" (job and item ids only). Pages kept as images have the documented "Leave
-  this page out of the HTML" button. Undo is 44 px, and the marks on the page image grow to 44 px
-  where there is room ([docs/web.md](docs/web.md), "Review at scale").
-- Job page: the tab title changes and an opt-in browser notice shows when a conversion finishes.
-  "Upload a revised version" is on the results page and on each finished row of My documents.
-- The landing page says what review costs (decisions per page, a full job, a new account's day,
-  deletion after 24 hours). `/guides` lists the guides; the sitemap names the showcase pages by their
-  canonical address.
-- `/demo`, the showcase pages and unhashed static files are served with an ETag and a one hour
-  `max-age` instead of `no-store` or `no-cache`.
-## Unreleased
-
-- Fifth fresh real-world split, builder only (no system run): `scripts/fresh5_select.py` (arXiv continuation, OpenStax
-  sections never used and printed to PDF, course-style LaTeX incl. Beamer decks from GitHub under CC BY, CC BY-SA
-  or MIT, compiled with a user-level TeX Live and Tectonic as fallback inside a bubblewrap sandbox), `gold/course_corpus.py`, and the registration as an unsigned draft
-  (`data/realworld/PREREGISTRATION-FRESH5.md`). `arxiv_gold.analyse` takes `min_equations` (default unchanged, 5). New `gold/safe_tex.py`: the one place that unpacks
-  (no links or unsafe paths, size and file caps, atomic) and compiles downloaded TeX (sandbox, `-norc`, no network or shell
-  escape, no environment from the parent, a cap on what a compile writes); `realworld_build.py` and
-  `figures_v2_arxiv.py` unpack and compile through it too.
-  Stratum D (`fresh5_select.py chemistry`): never-used OpenStax chemistry sections from the CC BY first editions, then the CC BY-NC-SA
-  2e editions as a private measurement (licence read live; their PDFs and gold only in the cache, ids and hashes in the repository),
-  with measured text overlap and page gates, and a chemistry-aware success rule in the draft registration; the rule fills 3 of 4 places. The used-section scan skips the selection files of B and D.
-  [docs/eval-realworld.md](docs/eval-realworld.md).
-### Figure gold v2 and a draft pre-registration for long descriptions
-
-- `data/gold-figures-v2/`: 50 figures (14 data charts, 14 diagrams, 10 photos and illustrations, 12 chemistry
-  structures) from CC BY OpenStax books, drawn by a seeded rule with licence and exclusion gates
-  (`gold/figures_v2.py`, `scripts/figures_v2_pool.py`, `scripts/figures_v2_build.py`); each has its source,
-  licence and a reference long description, and 4 of the charts a reference data table. 45 figures come from
-  retired editions ([decisions/0001-scope.md](docs/decisions/0001-scope.md), question 2). No model was run.
-- `gold/figures_v2_arxiv.py` reads plotted data from pgfplots TeX; 100 seeded CC BY papers held no usable
-  chart. `gold/figures_v2_table.py` scores table cells against a reference table.
-- [docs/eval-figures-long.md](docs/eval-figures-long.md): the set, and a draft pre-registration (arms, bars,
-  budget cap, judge calibration with human labels) awaiting sign-off.
-### EPUB export
-
-- `readablestem export epub FILE.html OUT.epub`: an EPUB 3 from the finished HTML (`pipeline/export_epub.py`): XHTML with native MathML, images as files with their alt text, a contents list from the headings, a page list from page markers when present, language, title and accessibility metadata. No `conformsTo`; the summary makes no conformance claim; a feature is claimed only when every item has it. Scripts, frames, forms, remote pictures and `url()` styles are not carried. EPUBCheck and DAISY Ace run on it in `.github/workflows/epub.yml` and locally when installed ([docs/output.md](docs/output.md), "The EPUB export"). No route or button yet.
-### Documentation
-
-- `docs/screen-reader-test.md`: a 15-minute VoiceOver (Safari) protocol for the demo, a converted file and the review screen, with a results table that maps to WCAG 2.2 criteria.
-### Microsoft sign-in configuration
-
-- `.railway/railway.ts` declares `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and `MS_ALLOWED_TENANTS` on the web service as `preserve()`, so values set with `railway variable set` survive `railway config apply`. `docs/deploy-railway.md` has a "Microsoft sign-in on Railway" section with the app registration, the secret's expiry, the allowed directory ids and the exact commands.
-- `readablestem ops launch-check` also lists `MS_ALLOWED_TENANTS` set without a client id and secret (the sign-in would be quietly off). A client id or secret alone was already refused.
-
-### Layout structure: bookmarks, numbered and run-in headings, joins (2026-11-02, branch fix/layout-structure)
+#### Layout structure: bookmarks, numbered and run-in headings, joins (2026-11-02, branch fix/layout-structure)
 
 - The PDF's outline (bookmarks) is the first signal for headings when it matches the page text
   (`pipeline/outline.py`): a line that is a bookmark's title becomes a heading at the bookmark's level
@@ -1103,7 +354,8 @@
   of the repository's fixtures, the three real-document sets and the eval's prints (128 PDFs, 245 tables); the
   fixes are pinned by generated pages. Real-document sets unchanged (25, 39 and 58 labelled tables, precision 1.000).
   `make fuzz-tables`: 300 of 300 mutants ok, as before.
-### Navigation in the output, and combining the parts of a long source (branch feat/output-navigation)
+
+#### Navigation in the output, and combining the parts of a long source (branch feat/output-navigation)
 
 - The converted file now has a skip link, a contents list (`<nav aria-label="Contents">`, nested links to the
   headings, from 3 headings, and not when the PDF has a contents page of its own), page markers at each source
@@ -1136,7 +388,828 @@
   2026-10-14 and 2026-10-21; it said 0.4.0) and tells `PIPELINE_VERSION` (`pipeline/run.py`, what reports
   record) from the package `__version__` (0.1.0); `tests/test_eval_docs.py` keeps the table true. The 0.4.0
   results sections are labelled as historical and are not rewritten.
-### Monitoring and recovery
+
+### Scans and handwriting
+
+#### Symbol inventory (branch hw/symbol-inventory)
+
+- Symbols screen (`GET/POST /jobs/{id}/symbols`, `web/inventory.py`, `routes/inventory.py`): for a document
+  with handwritten equations, every symbol read in them grouped with the ones that look alike, with counts,
+  small pictures and places; one symbol can be changed to another of its family everywhere at once, with
+  checkboxes to leave places out. Applied as one write through the edit checks per equation, never an accept
+  (each equation stays a required decision), one `relabel` review record per equation shown as one row in the
+  review record, one Undo. Linked from the review screen and the list view. docs/web.md, docs/eval-handwriting.md.
+
+#### Pen strokes check handwritten vector pages (branch hw/stroke-checks)
+
+- `pipeline/image_page_vector.py` (new): on a page `page_type` calls handwritten and `ink_strokes`
+  analysed, the image page pass now (1) draws the picture of each display equation, prose block
+  and left-out stretch from the strokes alone (300 dpi, black on white, cut to the ink) for the
+  model, the review screen and the student file; (2) checks each equation's reading against the
+  strokes: a letter in the other case (c o s u v w x z), a script lost, added or moved; (3)
+  compares the page's stroke groups with the blocks' boxes, so ink the reading left out becomes
+  the existing omission decision, including pale ink. Checks add failed warnings
+  (`image_page.case_check`, `image_page.script_check`; sentences in `web/messages.py`) to the
+  equation's fix and never change its required decision. Pages with no strokes, and every scan,
+  are read as before.
+- Settings `IMAGE_PAGES_VECTOR_CROPS` and `IMAGE_PAGES_VECTOR_CHECKS`, `VECTOR_CROPS` off until measured, `VECTOR_CHECKS` on. `layout.page_ink`
+  reads a page's strokes under the document lock; `run.recrop` can take the pages' kinds so a stored
+  vector page is drawn the way it was converted.
+- `scripts/handwriting_vector_checks.py` measures the checks on built vector sets at no cost
+  (put-in errors in the gold readings). Held-out (318 expressions): raised scripts taken out are
+  named 27 of 65 times at 12 of 172 false alarms, a case flip 21 of 37 at 6 of 25, a dropped
+  block 314 of 318 at 0 of 54 pages (the raster check: 290 of 318 at 11 of 54, and 0 on pale ink).
+  Not measured: real iPad ink, or the reader on the drawn pictures (docs/eval-handwriting.md,
+  "Checks from strokes").
+
+#### A second reader's reading and choices on the review card (branch hw/reconcile-and-chips)
+
+- `pipeline/image_page_reconcile.py`: with `IMAGE_PAGES_SECOND_READER` set (`local`, `claude` or
+  `openai`; default `off`, and the reader must also be enabled), the crop of each handwritten display
+  equation is read by that reader and compared with the page's reading. Agreement is a note and the
+  item stays a required decision; a difference is a note and, where it is a few symbols, fills
+  `Element.alternatives`; an unavailable reader, a spent time share (`IMAGE_PAGES_SECOND_READER_TIME_S`)
+  or a spent reader budget leaves the item as it was and adds one notice for the document
+  (`second_reader_unavailable`, `second_reader_budget`) instead of a line on every equation. A read
+  is not started unless it fits the share, which never outlasts the job's own time limit (it now
+  reaches the child). The reader's own spend limit is never a failed fix, so it cannot stop the job.
+  In the hosted conversion child only the local reader can run: a production start is refused with
+  `claude` or `openai`, or with `local` and no model files (also in `ops launch-check`). The child's
+  counts come back in `ImagePagesSummary.second_reader` and the worker logs `second_reader_job`.
+- Image-page equations and tables are explicitly never part of a bulk accept.
+- A chosen reading is recorded in the review record as a choice.
+- Review card: a handwritten equation whose second reading differed shows one-click choices
+  ("Use capital X") under the proposal; each posts an ordinary edit (checks, record, Undo), none is
+  chosen for the person, and nothing changes while there are no alternatives. Keyboard, 44 px targets,
+  forced-colors and axe are tested.
+- The two reader prompts moved under `models/prompts/` (`math_reader.md`, `math_reader_claude.md`),
+  text unchanged, so the eval guard sees them (mapped to `latest-image-pages.json`).
+- New check messages for the agree and differ notes (`image_page.second_reader`) and two notice messages.
+- Not measured: how often the choices contain the right reading, or whether decisions per page fall
+  (docs/eval-handwriting.md).
+
+#### A local handwriting reader (branch hw/local-reader)
+
+- New reader B, `local` (`models/math_readers/local_reader.py`): TexTeller on CPU with ONNX
+  Runtime, no key, no network, nothing leaves the server, so it is not a recipient and the
+  privacy page and production check are unchanged. Off (`MATH_READER_LOCAL_ENABLED=false`),
+  not called by the pipeline, built by `build_readers` like the Claude and OpenAI readers.
+  Settings: `MATH_READER_LOCAL_DIR`, `_THREADS` (2), `_TIME_S` (20, a read past it returns no
+  candidates with the outcome `timeout`).
+- Model files by `python -m readablestem.models.math_readers.local_weights` and, in the image,
+  by `--build-arg INSTALL_MATH_READER=true` (default off): five files at a pinned revision, each
+  refused unless its SHA-256 matches, the three ONNX files rewritten with int8 weights (0.6 GB
+  instead of 2.1 GB; about 1.1 GB resident in the conversion child, address space 2.1 GB under
+  the 3 GB cap). Measured on 74 expressions: 1.07 s a crop on two threads, exact 0.554 (float32
+  0.649); as a flag against the page pass it catches 18 of 21 wrong readings with 15 right ones
+  flagged (the page pass's required review: 10 and 17). The weights are Apache-2.0; the training
+  data and the practice set overlap in ways `docs/math-readers.md` lists.
+
+#### Page type reads per-sample pen ink (branch hw/page-type-dotted-ink)
+
+- `page_type` now calls vector handwriting drawn as one small filled disc per pen sample
+  `handwritten` (it was `vector_no_text`). Its ink analysis uses `ink_strokes`'s own rule for a
+  stroke made of samples (`sample_run_end`, `dot_grid_members`) instead of a second one. Dot-grid
+  paper, scatter-plot markers and stippled shading are still not handwriting. On the 846-page
+  labelled corpus no page changes its kind. Documented in docs/layout.md.
+
+#### Other readings of a formula as choices on its symbols (branch hw/schema-prompt)
+
+- `Element.alternatives` (`ReadingAlternatives`, `SymbolAlternative` in `core/types.py`): the doubtful
+  symbols of a reading as spans of the stored LaTeX, each with other LaTeX it may be, for a review to
+  offer as choices. Optional and empty everywhere today; results stored before it load as they were.
+- `pipeline/reading_alternatives.py` makes it from any other reading of the same expression
+  (`from_reading`, for a second reader) or from named doubts (`resolve_doubts`): spans are found in
+  the LaTeX as stored, an option is kept only when it converts, at most 3 doubts of 3 options.
+- Eval guard: the image page prompts, `IMAGE_PAGES_MODEL` and `ANTHROPIC_EFFORT_IMAGE_PAGES` need
+  `data/eval/latest-image-pages.json` (the document task never calls the image page pass). No such
+  report is committed yet.
+- No prompt changed. A prompt that made the page reader list its own doubts was measured and not
+  shipped: on 74 expressions it read 44 exactly against 49 for the current prompt, 50 carried
+  alternatives, and the right reading was one choice away for 7 of 18 one-symbol errors. docs/eval-handwriting.md,
+  "Doubtful symbols: tried, not shipped".
+
+#### A vector-ink handwriting dev set (branch hw/vector-devset)
+
+- `scripts/handwriting_accuracy.py build-vector` and `eval/handwriting_vector.py` build a dev set of
+  MathWriting expressions drawn into PDFs as vector ink (stroked paths, filled per-sample shapes,
+  filled pen outlines), on plain and ruled paper, some with a typed header, with gold LaTeX per
+  expression and a manifest with a rebuild hash. The pages stay in `~/.cache/readablestem`; the
+  ink is CC BY-NC-SA. No model is called. Documented in docs/eval-handwriting.md.
+
+#### Handwriting error classifier (branch hw/error-analysis)
+
+- `scripts/handwriting_errors.py` classifies every handwriting error in the recorded answers: kind
+  (case, Greek against Latin, other letter, digit against letter, `z` against `2`, `x` against `×`,
+  minus against dash, lost or added script, fraction, root, structure, left out), edit distance in
+  symbols, and whether the product's speech code reads the answer and the label alike. Text table
+  plus JSON with examples per arm; tests in `tests/test_handwriting_errors.py`; usage in
+  docs/eval-handwriting.md. It calls no model and changes no product behaviour.
+
+#### Vector ink to strokes (branch hw/ink-strokes)
+
+- New `pipeline/ink_strokes.py`: reads a PDF page's vector ink into ordered strokes (stroked
+  paths, one filled shape per pen sample, filled outlines), keeps colour and paint order, drops
+  page furniture (ruled and squared paper, dot grids, dashed lines, frames, backgrounds), groups
+  strokes into lines and regions, and writes each region as normalised point lists or InkML.
+  It uses `page_type`'s caps and `InkBudget` and groups with a grid hash (near linear), so a
+  hostile page cannot stall a worker. Nothing in the pipeline calls it yet, so conversions are
+  unchanged. What is read and the limits:
+  [docs/layout.md](docs/layout.md), "Vector ink and strokes" (`tests/test_ink_strokes.py`).
+
+#### Text layers that do not cover the page, and the maths rule as a guard (branch fix/handwriting-skip-and-flags)
+
+- A visible text layer no longer makes a page "typed" when it does not cover the page's content
+  (`page_type.TEXT_NOT_COVERING`, classifier page-type-v5.5). A watermark, a header, a stamp or a page
+  number over a page-sized picture (a photographed notebook page) made the page typed: it skipped the image page pass and came out "Not converted"
+  with only that text. Three of five real photographed pages hit it. Such a page is now scanned or
+  handwritten and read by the pass when asked; its visible text is still read when the pass is off, and
+  the pass's reading replaces it when on (`page_type.keeps_text`, `layout._analyze_document`,
+  `run.convert_pdf`). A background picture repeated on the pages, a plain one, or one with nothing on
+  it is not content. Details, thresholds and what was measured: docs/layout.md, "Hidden text and page
+  types"; ADR 0007 point 13. `tests/test_page_type_text_coverage.py`.
+- `scripts/page_type_corpus_compare.py` compares the classifier with and without these rules on a
+  labelled corpus (0 pages worse of 846 on the author's corpus; a test runs it when the corpus is there).
+- Production refuses `FEATURE_IMAGE_PAGES` or `IMAGE_PAGES_ACCEPT_AGREED` with
+  `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED=false` (`Settings.check_production`).
+- The review card of a page that was tried from an image and stayed an image says why (`reading_note`).
+- `image_page.enforce_maths_required` runs after every step: any equation or table read from an image
+  whose governing decision is not a required one is lifted to one (a no-op when every path kept
+  ADR 0007 point 12). A practice-set run that seemed to show 14 of 25 and 16 of 30 wrong readings not
+  flagged counted an inline formula's own `review`; counted by its paragraph's decision, as the eval
+  does, all were asked about (replayed at $0: docs/eval-handwriting.md, "Note, 2026-11-03").
+  `tests/test_image_page_maths_required.py`.
+- Copy: `limits.html`, README, docs/vendor-information.md (list in the pull request).
+
+#### A kit for collecting hand-copied OpenStax examples (branch hw/copy-set-kit)
+
+- `scripts/handwriting_copy_set.py` and `data/handwriting-copy/README.md`: a kit for a small set of
+  real iPad handwriting whose answer key nobody types. It draws OpenStax worked examples with a
+  written, seeded rule behind a CC BY licence gate (the committed table, then the live archive and CMS
+  records), writes each volunteer a brief, matches the PDFs they return to passages (counts only in
+  reports; a folder inside the repository is refused), builds the gold from the passage's published
+  MathML, and writes a manifest in which a page is published only if its writer's yes is recorded; the
+  other pages are counts. A person must look at every page (`review`) before it can be published; published PDFs are rebuilt with page content only and checked, failing closed; unpublished pages can be purged. Tests in
+  `tests/test_handwriting_copy_set.py`; no page has been collected yet, so there is no result.
+
+#### Reader B adapters for handwritten expressions (branch hw/math-readers)
+
+- `models/math_readers/`: one small `MathReader` protocol (a PNG crop in, LaTeX candidates with
+  reported confidences out) and two adapters, a Claude reader built to differ from the page pass
+  (another model, its own instructions, one high-resolution crop, no page text) and an OpenAI
+  vision reader (`store: false`). Worst-case reservation before every send, timeout, retries,
+  refusal and error mapping as in the step clients, no content in logs. Settings
+  `MATH_READER_CLAUDE_*` and `MATH_READER_OPENAI_*`, all off; nothing in the pipeline calls them
+  yet (`docs/math-readers.md`).
+- One list of who receives what (`web/recipients.py`) now writes the privacy page (its provider
+  items, "Where it is processed" and the account deletion notes), so a reader's company is named as
+  soon as the reader is on, whichever `MODEL_PROVIDER` is set. A production start is refused while a
+  reader is on and the rendered page does not name every company that receives pictures; the
+  launch checks (model provider, analytics, tables, notation, Microsoft, sign-up) now read the
+  rendered page, not the template source. `MATH_READER_MAX_USD_PER_JOB` caps all readers of a job
+  together. The vendor sheet and `docs/security.md` are updated to match.
+
+#### Handwriting harness for private handwritten notes
+
+- `scripts/handwriting_own.py`: intake of PDFs from a folder outside the repo, a hash-based dev and
+  held-out split registered privately, a blank answer-key form served on 127.0.0.1
+  (`scripts/handwriting_gold_form.html`, no model draft) and a `run` command capped by `--max-usd`
+  (at most 2.00 in total across restarts). `run` sends the PDFs to the model provider. Every command
+  refuses a path inside a git repository; `.gitignore` guards the usual private folder names.
+  Use: [docs/eval-handwriting.md](docs/eval-handwriting.md), "Your own handwritten notes".
+
+### LaTeX source, slides and batch upload
+
+#### Which Landlock step failed (branch latex/probe-step-codes)
+
+- New: when the Landlock launcher fails to start, it reports the failing setup step as a fixed
+  code and the errno's name; `ops sandbox-probe`, the `sandbox_probe` log line and
+  `/healthz/ops` show `landlock_step=`, `landlock_errno=`, `landlock_exit=` and
+  `can_<call>=yes|no` for each system call the launcher needs, tried once in a throwaway child
+  under the container's own seccomp filter. Information only: no change to what the sandbox
+  allows.
+
+#### Landlock sandbox backend (branch latex/landlock-sandbox)
+
+- New: a second sandbox for LaTeX source where bubblewrap cannot start (no user namespaces,
+  as on Railway): Landlock (read and execute on the system trees, read on the input, read and
+  write on the output and a private scratch folder, nothing else, not `/proc`) with a strict
+  seccomp filter (no sockets, no `setsid`, no `landlock_*`), `no_new_privs`, rlimits, the
+  one-at-a-time lock, a polled memory cap for the whole process group, and a launcher that is
+  the subreaper and dies with its caller. Chosen automatically; the same probe gates it
+  (`backend=bwrap|landlock`, new in-sandbox checks). The web process and the conversion child
+  call `PR_SET_DUMPABLE=0`. `tests/test_source_escapes.py` runs on both backends.
+- Hardened after review: Landlock ABI 6 is required (signal and abstract-socket scopes); the
+  strict filter also denies calls that name another process of the user (`prlimit64` and the
+  scheduler calls except on pid 0, `setpriority`, `ioprio_set`, pidfds, `kcmp`), memory and disk
+  outside the counters (`memfd_create`, System V and POSIX IPC, `execveat` of an open file), and
+  changes to file mode, owner, times and extended attributes; unlinked-but-open files count
+  against the output budget and the entries in the writable folders are capped; the task bound
+  is 4 x 512 MB and the probe fails over `SOURCE_SANDBOX_MAX_TOTAL_MB`; the memory poll is
+  every 0.1 s; the supervisor watches its caller's pid instead of `PR_SET_PDEATHSIG`.
+- Final review: `source_busy` is decided by the launcher's own observation (the user's task
+  count at the limit while the program has not used its allowance, written to a marker the
+  program cannot reach), no longer from the program's output, which a document could spoof.
+- Second review: `fallocate` denied, the output budget counts blocks and deleted files that are
+  still mapped, a fork that fails for lack of room fails the conversion as `source_busy`
+  (new message: "The server is busy right now ... Try again in a few minutes, or upload the
+  PDF instead."); running a written file through the dynamic loader is documented as a
+  residual (the loader's execute right cannot be withheld).
+
+#### Sandbox probe at start-up (branch latex/probe-at-startup)
+
+- New: when the web process starts and LaTeXML is in the image it runs the sandbox probe
+  (`--require-latexml`) in the background, logs `sandbox_probe result=PASS|FAIL ...` once, and
+  shows the result on `/healthz/ops` under `sandbox` (state, checks, bound_mb, cgroup, seccomp,
+  checked_at; `not_installed` when there is no LaTeXML). `FEATURE_LATEX_SOURCE`,
+  `FEATURE_BEAMER_SOURCE` and a `FEATURE_BATCH_ZIP` zip with a LaTeX project take effect only
+  while the last probe passed: otherwise the existing 503 `source_unavailable` answer. Settings
+  `SANDBOX_PROBE_AT_STARTUP` and `SANDBOX_PROBE_TIMEOUT_S`.
+
+#### Zip intake and tiered batch limits (branch batch/b2-zip-intake)
+
+- A `.zip` of documents is a batch (`FEATURE_BATCH_ZIP`, off by default, `web/batch_intake.py`): each PDF and each
+  folder with a main `.tex` file (a LaTeX project, re-zipped and checked again by the LaTeX source path) becomes a
+  document of its own through the ordinary upload checks; a zip with a main file at its root is one project; strays
+  are left out; a zip with no document, a link, a bad path, a nested zip, EPS or SVG, or over the limits (the LaTeX
+  source's, with 80 MB unpacked) is refused. The zip counts once for the upload rate limit.
+- Memory: the unpacked budget of a batch is one per request (twice the upload limit, shared by every zip in it, not
+  80 MB per zip), the documents of a zip are read one at a time when their turn comes, a PDF over the upload limit
+  is refused by its header unread, and documents past the person's limit are named, never read (a zip met after
+  the limit is refused unopened). `batch_intake.split` returns lazy `Member`s.
+- Limits by tier: one upload takes 30 documents for invited people and pilots and 10 for an account made by open
+  sign-up (`access.files_per_upload`), and the same number is the cap on documents waiting or converting at once
+  (it was 10 for everyone). The upload form and the messages say the number for the person.
+- The batch page `/app/batch/{id}` (`routes/batch.py`) replaces the results page of an upload of several files
+  (`/app/upload/{id}` redirects to it): a row per document with its status now, a polite live summary line, polling
+  with 204 while nothing changed, "Download all" (`/app/batch/{id}/download`) once nothing is waiting, the large
+  files and the refusals as before. `documents.documents` and `list_version` take a list of job ids.
+- Tests: `tests/test_batch_intake.py`, `tests/test_web_batch.py`, the batch page in `tests/test_web_jobs_browser.py`
+  (axe at 1280 and 375); the tests that fixed 10 now use the tier.
+
+#### Beamer source (branch latex/e2-beamer-source)
+
+- Beamer decks within LaTeX source (`FEATURE_BEAMER_SOURCE`, off by default, needs `FEATURE_LATEX_SOURCE`): frames
+  become headings with their content (sections the top level, frames below them), an overlay step is written only
+  when it shows something the frame's last step does not ("(step 2 of 3)"; the rule of the PDF slide decks), text a
+  step covers is not written, a list item a pause reveals is an item of its own, a title page drawn by Beamer is read
+  for its blocks. `source/beamer_compat.tex` gives LaTeXML 0.8.8's binding the block, column and `\institute`
+  definitions it lacks (read first, read-only in the sandbox). A deck counts a page per frame. Spike on five decks
+  written for it: 20 frames, none with an unknown command (3 had one without the compat file); no
+  real deck tried. `DocumentResult.origin` `beamer`, the student note says "a slide deck". Tests:
+  `tests/test_source_beamer.py`; fixtures `tests/fixtures/source/beamer/`.
+
+#### LaTeX source upload (branch latex/e1-source-intake)
+
+- LaTeX source (`FEATURE_LATEX_SOURCE`, off by default; ADR 0008): a `.tex` file or a `.zip` of a project is
+  converted by LaTeXML in the bubblewrap sandbox of the sandbox probe change, into the document a PDF becomes. Equations
+  come from the source (LaTeXML's MathML through the sanitiser, the source's own LaTeX), figures use the
+  project's pictures and the ordinary figure step, tables become grids, headings, lists and links are read as
+  written. A formula LaTeXML cannot read and a figure with no picture are required decisions; a source that cannot be
+  converted fails the job with "Upload the PDF instead" and keeps nothing. The review is the list view. New
+  `web/archive_intake.py` (zip limits: 20 MB, 100 MB unpacked, 500 entries, no links, absolute or `..` paths,
+  nested zips, EPS or SVG; a header that lies is caught), `source/` (`intake`, `lint`, `envelope`, `latexml`,
+  `ltx_reader`, `figures`, `convert`), a one-line hook in `pipeline/run.py` (`convert_pdf`), `DocumentResult.origin`,
+  `render_html(origin=)` (the student note says "a LaTeX document"), `INSTALL_LATEXML` and `FEATURE_LATEX_SOURCE` in
+  `railway.ts`. LaTeXML runs with `kpsewhich` hidden in the sandbox: where TeX Live's base is installed (the image) it
+  otherwise read raw TeX for packages and spent over a minute failing on `siunitx`. Beamer decks are refused until their own change. Docs: docs/web.md "LaTeX source",
+  docs/security.md "Running uploaded TeX", docs/development.md. Tests: `tests/test_archive_intake.py`,
+  `test_source_intake.py`, `test_source_reader.py`, `test_source_convert.py`, `test_source_escapes.py` (hostile
+  files through the real sandbox), `test_source_child.py`, `test_web_source.py`.
+
+#### Sandbox probe (branch latex/x0-sandbox-probe)
+
+- `readablestem ops sandbox-probe`: checks on the running image that the sandbox for uploaded TeX
+  works (bubblewrap, user namespaces, no network, empty environment, hidden `/proc/1/environ`,
+  memory, wall-clock and output caps), times a tiny LaTeXML run when LaTeXML is installed, reports
+  the kernel's seccomp mode, Landlock ABI and same-UID `/proc/<pid>/environ` readability, and
+  prints PASS or FAIL (exit 1). Nothing it prints is document content. Docs: docs/operations.md,
+  "Sandbox probe"; docs/security.md, "Running uploaded TeX".
+- The sandbox joins its cgroup before bubblewrap starts (a wrapper, not a move afterwards, so no child escapes it),
+  and without a cgroup the total is bounded by arithmetic: LaTeXML gets 4 tasks (it needs 3) and 512 MB of address
+  space each (`source.latexml.LIMITS`), one source conversion runs at a time on the machine (`sandbox.exclusive`),
+  and `ops sandbox-probe` prints `sandbox_total_bound_mb` and fails `--require-latexml` over
+  `SOURCE_SANDBOX_MAX_TOTAL_MB` (2048). The upload comment now assumes a 2 GB web service.
+- The sandbox also caps tasks and open files (`prlimit --nproc --nofile`), puts a seccomp filter in front of the
+  program (`core/seccomp.py`, built without libseccomp), counts the program's own output against the output budget,
+  and uses a cgroup v2 memory and pids limit for the whole group when the container allows one; the probe reports
+  `sandbox_task_cap`, `sandbox_file_cap`, `sandbox_seccomp` and `sandbox_cgroup`. docs/security.md says what is
+  capped per process and what in total.
+- New `core/sandbox.py` (the bubblewrap runner the probe tests and a later LaTeX upload uses) and
+  `source/latexml.py` (the `latexml` and `latexmlpost` calls). Nothing in the app calls them yet.
+  Tests: `tests/test_sandbox.py`, `tests/test_ops_sandbox_probe.py`.
+
+#### LaTeXML in the image (branch latex/x1-latexml-image)
+
+- Dockerfile: `ARG INSTALL_LATEXML=false` also installs `bubblewrap` and `util-linux` (the sandbox and `prlimit`; the
+  build fails without them). It installs the distribution's `latexml` (0.8.8) with TeX
+  Live's base and ImageMagick, and replaces ImageMagick's `policy.xml` with a deny-by-default one
+  (PNG, JPEG, GIF only; PS, EPS, PDF, XPS, URL and `@file` denied by name:
+  `src/readablestem/source/imagemagick-policy.xml`). Measured on the pinned base: +270 MB
+  (324.3 MB to 594.4 MB). Off by default; nothing in the app uses it yet. `INSTALL_LATEXML` is
+  declared on `web` in `.railway/railway.ts`; CI builds once with the argument and checks the
+  versions and the policy. Docs: docs/deploy-railway.md, "LaTeXML"; THIRD_PARTY_NOTICES.md.
+  Tests: `tests/test_latexml_image.py`.
+
+#### Slide decks (branch layout/beamer-slides)
+
+- Slide decks (`pipeline/slides.py`, docs/layout.md "Slide decks"): a Beamer file, or a slide-shaped
+  file whose pages share labels, is read frame by frame. An overlay step whose every line and
+  picture is also on the frame's last page is not read at all (no crop, no model call, not in the
+  output); a step that differs (`\only`) stays and its heading says "(step 1 of 2)". Frame titles
+  are headings again (they were dropped as running headers), a theme's headline text and bar and a
+  lone slide number are dropped, two-column frames are read left then right, and a bullet that
+  wraps onto a line of maths ("... zero at" / "x = 0.") is not a display equation. On the Beamer
+  fixtures: `beamer_overlay` 6 pages to 2, the new `slides_steps` 13 to 6; no line of a last step is lost.
+- Fix (every PDF): a ligature's characters (`ff`, `fi`, `ffi`) come out in order. MuPDF boxes the second
+  letter with no width, and everything that sorts by position put it after the next letter ("Stifnf ess",
+  "Ofcfi e", "Specifci"). Found on the repo's PDFs: table cells of five files.
+- Fix: a PDF page label that the PDF writes as UTF-16 (xdvipdfmx, so every Tectonic deck) is read
+  (`page_labels.pdf_label`); it was refused as "<FEFF0031>" and the page markers fell back to the
+  footline number.
+- Tests: `tests/test_layout_slides.py` and `tests/fixtures/layout/latex/slides_steps.tex` with its
+  PDF; six of the strict xfails of `tests/test_layout_beamer_math.py` now pass (one test was reworded: a frame's title is a heading once).
+- Pipeline version 0.5.2 to 0.5.3: deck output and ligature text change; results from 0.5.2 load
+  unchanged.
+
+### Web app, sharing and exports
+
+#### Upload, job page and My documents (branch ux/upload-job-documents)
+
+- A person a document was shared with who can only view it is no longer told "N decisions need
+  you": the status says the decisions are still open and only the owner or a reviewer can make
+  them (a reviewer is told they can review them). The results tile reads "Decisions made" and,
+  for a viewer, "Decisions still open". In My documents a document whose owner has no name is
+  "shared with you" instead of "shared by The owner".
+- "Try again" says what it will do ("puts your document back in the queue"); the confirmation
+  comes after it worked.
+- Times in My documents stay in the reader's time zone after the list refreshes itself.
+- One wording for keeping a document, "Keep for 7 days", on the upload form, job page, Account
+  page, notices and the privacy page. The job page shows the deletion time once, under the
+  review and download actions, with the day "Keep for 7 days" would delete it. Delete entry
+  points (a document, a course, an account, a waiting file) have a red outline style
+  (`button-danger-outline`, `danger-link`), the confirmation pages keep the filled button.
+- Upload form: shorter, in three groups (file, how to convert it, how long to keep it) with one
+  line of consequence beside each option and the long text in disclosures. A refused scanned PDF
+  says to tick "Convert scanned or handwritten pages" and choose the file again.
+- Choosing pages: sizes under 0.1 MB show in KB (`pending.size_text`), the range examples follow
+  the active page limit and the file, and a suggestion cut off at 20 parts says which pages it
+  leaves out.
+- My documents has a compact "Practise on the sample" link beside "Convert a PDF"; signed-in
+  pages get a compact footer of trust and help links (public pages keep the full footer).
+
+#### Sharing, guides, demo and status polish (branch ux/sharing-guides-demo)
+
+- The "About this demo" note has its own light-scheme, visited, hover, focus and forced-colour
+  link colours (it is a white box in every scheme; its links measured 2.39:1 in the dark scheme).
+  The generator (`eval/render.py`, `DEMO_NOTE_CSS`) and the committed demo carry the same rules; the
+  student output is unchanged. `/demo` is now axe-checked in the dark scheme
+  (`tests/test_web_demo_dark_browser.py`).
+- Sharing page: View and Review are whole-row choices (44 px or more, native radios, each with
+  what it allows); a "Copy link" button with a spoken confirmation (the address stays a
+  selectable field); the document's deletion time and a link to keep it longer beside the address;
+  sign-in wording from the enabled providers; "the same address, letter case aside" instead of "exactly
+  as written"; "Remove" is a danger button.
+- The comparison guide shows, under 52rem, one collapsed native disclosure per topic (ReadableSTEM's answer in the summary; opened, every tool with its source and date); the
+  table stays for wide screens. ADA, comparison and posting guides get the offices page's "On this
+  page" contents (`templates/_contents.html`) and stable heading ids.
+- Status page: "Checked at ...", a "Check again" link and what the 10-minute AI service
+  observation means.
+
+#### Review round fixes (branch ux/review-round-fixes)
+
+- Bulk accept: the button that accepts comes after the list of originals and proposals, which now asks you to compare each proposal with the image of the original; Cancel and Undo are unchanged.
+- Review split: on a wide screen the row of choices (Accept, Keep as image) sticks to the bottom of the window while the decision is longer than the window; on a phone the page has a "Back to the decision" link and says it scrolls sideways, with edge shadows where more of it is. The toolbar above the page image is `.page-bar` (it shared `.page-tools` with the "Change page" disclosure).
+- "Hear this" on an equation with no usable stored reading speaks it from its MathML, as the transcript does.
+- Review list: with more than three waiting in a group each is a compact row (what it is, page, status); one editor is open at a time when a row is opened by hand; the first, and any just worked on, starts open.
+- Symbols: beside "Change all" a line says how many places it changes and how many are left as they are, and follows the places ticked to be left out.
+- Listening: a compact transport (Play, Pause, Stop, previous and next, next heading and equation, Start at the lesson, Follow along) stays in view while the transcript scrolls; Follow along is on by default, is remembered in the browser and scrolls without animation under reduced motion; speed, voice and shortcuts are in a disclosure; a "Skip to the lesson" link works without scripts. Start at the lesson skips the title, language, notices and licence.
+- Code: `controls.css` holds the buttons for the app, the listening player and the showcase (listen.css no longer repeats them); spacing and type sizes in `app.css` are on the tokens; the unavailable sans weight 600 is 700.
+
+#### Listen as a student (branch preview/listen-as-student)
+
+- New: an instructor can hear roughly what a screen reader will say for a converted document
+  before sharing it. `GET /jobs/{id}/listen` (owners and anyone it is shared with) and
+  `GET /demo/listen` (public) show a transcript built from the final HTML, in reading order
+  (landmarks, headings with their level, lists, links, equations spoken by the same speech rules
+  as the review screen, figures, tables with their headers, pictures kept as images, language
+  changes; never LaTeX), with an optional Play, Pause, Stop, speed, previous and next item, next
+  heading and next equation, using the browser's own voice (a voice on the device by default;
+  online voices only on request). The job page, the review screen (a "Hear this" button
+  beside an equation plays the proposal and how the PDF's text layer reads), the landing hero,
+  the demo, the showcase examples and `/help/posting` offer it. Not part of any download.
+  See docs/web.md, "Listen as a student".
+
+#### Higher upload limits (branch limits/raise-upload-limits)
+
+- The limits now fit together. Before, a new account could convert 20 pages a day while one upload
+  could hold 30. Defaults: `MAX_PAGES_PER_JOB` 30 to 100, `MAX_UPLOAD_MB` 20 to 50,
+  `MAX_LARGE_UPLOAD_MB` 30 to 100 (also the most one upload request carries, files together),
+  `MAX_SOURCE_PAGES` 300 to 500, `OPEN_TIER_DAILY_PAGE_QUOTA` 20 to 150, `MAX_USD_PER_JOB` 2.00 (OpenAI)
+  and 3.00 (Claude) to 6.00 for both, `MAX_MODEL_CALLS_PER_JOB` 400 to 1200 (our densest 100-page test
+  document makes 652 calls). Not changed: `DAILY_SPEND_CAP_USD`, `OPEN_TIER_DAILY_SPEND_CAP_USD`,
+  `IMAGE_PAGES_*` caps, `CONVERSION_MEMORY_MB` and the job time limit (a 100-page document converts well
+  inside both: 31 s and 494 MB resident with fake models on one CPU, 193 s with 2 s of simulated model
+  latency a call; with 51 MB of pictures 44 s and 745 MB; docs/web.md, "The conversion runs in a child
+  process"). Production environment values (`PER_USER_DAILY_PAGE_QUOTA`, `OPEN_TIER_DAILY_PAGE_QUOTA`,
+  `MAX_USD_PER_JOB`) are set at deploy, not in code: a `MAX_USD_PER_JOB` of 4.70 set for tables is now
+  below the $5.71 that 100 pages need (docs/deploy.md, "Spend limits").
+- Stored-bytes caps, because uploads are in Postgres on a 5000 MB volume and one person could now store 2.2 GB: `STORAGE_PER_USER_MB` (300) and `STORAGE_OPEN_TIER_MB` (250) per person, counted with the quota checks in the job's transaction; `STORAGE_GLOBAL_MAX_MB` (2000, not 3000: the nightly backup check restores a second copy on the same volume) for the service, which turns uploads away with a 503 and puts `storage` in `/healthz/ops`. The hourly cron runs a plain `VACUUM` of the upload tables after a purge. The limits page names the cap. Declared in `.railway/railway.ts` (`webOnlyVariables`).
+- `ops launch-check` and the start-up check gain two warnings: an open-tier daily quota under one
+  full-size document, and `IMAGE_PAGES_MAX_USD_PER_JOB` under `MAX_USD_PER_JOB`.
+- Word and PowerPoint files: the ZIP checks scale with the upload limit (500 MB unpacked, 250 MB an
+  entry; were 200 and 100). A 100-page Word file became a PDF in 1.4 s here (PowerPoint could not be timed:
+  Impress is not installed on the box).
+- The parts page and its error message use `1-10` as the example range instead of `1-30`, which read
+  as a limit. docs/web.md, docs/deploy.md, docs/deploy-railway.md (the service should be allowed 2 GB; a 95
+  MB upload to confirm after the deploy), docs/security.md, docs/operations.md (how much the uploads
+  weigh in the database), README, vendor sheet, `.env.example`, `deploy/deploy.env.example`.
+
+#### Sharing with named people (branch share/g1-named-people)
+
+- An owner can share one finished document with named people by email address (`/jobs/{id}/share`,
+  `web/shares.py`, `routes/sharing.py`; migration `b7112167eb0d`, table `job_shares`). They must sign in with
+  that exact address (matched in lower case and in full; no domain rule, no public link, nothing is emailed:
+  the owner copies the address). Two rights: `view` (job page, preview, downloads, review record) and
+  `review` (also the review screen and every decision and edit, each recorded under the reviewer's name in the
+  review record). The owner alone can delete, retry, change settings, upload a revision, combine parts, share
+  further or remove a share; removing one works on the next request. A shared document is listed under "Shared
+  with you" on My documents.
+- One access check, `routes.jobs.job_access(session, job_id, user, need)` with `need` `view`, `review` or
+  `owner`, replaces `owned_job` at every call site (about 50). A stranger or a removed person still gets the same
+  404 as for a made-up id; a shared person asking for more than their right gets a 403 page.
+- Quotas and spend stay the owner's: a model re-read a reviewer asks for counts against the owner's day allowance
+  and the document's caps. A viewer's download does not restart the owner's deletion clock.
+- Deleting a document deletes its shares; erasing an account deletes the shares that name its address.
+- A share applies only to a sign-in that proved the address (Google's verified email, Microsoft's `xms_edov`, or
+  an emailed single-use link sent to that address; migration `ecb0b22515e0` adds `login_links.email`). **After
+  this deploy, people who use a shared document sign in once more** (sessions from before it carry no proof);
+  until they do, the document's address shows a page telling them to sign in again.
+- Wording: the privacy notice, the accessibility-office page, the landing page and the job page no longer say
+  that only the owner can see a document. docs/web.md, docs/security.md. Test: `tests/test_job_shares.py` (every
+  job route against the owner, a viewer, a reviewer, a removed person and a stranger).
+
+#### Fair queue
+
+- The worker takes queued jobs round-robin by person (`web/fair_queue.py`, docs/web.md "Worker"):
+  fewest attempts first as before, then the owner served longest ago, then oldest. Someone with ten
+  queued documents no longer keeps another person's single one waiting behind all ten; a person
+  alone is served in the same order as before. The job page's "documents ahead of yours" replays the
+  same order. Tests: `tests/test_web_fair_queue.py`, one Postgres test in `tests/test_web_postgres.py`.
+
+#### Word and EPUB in "Download all" (branch export/w3-download-all-formats)
+
+- "Download all" (My documents and the course page) and "Combine parts" offer Word (.docx, where pandoc is
+  installed) and EPUB as well as HTML: `?format=docx` or `?format=epub` on `/app/download`,
+  `/courses/{id}/download` and `/jobs/{id}/combine`. Same wording and pattern as the single downloads
+  ("Other file types"). A Word zip holds at most 10 documents (each is a pandoc run); a document that cannot
+  be made in the file type is left out and counted in `contents.txt`. Each document counts as downloaded in
+  that file type, so the review record lists it. The HTML zip no longer restarts the deletion clock of ready
+  documents it left out for the 25-document cap. docs/output.md, docs/web.md, docs/security.md.
+
+#### Word and EPUB downloads (branch export/word-and-buttons)
+
+- Word export (`pipeline/export_docx.py`, `readablestem export docx FILE.html OUT.docx`): the finished HTML through
+  pandoc in a child process (60 s, minimal environment, CPU, size and heap limits), then checked and fixed in
+  `word/document.xml`. Equations are native Word equations (OMML; the file must hold as many as the HTML has
+  `<math>`, else the export fails), headings are Heading 1 to 6, each picture's alt text is written where Word reads it
+  (pandoc wrote the picture's address there), a table's header row repeats and is marked `w:tblHeader`, lists and links
+  are Word's, the language and title are set, a long description follows its figure, page markers are left out and a
+  figure without a picture is paragraphs, not a layout table. Remote pictures, scripts and forms are not carried
+  (the same sanitiser as the EPUB). docs/output.md, "The Word export".
+- `GET /jobs/{id}/download.docx` and `/download.epub` (`web/routes/exports.py`) and an "Other file types" block on the
+  job page's finish line (plain links; the Word one only when pandoc is installed). Both follow the HTML download:
+  owner only, clock restarts, recorded as a download (with the decisions that were open), and offered only when no
+  decision is open. At most two Word files are made at once; a third request waits up to 20 s, then gets a 503 asking
+  to try again. "Download all" stays HTML only.
+- Usage events: a `download_format` event (`html`, `canvas`, `cartridge`, `docx`, `epub`) beside each `downloaded`; the
+  review record and its CSV list the file types downloaded, and its "what was not checked" says nobody has checked the
+  Word and EPUB files in Word or a reading app.
+- Fix: the Canvas zip and the Common Cartridge downloads did not restart the deletion clock, though docs/security.md
+  says a download does; they do now. The two questions after a download also open for the Common Cartridge link.
+- Docker image: pandoc from the distribution (about 200 MB on disk), always installed; `python-docx` joins the dev
+  group for the tests; THIRD_PARTY_NOTICES.md lists both.
+
+#### Review at scale, finish notice, guides, caching
+
+- Review: "Accept all remaining equations whose checks passed" and "Accept all figures that have
+  generated alt text", each after a list of what would be accepted; one write, one Undo
+  (`web/bulk_accept.py`). The list view's decisions can be filtered by kind and by page. Every card
+  has "Report this item" (job and item ids only). Pages kept as images have the documented "Leave
+  this page out of the HTML" button. Undo is 44 px, and the marks on the page image grow to 44 px
+  where there is room ([docs/web.md](docs/web.md), "Review at scale").
+- Job page: the tab title changes and an opt-in browser notice shows when a conversion finishes.
+  "Upload a revised version" is on the results page and on each finished row of My documents.
+- The landing page says what review costs (decisions per page, a full job, a new account's day,
+  deletion after 24 hours). `/guides` lists the guides; the sitemap names the showcase pages by their
+  canonical address.
+- `/demo`, the showcase pages and unhashed static files are served with an ETag and a one hour
+  `max-age` instead of `no-store` or `no-cache`.
+
+#### EPUB export
+
+- `readablestem export epub FILE.html OUT.epub`: an EPUB 3 from the finished HTML (`pipeline/export_epub.py`): XHTML with native MathML, images as files with their alt text, a contents list from the headings, a page list from page markers when present, language, title and accessibility metadata. No `conformsTo`; the summary makes no conformance claim; a feature is claimed only when every item has it. Scripts, frames, forms, remote pictures and `url()` styles are not carried. EPUBCheck and DAISY Ace run on it in `.github/workflows/epub.yml` and locally when installed ([docs/output.md](docs/output.md), "The EPUB export"). No route or button yet.
+
+### Site, design and copy
+
+#### Accuracy claims on the registered fresh5 result (2026-11-04)
+
+- The landing page, `/limits`, the comparison guide, the page for accessibility offices and its summary, the
+  vendor information sheet and `llms.txt` quote the fresh5 result in place of the October 2026 OpenStax numbers
+  (version 0.4.0), which stay on `/limits` and in `PROOF.md` as history. Registered wording: no difference this set
+  can detect from the Opus chatbot on the primary score (0.840 against 0.836, 26 documents, 1,715 equations);
+  silent errors 5.0 against 9.6 per 100 (goal 4.0 not met); flag recall 0.46 (goal 0.60 not met); chemistry (3
+  sections) not a success. The tiles come from `docs/eval-equation-fresh5.md` through `web/proof_facts.py`.
+
+#### Site copy rewrite (branch content/site-rewrite)
+
+- Every public and signed-in page says what the service does today. The landing page lists what it
+  handles (Beamer decks frame by frame, chemistry, and tables, long descriptions, scanned and
+  handwritten pages and course notation only where their flags are on, `routes/pages.py`
+  `_features`), what you download (HTML, Word, EPUB, Canvas zip, Common Cartridge, the review
+  record) and a short accuracy block that says it does not yet beat the chatbot on equations.
+- /limits holds every measured result with its sample size: the registered held-out test first,
+  the real-world held-out papers, the not-blind re-measurement, the development baseline
+  (labelled development), chemistry and handwriting. The old Physics chapter 2 sample is gone.
+- /for-accessibility-offices gains an "At a glance" list, names the downloads and sharing, and
+  says a conformance report is in preparation (not published). /privacy describes PostHog
+  analytics when `ANALYTICS_ENABLED` is on. "Also let the developer look" is now "Also let us
+  look at the results" everywhere. The upload hint is a list. Guides, README, the showcase,
+  `docs/vendor-information.md` and llms.txt are updated to match.
+- Second round, from a blind review: the landing page's lists are one line an item in plain
+  words (MathML, F1, model judge, held-out and Common Cartridge are glossed or left to
+  /limits; the proof strip takes plain labels through `plain`), a line says what "exactly
+  right" means, the chatbot comparison is its own sentence, and one decisions-per-page figure
+  per kind of document (textbook 1.8, LaTeX papers 5.6, handwriting 5.7) is given on the
+  landing page and /limits alike, with the job page's exact count. The calls to action are
+  "Sign in and convert a PDF" and the demo; the two FAQs a newcomer needs open by default. The
+  upload form's limits sentence, scanned-pages label and keep options are plainer, and the
+  redundant "Convert another PDF" link is gone. The ADA guide starts with "What to do this
+  term". On the review screen "Edit the LaTeX" is closed when a one-click fix is offered, and
+  the compare box says "at the same scale". `scripts/design_shots.py` uses the production
+  limits.
+- Footer: "Built and maintained by Harish Manoharan. Open source · Contact". The offices page
+  has "Support and continuity" (open source and self-hostable, every result downloadable, no
+  service-level agreement, how to report a problem).
+- Retention: an account setting "Keep my documents for 7 days by default"
+  (`users.keep_week_default`, migration `5d8e1f2a7c39`, `POST /account/keep-default`) starts the
+  upload form's 7-day box ticked; each upload still decides. The job page says near the top when
+  the document will be deleted, with a one-click "Keep it for 7 days". Retention wording says the
+  clock restarts on each decision or download.
+
+#### Design polish (branch design/d6-polish)
+
+- Fixes from the Impeccable audit and critique of the redesign: paragraphs, hints and list items are capped at 75ch;
+  Sign out, document-row links and check boxes meet the 24px target floor (header buttons 44px); the review screen's
+  desk colour is lighter so its links have 7.3:1; the current step on the review screen keeps the two-tone focus
+  ring; the three fonts the first view needs are preloaded (no layout shift on a phone); buttons and the page tools'
+  forms never overflow at 320px or 200% zoom; the file chooser button is styled as a secondary button; the
+  comparison table keeps its topic column in view and tints the ReadableSTEM column; a few legacy radii and an
+  off-token colour moved onto the tokens. The focus-style test reads the new tokens, light and dark.
+
+#### Comparison table and showcase on the tokens (branch design/d4-compare-showcase)
+
+- The comparison guide (`/guides/readablestem-mathpix-latexml`) now compares five tools: ReadableSTEM, Mathpix,
+  Aelira, general chatbots and LaTeXML, on what each takes in and gives back, its maths, what it automates,
+  review by a person, where the file goes, cost and licence, a published test of equations and its version.
+  Every cell names its source and the day it was read (Aelira's own page and Mathpix's pages for them; the
+  chatbot column is the recipe tested in PROOF.md, not a claim about any product); accuracy appears only where
+  we measured it (ReadableSTEM and the chatbot recipe). `tests/test_compare_table.py` checks the sources and
+  that no cell claims conformance. The title, `/guides`, the footer label and `llms.txt` name the five tools.
+- The static showcase (`site/`) is built on the web app's tokens: `build.py` copies `tokens.css` and its
+  fonts into `assets/` (no outside request; it still opens from a folder), `site.css` uses the tokens, the
+  footer has the same four columns, and the showcase follows light and dark. The converted output and the PDF
+  pages stay on white paper. The `/demo` page is the stored converted document and is not restyled.
+
+#### Landing page and proof strip (branch design/d2-landing)
+
+- Landing page: the hero shows a real passage of the demo (OpenStax Physics 2.3, page 3): the PDF crop
+  and what a screen reader gets from its text layer, beside the converted paragraph with live MathML
+  and the reading `pipeline/speech.py` gives it. `scripts/hero_assets.py` builds the crop, text layer,
+  MathML, reading and a 7.8 KB subset of Latin Modern Math from the stored demo; `tests/test_hero_assets.py`
+  regenerates them and compares. Then Upload, review, post; what you get; the numbers; try it;
+  questions (who can use it, what happens to your documents) and about, in the same wording as before.
+- `web/proof_facts.py` reads PROOF.md once into `proof_facts.json` (regenerate with
+  `uv run python -m readablestem.web.proof_facts`); the landing page and /limits show four tiles from it, each with
+  its count, the set, the date, "blind", where a general chatbot scored the same or higher, and a "How it was
+  measured" link to the PROOF.md section. `tests/test_proof_facts.py` fails when the JSON and PROOF.md differ.
+
+#### Design system (branch design/d1-tokens-components)
+
+- Site design tokens and components (`static/tokens.css`, `static/app.css`, `DESIGN.md`,
+  `PRODUCT.md`): self-hosted Source Sans 3, Source Serif 4 and Source Code Pro, one accent
+  (`#1c46ad`), all text at least 7:1 in light and in dark (follows the browser's setting),
+  nothing under 14px, a 4px grid, 4px and 8px radii (no pills), a 75rem page and a 68ch reading
+  column on pages people read. The header has a Sign in button and folds into a Menu disclosure on
+  a narrow screen; the footer is four columns (Product, Trust, Guides, Source) with the same
+  links as before. Forced-colours and reduced-motion rules cover the new components. The app's
+  side-stripe notices and cards became full borders. `/style` (noindex, not in the sitemap) shows
+  every component. Docs: `docs/site.md` "Design system", `static/vendor/README.md`.
+
+#### Keyboard walk and draft ACR
+
+- New keyboard-only walk of the web app (`tests/test_web_keyboard_browser.py`, browser-marked,
+  helpers in `tests/fixtures/web/keyboard.py`): Tab through every page at 1280, 390 and 320 CSS px
+  (skip link, focus visible and not covered, names, no trap, no change on focus, landmark order)
+  and the main flows by key alone, with where focus lands after each redirect.
+  `tests/test_web_focus_style.py` checks the focus ring's colours offline.
+- Fix (found by the walk): after leaving a page out, putting it back, or choosing a line to change
+  in the page tools, focus stayed on the page itself because the redirect named a fragment that was
+  not focusable (a browser skips `autofocus` when the address has a fragment). The redirects and
+  links now name `#page-tools-summary`, and the tool sections take focus (`tabindex="-1"`).
+- Draft accessibility conformance report in `docs/acr/` (VPAT 2.5Rev WCAG edition layout, WCAG 2.2
+  A and AA), not published and not a claim of conformance: each row names its test or code, and
+  rows that need a screen reader session are "Not yet evaluated". `tests/test_acr_draft.py` holds
+  the report to its own rules.
+
+#### Wording and a page for accessibility offices (branch trust/wording-and-offices)
+
+- Copy: the "individual developer" and "not a company or a university" framing is gone from the landing, privacy,
+  terms and login pages, `llms.txt` and the README; the landing page has an About block ("Built and maintained by
+  Harish Manoharan. The code is open source."). The listed strings are in the pull request.
+- Licence wording (ADR 0003 addendum): the PyMuPDF/AGPL sentence moved from every footer to the Terms
+  ("Open source", `/terms#open-source`); the footer keeps the "Source code" link and gains an "Open source" link.
+  The demo and showcase notes link the source without the sentence.
+- New public page `/for-accessibility-offices` (`web/offices.py`): data flow with a text equivalent, the
+  companies that receive data (from `web/recipients.py`, as `/privacy`), retention from the settings, no training
+  and `store`, student records (FERPA), what the tool does not do, a pilot checklist, and a one-page summary to
+  download (`/for-accessibility-offices/summary`). Footer link, sitemap, `llms.txt`.
+- `docs/vendor-information.md` refreshed: current accuracy numbers with sample size, scanned and handwritten
+  pages, files, no conformance report, no claim of conformance (kept under 900 words).
+
+### Evaluation and proof
+
+#### Fifth fresh split, registered result (branch eval/fresh5-report)
+
+- `docs/eval-equation-fresh5.md`: the fresh5 run (registration PR #149). The candidate and the Opus chatbot
+  show no difference this set can detect on spoken-equal end to end (0.840 against 0.836, 26 units, 1,715 gold
+  equations). The candidate has fewer silent errors (5.0 against 9.6 per 100 gold), but the registered claim is
+  not made, because silent errors are above 4.0 and flag recall is 0.46. Stratum D (chemistry) is not a success.
+- `scripts/realworld_run.py` reads the four fresh5 strata. It adds the registered settings in a clean environment
+  (`--settings`), one cap for the two ReadableSTEM arms (`--group-cap`), chatbot runs over the split in the
+  registered order (`--part fresh5`), a free token-count dry mode (`--dry`) and the strong-prompt arm
+  (`chatbot-opus-expert`). `scripts/fresh5_report.py` writes the registered tables.
+
+#### Spoken-equal scorer reads one print as one speech (branch eval/spoken-scorer-fix)
+
+- Evaluation only; the product's speech and `math_canonical.compare` are unchanged. The spoken-equal scorer
+  (`scripts/rw_spoken.py`) spoke 71 of the 2,350 development gold equations differently from a reading that
+  prints the same (`\mathrm{in}` against `\text{in}`, gold `\textbf` without its bold, `\min` against
+  `\text{min}`, `\bigl(`, `...`, `\backslash`, scripts and accents). `math_canonical.repair_converter_gaps`
+  and `speakable_latex` now write each print one way on both sides for every arm; a pair right before stays
+  right. 68 of the 71 became equal; ReadableSTEM base-0508 on development 0.792 to 0.820, Opus 0.728 to 0.755,
+  Haiku 0.723 to 0.749 (`docs/eval-realworld.md`). Guard tests: `tests/test_math_canonical_spoken.py`.
+- `PREREGISTRATION-FRESH5.md` section 4: the primary is spoken-equal, `exact_lenient` a secondary. The scorer,
+  its folding and the speech files are in `FRESH5_FILES`, to be hashed at signing.
+
+#### Development baseline (branch eval/dev-baseline-2026-11-03)
+
+- Measurement report `docs/eval-dev-baseline-2026-11-03.md`: ReadableSTEM at pipeline 0.5.3 with production flags on the 25
+  real-world development papers, against the recorded Opus (6 papers) and Haiku (25) chatbot answers. One
+  run, $0.1186 of model spend; no code, prompt or setting changed.
+
+#### Figures spot check
+
+- `eval figures-spotcheck` (`eval/figures_spotcheck.py`, docs/eval.md "Figure spot check"): offline,
+  no model call. From a figures run with long descriptions on, writes a blind sheet of every
+  long-judge fail plus a seeded sample of 10 passes for a person to label, and scores the labels
+  against a key (judge fails confirmed, sampled passes the person would fail, each with n and a
+  Wilson interval). Tests: `tests/test_eval_figures_spotcheck.py`.
+
+#### Agreement oracle on the recorded chatbot answers (branch eq/agreement-oracle)
+
+- `scripts/eq_oracle_agreement.py` and a D2 section of docs/eval-equation-diagnostics.md: how often
+  a second whole-page reading (the recorded Opus chatbot answers) is right where ours is wrong, how
+  often our reading is right when the two agree under `math_canonical`, how well disagreement
+  flags our wrong readings, and how many of our undetected equations it found. Measurement only,
+  offline, no change to the product.
+
+#### Speech under screen-reader engines (branch sr/speech-oracle)
+
+- `scripts/screenreader_speech.py` and `eval/speech_oracle.py` run any set's MathML (ours and the
+  gold's: OpenStax, authored, chemistry, handwriting, arXiv) through MathCAT 0.7.7 (NVDA 2026.1,
+  JAWS; ClearSpeak and SimpleSpeak) and Speech Rule Engine 4.1.5 (MathJax, ChromeVox). Per
+  equation: the spoken strings, whether MathCAT recognised chemistry, a word diff. Per set: the
+  share of ours that sounds like the gold under each engine, with an interval, and the worst
+  classes. `eval pipeline --speech` adds the aggregates to an equations or document report.
+  `scripts/speech_oracles/build.sh` builds the engines (rustup into `~/.cargo`, no sudo); without
+  them everything skips with a message. Offline, $0. See `docs/eval.md`, `docs/chemistry.md`.
+
+#### Eval runs keep their recordings; chemistry report fields (branch chem/eval-metric)
+
+- Every eval run that calls a real model (`eval pipeline` on any set and task, `eval sample`,
+  `eval calibrate --probes`) now writes `answers.jsonl`, `items.jsonl`, `report.json` and `run.json`
+  (the commit) under `~/.cache/readablestem/<set>/runs/<timestamp>/`, and the report names the folder
+  and the commit under `recording`. `--answers` and `--items` still override. Fake runs, replays and
+  the sealed check part keep nothing. `scripts/dev_chatbot.py score` always writes its items.
+- `scripts/dev_chem_classes.py`: reads a run folder, prints how many gold equations harm a listener,
+  and with `--speech` the spoken comparison and the silent harm per 100 gold.
+- Document reports with chemistry gold gain a `chemistry` block: `chem_right_excl_times` (lone `×`
+  left out, reported beside the count that keeps it) and `silent_harm` (wrong, not asked, heard
+  differently), counts only. Report fields only; the primary scorer, the gate and committed reports
+  are unchanged, and no gate reads them.
+- Recordings are private (folders 0700, files 0600). `eval prune --older-than DAYS [--set NAME] [--dry-run]`
+  deletes old runs and keeps any a committed report names. `scripts/dev_chem_classes.py` refuses
+  held-out and sealed run folders.
+
+#### Fifth fresh real-world split: selection, builders and registration draft
+
+- Fifth fresh real-world split, builder only (no system run): `scripts/fresh5_select.py` (arXiv continuation, OpenStax
+  sections never used and printed to PDF, course-style LaTeX incl. Beamer decks from GitHub under CC BY, CC BY-SA
+  or MIT, compiled with a user-level TeX Live and Tectonic as fallback inside a bubblewrap sandbox), `gold/course_corpus.py`, and the registration as an unsigned draft
+  (`data/realworld/PREREGISTRATION-FRESH5.md`). `arxiv_gold.analyse` takes `min_equations` (default unchanged, 5). New `gold/safe_tex.py`: the one place that unpacks
+  (no links or unsafe paths, size and file caps, atomic) and compiles downloaded TeX (sandbox, `-norc`, no network or shell
+  escape, no environment from the parent, a cap on what a compile writes); `realworld_build.py` and
+  `figures_v2_arxiv.py` unpack and compile through it too.
+  Stratum D (`fresh5_select.py chemistry`): never-used OpenStax chemistry sections from the CC BY first editions, then the CC BY-NC-SA
+  2e editions as a private measurement (licence read live; their PDFs and gold only in the cache, ids and hashes in the repository),
+  with measured text overlap and page gates, and a chemistry-aware success rule in the draft registration; the rule fills 3 of 4 places. The used-section scan skips the selection files of B and D.
+  [docs/eval-realworld.md](docs/eval-realworld.md).
+
+#### Figure gold v2 and a draft pre-registration for long descriptions
+
+- `data/gold-figures-v2/`: 50 figures (14 data charts, 14 diagrams, 10 photos and illustrations, 12 chemistry
+  structures) from CC BY OpenStax books, drawn by a seeded rule with licence and exclusion gates
+  (`gold/figures_v2.py`, `scripts/figures_v2_pool.py`, `scripts/figures_v2_build.py`); each has its source,
+  licence and a reference long description, and 4 of the charts a reference data table. 45 figures come from
+  retired editions ([decisions/0001-scope.md](docs/decisions/0001-scope.md), question 2). No model was run.
+- `gold/figures_v2_arxiv.py` reads plotted data from pgfplots TeX; 100 seeded CC BY papers held no usable
+  chart. `gold/figures_v2_table.py` scores table cells against a reference table.
+- [docs/eval-figures-long.md](docs/eval-figures-long.md): the set, and a draft pre-registration (arms, bars,
+  budget cap, judge calibration with human labels) awaiting sign-off.
+
+### Security, operations and deployment
+
+#### Redirects built from owned rows (branch sec/redirects-from-owned-job)
+
+- Every redirect in the review, edit, bulk, course, job-settings, feedback and job routes takes its job or course id
+  from the row the ownership check returned, never from the request's path or form. `write_review` and
+  `write_structure` return that id, and the `ReviewStale` and `ReviewInvalid` they raise carry it. The item a form
+  names is looked up in the stored result before it is put in an address. No change for a visitor; it removes the
+  CodeQL `py/url-redirection` alerts at the root. Test: `tests/test_web_redirects_owned.py`.
+
+#### Finished steps are kept when a configuration error ends the run
+
+- When a configuration error (a model that is not set up) ended a conversion while other
+  steps were still being answered, those steps were not kept for "Try again" if the error
+  reached the scheduler first; they are now (`pipeline/run.py`, `_Run.collect`). The tests
+  for this and for the worker and child-process suites no longer depend on timing luck, and
+  the end-to-end content test renders from the stored result the way the review screen does
+  (page markers included).
+
+#### Conversions run in a child process (branch fix/worker-child-process)
+
+- The whole conversion (`convert_pdf`) now runs in a child process the worker can kill
+  (`web/isolated_convert.py`, `web/conversion_child.py`), with an address-space cap
+  (`CONVERSION_MEMORY_MB`, default 3072), a CPU limit and the job's wall-clock limit. A PDF that
+  passes the upload probe and still crashes, exhausts memory or hangs MuPDF now fails that one job
+  (`conversion_crashed`, `conversion_oom`, `timeout`) instead of taking the web process, every
+  session and the worker down, three times over. The child has no keys or database URL: model
+  requests, spend reservations, progress and the step cache stay in the web process, so spend
+  accounting and the database writes are as before. Results are unchanged
+  (`tests/test_web_isolated_convert.py`). `PRELOAD_TABLE_MODELS` no longer loads models in the web
+  process. Details and measurements: [docs/web.md](docs/web.md), "The conversion runs in a child process".
+
+#### Faster CI
+
+- The pytest job is split into four shards balanced by recorded durations (`--shard i/4`,
+  `tests/shard_durations.json`), with a check that every test ran in exactly one shard. Python
+  3.14 runs the full suite on main, nightly and on dependency or workflow changes, and a smoke
+  (ruff, ty, import of every module, one shard in eight) on other pull requests. The browser job
+  runs in two shards of three xdist workers each and caches Chromium and axe-core; the axe-core download is written
+  atomically. Pull request runs cancel when superseded, main runs do not. Job names changed:
+  `ruff + ty + pytest (Python 3.x)` is now `ruff + ty (Python 3.x)` plus `pytest (...)` shards; a
+  `CI passed` job summarises them. See [docs/development.md](docs/development.md), "CI".
+
+#### Dependency and CI hardening
+
+- Locked dependencies upgraded for known advisories: pillow 12.3.0 to 13.0.0 (floor now `>=13.0`),
+  certifi to 2026.10.23, joserfc to 1.7.7.
+- CI: a `dependency-audit` job (`pip-audit` over the exported lock), a CodeQL workflow (Python and
+  GitHub Actions; push to main, pull requests, weekly), `alembic upgrade head` plus `alembic check` in
+  the `postgres` job, which now runs Postgres 18 (the backup image's major). Zero collected tests in the
+  `postgres` and `browser` jobs now fails them. The main `pytest` step runs in parallel (`-n auto`).
+- `make test-fast`; pytest-xdist and pytest-timeout in the dev group. The review-UX browser tests wait
+  with Playwright's `expect` and have a 120 s per-test timeout.
+
+#### Security hardening
+
+- The `/m/` analytics relay is rate limited per address (`analytics`, 300 per 10 minutes) and no
+  longer forwards the visitor's address to PostHog.
+- Production refuses `ANALYTICS_ENABLED=true` until the privacy notice names PostHog and no
+  longer says there are no analytics. The notice text is unchanged.
+- Production requires a `CRON_TOKEN` of at least 32 characters.
+- A one-time `proxy_hops_unexpected` log line when `X-Forwarded-For` has more entries than
+  `TRUSTED_PROXY_HOPS + 1`; `launch-check` flags `TRUSTED_PROXY_HOPS=0` in production.
+- `SESSION_SECRET_PREVIOUS`: earlier session secrets accepted for verification only, so the
+  secret can be rotated without signing everyone out ([docs/security.md](docs/security.md)).
+
+#### Microsoft sign-in configuration
+
+- `.railway/railway.ts` declares `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and `MS_ALLOWED_TENANTS` on the web service as `preserve()`, so values set with `railway variable set` survive `railway config apply`. `docs/deploy-railway.md` has a "Microsoft sign-in on Railway" section with the app registration, the secret's expiry, the allowed directory ids and the exact commands.
+- `readablestem ops launch-check` also lists `MS_ALLOWED_TENANTS` set without a client id and secret (the sign-in would be quietly off). A client id or secret alone was already refused.
+
+#### Monitoring and recovery
 
 - The daily backup keeps a dump only after it has been proved: gzip reads it back, it ends with pg_dump's completion line, it restores with errors fatal, every live table is in the restore and `alembic_version` matches. A failure prints `backup_failed reason=...`, removes the file and fails the run. The command is a readable bash script (`set -euo pipefail`) with tests (`tests/test_railway_backup_script.py`). `railway config apply` is needed to put it live.
 - Alerts without a new vendor: `ops_heartbeat` (migration `e1a7c3b95d24`), written by the backup and by `readablestem ops cron`; public content-free `GET /healthz/ops` (503 naming the late task); `uptime.yml` now checks `/readyz` every 5 minutes and `/healthz/ops` every 3 hours. GitHub disables scheduled workflows after 60 days with no commit to a public repository.
@@ -1144,6 +1217,37 @@
 - Per-person daily spend: `quota_days.spent_usd`, shown by pseudonym on `/admin`.
 - The day's cap on new accounts logs `signup_cap_reached` once a day and shows a notice on `/admin`.
 - Database pool: 5 plus 5 connections per process (was 3 plus 2).
+
+### Documentation
+
+#### Full documentation refresh (2026-11-04, branch docs/full-refresh-2026-11-04)
+
+- Every document was checked against the code and the production settings: flags and their production state
+  (on: `EQUATION_GLYPH_RECONCILE`, `EQUATION_GLYPH_CHECKS`, `EQUATION_LINE_CONTEXT`, `FLAG_POLICY`, `FEATURE_TABLES`,
+  `FEATURE_IMAGE_PAGES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_NOTATION_MEMORY`; off: `LAYOUT_DISPLAY_GROUPING` and the LaTeX,
+  Beamer and zip-batch features, because the sandbox probe fails on Railway), limits, the pipeline version (0.5.9),
+  deploy files (`.railway/railway.ts`, not `railway.json`), settings in `.env.example`, decision-record statuses and
+  the documentation index.
+- `docs/eval.md` lists the registered results newest first and the README's results section follows the same order: the
+  fresh5 result (26 documents, version 0.5.9) first, the first registered result (15 OpenStax sections, version 0.4.0) as
+  history. `PROOF.md` is the replayed report of that first result and stays as it is (`proof/verify-rename.py` checks it
+  against its tag); the site's proof tiles read `docs/eval-equation-fresh5.md` through `web/proof_facts.py`.
+
+#### Screen-reader test protocol
+
+- `docs/screen-reader-test.md`: a 15-minute VoiceOver (Safari) protocol for the demo, a converted file and the review screen, with a results table that maps to WCAG 2.2 criteria.
+
+## The interim held-out report is replayed at the tag, and CI runs it (2026-11-02, branch fix/proof-interim-repro)
+
+- `tests/test_proof_interim.py` used to rebuild the registered report with the current scorer, and
+  skipped without the held-out key, which CI never fetches. With the key it failed on main: the
+  chemistry converter change moved one parser's exact equations (238 to 241 of 1,369) and the rename
+  of Addendum 8 moved coverage by 210 6-grams. It now replays `report.py` at the tag
+  `proof-heldout-2026-10` with the key the tag's code fetches (`make heldout-gold-at-tag`) and
+  requires the registered bytes. No registered number or file changed.
+- `make proof-interim` writes `proof/interim/rebuilt-here.md` instead of the registered file.
+- `.github/workflows/proof-interim.yml` fetches the key and runs the test (a missing key fails) on
+  pull requests touching `proof/`, the scorer modules, the dependencies or the test, and weekly.
 
 ## Product analytics through `/m/`, off by default (2026-10-31, branch analytics)
 

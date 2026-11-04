@@ -1244,7 +1244,7 @@ Keep the two in step when a limit changes.
 - An equation wider than the screen does not wrap: it scrolls sideways inside its own
   box (a tab stop when it may not fit a phone screen).
 - NEEDS_REVIEW items look like converted ones in an export made before review.
-- A data table is rebuilt only with `FEATURE_TABLES` on (off by default). Off, or when
+- A data table is rebuilt only with `FEATURE_TABLES` on (off by default in code, on in production). Off, or when
   the model cannot read it, the table stays an image with its "not converted" note and a
   required decision. A table the detector misses (an unruled table of numbers only)
   stays in the text flow, sometimes read as a display equation; a grid of key terms

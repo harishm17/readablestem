@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Proposed** |
+| Status | **Proposed**, never marked accepted; the scope below was widened by later work (see the updates under "Decision"), so read it as the 2026-10-06 plan and not as today's feature list |
 | Date | 2026-10-06 |
 | Decider | Harish |
 
@@ -58,11 +58,13 @@ weekly GitHub `uptime.yml` plus Railway's project notifications, and the Google 
 row above does not apply to production. Production uses the Anthropic provider (see the update
 in ADR 0002). The Cloud Run guide ([deploy.md](../deploy.md)) stays as an alternative.
 
+**Update (2026-11-04).** What production does today differs from the plan above in these ways. The uptime checks are GitHub's `uptime.yml` (`/readyz` every 5 minutes; `/healthz/ops` and `/demo` every 3 hours), not a weekly run. Tables, long figure descriptions, course-notation memory, image pages (scanned and handwritten pages, opt-in per upload, ADR 0007) and several equation checks are on in production; the list is in [deploy-railway.md](../deploy-railway.md), "Feature flags in production". Microsoft sign-in for set-up universities and an open sign-up mode with lower limits for self-signed-up accounts exist ([web.md](../web.md), "Sign-up modes and access tiers"). Word and PowerPoint input exists where the image has LibreOffice. LaTeX source (ADR 0008) is built but off in production. The repository is public, which the AGPL source offer needed (ADR 0003).
+
 **Questions that were open on 2026-10-06**
 
 | Question | Outcome |
 |---|---|
-| Tables in the beta? | Out for 2026 and listed on the known-limits page. The code exists behind `FEATURE_TABLES` (off) |
+| Tables in the beta? | Out for 2026 and listed on the known-limits page. The code exists behind `FEATURE_TABLES` (off). Later changed: on in production since the owner's decision of 2026-10-21 (docs/tables.md, "The decision") |
 | Model routing (cheap cases to a cheap model)? | Yes: ADR 0002 |
 | Fallback model per step? | Yes, each model is the other's fallback: ADR 0002 |
 | Hosting | Cloud Run, one service: ADR 0004 (moved to Railway, see its update) |

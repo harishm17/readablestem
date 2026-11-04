@@ -115,5 +115,6 @@ These rows decide what changes in the repository:
 | B3: it arrived as a file only | Say so on the help page; the instructor links it from a module. Consider adding Canvas's own page resource type to the cartridge |
 | B2: the import reports an issue about the manifest | Send the issue text; `export_cartridge.manifest_xml` is the place to change |
 
-Then change the `TODO(Harish)` lines in `help_posting.html` and `_job_ready.html` (they say
-"not yet tried") and the sentence "Not tested against a live Canvas" in `docs/output.md`.
+Then change the "not yet tried in a live course" sentences in `help_posting.html`, `_job_ready.html`
+and `landing.html` (site copy: Harish's wording) and the sentence "Not tested against a live Canvas"
+in `docs/output.md`.
