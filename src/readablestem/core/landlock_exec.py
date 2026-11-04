@@ -33,6 +33,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import ctypes
+import errno
 import json
 import os
 import resource
@@ -127,6 +128,35 @@ def own_tasks(uid: int) -> int:
                     pass
     except OSError:
         pass
+    return total
+
+
+def program_tasks(root: int) -> int:
+    """Tasks of the descendants of `root` (not `root`'s own), from /proc."""
+    parents: dict[int, int] = {}
+    try:
+        for name in os.listdir("/proc"):
+            if name.isdigit():
+                try:
+                    with open(f"/proc/{name}/stat") as handle:
+                        line = handle.read()
+                    parents[int(name)] = int(line[line.rindex(")") + 2 :].split()[1])
+                except (OSError, ValueError, IndexError):
+                    pass
+    except OSError:
+        return 0
+    tree = {root}
+    grew = True
+    while grew:
+        grew = False
+        for pid, parent in parents.items():
+            if parent in tree and pid not in tree:
+                tree.add(pid)
+                grew = True
+    total = 0
+    for pid in tree - {root}:
+        with contextlib.suppress(OSError):
+            total += len(os.listdir(f"/proc/{pid}/task"))
     return total
 
 
@@ -268,7 +298,16 @@ def main() -> None:
     # slack for the user's other threads starting meanwhile) beside this supervisor.
     limits = spec["limits"]
     tasks = own_tasks(os.getuid()) + limits["pids"] + limits.get("slack", 0)
-    child = os.fork()
+    marker = spec.get("busy_marker", "")
+    allowance = limits["pids"] + limits.get("slack", 0)
+    starved = False
+    last_look = 0.0
+    try:
+        child = os.fork()
+    except OSError as exc:  # no room for the program at all
+        if marker and exc.errno == errno.EAGAIN:
+            open(marker, "w").close()
+        os._exit(125)
     if child == 0:
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
         confine_and_exec(libc, spec, tasks)
@@ -285,8 +324,19 @@ def main() -> None:
             break
         if os.getppid() != parent:  # the caller (the process, not a thread of it) is gone
             on_term(0, None)
+        now = time.monotonic()
+        if marker and not starved and now - last_look > 0.25:
+            # The machine is "busy" when the user's tasks are at the limit while the program has
+            # not used its own allowance: what filled the room is not the program. This is the
+            # launcher's own observation, never the program's output.
+            last_look = now
+            if own_tasks(os.getuid()) >= tasks and program_tasks(os.getpid()) < allowance:
+                starved = True
         time.sleep(0.05)
     kill_descendants()
+    if marker and starved and status != 0:
+        with contextlib.suppress(OSError):
+            open(marker, "w").close()
     if os.WIFSIGNALED(status):
         signal.signal(os.WTERMSIG(status), signal.SIG_DFL)
         os.kill(os.getpid(), os.WTERMSIG(status))

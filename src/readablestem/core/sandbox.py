@@ -416,23 +416,6 @@ def deleted_mapped_bytes(pids: set[int]) -> int:
     return sum(seen.values())
 
 
-# What a program prints when `fork` fails for lack of room (EAGAIN): Perl's, LaTeXML's and the
-# launcher's own. Only this errno text is looked for, in the end of the log, and never returned.
-_NO_ROOM = b"Resource temporarily unavailable"
-
-
-def _no_room(log: Path | None) -> bool:
-    if log is None:
-        return False
-    try:
-        with log.open("rb") as handle:
-            handle.seek(0, os.SEEK_END)
-            handle.seek(max(0, handle.tell() - 4096))
-            return _NO_ROOM in handle.read()
-    except OSError:
-        return False
-
-
 def _tree_usage(roots: tuple[Path, ...], cap: int) -> tuple[int, int]:
     """(bytes, entries) under `roots`; stops counting once entries pass `cap`."""
     total = entries = 0
@@ -564,6 +547,7 @@ def _landlock_spec(
     scratch: Path,
     stubs: Path,
     program: bytes | None,
+    busy_marker: str = "",
 ) -> dict:
     import base64
 
@@ -594,6 +578,7 @@ def _landlock_spec(
         },
         "seccomp": base64.b64encode(program).decode() if program else "",
         "cmd": command,
+        "busy_marker": busy_marker,
     }  # fmt: skip
 
 
@@ -621,7 +606,7 @@ def _run(
     limits = limits or Limits()
     landlock = name == "landlock"
     read_end = write_end = None
-    scratch = stubs = None
+    scratch = stubs = marker_dir = marker = None
     sink = None
     group = None
     if landlock:
@@ -632,9 +617,13 @@ def _run(
             raise SandboxUnavailable("the Landlock backend needs its seccomp filter")
         scratch = Path(tempfile.mkdtemp(prefix="rs-sandbox-"))
         stubs = Path(tempfile.mkdtemp(prefix="rs-stubs-"))
+        # Where the launcher says the machine was busy: in no folder the program is granted, so
+        # only the launcher can make the file.
+        marker_dir = Path(tempfile.mkdtemp(prefix="rs-marker-"))
+        marker = marker_dir / "busy"
         spec = _landlock_spec(
             command, ro=ro, rw=rw, tools=tools, env=env, cwd=cwd, limits=limits, hide=hide,
-            scratch=scratch, stubs=stubs, program=program,
+            scratch=scratch, stubs=stubs, program=program, busy_marker=str(marker),
         )  # fmt: skip
         argv = [sys.executable, "-I", "-S", str(LAUNCHER), json.dumps(spec)]
         rw_hosts = (*(host for host, _ in rw), scratch)
@@ -671,7 +660,10 @@ def _run(
         while True:
             try:
                 proc.wait(timeout=POLL_SECONDS)
-                return Outcome(proc.returncode, busy=bool(proc.returncode) and _no_room(log))
+                return Outcome(
+                    proc.returncode,
+                    busy=bool(proc.returncode) and marker is not None and marker.exists(),
+                )
             except subprocess.TimeoutExpired:
                 pass
             timed_out = time.monotonic() > deadline
@@ -702,6 +694,6 @@ def _run(
             sink.close()
         if group is not None:
             group.remove()
-        for folder in (scratch, stubs):
+        for folder in (scratch, stubs, marker_dir):
             if folder is not None:
                 shutil.rmtree(folder, ignore_errors=True)

@@ -363,10 +363,13 @@ What the two layers cover:
   (`sandbox.make_undumpable`), so even a same-user process that could open `/proc` could not read
   their `environ` or memory; the probe checks the property (`dumpable0_protects_environ`) and that
   the program's own environment holds only what the caller named.
-- **A busy machine.** When a fork fails for lack of room (the user's task count is at the
-  limit because the web app's threads came and went), the end of the program's log is checked
-  for the errno text and the conversion fails as `source_busy` ("The server is busy ... Try
-  again"), not as a bad document. The text is only looked for, never returned.
+- **A busy machine.** The supervisor (not the program) watches the user's task count: when it
+  is at the `RLIMIT_NPROC` limit while the program has not used its own allowance, what filled
+  the room is not the program, and if the program then ends in failure the supervisor makes a
+  marker file in a folder no grant covers; the conversion fails as `source_busy` ("The server is
+  busy ... Try again"), not as a bad document. Nothing the program prints or exits with is read:
+  a document that prints "Resource temporarily unavailable", or a program that hits its own task
+  limit, is an ordinary failure.
 - **Limits.** `RLIMIT_AS` 512 MB per task, CPU, file size, no core, 256 files, and `RLIMIT_NPROC`
   set to the user's tasks at that moment plus 2 (what LaTeXML needs: one task, the program,
   measured on every fixture: peak 2 with the supervisor) plus 2 of slack, because the web app's
@@ -382,7 +385,9 @@ What the two layers cover:
   between two polls the four tasks can touch what native code writes in 0.1 s (memory bandwidth
   is some GB/s, so up to the 2 GB of address space within a few polls is possible) before the
   kill. The container's own memory limit and the host's OOM killer are what is left behind that.
-  Under a cgroup the bound is the cgroup's limit and none of this applies.
+  Under a cgroup the bound is the cgroup's limit and none of this applies. The native code
+  that makes the burst fast is the loader residual below ("The dynamic loader can run a
+  file the program wrote").
 - **Probe.** `backend=bwrap|landlock`, and from inside the sandbox that `/etc/passwd`,
   `/etc/shadow` and `/app` cannot be read, `/proc/1/environ` and the parent's are unreadable, a TCP
   connect fails, nothing beside the job's folder can be written, a denied call answers `EPERM`
@@ -398,7 +403,11 @@ leaves):
   `EACCES`), so `ld.so /out/file` runs native code. Not mitigated: it is the same ruleset and
   filter as for Perl, so it reads nothing Perl cannot and makes no call Perl cannot
   (`test_the_dynamic_loader_can_run_a_file_the_program_wrote_but_it_stays_confined`); the output
-  folder has no execute right, so the file cannot be executed directly.
+  folder has no execute right, so the file cannot be executed directly. This is also what
+  makes the memory burst above fast: native code (not Perl) is what can touch gigabytes
+  within one 0.1 s poll, so the burst figure under "Worst case for memory" and this
+  residual are one risk, bounded by the address-space cap per task and the container's
+  memory limit, not by anything that could stop the first poll.
 - **Same user, same pid and network namespaces.** There is no namespace between the program and
   the web process. What keeps it out is the ruleset (no `/proc`, no files of the app), the
   scopes, the filter's denial of every call that names another process, and

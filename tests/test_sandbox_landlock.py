@@ -733,17 +733,72 @@ def test_the_dynamic_loader_can_run_a_file_the_program_wrote_but_it_stays_confin
     assert got["passwd"] != "0" and got["proc"] != "0"  # still no /etc/passwd, no /proc
 
 
-def test_a_fork_that_fails_for_lack_of_room_is_reported_as_busy_not_as_a_bad_document(tmp_path):
-    # Forks until the task limit stops it, then dies with the errno text, as Perl does.
+def test_a_program_that_prints_the_busy_text_is_not_busy(tmp_path):
+    """`busy` comes from the launcher's own observation, never from what the program prints or
+    how it exits: a program that fails with the errno text, or exits with any status, is a normal
+    failure."""
+    spoof = 'print STDERR "Cannot fork: Resource temporarily unavailable\\n"; exit 3;'
+    outcome, text = run_perl(spoof, tmp_path)
+    assert not outcome.ok and "Resource temporarily unavailable" in text and not outcome.busy
     loop = (
-        'my @k; for (1..40) { my $p = fork(); if (!defined $p) { die "Can\'t fork: $!\n" }'
+        'my @k; for (1..40) { my $p = fork(); if (!defined $p) { die "Cannot fork: $!\\n" }'
         " if ($p == 0) { sleep 5; exit 0 } push @k, $p }"
     )
-    outcome, text = run_perl(loop, tmp_path, limits=sandbox.Limits(wall_s=20, pids=4))
-    assert not outcome.ok and "Resource temporarily unavailable" in text
+    own_limit, text = run_perl(loop, tmp_path, limits=sandbox.Limits(wall_s=20, pids=4))
+    assert not own_limit.ok and "Resource temporarily unavailable" in text
+    assert not own_limit.busy  # the program used its own allowance: its own limit, not a busy host
+
+
+def test_a_document_that_prints_the_busy_text_is_a_normal_conversion_failure(monkeypatch):
+    from readablestem.config import get_settings
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.source import convert, envelope, latexml
+
+    if not latexml.installed():
+        pytest.skip("needs LaTeXML")
+    monkeypatch.setenv(sandbox.BACKEND_ENV, "landlock")
+    sandbox.backend.cache_clear()
+    try:
+        tex = (
+            "\\documentclass{article}\\begin{document}"
+            "\\typeout{Cannot fork: Resource temporarily unavailable}\\end{document}"
+        )
+        blob = envelope.wrap("tex", "a.tex", None, tex.encode())
+        with pytest.raises(convert.SourceFailed) as caught:
+            convert.convert_source(blob, settings=get_settings(), client=FakeVisionClient())
+    finally:
+        monkeypatch.undo()
+        sandbox.backend.cache_clear()
+    assert caught.value.code in {"source_unreadable", "source_failed"}  # never source_busy
+
+
+def test_a_machine_with_no_room_for_the_programs_tasks_is_busy(tmp_path):
+    """Other tasks of the user fill the limit while the program has used none of its allowance:
+    its fork fails and the launcher says so."""
+    code = (
+        'sleep 2; my $p = fork(); die "no fork: $!\\n" unless defined $p; exit 0 if $p == 0; wait;'
+    )
+    limits = sandbox.Limits(wall_s=30, pids=4)
+    squatters: list[subprocess.Popen] = []
+
+    def fill():
+        time.sleep(0.5)
+        # Just over this run's limit (and no more: they count against every sandbox of the
+        # user that is running meanwhile, under xdist too).
+        for _ in range(limits.task_bound("landlock") + 2):
+            squatters.append(subprocess.Popen(["sleep", "4"]))
+
+    thread = threading.Thread(target=fill)
+    thread.start()
+    try:
+        outcome, text = run_perl(code, tmp_path, limits=limits)
+    finally:
+        thread.join()
+        for proc in squatters:
+            proc.kill()
+            proc.wait()
+    assert not outcome.ok and "no fork" in text
     assert outcome.busy
-    other, _ = run_perl('die "a different failure\n";', tmp_path)
-    assert not other.ok and not other.busy
 
 
 def test_a_busy_machine_is_its_own_failure_code_for_a_conversion(tmp_path, monkeypatch):

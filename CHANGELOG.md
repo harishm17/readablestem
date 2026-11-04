@@ -18,6 +18,9 @@
   against the output budget and the entries in the writable folders are capped; the task bound
   is 4 x 512 MB and the probe fails over `SOURCE_SANDBOX_MAX_TOTAL_MB`; the memory poll is
   every 0.1 s; the supervisor watches its caller's pid instead of `PR_SET_PDEATHSIG`.
+- Final review: `source_busy` is decided by the launcher's own observation (the user's task
+  count at the limit while the program has not used its allowance, written to a marker the
+  program cannot reach), no longer from the program's output, which a document could spoof.
 - Second review: `fallocate` denied, the output budget counts blocks and deleted files that are
   still mapped, a fork that fails for lack of room fails the conversion as `source_busy`
   (new message: "The server is busy right now ... Try again in a few minutes, or upload the
