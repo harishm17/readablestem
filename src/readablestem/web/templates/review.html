@@ -471,12 +471,20 @@
       {{ page_group_card(unit.pages) }}
       {% else %}
       {% set item = unit.item %}
+      {# With more than three waiting, each is a compact row (what it is, its page, its status)
+         and one editor is open at a time (static/app.js); the first, and one that was just
+         worked on or has a message, starts open. Every row keeps its anchor, so a link to a
+         decision still lands on it open. #}
+      {% set compact = g.units|length > 3 %}
       <li id="item-{{ item.element_id }}" class="review-item" tabindex="-1">
         {% for notice in item.notices %}{{ notice_box(notice) }}{% endfor %}
+        {% if compact %}<details class="compact-item"{% if loop.first or item.open or item.changed %} open{% endif %}>
+          <summary>{{ item.label }}{% if item.page %}, page {{ item.page }}{% endif %}<span class="compact-status status-badge fix-{{ item.status }}">{{ item.status_label }}</span></summary>{% endif %}
         <article id="fix-{{ item.element_id }}" class="fix-card status-card-{{ item.status }}" aria-labelledby="fix-title-{{ item.element_id }}">
           <h4 id="fix-title-{{ item.element_id }}">{{ item.label }}{% if item.page %} <span class="meta">on page {{ item.page }}</span>{% endif %}</h4>
           {{ card_body(item) }}
         </article>
+        {% if compact %}</details>{% endif %}
       </li>
       {% endif %}
       {% endfor %}

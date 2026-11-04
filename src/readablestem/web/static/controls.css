@@ -1,0 +1,48 @@
+/* Buttons: the one component the app, the listening player and the static showcase share.
+   Tokens only (tokens.css loads first). Primary (filled), secondary (outlined), danger, small,
+   disabled and the link-styled button; 44px high; the label says the action. */
+
+button, .button, .button-secondary, .button-danger {
+  font: inherit;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-control);
+  border: 2px solid var(--accent);
+  background: var(--bg);
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+  line-height: 1.25;
+  max-width: 100%;
+  text-align: center;
+}
+.button, button.button { background: var(--accent); color: var(--on-accent); }
+.button:visited, .button:hover, .button-danger:visited, .button-danger:hover { color: var(--on-accent); }
+.button:hover, button.button:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.button-secondary, .button-secondary:visited { background: var(--bg); color: var(--accent); }
+.button-secondary:hover, button:hover { background: var(--accent-tint); color: var(--accent-hover); border-color: var(--accent-hover); text-decoration: none; }
+.button-danger, .button-danger:visited { background: var(--err); border-color: var(--err); color: var(--on-accent); }
+.button-danger:hover { background: var(--err-strong); border-color: var(--err-strong); }
+.button-small { min-height: 2.25rem; padding: var(--space-1) var(--space-4); }
+button[disabled], .button[aria-disabled="true"] { cursor: not-allowed; opacity: 1; background: var(--surface-2); border-color: var(--border-control); color: var(--ink-muted); }
+.link-button {
+  background: none; border: 0; padding: 0; min-height: 1.5rem; color: var(--accent); font-weight: 400;
+  text-decoration: underline; text-underline-offset: 0.18em; cursor: pointer; display: inline-flex; align-items: center;
+}
+.link-button:hover { background: none; color: var(--accent-hover); }
+
+@media (prefers-reduced-motion: no-preference) {
+  a, button, .button, .button-secondary, .button-danger { transition: color 120ms, background-color 120ms, border-color 120ms; }
+}
+
+@media (forced-colors: active) {
+  button, .button, .button-secondary, .button-danger { border: 2px solid ButtonText; }
+  .button, button.button { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
+  .button:hover, button.button:hover { background: Highlight; color: HighlightText; border-color: Highlight; }
+  button[disabled], button.button[disabled] { background: ButtonFace; color: GrayText; border-color: GrayText; }
+}

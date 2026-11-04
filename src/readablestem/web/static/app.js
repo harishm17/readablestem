@@ -717,3 +717,45 @@
   sync();
   if (narrow.addEventListener) narrow.addEventListener("change", sync);
 })();
+
+/* The review list's compact rows (review.html, more than three waiting): opening one editor
+ * (its summary pressed or clicked) closes the others in its list, so the page stays one editor
+ * long. Rows stay <details>, so the keyboard and a link to a decision work as before; opening
+ * rows by a link or by script leaves the others alone, and without this file all can be open. */
+(function () {
+  "use strict";
+  document.addEventListener("click", function (event) {
+    var summary = event.target instanceof Element ? event.target.closest("details.compact-item > summary") : null;
+    if (!summary) return;
+    var row = summary.parentElement;
+    if (row.open) return; // it is being closed
+    var list = row.closest("ol");
+    if (!list) return;
+    list.querySelectorAll("details.compact-item[open]").forEach(function (other) {
+      if (other !== row) other.open = false;
+    });
+  });
+})();
+
+/* Symbols (review_inventory.html): beside "Change all", say how many places it changes and how
+ * many are left as they are, and keep that true as places are ticked to be left out. */
+(function () {
+  "use strict";
+  document.querySelectorAll("form.symbol-form").forEach(function (form) {
+    var line = form.querySelector(".symbol-affect");
+    if (!line) return;
+    var total = Number(line.getAttribute("data-changeable"));
+    var count = line.querySelector("[data-affect-count]");
+    var left = line.querySelector("[data-affect-left]");
+    var decided = Number(left.textContent) || 0;
+    function update() {
+      var out = form.querySelectorAll('input[name="exclude"]:checked').length;
+      count.textContent = String(Math.max(total - out, 0));
+      left.textContent = String(decided + out);
+    }
+    form.addEventListener("change", function (event) {
+      if (event.target && event.target.name === "exclude") update();
+    });
+    update();
+  });
+})();
