@@ -16,11 +16,8 @@ that is unsure leaves the edge where it was.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Sequence
 from typing import Protocol
-
-from readablestem.pipeline.speech_nuclides import ELEMENTS
 
 
 class Glyph(Protocol):
@@ -92,32 +89,26 @@ def touching(chars: Sequence[Glyph], i: int) -> bool:
     return gap < NO_GAP * max(chars[before].size, chars[after].size)
 
 
-# A function name an author sets upright (`\operatorname{Cov}`, `\mathrm{supp}`, `\mathrm{Pr}`) is a
-# word of two to eight letters touching the bracket of its argument. Prose puts a space before a
-# bracket, so a word that touches one, is no English word and is not set in italic is a name
-# of maths, and the formula goes on through it.
-FUNCTION_NAME_LETTERS = (2, 8)
+# Names of operators and functions that papers set upright (`\operatorname{Cov}`, `\mathrm{supp}`,
+# `\Pr`) and that the layout's list of maths words (`layout._MATH_WORDS`) does not hold. The text
+# layer cannot tell an upright name from a word of the prose (both are in the text font), so the
+# rule never guesses: only these exact spellings count, and an acronym such as ARFIMA(1, d, 1) or
+# a word of the sentence is left alone. A name counts when it touches the bracket of its argument.
+OPERATOR_NAMES = frozenset(
+    {
+        "Pr", "Cov", "Corr", "Var", "Std", "Exp", "supp", "vec", "vech", "Vec", "Tr", "Rank",
+        "Diag", "diag", "Unif", "Bern", "Bin", "Poi", "Cat", "KL", "argmax", "argmin", "softmax",
+        "sign", "span", "proj", "dist", "dom", "Re", "Im", "Hess", "Jac", "ReLU", "erfc", "atan",
+        "atan2", "expit", "logit", "Ker", "Ran",
+    }
+)  # fmt: skip
 
 
-_SYMBOLS = re.compile(r"[A-Z][a-z]?")
-
-
-def _chemical(word: str) -> bool:
-    """Is the word made of element symbols only (`Na`, `HCl`, `NaOH`)? `Pr` is also the probability
-    of a paper's formulas and is not taken as an element."""
-    pieces = _SYMBOLS.findall(word)
-    return word != "Pr" and "".join(pieces) == word and all(p in ELEMENTS for p in pieces)
-
-
-def function_name(chars: Sequence[Glyph], start: int, end: int, *, known_word: bool) -> bool:
-    """Is the word `chars[start:end]` (upright letters, not scripts) a function name: it has two
-    to eight letters, is no known English word and no chemical formula, and an opening
-    parenthesis follows it with no gap (`NO_GAP` of the size)? A word of the dictionary
-    (`known_word`) is prose: "function(s)"; `Na(` and `Mg(OH)2` are chemistry."""
-    low, high = FUNCTION_NAME_LETTERS
-    if known_word or not low <= end - start <= high or end >= len(chars):
-        return False
-    if _chemical("".join(c.c for c in chars[start:end])):
+def function_name(chars: Sequence[Glyph], start: int, end: int) -> bool:
+    """Is the word `chars[start:end]` one of `OPERATOR_NAMES` with an opening parenthesis after
+    it and no gap (`NO_GAP` of the size)? "Cov(X)" is; "function(s)", "ARFIMA(1, d, 1)" and
+    "Mg(OH)2" are not."""
+    if end >= len(chars) or "".join(c.c for c in chars[start:end]) not in OPERATOR_NAMES:
         return False
     opening, last = chars[end], chars[end - 1]
     return opening.c == "(" and opening.x0 - last.x1 < NO_GAP * max(opening.size, last.size)

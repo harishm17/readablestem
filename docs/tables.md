@@ -691,17 +691,23 @@ table of a TeX paper now has a second reader for the cells whose glyphs say they
    tables are off, because the table stays a picture and nothing would write them.
 2. **The equation step** reads the cell's crop like any inline equation (its glyph checks, its flags, its place in the
    review). Nothing is guessed in layout: a cell is only marked.
-3. **The page** (`pipeline/table_math.py`, called by `assemble.render_html`): in a table the table step rebuilt, with a grid
-   of the size of the one read from the PDF, a cell the model wrote with no maths takes the equation step's LaTeX and MathML
-   when the equation has them (also when the equation is flagged for review: it has its own decision, as an inline formula
-   of a paragraph has). A cell the model already wrote as maths is not changed, a failed, abstained or rejected equation
-   leaves the cell as the model wrote it, and the cell's text, header and span never change. The equation elements of cells
-   are not written on their own.
+3. **One source per cell** (`pipeline/table_math.py`). A glyph belongs to one cell (the cell boxes of a detected grid overlap
+   by a few points: the one it overlaps most), and a cell becomes an equation only when the letters and digits of the glyphs
+   equal the cell's own text. After the steps, `settle` (called by `run.py`) drops the equation of a table that is not written
+   as a table (kept as a picture, abstained, a grid of another size: no review item for something nothing shows) and, where
+   the table step's LaTeX for a cell differs from the equation's reading (canonical comparison), makes the equation a required
+   decision with a failed check `table.cell_reading`, so neither reading is kept silently. When the page is written
+   (`assemble.render_html` and every re-render of the review screen) the cell shows its equation's current LaTeX and MathML,
+   also when the equation is flagged for review (it has its own decision, as an inline formula of a paragraph has), so a
+   reviewer's edit or accept of the equation is the cell's in the HTML, Word, EPUB, Canvas and the record, which are made
+   from it. A failed, abstained or rejected equation leaves the cell as the table step wrote it; the cell's text, header and
+   span never change, and the equation elements of cells are not written on their own. To change such a cell, edit its
+   equation: a LaTeX typed into the table card's cell is replaced by the equation's reading when the page is written.
 
 Measured offline with the layout alone (`scripts/eq_span_edges.py`, [eval-equation-diagnostics.md](eval-equation-diagnostics.md),
-"Table-cell maths"): gold equations typed in floats found 657 to 908 of 2,153 over the five development and replay parts.
+"Table-cell maths"): gold equations typed in floats found 661 to 892 of 2,153 over the five development and replay parts.
 What the glyphs cannot see: a number set in maths mode in a text font (`0.50` in `0.50 kg`, `1.57 s`) has no glyph that says
-so, and a table whose model reading differs from the equation step's keeps the model's.
+so. Revised uploads carry the equation like any inline equation (by its element), which moves when the table's cells do.
 
 ## Tables on, on the development sets (2026-10-21): measured, and the decision
 

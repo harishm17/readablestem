@@ -227,7 +227,8 @@ def test_the_results_page_of_a_part_links_to_combine_when_two_parts_are_finished
     _, jobs = three_finished_parts(web)
     page = web.alice.get(f"/jobs/{jobs[1].id}").text
     assert f'<a href="/jobs/{jobs[1].id}/combine">Combine parts</a>' in page
-    assert page.count("/combine") == 1  # one link
+    assert page.count('/combine"') == 1  # one HTML link; the Word and EPUB links add `?format=`
+    assert page.count("/combine?format=") >= 1
     text = text_of(page)
     assert "the 3 finished parts of this file that you still have, in page order" in text
     assert "A part you deleted, or one that is not finished or still has a" in text
@@ -269,3 +270,62 @@ def test_a_label_names_its_pages_and_label_reads_back(label, pages):
 @pytest.mark.parametrize("label", ["", None, "0", "3-1", "a", "1-", "1,,2", "1 - 2 - 3"])
 def test_what_is_not_a_label_names_no_pages(label):
     assert ranges.pages_of_label(label) is None
+
+
+# ------------------------------------------------------------------- Word and EPUB
+
+
+def test_the_combined_file_can_be_an_epub_recorded_in_that_file_type(web):  # noqa: F811
+    import io
+    import zipfile
+
+    from readablestem.web import events
+
+    _, jobs = three_finished_parts(web)
+    response = web.alice.get(f"/jobs/{jobs[0].id}/combine?format=epub")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/epub+zip"
+    assert ".epub" in response.headers["content-disposition"]
+    assert zipfile.ZipFile(io.BytesIO(response.content)).namelist()[0] == "mimetype"
+    with session_scope(web.ctx.factory) as session:
+        assert all(events.downloaded_formats(session, j.id) == ["epub"] for j in jobs)
+
+
+def test_the_combined_file_can_be_a_word_file(web):  # noqa: F811
+    import io
+
+    docx = pytest.importorskip("docx")
+    from readablestem.pipeline import export_docx
+
+    if not export_docx.available():
+        pytest.skip("pandoc is not installed")
+    _, jobs = three_finished_parts(web)
+    response = web.alice.get(f"/jobs/{jobs[2].id}/combine?format=docx")
+    assert response.status_code == 200
+    assert "wordprocessingml" in response.headers["content-type"]
+    assert docx.Document(io.BytesIO(response.content)).paragraphs
+
+
+def test_the_combined_file_in_an_unknown_type_is_a_400_and_changes_nothing(web):  # noqa: F811
+    _, jobs = three_finished_parts(web)
+    soon = utcnow() + timedelta(hours=1)
+    for job in jobs:
+        change(web, job, retain_until=soon)
+    assert web.alice.get(f"/jobs/{jobs[0].id}/combine?format=pdf").status_code == 400
+    with session_scope(web.ctx.factory) as session:
+        assert all(as_utc(session.get(Job, j.id).retain_until) == as_utc(soon) for j in jobs)
+
+
+def test_another_persons_parts_are_not_available_as_epub_either(web):  # noqa: F811
+    from fixtures.web.support import login
+
+    _, jobs = three_finished_parts(web)
+    bob = web.client()
+    login(bob, BOB)
+    assert bob.get(f"/jobs/{jobs[0].id}/combine?format=epub").status_code == 404
+
+
+def test_the_finish_line_offers_the_combined_file_in_each_type(web):  # noqa: F811
+    _, jobs = three_finished_parts(web)
+    page = web.alice.get(f"/jobs/{jobs[0].id}").text
+    assert f"/jobs/{jobs[0].id}/combine?format=epub" in page

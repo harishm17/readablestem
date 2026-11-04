@@ -23,10 +23,10 @@
   the table step wrote that cell as text (`pipeline/table_math.py`, `assemble.render_html`); a cell the model already
   wrote as maths, a failed reading and a table kept as a picture are left as they are. With tables off, `run.py` drops
   the cell equations. docs/tables.md "Maths cells from glyphs".
-- Measured offline (layout alone, no model): gold equations typed in a float found 657 to 908 of 2,153 over the five
-  development and replay parts; overall inline recall 0.734 to 0.765 on held-out and fresh2 to 4 (6,444 gold), precision
-  0.902 to 0.893 (one paper, `68.8±0.7`, holds most of the fall); 147 of 148 layout-identity PDFs identical, the one
-  that differs is the Beamer table deck (6 equation elements added, no text lost).
+- Measured offline (layout alone, no model): gold equations typed in a float found 661 to 892 of 2,153 over the five
+  development and replay parts; overall inline recall 0.731 to 0.759 on held-out and fresh2 to 4 (6,444 gold), precision
+  0.897 to 0.891 (one paper, `68.8±0.7`, holds most of the fall); 146 of 148 layout-identity PDFs identical, the two
+  that differ are TeX-made (the Beamer table deck gains 6 equation elements, `real-tables/2407.13734` 4; no text lost).
 - `scripts/eq_span_edges.py` also counts the cell equations (predicted, aligned to a gold equation).
 - Tests: `tests/test_table_math.py`; `tests/test_layout_beamer_math.py` (the table-cell test now asserts the equation
   elements; the inline count of the table deck stays a strict xfail: its two cells with a number set in maths mode and a
@@ -38,7 +38,7 @@
 
 - Inline formulas of TeX-made PDFs start and end where the glyphs say (`pipeline/glyph_math.py`, docs/layout.md "Inline
   span edges from glyphs"): a comma, colon or semicolon set as an index stays in the formula (`\rho_{m,q}(x)` was `q(x)`),
-  a radical is not cut from its radicand, an upright function name touching its bracket (`\Pr(A)`, `\operatorname{CTCS}(n)`)
+  a radical is not cut from its radicand, a known upright operator name touching its bracket (`\Pr(A)`, `\mathrm{supp}(\psi)`)
   and a percent sign after a number are in the formula, and the unit after a number (`24h`, `m^3 kg^{-1}`) is out of it.
   Nothing becomes a formula that was not one, so no text is lost: letters and digits of all 148 PDFs of
   `scripts/layout_identity.py` are equal before and after, 146 PDFs identical, 2 TeX papers differ.
@@ -49,6 +49,49 @@
 - Tests: `tests/test_glyph_math.py`.
 - Pipeline version 0.5.3 to 0.5.4: an inline formula's crop, id and marker text can change; results from 0.5.3 load
   unchanged.
+## Unreleased: keyboard walk and draft ACR
+
+- New keyboard-only walk of the web app (`tests/test_web_keyboard_browser.py`, browser-marked,
+  helpers in `tests/fixtures/web/keyboard.py`): Tab through every page at 1280, 390 and 320 CSS px
+  (skip link, focus visible and not covered, names, no trap, no change on focus, landmark order)
+  and the main flows by key alone, with where focus lands after each redirect.
+  `tests/test_web_focus_style.py` checks the focus ring's colours offline.
+- Fix (found by the walk): after leaving a page out, putting it back, or choosing a line to change
+  in the page tools, focus stayed on the page itself because the redirect named a fragment that was
+  not focusable (a browser skips `autofocus` when the address has a fragment). The redirects and
+  links now name `#page-tools-summary`, and the tool sections take focus (`tabindex="-1"`).
+- Draft accessibility conformance report in `docs/acr/` (VPAT 2.5Rev WCAG edition layout, WCAG 2.2
+  A and AA), not published and not a claim of conformance: each row names its test or code, and
+  rows that need a screen reader session are "Not yet evaluated". `tests/test_acr_draft.py` holds
+  the report to its own rules.
+## Unreleased: development baseline (branch eval/dev-baseline-2026-11-03)
+
+- Measurement report `docs/eval-dev-baseline-2026-11-03.md`: ReadableSTEM at pipeline 0.5.3 with production flags on the 25
+  real-world development papers, against the recorded Opus (6 papers) and Haiku (25) chatbot answers. One
+  run, $0.1186 of model spend; no code, prompt or setting changed.
+## Unreleased: figures spot check
+
+- `eval figures-spotcheck` (`eval/figures_spotcheck.py`, docs/eval.md "Figure spot check"): offline,
+  no model call. From a figures run with long descriptions on, writes a blind sheet of every
+  long-judge fail plus a seeded sample of 10 passes for a person to label, and scores the labels
+  against a key (judge fails confirmed, sampled passes the person would fail, each with n and a
+  Wilson interval). Tests: `tests/test_eval_figures_spotcheck.py`.
+## Unreleased: fair queue
+
+- The worker takes queued jobs round-robin by person (`web/fair_queue.py`, docs/web.md "Worker"):
+  fewest attempts first as before, then the owner served longest ago, then oldest. Someone with ten
+  queued documents no longer keeps another person's single one waiting behind all ten; a person
+  alone is served in the same order as before. The job page's "documents ahead of yours" replays the
+  same order. Tests: `tests/test_web_fair_queue.py`, one Postgres test in `tests/test_web_postgres.py`.
+## Unreleased: Word and EPUB in "Download all" (branch export/w3-download-all-formats)
+
+- "Download all" (My documents and the course page) and "Combine parts" offer Word (.docx, where pandoc is
+  installed) and EPUB as well as HTML: `?format=docx` or `?format=epub` on `/app/download`,
+  `/courses/{id}/download` and `/jobs/{id}/combine`. Same wording and pattern as the single downloads
+  ("Other file types"). A Word zip holds at most 10 documents (each is a pandoc run); a document that cannot
+  be made in the file type is left out and counted in `contents.txt`. Each document counts as downloaded in
+  that file type, so the review record lists it. The HTML zip no longer restarts the deletion clock of ready
+  documents it left out for the 25-document cap. docs/output.md, docs/web.md, docs/security.md.
 
 ## Unreleased: slide decks (branch layout/beamer-slides)
 
