@@ -214,15 +214,7 @@ log = logging.getLogger(__name__)
 # `\checkmark`, `\times`) is an inline cell equation; a cell equation's line crop and glyph
 # context are cut to its own column (the next column's "(5)" was read into it). Results from 0.5.7
 # load unchanged.
-# 0.5.10 (2026-11-03; 0.5.9 is the glyph-reconcile branch, eq/read-push, which this change does not
-# depend on): display grouping in layout (docs/layout.md "One printed display, one element"). Two
-# formulas set on one line with a connective word between them ("... and ...", "for all i") are one
-# display element with the word and the one number; the right half of a long aligned row and a
-# row that starts with "=" join the display above; a trailing ellipsis ("1, 2, 3, ...") stays in
-# an inline formula. Fewer, larger equation elements on TeX papers with such displays: their crops
-# and requests change, so recorded equation answers for those elements are asked again. Results
-# from 0.5.8 load unchanged.
-PIPELINE_VERSION = "0.5.10"
+PIPELINE_VERSION = "0.5.8"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -1476,6 +1468,7 @@ def _page_math_pass(
                     pages=pages,
                     max_pages=settings.max_pages_per_job,
                     page_math=applied,
+                    **({"display_grouping": True} if settings.layout_display_grouping else {}),
                 )
             except Exception as exc:  # the first run's pages stand
                 log.warning("page math: the second layout run failed: %s", type(exc).__name__)
@@ -1701,6 +1694,7 @@ def _convert(
                 pages=pages,
                 max_pages=settings.max_pages_per_job,
                 **({} if collector is None else {"page_math": collector}),
+                **({"display_grouping": True} if settings.layout_display_grouping else {}),
             )
             page_math_summary: PageMathSummary | None = None
             witness_summary: PageWitnessSummary | None = None

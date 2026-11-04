@@ -2,8 +2,8 @@
 
 ## Unreleased: display grouping (branch eq/display-grouping)
 
-- Pipeline 0.5.10 (0.5.9 is the glyph-reconcile branch; the two do not depend on each other).
-  Layout joins pieces of one printed display: two formulas with a connective word between them
+- New setting `LAYOUT_DISPLAY_GROUPING` (off; output byte-identical to before when off, no pipeline bump until it is turned on).
+  When on, layout joins pieces of one printed display: two formulas with a connective word between them
   ("P_A = ... and P_B = ...", "0 < p < 1 for all i") are one display element holding the word and
   the one equation number, where the word was a paragraph read after both equations; the right
   half of a long aligned row and a row that starts with "=" join the display above them; a

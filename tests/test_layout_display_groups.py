@@ -34,7 +34,7 @@ def nospace(text: str | None) -> str:
 
 @pytest.fixture(scope="module")
 def elements() -> list[Element]:
-    return analyze(PDF.read_bytes()).elements
+    return analyze(PDF.read_bytes(), display_grouping=True).elements
 
 
 def blocks(elements: list[Element]) -> list[Element]:
@@ -158,7 +158,9 @@ def aligned_row_with_a_bare_fraction_on_the_right() -> bytes:
 def test_the_right_half_of_a_row_joins_the_row_it_ends_beside():
     found = [
         e
-        for e in analyze(aligned_row_with_a_bare_fraction_on_the_right()).elements
+        for e in analyze(
+            aligned_row_with_a_bare_fraction_on_the_right(), display_grouping=True
+        ).elements
         if e.kind == Kind.EQUATION
     ]
     assert len(found) == 1
@@ -178,7 +180,9 @@ def test_a_fraction_far_from_the_row_is_not_joined():
     fraction(page, 142, 150, "f(s)", "s", 24)
     fraction(page, 420, 150, "h(s)/g(n)", "s(t - 1)", 60, size=12.0)  # 250 pt on: not a column
     page.insert_text((72, 260), "which is what we wanted to show in this note.", fontsize=11)
-    found = [e for e in analyze(doc.tobytes()).elements if e.kind == Kind.EQUATION]
+    found = [
+        e for e in analyze(doc.tobytes(), display_grouping=True).elements if e.kind == Kind.EQUATION
+    ]
     assert len(found) == 2
 
 
@@ -240,3 +244,22 @@ def test_two_numbered_displays_are_never_merged():
     row_two.labels.append(one_row("(2)", 500, 361))
     merged = layout._merge_continued_regions([row_one, row_two], [[first], [lead]])
     assert len(merged) == 2
+
+
+# ------------------------------------------------------------ the setting (off by default)
+
+
+def test_with_the_setting_off_the_output_is_the_old_output():
+    from readablestem.config import Settings
+
+    assert Settings().layout_display_grouping is False
+    off = analyze(PDF.read_bytes()).elements
+    on = analyze(PDF.read_bytes(), display_grouping=True).elements
+    # off: "and" is a paragraph after the two equations, the ellipsis is trimmed, no row joins
+    assert [e for e in off if e.kind == Kind.PARAGRAPH and nospace(e.text) == "and"]
+    assert "j=1,2,3" in inline(off) and "j=1,2,3,..." not in inline(off)
+    assert len(off) > len(on)
+    # and the flag does not stay set for the next call
+    assert [e.model_dump() for e in analyze(PDF.read_bytes()).elements] == [
+        e.model_dump() for e in off
+    ]

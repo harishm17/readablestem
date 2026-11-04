@@ -453,6 +453,7 @@ def analyze(
     pages: list[int] | None = None,
     max_pages: int | None = None,
     page_math: Any = None,
+    display_grouping: bool = False,
 ) -> Layout:
     """Elements of the given 0-based pages (all by default), ids "p{page+1}-e{index}".
 
@@ -468,6 +469,9 @@ def analyze(
     `after_regions(number, rows)` (`pipeline.page_math_reconcile.PageMathHook`). It is shown
     each page's text rows before the display equations are grouped, and may return them
     cut and marked by a verified plan. None (the default) is layout's own rules alone.
+
+    `display_grouping` (`LAYOUT_DISPLAY_GROUPING`, off): the rules of "One printed display, one
+    element" in docs/layout.md. Off, the output is what it was before they existed.
     """
     with _LOCK:
         _quiet_mupdf()
@@ -476,12 +480,12 @@ def analyze(
             try:
                 selected = _select_pages(doc.page_count, pages, max_pages)
                 _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
-                return _analyze_document(doc, selected, page_math)
+                return _analyze_document(doc, selected, page_math, display_grouping)
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
             finally:
-                global _TEX_MADE, _SLIDE_DECK, _COMPOUNDS, _WHOLE_WORDS
-                _TEX_MADE = _SLIDE_DECK = False
+                global _TEX_MADE, _SLIDE_DECK, _COMPOUNDS, _WHOLE_WORDS, _GROUPING
+                _TEX_MADE = _SLIDE_DECK = _GROUPING = False
                 _COMPOUNDS = _WHOLE_WORDS = frozenset()
                 doc.close()
         finally:
@@ -3353,7 +3357,7 @@ def _classify_row(row: _Row) -> None:
         row.score = max(row.score, EQUATION_THRESHOLD)
     elif prose == 0 and row.score >= EQUATION_THRESHOLD and ratio >= 0.5:
         row.kind = "math"
-    elif prose >= 1 and ratio >= 0.5 and _joined_formulas(row, info):
+    elif _GROUPING and prose >= 1 and ratio >= 0.5 and _joined_formulas(row, info):
         row.kind = "math"  # "P(A) = 1 and P(B) = 2": two formulas of one display
         row.reasons = [*row.reasons, JOINED_REASON]
     elif prose == 0 and ratio >= 0.6 and len(ink) <= 40:
@@ -3955,7 +3959,10 @@ def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tupl
         changed = False
         while end > start and (
             chars[end - 1].blank
-            or (chars[end - 1].c in ",.;:" and not _trailing_ellipsis(chars, start, end))
+            or (
+                chars[end - 1].c in ",.;:"
+                and not (_GROUPING and _trailing_ellipsis(chars, start, end))
+            )
         ):
             end -= 1
             changed = True
@@ -6011,6 +6018,7 @@ def _punctuation_only(row: _Row) -> bool:
     return all(c.c in ",.;:" for c in row.ink)
 
 
+_GROUPING = False  # set by `analyze(display_grouping=...)` for the length of one call
 JOINED_REASON = "formulas joined by a word"
 JOINED_INDENT = 2.5  # x font size: least space on each side of a display line of two formulas
 
@@ -6113,7 +6121,8 @@ def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
         _Line(members, list({id(p): p for r in members for p in on_rule.get(id(r), [])}.values()))
         for members in groups.values()
     ]
-    lines = _join_connectives(lines, rows)
+    if _GROUPING:
+        lines = _join_connectives(lines, rows)
     for label in labels:
         centre = (label.y0 + label.y1) / 2
         beside = [
@@ -6274,9 +6283,10 @@ def _stack_lines(lines: list[_Line]) -> list[_Region]:
         region.box = _union([region.box, line.box])
         if any(c.c.isalnum() for c in line.ink) or not last[host].ink:
             last[host] = line  # a stray mark does not stand for the line above
-    regions = _merge_continued_regions(
-        regions, [[f, *p] for f, p in zip(first, peers, strict=True)]
-    )
+    if _GROUPING:
+        regions = _merge_continued_regions(
+            regions, [[f, *p] for f, p in zip(first, peers, strict=True)]
+        )
     for region in regions:
         for row in [*region.rows, *region.labels]:
             row.region = region
@@ -9863,14 +9873,20 @@ def _read_page(
     return rows, _page_paths(page, drawings, seen), kind
 
 
-def _analyze_document(doc: pymupdf.Document, selected: list[int], page_math: Any = None) -> Layout:
+def _analyze_document(
+    doc: pymupdf.Document,
+    selected: list[int],
+    page_math: Any = None,
+    display_grouping: bool = False,
+) -> Layout:
     frags: dict[int, list[_Row]] = {}
     paths: dict[int, list[_Path]] = {}
     types: dict[int, page_type.PageTypeResult] = {}
     budget = page_type.InkBudget()
     producer = page_type.producer_hint(doc)
-    global _TEX_MADE
+    global _TEX_MADE, _GROUPING
     _TEX_MADE = producer == "tex"
+    _GROUPING = display_grouping
     for number in selected:
         frags[number], paths[number], types[number] = _read_page(doc[number], budget, producer)
         if _kept_whole(types[number]):

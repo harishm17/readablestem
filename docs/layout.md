@@ -583,7 +583,7 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   other side of the bar gets the reason `"half a fraction"` (`_flag_half_fractions`). The
   equation step adds the warning `equation.region: half_fraction`, holds the confidence
   under the accept bar and never accepts without a decision.
-- **One printed display, one element (pipeline 0.5.10).** Three patterns cut one printed
+- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off; bump `PIPELINE_VERSION` when it is turned on).** Three patterns cut one printed
   formula into several elements, and each is joined on evidence from the page; anything less
   clear keeps the old behaviour.
   1. *Two formulas and a word.* "P_A = ... and P_B = ...", "0 < p < 1 for all i": a connective
