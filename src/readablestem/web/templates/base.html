@@ -72,10 +72,9 @@
             {% if user.is_admin %}
             <li><a href="/admin"{% if active == "admin" %} aria-current="page"{% endif %}>Admin</a></li>
             {% endif %}
-            {% else %}
+            {% endif %}
             <li><a href="/guides"{% if active == "guides" %} aria-current="page"{% endif %}>Guides</a></li>
             <li><a href="/for-accessibility-offices"{% if active == "offices" %} aria-current="page"{% endif %}>For accessibility offices</a></li>
-            {% endif %}
           </ul>
         </nav>
       </details>
@@ -83,7 +82,7 @@
         {% if user %}
         <form method="post" action="/logout" class="inline-form">
           <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-          <span class="signed-in">Signed in as {{ user.email }}</span>
+          <span class="visually-hidden">Signed in as {{ user.email }}. </span>
           <button type="submit" class="link-button">Sign out</button>
         </form>
         {% else %}
