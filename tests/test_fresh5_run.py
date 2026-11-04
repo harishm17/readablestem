@@ -74,7 +74,7 @@ def test_registered_settings_refuse_a_dotenv(monkeypatch, tmp_path) -> None:
         monkeypatch.delenv(name.upper(), raising=False)
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".env").write_text("FLAG_POLICY=false\n")
-    with pytest.raises(SystemExit, match=".env"):
+    with pytest.raises(SystemExit, match=r"\.env"):
         run.apply_registered_settings("fresh5-candidate")
 
 
@@ -98,6 +98,16 @@ def test_answers_shared_by_two_runs_are_counted_once(tmp_path) -> None:
     a.write_text('{"k": "1", "call": {"cost_usd": 0.5}}\n{"k": "2", "call": {"cost_usd": 0.25}}\n')
     b.write_text('{"k": "1", "call": {"cost_usd": 0.5}}\n{"k": "3", "call": {"cost_usd": 1.0}}\n')
     assert run.answers_spent([a, b, tmp_path / "missing.jsonl"]) == pytest.approx(1.75)
+
+
+def test_a_started_run_gets_the_baselines_later_answers_once(tmp_path) -> None:
+    source, target = tmp_path / "control.jsonl", tmp_path / "candidate.jsonl"
+    source.write_text('{"k": "1", "v": "a"}\n{"k": "2", "v": "b"}\n')
+    target.write_text('{"k": "1", "v": "a"}\n{"k": "9", "v": "own"}\n')
+    assert run.merge_answers(source, target) == 1
+    assert run.merge_answers(source, target) == 0
+    keys = [line.split('"k": "')[1][0] for line in target.read_text().splitlines()]
+    assert keys == ["1", "9", "2"]
 
 
 def test_every_fresh5_folder_is_registered() -> None:

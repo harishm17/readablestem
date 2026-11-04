@@ -293,6 +293,26 @@ def answers_spent(paths: list[Path]) -> float:
     return total
 
 
+def merge_answers(source: Path, target: Path) -> int:
+    """Append to `target` the answers of `source` whose key it does not hold; returns how many."""
+    if not source.is_file():
+        return 0
+    held = {
+        json.loads(line).get("k")
+        for line in target.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+    new = [
+        line
+        for line in source.read_text(encoding="utf-8").splitlines()
+        if line.strip() and json.loads(line).get("k") not in held
+    ]
+    if new:
+        with target.open("a", encoding="utf-8") as handle:
+            handle.write("".join(line + "\n" for line in new))
+    return len(new)
+
+
 def group_answers(tags: list[str]) -> list[Path]:
     return [runs_dir(part) / tag / "answers.jsonl" for part in FRESH5_PARTS for tag in tags]
 
@@ -347,6 +367,9 @@ def cmd_rs(args: argparse.Namespace) -> int:
         # an experiment that asks mostly the same questions starts from the baseline's answers:
         # a request already answered replays for free and is not paid for twice
         shutil.copyfile(runs_dir(args.part) / args.seed_answers_from / "answers.jsonl", answers)
+    elif args.seed_answers_from:
+        # started before (a trial run): the baseline's answers recorded since are added
+        merge_answers(runs_dir(args.part) / args.seed_answers_from / "answers.jsonl", answers)
     report = out_dir / "report.json"
     items = out_dir / "items.jsonl"
     argv = [
