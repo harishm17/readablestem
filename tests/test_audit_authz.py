@@ -79,6 +79,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/account"): USER,  # open sign-up: what is held, the limits, delete my account
     ("GET", "/account/delete"): USER,
     ("POST", "/account/delete"): USER,  # CSRF; erases the caller's own account only
+    ("POST", "/account/keep-default"): USER,  # CSRF; the caller's own setting only
     ("GET", "/app"): USER,
     ("GET", "/app/documents"): USER,
     ("GET", "/app/download"): USER,  # T3-4: a zip of the person's own ready documents

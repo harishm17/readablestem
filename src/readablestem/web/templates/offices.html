@@ -28,6 +28,7 @@
     <li><a href="#ferpa">Student records (FERPA)</a></li>
     <li><a href="#not-certify">What the tool does not certify</a></li>
     <li><a href="#pilot">Pilot checklist</a></li>
+    <li><a href="#continuity">Support and continuity</a></li>
     <li><a href="#more">More</a></li>
   </ul>
 </nav>
@@ -207,6 +208,24 @@
   <li>Tell us what was wrong or missing, using “Report this item” on the review screen
     {% if feedback_url or contact_email %}or the feedback link in the footer{% endif %}.</li>
 </ol>
+
+{# Owner decision (2026-11-04): plain facts on continuity, no service-level promise. Self-hosting
+   is docs/deploy.md; the licence wording stays on /terms. #}
+<h2 id="continuity">Support and continuity</h2>
+<ul>
+  <li>The code is open source, so your institution can run its own copy:
+    <a href="{{ source_url }}">the source code</a> and
+    <a href="{{ source_url }}/blob/main/docs/deploy.md">how to deploy it</a>. The licence terms
+    are on the <a href="/terms#open-source">terms page</a>.</li>
+  <li>Nothing is locked in. Every result can be downloaded as a web page,
+    {% if word_export %}Word, {% endif %}EPUB and a Canvas package, with the review record, and
+    those files work without ReadableSTEM.</li>
+  <li>If the service stopped, stored documents would be deleted on their normal schedule and
+    nothing would be kept.</li>
+  <li>There is no support contract or service-level agreement. To report a problem, use
+    “Report this item” on the review screen{% if contact_email %} or email
+    <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% endif %}.</li>
+</ul>
 
 <h2 id="more">More</h2>
 <ul>

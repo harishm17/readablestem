@@ -33,6 +33,23 @@
   <p><a href="/limits">Known limits</a> lists the rest.</p>
 </section>
 
+<section aria-labelledby="account-keep-heading" id="account-keep">
+  <h2 id="account-keep-heading">How long your documents are kept</h2>
+  <p>A document is deleted {{ retention_hours }} hours after you last work on it: the clock
+    starts again each time you make a decision or download it. You can keep a document for
+    7 days instead, when you upload it or later from its page.</p>
+  <form method="post" action="/account/keep-default" class="stack-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <div class="field checkbox-field">
+      <input type="checkbox" id="keep-default" name="keep_default" value="on" aria-describedby="keep-default-hint"{% if keep_default %} checked{% endif %}>
+      <label for="keep-default">Keep my documents for 7 days by default</label>
+      <p class="hint" id="keep-default-hint">The 7-day box on the upload form then starts
+        ticked. You can still untick it for any upload.</p>
+    </div>
+    <button type="submit" class="button-secondary">Save</button>
+  </form>
+</section>
+
 <section aria-labelledby="account-delete">
   <h2 id="account-delete">Delete my account</h2>
   <p>This deletes your account and everything in it: your email address and name, every

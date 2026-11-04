@@ -60,9 +60,11 @@ def _context(request: Request, user: CurrentUser) -> dict[str, Any]:
         )
         row = session.get(User, user.id)
         joined = as_utc(row.created_at) if row is not None else None
+        keep_default = bool(row is not None and row.keep_week_default)
     return {
         "active": "account",
         "joined": joined,
+        "keep_default": keep_default,
         "tier_open": access.is_open(user.access_tier),
         "page_quota": quota,
         "pages_left": left,
@@ -79,6 +81,26 @@ def _context(request: Request, user: CurrentUser) -> dict[str, Any]:
 @router.get("/account")
 def account_page(request: Request, user: UserDep) -> Response:
     return render(request, "account.html", _context(request, user))
+
+
+KEEP_ON = "New uploads now start with “Keep it for 7 days” ticked."
+KEEP_OFF = "New uploads now start with “Keep it for 7 days” unticked."
+
+
+@router.post("/account/keep-default", dependencies=[Depends(require_csrf)])
+def save_keep_default(
+    request: Request, user: UserDep, keep_default: Annotated[str, Form()] = ""
+) -> Response:
+    """The "Keep my documents for 7 days by default" setting: remembered on the account, read by the
+    upload form (`routes/jobs.app_context`) as the starting state of its 7-day box. It changes
+    no document already uploaded."""
+    on = keep_default == "on"
+    with session_scope(get_ctx(request).factory) as session:
+        row = session.get(User, user.id)
+        if row is not None:
+            row.keep_week_default = on
+    flash(request, KEEP_ON if on else KEEP_OFF, undo=False)
+    return RedirectResponse("/account#account-keep", status_code=303)
 
 
 def _confirm_page(request: Request, user: CurrentUser) -> Response:

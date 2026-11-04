@@ -30,6 +30,22 @@
 <div id="job-status-region" role="status">
   {% include "_job_status.html" %}
 </div>
+{# When this document will be deleted, near the top, and the one-click way to keep it a week
+   (web/retention.py; the same POST as "Keep 7 more days" under "Keeping and deleting"). #}
+{% if job.is_owner and not job.is_sample and job.retain_until %}
+<div class="retention-line" id="retention-line">
+  <p>{% if job.retention_mode == "dev" %}Kept until {{ job.retain_until|utc }}, {{ opt_in_days }} days after upload, because you let us look at the results.
+    {%- elif job.retention_mode == "week" %}Deleted automatically on {{ job.retain_until|utc }}, 7 days after you last work on it.
+    {%- else %}Deleted automatically on {{ job.retain_until|utc }}, {{ retention_hours }} hours after you last work on it.{% endif %}
+    <a href="#delete-heading">Keeping and deleting</a></p>
+  {% if job.retention_mode == "day" %}
+  <form method="post" action="/jobs/{{ job.id }}/keep" class="inline-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <button type="submit" class="button-secondary button-small">Keep it for 7 days</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
 {% if not job.finished %}
 {% include "_job_progress.html" %}
 {# Opt-in browser notice when the conversion finishes (static/app.js "When a job finishes").
