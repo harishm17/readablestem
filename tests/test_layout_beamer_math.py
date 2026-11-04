@@ -106,8 +106,9 @@ def test_display_equations_on_the_last_page_of_a_frame_match_the_gold_count(name
     cases(
         {
             "beamer_columns_table": (
-                "the table's maths cells are not equation elements, so the inline count of the "
-                "table's frame differs from gold"
+                "six of the table's eight maths cells are equation elements; the two numbers set "
+                "in maths mode with their unit as text ('0.50 kg') are in a text font, no glyph "
+                "says they are maths"
             )
         }
     ),
@@ -168,15 +169,23 @@ def test_two_columns_are_read_left_then_right():
     assert order == sorted(order)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="a table cell's maths is plain text: the cell has no latex and no equation element",
-)
-def test_table_cell_maths_has_latex():
+def test_a_table_cell_that_is_one_formula_is_an_inline_equation_of_the_table():
+    """Layout reads a cell whose glyphs say it is maths as an equation of the table: the cell
+    names it (`TableCell.equation_id`), the equation step reads its crop, and the page writes
+    what it read into the cell (`pipeline.table_math`)."""
     layout = load("beamer_columns_table")
     table = next(e for e in layout.elements if e.kind == Kind.TABLE)
-    cells = [c for c in table.table.cells if c.text in ("ω = √k/m", "T = 2π/ω")]
-    assert cells and all(c.latex or c.mathml for c in cells)
+    by_id = {e.id: e for e in layout.elements}
+    cells = {c.text: c for c in table.table.cells}
+    for text in ("m", "k", "ω = √k/m", "T = 2π/ω"):
+        child = by_id[cells[text].equation_id]
+        assert child.kind == Kind.EQUATION and child.display == "inline"
+        assert child.parent_id == table.id
+        x0, y0, x1, y1 = table.bbox
+        assert x0 <= child.bbox[0] and child.bbox[2] <= x1 and y0 <= child.bbox[1] <= y1
+        assert (child.text or "").replace(" ", "") == text.replace(" ", "")
+    for text in ("Mass", "Stiffness", "Quantity"):  # words are not maths
+        assert cells[text].equation_id is None
 
 
 def test_table_text_with_a_ligature_is_intact():

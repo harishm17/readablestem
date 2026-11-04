@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
-from readablestem.web import analytics, office_convert, offices, seo
+from readablestem.web import analytics, office_convert, offices, seo, storage
 from readablestem.web.assets import cached_html, static_url
 from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
@@ -182,6 +182,9 @@ def limits(request: Request) -> Response:
         "office_on": bool(office_convert.input_kinds(settings)),
         # The daily page limit of invited people; the open tier's is in every page's context.
         "invited_page_quota": settings.per_user_daily_page_quota,
+        # What one person may keep stored at once (`web.storage`), by tier.
+        "storage_mb": settings.storage_per_user_mb,
+        "open_storage_mb": settings.storage_open_tier_mb,
     }
     return render(request, "limits.html", context)
 
@@ -294,7 +297,14 @@ def readyz(request: Request) -> Response:
 def healthz_ops(request: Request) -> Response:
     """Did the daily backup and the hourly cron finish well lately (ops.heartbeat)? 200, or
     503 listing only the names that are stale. Content-free, like /readyz."""
-    ok, stale = ops_freshness(get_ctx(request))
+    ctx = get_ctx(request)
+    ok, stale = ops_freshness(ctx)
+    try:
+        with session_scope(ctx.factory) as session:
+            stored = storage.report(session, ctx.settings)
+    except Exception:
+        stored = None
     return JSONResponse(
-        {"status": "ok" if ok else "stale", "stale": stale}, status_code=200 if ok else 503
+        {"status": "ok" if ok else "stale", "stale": stale, "storage": stored},
+        status_code=200 if ok else 503,
     )

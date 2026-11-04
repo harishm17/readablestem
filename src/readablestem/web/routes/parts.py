@@ -27,6 +27,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
 
 from readablestem.web import access, events, pending, ranges
+from readablestem.web import storage as stored_bytes
 from readablestem.web.database import utc_today
 from readablestem.web.db import PendingUpload, session_scope, utcnow
 from readablestem.web.deps import (
@@ -240,6 +241,22 @@ def _start_parts(
                 "need, then choose it again here: this file is kept."
             )
             out.status, out.retry_after = 429, "60"
+            break
+        except stored_bytes.StorageRefused as exc:
+            out.error = (
+                f"You are storing {exc.used_mb} MB of the {exc.limit_mb} MB you can keep, and "
+                f"{named} would go over it. It was not started. Delete documents you no longer "
+                "need (My documents, then Delete), then choose it again: this file is kept."
+            )
+            out.status, out.retry_after = 413, ""
+            break
+        except stored_bytes.StorageFull:
+            out.error = (
+                "The service holds as much uploaded material as it can for now, so "
+                f"{named} was not started. Room frees up through the day: choose it again in "
+                "an hour. This file is kept."
+            )
+            out.status, out.retry_after = 503, "3600"
             break
         except QuotaRefused as exc:
             left = exc.left
