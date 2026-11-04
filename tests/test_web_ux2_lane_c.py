@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, token
 from readablestem.web import ranges
-from readablestem.web.db import Course, CourseNotation, Job, JobStatus, session_scope
+from readablestem.web.db import CourseNotation, Job, JobStatus, session_scope
 from readablestem.web.routes.batch import _elapsed, _next_step
 from readablestem.web.routes.parts import preview_summary
 
@@ -63,12 +63,12 @@ def test_the_summary_says_how_many_parts_and_pages_and_where_today_runs_out():
     rows = ranges.preview("1-30\n31-59", total=59, limit=30)
     assert preview_summary(rows, 100) == "2 parts, 59 pages."
     assert preview_summary(rows, 40) == (
-        "2 parts, 59 pages. Today you can convert 40 more pages, so the first 1 part is "
-        "started and the rest stay here to choose later."
+        "2 parts, 59 pages. Only 40 pages are left today: "
+        "the first 1 part starts, the rest wait here."
     )
-    assert "none of these is started today" in preview_summary(rows, 10)
+    assert "none starts today" in preview_summary(rows, 10)
     bad = ranges.preview("1-30\nx", total=59, limit=30)
-    assert preview_summary(bad, 100).endswith("1 part needs fixing before you can convert.")
+    assert preview_summary(bad, 100).endswith("Fix 1 before converting.")
     assert preview_summary([], 100) == "No parts yet."
 
 
@@ -108,7 +108,7 @@ def test_the_chooser_leads_with_page_fields_and_a_preview_of_the_parts(parts_web
     page = parts_web.alice.get(f"/uploads/{upload_id}").text
     text = text_of(page)
     assert "3 parts, 12 pages." in text  # the suggestion, parsed
-    assert re.findall(r'<span class="parts-pages">Pages ([\d-]+)</span>', page) == [
+    assert re.findall(r'<span class="parts-pages">([\d-]+)</span>', page) == [
         "1-4",
         "5-8",
         "9-12",
@@ -120,7 +120,7 @@ def test_the_chooser_leads_with_page_fields_and_a_preview_of_the_parts(parts_web
     assert "Type the pages instead" in text and 'for="parts"' in page
     assert "/static/parts." in page
     # The daily quota is said once, not again in the hint of the box.
-    assert text.count("You can convert 40 more pages today") == 1
+    assert text.count("40 pages left today") == 1
 
 
 def test_an_error_keeps_what_was_typed_and_marks_the_part_that_is_wrong(parts_web):
@@ -133,7 +133,7 @@ def test_an_error_keeps_what_was_typed_and_marks_the_part_that_is_wrong(parts_we
     page = response.text
     assert "page 30 is not in this file, which has 12 pages" in text_of(page)
     assert 'class="parts-row parts-row-error"' in page
-    assert "1 part needs fixing before you can convert." in text_of(page)
+    assert "Fix 1 before converting." in text_of(page)
     assert "data-has-error" in page and "20-30" in page
     # The summary and the field error are linked to the box, which is open.
     assert 'aria-invalid="true"' in page
@@ -217,13 +217,13 @@ def test_the_retention_setting_comes_before_the_limits_and_names_what_it_saves(w
     page = web.browser.get("/account").text
     assert page.index('id="account-keep-heading"') < page.index('id="account-limits"')
     assert ">Save how long documents are kept</button>" in page
-    assert re.search(r"New documents are kept for\s+<strong>\d+ hours</strong>", page)
+    assert re.search(r"New documents are kept\s+<strong>\d+ hours</strong>", page)
     web.browser.post(
         "/account/keep-default",
         data={"csrf_token": token(web.browser, "/account"), "keep_default": "on"},
     )
     assert re.search(
-        r"New documents are kept for\s+<strong>7 days</strong>", web.browser.get("/account").text
+        r"New documents are kept\s+<strong>7 days</strong>", web.browser.get("/account").text
     )
 
 
@@ -242,13 +242,13 @@ def test_the_deletion_confirmation_leads_with_exports_and_folds_the_long_wording
     page = web.browser.get("/account/delete").text
     text = text_of(page)
     assert page.index("Download what you want to keep first") < page.index("What is deleted")
-    assert page.index("What is deleted") < page.index("What deleting does not reach")
-    assert page.index("What deleting does not reach") < page.index(">Delete my account</button>")
+    assert page.index("What is deleted") < page.index("Not reached by deleting")
+    assert page.index("Not reached by deleting") < page.index(">Delete my account</button>")
     assert 'href="/app/download"' in page and 'href="/app"' in page
-    # The short list, and the full wording closed in a disclosure with the policy link.
-    assert re.search(r'<details class="account-delete-details">\s*<summary>', page)
-    assert 'href="/privacy">privacy notice</a>' in page and "has the full policy" in text
-    assert "Backups: your account and documents can stay in a daily backup for about a week." in text
+    # A short list, with the policy one link away.
+    assert 'href="/privacy">privacy notice</a>' in page
+    assert "Backups keep a copy for about a week." in text
+    assert len(text.split()) < 400
 
 
 def test_the_export_links_are_left_out_when_there_is_nothing_to_download(web):
@@ -265,24 +265,30 @@ def finished_share_page(env) -> tuple[str, str]:
 
 
 def test_sharing_leads_with_the_steps_and_keeps_the_exact_address_rule_in_help(web):
-    job_id, page = finished_share_page(web)
-    steps = re.findall(r"<li>(.*?)</li>", page[page.index('class="share-steps"') :], re.S)[:3]
-    assert [" ".join(s.split())[:12] for s in steps] == ["Add the pers", "Copy the lin", "Send it to t"]
+    _job_id, page = finished_share_page(web)
+    steps = text_of(page[page.index('class="share-steps"') :].split("</p>")[0])
+    assert steps.endswith(
+        "Add a person, copy the link, send it yourself. Nothing is emailed from here."
+    )
     assert page.index('class="share-steps"') < page.index('id="add-heading"')
     # The long wording is in the help disclosure, after the controls.
     assert page.index('id="add-heading"') < page.index('class="share-help"')
     help_text = text_of(page[page.index('class="share-help"') :])
-    assert "an alias, a forwarding address or another account of theirs does not match" in help_text
+    assert "an alias does not match" in help_text
     # The expiry sits by the Share button and by Copy link.
     assert 'class="hint share-expiry-note"' in page and 'id="share-expiry"' in page
-    assert "View" in page and "can also make review decisions" in page
+    assert "Also makes review decisions" in page
 
 
 def test_an_error_summary_sits_directly_above_the_form_it_is_about(web):
     job_id = finished(web)
     response = web.browser.post(
         f"/jobs/{job_id}/share",
-        data={"csrf_token": token(web.browser, f"/jobs/{job_id}/share"), "email": "nope", "role": "view"},
+        data={
+            "csrf_token": token(web.browser, f"/jobs/{job_id}/share"),
+            "email": "nope",
+            "role": "view",
+        },
     )
     page = response.text
     summary = page.index('class="error-summary"')
@@ -319,7 +325,14 @@ def test_the_course_list_shows_documents_and_a_configure_notation_action(web):
     row = page[page.index('class="course-table"') :]
     assert re.search(r'data-label="Documents">1</td>', row)
     assert f'href="/courses/{course_id}#entries-heading">Set up notation' in row
-    post(web, f"/courses/{course_id}/entries", f"/courses/{course_id}", symbol="bold d", meaning="vector", note="")
+    post(
+        web,
+        f"/courses/{course_id}/entries",
+        f"/courses/{course_id}",
+        symbol="bold d",
+        meaning="vector",
+        note="",
+    )
     assert "Edit notation" in web.browser.get("/courses").text
 
 
@@ -388,10 +401,13 @@ def test_documents_already_converted_can_be_added_to_a_course_and_the_page_says_
     assert web.run_worker() == job_id_from(inside)
     path = f"/courses/{course_id}"
     page = web.browser.get(path).text
-    assert "Add documents you already converted (1)" in page
-    assert f'id="attach-{kept}"' in page and job_id_from(inside) not in page.split("attach-documents")[1]
+    assert "Add converted documents (1)" in page
+    assert (
+        f'id="attach-{kept}"' in page
+        and job_id_from(inside) not in page.split("attach-documents")[1]
+    )
     text = text_of(page)
-    assert "is not done again" in text and "upload it again and choose this course" in text
+    assert "It is not converted again" in text and "upload it again for this course" in text
 
     response = web.browser.post(
         f"{path}/documents",
@@ -406,7 +422,7 @@ def test_documents_already_converted_can_be_added_to_a_course_and_the_page_says_
     assert "Added 1 document to Physics 1. They were not converted again." in text_of(
         web.browser.get(path).text
     )
-    assert "Add documents you already converted" not in web.browser.get(path).text
+    assert "Add converted documents" not in web.browser.get(path).text
 
 
 def test_only_ones_own_finished_documents_can_be_added(web):
@@ -428,22 +444,26 @@ def test_only_ones_own_finished_documents_can_be_added(web):
     assert web.job(job_id_from(queued)).course_id is None
     assert web.job(job_id_from(queued)).status == JobStatus.QUEUED
     # Someone else's course is a 404.
-    assert bob.post(f"{path}/documents", data={"csrf_token": token(bob), "job": [theirs]}).status_code in {403, 404}
+    assert bob.post(
+        f"{path}/documents", data={"csrf_token": token(bob), "job": [theirs]}
+    ).status_code in {403, 404}
 
 
 def test_the_course_page_keeps_notation_documents_and_settings_apart(web):
     course_id = new_course(web)
     page = web.browser.get(f"/courses/{course_id}").text
-    positions = [page.index(f'id="{i}"') for i in ("entries-heading", "course-documents-heading", "settings-heading")]
+    positions = [
+        page.index(f'id="{i}"')
+        for i in ("entries-heading", "course-documents-heading", "settings-heading")
+    ]
     assert positions == sorted(positions)
-    assert 'aria-label="On this page"' in page
-    assert "Rename or delete this course" in page
+    assert "Rename or delete" in page
 
 
 def test_the_course_list_has_a_first_course_example_when_empty(web):
     page = web.browser.get("/courses").text
     assert "You have no courses yet." in page and "Add your first course" in page
-    assert "common bold vectors and matrices" in page
+    assert "common symbols to start from" in page
 
 
 # --------------------------------------------------------------------------- the batch page
@@ -489,13 +509,13 @@ def test_a_404_says_what_to_try_for_the_kind_of_page(web):
     mine = web.browser.get(f"/jobs/{'0' * 32}")
     assert mine.status_code == 404
     text = text_of(mine.text)
-    assert "What you can try" in text and "passed its deletion time" in text
-    assert "someone shared it with you" in text and 'class="button" href="/app"' in mine.text
+    assert "A deleted document, or one not shared with you, looks like this too." in text
+    assert 'class="button" href="/app"' in mine.text
     course = web.browser.get(f"/courses/{'0' * 32}")
-    assert "A course you deleted is gone" in text_of(course.text)
+    assert "A deleted course looks like this too." in text_of(course.text)
     assert 'class="button" href="/courses"' in course.text
     other = web.browser.get("/no-such-page")
-    assert "What you can try" in text_of(other.text) and "passed its deletion time" not in other.text
+    assert "looks like this too" not in other.text
 
 
 def test_a_404_for_someone_elses_job_matches_one_for_a_made_up_id(web):

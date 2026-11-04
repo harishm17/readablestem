@@ -1,43 +1,29 @@
 {% extends "base.html" %}
-{# Confirm deleting the account (routes/account.py): download what to keep, a short list of
-   what goes, the short list of what stays (full wording folded away), then the button. #}
+{# Confirm deleting the account (routes/account.py): download what to keep, what goes, what
+   stays, then the button. #}
 {% block title %}Delete your account?{% endblock %}
 {% block body_class %}page-confirm{% endblock %}
 {% block content %}
 <h1>Delete your account?</h1>
-<p>This deletes the account for <strong>{{ user.email }}</strong> and signs you out. It cannot
-  be undone.</p>
+<p>This deletes the account for <strong>{{ user.email }}</strong> and signs you out. It cannot be undone.</p>
 {% if documents %}
 <section aria-labelledby="export-heading" class="confirm-export">
   <h2 id="export-heading">Download what you want to keep first</h2>
-  <p>Your {{ documents }} {{ "document is" if documents == 1 else "documents are" }} deleted
-    with the account. Files you have already downloaded are not affected.</p>
   <ul class="actions">
     {% if ready_documents %}<li><a href="/app/download">Download the {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} (zip)</a></li>{% endif %}
-    <li><a href="/app">Open My documents</a> to download them one by one or in Word or EPUB</li>
+    <li><a href="/app">Open My documents</a> for single files, Word and EPUB</li>
   </ul>
 </section>
 {% endif %}
 <h2>What is deleted</h2>
-<ul>
-  <li>your email address and name;</li>
-  <li>{% if documents %}the {{ documents }} {{ "document" if documents == 1 else "documents" }} you have now{% else %}any documents you have now{% endif %}, with the uploaded PDFs, the converted HTML, the images cut from them and your review decisions;</li>
-  <li>your courses and notation, and the notes about what you did in the app.</li>
-</ul>
+<p>Your email and name, {% if documents %}{{ documents }} {{ "document" if documents == 1 else "documents" }}{% else %}any documents{% endif %} with their decisions, your courses and notation.</p>
 {% include "_account_deletion_notes.html" %}
 {% if invitation_only %}
-<p>You are on the invitation list. Deleting your account takes you off it, so you would need
-  to be invited again to come back.</p>
+<p>You are on the invitation list. Deleting removes you from it.</p>
 {% elif tier_open %}
-<p>If you sign in again later, you get a new, empty account, and it counts as a new account.
-  Today's pages and reads that you have already used stay used: deleting does not reset the
-  day's limits.</p>
+<p>Signing in again makes a new, empty account. Today's limits do not reset.</p>
 {% else %}
-<p>You were invited. If you sign in again later, you come back as a new, empty account with
-  the limits for new accounts ({{ open_page_quota }} pages a day), not the invited ones, and
-  it counts as a new account. Today's pages and reads that you have already used stay
-  used.{% if is_admin %} You are an admin: the new account has no admin rights, and an admin
-  would have to make you one again.{% endif %}</p>
+<p>Signing in again makes a new, empty account with new-account limits ({{ open_page_quota }} pages a day).{% if is_admin %} It has no admin rights.{% endif %}</p>
 {% endif %}
 <div class="confirm-actions">
   <form method="post" action="/account/delete" class="inline-form">

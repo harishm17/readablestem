@@ -14,14 +14,12 @@
       {% if row.error %}
       <span class="parts-problem"><span class="visually-hidden">Problem: </span>{{ row.error }}</span>
       {% else %}
-      <span class="parts-pages">Pages {{ row.label }}</span>
+      <span class="parts-pages">{{ row.label }}</span>
       <span class="parts-count">{{ row.count }} {{ "page" if row.count == 1 else "pages" }}</span>
       {% endif %}
       {% if row.number <= max_parts %}<button type="button" class="link-button" data-remove-part="{{ row.number }}" hidden>Remove<span class="visually-hidden"> part {{ row.number }}</span></button>{% endif %}
     </li>
     {% endfor %}
   </ol>
-  {% else %}
-  <p class="hint parts-empty">No parts yet. Add one with the page fields above.</p>
   {% endif %}
 </div>

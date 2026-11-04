@@ -164,9 +164,10 @@ def preview_summary(rows: list[ranges.PreviewRow], left: int | None) -> str:
     good = [r for r in rows if not r.error]
     bad = len(rows) - len(good)
     pages = sum(r.count for r in good)
-    text = f"{len(good)} {'part' if len(good) == 1 else 'parts'}, {pages} {'page' if pages == 1 else 'pages'}."
+    parts_word = "part" if len(good) == 1 else "parts"
+    text = f"{len(good)} {parts_word}, {pages} {'page' if pages == 1 else 'pages'}."
     if bad:
-        text += f" {bad} {'part needs' if bad == 1 else 'parts need'} fixing before you can convert."
+        text += f" Fix {bad} before converting."
     elif left is not None and pages > left:
         fits, used = 0, 0
         for r in good:
@@ -174,14 +175,10 @@ def preview_summary(rows: list[ranges.PreviewRow], left: int | None) -> str:
                 break
             used += r.count
             fits += 1
-        text += (
-            f" Today you can convert {left} more pages, so "
-            + (
-                f"the first {fits} {'part is' if fits == 1 else 'parts are'} started and the rest "
-                "stay here to choose later."
-                if fits
-                else "none of these is started today; this file is kept so you can choose them later."
-            )
+        text += f" Only {left} pages are left today: " + (
+            f"the first {fits} {'part starts' if fits == 1 else 'parts start'}, the rest wait here."
+            if fits
+            else "none starts today; they wait here."
         )
     return text
 

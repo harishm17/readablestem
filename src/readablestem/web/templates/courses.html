@@ -6,15 +6,14 @@
 {% block title %}{% if errors|default([]) %}Error: {% endif %}Your courses{% endblock %}
 {% macro add_form() %}
   {% if courses|length >= max_courses %}
-  <p>You have {{ max_courses }} courses, the most you can keep. Delete one you no longer use
-    to add another.</p>
+  <p>You have {{ max_courses }} courses, the most allowed. Delete one to add another.</p>
   {% else %}
   <form method="post" action="/courses" novalidate>
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     {% set err = field_errors.get("name") %}
     <div class="field{% if err %} field-error{% endif %}">
       <label for="name">Course name</label>
-      <p class="hint" id="name-hint">For example “Physics 1, fall term”. Only you see it.</p>
+      <p class="hint" id="name-hint">For example “Physics 1”. Only you see it.</p>
       {% if err %}<p class="error-message" id="name-error"><span class="visually-hidden">Error: </span>{{ err.message }}</p>{% endif %}
       <input type="text" id="name" name="name" maxlength="200" autocomplete="off" value="{{ values.get('name', '') }}"
              aria-describedby="name-hint{% if err %} name-error{% endif %}"{% if err %} aria-invalid="true"{% endif %}>
@@ -26,16 +25,14 @@
 {% block content %}
 <h1>Your courses</h1>
 {% include "_error_summary.html" %}
-<p class="lede">A course keeps the notation you use, such as “bold d is a vector”, so the tool
-  reads and says your letters the way your course does. You still decide anything it is
-  unsure of.</p>
+<p class="lede">A course keeps your notation, such as “bold d is a vector”, so letters are read your way.</p>
 
 {% if courses %}
 <section aria-labelledby="list-heading">
   <h2 id="list-heading">Courses</h2>
   <div class="table-scroll">
   <table class="course-table">
-    <caption class="visually-hidden">Your courses, with their documents and symbols</caption>
+    <caption class="visually-hidden">Your courses</caption>
     <thead>
       <tr><th scope="col">Course</th><th scope="col">Documents</th><th scope="col">Symbols</th><th scope="col">Notation</th></tr>
     </thead>
@@ -60,9 +57,7 @@
 {% else %}
 <section aria-labelledby="add-heading">
   <h2 id="add-heading">Add your first course</h2>
-  <p>You have no courses yet. Name the course, then say which symbols it writes in a special way. The course page
-    offers a short list of common bold vectors and matrices to start from, and you can add
-    your own. Choose the course when you convert a PDF.</p>
+  <p>You have no courses yet. Its page offers common symbols to start from.</p>
   {{ add_form() }}
 </section>
 {% endif %}

@@ -279,7 +279,7 @@ def test_online_voices_alone_need_an_explicit_choice(site, browser, job):
     page.wait_for_selector("[data-listen-transport]:not([hidden])")
     # The explanation is beside Play, with the controls still folded away.
     note = page.locator("[data-listen-voice-note]")
-    assert "only online voices" in note.inner_text()
+    assert "Only online voices" in note.inner_text()
     assert note.is_visible() and not page.locator(".listen-more").evaluate("d => d.open")
     play = page.locator("[data-listen=play]")
     assert play.is_disabled()
@@ -305,7 +305,7 @@ def test_with_no_voice_at_all_the_menu_goes_and_a_line_beside_play_says_why(site
         ".listen-more"
     ).evaluate("d => d.open")
     note = page.locator("[data-listen-voice-note]")
-    assert note.is_visible() and "no voice to speak with" in note.inner_text()
+    assert note.is_visible() and "No voice on this device" in note.inner_text()
     play = page.locator("[data-listen=play]")
     assert play.is_disabled()
     assert play.get_attribute("aria-describedby") == "listen-voice-note"
@@ -472,7 +472,7 @@ def test_the_transcript_folds_away_what_comes_before_the_lesson(site, browser, j
     context, page = open_listen(browser, site, f"/jobs/{job}/listen")
     before = page.locator("[data-listen-before]")
     assert not before.evaluate("d => d.open")
-    assert "Before the lesson: 2 items" in before.locator("summary").inner_text()
+    assert "Before the lesson (2)" in before.locator("summary").inner_text()
     assert page.locator("#item-3").is_visible()  # the lesson starts at item 3
     assert page.locator("#item-1").is_hidden()
     context.close()

@@ -127,7 +127,9 @@ def _read_entry(
             raise PartsError(f"{named}: “{piece}” runs backwards. Write it as {last}-{first}.")
         beyond = max(first, last)
         if beyond > total:
-            raise PartsError(f"{named}: page {beyond} is not in this file, which has {total} pages.")
+            raise PartsError(
+                f"{named}: page {beyond} is not in this file, which has {total} pages."
+            )
         pages.update(range(first - 1, last))
     if len(pages) > limit:
         raise PartsError(

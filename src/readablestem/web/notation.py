@@ -66,7 +66,7 @@ MEANINGS: dict[str, str] = {
 SYMBOL_EXAMPLES = (
     "“bold d”, “\\mathbf{d}”, “\U0001d41d”, “bold omega”, “double-struck R” or “v with an arrow”"
 )
-# A small starter set for an empty course, offered as editable rows (the course page, `add_starter`):
+# A small starter set for an empty course, offered as editable rows (`add_starter`):
 # the symbols most STEM courses write bold. The instructor ticks the ones the course uses and can
 # change each symbol and its meaning; nothing is added until they press the button.
 STARTER: tuple[tuple[str, str], ...] = (
@@ -172,9 +172,7 @@ def list_courses(session: Session, user_id: str, now: datetime | None = None) ->
         .where(Course.user_id == user_id)
         .order_by(func.lower(Course.name), Course.created_at)
     ).all()
-    return [
-        CourseView(id=r[0], name=r[1], entries=int(r[2]), documents=int(r[3])) for r in rows
-    ]
+    return [CourseView(id=r[0], name=r[1], entries=int(r[2]), documents=int(r[3])) for r in rows]
 
 
 def entries(course: Course) -> list[EntryView]:

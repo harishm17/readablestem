@@ -82,8 +82,8 @@ def test_the_parts_page_and_its_errors_do_not_show_the_old_limit_as_an_example(w
     assert response.status_code == 303, response.text[:300]
     page = web.alice.get(response.headers["location"])
     text = flat(page.text)
-    assert "has 80 pages" in text and "up to 77 pages" in text
-    assert "Each part has up to 77 pages." in text
+    assert "80 pages" in text and "up to 77 pages" in text
+    assert "of up to 77 pages" in text
     for old in OLD:
         assert old not in text, old
     with pytest.raises(ranges.PartsError) as error:

@@ -7,8 +7,7 @@
 <h1>Delete “{{ title }}”?</h1>
 <p>{% if title != filename %}{{ filename }}, uploaded{% else %}Uploaded{% endif %} {{ uploaded|utc }}.
   {% if decided %}You made {{ decided }} {{ "decision" if decided == 1 else "decisions" }} on it.{% endif %}</p>
-<p>This deletes the uploaded PDF, the converted HTML, the images cut from it and your review
-  decisions. It cannot be undone. Files you have already downloaded are not affected.</p>
+<p>Deletes the PDF, the converted HTML, its images and your decisions. It cannot be undone. Files you downloaded are not affected.</p>
 <div class="confirm-actions">
   <form method="post" action="/jobs/{{ job_id }}/delete" class="inline-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">

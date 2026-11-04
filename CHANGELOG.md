@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased: second UX round, lane C (branch ux2/lane-c)
+
+Listening, page picking, sharing, account and deletion, courses, batch, confirmations and error pages. The copy on
+each of these pages is cut to roughly half or less; every fact that protects the user (what is deleted, kept or shared)
+stays, in fewer words and next to the action.
+
+- Listening: Play (it becomes Pause), Previous and Next are the transport; stop, jump, speed, voice and keys are under
+  "More controls". Play starts at the lesson ("Play from the beginning" is under More controls) and the title, notices
+  and licence are folded under "Before the lesson". Why Play is off (no voice, only online voices) is a line right
+  under it with "Read the transcript". A compact index of headings and equations, a text and kind filter, hairlines
+  instead of a box per item, and a scroll offset that follows the transport's measured height (tested at 200% text).
+- Choosing pages: two page fields with "Add part" and "Remove", the parts as a list with page counts and one summary
+  line (also after an error, marking the part that is wrong); the typed box is under "Type the pages instead"
+  (`ranges.preview`, `GET /uploads/{id}/preview`, `static/parts.js`). The daily quota is said once.
+- Sharing: the page leads with add a person, copy the link, send it yourself; when access ends is beside Share and
+  beside Copy link; the exact-address rule is under "Help with sharing"; an error summary sits directly above the form.
+- Account: how long documents are kept comes before the limits, with its own save button; deleting is a short list.
+  Account deletion leads with download links, a short "not reached by deleting" list and the button; the long
+  provider and backup prose is one link to the privacy notice.
+- Courses: documents and symbols per course with a "Set up notation" or "Edit notation" action; an editable starter set
+  of common bold vectors and matrices (`POST /courses/{id}/starter`); adding documents already converted to a course
+  (`POST /courses/{id}/documents`), which says plainly that they are not converted again; notation, documents and
+  rename or delete are separate sections.
+- Confirmations (document, account, course, discarded upload): the button names what it deletes ("Delete “Lecture 3”"),
+  "No, keep it" is a button of the same size, and the footer is compact.
+- Batch: a next-step line (what to do, and how long ago it was uploaded), a clearer "Download all" note, and documents
+  with the same title lead with their file names.
+- Error pages: 500 and 503 carry the wordmark, a My documents link, the status page and a contact link; the 404 says
+  what a missing document or course can mean without saying which.
+- Tests: `tests/test_web_ux2_lane_c.py`, and the listening, page-picking, keyboard and course browser tests.
+
 ## Unreleased: the Landlock launcher counts the user's tasks as the kernel does (branch latex/nproc-hidden-tasks)
 
 - The program's task count is bounded by the supervisor's check (every 0.05 s) and the caller's

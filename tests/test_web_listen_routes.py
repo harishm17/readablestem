@@ -60,8 +60,8 @@ def test_the_owner_hears_the_converted_page(site):
     body = response.text
     assert "<h1>Listen as a student</h1>" in body
     assert (
-        "Roughly what a screen reader says.</strong> NVDA, JAWS and VoiceOver each speak "
-        "differently; test with one before you rely on it." in body
+        "Roughly what a screen reader says.</strong> Each one speaks differently: test with yours."
+        in body
     )
     assert "Heading level 1" in body and "Kinematics" in body
     assert "The speed is v equals d over t." in body
@@ -130,10 +130,10 @@ def test_the_page_folds_what_precedes_the_lesson_and_indexes_headings_and_equati
     links (it works without script) and the filter is there for script to show."""
     listen.CACHE.clear()
     body = site.owner.get(f"/jobs/{site.job_id}/listen").text
-    assert "data-listen-before" in body and "Before the lesson: 2 items" in body
+    assert "data-listen-before" in body and "Before the lesson (2)" in body
     assert body.index("data-listen-before") < body.index('id="item-3"')
     assert 'id="item-1"' in body and 'id="item-3"' in body
-    assert "Play starts at the lesson, item 3." in body
+    assert "Play starts at the lesson." in body
     assert re.search(r"<summary>Index: 1 heading, 1 equation</summary>", body)
     assert 'href="#item-4">Kinematics' in body
     assert "data-listen-filter hidden" in body and 'data-listen="beginning"' in body

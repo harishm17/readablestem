@@ -7,11 +7,7 @@
 {% block head %}<script src="{{ static_url('copy-link.js') }}" defer></script>{% endblock %}
 {% block content %}
 <h1>Share {{ doc_title }}</h1>
-<ol class="share-steps">
-  <li>Add the person by the email address they sign in with.</li>
-  <li>Copy the link.</li>
-  <li>Send it to them yourself: nothing is emailed from here.</li>
-</ol>
+<p class="share-steps">Add a person, copy the link, send it yourself. Nothing is emailed from here.</p>
 {% include "_error_summary.html" %}
 
 <section aria-labelledby="add-heading">
@@ -43,7 +39,7 @@
     </fieldset>
     <div class="share-submit">
       <button type="submit" class="button">Share</button>
-      {% if retain_until %}<p class="hint share-expiry-note">They can open it until the document is deleted on {{ retain_until|utc }}, or until you remove them.</p>{% endif %}
+      {% if retain_until %}<p class="hint share-expiry-note">Access ends {{ retain_until|utc }}, or when you remove them.</p>{% endif %}
     </div>
   </form>
 </section>
@@ -71,13 +67,13 @@
     {% endfor %}
   </ul>
   {% else %}
-  <p>Nobody yet. A document can be shared with up to {{ max_shares }} people.</p>
+  <p>Nobody yet.</p>
   {% endif %}
 </section>
 
 <section aria-labelledby="address-heading">
-  <h2 id="address-heading">Copy the link and send it</h2>
-  <p class="hint" id="address-hint">Copy this and send it to the people you added. It opens only for them, after they sign in: copying it gives nobody access by itself. People added with “View” can read the document; people added with “Review” can also make review decisions.</p>
+  <h2 id="address-heading">Link</h2>
+  <p class="hint" id="address-hint">Opens only for the people above, after they sign in.</p>
   <label for="share-address" class="visually-hidden">Address of this document</label>
   <div class="copy-row">
     <input type="text" id="share-address" readonly value="{{ address }}" aria-describedby="address-hint">
@@ -86,21 +82,14 @@
   </div>
   <p class="hint" id="share-copy-state" role="status"></p>
   {% if retain_until %}
-  <p class="share-expiry" id="share-expiry">This document is deleted automatically on {{ retain_until|utc }}.
-    The address and every share stop working then.
+  <p class="share-expiry" id="share-expiry">Deleted automatically on {{ retain_until|utc }}; the link stops working then.
     {%- if retention_mode != "dev" %} <a href="/jobs/{{ job_id }}#delete-heading">Keep it longer</a>.{% endif %}</p>
   {% endif %}
 </section>
 
 <details class="share-help">
   <summary>Help with sharing</summary>
-  <p>Give a named person access to this one document. They must sign in with the email address
-    you enter here. Letter case does not matter, but it has to be the same address: an alias, a
-    forwarding address or another account of theirs does not match. There are no public links:
-    nobody who is not signed in with that address can open it. You can remove access at any time,
-    and it stops on their next click.</p>
-  <p>Only you can delete the document, try it again, change its title, language or settings,
-    upload a new version or share it. Conversion and what it costs stay yours.</p>
+  <p>They must sign in with exactly this address (case does not matter): an alias does not match. There are no public links.</p>
 </details>
 
 <p><a href="/jobs/{{ job_id }}">Back to the document</a></p>

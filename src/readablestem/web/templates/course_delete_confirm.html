@@ -4,8 +4,7 @@
 {% block body_class %}page-confirm{% endblock %}
 {% block content %}
 <h1>Delete “{{ name }}”?</h1>
-<p>This deletes the course and its {{ entries }} {{ "symbol" if entries == 1 else "symbols" }}.
-  It cannot be undone. Documents you converted for this course keep their results.</p>
+<p>Deletes the course and its {{ entries }} {{ "symbol" if entries == 1 else "symbols" }}. Its documents keep their results.</p>
 <div class="confirm-actions">
   <form method="post" action="/courses/{{ course_id }}/delete" class="inline-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">

@@ -74,7 +74,7 @@ def test_database_trouble_gives_a_static_503_page_without_the_error(env, caplog,
     assert response.status_code == 503
     assert response.headers["retry-after"] == "30"
     assert "Not available right now" in response.text
-    assert "Documents already here are not lost" in response.text
+    assert "Nothing is lost" in response.text
     assert 'href="/status"' in response.text and 'href="/"' in response.text
     assert "SECRET" not in response.text and "SECRET" not in caplog.text
     assert response.headers["content-security-policy"] == APP_CSP

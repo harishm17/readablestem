@@ -22,9 +22,9 @@
 {% endmacro %}
 <div data-listen-player>
   <h2 id="player-heading">Play it</h2>
-  <p class="hint" id="player-hint">Playing is optional. If you use a screen reader, read the transcript below with it instead.</p>
-  <noscript><p>Playing needs JavaScript. The transcript below can be read as it is.</p></noscript>
-  <p data-listen-unsupported hidden>This browser cannot speak text, so there is nothing to play. <a href="#transcript-heading">Read the transcript</a>, which can be read as it is.</p>
+  <p class="hint" id="player-hint">Optional: a screen reader can read the transcript instead.</p>
+  <noscript><p>Playing needs JavaScript. The transcript still reads.</p></noscript>
+  <p data-listen-unsupported hidden>This browser cannot speak text. <a href="#transcript-heading">Read the transcript</a> instead.</p>
   {# The transport stays in view while the transcript scrolls (listen.css, sticky): a direct
      child of the player, hidden like the rest of the controls until a speech engine is found.
      Only the three buttons that are used all the time live here, so it stays short. #}
@@ -44,7 +44,7 @@
   </div>
   <div class="listen-controls" data-listen-controls hidden>
     <details class="listen-more">
-      <summary>More controls: stop, jump, speed, voice and keys</summary>
+      <summary>More controls</summary>
       <div class="listen-row">
         <button type="button" class="button-secondary button-small" data-listen="stop" aria-disabled="true">Stop</button>
         <button type="button" class="button-secondary button-small" data-listen="beginning">Play from the beginning</button>
@@ -68,23 +68,14 @@
           <select id="listen-voice" data-listen-voice aria-describedby="listen-voice-note"></select>
         </div>
       </div>
-      <div class="listen-keys">
-        <p>These work while focus is on this page's content and you are not in a menu. A screen reader in browse mode may keep these keys for itself: the buttons do the same.</p>
-        <dl>
-          <dt><kbd>p</kbd></dt><dd>Play or pause</dd>
-          <dt><kbd>s</kbd> or <kbd>Esc</kbd></dt><dd>Stop</dd>
-          <dt><kbd>[</kbd> and <kbd>]</kbd></dt><dd>Previous and next item</dd>
-          <dt><kbd>h</kbd></dt><dd>Next heading</dd>
-          <dt><kbd>e</kbd></dt><dd>Next equation</dd>
-        </dl>
-      </div>
+      <p class="listen-keys">Keys: <kbd>p</kbd> play or pause, <kbd>s</kbd> stop, <kbd>[</kbd> <kbd>]</kbd> previous or next, <kbd>h</kbd> heading, <kbd>e</kbd> equation. A screen reader may keep them; the buttons do the same.</p>
     </details>
     <p class="visually-hidden" data-listen-status role="status"></p>
   </div>
 
   <h2 id="transcript-heading">Transcript</h2>
-  <p class="hint" id="transcript-hint">{{ items|length }} {{ "item" if items|length == 1 else "items" }}, in reading order. Each starts with what it is.
-    {%- if before %} Play starts at the lesson, item {{ lesson.at }}.{% endif %}</p>
+  <p class="hint" id="transcript-hint">{{ items|length }} {{ "item" if items|length == 1 else "items" }}.
+    {%- if before %} Play starts at the lesson.{% endif %}</p>
   {# A compact index of plain links (it works without script) and a filter (needs script, so
      it stays hidden until the controls are shown). #}
   {% set headings = [] %}{% set equations = [] %}
@@ -129,7 +120,7 @@
   <div data-listen-transcript>
     {% if before %}
     <details class="listen-before" data-listen-before>
-      <summary id="before-heading">Before the lesson: {{ before }} {{ "item" if before == 1 else "items" }} (title, language, notices, licence)</summary>
+      <summary id="before-heading">Before the lesson ({{ before }})</summary>
       {{ entries(items[:before], 1, "before-heading") }}
     </details>
     {{ entries(items[before:], lesson.at, "transcript-heading") }}

@@ -123,29 +123,21 @@ def _next_step(rows: list[dict[str, Any]]) -> dict[str, str]:
     are set when there is a link."""
     states = [r["state"] for r in rows]
     if any(s in {"waiting", "converting"} for s in states):
-        return {
-            "text": "Nothing to do yet. Documents are converted one after another, so a batch "
-            "can take a while. You can leave this page: they keep converting, and My "
-            "documents lists them."
-        }
+        return {"text": "Nothing to do yet: you can leave, and documents keep converting."}
     decide = [r for r in rows if r["state"] == "decide"]
     if decide:
         many = len(decide) > 1
         return {
             "text": f"{_word(len(decide), 'document needs', 'documents need')} your decisions "
-            "before it can be shared. Review "
-            + ("them one at a time, then download the batch." if many else "it, then download."),
+            "before sharing.",
             "href": f"/jobs/{decide[0]['id']}/review",
             "label": "Review the first one" if many else "Review it",
         }
     stopped = states.count("stopped")
     if stopped:
-        return {
-            "text": f"{_word(stopped, 'document stopped', 'documents stopped')} before it "
-            "finished. Open it from the list to see why."
-        }
+        return {"text": f"{_word(stopped, 'document', 'documents')} stopped. Open it to see why."}
     if states.count("ready"):
-        return {"text": "Every document is ready. Download the batch below, or open one to post it."}
+        return {"text": "Every document is ready."}
     return {}
 
 
@@ -161,9 +153,7 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
             session, user.id, now=now, budget_closed=closed, job_ids=ids
         )
         began = as_utc(
-            session.scalar(select(func.min(Job.created_at)).where(Job.id.in_(ids)))
-            if ids
-            else None
+            session.scalar(select(func.min(Job.created_at)).where(Job.id.in_(ids))) if ids else None
         )
         minutes = int((now - began).total_seconds() // 60) if began else 0
         # The minute is part of the version, so a batch still converting is drawn again once a

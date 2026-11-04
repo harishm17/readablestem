@@ -166,8 +166,10 @@ def test_the_lists_delete_is_a_link_to_the_confirmation(web):
     confirm = web.browser.get(f"/jobs/{job_id}/delete?from=app").text
     flat = text(confirm)
     assert "Delete “Kinematics”?" in flat and "notes.pdf, uploaded" in flat
-    assert '<a class="button-secondary" href="/app">No, keep it</a>' in confirm  # back where it came from
-    assert "Files you have already downloaded are not affected." in flat
+    assert (
+        '<a class="button-secondary" href="/app">No, keep it</a>' in confirm
+    )  # back where it came from
+    assert "Files you downloaded are not affected." in flat
 
 
 def test_the_confirmation_counts_the_decisions_that_go_with_it(web, monkeypatch):

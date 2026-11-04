@@ -18,22 +18,9 @@
 {% elif status == 403 and contact_email %}
 <p>If you think this is a mistake, email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.</p>
 {% elif status == 404 %}
-<h2 id="try-heading">What you can try</h2>
-<ul aria-labelledby="try-heading">
-  <li>Check the address for a missing or extra character, or open the link again from where you found it.</li>
-  {% if area == "job" or area == "upload" %}
-  {% if user %}
-  <li>If it is your own document, it may have passed its deletion time. My documents lists what is still kept; you can upload the PDF again.</li>
-  <li>If someone shared it with you, check that you are signed in with the email address they used, or ask them to share it again.</li>
-  {% else %}
-  <li>If someone shared it with you, sign in with the email address they used.</li>
-  {% endif %}
-  {% elif area == "course" %}
-  <li>A course you deleted is gone. Your courses lists the ones you have.</li>
-  {% endif %}
-</ul>
+{% if area == "job" or area == "upload" %}<p>A deleted document, or one not shared with you, looks like this too.</p>{% elif area == "course" %}<p>A deleted course looks like this too.</p>{% endif %}
 {% elif status|default(0) >= 500 %}
-<p>The error was recorded without any of your document's content. The <a href="/status">service status</a> page says whether we know about it{% if contact_email %}, or you can <a href="mailto:{{ contact_email }}">email us</a>{% endif %}.</p>
+<p>See the <a href="/status">service status</a>{% if contact_email %} or <a href="mailto:{{ contact_email }}">email us</a>{% endif %}.</p>
 {% endif %}
 {% set primary_href = back_href|default(none) or ("/jobs/" ~ job_id if job_id else none) %}
 {% if not primary_href and user %}{% set primary_href = "/courses" if (area == "course" and courses_enabled) else "/app" %}{% endif %}

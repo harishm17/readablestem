@@ -447,13 +447,12 @@
       var words = "";
       var pick = false;
       if (!voices.length) {
-        words = "Play is off: this device has no voice to speak with.";
+        words = "No voice on this device.";
       } else if (!local.length && !voice) {
-        words = "Play is off: this browser has only online voices, and some browsers send " +
-          "the text to their maker to speak it.";
+        words = "Only online voices: some browsers send the text to their maker.";
         pick = true;
       } else if (voice && voice.localService !== true) {
-        words = "This voice is online: your browser may send the text to its maker to speak it.";
+        words = "Online voice: your browser may send the text to its maker.";
       }
       voiceText.textContent = words;
       if (chooseVoice) chooseVoice.hidden = !pick;

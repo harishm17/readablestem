@@ -120,21 +120,21 @@ def test_the_page_for_choosing_suggests_parts_that_cover_the_whole_file(web):
     page = web.alice.get(f"/uploads/{upload_id}")
     assert page.status_code == 200
     text = text_of(page.text)
-    assert "chapter2.pdf has 12 pages" in text
-    assert "One conversion takes up to 5 pages" in text
-    assert "Nothing has been converted yet, and no pages have been taken" in text
+    assert "chapter2.pdf : 12 pages" in text
+    assert "each part is its own document of up to 5 pages" in text.lower()
+    assert "Nothing is converted or counted yet" in text
     area = re.search(r'<textarea[^>]*id="parts"[^>]*>(.*?)</textarea>', page.text, re.S)
     assert area is not None and area.group(1).split() == ["1-4", "5-8", "9-12"]
     assert 'for="parts"' in page.text and "Shrink large pictures first" in text
-    assert "You can convert 40 more pages today" in text
-    assert "This file is kept until" in text
+    assert "40 pages left today" in text
+    assert "Kept until" in text
 
 
 def test_a_file_over_the_size_limit_is_kept_even_with_few_pages(web):
     response = post_file(web.alice, "scans.pdf", heavy_pdf(3, 1.6))
     assert response.status_code == 303 and response.headers["location"].startswith("/uploads/")
     page = web.alice.get(response.headers["location"])
-    assert "This file is large because of its pictures, so this is ticked" in text_of(page.text)
+    assert "Ticked because this file is large" in text_of(page.text)
     assert re.search(r'<input[^>]*id="shrink"[^>]*checked', page.text)
 
 
@@ -213,7 +213,7 @@ def test_one_part_goes_straight_to_its_page_and_says_which_pages_it_is(web):
     assert "This is pages 1-5 of a larger file" in page
     # The rest is still waiting and the chooser leaves out what was sent.
     again = text_of(web.alice.get(f"/uploads/{upload_id}").text)
-    assert "Pages 1-5 are already sent to be converted" in again
+    assert "Pages 1-5 are already sent." in again
     area = re.search(
         r'<textarea[^>]*id="parts"[^>]*>(.*?)</textarea>',
         web.alice.get(f"/uploads/{upload_id}").text,
