@@ -66,7 +66,11 @@ Element conventions:
    columns not text columns. This happens whatever `FEATURE_TABLES` says; with the flag
    off the table step keeps the table as an image with a required decision. A grid of
    prose (one column, or a term and its long definition) is not claimed and is read as
-   before.
+   before. In a TeX-made PDF a cell that is one formula by its glyphs (the rules that
+   find inline maths in prose, applied to the cell alone) is also an inline equation
+   element of the table, `TableCell.equation_id` naming it (`_cell_maths`,
+   [tables.md](tables.md) "Maths cells from glyphs"); `run.py` drops these when the flag
+   is off.
 1. **Characters.** PyMuPDF's raw text dictionary with `TEXT_ACCURATE_BBOXES`, so glyph boxes
    are tight. Without it, a fraction's numerator and denominator boxes overlap the main
    line and cannot be told apart. Ligatures are expanded.
@@ -711,7 +715,7 @@ Found by the error analysis of the real-world set ([eval-equation-rootcause.md](
 a paper page is mostly `$x$` in running text, in a font the OpenStax prints never use. What the
 layout learned from it, all from the text layer and the glyph boxes, no model call. The rules that
 come from what a TeX author types (italic variables, bold letters with an index, the edges: parentheses, units,
-citations, word spaces) apply to PDFs typeset by TeX only (`_TEX_MADE`, from `page_type.producer_hint`): an
+citations, word spaces) apply to PDFs typeset by TeX only (`_TEX_MADE`, from `page_type.producer_hint`: the producer or creator names pdfTeX, XeTeX or XeLaTeX (`xdvipdfmx`, what Overleaf offers), LuaTeX, LuaHBTeX, dvips, dvipdfm(x), Tectonic, or says LaTeX or TeX, as whole words in `page_type.TEX_PRODUCER`; a substring match took Quartz's "PDFContext" and iText for TeX): an
 OpenStax print from Chromium, where emphasis is italic and the unit is inside the maths, is read as before
 (`scripts/layout_identity.py` on 126 PDFs: 111 identical, the rest explained in
 [eval-equation-rootcause.md](eval-equation-rootcause.md) section 7). Captions, ellipsis lists and `:=` apply to every producer.
@@ -758,6 +762,16 @@ OpenStax print from Chromium, where emphasis is italic and the unit is inside th
   text) cannot be told from one formula by the glyphs, accents drawn as a separate glyph that PyMuPDF
   puts in another line (`\widetilde W`) still end a run, and a top-level comma between two variables
   (`S, M \to \infty`) still ends it.
+- **Short formulas the runs miss** (`glyph_math.relation_runs`, `layout._with_simple_maths`, 2026-11-03). A relation
+  glyph in a maths font (`\approx`, `\sim`, `\le`, `\ge`, `\ll`, `\gg`, `<`, `>`) and the number after it (`\approx 0.14`,
+  `\geq 2`, `\geq 90\%`) is one inline formula when the glyph before the relation is no maths and no digit: the run finder
+  dropped such a relation as the tail of a formula that a line break cut, and the number had no evidence of its own. A
+  run that is only the number is replaced by the whole; a longer run is left alone. Measured, with the evidence that was
+  tried and left out, in [eval-equation-diagnostics.md](eval-equation-diagnostics.md), "Simple inline maths": a number
+  with a percent sign, a number with a unit, an equation reference `(1)`, a bare number and an upright letter have no
+  glyph that tells the author's `$...$` from text (a percent rule predicted 20 and aligned 4), so none is a formula
+  here; a page number, a citation, a list marker, a year and a figure number are never taken
+  (`tests/fixtures/layout/latex/short_maths.pdf`).
 - **Figure captions** are cut like paragraphs (`_attach_captions`): `Element.caption` stays plain text,
   `Element.caption_marked` has an inline marker where each formula was, and each formula is an
   equation element whose `parent_id` is the figure (id right after the figure's). `assemble` writes the
