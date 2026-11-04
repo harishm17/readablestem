@@ -57,7 +57,7 @@ def test_a_guide_is_a_public_server_rendered_page_with_its_own_metadata(env, pat
     assert levels[0] == 1 and levels.count(1) == 1
     assert all(b - a <= 1 for a, b in itertools.pairwise(levels))
     assert f'Last updated <time datetime="{entry.updated}">' in html
-    assert "<h2>Sources</h2>" in html and "accessed on october 28, 2026" in html.lower()
+    assert '<h2 id="sources">Sources</h2>' in html and "accessed on october 28, 2026" in html.lower()
     assert "https://harishmanoharan.com" in html
 
 
