@@ -74,7 +74,7 @@ from readablestem.web import (
     notation,
     notice_places,
     page_edits,
-    retention,
+    shares,
 )
 from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
 from readablestem.web.deps import (
@@ -145,7 +145,8 @@ from readablestem.web.review import (
     review_anchor,
     undo_last,
 )
-from readablestem.web.routes.jobs import NOT_FOUND, owned_job, require_done
+from readablestem.web.routes.jobs import NOT_FOUND, job_access, require_done, restart_owner_clock
+from readablestem.web.shares import REVIEW
 from readablestem.web.table_card import TableCard, table_card
 from readablestem.web.views import (
     KIND_LABELS,
@@ -1045,9 +1046,10 @@ def _load_versioned(
 ) -> tuple[JobView, DocumentResult, set[str], int]:
     """`_load`, and the job's review version: what the page's forms carry (stale guard)."""
     with session_scope(get_ctx(request).factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, REVIEW)
         require_done(job)
-        view = job_view(session, job, with_summary=True)
+        role = shares.role_of(session, job, user) or REVIEW
+        view = job_view(session, job, with_summary=True, role=role)
         result = DocumentResult.model_validate(job.result_json or {})
         crop_ids = set(
             session.scalars(
@@ -1478,7 +1480,7 @@ def review_action(
             session_scope(ctx.factory) as session,
             notation.in_force(ctx.factory, ctx.settings, job_id),
         ):
-            job = owned_job(session, job_id, user, lock=True)
+            job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
             _refuse_stale(job, version)
@@ -1494,7 +1496,7 @@ def review_action(
             job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
-            retention.restart_clock(job, get_ctx(request).settings)
+            restart_owner_clock(job, user, get_ctx(request).settings)
             session.add_all(_review_edit(job.id, user, c, written) for c in change_made.every)
             _decision_events(request, session, user, job, result, "single", 1)
     except LookupError:
@@ -1585,7 +1587,7 @@ def _group_action(
 ) -> Response:
     try:
         with session_scope(get_ctx(request).factory) as session:
-            job = owned_job(session, job_id, user, lock=True)
+            job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
             _refuse_stale(job, version)
@@ -1595,7 +1597,7 @@ def _group_action(
                 job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
-                retention.restart_clock(job, get_ctx(request).settings)
+                restart_owner_clock(job, user, get_ctx(request).settings)
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
                 _decision_events(request, session, user, job, result, "group", len(outcome.changes))
     except LookupError:
@@ -1656,7 +1658,7 @@ def _page_group_action(
             message = "Choose “Keep”: these images have nothing else to accept."
             raise ReviewInvalid([FieldError(f"group-actions-{group_key}", message)])
         with session_scope(get_ctx(request).factory) as session:
-            job = owned_job(session, job_id, user, lock=True)
+            job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
             _refuse_stale(job, version)
@@ -1666,7 +1668,7 @@ def _page_group_action(
                 job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
-                retention.restart_clock(job, get_ctx(request).settings)
+                restart_owner_clock(job, user, get_ctx(request).settings)
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
                 _decision_events(request, session, user, job, result, "group", len(outcome.changes))
     except LookupError:
@@ -1822,17 +1824,21 @@ def last_write(session: Session, job_id: str, version: int) -> list[ReviewEdit]:
     return [e for e in edits if isinstance(e.after, dict) and e.after.get(WRITE_KEY) == version]
 
 
-def can_undo(edits: list[ReviewEdit]) -> bool:
-    """Undo is offered for the last write when it was a decision (not an Undo itself)
-    and every fix it changed can be put back."""
-    return bool(edits) and all(e.action != UNDO_ACTION and restorable(e.before) for e in edits)
+def can_undo(edits: list[ReviewEdit], user_id: str) -> bool:
+    """Undo is offered for the last write when it was a decision (not an Undo itself), every
+    fix it changed can be put back, and the person asking made it: Undo means "what I just
+    did", so nobody undoes another person's write with it (the owner does not undo a
+    reviewer's, and a reviewer does not undo the owner's; they review the item again)."""
+    return bool(edits) and all(
+        e.action != UNDO_ACTION and e.user_id == user_id and restorable(e.before) for e in edits
+    )
 
 
 def undo_offer(request: Request, job_id: str, user: CurrentUser, version: int) -> bool:
     """Whether the notice after a decision offers Undo (one small query)."""
     with session_scope(get_ctx(request).factory) as session:
-        owned_job(session, job_id, user)
-        return can_undo(last_write(session, job_id, version))
+        job_access(session, job_id, user, REVIEW)
+        return can_undo(last_write(session, job_id, version), user.id)
 
 
 UNDO_PENDING = "Undone. {it} waiting for your decision again."
@@ -1856,14 +1862,14 @@ def undo(
     view = view if view == SYMBOLS_VIEW else (LIST_VIEW if view == LIST_VIEW else "split")
     try:
         with session_scope(get_ctx(request).factory) as session:
-            job = owned_job(session, job_id, user, lock=True)
+            job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
             if not version.strip():
                 raise ReviewStale(owned_id)
             _refuse_stale(job, version)
             edits = last_write(session, job.id, job.result_version or 0)
-            if not can_undo(edits):
+            if not can_undo(edits, user.id):
                 raise _NothingToUndo(owned_id)
             result = DocumentResult.model_validate(job.result_json or {})
             try:
@@ -1876,7 +1882,7 @@ def undo(
             job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
-            retention.restart_clock(job, get_ctx(request).settings)
+            restart_owner_clock(job, user, get_ctx(request).settings)
             session.add_all(_review_edit(job.id, user, c, written) for c in changes)
     except ReviewStale as exc:
         log_event(logger, "review_stale", job_id=job_id)

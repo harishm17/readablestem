@@ -21,9 +21,10 @@
 {% include "_error_summary.html" %}
 <h1>{{ job.title }}</h1>
 {% if job.title != job.filename %}<p class="doc-file">File: {{ job.filename }}</p>{% endif %}
+{% if not job.is_owner %}{% include "_job_shared.html" %}{% endif %}
 {% include "_job_course.html" %}
 {% if job.is_sample %}{% include "_job_sample.html" %}{% endif %}
-{% if job.part_label %}{% include "_job_parts.html" %}{% endif %}
+{% if job.part_label and job.is_owner %}{% include "_job_parts.html" %}{% endif %}
 {# A polite live region that changes per step, not per element: the counts are in the
    list below it, outside the region (_job_progress.html). #}
 <div id="job-status-region" role="status">
@@ -62,10 +63,10 @@
 {# Decisions open: the review is the main action; downloading now is a draft, and the
    draft link asks first (/jobs/{id}/draft) what students would get. #}
 <ul class="actions" id="next-actions">
-  <li><a class="button" href="{{ review_url }}">Review {{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }}</a></li>
+  {% if job.can_review %}<li><a class="button" href="{{ review_url }}">Review {{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }}</a></li>{% endif %}
   <li><a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a></li>
   <li><a href="/jobs/{{ job.id }}/draft">Download a draft ({{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} open)</a></li>
-  {% if not job.is_sample %}<li><a href="/app?revises={{ job.id }}#upload-heading" data-role="revise">Upload a revised version</a></li>{% endif %}
+  {% if not job.is_sample and job.is_owner %}<li><a href="/app?revises={{ job.id }}#upload-heading" data-role="revise">Upload a revised version</a></li>{% endif %}
 </ul>
 {# ux-a: under the download link, where to post the file and the two questions. #}
 {% include "_after_download.html" %}
@@ -73,7 +74,7 @@
 {% include "_job_ready.html" %}
 {% endif %}
 
-{% if job.carry %}
+{% if job.carry and job.is_owner %}
 {% include "_job_carry.html" %}
 {% endif %}
 
@@ -92,7 +93,7 @@
     <p><strong>{{ outcome.label }}:</strong> part of this document was not converted. The
       status above says why and what to do; the HTML keeps those parts as images of the
       original, marked “Not converted”.</p>
-    {% include "_job_retry.html" %}
+    {% if job.is_owner %}{% include "_job_retry.html" %}{% endif %}
   </div>
   {% endif %}
   <p>{{ pg.found }}</p>
@@ -114,9 +115,9 @@
   </dl>
   {% if c.as_image %}<p id="items-count">{{ c.as_image_sentence }}</p>{% endif %}
   {% if c.notes %}
-  <p id="notes-line">{{ c.notes }} {{ "part was" if c.notes == 1 else "parts were" }} accepted for you with a note{% if s.second_check %} ({{ s.second_check }} worth a look){% endif %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>. None of them holds up the file.</p>
+  <p id="notes-line">{{ c.notes }} {{ "part was" if c.notes == 1 else "parts were" }} accepted for you with a note{% if s.second_check %} ({{ s.second_check }} worth a look){% endif %}{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>{% endif %}. None of them holds up the file.</p>
   {% endif %}
-  {% if c.decisions %}
+  {% if c.decisions and job.can_review %}
   {# One link per kind, straight to its first decision on the review screen. A group of
      repeated headings is one decision, and so are the pages kept as images for one
      reason. #}
@@ -126,8 +127,10 @@
     {% endfor %}
   </p>
   {% endif %}
+  {% if job.can_review %}
   <p class="hint">The full list of items, with every note, is on
     <a href="/jobs/{{ job.id }}/review/list">all items as a list</a>.</p>
+  {% endif %}
   {% if s.checks_run %}
   <h3 id="checks-heading">Automatic checks of the HTML file</h3>
   {% if s.failed_checks %}
@@ -157,15 +160,18 @@
   </details>
 </section>
 
+{% if job.is_owner %}
 {% include "_job_language.html" %}
 {% include "_notation_suggestions.html" %}
 {% include "_job_student_file.html" %}
+{% endif %}
 {% include "_job_record.html" %}
+{% if job.is_owner and not job.is_sample %}{% include "_job_sharing.html" %}{% endif %}
 {% elif job.status == "failed" %}
 <section aria-labelledby="failed-heading">
   <h2 id="failed-heading">Why the conversion stopped</h2>
   <p>{{ outcome.message if outcome else job.status_detail }}</p>
-  {% include "_job_retry.html" %}
+  {% if job.is_owner %}{% include "_job_retry.html" %}{% endif %}
   <details class="tech">
     <summary>Details for a bug report</summary>
     <p>Error code: <code>{{ job.error_code or "unknown" }}</code></p>
@@ -173,7 +179,7 @@
 </section>
 {% endif %}
 
-{% if job.status == "done" and not job.is_sample %}
+{% if job.status == "done" and not job.is_sample and job.is_owner %}
 <section aria-labelledby="revise-heading">
   <h2 id="revise-heading">If you change the PDF</h2>
   <p>Fixed a typo or added a slide? Upload the new version and the decisions you made here
@@ -185,6 +191,7 @@
 {# A secondary action, last on the page (MF17): deleting is confirmed on its own page.
    How long the document is kept is T1-8 (web/retention.py): the clock restarts on a
    decision, a change or a download; "Keep 7 more days" makes it a 7-day document. #}
+{% if job.is_owner %}
 <section aria-labelledby="delete-heading">
   <h2 id="delete-heading">Keeping and deleting this document</h2>
   {% if job.retention_mode == "dev" %}
@@ -192,7 +199,7 @@
     {{ opt_in_days }} days from upload. It will be deleted automatically on
     {{ job.retain_until|utc }}.</p>
   {% elif job.retention_mode == "week" %}
-  <p>This document is kept for 7 days, and only you can see it. It will be deleted
+  <p>This document is kept for 7 days, and only you and the people you share it with can see it. It will be deleted
     automatically on {{ job.retain_until|utc }}. Working on it or downloading it starts the
     7 days again.</p>
   {% else %}
@@ -211,4 +218,5 @@
     <button type="submit" class="button-secondary">Delete now</button>
   </form>
 </section>
+{% endif %}
 {% endblock %}
