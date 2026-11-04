@@ -341,8 +341,15 @@ def main() -> None:
     if spec.get("no_subreaper"):  # a test of the fallback
         subreaper = False
 
-    def on_term(_signum, _frame) -> None:  # the caller is gone: take the whole group down
-        os.killpg(os.getpgrp(), signal.SIGKILL)
+    def on_term(_signum, _frame) -> None:
+        """Told to stop (the caller's deadline, or the caller is gone): kill the program and
+        everything it started and reap them, then end. Reaping here, not by SIGKILLing the whole
+        group, is what leaves no zombie behind for whoever is pid 1."""
+        if subreaper:
+            kill_descendants()
+        else:
+            kill_group()
+        os._exit(143)
 
     signal.signal(signal.SIGTERM, on_term)
     # Counted now: after the ruleset /proc is no longer readable. This process becomes nothing;
@@ -356,6 +363,7 @@ def main() -> None:
         fail("count_tasks")
     tasks = counted + limits["pids"] + limits.get("slack", 0)
     tasks += min(0, limits.get("nproc_adjust", 0))
+    supervisor = os.getpid()  # the child's parent, named here: the child cannot ask itself
     marker = spec.get("busy_marker", "")
     allowance = limits["pids"] + limits.get("slack", 0)
     starved = False
@@ -370,7 +378,7 @@ def main() -> None:
         os.close(report_read)
         REPORT["fd"] = report_write
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
-        confine_and_exec(libc, spec, tasks, os.getppid())
+        confine_and_exec(libc, spec, tasks, supervisor)
         fail("launcher_exception")
     os.close(report_write)
     status = 0

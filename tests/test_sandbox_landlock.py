@@ -840,3 +840,60 @@ def test_a_filter_that_denies_fallocate_does_not_stop_a_real_conversion(tmp_path
         monkeypatch.undo()
         sandbox.backend.cache_clear()
     assert outcome.ok and "fallocate" in seccomp._STRICT_DENIED
+
+
+# ------------------------------------------------- reaping: nothing is left for pid 1
+
+
+def _alive(tag: str) -> bool:
+    ps = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True).stdout
+    return tag in ps
+
+
+def test_told_to_stop_the_supervisor_kills_and_reaps_the_whole_tree_itself(tmp_path):
+    """SIGTERM to the supervisor alone (not its group): the program, its children and a
+    double-forked orphan are all gone, and the supervisor ends, with nobody else killing anyone."""
+    import json
+    import signal
+
+    out = tmp_path / "out"
+    out.mkdir()
+    code = (
+        'my $p = fork(); if ($p == 0) { my $q = fork(); if ($q == 0) { exec("/bin/sleep", "901") }'
+        ' exec("/bin/sleep", "902") } exec("/bin/sleep", "903");'
+    )
+    spec = sandbox._landlock_spec(
+        [PERL, "-e", code], ro=(), rw=((out, "/out"),), tools=(), env=None, cwd="/",
+        limits=sandbox.Limits(wall_s=60, pids=8), hide=(), scratch=out, stubs=out,
+        program=seccomp.program(strict=True),
+    )  # fmt: skip
+    proc = subprocess.Popen(
+        [sys.executable, "-I", "-S", str(sandbox.LAUNCHER), json.dumps(spec)],
+        stdin=subprocess.DEVNULL, start_new_session=True,
+    )  # fmt: skip
+    for _ in range(50):
+        time.sleep(0.1)
+        if _alive("sleep 901") and _alive("sleep 902") and _alive("sleep 903"):
+            break
+    assert _alive("sleep 901") and _alive("sleep 903")
+    os.kill(proc.pid, signal.SIGTERM)  # only the supervisor
+    assert proc.wait(10) == 143
+    time.sleep(0.3)
+    assert not (_alive("sleep 901") or _alive("sleep 902") or _alive("sleep 903"))
+
+
+def test_a_timeout_asks_the_supervisor_to_stop_before_the_group_is_killed(tmp_path, monkeypatch):
+    sent: list[tuple[str, int]] = []
+    real_kill, real_killpg = os.kill, os.killpg
+    monkeypatch.setattr(
+        sandbox.os, "kill", lambda pid, sig: (sent.append(("kill", sig)), real_kill(pid, sig))[1]
+    )
+    monkeypatch.setattr(
+        sandbox.os,
+        "killpg",
+        lambda pg, sig: (sent.append(("killpg", sig)), real_killpg(pg, sig))[1],
+    )
+    outcome, _ = run_perl('system("/bin/sleep", "904");', tmp_path, limits=sandbox.Limits(wall_s=1))
+    assert outcome.timed_out
+    assert sent[0] == ("kill", int(signal.SIGTERM))  # the supervisor, first
+    assert not _alive("sleep 904")

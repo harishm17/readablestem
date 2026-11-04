@@ -513,6 +513,18 @@ Railway. What the probe found there:
   Fixed in PR #153 (the launcher now checks its parent is the process that started it, and every
   launcher-side check has a step code). The fix is verified in the container reproduction, not yet
   on Railway: the next deploy's start-up probe decides.
+- **Orphans and pid 1.** With the web app as pid 1 of the container, nothing reaps what the
+  sandbox leaves when its caller is killed (a deadline kill of the conversion child, a crash): the
+  program's orphans and the launcher itself are re-parented to pid 1 and stay as zombies, and a
+  hostile document can cause that on purpose. The image therefore has `tini` as its ENTRYPOINT
+  (`ENTRYPOINT ["tini", "--"]`, then the unchanged CMD), so tini is pid 1 and reaps every orphan.
+  `web` has no `start` command in `railway.ts` (a start command replaces the image's CMD, and
+  whether Railway keeps the ENTRYPOINT behind a custom start command is not something this
+  repository has verified): it runs the image's CMD behind the ENTRYPOINT. `cron` and `backup` do
+  have start commands; they run no sandbox. After a deploy, `init_process=tini` in the probe on
+  `/healthz/ops` (`sandbox.checks`) shows the ENTRYPOINT is in force; any other name means the
+  app is pid 1 again. In the container reproduction below, the cleanup probe leaves one zombie
+  with the app as pid 1 and none with an init (`podman run --init`).
 - **When LaTeX source is switched on.** `FEATURE_LATEX_SOURCE` takes effect only after the web
   process's start-up probe reports PASS (`/healthz/ops`, `sandbox.result`); the flag stays off
   until a deploy shows PASS there. `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` stay off even
@@ -535,7 +547,9 @@ docker run --rm --user 10001:10001 --read-only --tmpfs /tmp:rw,exec --cap-drop=A
   readablestem-probe readablestem ops sandbox-probe --require-latexml
 ```
 
-With podman the same flags work (`podman run`). On a host where unprivileged user namespaces are
+With podman the same flags work (`podman run`; add `--init` to put an init in front, as the
+image's ENTRYPOINT does, and compare the zombies `ps -eo stat,pid,ppid,cmd` shows after the
+sandbox's caller is killed). On a host where unprivileged user namespaces are
 allowed, bubblewrap will start and the Landlock backend is not tried; to see the Landlock path
 there, add `-e READABLESTEM_SANDBOX_BACKEND=landlock`. The output ends in `PASS` or `FAIL`; when the
 Landlock backend does not start, `landlock_step=` names the setup step that failed

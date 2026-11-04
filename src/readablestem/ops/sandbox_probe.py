@@ -522,6 +522,7 @@ def _information(report: Report) -> None:
     report.add("seccomp_mode", seccomp_mode(), required=False)
     report.add("user", f"uid-{os.getuid()}", required=False)
     report.add("pid1_environ_readable", "yes" if _can_read_pid1() else "no", required=False)
+    report.add("init_process", _init_process(), required=False)
     report.add(
         "same_uid_environ_readable_default",
         "yes" if _readable_environ(True) else "no",
@@ -541,6 +542,16 @@ def _information(report: Report) -> None:
     report.add("process_dumpable", _dumpable(), required=False)
     report.add("fallback_unshare_net", _plain_child_can_unshare_net(), required=False)
     report.add("fallback", "never-used-shows-all-files", required=False)
+
+
+def _init_process() -> str:
+    """The name of pid 1 in this container (`tini` when the image's ENTRYPOINT is in force; the
+    app's own name when it is pid 1 and nothing reaps the orphans of the sandbox)."""
+    try:
+        name = Path("/proc/1/comm").read_text().strip()
+    except OSError:
+        return "unknown"
+    return name if name.replace("-", "").replace("_", "").isalnum() and len(name) <= 16 else "other"
 
 
 def _dumpable() -> str:

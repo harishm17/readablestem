@@ -527,3 +527,12 @@ def test_the_backend_starts_in_a_container_where_the_caller_is_pid_1():
         timeout=120,
     )  # fmt: skip
     assert done.stdout.strip() == "1 landlock None", (done.stdout, done.stderr)
+
+
+def test_the_probe_names_pid_1_so_the_entrypoint_can_be_seen_to_be_in_force(monkeypatch):
+    name = sandbox_probe._init_process()
+    assert name == "unknown" or name == "other" or name.replace("-", "").replace("_", "").isalnum()
+    report = sandbox_probe.Report()
+    monkeypatch.setattr(sandbox_probe, "can_do", lambda name: (True, ""))
+    sandbox_probe._information(report)
+    assert any(check.name == "init_process" and not check.required for check in report.checks)

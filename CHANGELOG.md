@@ -2,6 +2,10 @@
 
 ## Unreleased: the Landlock launcher starts where the web process is pid 1 (branch latex/launcher-railway)
 
+- The image's ENTRYPOINT is now `tini`, so the web app is no longer pid 1 and the orphans and
+  defunct launchers left when the sandbox's caller is killed are reaped; on a stop the Landlock
+  supervisor kills and reaps the program's tree itself (SIGTERM first, the group kill as
+  backstop); the probe shows `init_process=`.
 - Fixed: the launcher exited silently when its parent was pid 1, which is the web process in
   Railway's container, so the Landlock backend never started there (`landlock_step=no_report`).
   It now checks that its parent is the process that started it (`parent_pid`), and every

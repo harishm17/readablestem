@@ -361,6 +361,13 @@ What the two layers cover:
   The launcher is the subreaper of what the program starts, watches the pid of its caller (not
   `PR_SET_PDEATHSIG`, which fires when the starting *thread* exits) and takes the group down when
   it is gone, and kills what the program leaves behind when it exits.
+- **Zombies and pid 1.** On a stop (the caller's deadline or its death) the supervisor kills and
+  reaps the program's whole tree itself (`SIGTERM` to the supervisor first, the group kill is the
+  backstop), so nothing is left behind by the sandbox; the supervisor's own exit status is
+  collected by its caller, or, when the caller was killed, by pid 1. The image's ENTRYPOINT is
+  `tini` so that pid 1 reaps (docs/deploy-railway.md): without an init the web app is pid 1, and
+  each caller crash leaves one defunct launcher behind. A hostile document cannot make more
+  than that: it can cause a conversion child to be killed at its deadline, and no more.
 - **Keys.** The web process and the conversion child call `PR_SET_DUMPABLE=0` at start
   (`sandbox.make_undumpable`), so even a same-user process that could open `/proc` could not read
   their `environ` or memory; the probe checks the property (`dumpable0_protects_environ`) and that
