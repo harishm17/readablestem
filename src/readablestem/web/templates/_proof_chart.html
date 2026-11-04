@@ -12,6 +12,7 @@
    attribute). Under 40rem each bar sits under its name. Dark mode follows the tokens; in forced
    colours the fills are system colours (app.css, "ux2-lane-d").
    Use: {% from "_proof_chart.html" import proof_chart %}{{ proof_chart(proof_facts) }} #}
+{% from "_table_scroll.html" import table_scroll %}
 {% macro proof_chart(proof_facts, first_test=true) %}
 <figure class="proof-chart" aria-labelledby="proof-chart-title">
   <p class="proof-chart-title" id="proof-chart-title"><strong>ReadableSTEM against a general chatbot, on equations</strong></p>
@@ -68,6 +69,7 @@
   </figcaption>
   {% if first_test %}
   {% set t = proof_facts.first_test %}
+  {% call table_scroll("Headings and figures, the first registered test") %}
   <table class="chart-mini">
     <caption>Headings and figures: the first registered test ({{ t.set_label }})</caption>
     <thead>
@@ -78,6 +80,7 @@
       <tr><th scope="row">Figure descriptions a model judge (not yet checked against people) found contradicting the picture</th><td>{{ t.errors_ours }}</td><td>{{ t.errors_chatbot }}</td></tr>
     </tbody>
   </table>
+  {% endcall %}
   {% endif %}
   <p class="chart-source"><a href="/limits#accuracy">Evidence: the four measures, how each was
     measured and what they do not show, with all results including earlier tests</a>.</p>
