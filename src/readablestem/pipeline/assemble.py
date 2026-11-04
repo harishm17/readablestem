@@ -71,6 +71,7 @@ from readablestem.pipeline import (
     inline_text,
     navigation,
     table_html,
+    table_math,
 )
 from readablestem.pipeline.safe_html import MATHML_ATTRIBUTES as MATHML_ATTRIBUTES
 from readablestem.pipeline.safe_html import MATHML_ELEMENTS as MATHML_ELEMENTS
@@ -112,6 +113,11 @@ ABOUT_TITLE = "About this version"
 ABOUT_WORDING = (
     "This is a web version of a PDF from your course, made with ReadableSTEM, a tool that "
     "assists with accessibility."
+)
+# The first sentence for a document made from a LaTeX source (`DocumentResult.origin`).
+ABOUT_WORDING_SOURCE = (
+    "This is a web version of a LaTeX document from your course, made with ReadableSTEM, "
+    "a tool that assists with accessibility."
 )
 MATHS_NOTE = "Its equations are written so that screen readers can read them aloud."
 NOT_CHECKED_YET = (
@@ -1293,6 +1299,7 @@ def _about_section(
     contact: str | None = None,
     omitted_pages: list[int] | None = None,
     image_pages: list[int] | None = None,
+    origin: str = "pdf",
 ) -> str:
     """The note for students at the end of the file (MF7 of the UX review): what this
     is, whether the instructor has checked it, which pages are only pictures, who to tell
@@ -1300,7 +1307,8 @@ def _about_section(
     and no review vocabulary ("needs review", "rejected"): the instructor's numbers are
     on the job page. `kept_pages`: 0-based pages kept whole as an image."""
     maths = any(f.kind is Kind.EQUATION and f.status not in NOT_CONVERTED for f in fixes)
-    what = f"{ABOUT_WORDING} {MATHS_NOTE}" if maths else ABOUT_WORDING
+    opening = ABOUT_WORDING if origin == "pdf" else ABOUT_WORDING_SOURCE
+    what = f"{opening} {MATHS_NOTE}" if maths else opening
     flagged_note = f"<p>{FLAGGED_NOTE}</p>\n" if flagged else ""
     if pages_line := kept_pages_note(kept_pages or []):
         flagged_note += f"<p>{pages_line}</p>\n"
@@ -1522,6 +1530,7 @@ def render_html(
     page_labels: Mapping[int, str] | None = None,
     pdf_pages: Mapping[int, int] | None = None,
     footnote_ids: Collection[str] = (),
+    origin: str = "pdf",
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -1547,12 +1556,15 @@ def render_html(
     both read "Page 5", and "Page 5" when none has. `pdf_pages` maps a page of this document to
     its page in the PDF it was cut from (a part of a longer file). `footnote_ids`: the element
     ids of footnotes (`Notice` code "footnote"), whose marks and notes are linked both ways.
+    `origin`: "pdf" or, for a document made from a LaTeX source, "latex" or "beamer"
+    (`DocumentResult.origin`): the student note's first sentence says so.
     """
     ordered = _without_dead_links(sorted(elements, key=lambda e: e.order))
     first_fix: dict[str, Fix] = {}
     for fix in fixes:  # first wins, like DocumentResult.fix_for
         first_fix.setdefault(fix.element_id, fix)
     ordered = _kept_prose(ordered, first_fix)
+    first_fix = table_math.with_cell_readings(ordered, first_fix)  # a table's maths cells
     equations = {e.id: e for e in ordered if e.kind is Kind.EQUATION}
     if math_alttext is None:
         math_alttext = get_settings().mathml_alttext
@@ -1570,7 +1582,9 @@ def render_html(
         mark_pages=len({p for e in ordered for p in (e.page, e.last_page or e.page)}) >= 2,
         footnote_ids=set(footnote_ids),
     )
-    renderer.placed = _placed_equations(ordered, renderer, set(equations))
+    renderer.placed = _placed_equations(ordered, renderer, set(equations)) | (
+        table_math.cell_equation_ids(ordered) & set(equations)  # written in their table's cell
+    )
     body = renderer.fill_backlinks(renderer.render_all(ordered))
     kept_pages = [
         e.page
@@ -1588,6 +1602,7 @@ def render_html(
         contact,
         omitted_pages,
         [e.page for e in ordered if IMAGE_PAGE_ORIGINAL_REASON in e.reasons],
+        origin,
     )
     heading_texts = [
         text

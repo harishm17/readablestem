@@ -224,16 +224,19 @@ script injected into an app page is refused by the policy.
 | Upload size | `MAX_UPLOAD_MB` a file converted at once, `MAX_LARGE_UPLOAD_MB` a file kept for choosing its pages and the whole request; checked while streaming, never spooled to disk (a Word or PowerPoint file is written to a private temporary directory by the converter for the seconds it takes: below) | `web/uploads.py` |
 | Pages per upload | `MAX_PAGES_PER_JOB` converted at once, `MAX_SOURCE_PAGES` for a file kept for choosing its pages; the quota counts only the pages converted | the probe, before quota or model |
 | Page size | 5000 pt a side | probe |
-| Uploads in progress | 3 per instance, 1 per person | `UploadGate` |
-| Files in one upload | 10; the request, files together, at most `MAX_LARGE_UPLOAD_MB` (30); each file after the first counts as an upload for `upload_user`; the probes of one request share 120 s | `web/uploads.py`, `routes/jobs.py` |
-| Large files kept for choosing their pages | 2 per person, up to 30 MB and 300 pages, deleted after `RETENTION_HOURS`; their parts are held to the page quota and the caps below | `web/pending.py`, `web/intake.py` |
+| Uploads in progress | 3 per instance, 1 per person; each is held in memory about three times over, so at most about 900 MB at the largest size (`MAX_LARGE_UPLOAD_MB`) | `UploadGate` |
+| Stored bytes per person | `STORAGE_PER_USER_MB` (300, invited) or `STORAGE_OPEN_TIER_MB` (250, open tier): everything they have stored (source PDFs, crops, results, kept large files) that is not past its deletion time, counted in the same transaction as the job with the person's row locked, so two uploads cannot both pass; a new upload that would go over is refused (413) with how much is used and to delete documents. The old worst case was 2.2 GB a person | `web/storage.py`, `web/intake.py`, `web/pending.py` |
+| Stored upload bytes, whole service | `STORAGE_GLOBAL_MAX_MB` (2000): over it new uploads get a plain 503 before the body is read, and `/healthz/ops` goes 503 naming `storage`, until the hourly purge has deleted enough | `web/storage.py`, `routes/jobs.py`, `web/health.py` |
+| Files in one upload | 10; the request, files together, at most `MAX_LARGE_UPLOAD_MB` (100), so ten files of 10 MB or two of 50; each file after the first counts as an upload for `upload_user`; the probes of one request share 120 s | `web/uploads.py`, `routes/jobs.py` |
+| Large files kept for choosing their pages | 2 per person, up to 100 MB and 500 pages, deleted after `RETENTION_HOURS`; their parts are held to the page quota and the caps below | `web/pending.py`, `web/intake.py` |
+| LaTeX source (`FEATURE_LATEX_SOURCE`) | A `.tex` file or a zip of at most 20 MB, 100 MB unpacked, 500 entries, 50 MB a file, expansion at most 200 times, depth 8; no symlinks, absolute or `..` paths, encrypted members, nested zips, EPS or SVG; an extension allowlist; the lint; checked again in the conversion child; LaTeXML in the sandbox below | `web/archive_intake.py`, `source/intake.py`, `source/lint.py`, `source/convert.py` |
 | Zip of ready documents | 25 documents and 80 MB, in memory | `web/bundle.py` |
 | Answers to an upload of several files | one row per upload, names and numbers only, kept 1 hour, deleted with the person; readable by its owner only (404 for anyone else) | `web/upload_result.py`, `ops.retention.purge_upload_results` |
 | Word and PowerPoint files of one upload | their conversions share 180 s (`OFFICE_BUDGET_S`); the rest are refused with a reason | `routes/jobs.py` (`_place_files`) |
 | Sample document | one per person, outside the quota, the spend and the caps; `sample` rate rule 10 per 10 minutes per address | `web/sample.py` |
 | Probe child | 30 s timeout, 768 MiB address space, minimal environment | `inspect_pdf_isolated`, `pdf_probe` |
 | Conversion child | The whole conversion, in its own process and process group: `CONVERSION_MEMORY_MB` (3072) plus twice the PDF of address space, CPU time 4 times the job's time limit, no core file, killed at the job's time limit, on cancel or shutdown, dies with the web process; minimal environment (no keys, no database URL), model requests and every database write made by the parent; a crash fails that job at once (`conversion_crashed`, `conversion_oom`) | `convert_isolated`, `conversion_child` |
-| Word and PowerPoint (T3-30) | File checks in a child with a minimal environment and a 768 MiB cap; LibreOffice in its own session and process group with 2 GiB address space, CPU, output-size and open-file limits and `OFFICE_TIMEOUT_S` (90 s) then killed; one conversion at a time per instance; the PDF it makes is probed like any upload | `convert_office_isolated`, `office_convert` |
+| Word and PowerPoint (T3-30) | File checks in a child with a minimal environment and a 768 MiB cap (a ZIP of more than 3000 entries, 500 MB unpacked or an entry over 250 MB is refused unopened: with the 100 MB upload limit that is the same room for compression as the 200 MB and 30 MB were; the sizes are read from the ZIP's directory, nothing is unpacked to check); LibreOffice in its own session and process group with 2 GiB address space, CPU, output-size and open-file limits and `OFFICE_TIMEOUT_S` (90 s) then killed; one conversion at a time per instance; the PDF it makes is probed like any upload | `convert_office_isolated`, `office_convert` |
 | Daily pages per person | `PER_USER_DAILY_PAGE_QUOTA` (invited), `OPEN_TIER_DAILY_PAGE_QUOTA` (open tier) | `web/quota.py`, `web/access.py` |
 | Model reads from review per person per day (open tier) | `OPEN_TIER_DAILY_REREADS`, counted before the read and not given back | `web/quota.py` (`try_consume_reread`), `web/reread.py` |
 | New accounts (open sign-up) | `MAX_NEW_ACCOUNTS_PER_DAY` a UTC day for the service, not given back when an account is deleted; 5 an hour per address; an address deleted today comes back with the day's pages, reads and place already used (a keyed hash of the address, kept to the end of the day) | `web/quota.py` (`try_take_signup`), `web/abuse.py` (`signup`), `web/tombstones.py` |
@@ -264,6 +267,54 @@ never an address): a proxy is missing from the setting, or a client is forging t
 `readablestem ops launch-check` lists `TRUSTED_PROXY_HOPS=0` in production, which makes every
 visitor share the platform's address. Launch-check runs from the repo and the settings, so it
 cannot see the live header; the log line is the only live check.
+
+### Running uploaded TeX (sandbox)
+
+A `.tex` file is a program, so a LaTeX upload (a later change; the switch is `FEATURE_LATEX_SOURCE`)
+runs LaTeXML only inside `core/sandbox.py`: bubblewrap with a minimal read-only root (no
+application, no `/home`, `/proc/1/environ` hidden), the project mounted read-only and one output
+folder writable, a new network namespace (no network), a new pid namespace that dies with the
+caller, an empty environment, a seccomp filter (`core/seccomp.py`: `ptrace`, `mount` and the new
+mount API, `unshare`, `setns`, `clone` with namespace flags, `keyctl`, `bpf`, `perf_event_open`,
+`userfaultfd`, `io_uring_*`, `kexec_*`, module loading, `process_vm_*` answer EPERM; `clone3` answers
+ENOSYS; x86-64 and arm64 only) and `prlimit` caps. **What is capped, exactly:** address space
+(512 MB for LaTeXML), CPU time (120 s), the size of any one file (50 MB) and open files (256) are
+limits **per process**. The sandbox joins its cgroup before it starts bubblewrap, so when the
+container delegates a cgroup v2 (the probe says `sandbox_cgroup=ok`) the memory limit (512 MB) and
+the pids limit hold for the whole tree. Without one, the total is bounded by arithmetic: at most 4
+tasks (LaTeXML needs 3, measured: the sandbox's init, `prlimit` becoming perl, perl; counted inside
+the sandbox's own user namespace on kernels from 5.14, else as this user's tasks now plus 4) times
+512 MB of address space each (a 29-page equation-heavy document needs between 256 and 384 MB), and
+one source conversion runs at a time on the machine (`sandbox.exclusive`, a file lock), so the
+bound is 4 x 512 MB = 2 GB for the whole server. `ops sandbox-probe` prints it as
+`sandbox_total_bound_mb` (the cgroup's limit, else tasks x address space) and, with
+`--require-latexml`, fails when it is over `SOURCE_SANDBOX_MAX_TOTAL_MB` (2048). **Residual:** address
+space is more than memory in use, so the bound is loose, and it can only be approached by code that
+runs inside LaTeXML's Perl first (a LaTeXML bug); the container's memory limit and the host's OOM
+killer are what is left behind it. The caller kills the group at a wall-clock limit
+(120 s) or when the output folders and the program's log pass 200 MB. If bubblewrap or user namespaces are not available the run is
+refused; there is no unsandboxed fallback (a plain child of the web process shares its user, so
+it could read the web process's files). Whether the platform allows it is checked on the deployed
+image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"); a FAIL there means
+LaTeX upload must stay off.
+
+What each layer is for, and what is tested (`tests/test_source_escapes.py` runs these through the
+real sandbox with the lint switched off):
+
+| Layer | Stops | Not relied on for |
+|---|---|---|
+| Zip rules (`web/archive_intake.py`) | a bomb, a path that leaves the folder, a link, a device, a nested zip, a file kind that is not on the list | what is in a `.tex` file |
+| Lint (`source/lint.py`) | the plain forms: `\write18`, `\openout`, `\input{|...}`, `\directlua`, absolute and `..` paths | anything: `\catcode` and `\csname` rebuild any command |
+| The conversion child (`web/conversion_child.py`) | keys and database address (not in its environment), runaway memory and CPU of the reader | TeX: it runs below the child, in the sandbox |
+| The sandbox (`core/sandbox.py`) | reading a file of this machine (`/etc/passwd`, `/proc/1/environ`, a file of the web app, a link out of the project), writing outside its folders, running a program, the network, running for ever, using all memory or disk | a platform that forbids user namespaces: then the probe fails and the switch stays off |
+
+Tested closed: `\input` of an absolute path, of `/etc/passwd`, of `/proc/1/environ` and of a
+relative path out of the project; a symlink in the project; a `\catcode` and a `\csname` rebuild
+of `\input`; `\write18`; `\openout` outside the output folders and into the read-only project; a
+document writing a forged `doc.xhtml` into step one's output; `\input` of a URL with a local server
+listening; an infinite loop and an `\openin` loop (the time cap); a runaway macro (the memory
+cap); runaway output (the output cap). Each step's output folder is separate: step two reads
+step one's read-only.
 
 ### Rotating the session secret
 
@@ -467,8 +518,12 @@ Triage of what the scanners reported:
   the recipient's mail provider hold it until it expires or is used, and anyone who reads the
   mailbox can sign in.
 - Rate limits and the upload gate are per instance and in memory.
-- `/healthz/ops` is public and has no rate limit: it reads two rows and answers with at most the
-  words `backup`, `cron` or `database`. Scheduled-task failures are found by a GitHub Actions job
+- LaTeX source (when `FEATURE_LATEX_SOURCE` is on) puts LaTeXML, a Perl program, in front of files from the
+  internet. The sandbox contains it; a flaw in bubblewrap or in the kernel's namespaces is not
+  prevented by anything here. The lint is not a defence. The image has the distribution's LaTeXML, so
+  a security update of it arrives with the next build (`apt`, not pinned).
+- `/healthz/ops` is public and has no rate limit: it reads two rows and a sum of stored sizes, and answers with at most the
+  words `backup`, `cron`, `storage` or `database`, and the stored and allowed megabytes (totals, no names). Scheduled-task failures are found by a GitHub Actions job
   that stops after 60 days without a commit to the public repository, unless re-enabled.
 - The session cookie is readable by its owner (signed, not encrypted).
 - A copy of the converted HTML opened from disk has no CSP; it is built to need none.

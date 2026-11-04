@@ -39,8 +39,8 @@ SignupMode = Literal["allowlist", "open"]
 # the environment does not set (`Settings._provider_limits`); the measurements and the
 # reasoning are in docs/deploy.md, "Spend limits".
 PROVIDER_LIMIT_DEFAULTS: dict[str, dict[str, float]] = {
-    "openai": {"max_usd_per_job": 2.0, "max_usd_per_page": 0.30},
-    "anthropic": {"max_usd_per_job": 3.0, "max_usd_per_page": 1.0},
+    "openai": {"max_usd_per_job": 6.0, "max_usd_per_page": 0.30},
+    "anthropic": {"max_usd_per_job": 6.0, "max_usd_per_page": 1.0},
 }
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
@@ -222,7 +222,7 @@ class Settings(BaseSettings):
     # production values: they only apply in open mode, and the first three only to accounts
     # that were not invited ("open tier"). Invited people keep PER_USER_DAILY_PAGE_QUOTA.
     # Pages an open-tier account may submit per UTC day.
-    open_tier_daily_page_quota: int = Field(default=20, gt=0)
+    open_tier_daily_page_quota: int = Field(default=150, gt=0)
     # Model reads from review (a marked equation region, a table cell read as maths) an
     # open-tier account may start per UTC day. Each one costs model spend that no page count
     # bounds. 0 turns them off for that tier.
@@ -235,23 +235,26 @@ class Settings(BaseSettings):
     # in addition to DAILY_SPEND_CAP_USD (their spend counts toward that cap too), so
     # strangers can never use more than this of the instructors' budget. 0 closes it.
     open_tier_daily_spend_cap_usd: float = Field(default=4.0, ge=0)
-    max_usd_per_job: float = Field(default=2.0, gt=0)
-    max_model_calls_per_job: int = Field(default=400, gt=0)
+    max_usd_per_job: float = Field(default=6.0, gt=0)
+    # 1200: a 100-page document of our own densest test pages (equations, figures, tables on
+    # most pages) made 652 calls with the offline client, and real Claude documents 2 to 2.7
+    # a page (docs/deploy.md, "Sizing"); the old 400 would have stopped it at 61 pages.
+    max_model_calls_per_job: int = Field(default=1200, gt=0)
     # A job's caps are also at most this much per page of the upload (web.worker.job_caps),
     # so a short document cannot use a long one's allowance. Measured average: about
     # $0.004 and a few calls per PDF page; these leave room for equation-dense pages.
     max_usd_per_page: float = Field(default=0.30, gt=0)
     max_model_calls_per_page: int = Field(default=80, gt=0)
-    max_pages_per_job: int = Field(default=30, gt=0)
-    max_upload_mb: int = Field(default=20, gt=0)
+    max_pages_per_job: int = Field(default=100, gt=0)
+    max_upload_mb: int = Field(default=50, gt=0)
     # Larger than a conversion takes (MAX_PAGES_PER_JOB pages, MAX_UPLOAD_MB): a file up to
     # this many MB and pages is kept so the person can choose which pages to convert, in
     # parts that each fit (web/pending.py). Also the most one upload request may carry, files
-    # together. 30 was chosen under Cloud Run's 32 MiB request limit; Railway documents no
+    # together. The old 30 was chosen under Cloud Run's 32 MiB request limit; Railway documents no
     # request-size limit (docs/deploy-railway.md). Equal to the limits above, it
     # turns the feature off (the file is refused, as before).
-    max_large_upload_mb: int = Field(default=30, gt=0)
-    max_source_pages: int = Field(default=300, gt=0)
+    max_large_upload_mb: int = Field(default=100, gt=0)
+    max_source_pages: int = Field(default=500, gt=0)
     # Word and PowerPoint uploads (T3-30): converted to a tagged PDF by LibreOffice in a
     # sandboxed child process (`web.office_convert`). Taken only when LibreOffice is
     # installed (the production image has it only when built with INSTALL_LIBREOFFICE=true,
@@ -260,8 +263,25 @@ class Settings(BaseSettings):
     soffice_path: str | None = None
     # How long LibreOffice may take for one file, in seconds (it is killed after that).
     office_timeout_s: float = Field(default=90.0, gt=0, le=300)
+    # The most memory (MB) one source conversion may use in all, as `ops sandbox-probe` works it out
+    # (a cgroup's limit, else tasks x address space each, `source.latexml.LIMITS`); the probe fails
+    # with --require-latexml when it is more.
+    source_sandbox_max_total_mb: int = Field(default=2048, gt=0)
     # Uploads taken in at once per instance (one per user); see web/uploads.py.
     max_concurrent_uploads: int = Field(default=3, gt=0)
+    # Stored bytes (web/storage.py): uploads live in Postgres on a volume of fixed size (5000 MB,
+    # .railway/railway.ts), and with 50 and 100 MB uploads one person could fill it. Per person,
+    # by tier: everything they have stored (sources, crops, results, kept large files); a new
+    # upload that would pass it is refused. The open tier's 250 holds a 100 MB file kept for
+    # choosing pages and a 50 MB part cut from it; with 100 new accounts a day the global cap
+    # below, not these, protects the volume.
+    storage_per_user_mb: int = Field(default=300, gt=0)
+    storage_open_tier_mb: int = Field(default=250, gt=0)
+    # Stored upload bytes of everybody: over it new uploads are refused until the hourly purge
+    # has caught up. 2000 and not more: the daily backup restores the dump into a second
+    # database on the same volume (`restore_check`), so the volume holds about twice the data
+    # while it runs; 2000 MB of uploads twice over, plus overhead, stays inside 5000 MB.
+    storage_global_max_mb: int = Field(default=2000, gt=0)
 
     # --- storage and retention
     database_url: str = "sqlite:///.local/readablestem.db"
@@ -439,6 +459,11 @@ class Settings(BaseSettings):
     # converted", as before. For the CLI and the eval it turns the pass on for the whole run.
     # `image_pages_model` None: the main model.
     feature_image_pages: bool = False
+    # LaTeX and Beamer source uploads (`readablestem.source`): a `.tex` file or a zip of a
+    # project, converted by LaTeXML in a sandbox. Off until `readablestem ops sandbox-probe`
+    # passes on the deployed image and the image was built with INSTALL_LATEXML (docs/security.md,
+    # "Running uploaded TeX").
+    feature_latex_source: bool = False
     image_pages_model: str | None = None
     # Seconds the model may take to write one page (a dense page is a few thousand tokens;
     # `model_timeout_s` is for a crop's short answer).

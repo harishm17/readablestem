@@ -202,10 +202,18 @@ class ReviewChange:
     note: str = ""
     # An edit used although it differs from the PDF where it changes the meaning.
     anyway: bool = False
+    # What the same edit changed in another fix: a table cell and the equation behind it are one
+    # reading (`pipeline.table_math`), so editing one writes the other. Recorded and undone with it.
+    also: list[ReviewChange] = field(default_factory=list)
 
     @property
     def element_id(self) -> str:
         return self.fix.element_id
+
+    @property
+    def every(self) -> list[ReviewChange]:
+        """This change and the ones it wrote through to."""
+        return [self, *self.also]
 
 
 @dataclass
@@ -501,6 +509,7 @@ def apply_review(
     *,
     anyway: bool = False,
     witness: bool = False,
+    through: bool = True,
 ) -> ReviewChange:
     """Apply one decision to `result` in place. Raises LookupError or ReviewInvalid.
 
@@ -573,7 +582,7 @@ def apply_review(
         after[ANYWAY_KEY] = True  # the ReviewEdit records the explicit choice
     if offered and fix.equation is not None and fix.equation.latex in offered:
         after[CHOICE_ORIGINS[origin]] = True
-    return ReviewChange(
+    made = ReviewChange(
         fix=fix,
         action=action,
         before=before,
@@ -583,6 +592,66 @@ def apply_review(
         note=note,
         anyway=overridden,
     )
+    if through and action == "edit":
+        made.also = _written_through(result, fix, element, form, anyway=anyway)
+    return made
+
+
+def _written_through(
+    result: DocumentResult,
+    fix: Fix,
+    element: Element | None,
+    form: Mapping[str, str],
+    *,
+    anyway: bool,
+) -> list[ReviewChange]:
+    """A table cell and the equation behind it (`TableCell.equation_id`) are one reading: the
+    edit of one is written to the other, with the same checks, as its own recorded change, so the
+    cell, the equation, the page and Undo always agree."""
+    from readablestem.pipeline import table_math
+
+    if fix.kind is Kind.TABLE and form.get("change") == "cell":
+        if element is None or element.table is None or fix.table is None:
+            return []
+        if not (_INDEX.fullmatch(form.get("row", "")) and _INDEX.fullmatch(form.get("col", ""))):
+            return []
+        cell = find_cell(fix.table.grid, int(form["row"]), int(form["col"]))
+        eq_id = table_math.equation_id_of(cell, element.table) if cell is not None else None
+        eq_fix = result.fix_for(eq_id) if eq_id else None
+        if cell is None or not cell.latex or eq_id is None or eq_fix is None:
+            return []
+        if eq_fix.equation is not None and _same_text(cell.latex, eq_fix.equation.latex):
+            return []
+        return [
+            apply_review(result, eq_id, "edit", {"latex": cell.latex}, anyway=True, through=False)
+        ]
+    if fix.kind is Kind.EQUATION and fix.equation is not None:
+        tie = table_math.tie_of(result.elements, fix.element_id)
+        table_fix = result.fix_for(tie[0].id) if tie else None
+        if tie is None or table_fix is None or table_fix.table is None or tie[0].table is None:
+            return []
+        cell = table_math.cell_for(table_fix.table.grid, tie[0].table, tie[1])
+        if cell is None or (cell.latex, cell.mathml) == (fix.equation.latex, fix.equation.mathml):
+            return []
+        before = snapshot(table_fix)
+        cells = [
+            c.model_copy(update={"latex": fix.equation.latex, "mathml": fix.equation.mathml})
+            if c is cell
+            else c
+            for c in table_fix.table.grid.cells
+        ]
+        grid = table_fix.table.grid.model_copy(update={"cells": cells})
+        table_fix.table = table_fix.table.model_copy(update={"grid": grid})
+        return [
+            ReviewChange(
+                fix=table_fix,
+                action="edit",
+                before=before,
+                after=snapshot(table_fix),
+                note=f"row {cell.row + 1}, column {cell.col + 1}, from its equation",
+            )
+        ]
+    return []
 
 
 UNSAVED = "Choose Save edit to use your change, or {undo} to accept the proposal."
@@ -1720,6 +1789,7 @@ def rerender_html(
     if contact:
         chosen |= {"contact": contact}
     html = assemble.render_html(
+        origin=result.origin,
         title=title_override or result.title,
         **chosen,
         lang=result.lang,

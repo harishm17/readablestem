@@ -36,6 +36,23 @@
   the document will be deleted, with a one-click "Keep it for 7 days". Retention wording says the
   clock restarts on each decision or download.
 
+## Unreleased: LaTeX source upload (branch latex/e1-source-intake)
+
+- LaTeX source (`FEATURE_LATEX_SOURCE`, off by default; ADR 0008): a `.tex` file or a `.zip` of a project is
+  converted by LaTeXML in the bubblewrap sandbox of the sandbox probe change, into the document a PDF becomes. Equations
+  come from the source (LaTeXML's MathML through the sanitiser, the source's own LaTeX), figures use the
+  project's pictures and the ordinary figure step, tables become grids, headings, lists and links are read as
+  written. A formula LaTeXML cannot read and a figure with no picture are required decisions; a source that cannot be
+  converted fails the job with "Upload the PDF instead" and keeps nothing. The review is the list view. New
+  `web/archive_intake.py` (zip limits: 20 MB, 100 MB unpacked, 500 entries, no links, absolute or `..` paths,
+  nested zips, EPS or SVG; a header that lies is caught), `source/` (`intake`, `lint`, `envelope`, `latexml`,
+  `ltx_reader`, `figures`, `convert`), a one-line hook in `pipeline/run.py` (`convert_pdf`), `DocumentResult.origin`,
+  `render_html(origin=)` (the student note says "a LaTeX document"), `INSTALL_LATEXML` and `FEATURE_LATEX_SOURCE` in
+  `railway.ts`. LaTeXML runs with `kpsewhich` hidden in the sandbox: where TeX Live's base is installed (the image) it
+  otherwise read raw TeX for packages and spent over a minute failing on `siunitx`. Beamer decks are refused until their own change. Docs: docs/web.md "LaTeX source",
+  docs/security.md "Running uploaded TeX", docs/development.md. Tests: `tests/test_archive_intake.py`,
+  `test_source_intake.py`, `test_source_reader.py`, `test_source_convert.py`, `test_source_escapes.py` (hostile
+  files through the real sandbox), `test_source_child.py`, `test_web_source.py`.
 ## Unreleased: design polish (branch design/d6-polish)
 
 - Fixes from the Impeccable audit and critique of the redesign: paragraphs, hints and list items are capped at 75ch;
@@ -60,6 +77,40 @@
   footer has the same four columns, and the showcase follows light and dark. The converted output and the PDF
   pages stay on white paper. The `/demo` page is the stored converted document and is not restyled.
 
+## Unreleased: LaTeXML in the image (branch latex/x1-latexml-image)
+
+## Unreleased: sandbox probe (branch latex/x0-sandbox-probe)
+
+- `readablestem ops sandbox-probe`: checks on the running image that the sandbox for uploaded TeX
+  works (bubblewrap, user namespaces, no network, empty environment, hidden `/proc/1/environ`,
+  memory, wall-clock and output caps), times a tiny LaTeXML run when LaTeXML is installed, reports
+  the kernel's seccomp mode, Landlock ABI and same-UID `/proc/<pid>/environ` readability, and
+  prints PASS or FAIL (exit 1). Nothing it prints is document content. Docs: docs/operations.md,
+  "Sandbox probe"; docs/security.md, "Running uploaded TeX".
+- The sandbox joins its cgroup before bubblewrap starts (a wrapper, not a move afterwards, so no child escapes it),
+  and without a cgroup the total is bounded by arithmetic: LaTeXML gets 4 tasks (it needs 3) and 512 MB of address
+  space each (`source.latexml.LIMITS`), one source conversion runs at a time on the machine (`sandbox.exclusive`),
+  and `ops sandbox-probe` prints `sandbox_total_bound_mb` and fails `--require-latexml` over
+  `SOURCE_SANDBOX_MAX_TOTAL_MB` (2048). The upload comment now assumes a 2 GB web service.
+- The sandbox also caps tasks and open files (`prlimit --nproc --nofile`), puts a seccomp filter in front of the
+  program (`core/seccomp.py`, built without libseccomp), counts the program's own output against the output budget,
+  and uses a cgroup v2 memory and pids limit for the whole group when the container allows one; the probe reports
+  `sandbox_task_cap`, `sandbox_file_cap`, `sandbox_seccomp` and `sandbox_cgroup`. docs/security.md says what is
+  capped per process and what in total.
+- New `core/sandbox.py` (the bubblewrap runner the probe tests and a later LaTeX upload uses) and
+  `source/latexml.py` (the `latexml` and `latexmlpost` calls). Nothing in the app calls them yet.
+  Tests: `tests/test_sandbox.py`, `tests/test_ops_sandbox_probe.py`.
+## Unreleased: LaTeXML in the image (branch latex/x1-latexml-image)
+
+- Dockerfile: `ARG INSTALL_LATEXML=false` also installs `bubblewrap` and `util-linux` (the sandbox and `prlimit`; the
+  build fails without them). It installs the distribution's `latexml` (0.8.8) with TeX
+  Live's base and ImageMagick, and replaces ImageMagick's `policy.xml` with a deny-by-default one
+  (PNG, JPEG, GIF only; PS, EPS, PDF, XPS, URL and `@file` denied by name:
+  `src/readablestem/source/imagemagick-policy.xml`). Measured on the pinned base: +270 MB
+  (324.3 MB to 594.4 MB). Off by default; nothing in the app uses it yet. `INSTALL_LATEXML` is
+  declared on `web` in `.railway/railway.ts`; CI builds once with the argument and checks the
+  versions and the policy. Docs: docs/deploy-railway.md, "LaTeXML"; THIRD_PARTY_NOTICES.md.
+  Tests: `tests/test_latexml_image.py`.
 ## Unreleased: landing page and proof strip (branch design/d2-landing)
 
 - Landing page: the hero shows a real passage of the demo (OpenStax Physics 2.3, page 3): the PDF crop
@@ -84,6 +135,98 @@
   links as before. Forced-colours and reduced-motion rules cover the new components. The app's
   side-stripe notices and cards became full borders. `/style` (noindex, not in the sitemap) shows
   every component. Docs: `docs/site.md` "Design system", `static/vendor/README.md`.
+## Unreleased: higher upload limits (branch limits/raise-upload-limits)
+
+- The limits now fit together. Before, a new account could convert 20 pages a day while one upload
+  could hold 30. Defaults: `MAX_PAGES_PER_JOB` 30 to 100, `MAX_UPLOAD_MB` 20 to 50,
+  `MAX_LARGE_UPLOAD_MB` 30 to 100 (also the most one upload request carries, files together),
+  `MAX_SOURCE_PAGES` 300 to 500, `OPEN_TIER_DAILY_PAGE_QUOTA` 20 to 150, `MAX_USD_PER_JOB` 2.00 (OpenAI)
+  and 3.00 (Claude) to 6.00 for both, `MAX_MODEL_CALLS_PER_JOB` 400 to 1200 (our densest 100-page test
+  document makes 652 calls). Not changed: `DAILY_SPEND_CAP_USD`, `OPEN_TIER_DAILY_SPEND_CAP_USD`,
+  `IMAGE_PAGES_*` caps, `CONVERSION_MEMORY_MB` and the job time limit (a 100-page document converts well
+  inside both: 31 s and 494 MB resident with fake models on one CPU, 193 s with 2 s of simulated model
+  latency a call; with 51 MB of pictures 44 s and 745 MB; docs/web.md, "The conversion runs in a child
+  process"). Production environment values (`PER_USER_DAILY_PAGE_QUOTA`, `OPEN_TIER_DAILY_PAGE_QUOTA`,
+  `MAX_USD_PER_JOB`) are set at deploy, not in code: a `MAX_USD_PER_JOB` of 4.70 set for tables is now
+  below the $5.71 that 100 pages need (docs/deploy.md, "Spend limits").
+- Stored-bytes caps, because uploads are in Postgres on a 5000 MB volume and one person could now store 2.2 GB: `STORAGE_PER_USER_MB` (300) and `STORAGE_OPEN_TIER_MB` (250) per person, counted with the quota checks in the job's transaction; `STORAGE_GLOBAL_MAX_MB` (2000, not 3000: the nightly backup check restores a second copy on the same volume) for the service, which turns uploads away with a 503 and puts `storage` in `/healthz/ops`. The hourly cron runs a plain `VACUUM` of the upload tables after a purge. The limits page names the cap. Declared in `.railway/railway.ts` (`webOnlyVariables`).
+- `ops launch-check` and the start-up check gain two warnings: an open-tier daily quota under one
+  full-size document, and `IMAGE_PAGES_MAX_USD_PER_JOB` under `MAX_USD_PER_JOB`.
+- Word and PowerPoint files: the ZIP checks scale with the upload limit (500 MB unpacked, 250 MB an
+  entry; were 200 and 100). A 100-page Word file became a PDF in 1.4 s here (PowerPoint could not be timed:
+  Impress is not installed on the box).
+- The parts page and its error message use `1-10` as the example range instead of `1-30`, which read
+  as a limit. docs/web.md, docs/deploy.md, docs/deploy-railway.md (the service should be allowed 2 GB; a 95
+  MB upload to confirm after the deploy), docs/security.md, docs/operations.md (how much the uploads
+  weigh in the database), README, vendor sheet, `.env.example`, `deploy/deploy.env.example`.
+## Unreleased: TeX producers (branch eq/tex-producer-xetex, on eq/inline-simple-maths)
+
+- `page_type.producer_hint` calls a PDF TeX-made when its producer or creator names TeX as a whole word
+  (`page_type.TEX_PRODUCER`): pdfTeX, XeTeX and XeLaTeX (`xdvipdfmx`, offered by Overleaf), LuaTeX, LuaHBTeX, dvips,
+  dvipdfm(x), Tectonic, and "LaTeX" or "TeX" in a creator (Ghostscript alone is not). It matched the substring "tex",
+  so XeLaTeX and Tectonic files missed every TeX rule (the unit after a number, index punctuation, table-cell maths,
+  short formulas) while Quartz ("PDFContext", a Mac-saved Word file) and iText were taken for TeX. The Beamer check of
+  `slides.py` is a whole word too. Every caller of `producer_hint` (layout, the page-type refusal and image-page counts,
+  the page-type eval) takes the value from this one function.
+- Layout identity over 149 PDFs: 136 identical, 13 different, every one a TeX-made file read by the TeX rules now (7 only
+  record the producer; 6 change: units leave their formulas, table cells gain equation elements); letters and digits of
+  every page equal before and after. The golden `flags_off_problem_set.html` is regenerated: its `t = 4.0 s` formulas no
+  longer hold the unit.
+- Tests: `tests/test_producer_hint.py`.
+- Pipeline version 0.5.6 to 0.5.7; results from 0.5.6 load unchanged.
+
+## Unreleased: short inline maths from glyphs (branch eq/inline-simple-maths, on eq/t10-table-cell-maths)
+
+- A relation set in a maths font before a number (`\approx 0.14`, `\geq 2`, `\geq 90\%`) is one inline formula in a
+  TeX-made PDF (`glyph_math.relation_runs`); the run finder had dropped the relation as the tail of a cut formula and the
+  number had no evidence of its own. Nothing else was added: a number with a percent sign (a trial rule predicted 20 and
+  aligned 4 on dev2), a number with a unit, an equation reference, a bare number and an upright letter have no glyph that
+  tells the author's maths mode from text, so they are not taken (docs/eval-equation-diagnostics.md, "Simple inline
+  maths"; docs/layout.md "Short formulas the runs miss"). Page numbers, citations, list markers, years and figure numbers
+  are never taken: `tests/fixtures/layout/latex/short_maths.pdf`.
+- Measured offline (layout alone, no model): 6 gold equations found that were not and none lost, in 3 of 85 papers;
+  recall 0.844 to 0.846 on dev2 (2,153 inline gold), 0.765 to 0.766 on held-out and fresh2 to 4, precision unchanged; the
+  148 PDFs of `scripts/layout_identity.py` are identical. `scripts/eq_short_missed.py` says why short inline gold is
+  missed (what the glyphs there are); `scripts/eq_span_edges.py` prints precision by evidence.
+- Pipeline version 0.5.5 to 0.5.6; results from 0.5.5 load unchanged.
+
+## Unreleased: maths in table cells (branch eq/t10-table-cell-maths, on eq/t11-glyph-spans)
+
+- A table cell that is one formula by its glyphs (TeX-made PDFs; the rules that find inline maths in prose, applied to the
+  cell alone) is an inline equation element of the table (`layout._cell_maths`, `TableCell.equation_id`). The equation step
+  reads its crop with its checks and its place in the review, and the page writes the reading into the table's cell when
+  the table step wrote that cell as text (`pipeline/table_math.py`, `assemble.render_html`); a cell the model already
+  wrote as maths, a failed reading and a table kept as a picture are left as they are. With tables off, `run.py` drops
+  the cell equations. docs/tables.md "Maths cells from glyphs".
+- Measured offline (layout alone, no model): gold equations typed in a float found 661 to 892 of 2,153 over the five
+  development and replay parts; overall inline recall 0.731 to 0.759 on held-out and fresh2 to 4 (6,444 gold), precision
+  0.897 to 0.891 (one paper, `68.8±0.7`, holds most of the fall); 146 of 148 layout-identity PDFs identical, the two
+  that differ are TeX-made (the Beamer table deck gains 6 equation elements, `real-tables/2407.13734` 4; no text lost).
+- A cell and its equation are edited as one (`web.review._written_through`): LaTeX typed on the table card is written to the
+  equation with the same checks and an equation edit to the cell, as recorded changes of one write that Undo takes back
+  together; the card marks such a cell "(also an equation)". `tests/test_web_table_cell_equation.py`.
+- `scripts/eq_span_edges.py` also counts the cell equations (predicted, aligned to a gold equation).
+- Tests: `tests/test_table_math.py`; `tests/test_layout_beamer_math.py` (the table-cell test now asserts the equation
+  elements; the inline count of the table deck stays a strict xfail: its two cells with a number set in maths mode and a
+  text-font unit have no glyph that says they are maths).
+- Pipeline version 0.5.4 to 0.5.5: `TableCell.equation_id` is new (left out of the JSON when empty, so a record without it
+  is unchanged); results from 0.5.4 load unchanged.
+
+## Unreleased: inline span edges from glyphs (branch eq/t11-glyph-spans)
+
+- Inline formulas of TeX-made PDFs start and end where the glyphs say (`pipeline/glyph_math.py`, docs/layout.md "Inline
+  span edges from glyphs"): a comma, colon or semicolon set as an index stays in the formula (`\rho_{m,q}(x)` was `q(x)`),
+  a radical is not cut from its radicand, a known upright operator name touching its bracket (`\Pr(A)`, `\mathrm{supp}(\psi)`)
+  and a percent sign after a number are in the formula, and the unit after a number (`24h`, `m^3 kg^{-1}`) is out of it.
+  Nothing becomes a formula that was not one, so no text is lost: letters and digits of all 148 PDFs of
+  `scripts/layout_identity.py` are equal before and after, 146 PDFs identical, 2 TeX papers differ.
+- Measured with the new `scripts/eq_span_edges.py` (layout alone, no model): inline span edge errors on the development
+  gold 4.7% to 3.8% (dev2, 2,153 inline gold), 4.5% to 4.0% on held-out and fresh2 to 4 (6,444, replay only), precision
+  0.893 to 0.902, recall 0.730 to 0.734 (docs/eval-equation-diagnostics.md, "Inline span edges"). No model read the
+  changed spans.
+- Tests: `tests/test_glyph_math.py`.
+- Pipeline version 0.5.3 to 0.5.4: an inline formula's crop, id and marker text can change; results from 0.5.3 load
+  unchanged.
 ## Unreleased: sharing with named people (branch share/g1-named-people)
 
 - An owner can share one finished document with named people by email address (`/jobs/{id}/share`,

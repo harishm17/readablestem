@@ -150,17 +150,20 @@ production if a required one is missing, and logs the reason):
 |---|---|---|
 | `SIGNUP_MODE` | `allowlist` (the default) or `open`: whether anyone with a verified Google (or allowed Microsoft) account gets an account at the first sign-in (docs/web.md, "Sign-up modes and access tiers"). | **`open`** for the free beta anyone can try. Set it last, after the checks below. |
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft sign-in. All three or none. | Next section: "Microsoft sign-in on Railway". |
-| `OPEN_TIER_DAILY_PAGE_QUOTA` | Pages a day for an account that signed itself up. Invited people keep `PER_USER_DAILY_PAGE_QUOTA` (90). | **`20`** (a couple of short handouts a day; the default). |
+| `OPEN_TIER_DAILY_PAGE_QUOTA` | Pages a day for an account that signed itself up. Invited people keep `PER_USER_DAILY_PAGE_QUOTA` (300). | **`150`** (one full-size 100-page document and some handouts a day; the default). |
 | `OPEN_TIER_DAILY_REREADS` | Model reads from the review screen (a marked equation, a table cell) a day for such an account. Each costs model spend that no page count bounds. | **`30`** (the default). |
+| `STORAGE_PER_USER_MB`, `STORAGE_OPEN_TIER_MB`, `STORAGE_GLOBAL_MAX_MB` | Stored-bytes caps (docs/operations.md, "How much the uploads weigh"): per invited person, per open-tier person, and for all uploads together. The database volume is 5000 MB and the nightly backup check restores a second copy on it. | Leave unset: the defaults are **300**, **250** and **2000**. |
 | `MAX_NEW_ACCOUNTS_PER_DAY` | Accounts open sign-up may make per UTC day, for the whole service. When it is used up, new sign-ins get "Sign-ups are full for today"; people with accounts are not affected. `0` pauses sign-up. | **`100`** (the default). |
 | `OPEN_TIER_DAILY_SPEND_CAP_USD` | The part of `DAILY_SPEND_CAP_USD` that documents of such accounts may use together; invited people are not held back when it is spent. It is inside the daily cap, not added to it. | **`4`** (the default; $4 of the $10 day, so strangers can never take the instructors' whole budget). |
 | `SOURCE_URL` | The footer's link to the source (AGPL). The default is the public repository, `https://github.com/harishm17/readablestem`, which has to exist before the first sign-in. | Leave unset, or set it to the deployed commit's URL. |
-| `MAX_USD_PER_JOB`, `MAX_USD_PER_PAGE` | Per-conversion dollar caps. | Leave unset: the defaults for Claude are $3.00 and $1.00, and the start-up check refuses numbers that cannot work. |
+| `MAX_USD_PER_JOB`, `MAX_USD_PER_PAGE` | Per-conversion dollar caps. | Leave unset: the defaults for Claude are $6.00 and $1.00 (a 100-page document is $1.50 spent plus about $1.1 held at once; with tables on the job cap must be at least $5.71), and the start-up check refuses numbers that cannot work. A value set earlier (a job cap of $3.00 or $4.70) is too low for 100-page documents: unset it. |
 | `FEEDBACK_URL` | The footer's Feedback link. | Leave unset: it becomes an email to `CONTACT_EMAIL`. A form service is a new data processor to name on the privacy page. |
 | `ALERT_EMAIL` | Read only by `deploy/deploy.sh` (Google Cloud alert policies). The app ignores it, so setting it on Railway does nothing. | Skip. Use Railway's project notifications and the GitHub uptime checks (below). |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | Defaults 24 hours and 30 days. | Leave unset. If you set them, the cron service needs the same values (reference the web service's). |
 | `CLAUDE_CANARY` | Daily drift check of the Claude second check. Only the HTTP cron route runs it, so with the cron service it never runs and this variable does nothing. | Leave unset. |
 | `INSTALL_LIBREOFFICE` | Build argument, see decision 4. | Unset. |
+| `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project (docs/web.md, "LaTeX source"; ADR 0008). Declared on `web` in `railway.ts`. | Unset (off) until the image has LaTeXML (`INSTALL_LATEXML`) and `railway ssh -s web -- readablestem ops sandbox-probe --require-latexml` prints PASS. |
+| `INSTALL_LATEXML` | Build argument: adds LaTeXML, TeX Live's base and ImageMagick (about 270 MB; see "LaTeXML" below). Needed for LaTeX source uploads, which also need the sandbox to pass `readablestem ops sandbox-probe` on this image. Declared on `web` in `.railway/railway.ts` so that `railway config apply` keeps it. | Unset until the probe has passed. |
 | `INSTALL_MATH_READER` | Build argument: adds the local handwriting reader's model files (0.6 GB; `docs/math-readers.md`, "The local reader"). Only `IMAGE_PAGES_SECOND_READER=local` makes the pipeline call it, and both it and `MATH_READER_LOCAL_ENABLED` are off. With it, allow 2 GB of memory. | Unset. |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | How long Railway waits between SIGTERM and SIGKILL for the old deployment (its documented default is 0). The worker stops claiming at once on SIGTERM and gives its running job back; uvicorn waits up to 5 s for open connections, then the worker stop up to 3 s. | `10`, set as `deploy.drainingSeconds` on `web` in `.railway/railway.ts` |
 | `TRACING_ENABLED` and the Langfuse keys | Off. | Leave off. |
@@ -415,33 +418,33 @@ connection string without the `+psycopg` driver suffix, which `pg_dump` does not
 ## Memory, CPU and request size
 
 **Memory.** Measured on the development box, one conversion peaks near 0.5 GB including the web app
-(deploy.md "Sizing": 437-504 MB for 30 dense pages). The layout work on a lecture PDF with the new
+(deploy.md "Sizing": 437-504 MB for 30 dense pages; a 100-page document 494 MB and a 51 MB, 100-page one with a picture on every page 745 MB, resident, for the child alone, measured 2026-11-03). The layout work on a lecture PDF with the new
 limits (merged from `feat/perf-layout`) measured up to about 413 MB for the layout step alone, and a
 page over the drawing limits is no longer read at all. The probe that checks an upload before layout
-has its own address-space cap of 768 MB plus twice the PDF. Each conversion runs in a child process of the web service
+has its own address-space cap of 768 MB (a 117 MB, 500-page PDF was probed in 8 s inside it). Each conversion runs in a child process of the web service
 (docs/web.md, "The conversion runs in a child process"; it loads the table models itself, so
 `PRELOAD_TABLE_MODELS` no longer preloads them in the web process): while a job converts expect the
 web process plus a child of about 0.3-0.5 GB resident. Recommendation:
-**allow 1 GB, expect 0.4 to 0.6 GB resident, and do not set a limit below 1 GB**; with
+**allow 2 GB, expect 0.4 to 0.9 GB resident, and do not set a limit below 1 GB** (an upload is held in memory about three times over while it is read, so one of 100 MB adds about 300 MB, and `MAX_CONCURRENT_UPLOADS=3` of them 900 MB: 1 GB was enough for 20 MB uploads); with
 `INSTALL_LIBREOFFICE=true` allow 2 GB (LibreOffice adds about 300 MB while a Word or PowerPoint file
 converts); with `INSTALL_MATH_READER=true` and the reader enabled, a child that has loaded it holds
 about 1.1 GB resident (measured, 74 crops), so allow 2 GB there too. Railway bills memory by use, not by what is allowed, so a higher allowance costs nothing
 until it is used. Railway's Hobby plan lists up to 48 GB per service in its pricing page;
-a service memory limit is a setting only if you want to cap it (Settings > Resource limits, **confirm**).
-Watch the Metrics tab during the first real conversions and the first 300-page upload.
+a service memory limit is a setting only if you want to cap it (Settings > Resource limits, **confirm**). `.railway/railway.ts` configures no memory limit for `web` (nor CPU), so there is none to raise: leave it unset, or if you set one, set **2 GB** for `web` (three 100 MB uploads in memory at once are about 900 MB, plus the 0.5 to 0.9 GB of a conversion).
+Watch the Metrics tab during the first real conversions and the first 500-page upload.
 
-**CPU.** One vCPU is enough (deploy.md: about 20 CPU-seconds for a 30-page document). Replicas: 1.
+**CPU.** One vCPU is enough (deploy.md: about 20 CPU-seconds for a 30-page document, about 25 for 100 pages and 35 for 100 pages with 51 MB of pictures, measured 2026-11-03 on one CPU with fake models: 31 s and 44 s of wall time). Replicas: 1.
 
-**Request size.** `MAX_LARGE_UPLOAD_MB=30` (and `MAX_UPLOAD_MB=20`) were sized for Cloud Run's
-32 MiB request cap. The app enforces its own limits: it refuses a request whose declared length or
+**Request size.** `MAX_LARGE_UPLOAD_MB=100` (and `MAX_UPLOAD_MB=50`) apply on Railway; the old 30 and 20 were
+sized for Cloud Run's 32 MiB request cap, which a Cloud Run deployment still has (set both to 30 or less there). The app enforces its own limits: it refuses a request whose declared length or
 streamed size is over `MAX_LARGE_UPLOAD_MB` (middleware in `web/security.py`, `web/uploads.py`) and
 the form tells the person. Railway's documentation (networking specs and limits) states no maximum
 request body size; it states that a request body must finish uploading within 5 minutes, a request
 may run up to 15 minutes while data moves (5 minutes idle), headers are limited to 32 KB, and there
-are 10,000 concurrent connections. So the app's 30 MB cap should be the effective one, but that is an absence of a documented limit and not a
-guarantee: **confirm after the first deploy by uploading a 29 MB PDF at the domain**, and if Railway
+are 10,000 concurrent connections. So the app's 100 MB cap should be the effective one, but that is an absence of a documented limit and not a
+guarantee: **confirm after the first deploy by uploading a PDF of about 95 MB at the domain**, and if Railway
 refuses it, lower `MAX_LARGE_UPLOAD_MB`. The 5-minute upload window matters for slow
-connections: 30 MB in 5 minutes needs about 0.8 Mbit/s.
+connections: 100 MB in 5 minutes needs about 2.7 Mbit/s (30 MB needed 0.8). A slower upload fails with the browser's own error, before the app sees the file.
 
 **LibreOffice.** The Dockerfile declares `ARG INSTALL_LIBREOFFICE=false` in its final stage, and
 Railway makes a service's variables available to Dockerfile builds, which a Dockerfile must pick up
@@ -449,6 +452,24 @@ with `ARG`. So setting the service variable `INSTALL_LIBREOFFICE=true` and redep
 LibreOffice Writer and Impress. Check the build log for the `apt-get install` step, and that the
 upload form then offers Word and PowerPoint. Unset it to go back. (On Cloud Run this needed a code
 change because `gcloud builds submit --tag` cannot pass build arguments.)
+
+**LaTeXML.** The Dockerfile declares `ARG INSTALL_LATEXML=false` in its final stage. Setting the
+service variable `INSTALL_LATEXML=true` (declared in `railway.ts`, so an apply keeps it) and
+redeploying installs the distribution's `latexml` package (0.8.8) with `--no-install-recommends`; it
+depends on TeX Live's base (`texlive-latex-base`), ImageMagick and their Perl bindings. The same step installs `bubblewrap` (the sandbox LaTeX source runs in) and `util-linux` (`prlimit`), and the build fails if `bwrap` or `prlimit` is missing, so `readablestem ops sandbox-probe` on Railway tests the sandbox of this image (whether the platform allows user namespaces is what the probe decides). Right after
+the install the build replaces ImageMagick's `policy.xml` with `src/readablestem/source/imagemagick-policy.xml`:
+nothing is allowed except PNG, JPEG and GIF, and PS, EPS, PDF, XPS, URL, HTTP(S), FTP, MVG, MSL, TEXT,
+LABEL, SVG and `@file` paths are named as denied. The build fails if no policy file was replaced or
+`identify -list policy` does not show the PDF denial. **Size:** measured with `podman build` of the
+same `apt-get` steps on the pinned `python:3.12-slim-trixie` (pandoc already in it): 324.3 MB before,
+594.4 MB after (+270.1 MB, one layer of 270 MB; the plan's estimate of 0.6 GB was too high for this
+base). The first Railway build prints the real image size; write it here. Check the build log for the
+two `LaTeXML version 0.8.8` lines and the `1` printed by the policy check. Nothing in the app uses
+LaTeXML until the LaTeX-source switch (`FEATURE_LATEX_SOURCE`) is on, and that switch stays off
+until `readablestem ops sandbox-probe --require-latexml` prints PASS on the deployed image
+(docs/operations.md, "Sandbox probe"). CI builds the image with the argument once and checks the
+versions and the policy (job `docker build (no push)`); the sandbox itself cannot be probed inside CI's
+Docker, which does not allow user namespaces.
 
 **pandoc.** The Dockerfile installs pandoc from the distribution in every build (no build argument):
 it makes the Word download (docs/output.md, "The Word export"). It adds about 200 MB to the image (the

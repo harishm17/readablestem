@@ -396,7 +396,7 @@ class _Conversion:
         threading.Thread(target=self._read, name="conversion-reader", daemon=True).start()
 
     def _send_init(self, init: dict[str, Any]) -> None:
-        # On its own thread: a 20 MB PDF does not fit the socket's buffer, and the child
+        # On its own thread: a large PDF does not fit the socket's buffer, and the child
         # reads it only once it has started; the cancel flag is looked at meanwhile.
         with suppress(OSError):  # the child is gone: the reader sees the end
             self._send([pickle.dumps(init), self.pdf])
@@ -764,6 +764,11 @@ class _Conversion:
             return ConfigError(message)
         if kind == "unknown_model":
             return UnknownModelError(message)
+        if kind == "source":  # a LaTeX source that could not be converted: a plain code
+            code = "".join(c for c in str(header.get("code", "")) if c.isalnum() or c == "_")[:40]
+            failure = ConversionFailed("the source could not be converted")
+            failure.code = code or "source_failed"
+            return failure
         if kind == "oom":
             return ConversionOom("the child ran out of memory")
         if kind == "startup":

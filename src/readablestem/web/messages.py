@@ -26,6 +26,12 @@ from readablestem.pipeline.validate import ALT_MAX_CHARS, ALT_WARN_CHARS, MAX_LA
 # Failed checks, keyed by (check name, code). Names are what was checked, codes are what
 # went wrong; a code alone can be ambiguous ("empty" LaTeX vs "empty" alt text).
 CHECK_MESSAGES: dict[tuple[str, str], str] = {
+    # LaTeX source (readablestem.source): a formula LaTeXML could not read
+    (
+        "source.macro",
+        "unknown_command",
+    ): "The LaTeX source uses a command this tool does not know, so this equation could "
+    "not be read from it: correct the LaTeX or reject it.",
     # LaTeX (pipeline.validate.check_latex)
     ("latex.not_empty", "empty"): "The transcription is empty: type the LaTeX for this "
     "equation, or reject it to keep the image.",
@@ -374,6 +380,10 @@ REASON_MESSAGES: dict[str, str] = {
     "is kept, but you can still fill it in yourself.",
     "crop_error": "The image of this item could not be cut out of the PDF, so the model never "
     "saw it.",
+    # LaTeX source (readablestem.source)
+    "source_figure_missing": "This figure has no picture this tool could read from the "
+    "LaTeX project (a drawing made in LaTeX, a missing file or a format it does not "
+    "read), so describe it yourself.",
     # f"budget_{scope}" for every BudgetExceeded scope (core.budget, web.worker)
     "budget_daily": "Today's spending limit was reached before this item was converted.",
     "budget_job_usd": "This document's spending limit was reached before this item was converted.",
@@ -451,6 +461,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "decision for you.",
     "page_omitted": "You left this page out of the student file and of the review, and the "
     "file says that it is not there.",
+    "source_error": "Part of the LaTeX source could not be read (an unknown command) and "
+    "is shown as it was written.",
 }
 
 UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."

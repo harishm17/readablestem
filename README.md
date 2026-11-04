@@ -116,7 +116,7 @@ development-sample checks that priced the run (Addendum 7).
   0.23 on the development sample, plus 0.55 optional notes per page. Of the required decisions,
   230 are repeated heading labels and 216 headings with weak evidence, 351 below the
   acceptance threshold and 296 symbol mismatches (a fix can have several reasons). At that rate a
-  30-page document, the most the app takes, comes with about 53 decisions, the number
+  100-page document, the most the app takes at once, comes with about 176 decisions, the number
   to weigh the others against.
 - **Headings: ReadableSTEM leads, by less than the intervals need.** F1 0.961 against 0.910 to
   0.932 for the others. The paired comparisons at the registered level (k = 8, 99.4%)
@@ -398,9 +398,11 @@ which compares each tracked metric with the committed baselines in `data/eval/` 
 
 - **PDF in, web page out** (with Word, EPUB, Canvas zip and Common Cartridge downloads). Word and
   PowerPoint files are taken only on a server with LibreOffice (readablestem.com takes PDF only).
-  One upload is limited by `MAX_PAGES_PER_JOB` and `MAX_UPLOAD_MB`; a bigger file, up to
-  `MAX_SOURCE_PAGES` and `MAX_LARGE_UPLOAD_MB`, is kept so you can choose which pages to convert,
-  in parts. The live values are on the site's Known limits page. LaTeX source is not taken.
+  One upload is limited by `MAX_PAGES_PER_JOB` and `MAX_UPLOAD_MB` (100 pages and 50 MB by
+  default); a bigger file, up to `MAX_SOURCE_PAGES` and `MAX_LARGE_UPLOAD_MB` (500 pages and
+  100 MB), is kept so you can choose which pages to convert, in parts. The live values are on
+  the site's Known limits page. LaTeX source upload exists behind `FEATURE_LATEX_SOURCE`, off by
+  default and on no public server.
 - **A model is in the loop.** Document images and the text around them are sent to Anthropic's
   Claude API (the beta's provider, `MODEL_PROVIDER=anthropic`), or to OpenAI's API (with
   `store=False`) if you set `MODEL_PROVIDER=openai`; the handwriting readers (off, unused) would send crops to their own company. Models are not deterministic, so two runs on the same file can differ.

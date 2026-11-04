@@ -88,9 +88,11 @@
   <li><strong>Maths in headings</strong> stays as plain characters in the
     text, not as MathML equations: check how it reads.</li>
   <li><strong>File types.</strong> {% if office_on %}PDF files, and Word (.docx) or PowerPoint
-    (.pptx) files, which are turned into a PDF first.{% else %}Only PDF files are taken. For a Word
-    or PowerPoint file, save a copy as a PDF first.{% endif %} It works from the PDF, not from
-    LaTeX source files.</li>
+    (.pptx) files, which are turned into a PDF first.{% elif latex_source %}PDF files. For a Word or
+    PowerPoint file, save a copy as a PDF first.{% else %}Only PDF files are taken. For a Word
+    or PowerPoint file, save a copy as a PDF first.{% endif %}{% if latex_source %} A LaTeX file
+    (.tex) or a zip of a LaTeX project is also taken, and its equations are read from the
+    source.{% else %} It works from the PDF, not from LaTeX source files.{% endif %}</li>
   <li><strong>The checks look at structure, not meaning.</strong> Every file is checked for
     structure (language, title, headings, lists, image text alternatives). The full axe-core
     accessibility test runs on our own test documents, not on yours, and nothing here
@@ -119,6 +121,10 @@
     for a day so you can choose which pages to convert; each part becomes a document of its
     own. When two or more parts are finished, a “Combine parts” link on a part's page joins the
     ones you still have into one file, in page order; a part you deleted is left out.{% else %}Split longer documents.{% endif %}</li>
+  <li><strong>Storage.</strong> You can keep up to {{ storage_mb }} MB of uploads and results at
+    once{% if signup_open %} ({{ open_storage_mb }} MB for a new account){% endif %}. An upload
+    that would go over is refused; delete documents you no longer need to make room. When the
+    service as a whole is full, uploads wait until older documents have been deleted.</li>
   <li><strong>Your documents are deleted</strong> {{ retention_hours }} hours after you last
     worked on them (7 days if you choose to keep them, {{ opt_in_days }} if you also let us look
     at the results). Download the file before then.</li>

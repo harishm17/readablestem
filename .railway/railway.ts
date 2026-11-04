@@ -134,18 +134,25 @@ const appVariables = [
 // sign-in settings (docs/deploy-railway.md, "Microsoft sign-in on Railway"): declared before
 // they have values so a later `railway variable set` is not deleted by the next apply; the
 // app treats an unset variable as "Microsoft sign-in off", and a half-set group refuses to
-// start. Only web serves sign-in, so cron does not hold them.
+// start. Only web serves sign-in, so cron does not hold them. INSTALL_LATEXML is the image's
+// build argument for LaTeXML (docs/deploy-railway.md, "LaTeXML"): declared so that the variable
+// set in the dashboard is not deleted by the next apply.
 const webOnlyVariables = [
   "EQUATION_GLYPH_CHECKS",
   "EQUATION_LINE_CONTEXT",
   "FEATURE_IMAGE_PAGES",
+  "FEATURE_LATEX_SOURCE",
   "FEATURE_PAGE_WITNESS",
   "FLAG_POLICY",
+  "INSTALL_LATEXML",
   "IMAGE_PAGES_SECOND_READER",
   "IMAGE_PAGES_VECTOR_CHECKS",
   "IMAGE_PAGES_VECTOR_CROPS",
   "MATH_READER_LOCAL_DIR",
   "PAGE_WITNESS_MODEL",
+  "STORAGE_GLOBAL_MAX_MB",
+  "STORAGE_OPEN_TIER_MB",
+  "STORAGE_PER_USER_MB",
   "MAX_USD_PER_JOB",
   "MAX_USD_PER_PAGE",
   "MS_ALLOWED_TENANTS",
