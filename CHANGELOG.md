@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased: higher upload limits (branch limits/raise-upload-limits)
+
+- The limits now fit together. Before, a new account could convert 20 pages a day while one upload
+  could hold 30. Defaults: `MAX_PAGES_PER_JOB` 30 to 100, `MAX_UPLOAD_MB` 20 to 50,
+  `MAX_LARGE_UPLOAD_MB` 30 to 100 (also the most one upload request carries, files together),
+  `MAX_SOURCE_PAGES` 300 to 500, `OPEN_TIER_DAILY_PAGE_QUOTA` 20 to 150, `MAX_USD_PER_JOB` 2.00 (OpenAI)
+  and 3.00 (Claude) to 6.00 for both, `MAX_MODEL_CALLS_PER_JOB` 400 to 1200 (our densest 100-page test
+  document makes 652 calls). Not changed: `DAILY_SPEND_CAP_USD`, `OPEN_TIER_DAILY_SPEND_CAP_USD`,
+  `IMAGE_PAGES_*` caps, `CONVERSION_MEMORY_MB` and the job time limit (a 100-page document converts well
+  inside both: 31 s and 494 MB resident with fake models on one CPU, 193 s with 2 s of simulated model
+  latency a call; with 51 MB of pictures 44 s and 745 MB; docs/web.md, "The conversion runs in a child
+  process"). Production environment values (`PER_USER_DAILY_PAGE_QUOTA`, `OPEN_TIER_DAILY_PAGE_QUOTA`,
+  `MAX_USD_PER_JOB`) are set at deploy, not in code: a `MAX_USD_PER_JOB` of 4.70 set for tables is now
+  below the $5.71 that 100 pages need (docs/deploy.md, "Spend limits").
+- Stored-bytes caps, because uploads are in Postgres on a 5000 MB volume and one person could now store 2.2 GB: `STORAGE_PER_USER_MB` (300) and `STORAGE_OPEN_TIER_MB` (250) per person, counted with the quota checks in the job's transaction; `STORAGE_GLOBAL_MAX_MB` (2000, not 3000: the nightly backup check restores a second copy on the same volume) for the service, which turns uploads away with a 503 and puts `storage` in `/healthz/ops`. The hourly cron runs a plain `VACUUM` of the upload tables after a purge. The limits page names the cap. Declared in `.railway/railway.ts` (`webOnlyVariables`).
+- `ops launch-check` and the start-up check gain two warnings: an open-tier daily quota under one
+  full-size document, and `IMAGE_PAGES_MAX_USD_PER_JOB` under `MAX_USD_PER_JOB`.
+- Word and PowerPoint files: the ZIP checks scale with the upload limit (500 MB unpacked, 250 MB an
+  entry; were 200 and 100). A 100-page Word file became a PDF in 1.4 s here (PowerPoint could not be timed:
+  Impress is not installed on the box).
+- The parts page and its error message use `1-10` as the example range instead of `1-30`, which read
+  as a limit. docs/web.md, docs/deploy.md, docs/deploy-railway.md (the service should be allowed 2 GB; a 95
+  MB upload to confirm after the deploy), docs/security.md, docs/operations.md (how much the uploads
+  weigh in the database), README, vendor sheet, `.env.example`, `deploy/deploy.env.example`.
+## Unreleased: TeX producers (branch eq/tex-producer-xetex, on eq/inline-simple-maths)
+
+- `page_type.producer_hint` calls a PDF TeX-made when its producer or creator names TeX as a whole word
+  (`page_type.TEX_PRODUCER`): pdfTeX, XeTeX and XeLaTeX (`xdvipdfmx`, offered by Overleaf), LuaTeX, LuaHBTeX, dvips,
+  dvipdfm(x), Tectonic, and "LaTeX" or "TeX" in a creator (Ghostscript alone is not). It matched the substring "tex",
+  so XeLaTeX and Tectonic files missed every TeX rule (the unit after a number, index punctuation, table-cell maths,
+  short formulas) while Quartz ("PDFContext", a Mac-saved Word file) and iText were taken for TeX. The Beamer check of
+  `slides.py` is a whole word too. Every caller of `producer_hint` (layout, the page-type refusal and image-page counts,
+  the page-type eval) takes the value from this one function.
+- Layout identity over 149 PDFs: 136 identical, 13 different, every one a TeX-made file read by the TeX rules now (7 only
+  record the producer; 6 change: units leave their formulas, table cells gain equation elements); letters and digits of
+  every page equal before and after. The golden `flags_off_problem_set.html` is regenerated: its `t = 4.0 s` formulas no
+  longer hold the unit.
+- Tests: `tests/test_producer_hint.py`.
+- Pipeline version 0.5.6 to 0.5.7; results from 0.5.6 load unchanged.
+
 ## Unreleased: short inline maths from glyphs (branch eq/inline-simple-maths, on eq/t10-table-cell-maths)
 
 - A relation set in a maths font before a number (`\approx 0.14`, `\geq 2`, `\geq 90\%`) is one inline formula in a

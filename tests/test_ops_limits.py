@@ -11,7 +11,7 @@ from readablestem.web.worker import job_caps
 PROD = {
     "env": "prod",
     "daily_spend_cap_usd": 10,
-    "per_user_daily_page_quota": 90,
+    "per_user_daily_page_quota": 300,
     "session_secret": "x" * 40,
     "google_client_id": "id",
     "google_client_secret": "secret",
@@ -29,9 +29,9 @@ def settings(**kw) -> Settings:
 
 
 def test_claude_gets_its_own_job_caps_unless_the_environment_sets_them():
-    assert (settings().max_usd_per_job, settings().max_usd_per_page) == (2.0, 0.30)
+    assert (settings().max_usd_per_job, settings().max_usd_per_page) == (6.0, 0.30)
     claude = settings(model_provider="anthropic")
-    assert (claude.max_usd_per_job, claude.max_usd_per_page) == (3.0, 1.0)
+    assert (claude.max_usd_per_job, claude.max_usd_per_page) == (6.0, 1.0)
     set_by_hand = settings(model_provider="anthropic", max_usd_per_job=1.5, max_usd_per_page=0.9)
     assert (set_by_hand.max_usd_per_job, set_by_hand.max_usd_per_page) == (1.5, 0.9)
 
@@ -41,15 +41,15 @@ def test_environment_variable_sets_a_cap_and_a_blank_one_does_not(monkeypatch):
     monkeypatch.setenv("MAX_USD_PER_JOB", "")
     monkeypatch.setenv("MAX_USD_PER_PAGE", "1.25")
     s = Settings(_env_file=None)  # type: ignore[call-arg]
-    assert (s.max_usd_per_job, s.max_usd_per_page) == (3.0, 1.25)
+    assert (s.max_usd_per_job, s.max_usd_per_page) == (6.0, 1.25)
 
 
 def test_switching_provider_brings_that_providers_defaults():
     base = settings(max_usd_per_page=0.5)
     claude = with_provider(base, "anthropic")
     assert claude.max_usd_per_page == 0.5  # a set value is kept
-    assert claude.max_usd_per_job == 3.0
-    assert with_provider(claude, "openai").max_usd_per_job == 2.0
+    assert claude.max_usd_per_job == 6.0
+    assert with_provider(claude, "openai").max_usd_per_job == 6.0
 
 
 def test_a_short_claude_document_runs_as_many_steps_as_its_cap_can_hold():
@@ -92,18 +92,74 @@ def test_the_concurrency_is_a_setting_with_a_range():
 
 @pytest.mark.parametrize("provider", ["openai", "anthropic"])
 def test_default_caps_and_the_recommended_beta_numbers_raise_no_finding(provider):
-    s = settings(model_provider=provider, daily_spend_cap_usd=10, per_user_daily_page_quota=90)
+    s = settings(model_provider=provider, daily_spend_cap_usd=10, per_user_daily_page_quota=300)
     assert limits.spend_findings(s) == []
+    # the same with open sign-up on, whose quota (150) must also hold one 100-page document
+    open_signup = settings(
+        model_provider=provider,
+        daily_spend_cap_usd=10,
+        per_user_daily_page_quota=300,
+        signup_mode="open",
+    )
+    assert limits.spend_findings(open_signup) == []
 
 
-def test_a_normal_30_page_claude_document_never_reaches_the_default_job_cap():
+def test_a_normal_full_size_claude_document_never_reaches_the_default_job_cap():
     s = settings(model_provider="anthropic")
-    usd, _ = job_caps(s, 30)
+    assert s.max_pages_per_job == 100
+    pages = s.max_pages_per_job
+    usd, _ = job_caps(s, pages)
     assert usd == s.max_usd_per_job
-    # 30 dense pages at the planning rate, plus every concurrent step held at its worst case
-    assert usd > 30 * limits.PLANNING_USD_PER_PAGE + limits.in_flight_usd(s)
+    # 100 dense pages at the planning rate, plus every concurrent step held at its worst case
+    assert usd > pages * limits.PLANNING_USD_PER_PAGE + limits.in_flight_usd(s)
     # and a runaway is still stopped within a small multiple of it
-    assert usd < limits.RUNAWAY_FACTOR * 30 * limits.PLANNING_USD_PER_PAGE
+    assert usd < limits.RUNAWAY_FACTOR * pages * limits.PLANNING_USD_PER_PAGE
+
+
+def test_the_default_limits_fit_together():
+    """What the owner decided on 2026-11-03: one upload of the most pages fits what a new
+    account may convert in a day, the upload fits the request, and a kept source is never
+    smaller than a conversion. A change to one default that breaks another fails here."""
+    s = settings()
+    assert (s.max_pages_per_job, s.max_upload_mb) == (100, 50)
+    assert (s.max_large_upload_mb, s.max_source_pages) == (100, 500)
+    assert s.open_tier_daily_page_quota >= s.max_pages_per_job
+    assert s.upload_limit_mb >= s.max_upload_mb
+    assert s.source_page_limit >= s.max_pages_per_job
+    assert s.image_pages_max_usd_per_job >= s.max_usd_per_job
+    # a full-size document's allowance is the job cap, not the page cap times the pages
+    usd, calls = job_caps(s, s.max_pages_per_job)
+    assert usd == s.max_usd_per_job
+    # and its calls fit the call cap: our densest 100-page test document makes 652
+    assert calls >= 652
+    for provider in ("openai", "anthropic"):
+        for tables in (False, True):
+            everything = settings(
+                model_provider=provider,
+                feature_tables=tables,
+                daily_spend_cap_usd=10,
+                per_user_daily_page_quota=300,
+                signup_mode="open",
+            )
+            assert limits.spend_findings(everything) == []
+
+
+def test_an_open_tier_quota_under_one_full_size_document_is_a_warning():
+    s = settings(signup_mode="open", open_tier_daily_page_quota=20)
+    text = " ".join(f.text for f in limits.spend_findings(s))
+    assert "OPEN_TIER_DAILY_PAGE_QUOTA 20 is below MAX_PAGES_PER_JOB 100" in text
+    # not in allowlist mode, where the open tier does not exist
+    quiet = settings(open_tier_daily_page_quota=20)
+    assert not any("OPEN_TIER" in f.text for f in limits.spend_findings(quiet))
+
+
+def test_an_image_page_cap_under_the_ordinary_job_cap_is_a_warning():
+    s = settings(feature_image_pages=True, image_pages_max_usd_per_job=3.0)
+    assert any("IMAGE_PAGES_MAX_USD_PER_JOB $3.00" in f.text for f in limits.spend_findings(s))
+    plain = settings(feature_image_pages=True)
+    assert not any("IMAGE_PAGES" in f.text for f in limits.spend_findings(plain))
+    off = settings(image_pages_max_usd_per_job=3.0)  # the offer is off: no finding
+    assert not any("IMAGE_PAGES" in f.text for f in limits.spend_findings(off))
 
 
 def test_openai_page_cap_on_claude_is_refused_in_production():
@@ -168,7 +224,7 @@ def test_the_beta_feature_set_raises_no_finding_on_the_default_claude_caps():
     s = settings(
         model_provider="anthropic",
         daily_spend_cap_usd=10,
-        per_user_daily_page_quota=90,
+        per_user_daily_page_quota=300,
         feature_long_descriptions=True,
         feature_notation_memory=True,
     )
@@ -182,7 +238,7 @@ def test_a_small_page_limit_is_judged_by_the_job_cap_it_really_gives():
     """With 5 pages allowed, a $2 job cap is really 5 x the page cap, not $2."""
     s = settings(max_pages_per_job=5)
     assert limits.spend_findings(s) == []
-    wide = settings(model_provider="anthropic", max_pages_per_job=30, max_usd_per_job=500)
+    wide = settings(model_provider="anthropic", max_pages_per_job=100, max_usd_per_job=500)
     assert any("runaway" in f.text for f in limits.spend_findings(wide))
 
 

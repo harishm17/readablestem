@@ -24,6 +24,7 @@ from types import FrameType
 
 from readablestem.config import Settings
 from readablestem.ops import heartbeat
+from readablestem.web import storage
 from readablestem.web.database import ping
 from readablestem.web.db import session_scope
 from readablestem.web.deps import AppContext
@@ -52,8 +53,11 @@ def ops_freshness(ctx: AppContext) -> tuple[bool, list[str]]:
     try:
         with session_scope(ctx.factory) as session:
             stale = heartbeat.stale_names(session)
+            full = storage.global_full(session, ctx.settings)
     except Exception:
         return False, ["database"]
+    if full:  # new uploads are being refused until the purge has caught up (`web.storage`)
+        stale = sorted([*stale, "storage"])
     return not stale, stale
 
 

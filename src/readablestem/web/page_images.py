@@ -11,7 +11,7 @@ space cap), never in the web process: a page that crashes or hangs MuPDF kills a
 and the request gets a `RenderFailed` instead.
 
 A render needs a slot (`render_slot`), taken *before* the route loads the upload, so a
-burst of image requests cannot park threads each holding a copy of a 20 MB PDF:
+burst of image requests cannot park threads each holding a copy of a large PDF:
 
 - each user has at most `MAX_RENDERS_PER_USER` renders in progress; one more is refused
   at once (`RenderLimited`, the route answers 429). A review page asks for at most four

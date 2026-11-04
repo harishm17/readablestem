@@ -1467,14 +1467,27 @@ def producer_hint(doc: pymupdf.Document) -> str:
         ("finereader", "ocr_tool"),
         ("paper capture", "ocr_tool"),
         ("scan", "scanner"),
-        ("tex", "tex"),
-        ("skia", "chromium"),
-        ("microsoft", "office"),
-        ("word", "office"),
     ):
         if word in s:
             return hint
+    if TEX_PRODUCER.search(s):
+        return "tex"
+    for word, hint in (("skia", "chromium"), ("microsoft", "office"), ("word", "office")):
+        if word in s:
+            return hint
     return "other"
+
+
+# What TeX leaves in /Producer and /Creator, as whole words (a substring match took "PDFContext" of
+# Quartz and "iText" for TeX): the engines pdfTeX, XeTeX, LuaTeX and LuaHBTeX, the drivers xdvipdfmx
+# (XeLaTeX, which Overleaf offers), dvipdfm(x) and dvips, Tectonic, and "LaTeX" or "TeX" in a
+# creator ("LaTeX with Beamer class", "TeX output ..." from dvips). Ghostscript alone is not TeX: a
+# file it made says so only when its creator names one of these.
+TEX_PRODUCER = re.compile(
+    r"\b(?:pdftex|pdflatex|xetex|xelatex|luatex|lualatex|luahbtex|xdvipdfmx|dvipdfmx?|dvips(?:k)?"
+    r"|tectonic|latex|tex)\b",
+    re.IGNORECASE,
+)
 
 
 # ---------------------------------------------------------------------------- decision
