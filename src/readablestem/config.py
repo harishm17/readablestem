@@ -459,6 +459,11 @@ class Settings(BaseSettings):
     # converted", as before. For the CLI and the eval it turns the pass on for the whole run.
     # `image_pages_model` None: the main model.
     feature_image_pages: bool = False
+    # LaTeX and Beamer source uploads (`readablestem.source`): a `.tex` file or a zip of a
+    # project, converted by LaTeXML in a sandbox. Off until `readablestem ops sandbox-probe`
+    # passes on the deployed image and the image was built with INSTALL_LATEXML (docs/security.md,
+    # "Running uploaded TeX").
+    feature_latex_source: bool = False
     image_pages_model: str | None = None
     # Seconds the model may take to write one page (a dense page is a few thousand tokens;
     # `model_timeout_s` is for a crop's short answer).

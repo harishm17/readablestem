@@ -191,11 +191,13 @@ def build_argv(
     env: dict[str, str] | None = None,
     cwd: str = "/",
     limits: Limits | None = None,
+    hide: tuple[str, ...] = (),
     seccomp_fd: int | None = None,
 ) -> list[str]:
     """The `bwrap` command line for `command` (a list, never a shell string). `ro` and `rw` are
     (host path, path inside) pairs; every path is absolute and `inside` never overlaps
-    `/proc`, `/dev` or `/tmp`."""
+    `/proc`, `/dev` or `/tmp`. `hide`: files of the system that exist here and are replaced by an
+    empty file inside (the program sees them as present and empty)."""
     limits = limits or Limits()
     bwrap, prlimit = bwrap_path(), prlimit_path()
     if bwrap is None:
@@ -217,6 +219,9 @@ def build_argv(
     # bubblewrap is pid 1 of the sandbox: hide what it was started with.
     for hidden in ("/proc/1/environ", "/proc/1/cmdline"):
         args += ["--ro-bind", "/dev/null", hidden]
+    for path in hide:
+        if Path(path).is_file():  # an absent file needs no hiding (and cannot be mounted over)
+            args += ["--ro-bind", "/dev/null", path]
     for key, value in {"PATH": "/usr/local/bin:/usr/bin:/bin", **(env or {})}.items():
         args += ["--setenv", key, value]
     args += [
@@ -311,6 +316,7 @@ def run(
     cwd: str = "/",
     limits: Limits | None = None,
     log: Path | None = None,
+    hide: tuple[str, ...] = (),
     seccomp: bool = True,
     cgroup: bool = True,
     cgroup_parent: Path | None = None,
@@ -330,7 +336,9 @@ def run(
         read_end, write_end = os.pipe()
         os.write(write_end, program)
         os.close(write_end)
-    argv = build_argv(command, ro=ro, rw=rw, env=env, cwd=cwd, limits=limits, seccomp_fd=read_end)
+    argv = build_argv(
+        command, ro=ro, rw=rw, env=env, cwd=cwd, limits=limits, hide=hide, seccomp_fd=read_end
+    )
     sink = log.open("wb") if log is not None else None
     group = Cgroup.make(limits, cgroup_parent) if cgroup else None
     if group is not None:
