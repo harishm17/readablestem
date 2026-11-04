@@ -380,7 +380,11 @@ What the two layers cover:
   a document that prints "Resource temporarily unavailable", or a program that hits its own task
   limit, is an ordinary failure.
 - **Limits.** `RLIMIT_AS` 512 MB per task, CPU, file size, no core, 256 files, and `RLIMIT_NPROC`
-  set to the user's tasks at that moment plus 2 (what LaTeXML needs: one task, the program,
+  set to the user's tasks at that moment (**as the kernel counts them**: the launcher finds the
+  count by asking `fork_fits`, a search for the smallest limit under which a throwaway child's
+  fork works, because the kernel counts every task of the user in the user namespace, including
+  ones this container's `/proc` does not show; reading `/proc` undercounted on Railway and made
+  every fork fail, see docs/deploy-railway.md) plus 2 (what LaTeXML needs: one task, the program,
   measured on every fixture: peak 2 with the supervisor) plus 2 of slack, because the web app's
   own threads come and go meanwhile and the limit counts them. One conversion at a time (the
   `flock`); the caller kills the whole group at the wall-clock limit, the output budget or the

@@ -404,13 +404,13 @@ def test_a_launcher_does_not_care_what_its_callers_pid_is(tmp_path):
 
 
 @needs_landlock
-def test_a_launcher_that_cannot_count_the_users_tasks_names_count_tasks(tmp_path):
-    spec = _spec(tmp_path)
-    empty = tmp_path / "noproc"
-    empty.mkdir()
-    spec["proc_root"] = str(empty)  # /proc is not readable
-    done = _launch(spec)
-    assert done.returncode == 125 and (tmp_path / "step").read_text() == "count_tasks"
+def test_a_launcher_that_cannot_make_any_task_names_count_tasks(launcher, monkeypatch):
+    """No fork works at all (there is no room for even the question's child): the limit cannot be
+    worked out and the launcher fails closed."""
+    monkeypatch.setattr(
+        launcher.os, "fork", lambda: (_ for _ in ()).throw(OSError(errno.EAGAIN, ""))
+    )
+    assert launcher.count_tasks() is None
 
 
 @needs_landlock
@@ -536,3 +536,137 @@ def test_the_probe_names_pid_1_so_the_entrypoint_can_be_seen_to_be_in_force(monk
     monkeypatch.setattr(sandbox_probe, "can_do", lambda name: (True, ""))
     sandbox_probe._information(report)
     assert any(check.name == "init_process" and not check.required for check in report.checks)
+
+
+# ----------------------------------------- the task limit is the kernel's count, not /proc's
+
+
+PROBE_SCRIPT = r"""
+import os, sys, tempfile
+from pathlib import Path
+sys.path.insert(0, "/src")
+os.environ["READABLESTEM_SANDBOX_BACKEND"] = "landlock"
+from readablestem.core import sandbox
+from readablestem.source import latexml
+out, src = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+(src / "main.tex").write_text(r"\documentclass{article}\begin{document}Hi $x$.\end{document}")
+fork = sandbox._run(
+    "landlock",
+    ["/usr/bin/perl", "-e", "my $p = fork(); die 'nofork' unless defined $p; exit 0 if !$p; wait;"],
+    cgroup=False,
+)
+done = latexml.convert(src, "main.tex", out)
+visible = sum(1 for e in os.scandir("/proc") if e.name.isdigit())
+html = (out / "html" / "doc.xhtml").is_file()
+print("visible", visible, "fork", fork.ok, "latexml", done.ok and html)
+"""
+
+COUNT_CHILD = (
+    "import importlib.util, sys\n"
+    f"spec = importlib.util.spec_from_file_location('l', {str(sandbox.LAUNCHER)!r})\n"
+    "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n"
+    "print(m.count_tasks(), m.fork_fits(1), m.fork_fits(10**6))\n"
+)
+
+
+def test_the_launcher_asks_the_kernel_how_many_tasks_the_user_has():
+    """`count_tasks` is a search over `fork_fits`: close to what `ps` sees for this user when
+    everything of the user is visible (it counts the user's tasks the process list cannot show,
+    which is the case on Railway: docs/deploy-railway.md), and a limit of 1 never fits."""
+    done = subprocess.run(
+        [sys.executable, "-I", "-c", COUNT_CHILD], capture_output=True, text=True, timeout=60
+    )
+    counted, tiny, huge = done.stdout.split()
+    visible = int(
+        subprocess.run(
+            ["sh", "-c", "ps -u $(id -u) -L --no-headers | wc -l"], capture_output=True, text=True
+        ).stdout
+    )
+    assert tiny == "False" and huge == "True", done.stderr
+    assert abs(int(counted) - visible) <= 200, (counted, visible)  # other tasks come and go
+
+
+def test_the_launcher_no_longer_reads_the_task_count_from_proc():
+    source = Path(sandbox.LAUNCHER).read_text()
+    assert "def own_tasks" not in source and "proc_root" not in source
+    assert "count_tasks()" in source and "fork_fits(" in source
+
+
+@pytest.mark.skipif(
+    shutil.which("podman") is None
+    or subprocess.run(
+        ["podman", "image", "exists", "localhost/mini-latexml"], capture_output=True
+    ).returncode
+    != 0,
+    reason="needs podman and the localhost/mini-latexml image (docs/deploy-railway.md)",
+)
+def test_a_program_can_fork_and_latexml_converts_when_most_of_the_users_tasks_are_hidden(
+    tmp_path,
+):
+    """The shape that failed on Railway: 400 tasks of the same user that this container's /proc
+    does not show (another pid namespace of the same user namespace) are counted by the kernel
+    against RLIMIT_NPROC. The old limit, worked out from /proc, was below the real count: every
+    fork failed, LaTeXML waited and retried until the wall clock, and the probe's memory test
+    never started its tasks."""
+    root = Path(sandbox.LAUNCHER).parents[2]
+    (tmp_path / "probe.py").write_text(PROBE_SCRIPT)
+    tmp_path.chmod(0o755)  # readable by the container's uid 10001
+    (tmp_path / "probe.py").chmod(0o644)
+    inner = (
+        'setpriv --reuid=10001 --regid=10001 --clear-groups python3 -c "import subprocess, time;'
+        " [subprocess.Popen(['sleep','300']) for _ in range(400)]; time.sleep(300)\" & sleep 3;"
+        " unshare --pid --fork --mount-proc setpriv --reuid=10001 --regid=10001 --clear-groups"
+        " env HOME=/tmp python3 /rail/probe.py"
+    )
+    done = subprocess.run(
+        [
+            "podman", "run", "--rm", "--cap-add=SYS_ADMIN", "--security-opt", "seccomp=unconfined",
+            "--tmpfs", "/tmp:rw,exec", "-v", f"{root}:/src:ro", "-v", f"{tmp_path}:/rail:ro",
+            "localhost/mini-latexml", "sh", "-c", inner,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=200,
+    )  # fmt: skip
+    line = done.stdout.strip().splitlines()[-1] if done.stdout.strip() else done.stderr[-300:]
+    assert line.endswith("fork True latexml True"), line
+    assert line.startswith("visible 1 ") or line.startswith("visible 2 "), line  # really hidden
+
+
+def test_the_latexml_log_tail_is_fixed_size_plain_text_without_paths():
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as folder:
+        log = Path(folder) / "latexml.out"
+        noisy = "Fatal:perl:die at /tmp/rs-sandbox-ab/x.pm line 9\n\x1b[31m" + "word " * 200
+        log.write_text(noisy)
+        tail = sandbox_probe._log_tail(log)
+        assert len(tail) <= sandbox_probe.LOG_TAIL_CHARS and "/" not in tail and "\x1b" not in tail
+        assert " " not in tail  # one token, so it fits `name=value`
+        log.write_text("error at /home/someone/secret/file.tex line 3")
+        assert sandbox_probe._log_tail(log) == "error_at_<path>_line_3"
+        assert sandbox_probe._log_tail(Path(folder) / "missing") == "none"
+
+
+def test_a_failed_latexml_run_says_which_step_it_was_in(tmp_path, monkeypatch):
+    from readablestem.source import latexml
+
+    monkeypatch.setattr(latexml, "installed", lambda: True)
+
+    def convert(src, main, out, **kwargs):
+        (out / "xml").mkdir(parents=True)
+        (out / "xml" / latexml.XML_NAME).write_text("<x/>")  # the first step finished
+        (out / "post.out").write_text(
+            "Fatal: fork failed: Resource temporarily unavailable at /usr/x"
+        )
+        return sandbox.Outcome(-9, timed_out=True)
+
+    monkeypatch.setattr(latexml, "convert", convert)
+    report = sandbox_probe.Report()
+    sandbox_probe._check_latexml(report, tmp_path, require=True)
+    lines = report.lines()
+    assert "latexml=fail" in lines and "latexml_step=latexmlpost" in lines
+    assert "latexml_timed_out=yes" in lines and "latexml_exit=-9" in lines
+    assert any(line.startswith("latexml_log=") and "fork_failed" in line for line in lines)
+    assert not report.passed  # the diagnostic lines are information; the failure is `latexml`
+    assert all(not c.required for c in report.checks if c.name.startswith("latexml_"))

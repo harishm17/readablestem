@@ -314,7 +314,7 @@ def test_the_whole_group_is_held_to_its_memory_cap(tmp_path):
     start = time.monotonic()
     outcome, _ = run_perl(
         code, tmp_path,
-        limits=sandbox.Limits(wall_s=30, memory_bytes=300_000_000, pids=8,
+        limits=sandbox.Limits(wall_s=30, memory_bytes=300_000_000, pids=40,
                               group_memory_bytes=150_000_000),
     )  # fmt: skip
     assert outcome.over_memory and not outcome.ok and time.monotonic() - start < 15

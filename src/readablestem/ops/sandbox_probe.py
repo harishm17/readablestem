@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -256,15 +257,21 @@ def _check_limits(report: Report, tmp: Path) -> None:
     )
     # Memory of the group together: three processes that each hold 100 MB under a group cap of
     # 150 MB are killed (the poll in `sandbox.run`, which bounds the sum where no cgroup does).
-    outcome, _ = _perl(
-        "my @k; for (1..3) { my $p = fork(); next unless defined $p; if ($p == 0) "
-        '{ my $x = "a" x 100_000_000; sleep 20; exit 0 } push @k, $p } sleep 20;',
+    outcome, text = _perl(
+        "$| = 1; my $n = 0; for (1..3) { my $p = fork(); next unless defined $p; $n++;"
+        ' if ($p == 0) { my $x = "a" x 100_000_000; sleep 20; exit 0 } }'
+        ' print "forked:$n\\n"; sleep 20;',
         tmp=tmp,
         limits=sandbox.Limits(
             wall_s=20, memory_bytes=300_000_000, pids=8, group_memory_bytes=150_000_000
         ),
     )
     report.add("sandbox_group_memory_cap", "ok" if outcome.over_memory else "fail")
+    if not outcome.over_memory:  # why: how many of the three tasks could be made, and the end
+        forked = text.split("forked:")[1].split()[0] if "forked:" in text else "unknown"
+        report.add("group_cap_forked", forked if forked.isdigit() else "unknown", required=False)
+        report.add("group_cap_exit", str(outcome.returncode), required=False)
+        report.add("group_cap_timed_out", "yes" if outcome.timed_out else "no", required=False)
     # seccomp: ptrace answers EPERM inside (the filter, `core/seccomp.py`).
     if seccomp.supported():
         _outcome, text = _perl(
@@ -326,6 +333,23 @@ def _check_total_bound(report: Report, *, cgroup: bool) -> None:
 # ------------------------------------------------------------------------------- LaTeXML run
 
 
+LOG_TAIL_CHARS = 240
+
+
+def _log_tail(path: Path) -> str:
+    """The end of LaTeXML's own output for the probe's fixed fixture, made safe to print: paths
+    removed, only plain characters kept, whitespace collapsed, a fixed size. (It is the probe's
+    document, never a user's.)"""
+    try:
+        raw = path.read_bytes()[-2000:].decode("ascii", "replace")
+    except OSError:
+        return "none"
+    raw = re.sub(r"/[\w./+-]*", "<path>", raw)
+    raw = re.sub(r"[^A-Za-z0-9 .,:;()=<>_-]+", " ", raw)
+    text = " ".join(raw.split())[-LOG_TAIL_CHARS:].strip()
+    return text.replace(" ", "_") or "empty"
+
+
 def _check_latexml(report: Report, tmp: Path, *, require: bool) -> None:
     from readablestem.source import latexml  # imported late: the module is part of the source path
 
@@ -343,6 +367,16 @@ def _check_latexml(report: Report, tmp: Path, *, require: bool) -> None:
     good = result.ok and html.is_file() and "<math" in html.read_text(errors="replace")
     report.add("latexml", "ok" if good else "fail")
     report.add("latexml_seconds", f"{elapsed:.1f}", required=False)
+    if not good:  # where it stopped, and the end of what LaTeXML said about the probe's own file
+        xml = out / latexml.XML_PATH
+        step = (
+            "latexml" if not xml.is_file() else ("latexmlpost" if not html.is_file() else "check")
+        )
+        report.add("latexml_step", step, required=False)
+        report.add("latexml_exit", str(result.returncode), required=False)
+        report.add("latexml_timed_out", "yes" if result.timed_out else "no", required=False)
+        log = out / ("post.out" if step != "latexml" else "latexml.out")
+        report.add("latexml_log", _log_tail(log), required=False)
 
 
 # ------------------------------------------------------------------------------- information
