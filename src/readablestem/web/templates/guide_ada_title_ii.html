@@ -19,25 +19,12 @@
    conform to WCAG or the ADA. #}
 <p class="crumb"><a href="/guides">All guides</a></p>
 <h1>ADA Title II and STEM course materials</h1>
+<p class="lede">The Department of Justice's ADA Title II web rule asks public universities to
+  make their online course materials accessible. This is what it asks, when, and what to do
+  about STEM files. It is guidance, not legal advice.</p>
 <p class="hint">Last updated <time datetime="{{ updated }}">{{ updated_text }}</time>. By
   <a href="https://harishmanoharan.com">Harish Manoharan</a>. The rules and dates below were
   checked against the sources at the bottom of the page on 28 October 2026.</p>
-<p class="lede">The Department of Justice's ADA Title II web rule asks public universities to
-  make their online course materials accessible to students with disabilities. This page says
-  what the rule requires, when, and what that means for STEM materials. It is guidance, not
-  legal advice.</p>
-
-{% from "_contents.html" import contents %}
-{{ contents([
-  ("this-term", "What to do this term"),
-  ("rule", "What the rule requires"),
-  ("dates", "When it applies"),
-  ("stem-materials", "What it means for STEM course materials"),
-  ("fall-short", "Where STEM files usually fall short"),
-  ("what-it-does", "What ReadableSTEM does and does not do"),
-  ("accessibility-office", "Check with your accessibility office"),
-  ("sources", "Sources")
-]) }}
 
 <h2 id="this-term">What to do this term</h2>
 <ul>
@@ -49,6 +36,17 @@
   <li>Post the accessible version as the main one, in place of the PDF, not beside it.</li>
   <li>Ask your campus accessibility office which date and which exceptions apply to you.</li>
 </ul>
+
+{% from "_contents.html" import contents %}
+{{ contents([
+  ("rule", "What the rule requires"),
+  ("dates", "When it applies"),
+  ("stem-materials", "What it means for STEM course materials"),
+  ("fall-short", "Where STEM files usually fall short"),
+  ("what-it-does", "What ReadableSTEM does and does not do"),
+  ("accessibility-office", "Check with your accessibility office"),
+  ("sources", "Sources")
+]) }}
 
 <h2 id="rule">What the rule requires</h2>
 <p>The rule is 28 CFR part 35, subpart H. The Department of Justice published it in the

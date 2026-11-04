@@ -62,19 +62,25 @@ def pages(tmp_path_factory):
         return {path: anon.get(path).text for path in ("/", "/limits")}
 
 
-@pytest.mark.parametrize("path", ["/", "/limits"])
-def test_the_pages_show_the_strip_with_set_date_and_how_measured_links(pages, path):
-    page = " ".join(pages[path].split())
+def test_the_landing_page_has_the_headline_and_one_evidence_link_not_the_tiles(pages):
+    """The four tiles and their method are on /limits; the landing page says the same set and
+    numbers in plain words and links there (ux2 lane D: the landing page reads shorter)."""
+    page = " ".join(pages["/"].split())
+    assert 'class="proof-strip"' not in page and "How it was measured" not in page
+    assert "26 documents the tool had never seen" in page
+    assert "4 November 2026, version 0.5.9" in page
+    assert 'href="/limits#accuracy">Evidence: the four measures' in page
+    for number in ("0.840", "0.836", "0.793", "0.770", "5.0", "9.6", "46%", "1,715"):
+        assert number in page, number
+    assert "so it was not met" in page and "no difference it could detect" in page
+    assert "beat" not in page.lower()
+
+
+def test_the_limits_page_shows_the_strip_with_set_date_and_how_measured_links(pages):
+    page = " ".join(pages["/limits"].split())
     assert 'class="proof-strip"' in page
-    if path == "/limits":
-        assert "Fresh5 set, 26 documents, run recorded 2026-11-04 (version 0.5.9)" in page
-        assert (
-            "spoken-equal, end to end" in page and "wrong equations nobody is asked about" in page
-        )
-    else:  # the landing page says the same set and numbers in plain words
-        assert "26 documents the tool had never seen" in page
-        assert "4 November 2026, version 0.5.9" in page
-        assert "spoken-equal" not in page
+    assert "Fresh5 set, 26 documents, run recorded 2026-11-04 (version 0.5.9)" in page
+    assert "spoken-equal, end to end" in page and "wrong equations nobody is asked about" in page
     assert page.count("How it was measured") >= 4
     for number in ("0.840", "0.793", "5.0", "0.46", "1,715 gold equations in 26 documents"):
         assert number in page, number

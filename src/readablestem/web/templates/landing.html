@@ -16,11 +16,8 @@
      should only be added once it is checked against it and the university's own page
      (UX review BW9). #}
   <p class="lede">Upload your lecture notes, slides or problem sets. ReadableSTEM rebuilds each
-    equation as real maths (MathML) that a screen reader can speak, restores the headings and
-    describes the figures.</p>
-  <p class="hero-rest">When it is unsure about something, it asks you on a review screen, where
-    you accept, edit or reject the change. Then you download a web page to post in your
-    course.</p>
+    equation as real maths (MathML) that a screen reader can speak, restores the headings,
+    describes the figures and asks you about what it is unsure of.</p>
   <p class="hero-actions">
     {% if user %}
     <a class="button" href="/app">Go to my documents</a>
@@ -30,7 +27,7 @@
     <a class="button-secondary" href="/demo">See an example first (no sign-in)</a>
   </p>
   {% if not user %}
-  <p class="hint">{% include "_signin_line.html" %} <a href="#who">Who can use it</a> and
+  <p class="hint hero-hint">Free during the beta. <a href="#who">Who can use it</a> and
     <a href="#documents">what happens to your documents</a>.</p>
   {% endif %}
 
@@ -130,30 +127,26 @@
   you review it.</p>
 
 <h2 id="accuracy">How accurate it is</h2>
-{# The newest registered held-out test is the headline (PROOF.md, via proof_facts), in plain
-   words here; /limits gives the same tiles with their technical names. The earlier numbers are
-   history and stay on /limits. tests/test_landing_facts.py checks the text against the reports. #}
-{% set plain = {
-  "set_line": "Measured on 26 documents the tool had never seen (arXiv papers, textbook sections and course notes made with LaTeX), in a test set up before it ran (4 November 2026, version 0.5.9).",
-  "spoken-equal, end to end": ["score, out of 1, for equations that a screen reader reads the same as the original", "A general chatbot (Claude Opus) scored 0.836: this set can detect no difference between them."],
-  "exactly right, end to end": ["score, out of 1, for equations exactly right, symbol for symbol", "A general chatbot (Claude Opus) scored 0.770."],
-  "wrong equations nobody is asked about, per 100": ["wrong equations left without a question to you, per 100", "A general chatbot (Claude Opus): 9.6. Our goal, set before the run, was 4.0 or fewer, so it was not met."],
-  "of wrong equations the review screen asks about": ["of the wrong equations are among the ones the tool asks you about", "Our goal, set before the run, was 0.60, so it was not met. A chatbot asks nothing."],
-} %}
-{% include "_proof_strip.html" %}
-<p>“Exactly right” means the whole equation matches the original symbol for symbol. The
-  first score also counts an equation as right when a screen reader reads it the same way as
-  the original. The rest is why you review the equations the tool flags.</p>
+{# The newest registered held-out test is the headline (PROOF.md, docs/eval-equation-fresh5.md),
+   in plain words. The four measures, their sample sizes and how each was measured are on
+   /limits (the proof strip), behind one evidence link. tests/test_landing_facts.py checks the
+   text against the reports. #}
 <p><strong>On equations, this test found no difference it could detect between ReadableSTEM
-  and a general chatbot.</strong> Given the same PDFs, a chatbot (Claude Opus) scored 0.836
-  against 0.840 for ReadableSTEM (26 documents, 1,715 equations). ReadableSTEM left fewer wrong
-  equations without a question to you (5.0 against 9.6 per 100), but not as few as the goal we
-  set, and it asked about 46% of its wrong equations against a goal of 60%. In 3 chemistry
-  sections, 0.33 of the equations were right as chemistry, against a goal of 0.80. The earlier test, on 15 textbook sections (October
-  2026, version 0.4.0), had the chatbot ahead on equations exactly right, 0.62 against 0.50.</p>
-<p>Its checks compare each equation with the PDF's own text and flag the ones that disagree.
-  They catch some wrong equations, not all. <a href="/limits#accuracy">All the results, how they
-  were measured and what they do not show</a>.</p>
+  and a general chatbot.</strong> Scored by whether a screen reader reads each equation the same
+  as the original, a chatbot (Claude Opus) scored 0.836 against 0.840 for ReadableSTEM (26
+  documents, 1,715 equations). “Exactly right” means the whole equation matches the original
+  symbol for symbol: 0.770 for the chatbot, 0.793 for ReadableSTEM.</p>
+<p>The test was set up before it ran, on 26 documents the tool had never seen (arXiv papers,
+  textbook sections and course notes made with LaTeX; 4 November 2026, version 0.5.9).
+  ReadableSTEM left fewer wrong equations without a question to you (5.0 against 9.6 per 100),
+  but not as few as the goal we set before the run (4.0 or fewer), so it was not met. It asked
+  about 46% of its wrong equations against a goal of 60%, so that was not met either. In 3
+  chemistry sections, 0.33 of the equations were right as chemistry, against a goal of 0.80.
+  The earlier test, on 15 textbook sections (October 2026, version 0.4.0), had the chatbot ahead
+  on equations exactly right, 0.62 against 0.50. This is why you review the equations the tool
+  flags.</p>
+<p><a href="/limits#accuracy">Evidence: the four measures, how each was measured and what
+  they do not show</a>.</p>
 
 <h2 id="try">Sign in and convert a PDF</h2>
 {% if user %}

@@ -1,0 +1,49 @@
+{# How long a document is kept: the default and each way to change it, one row each. Used by
+   the privacy notice and the offices page; the times are the settings' (`retention_hours`,
+   `opt_in_days`) and the companies' are those in `recipients` (web/recipients.py). Keep it
+   in step with the list under "What is stored, and for how long" on /privacy. #}
+{% from "_recipients.html" import retention_short %}
+{# `retention_voice`: "you" (the privacy notice) or "instructor" (the offices page). #}
+{% set you = retention_voice|default("you") == "you" %}
+{% set last = "you last worked on it" if you else "the instructor last worked on it" %}
+{% set viewers = "Only you, and the people you name" if you else "Only the instructor, and the people the instructor names" %}
+<table class="retention-table">
+  <caption>How long a document is kept</caption>
+  <thead>
+    <tr><th scope="col">Case</th><th scope="col">Deleted</th><th scope="col">Who can look at it</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th scope="row">Default: neither box ticked</th>
+      <td><strong>{{ retention_hours }} hours</strong> after {{ last }}</td>
+      <td>{{ viewers }}</td>
+    </tr>
+    <tr>
+      <th scope="row">“Keep for 7 days”</th>
+      <td><strong>7 days</strong> after {{ last }}</td>
+      <td>{{ viewers }}</td>
+    </tr>
+    <tr>
+      <th scope="row">Also “let us look at the results”</th>
+      <td><strong>{{ opt_in_days }} days</strong> after upload</td>
+      <td>The people who run ReadableSTEM, to find mistakes in the tool</td>
+    </tr>
+    <tr>
+      <th scope="row">“Delete now”, or deleting the account</th>
+      <td>At once, from the database</td>
+      <td>Nobody</td>
+    </tr>
+    <tr>
+      <th scope="row">Database backups</th>
+      <td>A deleted document can stay in a backup for up to about a week</td>
+      <td>Used only to recover the service</td>
+    </tr>
+    {% for r in recipients if r.gets_documents %}
+    <tr>
+      <th scope="row">What {{ r.name }} received</th>
+      <td>{{ retention_short(r.name) }}</td>
+      <td>{{ r.name }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

@@ -135,7 +135,9 @@ def test_the_other_results_match_their_reports_and_development_is_labelled(pages
 def test_the_landing_page_summarises_without_overclaiming(pages):
     landing = squash(pages["/"])
     # The registered held-out tiles are the headline, and the gap to the chatbot is said.
-    assert 'class="proof-strip"' in pages["/"]
+    # The four measures and how each was measured are on /limits, behind one evidence link.
+    assert 'class="proof-strip"' not in pages["/"] and 'class="proof-strip"' in pages["/limits"]
+    assert "Evidence: the four measures, how each was measured" in landing
     assert (
         "this test found no difference it could detect between ReadableSTEM and a general chatbot"
         in landing
@@ -145,7 +147,8 @@ def test_the_landing_page_summarises_without_overclaiming(pages):
     assert "0.62 against 0.50" in landing  # the earlier result is not hidden
     assert "beat" not in landing.lower().replace("beats", "")
     assert (
-        "“Exactly right” means the whole equation matches the original symbol for symbol" in landing
+        "“Exactly right” means the whole equation matches the original symbol for symbol: "
+        "0.770 for the chatbot, 0.793 for ReadableSTEM" in landing
     )
     # One decisions-per-page figure per kind of document, the same as /limits gives.
     limits = squash(pages["/limits"])

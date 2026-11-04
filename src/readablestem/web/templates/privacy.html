@@ -8,6 +8,15 @@
 <p class="hint">This page describes how the beta works today. If it changes in a way that
   matters to you, see "Changes to this notice" below.</p>
 
+<h2 id="retention-at-a-glance">How long a document is kept, at a glance</h2>
+<p>By default it is deleted {{ retention_hours }} hours after you last worked on it. The two
+  boxes on the upload form change that, and you can delete it sooner. The full list is under
+  “What is stored, and for how long”.</p>
+{% from "_table_scroll.html" import table_scroll %}
+{% call table_scroll("How long a document is kept") %}
+{% include "_retention_table.html" %}
+{% endcall %}
+
 <h2>Who runs this</h2>
 <p>ReadableSTEM is a free, open-source beta built and maintained by Harish Manoharan.{% if contact_email %} Contact:
   <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.{% endif %}</p>
@@ -19,7 +28,8 @@
 
 <h2>What is stored, and for how long</h2>
 <p>For each upload we store: the PDF{% if office_on %} (for a Word or PowerPoint file, the PDF
-  made from it; the Word or PowerPoint file itself is not kept){% endif %} and its file name, images cut from it (equations and
+  made from it; the Word or PowerPoint file itself is not kept){% endif %}{% if latex_source %}
+  (for LaTeX source, the .tex file or the zip that was uploaded){% endif %} and its file name, images cut from it (equations and
   figures), the conversion result (proposed LaTeX, MathML, alt text and headings), the
   converted HTML, and your review decisions.</p>
 <ul>
@@ -40,7 +50,8 @@
     deleted <strong>{{ opt_in_days }} days</strong> after upload. During that time the people
     who run ReadableSTEM may look at the conversion results to find and fix mistakes in the
     tool. Both boxes
-    are unticked unless you tick them.</li>
+    are unticked unless you tick them; “Keep for 7 days” can be made the default for new
+    uploads in <a href="/account">Account</a>.</li>
   <li>You can delete a document and everything made from it at any time with
     "Delete now". It is removed from the database straight away.</li>
   <li>A PDF that is too large to convert at once is kept, as uploaded, while you choose which

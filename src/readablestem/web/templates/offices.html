@@ -13,13 +13,33 @@
 <h1>For accessibility offices</h1>
 <p class="lede">ReadableSTEM assists instructors who turn a STEM course PDF into an accessible
   web page. This page is for the office that decides whether instructors may use it.</p>
-<p class="hint">This page describes the beta as it works today. It is not a contract or an
-  audit. <a href="{{ summary_path }}" download="{{ summary_filename }}">Download the one-page
+<p class="hint">It describes the beta as it works today. It is not a contract or an audit.
+  <a href="{{ summary_path }}" download="{{ summary_filename }}">Download the one-page
   summary</a> (an HTML file that prints on one page).</p>
+
+<h2 id="glance">At a glance</h2>
+{# One row per kind of data, from web/offices.py `data_items`: the by-company table below and
+   the one-page summary are written from the same list. #}
+{% from "_table_scroll.html" import table_scroll %}
+{% from "_data_matrix.html" import matrix, matrix_stack %}
+<div class="matrix-wide-view">
+{% call table_scroll("What is sent where, and for how long") %}
+{{ matrix(data_items, "What is sent where, and for how long") }}
+{% endcall %}
+</div>
+{{ matrix_stack(data_items, "What is sent where, and for how long") }}
+<ul>
+  <li>Students never sign in. Instructors upload course material they wrote or may adapt.</li>
+  <li>Uploads are not used to train models. The terms forbid student records, and no data
+    processing agreement is offered.</li>
+  <li>Every change the tool is unsure about goes to the instructor, who decides. In a held-out
+    test, 0.79 of the equations came out exactly right end to end, and the tool asked about
+    fewer than half of the wrong ones, so the review matters.</li>
+  <li>It makes no claim that a document meets WCAG, the ADA or Section 508.</li>
+</ul>
 
 {% from "_contents.html" import contents %}
 {{ contents([
-  ("glance", "At a glance"),
   ("data-flow", "Where a document goes"),
   ("subprocessors", "Who receives what"),
   ("retention", "How long it is kept"),
@@ -31,31 +51,19 @@
   ("more", "More")
 ]) }}
 
-<h2 id="glance">At a glance</h2>
-<ul>
-  <li>Instructors upload course material they wrote or may adapt. Students never sign in.</li>
-  <li>The app runs on Railway in the United States. Pictures of equations and figures, with a
-    little nearby text, go to {{ model_names }}. No one else receives a document.</li>
-  <li>A document is deleted {{ retention_hours }} hours after the instructor last works on it,
-    unless the instructor chooses to keep it longer.</li>
-  <li>Uploads are not used to train models. Student records are forbidden by the terms, and no
-    data processing agreement is offered.</li>
-  <li>Every change the tool is unsure about goes to the instructor, who decides. In a held-out
-    test, 0.79 of the equations came out exactly right end to end, and the tool asked about
-    fewer than half of the wrong ones, so the review matters.</li>
-  <li>It makes no claim that a document meets WCAG, the ADA or Section 508.</li>
-</ul>
-
 <h2 id="data-flow">Where a document goes</h2>
 <figure class="data-flow-figure">
   {% include "_data_flow.html" %}
   <figcaption>The same steps are listed below.</figcaption>
 </figure>
 <ol class="steps-list">
-  <li>The instructor signs in and uploads a PDF over HTTPS to the ReadableSTEM app, which
-    Railway hosts in the United States. Students do not sign in and have no account.</li>
+  <li>The instructor signs in and uploads a PDF{% if latex_source %} (or a LaTeX file or a zip
+    of a LaTeX project){% endif %} over HTTPS to the ReadableSTEM app, which Railway hosts in
+    the United States.</li>
   <li>The app opens the PDF in a separate short-lived process and cuts out images of the
-    equations and figures{% if tables_on %} and tables{% endif %}, with a little of the nearby text.</li>
+    equations and figures{% if tables_on %} and tables{% endif %}, with a little of the nearby text.{% if latex_source %}
+    A LaTeX file or project is read on the server instead, with LaTeXML in a sandbox: its
+    equations come from the source, and its figures are described as a PDF's are.{% endif %}</li>
   <li>Those images and that text are sent to the API of {{ model_names }}, which returns
     proposed LaTeX and descriptions.{% if notation_on %} For a document uploaded for one of
     the instructor's courses, that course's notation (its symbols and what they mean) is sent
@@ -69,14 +77,15 @@
   <li>The instructor downloads the result and posts it in the course: a web page (one HTML
     file), and if wanted the same document as {% if word_export %}Word, {% endif %}EPUB, a zip
     for a Canvas page or a Common Cartridge.</li>
-  <li>The PDF, the images, the result and the review decisions stay in the database until
-    they are deleted on the schedule below.</li>
 </ol>
 
 <h2 id="subprocessors">Who receives what</h2>
-{# One row per recipient, from web/recipients.py: the privacy page lists the same companies. #}
-<div class="table-scroll">
-<table>
+<p>The same data as the first table, by company. The <a href="/privacy">privacy notice</a>
+  lists the same companies and is the page to cite.</p>
+{# One row per recipient, from web/recipients.py; what each receives is read from the same
+   `data_items` list as the first table. #}
+{% call table_scroll("Companies that receive data from a conversion") %}
+<table class="recipients-table">
   <caption>Companies that receive data from a conversion</caption>
   <thead>
     <tr><th scope="col">Company</th><th scope="col">What it receives</th><th scope="col">What it says about training and retention</th></tr>
@@ -85,52 +94,30 @@
     {% for r in recipients %}
     <tr>
       <th scope="row">{{ r.name }}</th>
-      {% if "model" in r.purposes %}
-      <td>Images of equations and figures{% if tables_on %} and tables{% endif %}, and a little
-        nearby text{% if "handwriting" in r.purposes %}; also a close-up of a handwritten
-        expression, to be read a second time{% endif %}.</td>
-      <td>{{ retention(r.name) }}</td>
-      {% elif "handwriting" in r.purposes %}
-      <td>A close-up picture of a handwritten expression, to be read a second time. No other
-        text goes with it.</td>
+      <td>
+        <ul class="cell-list">
+          {% for what in received_by(r.name) %}<li>{{ what }}</li>{% endfor %}
+        </ul>
+      </td>
+      {% if r.gets_documents %}
       <td>{{ retention(r.name) }}</td>
       {% elif "hosting" in r.purposes %}
-      <td>Hosts the app and its database, in its United States region: everything that is
-        stored (the PDF, images, results, review decisions and account details).</td>
-      <td>Daily database backups are kept about 6 days.</td>
+      <td>Daily database backups are kept about {{ backup_days }} days.</td>
       {% elif "tracing" in r.purposes %}
-      <td>Timings, model names, token counts, costs and error categories, with random ids.
-        Never document text, images, file names or email addresses.</td>
       <td>Set in the Langfuse project; see the privacy notice.</td>
       {% endif %}
     </tr>
     {% endfor %}
   </tbody>
 </table>
-</div>
-{% if analytics_on %}
-<p>Page views and a few named events (for example “uploaded a document”, with a count at
-  most) are sent to PostHog in the United States through this site's own address. They never
-  contain document content, and nobody is identified.</p>
-{% endif %}
-<p>No one else receives a document. The <a href="/privacy">privacy notice</a> lists the same
-  companies and is the page to cite.</p>
+{% endcall %}
 
 <h2 id="retention">How long it is kept</h2>
-<ul>
-  <li>By default a document and everything made from it is deleted
-    <strong>{{ retention_hours }} hours</strong> after the instructor last worked on it.</li>
-  <li>If the instructor chooses “Keep for 7 days”, it is deleted <strong>7 days</strong> after
-    the last activity. Only the instructor, and the people the instructor names, can see it.</li>
-  <li>If the instructor also lets us look at the results, it is deleted
-    <strong>{{ opt_in_days }} days</strong> after upload, and the people who run ReadableSTEM may
-    look at it to find mistakes in the tool. Both choices are off unless the instructor ticks
-    them.</li>
-  <li>The instructor can delete a document at any time. It leaves the database at once.</li>
-  <li>Database backups keep a deleted document for up to about a week. {{ model_names }} may
-    keep what it received for the time in the table above.</li>
-  <li>An instructor can delete their account, with all their documents.</li>
-</ul>
+{% set retention_voice = "instructor" %}
+{% call table_scroll("How long a document is kept") %}
+{% include "_retention_table.html" %}
+{% endcall %}
+<p>Both choices that keep a document longer are off unless the instructor ticks them.</p>
 
 <h2 id="training">No training, and what is stored by the model company</h2>
 <p>ReadableSTEM does not use uploads to train any model, and does not sell or share them
