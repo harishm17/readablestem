@@ -1,7 +1,7 @@
 """What the instructor sets on the job page beyond the review: the title students hear (T1-7),
 a contact line for the student file's footer (T1-17), and keeping the document longer (T1-8).
 
-Each is a POST that is CSRF-checked and owner-only (`owned_job` answers 404 for someone
+Each is a POST that is CSRF-checked and owner-only (`job_access(..., "owner")`: a 404 for someone
 else's job), and works without JavaScript: it answers with a redirect to the job page and a
 confirmation, or, when the typed text cannot be used, the job page again with the error
 under the field and what was typed still in it.
@@ -42,12 +42,13 @@ from readablestem.web.routes.jobs import (
     _crops,
     _job_course,
     after_download_state,
+    job_access,
     live_job_count,
     load_job_status,
-    owned_job,
     require_done,
     status_context,
 )
+from readablestem.web.shares import OWNER
 from readablestem.web.views import last_decision
 
 logger = logging.getLogger(__name__)
@@ -100,7 +101,7 @@ def set_title(
     except titles.Invalid as exc:
         return _job_page_with_errors(request, job_id, user, "title", str(exc), title)
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user, lock=True)
+        job = job_access(session, job_id, user, OWNER, lock=True)
         owned_id = job.id  # redirects are built from the owned row, not the request
         require_done(job)
         result = DocumentResult.model_validate(job.result_json or {})
@@ -135,7 +136,7 @@ def set_contact(
     except titles.Invalid as exc:
         return _job_page_with_errors(request, job_id, user, "contact", str(exc), contact)
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user, lock=True)
+        job = job_access(session, job_id, user, OWNER, lock=True)
         owned_id = job.id  # redirects are built from the owned row, not the request
         require_done(job)
         if (line or None) == job.contact_line:
@@ -164,7 +165,7 @@ def keep_longer(request: Request, job_id: str, user: UserDep) -> Response:
     they may keep (`MAX_LIVE_JOBS_PER_USER`, the cap the upload also enforces)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user, lock=True)
+        job = job_access(session, job_id, user, OWNER, lock=True)
         owned_id = job.id  # the redirect is built from the owned row, not the request
         if retention.can_keep_longer(job):
             others = live_job_count(session, user.id, utcnow(), excluding=job.id)
