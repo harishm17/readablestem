@@ -260,7 +260,7 @@ class _Transcript:
         text = _words(text)
         if say is None:
             say = f"{role}: {text}" if text else role
-        kinds = (kind, *(k for k in dict.fromkeys(held) if k != kind))
+        kinds = (kind, *(k for k in dict.fromkeys(sorted(held)) if k != kind))
         self.items.append(Item(role, text, say, kinds, self.lang))
 
     def paragraph(self, text: str, kind: str = "paragraph", role: str = "Paragraph") -> None:
