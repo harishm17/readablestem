@@ -1,16 +1,87 @@
 {% extends "base.html" %}
-{% block body_class %}mode-read{% endblock %}
+{% block body_class %}mode-read mode-landing{% endblock %}
 {% block title %}Accessible HTML with MathML from STEM course PDFs{% endblock %}
 {% block content %}
-<h1>Turn STEM course PDFs into accessible web pages, equations included</h1>
-{# No deadline date is stated here: the rule is 28 CFR part 35, subpart H, and a date
-   should only be added once it is checked against it and the university's own page
-   (UX review BW9). #}
-<p class="lede">ReadableSTEM assists instructors who need to turn a STEM course PDF into an
-  accessible web page. It reads the PDF, rebuilds equations as MathML a screen reader can
-  speak, restores headings, writes short alt text for figures, and returns one web page.
-  Every change it is unsure about goes to a review screen where the instructor accepts,
-  edits or rejects it.</p>
+{# Layout of the redesign (DESIGN.md): hero with the real before/after, three steps, what you
+   get, the numbers, then the rest in the owner's wording. All wording below is the owner's
+   from before the redesign, moved but not rewritten, except the strings listed under
+   "Copy to review" in the pull request (the pane labels, the step names and the section
+   names added to hold existing text). #}
+<section class="hero" aria-labelledby="hero-title">
+  <h1 id="hero-title">Turn STEM course PDFs into accessible web pages, equations included</h1>
+  {# No deadline date is stated here: the rule is 28 CFR part 35, subpart H, and a date
+     should only be added once it is checked against it and the university's own page
+     (UX review BW9). #}
+  <p class="lede">ReadableSTEM assists instructors who need to turn a STEM course PDF into an
+    accessible web page.</p>
+  <p class="hero-rest">It reads the PDF, rebuilds equations as MathML a screen reader can
+    speak, restores headings, writes short alt text for figures, and returns one web page.
+    Every change it is unsure about goes to a review screen where the instructor accepts,
+    edits or rejects it.</p>
+  <p class="hero-actions">
+    {% if user %}
+    <a class="button" href="/app">Go to my documents</a>
+    {% else %}
+    <a class="button" href="#try">Try it</a>
+    {% endif %}
+    <a class="button-secondary" href="/demo">Look at an example conversion</a>
+  </p>
+
+  {# The real passage from the demo (OpenStax Physics 2.3, page 3), built by
+     scripts/hero_assets.py and checked by tests/test_hero_assets.py. The right pane holds
+     live MathML, so a screen reader can explore the equation here. #}
+  <div class="panes hero-panes">
+    <section class="pane before" aria-labelledby="hero-before">
+      <h2 id="hero-before">In the PDF <span class="tag tag-err">Untagged</span></h2>
+      <div class="sheet crop-scroll" role="group" aria-label="The PDF passage, scrolls sideways on a narrow screen" tabindex="0">
+        <img src="{{ static_url('hero/before.png') }}" width="{{ hero.crop_width }}" height="{{ hero.crop_height }}"
+          alt="A crop of the printed PDF page: the end of a sentence about slope, then equation 2.4, delta d over delta t.">
+      </div>
+      <dl class="reading">
+        <dt>A screen reader reads the PDF's text layer</dt>
+        <dd>{{ hero.text_layer }}</dd>
+      </dl>
+    </section>
+    <section class="pane after" aria-labelledby="hero-after">
+      <h2 id="hero-after">In the converted page <span class="tag tag-ok">MathML</span></h2>
+      <div class="sheet">
+        <p>{{ hero.paragraph }}</p>
+        <div class="eq">{{ hero.mathml|safe }}<span class="eq-label"><span class="visually-hidden">Equation </span>{{ hero.label }}</span></div>
+        <p class="figure-alt"><strong>Figure 2.11 alt text:</strong> {{ hero.figure_alt }}</p>
+      </div>
+      <dl class="reading">
+        <dt>A screen reader says</dt>
+        <dd>{{ hero.speech }}</dd>
+      </dl>
+    </section>
+  </div>
+  <p class="hero-source">From <a href="https://openstax.org/books/physics/pages/2-3-position-vs-time-graphs">OpenStax Physics, 2.3 Position vs. Time Graphs</a>
+    (CC BY 4.0), page 3 of <a href="{{ static_url('demo/source.pdf') }}">the PDF</a>. The PDF has no tags, so a
+    screen reader gets only its text layer. The reading on the right is made from the page's
+    MathML by the same code that checks the equations.</p>
+</section>
+
+<section class="steps-section" aria-labelledby="steps-title">
+  <h2 id="steps-title">Upload, review, post</h2>
+  <ol class="three-steps">
+    <li>
+      <h3>Upload</h3>
+      <p>Upload a PDF of your own notes, slides or problem sets. Converting takes a few minutes.</p>
+    </li>
+    <li>
+      <h3>Review</h3>
+      <p>You decide only what could change what a student reads; everything else is
+        accepted for you and listed, so you can look it over.</p>
+    </li>
+    <li>
+      <h3>Post</h3>
+      <p>Post it in your course in place of the PDF. Students open it in any browser.
+        <a href="/help/posting">How to post it in your course</a>.</p>
+    </li>
+  </ol>
+</section>
+
+<h2>What you get</h2>
 <p>The Department of Justice's ADA Title II web rule asks public universities to make their
   online course materials accessible to students with disabilities. In STEM the hard part is
   the maths. Upload a PDF of your own notes, slides or problem sets, and get back one web page
@@ -27,7 +98,7 @@
    in README.md ("Re-measurement on the same sections", 2026-10-21, not blind). PROOF.md is
    generated from the recorded run; tests/test_landing_facts.py fails when this page and
    PROOF.md or the README disagree. Update them only from a new registered test, and say
-   when a number is not blind. #}
+   when a number is not blind. The tiles come from web/proof_facts.py (PROOF.md, once). #}
 <h2>How long it takes</h2>
 <p>Converting takes a few minutes. Then you decide only what could change what a student
   reads; everything else is accepted for you and listed, so you can look it over. Dense
@@ -47,6 +118,7 @@
   after seeing the list.</p>
 
 <h2>How accurate it is</h2>
+{% include "_proof_strip.html" %}
 <p>It makes mistakes, so look over the equations your students rely on. In a
   pre-registered test on 15 textbook sections it had not seen (run on 2026-10-14, version
   0.4.0), it found about as many equations as a general chatbot (89%), but fewer of them
@@ -62,11 +134,7 @@
   <a href="{{ source_url }}/blob/main/README.md#re-measurement-on-the-same-sections-2026-10-21-not-a-blind-result">How
   it was measured</a>.</p>
 
-<h2>What you do with the file</h2>
-<p>Post it in your course in place of the PDF. Students open it in any browser.
-  <a href="/help/posting">How to post it in your course</a>.</p>
-
-<h2>Try it</h2>
+<h2 id="try">Try it</h2>
 {% if user %}
 <p><a class="button" href="/app">Go to my documents</a></p>
 {% else %}
@@ -74,30 +142,36 @@
 {% endif %}
 <p>Or <a href="/demo">look at an example conversion</a> first (no sign-in needed).</p>
 
-<h2>Who can use it</h2>
-{% if signup_open %}
-<p>ReadableSTEM is a free beta. Anyone with
-  a Google account can sign in and try it{% if microsoft_login %}, and so can people with a
-  Microsoft account from a university that is set up for it{% endif %}. Signing in the first
-  time makes your account. New accounts have daily limits: {{ open_page_quota }} pages a day,
-  and the service pauses for the day when its budget for AI model calls is used up. The
-  example conversion needs no sign-in. Upload only materials you wrote or have the right to
-  adapt, and never upload student records or anything with students' personal information in
-  it.</p>
-{% else %}
-<p>The beta is open to a small group of instructors, by invitation. Upload only materials
-  you wrote or have the right to adapt, and never upload student records or anything with
-  students' personal information in it.</p>
-{% endif %}
-
-<h2>What happens to your documents</h2>
-<p>Your PDF and everything made from it are deleted {{ retention_hours }} hours after you
-  last worked on it. You can choose to keep it for 7 days, so only you and the people you name can see it, and
-  separately to let the developer look at the results for {{ opt_in_days }} days to improve
-  the tool. You can delete it yourself at any time. We do not use your uploads to train models.
-  ReadableSTEM assists you; it does not replace your judgement or a full accessibility review of your
-  course. <a href="/privacy">Read the privacy notice</a>. Working for an accessibility
-  office? <a href="/for-accessibility-offices">See the page for accessibility offices</a>.</p>
+<h2>Questions</h2>
+<div class="faq">
+  <details>
+    <summary>Who can use it</summary>
+    {% if signup_open %}
+    <p>ReadableSTEM is a free beta. Anyone with
+      a Google account can sign in and try it{% if microsoft_login %}, and so can people with a
+      Microsoft account from a university that is set up for it{% endif %}. Signing in the first
+      time makes your account. New accounts have daily limits: {{ open_page_quota }} pages a day,
+      and the service pauses for the day when its budget for AI model calls is used up. The
+      example conversion needs no sign-in. Upload only materials you wrote or have the right to
+      adapt, and never upload student records or anything with students' personal information in
+      it.</p>
+    {% else %}
+    <p>The beta is open to a small group of instructors, by invitation. Upload only materials
+      you wrote or have the right to adapt, and never upload student records or anything with
+      students' personal information in it.</p>
+    {% endif %}
+  </details>
+  <details>
+    <summary>What happens to your documents</summary>
+    <p>Your PDF and everything made from it are deleted {{ retention_hours }} hours after you
+      last worked on it. You can choose to keep it for 7 days, so only you and the people you name can see it, and
+      separately to let the developer look at the results for {{ opt_in_days }} days to improve
+      the tool. You can delete it yourself at any time. We do not use your uploads to train models.
+      ReadableSTEM assists you; it does not replace your judgement or a full accessibility review of your
+      course. <a href="/privacy">Read the privacy notice</a>. Working for an accessibility
+      office? <a href="/for-accessibility-offices">See the page for accessibility offices</a>.</p>
+  </details>
+</div>
 
 <h2>About</h2>
 <p>Built and maintained by Harish Manoharan. The code is open source:
