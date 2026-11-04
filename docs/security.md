@@ -225,16 +225,18 @@ script injected into an app page is refused by the policy.
 | Upload size | `MAX_UPLOAD_MB` a file converted at once, `MAX_LARGE_UPLOAD_MB` a file kept for choosing its pages and the whole request; checked while streaming, never spooled to disk (a Word or PowerPoint file is written to a private temporary directory by the converter for the seconds it takes: below) | `web/uploads.py` |
 | Pages per upload | `MAX_PAGES_PER_JOB` converted at once, `MAX_SOURCE_PAGES` for a file kept for choosing its pages; the quota counts only the pages converted | the probe, before quota or model |
 | Page size | 5000 pt a side | probe |
-| Uploads in progress | 3 per instance, 1 per person | `UploadGate` |
-| Files in one upload | 10; the request, files together, at most `MAX_LARGE_UPLOAD_MB` (30); each file after the first counts as an upload for `upload_user`; the probes of one request share 120 s | `web/uploads.py`, `routes/jobs.py` |
-| Large files kept for choosing their pages | 2 per person, up to 30 MB and 300 pages, deleted after `RETENTION_HOURS`; their parts are held to the page quota and the caps below | `web/pending.py`, `web/intake.py` |
+| Uploads in progress | 3 per instance, 1 per person; each is held in memory about three times over, so at most about 900 MB at the largest size (`MAX_LARGE_UPLOAD_MB`) | `UploadGate` |
+| Stored bytes per person | `STORAGE_PER_USER_MB` (300, invited) or `STORAGE_OPEN_TIER_MB` (250, open tier): everything they have stored (source PDFs, crops, results, kept large files) that is not past its deletion time, counted in the same transaction as the job with the person's row locked, so two uploads cannot both pass; a new upload that would go over is refused (413) with how much is used and to delete documents. The old worst case was 2.2 GB a person | `web/storage.py`, `web/intake.py`, `web/pending.py` |
+| Stored upload bytes, whole service | `STORAGE_GLOBAL_MAX_MB` (2000): over it new uploads get a plain 503 before the body is read, and `/healthz/ops` goes 503 naming `storage`, until the hourly purge has deleted enough | `web/storage.py`, `routes/jobs.py`, `web/health.py` |
+| Files in one upload | 10; the request, files together, at most `MAX_LARGE_UPLOAD_MB` (100), so ten files of 10 MB or two of 50; each file after the first counts as an upload for `upload_user`; the probes of one request share 120 s | `web/uploads.py`, `routes/jobs.py` |
+| Large files kept for choosing their pages | 2 per person, up to 100 MB and 500 pages, deleted after `RETENTION_HOURS`; their parts are held to the page quota and the caps below | `web/pending.py`, `web/intake.py` |
 | Zip of ready documents | 25 documents and 80 MB, in memory | `web/bundle.py` |
 | Answers to an upload of several files | one row per upload, names and numbers only, kept 1 hour, deleted with the person; readable by its owner only (404 for anyone else) | `web/upload_result.py`, `ops.retention.purge_upload_results` |
 | Word and PowerPoint files of one upload | their conversions share 180 s (`OFFICE_BUDGET_S`); the rest are refused with a reason | `routes/jobs.py` (`_place_files`) |
 | Sample document | one per person, outside the quota, the spend and the caps; `sample` rate rule 10 per 10 minutes per address | `web/sample.py` |
 | Probe child | 30 s timeout, 768 MiB address space, minimal environment | `inspect_pdf_isolated`, `pdf_probe` |
 | Conversion child | The whole conversion, in its own process and process group: `CONVERSION_MEMORY_MB` (3072) plus twice the PDF of address space, CPU time 4 times the job's time limit, no core file, killed at the job's time limit, on cancel or shutdown, dies with the web process; minimal environment (no keys, no database URL), model requests and every database write made by the parent; a crash fails that job at once (`conversion_crashed`, `conversion_oom`) | `convert_isolated`, `conversion_child` |
-| Word and PowerPoint (T3-30) | File checks in a child with a minimal environment and a 768 MiB cap; LibreOffice in its own session and process group with 2 GiB address space, CPU, output-size and open-file limits and `OFFICE_TIMEOUT_S` (90 s) then killed; one conversion at a time per instance; the PDF it makes is probed like any upload | `convert_office_isolated`, `office_convert` |
+| Word and PowerPoint (T3-30) | File checks in a child with a minimal environment and a 768 MiB cap (a ZIP of more than 3000 entries, 500 MB unpacked or an entry over 250 MB is refused unopened: with the 100 MB upload limit that is the same room for compression as the 200 MB and 30 MB were; the sizes are read from the ZIP's directory, nothing is unpacked to check); LibreOffice in its own session and process group with 2 GiB address space, CPU, output-size and open-file limits and `OFFICE_TIMEOUT_S` (90 s) then killed; one conversion at a time per instance; the PDF it makes is probed like any upload | `convert_office_isolated`, `office_convert` |
 | Daily pages per person | `PER_USER_DAILY_PAGE_QUOTA` (invited), `OPEN_TIER_DAILY_PAGE_QUOTA` (open tier) | `web/quota.py`, `web/access.py` |
 | Model reads from review per person per day (open tier) | `OPEN_TIER_DAILY_REREADS`, counted before the read and not given back | `web/quota.py` (`try_consume_reread`), `web/reread.py` |
 | New accounts (open sign-up) | `MAX_NEW_ACCOUNTS_PER_DAY` a UTC day for the service, not given back when an account is deleted; 5 an hour per address; an address deleted today comes back with the day's pages, reads and place already used (a keyed hash of the address, kept to the end of the day) | `web/quota.py` (`try_take_signup`), `web/abuse.py` (`signup`), `web/tombstones.py` |
@@ -468,8 +470,8 @@ Triage of what the scanners reported:
   the recipient's mail provider hold it until it expires or is used, and anyone who reads the
   mailbox can sign in.
 - Rate limits and the upload gate are per instance and in memory.
-- `/healthz/ops` is public and has no rate limit: it reads two rows and answers with at most the
-  words `backup`, `cron` or `database`. Scheduled-task failures are found by a GitHub Actions job
+- `/healthz/ops` is public and has no rate limit: it reads two rows and a sum of stored sizes, and answers with at most the
+  words `backup`, `cron`, `storage` or `database`, and the stored and allowed megabytes (totals, no names). Scheduled-task failures are found by a GitHub Actions job
   that stops after 60 days without a commit to the public repository, unless re-enabled.
 - The session cookie is readable by its owner (signed, not encrypted).
 - A copy of the converted HTML opened from disk has no CSP; it is built to need none.

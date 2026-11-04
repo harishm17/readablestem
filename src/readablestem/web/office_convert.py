@@ -66,12 +66,15 @@ OLE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # a Word 97 .doc, or a password
 
 KINDS = ("docx", "pptx")
 MAX_ENTRIES = 3000
-MAX_UNPACKED_BYTES = 200 * 1024 * 1024
-MAX_ENTRY_BYTES = 100 * 1024 * 1024
+MAX_UNPACKED_BYTES = 500 * 1024 * 1024
+MAX_ENTRY_BYTES = 250 * 1024 * 1024
 MAX_RELS_BYTES = 2 * 1024 * 1024
+# The PDF it makes is at most what one upload request may carry (MAX_LARGE_UPLOAD_MB, 100 by
+# default); a bigger one is refused after this anyway (`routes.jobs._place_files`).
 MAX_PDF_BYTES = 100 * 1024 * 1024
-# Address space for the wrapper's own checks (a 20 MB upload and the zip's bookkeeping),
-# and for LibreOffice. LibreOffice maps a lot of address space it never touches.
+# Address space for the wrapper's own checks (an upload of up to 100 MB read three times
+# over, and the zip's bookkeeping), and for LibreOffice. LibreOffice maps a lot of address
+# space it never touches.
 WRAPPER_MEMORY_BYTES = 768 * 1024 * 1024
 SOFFICE_MEMORY_BYTES = 2 * 1024 * 1024 * 1024
 SOFFICE_CPU_SECONDS = 120

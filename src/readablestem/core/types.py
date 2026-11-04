@@ -245,6 +245,11 @@ class TableCell(BaseModel):
     mathml: str | None = None
     header: Literal["col", "row"] | None = None
     bbox: BBox | None = None
+    # Layout found maths in this cell from its glyphs (`pipeline.layout._cell_maths`) and made it
+    # an inline equation element of the table: its id. The equation step reads the cell's crop
+    # like any inline equation, and the page writes what it read into the cell
+    # (`pipeline.table_math`).
+    equation_id: str | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @property
     def is_empty(self) -> bool:
