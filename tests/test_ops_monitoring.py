@@ -97,10 +97,11 @@ def test_healthz_ops_is_503_listing_only_names_until_both_have_reported(tmp_path
     with env.running() as web:
         response = web.get("/healthz/ops")
         assert response.status_code == 503
-        assert response.json() | {"storage": None} == {
+        assert response.json() | {"storage": None, "sandbox": None} == {
             "status": "stale",
             "stale": ["backup", "cron"],
             "storage": None,
+            "sandbox": None,
         }
         with session_scope(env.ctx.factory) as session:
             heartbeat.beat(session, heartbeat.CRON, "aggregated=0 jobs_deleted=0")
@@ -110,7 +111,9 @@ def test_healthz_ops_is_503_listing_only_names_until_both_have_reported(tmp_path
             heartbeat.beat(session, heartbeat.BACKUP, "tables=30 alembic=abc")
         response = web.get("/healthz/ops")
     assert response.status_code == 200
-    assert response.json() == {
+    body = response.json()
+    assert body.pop("sandbox")["state"] == "not_run"  # the start-up probe is off in tests
+    assert body == {
         "status": "ok",
         "stale": [],
         "storage": {"stored_mb": 0, "limit_mb": 2000, "full": False},

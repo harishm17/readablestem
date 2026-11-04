@@ -82,6 +82,7 @@ from readablestem.web.routes import (
     sharing,
     split,
 )
+from readablestem.web.sandbox_status import run_probe
 from readablestem.web.security import (
     RequestSizeLimitMiddleware,
     SafeErrorMiddleware,
@@ -408,6 +409,9 @@ def create_app(
         if settings.env == "prod" and (blockers := launch_blockers(settings=settings)):
             # Not a refusal: a staging deploy runs as prod before the copy is final.
             log_event(logger, "launch_blockers", logging.WARNING, count=len(blockers))
+        if settings.sandbox_probe_at_startup:
+            # In the background: neither start-up nor /healthz waits for it.
+            run_probe(ctx.sandbox, timeout_s=settings.sandbox_probe_timeout_s)
         if settings.run_worker:
             ctx.worker = Worker(
                 settings,

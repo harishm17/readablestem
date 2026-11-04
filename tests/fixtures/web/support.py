@@ -105,6 +105,8 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         # Word and PowerPoint uploads depend on LibreOffice being installed; the tests that
         # are about them (tests/test_web_office.py) turn this on.
         "office_input_enabled": False,
+        # The sandbox probe is run by the tests that are about it (tests/test_sandbox_status.py).
+        "sandbox_probe_at_startup": False,
     }
     values.update(overrides)
     if values["env"] != "prod":
@@ -273,6 +275,8 @@ class WebEnv:
             self.settings, converter=self.converter, client_factory=fake_client_factory
         )
         self.ctx = self.app.state.ctx
+        if self.settings.feature_latex_source or self.settings.feature_batch_zip:
+            self.ctx.sandbox.set("pass")  # as if the probe had passed on this machine
 
     @contextmanager
     def running(self) -> Iterator[TestClient]:
