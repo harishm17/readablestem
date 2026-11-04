@@ -7,6 +7,8 @@
 Everything that was listed as unreleased up to 2026-11-04, grouped by area (newest entry first within an area, as it was
 written). Each entry keeps the branch it came from. The pipeline is version 0.5.9. LaTeX source, Beamer and zip-batch upload
 are in the code and off on readablestem.com until the sandbox check passes there.
+A setting an entry calls "off" is off by default in the code; which ones production turns on is in
+[docs/deploy-railway.md](docs/deploy-railway.md), "Feature flags in production".
 
 ### Equations and speech
 
