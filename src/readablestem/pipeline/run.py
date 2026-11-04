@@ -1462,13 +1462,16 @@ def _page_math_pass(
         applied = page_math_reconcile.PageMathHook(plan)
         answered = [n for n, p in plan.pages.items() if p.failed is None]
         if answered:
+            grouping: dict[str, Any] = (
+                {"display_grouping": True} if settings.layout_display_grouping else {}
+            )
             try:
                 doc = layout.analyze(
                     pdf_bytes,
                     pages=pages,
                     max_pages=settings.max_pages_per_job,
                     page_math=applied,
-                    **({"display_grouping": True} if settings.layout_display_grouping else {}),
+                    **grouping,
                 )
             except Exception as exc:  # the first run's pages stand
                 log.warning("page math: the second layout run failed: %s", type(exc).__name__)
@@ -1689,12 +1692,14 @@ def _convert(
                 else None
             )
             # (`page_math` only when asked for: stand-ins for `analyze` take no such argument)
+            extra: dict[str, Any] = {} if collector is None else {"page_math": collector}
+            if settings.layout_display_grouping:
+                extra["display_grouping"] = True
             doc = layout.analyze(
                 pdf_bytes,
                 pages=pages,
                 max_pages=settings.max_pages_per_job,
-                **({} if collector is None else {"page_math": collector}),
-                **({"display_grouping": True} if settings.layout_display_grouping else {}),
+                **extra,
             )
             page_math_summary: PageMathSummary | None = None
             witness_summary: PageWitnessSummary | None = None
