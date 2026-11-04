@@ -49,6 +49,8 @@
 ]) }}
 
 <h2 id="rule">What the rule requires</h2>
+<details>
+<summary>The rule in full</summary>
 <p>The rule is 28 CFR part 35, subpart H. The Department of Justice published it in the
   Federal Register on April 24, 2024. It covers the web content and mobile apps that a public
   entity provides or makes available, directly or through contractual, licensing, or other
@@ -57,6 +59,7 @@
   Level A and Level AA (28 CFR 35.200(b)). A public entity does not have to meet it where it
   can show that doing so would fundamentally alter a service, program or activity, or cause
   undue financial and administrative burdens.</p>
+</details>
 
 <h2 id="dates">When it applies</h2>
 <div class="table-scroll" role="group" aria-label="Compliance dates" tabindex="0">
@@ -90,6 +93,8 @@
   under title II of the ADA.</p>
 
 <h2 id="stem-materials">What it means for STEM course materials</h2>
+<details>
+<summary>What counts as course material, and the exception</summary>
 <p>Course materials put online are web content. The rule names PDF, word processor,
   presentation and spreadsheet files as &ldquo;conventional electronic documents&rdquo; and
   lists them as web content (28 CFR 35.104).</p>
@@ -102,8 +107,11 @@
   The Department's fact sheet gives an example of a document that loses the exception once it
   is updated. Whether a given course file falls under the exception is for your campus to
   decide. This page does not decide it.</p>
+</details>
 
 <h2 id="fall-short">Where STEM files usually fall short</h2>
+<details>
+<summary>The five usual problems</summary>
 <p>These are the parts of WCAG 2.1 that STEM files meet most often. The list is not complete.</p>
 <ul>
   <li><strong>Equations.</strong> An equation that is a picture needs a text alternative that
@@ -122,8 +130,11 @@
     exceptions), so the text has to be recovered, and the math checked. A tool can misread
     handwriting and small symbols.</li>
 </ul>
+</details>
 
 <h2 id="what-it-does">What ReadableSTEM does and does not do</h2>
+<details>
+<summary>What ReadableSTEM does and does not do</summary>
 <p>ReadableSTEM assists instructors who need to turn a STEM course PDF into an accessible web
   page. It reads the PDF, rebuilds equations as MathML a screen reader can speak, restores
   headings and lists{% if tables_on %}, rebuilds tables with header cells{% endif %} and
@@ -147,12 +158,15 @@
   35.202(a)). So post the HTML as the main course material, not as an extra beside an
   inaccessible PDF. <a href="/help/posting">How to post it in your course</a>, and
   <a href="/demo">an example conversion</a> to look at first.</p>
+</details>
 
 <h2 id="accessibility-office">Check with your accessibility office</h2>
 <p>This page is guidance, not legal advice. Your campus accessibility office can say what your
   courses need, and can help with documents this tool does not handle well.</p>
 
 <h2 id="sources">Sources</h2>
+<details>
+<summary>Sources, all read on 28 October 2026</summary>
 <p class="hint">All accessed on October 28, 2026.</p>
 <ul>
   <li><a href="https://www.ecfr.gov/current/title-28/chapter-I/part-35/subpart-H/section-35.200">28 CFR 35.200, requirements for web and mobile accessibility</a> (eCFR; shows the April 20, 2026 amendment)</li>
@@ -170,4 +184,6 @@
     <a href="https://www.w3.org/WAI/WCAG21/Understanding/images-of-text.html">1.4.5</a></li>
   <li><a href="{{ source_url }}/blob/main/README.md">ReadableSTEM README</a> and the <a href="/limits">known limits</a> (what it does and does not do)</li>
 </ul>
+</details>
+
 {% endblock %}

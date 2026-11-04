@@ -5,19 +5,18 @@
 {% block description %}Turns STEM notes, slides and problem sets into accessible web pages: equations as MathML a screen reader can speak, real headings, tables and described figures.{% endblock %}
 {% block head %}<script src="{{ static_url('listen.js') }}" defer></script>{% endblock %}
 {% block content %}
-{# Layout (DESIGN.md): hero with the real before/after, what it handles, three steps, what
-   you download, the numbers, then sign-in and questions. The feature list reads the same
-   flags as /limits (routes/pages.py `_features`), so a server never lists a feature it has
-   off. Method and accuracy detail live on /limits; this page keeps the proof strip and one
-   paragraph. #}
+{# Layout (DESIGN.md): a headline, one line, the real before/after, the comparison chart, three
+   short lines on what it handles, and the questions folded. Detail lives on /limits, /privacy
+   and the guides. The lines read the same flags as /limits (routes/pages.py `_features`), so a
+   server never lists a feature it has off. The chart is web/proof_facts.py (the registered
+   report), once, from `_proof_chart.html`. #}
 <section class="hero" aria-labelledby="hero-title">
   <h1 id="hero-title">Turn STEM course PDFs into accessible web pages, equations included</h1>
   {# No deadline date is stated here: the rule is 28 CFR part 35, subpart H, and a date
      should only be added once it is checked against it and the university's own page
      (UX review BW9). #}
-  <p class="lede">Upload your lecture notes, slides or problem sets. ReadableSTEM rebuilds each
-    equation as real maths (MathML) that a screen reader can speak, restores the headings,
-    describes the figures and asks you about what it is unsure of.</p>
+  <p class="lede">Upload your lecture notes, slides or problem sets. Get a web page whose
+    equations a screen reader can speak, and review what the tool is unsure of.</p>
   <p class="hero-actions">
     {% if user %}
     <a class="button" href="/app">Go to my documents</a>
@@ -62,145 +61,67 @@
     </section>
   </div>
   <p class="hero-source">From <a href="https://openstax.org/books/physics/pages/2-3-position-vs-time-graphs">OpenStax Physics, 2.3 Position vs. Time Graphs</a>
-    (CC BY 4.0), page 3 of <a href="{{ static_url('demo/source.pdf') }}">the PDF</a>. The PDF has no tags, so a
-    screen reader gets only its text layer. The reading on the right is made from the page's
-    MathML by the same code that checks the equations.</p>
+    (CC BY 4.0), page 3 of <a href="{{ static_url('demo/source.pdf') }}">the PDF</a>, which has no tags.</p>
 </section>
+
+<h2 id="compare">How it compares</h2>
+{% from "_proof_chart.html" import proof_chart %}
+{{ proof_chart(proof_facts) }}
+<p><a href="/limits#accuracy">Evidence: the four measures, how each was measured and what they
+  do not show</a>, and <a href="/guides/readablestem-mathpix-latexml">how to choose a tool</a>.</p>
 
 <h2 id="handles">What it handles</h2>
-{# One line an item; the detail of each is on /limits ("What it handles, with limits"). #}
+{# One line each; the detail is on /limits ("What it handles, with limits"). #}
 <ul>
-  <li>Lecture notes and problem sets made with LaTeX or Word{% if office_on %}, as PDF, Word or PowerPoint files{% endif %}.</li>
-  <li>Equations, which a screen reader can read aloud and step through.</li>
-  <li>Chemistry formulas and reactions (its weakest area: check each one).</li>
-  <li>Beamer slide decks, one slide per frame.</li>
-  {% if tables_on %}<li>Tables, rebuilt with proper header cells.</li>{% endif %}
-  <li>Figures, with short descriptions{% if long_on %}, and longer ones for charts and diagrams{% endif %}.</li>
-  {% if image_pages_on %}<li>Scanned and handwritten pages, when you ask for them.</li>{% endif %}
-  {% if notation_on %}<li>Your course's own notation, once you describe it.</li>{% endif %}
-  {% if latex_source %}<li>LaTeX source files (.tex) and project zips, read directly from the source (not Beamer source yet: use the PDF).</li>{% endif %}
+  <li><strong>Equations</strong> become MathML a screen reader can speak. What it is unsure of
+    goes to a review screen where you accept, edit or reject it.</li>
+  <li><strong>The rest of the page:</strong> real headings and lists{% if tables_on %}, tables with header cells{% endif %}
+    and short descriptions for figures.</li>
+  <li><strong>Your files:</strong> PDF{% if office_on %}, Word or PowerPoint{% endif %}, up to {{ max_pages }}
+    pages at a time{% if image_pages_on %}; scanned and handwritten pages when you ask{% endif %}.
+    {% if latex_source %}LaTeX source files (.tex) and project zips are read from the source.
+    {% endif %}You download one HTML file to post in your course
+    ({% if word_export %}Word, {% endif %}EPUB and Canvas too).</li>
 </ul>
-<p><a href="/limits#handles">How each works, and what it does not do yet</a>.</p>
-
-<section class="steps-section" aria-labelledby="steps-title">
-  <h2 id="steps-title">Upload, review, post</h2>
-  <ol class="three-steps">
-    <li>
-      <h3>Upload</h3>
-      <p>Upload up to {{ max_pages }} pages at a time. Converting takes a few minutes, and you
-        can open a sample document first to see the review screen.</p>
-    </li>
-    <li>
-      <h3>Review</h3>
-      <p>You decide only what could change what a student reads. Everything else is accepted
-        and listed for you to look over. Once your document is converted, its page tells you
-        exactly how many decisions it needs.</p>
-    </li>
-    <li>
-      <h3>Post</h3>
-      <p>Post the web page in your course in place of the PDF. Students open it in any browser
-        and do not sign in. <a href="/help/posting">How to post it in your course</a>.</p>
-    </li>
-  </ol>
-</section>
-
-<h2 id="review-time">How much review it needs</h2>
-{# The same three figures as /limits ("Review time"): PROOF.md (1.8), docs/eval-realworld.md
-   (5.6), docs/eval-handwriting.md (5.7). tests/test_landing_facts.py keeps them in step. #}
-<ul>
-  <li>Textbook sections: about 1.8 decisions a page (15 OpenStax sections, 242 pages).</li>
-  <li>Research papers made with LaTeX: about 5.6 decisions a page (15 arXiv papers, 71
-    pages).</li>
-  {% if image_pages_on %}<li>Handwritten notes: about 5.7 decisions a page (24 pages).</li>{% endif %}
-</ul>
-<p>These are averages from our tests. Your document's page gives the exact count after it is
-  converted.</p>
-
-<h2 id="download">What you download</h2>
-<ul>
-  <li>A web page to post in your course, with the text, equations and pictures inside it.</li>
-  <li>The same document as {% if word_export %}a Word file or {% endif %}an e-book (EPUB).</li>
-  <li>Packages to import into Canvas, Blackboard, Moodle or D2L (not yet tried in a live course).</li>
-  <li>A record of the review that you can print: what the tool proposed and what you decided.</li>
-</ul>
-<p>You can share a document with a colleague or a TA by email address, to view it or to help
-  you review it.</p>
-
-<h2 id="accuracy">How accurate it is</h2>
-{# The newest registered held-out test is the headline (PROOF.md, docs/eval-equation-fresh5.md),
-   in plain words. The four measures, their sample sizes and how each was measured are on
-   /limits (the proof strip), behind one evidence link. tests/test_landing_facts.py checks the
-   text against the reports. #}
-<p><strong>On equations, this test found no difference it could detect between ReadableSTEM
-  and a general chatbot.</strong> Scored by whether a screen reader reads each equation the same
-  as the original, a chatbot (Claude Opus) scored 0.836 against 0.840 for ReadableSTEM (26
-  documents, 1,715 equations). “Exactly right” means the whole equation matches the original
-  symbol for symbol: 0.770 for the chatbot, 0.793 for ReadableSTEM.</p>
-<p>The test was set up before it ran, on 26 documents the tool had never seen (arXiv papers,
-  textbook sections and course notes made with LaTeX; 4 November 2026, version 0.5.9).
-  ReadableSTEM left fewer wrong equations without a question to you (5.0 against 9.6 per 100),
-  but not as few as the goal we set before the run (4.0 or fewer), so it was not met. It asked
-  about 46% of its wrong equations against a goal of 60%, so that was not met either. In 3
-  chemistry sections, 0.33 of the equations were right as chemistry, against a goal of 0.80.
-  The earlier test, on 15 textbook sections (October 2026, version 0.4.0), had the chatbot ahead
-  on equations exactly right, 0.62 against 0.50. This is why you review the equations the tool
-  flags.</p>
-<p><a href="/limits#accuracy">Evidence: the four measures, how each was measured and what
-  they do not show</a>.</p>
-
-<h2 id="try">Sign in and convert a PDF</h2>
-{% if user %}
-<p><a class="button" href="/app">Go to my documents</a></p>
-{% else %}
-<p>{% include "_signin_line.html" %}</p>
-{% include "_signin.html" %}
-{% endif %}
-<p>Or <a href="/demo">look at an example conversion</a> first (no sign-in needed).</p>
+<p><a href="/limits">What it does not do yet</a> and
+  <a href="/help/posting">how to post it in your course</a>.</p>
 
 <h2>Questions</h2>
 <div class="faq">
-  <details id="who" open>
-    <summary>Who can use it</summary>
+  <details>
+    <summary id="who">Who can use it</summary>
     {% if signup_open %}
     <p>ReadableSTEM is a free beta. Anyone with a Google account can sign in and try it,
       including a university Google account{% if microsoft_login %}, and so can people with a
       Microsoft account from a university that is set up for it{% endif %}. Signing in the first
-      time makes your account. New accounts have daily limits: {{ open_page_quota }} pages a day,
-      and the service pauses for the day when its budget for AI model calls is used up. The
-      example conversion needs no sign-in. Upload only materials you wrote or have the right to
-      adapt. Never upload student records or anything with students' personal information in
-      it.</p>
+      time makes your account. New accounts have daily limits: {{ open_page_quota }} pages a day.
+      The example conversion needs no sign-in. Upload only materials you wrote or have the
+      right to adapt, never student records.</p>
     {% else %}
     <p>The beta is open to a small group of instructors, by invitation. Upload only materials
-      you wrote or have the right to adapt. Never upload student records or anything with
-      students' personal information in it.</p>
+      you wrote or have the right to adapt, never student records.</p>
     {% endif %}
   </details>
-  <details id="documents" open>
-    <summary>What happens to your documents</summary>
+  <details>
+    <summary id="documents">What happens to your documents</summary>
     <p>Your file and everything made from it are deleted {{ retention_hours }} hours after you
-      last work on them: each decision or download starts the clock again. You can choose to
-      keep a document for 7 days, at upload, from its page, or for every upload in your account
-      settings, seen only by you and the people you name. You can also let us
-      look at the results for {{ opt_in_days }} days, to find and fix mistakes in the tool. You
-      can delete a document at any time. We do not use your uploads to train models.
-      <a href="/privacy">Read the privacy notice</a>.</p>
+      last work on it. You can keep a document for 7 days, or let us look at the results for
+      {{ opt_in_days }} days to find mistakes in the tool. You can delete it at any time. We do
+      not use your uploads to train models. <a href="/privacy">Read the privacy notice</a>.</p>
   </details>
   <details>
     <summary>Why STEM courses need this now</summary>
-    <p>The Department of Justice's ADA Title II web rule asks public universities to make their
-      online course materials accessible to students with disabilities. In STEM the hard part
-      is the maths: a PDF equation is usually a picture or a jumble of characters to a screen
-      reader. <a href="/guides/ada-title-ii-stem-course-materials">What the rule asks of STEM
-      course materials</a>.</p>
+    <p>The Department of Justice's ADA Title II web rule asks public universities to make online
+      course materials accessible. In STEM the hard part is the maths: a PDF equation is
+      usually a picture to a screen reader.
+      <a href="/guides/ada-title-ii-stem-course-materials">What the rule asks</a>.</p>
   </details>
   <details>
     <summary>For accessibility and disability services offices</summary>
-    <p>ReadableSTEM assists the instructor. It does not replace their judgement or your
-      office's review, and it does not say that a document meets WCAG, the ADA or Section 508.
-      <a href="/for-accessibility-offices">The page for accessibility offices</a> covers where
-      a document goes, who receives it, how long it is kept, and a pilot checklist you can
-      print.</p>
+    <p>ReadableSTEM assists the instructor. It does not replace your office's review, and it
+      does not say that a document meets WCAG, the ADA or Section 508.
+      <a href="/for-accessibility-offices">Where a document goes, who receives it and a pilot
+      checklist</a>.</p>
   </details>
   <details>
     <summary>Who makes it</summary>

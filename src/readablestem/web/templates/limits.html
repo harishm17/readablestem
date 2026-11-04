@@ -55,6 +55,8 @@
 </dl>
 
 <h2 id="handles">What it handles, with limits</h2>
+<details>
+<summary>Each thing it handles, with its limit</summary>
 <ul>
   <li><strong>Equations.</strong> Each equation's proposal is compared with the PDF's own text
     (letters, digits, signs and letter styles), and a difference becomes a decision for you.
@@ -117,8 +119,11 @@
     says otherwise. A passage in another language is marked only when it is a whole paragraph
     or list item.</li>
 </ul>
+</details>
 
 <h2 id="not-yet">What it does not do</h2>
+<details>
+<summary>What it does not do</summary>
 <ul>
   <li><strong>Hidden text is never used.</strong> Text that a tablet or a text recognition
     (OCR) program guessed and hid in the PDF, and text that cannot be seen when the page is
@@ -135,6 +140,7 @@
   <li><strong>No certification.</strong> The tool assists you. It does not say that a document
     meets WCAG, the ADA, Section 508 or any other standard or law.</li>
 </ul>
+</details>
 
 <h2 id="review-time">How much review it needs</h2>
 <ul>
@@ -176,7 +182,8 @@
 <p>We therefore do not claim that ReadableSTEM does better than a general chatbot on
   equations. This was one run on 26 documents; it says nothing about scans, handwriting, Word
   files or maths inside figures.</p>
-<p>Earlier results, kept as history (older versions of the tool):</p>
+<details>
+<summary>Earlier results, kept as history (older versions of the tool)</summary>
 <ul>
   <li><strong>The first registered test</strong> (15 sections of five OpenStax textbooks, 242
     pages, 2,738 equations, version 0.4.0, October 2026; <a href="{{ source_url }}/blob/main/PROOF.md">full
@@ -217,4 +224,5 @@
 <p>Real course PDFs, especially ones typeset with LaTeX or exported from Word, may do
   worse. <a href="{{ source_url }}/blob/main/docs/eval.md">The evaluation report</a> says how
   this was measured and what the numbers do not show.</p>
+</details>
 {% endblock %}

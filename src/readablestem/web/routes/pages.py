@@ -192,6 +192,7 @@ def for_accessibility_offices(request: Request) -> Response:
     ctx = get_ctx(request)
     context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
     context["latex_source"] = _features(request)["latex_source"]
+    context["proof_facts"] = proof_facts.load()
     return render(request, "offices.html", context)
 
 
@@ -284,7 +285,11 @@ def guide_ada_title_ii(request: Request) -> Response:
 def guide_compare(request: Request) -> Response:
     """ReadableSTEM beside Mathpix, Aelira, chatbots and LaTeXML, each fact with source and date."""
     path = seo.COMPARE_GUIDE
-    context = _guide_context(path, "guide-compare") | _features(request)
+    context = (
+        _guide_context(path, "guide-compare")
+        | _features(request)
+        | {"proof_facts": proof_facts.load()}
+    )
     return render(request, "guide_compare.html", context)
 
 

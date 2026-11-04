@@ -27,6 +27,8 @@
   with students' personal information in it.</p>
 
 <h2>What is stored, and for how long</h2>
+<details>
+<summary>What is stored, and the exact clocks</summary>
 <p>For each upload we store: the PDF{% if office_on %} (for a Word or PowerPoint file, the PDF
   made from it; the Word or PowerPoint file itself is not kept){% endif %}{% if latex_source %}
   (for LaTeX source, the .tex file or the zip that was uploaded){% endif %} and its file name, images cut from it (equations and
@@ -73,6 +75,7 @@
     you delete them or your account; they are not deleted with your documents.</li>
   {% endif %}
 </ul>
+</details>
 
 <h2>Who else sees your documents</h2>
 <ul>
@@ -107,6 +110,8 @@
 </ul>
 
 <h2>Your account</h2>
+<details>
+<summary>Account details and deleting your account</summary>
 {% if signup_open %}
 {# SIGNUP_MODE=open. Keep in step with web/auth.py, web/routes/account.py and the checks of
    ops/launch.py (this page must say that the first sign-in makes an account, and how to
@@ -147,6 +152,7 @@
   delete your account yourself from the <a href="/account">Account</a> page once you are
   signed in.</p>
 {% endif %}
+</details>
 
 <h2>Cookies</h2>
 <p>One cookie keeps you signed in (for up to 7 days) and protects forms against forgery.
@@ -166,6 +172,8 @@
 {% endif %}
 
 <h2>What is logged</h2>
+<details>
+<summary>Logs and usage notes</summary>
 {# Platform logs: Railway keeps its own request logs; how long depends on the plan, so the
    sentence does not give a number. #}
 <p>The app's logs record what happened, not what was in your document: event names, random
@@ -186,8 +194,11 @@
   cookies or scripts are used for this. These notes are deleted after {{ event_days }}
   days, or with your account.</p>
 {% endif %}
+</details>
 
 <h2>How it is protected</h2>
+<details>
+<summary>How it is protected</summary>
 {# Every line below is a behaviour the tests exercise (docs/security.md, tests/test_audit_*.py);
    keep it that way when editing. #}
 <ul>
@@ -213,6 +224,8 @@
     refused.</li>
   {% endif %}
 </ul>
+</details>
+
 <h2>Where it is processed</h2>
 <p>The app and its database run on Railway, in its United States region. Images and nearby
   text of equations and figures are sent to {{ recipients|selectattr("gets_documents")|map(attribute="name")|join(" and ") }} in

@@ -1,13 +1,15 @@
 {% extends "base.html" %}
-{% block body_class %}mode-read{% endblock %}
-{% block title %}Terms of use{% endblock %}
-{% block description %}Terms of use for ReadableSTEM, a free beta built by Harish Manoharan: who can use it, the daily limits and what you may upload.{% endblock %}
+{% block body_class %}mode-read</details>
+{% endblock %}
+{% block title %}Terms of use</details>
+{% endblock %}
+{% block description %}Terms of use for ReadableSTEM, a free beta built by Harish Manoharan: who can use it, the daily limits and what you may upload.</details>
+{% endblock %}
 {% block content %}
 <h1>Terms of use</h1>
 <p class="hint">These terms describe how the beta works today.</p>
 
 <h2 id="summary">In short</h2>
-<p>What you agree to by using it. The full terms follow, and they are the ones that count.</p>
 <ul>
   <li><strong>Upload only your own materials</strong>, or ones you have the right to adapt.
     Never upload student records, graded work or anything with students' personal
@@ -23,6 +25,8 @@
     comes without warranty.</li>
 </ul>
 
+<details>
+<summary>The full terms, which are the ones that count</summary>
 <h2>The service</h2>
 <p>ReadableSTEM is a free beta built and maintained by Harish Manoharan.
   {% if signup_open %}It is open to anyone with a Google account{% if microsoft_on %} (or a Microsoft school
@@ -90,4 +94,5 @@
 <p>For takedown requests, rights concerns or questions{% if contact_email %}, email
   <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% else %}, use the contact
   address of this service{% endif %}.</p>
+</details>
 {% endblock %}

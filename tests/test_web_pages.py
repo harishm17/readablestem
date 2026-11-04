@@ -140,7 +140,7 @@ def test_landing_page_says_assists_and_links_the_demo(pages):
     html = pages["/"]
     assert "assists" in html
     assert 'href="/demo"' in html
-    assert 'href="/dev-login"' in html  # the sign-in option on this test server
+    assert 'href="/login"' in html  # the one call to action; the buttons are on /login
 
 
 def test_privacy_and_terms_describe_real_behaviour(pages):

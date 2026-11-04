@@ -1,0 +1,83 @@
+{# The comparison chart: ReadableSTEM, the Opus chatbot and the Haiku chatbot on the newest
+   registered held-out test, as horizontal bars. One component for the landing page, the
+   comparison guide and the offices page; use it once on a page (it defines the bar patterns).
+   Every number comes from `proof_facts.chart` (web/proof_facts.py, read from
+   data/realworld/results-fresh5.json), so a page cannot show a bar the report does not have.
+
+   Accessibility: the bars are drawn for the eye and hidden from assistive technology
+   (aria-hidden), and the same numbers are a real table beside them (visually hidden, so it is
+   always read), so nothing depends on seeing the bars. Each bar has its system's name and its
+   number written beside it, and a different fill (solid, hatched, dotted), so colour is not
+   the only difference. No script, no inline style (the bars are SVG rects with a width
+   attribute). Under 40rem each bar sits under its name. Dark mode follows the tokens; in forced
+   colours the fills are system colours (app.css, "ux2-lane-d").
+   Use: {% from "_proof_chart.html" import proof_chart %}{{ proof_chart(proof_facts) }} #}
+{% macro proof_chart(proof_facts, first_test=true) %}
+<figure class="proof-chart" aria-labelledby="proof-chart-title">
+  <p class="proof-chart-title" id="proof-chart-title"><strong>ReadableSTEM against a general chatbot, on equations</strong></p>
+  <svg class="chart-defs" width="0" height="0" aria-hidden="true" focusable="false">
+    <defs>
+      <pattern id="chart-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect class="pat-bg" width="6" height="6"/>
+        <rect class="pat-stroke" width="6" height="2"/>
+      </pattern>
+      <pattern id="chart-dots" width="6" height="6" patternUnits="userSpaceOnUse">
+        <rect class="pat-bg" width="6" height="6"/>
+        <circle class="pat-fill" cx="3" cy="3" r="1.5"/>
+      </pattern>
+    </defs>
+  </svg>
+  <div class="chart" aria-hidden="true">
+    {% for row in proof_facts.chart %}
+    <div class="chart-row">
+      <p class="chart-measure">{{ row.measure }} <span class="chart-better">{{ row.better }}</span></p>
+      {% for line in row.lines %}
+      <div class="chart-line chart-sys-{{ loop.index }}">
+        <span class="chart-name">{{ line.system }}</span>
+        <svg class="chart-bar" width="100%" height="16" focusable="false">
+          <rect class="chart-track" x="0.5" y="0.5" width="99.5%" height="15"/>
+          {% if line.width %}<rect class="chart-fill" x="0" y="0" width="{{ line.width }}%" height="16"/>{% endif %}
+        </svg>
+        <span class="chart-value">{{ line.value }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  <table class="visually-hidden">
+    <caption>ReadableSTEM, the chatbot on Opus and the chatbot on Haiku, on {{ proof_facts.set_label }}: {{ proof_facts.pipeline }}, run recorded {{ proof_facts.date }}</caption>
+    <thead>
+      <tr><th scope="col">Measure</th>{% for line in proof_facts.chart[0].lines %}<th scope="col">{{ line.system }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+      {% for row in proof_facts.chart %}
+      <tr><th scope="row">{{ row.measure }} ({{ row.better|lower }})</th>{% for line in row.lines %}<td>{{ line.value }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <figcaption>
+    <p>26 documents the tool had never seen (arXiv papers, textbook sections, course notes),
+      1,715 equations, a test set up before it ran, 4 November 2026, version 0.5.9
+      (<a href="{{ proof_facts.facts[0].href }}">the registered report</a>).</p>
+    <p><strong>On the main score, what a listener hears, ReadableSTEM and the Opus chatbot are
+      level</strong> ({{ proof_facts.facts[0].value }} and {{ proof_facts.chart[0].lines[1].value }}): the
+      test can detect no difference between them. A chatbot never asks about an equation it is
+      unsure of.</p>
+  </figcaption>
+  {% if first_test %}
+  {% set t = proof_facts.first_test %}
+  <table class="chart-mini">
+    <caption>Headings and figures: the first registered test ({{ t.set_label }})</caption>
+    <thead>
+      <tr><th scope="col">Measure</th><th scope="col">ReadableSTEM</th><th scope="col">Chatbot on Opus</th></tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">Heading levels right, of the headings both found</th><td>{{ t.levels_ours }}</td><td>{{ t.levels_chatbot }}</td></tr>
+      <tr><th scope="row">Figure descriptions a model judge found contradicting the picture</th><td>{{ t.errors_ours }}</td><td>{{ t.errors_chatbot }}</td></tr>
+    </tbody>
+  </table>
+  <p class="chart-source">The judge is a model, not yet checked against people.
+    <a href="/limits#accuracy">All results, including earlier tests, and how they were measured</a>.</p>
+  {% endif %}
+</figure>
+{% endmacro %}

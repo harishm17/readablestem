@@ -1294,4 +1294,42 @@ fieldset.option-group > .hint { margin-top: var(--space-1); }
 @media (forced-colors: active) {
   .style-example, .style-scheme { border-color: CanvasText; }
 }
+/* The comparison chart (templates/_proof_chart.html): horizontal bars, a name and a number on
+   every bar, three fills (solid, hatched, dotted) so colour is not the only difference. */
+.proof-chart { margin: var(--space-5) 0; max-width: 52rem; }
+.mode-read main > .proof-chart { max-width: 52rem; }
+.proof-chart-title { margin: 0 0 var(--space-3); font-size: var(--step-1); }
+.chart-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.chart-row { margin: 0 0 var(--space-4); }
+.chart-measure { margin: 0 0 var(--space-1); font-weight: 700; }
+.chart-better { margin-left: var(--space-2); font-weight: 400; color: var(--ink-muted); font-size: var(--step--1); }
+.chart-line { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr) 6rem; align-items: center; gap: var(--space-3); min-height: 1.75rem; }
+.chart-name { font-size: var(--step-0); }
+.chart-value { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
+.chart-bar { display: block; width: 100%; height: 16px; }
+.chart-track { fill: var(--surface-2); stroke: var(--border-subtle); stroke-width: 1; }
+.chart-sys-1 .chart-fill { fill: var(--accent); }
+.chart-sys-2 .chart-fill { fill: url(#chart-hatch); stroke: var(--ink-muted); stroke-width: 1; }
+.chart-sys-3 .chart-fill { fill: url(#chart-dots); stroke: var(--ink-muted); stroke-width: 1; }
+.pat-bg { fill: var(--bg); }
+.pat-stroke, .pat-fill { fill: var(--ink-muted); }
+.proof-chart figcaption { margin-top: var(--space-3); }
+.proof-chart figcaption p, .chart-source { margin: 0 0 var(--space-2); }
+.chart-mini { margin-top: var(--space-4); }
+.chart-mini caption { font-weight: 700; color: var(--ink); }
+.chart-source { color: var(--ink-muted); }
+@media (max-width: 39.99rem) {
+  .chart-line { grid-template-columns: minmax(0, 1fr) auto; gap: 0 var(--space-3); margin-bottom: var(--space-2); }
+  .chart-bar { grid-column: 1 / -1; grid-row: 2; }
+  .chart-value { grid-column: 2; grid-row: 1; }
+  .chart-name { grid-column: 1; grid-row: 1; }
+}
+@media (forced-colors: active) {
+  .chart-bar { forced-color-adjust: none; }
+  .chart-track { fill: Canvas; stroke: CanvasText; }
+  .chart-sys-1 .chart-fill { fill: CanvasText; }
+  .chart-sys-2 .chart-fill, .chart-sys-3 .chart-fill { stroke: CanvasText; }
+  .pat-bg { fill: Canvas; }
+  .pat-stroke, .pat-fill { fill: CanvasText; }
+}
 /* ===== end ux2-lane-d ====================================================================== */

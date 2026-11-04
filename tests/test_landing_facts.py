@@ -134,42 +134,37 @@ def test_the_other_results_match_their_reports_and_development_is_labelled(pages
 
 def test_the_landing_page_summarises_without_overclaiming(pages):
     landing = squash(pages["/"])
-    # The registered held-out tiles are the headline, and the gap to the chatbot is said.
-    # The four measures and how each was measured are on /limits, behind one evidence link.
+    # The newest registered held-out result is the one framing: level on what a listener hears,
+    # drawn as a chart (web/proof_facts.py). The four measures and how each was measured are on
+    # /limits, behind one evidence link; the earlier test (chatbot ahead on exactly right) is
+    # history there, in PROOF.md and in the README, not on the landing page.
     assert 'class="proof-strip"' not in pages["/"] and 'class="proof-strip"' in pages["/limits"]
+    assert 'class="proof-chart"' in pages["/"]
     assert "Evidence: the four measures, how each was measured" in landing
-    assert (
-        "this test found no difference it could detect between ReadableSTEM and a general chatbot"
-        in landing
-    )
-    assert "0.836 against 0.840 for ReadableSTEM (26 documents, 1,715 equations)" in landing
-    assert "5.0 against 9.6 per 100" in landing and "so it was not met" in landing
-    assert "0.62 against 0.50" in landing  # the earlier result is not hidden
+    assert "ReadableSTEM and the Opus chatbot are level (0.840 and 0.836)" in landing
+    assert "can detect no difference between them" in landing
+    assert "26 documents the tool had never seen" in landing and "1,715 equations" in landing
+    assert "a test set up before it ran, 4 November 2026, version 0.5.9" in landing
+    assert "0.62 against 0.50" not in landing and "chatbot ahead" not in landing
+    assert "All results, including earlier tests" in landing
     assert "beat" not in landing.lower().replace("beats", "")
-    assert (
-        "“Exactly right” means the whole equation matches the original symbol for symbol: "
-        "0.770 for the chatbot, 0.793 for ReadableSTEM" in landing
-    )
-    # One decisions-per-page figure per kind of document, the same as /limits gives.
     limits = squash(pages["/limits"])
-    for line, figure in (
-        (
-            "Textbook sections: about 1.8 decisions a page (15 OpenStax sections, 242 pages)",
-            "textbook sections, about 1.8 decisions a page (15 OpenStax sections, 242 pages)",
-        ),
-        (
-            "about 5.6 decisions a page (15 arXiv papers, 71 pages)",
-            "about 5.6 a page (15 arXiv papers, 71 pages)",
-        ),
-    ):
-        assert line in landing and figure in limits
+    assert "about half (0.50) against 0.62 for the chatbot" in limits  # the history stays there
+    assert 'href="/limits#accuracy"' in pages["/"]
     assert "about 5.6 things per page" in REALWORLD and "5.7 decisions per page" in HANDWRITING
     assert "**242**" in PROOF
-    assert 'href="/limits#accuracy"' in pages["/"]
     # Development numbers stay on /limits, labelled there.
     assert "0.735" not in landing and "development set" not in landing.lower()
     for claim in ("compliant", "conforms", "guarantee"):
         assert claim not in landing.lower(), claim
+
+
+def test_limits_keeps_one_decisions_per_page_figure_per_kind_of_document(pages):
+    limits = squash(pages["/limits"])
+    assert (
+        "textbook sections, about 1.8 decisions a page (15 OpenStax sections, 242 pages)" in limits
+    )
+    assert "about 5.6 a page (15 arXiv papers, 71 pages)" in limits
 
 
 def test_licence_is_worded_the_same_way_everywhere(pages):
