@@ -569,6 +569,13 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   paragraphs, lists, tables, exact equations (LaTeXML's MathML through the sanitiser, accepted),
   and figures with the project's own picture through the ordinary figure step. A formula
   LaTeXML could not read, and a figure with no picture, are required decisions.
+- **TeX Live is not read.** LaTeXML finds a package's own TeX with `kpsewhich`. With TeX Live's base
+  installed (the image has `texlive-latex-base`, which `latexml` depends on) it then reads raw TeX for a
+  package it has a binding for and runs expl3 under its own interpreter: `\\usepackage{siunitx}` took 72 s
+  and ended in over 100 errors (found by the CI job that runs the real sandbox). The sandbox puts an empty
+  file over `kpsewhich` (`sandbox.run(hide=)`, `latexml.HIDDEN_FILES`), so LaTeXML uses only its own
+  bindings, as it does where TeX Live is not installed: 2 s and the right answer. A package it has no
+  binding for is then an unknown-command decision, never a slow raw-TeX run.
 - **Review.** A source has no pages to show, so its review is the list view; the split view
   redirects to it. `DocumentResult.origin` is `latex`; the student note says "a LaTeX document".
 - **Failure.** A source that cannot be converted fails the job with `source_failed`,

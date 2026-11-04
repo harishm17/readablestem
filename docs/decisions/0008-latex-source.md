@@ -51,6 +51,8 @@ holds the model API keys and the database address in its environment, in the sam
 ## Consequences
 
 - The image grows by about 270 MB (`INSTALL_LATEXML`, docs/deploy-railway.md).
+- The sandbox hides `kpsewhich` from LaTeXML (an empty file over it): with TeX Live's base installed,
+  LaTeXML otherwise reads raw TeX for packages and failed slowly on `siunitx`. It uses its own bindings only.
 - LaTeXML 0.8.8 in Debian trixie has no `mhchem` binding and, without TeX Live's pictures
   packages, no TikZ: `\ce` and TikZ pictures become decisions, not conversions. Custom `.sty`
   files are not read (`--includestyles` is off): a document that depends on one may produce

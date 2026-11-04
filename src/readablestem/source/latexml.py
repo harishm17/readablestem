@@ -31,6 +31,13 @@ LIMITS = sandbox.Limits(
     wall_s=120, cpu_s=120, memory_bytes=1_500_000_000, file_bytes=50_000_000, out_bytes=200_000_000
 )
 
+# LaTeXML finds a package's own TeX with `kpsewhich`. With TeX Live's base installed (the image's
+# `texlive-latex-base`) it then reads raw TeX for a package it has a binding for and tries to run
+# expl3 under its own interpreter: `\\usepackage{siunitx}` took 72 s and ended in over 100 errors.
+# Without `kpsewhich` it uses its own bindings only, as it does where TeX Live is not installed:
+# 2 s and the right answer. So the program is hidden from LaTeXML (an empty file in the sandbox).
+HIDDEN_FILES = ("/usr/bin/kpsewhich", "/usr/local/bin/kpsewhich", "/bin/kpsewhich")
+
 DOC_NAME = "doc.xhtml"
 XML_NAME = "doc.xml"
 # Where `convert` leaves them, relative to its `out` folder.
@@ -95,7 +102,7 @@ def convert(
             "--log=/out/latexml.log", f"/work/{main}",
         ],
         ro=ro + mounts, rw=((xml_dir, "/out"),), env=_env(extra), cwd="/work", limits=limits,
-        log=out / "latexml.out",
+        log=out / "latexml.out", hide=HIDDEN_FILES,
     )  # fmt: skip
     # latexml exits 0 for "no obvious problems" and for warnings; 10 or more means fatal.
     if not first.ok or not (xml_dir / XML_NAME).is_file():
@@ -118,5 +125,5 @@ def convert(
             "--log=/out/post.log", f"/xml/{XML_NAME}",
         ],
         ro=ro + mounts + ((xml_dir, "/xml"),), rw=((html_dir, "/out"),), env=_env(extra),
-        cwd="/out", limits=second_limits, log=out / "post.out",
+        cwd="/out", limits=second_limits, log=out / "post.out", hide=HIDDEN_FILES,
     )  # fmt: skip
