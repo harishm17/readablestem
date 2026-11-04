@@ -471,6 +471,16 @@ jobs:
           docker run --rm readablestem:ci readablestem --version
           docker run --rm readablestem:ci readablestem ops --help
           test "$(docker run --rm readablestem:ci id -u)" = "10001"
+      # The LaTeXML build argument (docs/deploy-railway.md, "LaTeXML"): the packages install, the
+      # versions print, and ImageMagick's policy is the locked-down one. The sandbox itself is
+      # probed on the deployed image (`readablestem ops sandbox-probe`), not here.
+      - name: Build with LaTeXML and check its policy
+        run: |
+          docker build --build-arg INSTALL_LATEXML=true --tag readablestem:latexml .
+          docker run --rm readablestem:latexml latexml --VERSION
+          docker run --rm readablestem:latexml latexmlpost --VERSION
+          docker run --rm readablestem:latexml identify -list policy | grep -B1 'pattern: PDF' | grep -q 'rights: None'
+          docker images readablestem --format '{{.Tag}} {{.Size}}'
 
   eval-gate:
     name: eval gate (when a baseline exists)
