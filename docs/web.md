@@ -406,7 +406,8 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    user (`uploads.UploadGate`). Each upload costs about three times its size in memory
    while it is read, copied and probed, so this keeps uploads near 200 MB however many
    requests arrive at once (the limit was set for Cloud Run's `--concurrency=20` and a 1 GiB
-   instance). Over the limit: a 503
+   instance; with the 50 MB upload limit the web service is sized at 2 GB: 3 uploads of 3 times
+   50 MB are about 450 MB). Over the limit: a 503
    (busy) or 429 (your own upload is still in progress) page with `Retry-After`, before
    the body is read;
 3. size: a declared `Content-Length` over the limit is refused before reading, and the
@@ -687,8 +688,11 @@ file goes through (`_place_files`: the probe, the page quota, the caps):
   refused by its header without any of it being read; a project is at most the budget) plus the usual
   copies an upload makes. Documents past the person's limit are only named, never read, and a zip met
   after the limit is reached is refused unopened. With the defaults (20 MB) that is about 150 MB at the
-  peak of a request and 3 requests at once (the upload gate), under the service's 1 GiB; when the upload
-  limit is raised the budgets follow it, so check this sum against the gate and the memory size;
+  peak of a request and 3 requests at once (the upload gate), well under the service's size; with the
+  50 MB limit it is about 350 MB a request (body 50, text 24, one document up to 100 for a project, and the
+  three copies an upload makes), so 3 at once stay near 1.1 GB inside the 2 GB the web service is sized
+  at (1 GiB before the limit was raised). The budgets follow the upload limit, so check this sum against
+  the gate and the memory size whenever it changes;
 - every refusal of a zip (`zip_bad`, `zip_limits`, `zip_unsafe`, `zip_unsupported`, `zip_empty`,
   `batch_limit`) is a category with a sentence (`routes.jobs.batch_messages`), a row on the batch page, and
   costs nothing.
