@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block head %}
+<link rel="stylesheet" href="{{ root }}assets/listen.css">
+<script src="{{ root }}assets/listen.js" defer></script>
+{% endblock %}
+{% block content %}
+{# One worked example read as a screen reader roughly would (web/listen.py), built when the
+   site is built: the page is static, so the transcript is text in the page and the player is
+   the same script the app uses. The component is the app's own (_listen_player.html). #}
+<div id="listen-page">
+<p class="eyebrow">Worked example</p>
+<h1>Listen as a student</h1>
+<p class="lede measure">{{ example.title }}</p>
+<p class="measure"><strong>Roughly what a screen reader says.</strong> NVDA, JAWS and VoiceOver each speak differently; test with one before you rely on it.</p>
+<p class="measure">This is the converted page read in order, with headings and their levels, lists, links, equations, figures and tables. <a href="index.html">Back to the example</a>, or <a href="converted.html">open the converted page</a> to try it with your own screen reader.</p>
+{% include "_listen_player.html" %}
+</div>
+{% endblock %}

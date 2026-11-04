@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import functools
 import logging
-import re
 import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -55,6 +54,7 @@ from readablestem.web.deps import (
     render,
 )
 from readablestem.web.health import stop_worker_on_sigterm
+from readablestem.web.listen import speakable
 from readablestem.web.logsafe import log_event, log_exception
 from readablestem.web.return_to import decision_link, remember_return, signed_out_page
 from readablestem.web.routes import (
@@ -73,6 +73,7 @@ from readablestem.web.routes import (
     inventory,
     job_settings,
     jobs,
+    listen,
     pages,
     parts,
     record,
@@ -81,6 +82,7 @@ from readablestem.web.routes import (
     sharing,
     split,
 )
+from readablestem.web.sandbox_status import run_probe
 from readablestem.web.security import (
     RequestSizeLimitMiddleware,
     SafeErrorMiddleware,
@@ -147,11 +149,10 @@ def _utc_text(value: datetime | None) -> str:
 
 
 def _speakable(text: str | None) -> str:
-    """A spoken reading to show, or "" when the text is not one. Speech is words ("v equals d
-    over t"); a string with a backslash, braces, a caret or an underscore is LaTeX that stood
-    in for a reading, and the review screen must never present that as what a person hears."""
-    value = (text or "").strip()
-    return "" if not value or re.search(r"[\\{}^_]", value) else value
+    """A spoken reading to show, or "" when the text is not one (LaTeX that stood in for a
+    reading must never be presented as what a person hears). One rule, in `web.listen`,
+    shared with the listening transcript."""
+    return speakable(text)
 
 
 def _utc(value: datetime | None) -> Markup:
@@ -408,6 +409,9 @@ def create_app(
         if settings.env == "prod" and (blockers := launch_blockers(settings=settings)):
             # Not a refusal: a staging deploy runs as prod before the copy is final.
             log_event(logger, "launch_blockers", logging.WARNING, count=len(blockers))
+        if settings.sandbox_probe_at_startup:
+            # In the background: neither start-up nor /healthz waits for it.
+            run_probe(ctx.sandbox, timeout_s=settings.sandbox_probe_timeout_s)
         if settings.run_worker:
             ctx.worker = Worker(
                 settings,
@@ -497,6 +501,7 @@ def create_app(
         cron,
         courses,
         record,
+        listen,
         email_login,
         discovery,
     ):

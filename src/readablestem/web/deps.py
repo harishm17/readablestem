@@ -26,6 +26,7 @@ from readablestem.web import analytics, report_item, seo
 from readablestem.web.abuse import RateLimiter, client_ip
 from readablestem.web.db import User, session_scope
 from readablestem.web.logsafe import log_event
+from readablestem.web.sandbox_status import SandboxStatus
 from readablestem.web.spend import DbSpendGuard
 from readablestem.web.uploads import UploadGate
 from readablestem.web.worker import ClientFactory, Converter, Worker
@@ -64,6 +65,8 @@ class AppContext:
     uploads: UploadGate = field(default_factory=lambda: UploadGate(limit=3))
     # Attempts per address and person on sign-in, upload and cron (`web.abuse`).
     limiter: RateLimiter = field(default_factory=RateLimiter)
+    # The last sandbox probe of this process (`web.sandbox_status`): LaTeX source needs a PASS.
+    sandbox: SandboxStatus = field(default_factory=SandboxStatus)
 
     @property
     def dev_login_enabled(self) -> bool:

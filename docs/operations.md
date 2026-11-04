@@ -659,6 +659,18 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 
 ## Sandbox probe
 
+**At start-up.** There is no shell on Railway to run the probe by hand, so the web process runs it
+itself, in the background, when it starts and LaTeXML is in the image
+(`web/sandbox_status.py`; `SANDBOX_PROBE_AT_STARTUP`, default on, `SANDBOX_PROBE_TIMEOUT_S`, default
+240). It is the same probe with `--require-latexml`. It logs one line, `sandbox_probe result=PASS|FAIL
+<check>=<value> ...` (the probe's own check names and one-word answers, nothing else), and
+`/healthz/ops` shows it under `sandbox`: `state` (`running`, `pass`, `fail`, `timeout`,
+`not_installed` or `not_run`), `result`, `checks`, `bound_mb`, `cgroup`, `seccomp`, `checked_at`.
+Neither start-up nor `/healthz` waits for it. `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE` and
+a `FEATURE_BATCH_ZIP` zip with a LaTeX project take effect only while the state is `pass`; before
+that, after a FAIL and after a timeout, such an upload gets the 503 "cannot read LaTeX source right
+now" answer and the pages do not offer it. A redeploy runs the probe again.
+
 `readablestem ops sandbox-probe` says whether the sandbox for uploaded TeX (`core/sandbox.py`,
 docs/security.md, "Running uploaded TeX") works on the machine it runs on. Platforms may forbid the
 unprivileged user namespaces bubblewrap needs, so run it on the deployed image, not on a laptop:

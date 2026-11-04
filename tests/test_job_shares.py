@@ -36,6 +36,7 @@ NEEDS: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/progress"): "view",
     ("GET", "/jobs/{job_id}/draft"): "view",
     ("GET", "/jobs/{job_id}/view"): "view",
+    ("GET", "/jobs/{job_id}/listen"): "view",
     ("GET", "/jobs/{job_id}/record"): "view",
     ("GET", "/jobs/{job_id}/record.csv"): "view",
     ("GET", "/jobs/{job_id}/download"): "view",

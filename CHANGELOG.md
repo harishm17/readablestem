@@ -11,6 +11,29 @@
   (`docs/tables.md`). Bullets and Dingbats are not taken.
 - A cell equation's line crop and glyph context are cut to its own column, not the table's width
   (the next column's "(5)" was read into `S^3`).
+## Unreleased: sandbox probe at start-up (branch latex/probe-at-startup)
+
+- New: when the web process starts and LaTeXML is in the image it runs the sandbox probe
+  (`--require-latexml`) in the background, logs `sandbox_probe result=PASS|FAIL ...` once, and
+  shows the result on `/healthz/ops` under `sandbox` (state, checks, bound_mb, cgroup, seccomp,
+  checked_at; `not_installed` when there is no LaTeXML). `FEATURE_LATEX_SOURCE`,
+  `FEATURE_BEAMER_SOURCE` and a `FEATURE_BATCH_ZIP` zip with a LaTeX project take effect only
+  while the last probe passed: otherwise the existing 503 `source_unavailable` answer. Settings
+  `SANDBOX_PROBE_AT_STARTUP` and `SANDBOX_PROBE_TIMEOUT_S`.
+
+## Unreleased: Listen as a student (branch preview/listen-as-student)
+
+- New: an instructor can hear roughly what a screen reader will say for a converted document
+  before sharing it. `GET /jobs/{id}/listen` (owners and anyone it is shared with) and
+  `GET /demo/listen` (public) show a transcript built from the final HTML, in reading order
+  (landmarks, headings with their level, lists, links, equations spoken by the same speech rules
+  as the review screen, figures, tables with their headers, pictures kept as images, language
+  changes; never LaTeX), with an optional Play, Pause, Stop, speed, previous and next item, next
+  heading and next equation, using the browser's own voice (a voice on the device by default;
+  online voices only on request). The job page, the review screen (a "Hear this" button
+  beside an equation plays the proposal and how the PDF's text layer reads), the landing hero,
+  the demo, the showcase examples and `/help/posting` offer it. Not part of any download.
+  See docs/web.md, "Listen as a student".
 
 ## Unreleased: site copy rewrite (branch content/site-rewrite)
 

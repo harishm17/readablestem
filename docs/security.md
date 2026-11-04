@@ -87,7 +87,7 @@ cannot skip these checks unnoticed.
 
 | Class | Routes |
 |---|---|
-| Public | `/`, `/demo`, `/style` (the design tokens and components; `noindex`, no data), `/privacy`, `/terms`, `/limits`, `/for-accessibility-offices` and its `/summary` download, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (names of late scheduled tasks only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
+| Public | `/`, `/demo`, `/demo/listen` (the stored demo's listening transcript; read-only, no user data), `/style` (the design tokens and components; `noindex`, no data), `/privacy`, `/terms`, `/limits`, `/for-accessibility-offices` and its `/summary` download, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (names of late scheduled tasks only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
 | Signed-in user, owner or a person the owner shared the document with (below) | `/account`, `/account/delete` (GET, POST), `POST /account/keep-default` (CSRF-checked; sets the caller's own "keep 7 days by default" only), `/app`, `/app/documents`, `/app/download`, `/app/batch/{id}` and `/app/batch/{id}/download` (the answer to an upload of several files, kept an hour; the uploader only), `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages), everything under `/courses/...` (including `/courses/{id}/download`) |
 | Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
 | Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), rate limited per address (`analytics`, 300 per 10 minutes), the visitor's address is not forwarded (PostHog sees the relay's own), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
@@ -160,7 +160,8 @@ the `job_shares` table). It adds a way in, so it is described in full here.
   domain rule, no `+tag` folding. Signing in is still the service's own gate (`users.is_allowed`,
   or open sign-up), so a share does not let anyone in who could not sign in. Nothing is emailed
   and there are no links that work without signing in.
-- **What.** Two rights. `view`: the job page, `/view` preview, the downloads, the crops and the
+- **What.** Two rights. `view`: the job page, `/view` preview, `/listen` (the listening
+  transcript, a GET that only reads; no POST), the downloads, the crops and the
   review record. `review`: also the review screen and every decision and edit. The owner alone
   can delete, retry, change the title, contact line, language or retention, upload a revision,
   combine parts, use "Download all", add or change or remove a share, or read the course
@@ -296,7 +297,8 @@ killer are what is left behind it. The caller kills the group at a wall-clock li
 (120 s) or when the output folders and the program's log pass 200 MB. If bubblewrap or user namespaces are not available the run is
 refused; there is no unsandboxed fallback (a plain child of the web process shares its user, so
 it could read the web process's files). Whether the platform allows it is checked on the deployed
-image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"); a FAIL there means
+image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"; the web process also runs it at start-up and LaTeX source is
+refused with a 503 unless it passed, `web/sandbox_status.py`); a FAIL there means
 LaTeX upload must stay off.
 
 What each layer is for, and what is tested (`tests/test_source_escapes.py` runs these through the
@@ -523,7 +525,7 @@ Triage of what the scanners reported:
   internet. The sandbox contains it; a flaw in bubblewrap or in the kernel's namespaces is not
   prevented by anything here. The lint is not a defence. The image has the distribution's LaTeXML, so
   a security update of it arrives with the next build (`apt`, not pinned).
-- `/healthz/ops` is public and has no rate limit: it reads two rows and a sum of stored sizes, and answers with at most the
+- `/healthz/ops` is public and has no rate limit: it reads two rows, a sum of stored sizes and the last sandbox probe result (`sandbox`: check names and one-word answers), and answers with at most the
   words `backup`, `cron`, `storage` or `database`, and the stored and allowed megabytes (totals, no names). Scheduled-task failures are found by a GitHub Actions job
   that stops after 60 days without a commit to the public repository, unless re-enabled.
 - The session cookie is readable by its owner (signed, not encrypted).

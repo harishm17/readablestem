@@ -31,6 +31,7 @@ CRON = "cron"
 ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/"): PUBLIC,
     ("GET", "/demo"): PUBLIC,
+    ("GET", "/demo/listen"): PUBLIC,  # the stored demo's listening transcript; no user data
     ("GET", "/style"): PUBLIC,
     ("GET", "/privacy"): PUBLIC,
     ("GET", "/terms"): PUBLIC,
@@ -149,6 +150,9 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/symbols"): USER,  # T1-7: CSRF, owner only, not rate limited
     ("POST", "/jobs/{job_id}/undo"): USER,
     ("GET", "/jobs/{job_id}/view"): USER,
+    # Listen as a student: the transcript of what a screen reader says. Read-only (no POST),
+    # access `view`: the owner and anyone it is shared with; a stranger gets the 404.
+    ("GET", "/jobs/{job_id}/listen"): USER,
     # G1: who has access to a document. The owner only; a person it is shared with gets a 403,
     # a stranger the same 404 as for a made-up id (tests/test_job_shares.py has the matrix).
     ("GET", "/jobs/{job_id}/share"): USER,

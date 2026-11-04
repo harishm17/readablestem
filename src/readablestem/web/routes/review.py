@@ -71,6 +71,7 @@ from readablestem.web import (
     events,
     heading_groups,
     inventory,
+    listen,
     notation,
     notice_places,
     page_edits,
@@ -454,6 +455,9 @@ class ReviewItem:
     # What a screen reader gets from the PDF for an equation: its text layer ("" when
     # the PDF has none). Shown only to the job's owner, on the review screens.
     text_layer: str = ""
+    # What "Hear this" speaks for the decision (`web.listen.hear_for`): the proposal and, for
+    # an equation, how the PDF's text layer reads. None when there is nothing to play.
+    hear: listen.Hear | None = None
     # A page (or handwriting) kept as an image (`web.review.is_kept_image`): its card says
     # what it is now and offers no figure form (its one decision is the page group's).
     kept_image: bool = False
@@ -861,6 +865,18 @@ def _item(
         text_layer=(element.text or "").strip()
         if element is not None and fix.kind is Kind.EQUATION
         else "",
+        hear=listen.hear_for(
+            fix.kind.value,
+            speech=fix.equation.speech if fix.equation else None,
+            alt=fix.figure.alt if fix.figure else None,
+            decorative=bool(fix.figure and fix.figure.decorative),
+            heading_level=(place.written if place is not None and place.written else None)
+            or (fix.heading.level if fix.heading else None),
+            heading_text=fix.heading.text if fix.heading else None,
+            text_layer=(element.text or "").strip()
+            if element is not None and fix.kind is Kind.EQUATION
+            else "",
+        ),
         kept_image=is_kept_image(fix),
         kept_state=KEPT_IMAGE_STATE if is_kept_image(fix) and not fix.pending else "",
         can_describe=describable,

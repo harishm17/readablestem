@@ -63,6 +63,7 @@ PUBLIC = {
     "privacy": "/privacy",
     "login": "/login",
     "status": "/status",
+    "demo-listen": "/demo/listen",
 }
 SIGNED_IN = {
     "app": "/app",
@@ -72,6 +73,7 @@ SIGNED_IN = {
     "review-figure": "/jobs/{job}/review?item=p1-e6",
     "review-list": "/jobs/{job}/review/list",
     "symbols": "/jobs/{job}/symbols?view=split",
+    "listen": "/jobs/{job}/listen",
 }
 VIEWS = {"1440": {"width": 1440, "height": 900}, "390": {"width": 390, "height": 844}}
 
@@ -157,6 +159,16 @@ def main() -> None:
         state = seed.storage_state()
         seed.close()
         env.run_worker()
+        # The fake conversion's file is a stub; the listening page is shot with the demo's
+        # real converted document (headings, equations, figures, links) in its place.
+        from readablestem.web.db import Job, session_scope
+
+        demo = Path(__file__).resolve().parents[1] / "src/readablestem/web/static/demo/index.html"
+        with session_scope(env.ctx.factory) as session:
+            row = session.get(Job, job)
+            if row is not None:
+                row.html = demo.read_text(encoding="utf-8")
+                row.html_stale = False
         env.settings.dev_login_enabled = False  # no "Development sign-in" from here on
 
         def shoot(name: str, path: str, signed: bool, view: str, scheme: str, **options) -> None:
