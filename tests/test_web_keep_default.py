@@ -1,4 +1,4 @@
-"""The account's "Keep my documents for 7 days by default" and the job page's retention line.
+"""The account's "Keep new documents for 7 days by default" and the job page's retention line.
 
 The setting is remembered on the account (`users.keep_week_default`) and only sets the starting
 state of the upload form's 7-day box: each upload still decides, and the job page says, near the
@@ -51,7 +51,7 @@ def save(env, on: bool):
 def test_the_setting_is_off_by_default_and_the_box_starts_unticked(web):
     assert stored(web) is False
     account = web.browser.get("/account").text
-    assert "Keep my documents for 7 days by default" in account
+    assert "Keep new documents for 7 days by default" in account
     assert "checked" not in re.search(r'<input type="checkbox" id="keep-default"[^>]*>', account)[0]
     assert "checked" not in keep_box(web.browser.get("/app").text)
 
@@ -95,8 +95,8 @@ def test_the_job_page_says_when_it_is_deleted_and_offers_a_week(web):
     line = page.split('id="retention-line"', 1)[1].split("</div>", 1)[0]
     flat = " ".join(re.sub(r"<[^>]+>", " ", line).split())
     assert "Deleted automatically on" in flat and "24 hours after you last work on it" in flat
-    assert f'action="/jobs/{job_id}/keep"' in line and "Keep it for 7 days" in flat
-    # Keeping it: the line then says 7 days and the button goes (the bottom one extends).
+    assert f'action="/jobs/{job_id}/keep"' in line and "Keep for 7 days" in flat
+    # Keeping it: the line then says 7 days and the button goes (it was just extended).
     web.browser.post(f"/jobs/{job_id}/keep", data={"csrf_token": csrf_from(page)})
     page = web.browser.get(f"/jobs/{job_id}").text
     line = page.split('id="retention-line"', 1)[1].split("</div>", 1)[0]

@@ -74,6 +74,7 @@ SIGNED_IN = {
     "review-list": "/jobs/{job}/review/list",
     "symbols": "/jobs/{job}/symbols?view=split",
     "listen": "/jobs/{job}/listen",
+    "bulk-figures": "/jobs/{job}/accept/figures",
 }
 VIEWS = {"1440": {"width": 1440, "height": 900}, "390": {"width": 390, "height": 844}}
 

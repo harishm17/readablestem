@@ -378,3 +378,16 @@ def test_offering_the_option_makes_room_for_a_page_read_in_the_largest_reservati
         )
     )
     assert cheap <= on
+
+
+def test_the_scan_refusal_summary_says_what_to_do_and_that_the_file_is_chosen_again(offered):
+    page = upload(offered.browser, scan_pdf()).text
+    summary = page.split('id="error-summary-title"', 1)[1].split("</div>", 1)[0]
+    flat = " ".join(re.sub(r"<[^>]+>", " ", summary).split())
+    assert "Tick “Convert scanned or handwritten pages” and choose the file again." in flat
+    assert 'href="#image_pages"' in summary  # the link goes to the box to tick
+    assert "cannot convert it" not in flat  # no permanent-sounding verdict in the summary
+    assert "choose the file again" in page.split('id="pdf-error"', 1)[1]  # the field says it too
+    assert 'id="image_pages"' in page and "checked" not in re.search(
+        r'<input type="checkbox" id="image_pages"[^>]*>', page
+    ).group(0)

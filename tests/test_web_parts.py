@@ -447,3 +447,13 @@ def test_without_the_bigger_limits_the_limits_page_still_says_to_split(tmp_path)
     env = WebEnv(tmp_path)  # the test defaults: no keeping of larger files
     with env.running() as client:
         assert "Split longer documents." in text_of(client.get("/limits").text)
+
+
+def test_file_sizes_are_never_zero_megabytes():
+    from readablestem.web.pending import size_text
+
+    assert size_text(0) == "1 KB"
+    assert size_text(84 * 1024) == "84 KB"
+    assert size_text(104857) == "102 KB"
+    assert size_text(104858) == "0.1 MB"
+    assert size_text(5 * 1024 * 1024) == "5.0 MB"

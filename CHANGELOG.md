@@ -11,6 +11,66 @@
   Conservative: any other word, two numbered equations, or a fraction far from the row keep the old
   reading. `docs/layout.md` "One printed display, one element"; `scripts/layout_identity.py` lists
   what changed on 149 repository PDFs and the development, fresh and held-out papers.
+## Unreleased: upload, job page and My documents (branch ux/upload-job-documents)
+
+- A person a document was shared with who can only view it is no longer told "N decisions need
+  you": the status says the decisions are still open and only the owner or a reviewer can make
+  them (a reviewer is told they can review them). The results tile reads "Decisions made" and,
+  for a viewer, "Decisions still open". In My documents a document whose owner has no name is
+  "shared with you" instead of "shared by The owner".
+- "Try again" says what it will do ("puts your document back in the queue"); the confirmation
+  comes after it worked.
+- Times in My documents stay in the reader's time zone after the list refreshes itself.
+- One wording for keeping a document, "Keep for 7 days", on the upload form, job page, Account
+  page, notices and the privacy page. The job page shows the deletion time once, under the
+  review and download actions, with the day "Keep for 7 days" would delete it. Delete entry
+  points (a document, a course, an account, a waiting file) have a red outline style
+  (`button-danger-outline`, `danger-link`), the confirmation pages keep the filled button.
+- Upload form: shorter, in three groups (file, how to convert it, how long to keep it) with one
+  line of consequence beside each option and the long text in disclosures. A refused scanned PDF
+  says to tick "Convert scanned or handwritten pages" and choose the file again.
+- Choosing pages: sizes under 0.1 MB show in KB (`pending.size_text`), the range examples follow
+  the active page limit and the file, and a suggestion cut off at 20 parts says which pages it
+  leaves out.
+- My documents has a compact "Practise on the sample" link beside "Convert a PDF"; signed-in
+  pages get a compact footer of trust and help links (public pages keep the full footer).
+## Unreleased: spoken-equal scorer reads one print as one speech (branch eval/spoken-scorer-fix)
+
+- Evaluation only; the product's speech and `math_canonical.compare` are unchanged. The spoken-equal scorer
+  (`scripts/rw_spoken.py`) spoke 71 of the 2,350 development gold equations differently from a reading that
+  prints the same (`\mathrm{in}` against `\text{in}`, gold `\textbf` without its bold, `\min` against
+  `\text{min}`, `\bigl(`, `...`, `\backslash`, scripts and accents). `math_canonical.repair_converter_gaps`
+  and `speakable_latex` now write each print one way on both sides for every arm; a pair right before stays
+  right. 68 of the 71 became equal; ReadableSTEM base-0508 on development 0.792 to 0.820, Opus 0.728 to 0.755,
+  Haiku 0.723 to 0.749 (`docs/eval-realworld.md`). Guard tests: `tests/test_math_canonical_spoken.py`.
+- `PREREGISTRATION-FRESH5.md` section 4: the primary is spoken-equal, `exact_lenient` a secondary. The scorer,
+  its folding and the speech files are in `FRESH5_FILES`, to be hashed at signing.
+## Unreleased: sharing, guides, demo and status polish (branch ux/sharing-guides-demo)
+
+- The "About this demo" note has its own light-scheme, visited, hover, focus and forced-colour
+  link colours (it is a white box in every scheme; its links measured 2.39:1 in the dark scheme).
+  The generator (`eval/render.py`, `DEMO_NOTE_CSS`) and the committed demo carry the same rules; the
+  student output is unchanged. `/demo` is now axe-checked in the dark scheme
+  (`tests/test_web_demo_dark_browser.py`).
+- Sharing page: View and Review are whole-row choices (44 px or more, native radios, each with
+  what it allows); a "Copy link" button with a spoken confirmation (the address stays a
+  selectable field); the document's deletion time and a link to keep it longer beside the address;
+  sign-in wording from the enabled providers; "the same address, letter case aside" instead of "exactly
+  as written"; "Remove" is a danger button.
+- The comparison guide shows, under 52rem, one collapsed native disclosure per topic (ReadableSTEM's answer in the summary; opened, every tool with its source and date); the
+  table stays for wide screens. ADA, comparison and posting guides get the offices page's "On this
+  page" contents (`templates/_contents.html`) and stable heading ids.
+- Status page: "Checked at ...", a "Check again" link and what the 10-minute AI service
+  observation means.
+## Unreleased: review round fixes (branch ux/review-round-fixes)
+
+- Bulk accept: the button that accepts comes after the list of originals and proposals, which now asks you to compare each proposal with the image of the original; Cancel and Undo are unchanged.
+- Review split: on a wide screen the row of choices (Accept, Keep as image) sticks to the bottom of the window while the decision is longer than the window; on a phone the page has a "Back to the decision" link and says it scrolls sideways, with edge shadows where more of it is. The toolbar above the page image is `.page-bar` (it shared `.page-tools` with the "Change page" disclosure).
+- "Hear this" on an equation with no usable stored reading speaks it from its MathML, as the transcript does.
+- Review list: with more than three waiting in a group each is a compact row (what it is, page, status); one editor is open at a time when a row is opened by hand; the first, and any just worked on, starts open.
+- Symbols: beside "Change all" a line says how many places it changes and how many are left as they are, and follows the places ticked to be left out.
+- Listening: a compact transport (Play, Pause, Stop, previous and next, next heading and equation, Start at the lesson, Follow along) stays in view while the transcript scrolls; Follow along is on by default, is remembered in the browser and scrolls without animation under reduced motion; speed, voice and shortcuts are in a disclosure; a "Skip to the lesson" link works without scripts. Start at the lesson skips the title, language, notices and licence.
+- Code: `controls.css` holds the buttons for the app, the listening player and the showcase (listen.css no longer repeats them); spacing and type sizes in `app.css` are on the tokens; the unavailable sans weight 600 is 700.
 
 ## Unreleased: equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
 

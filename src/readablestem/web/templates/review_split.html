@@ -650,6 +650,7 @@
   <section class="page-area" id="page-view" aria-labelledby="page-title" tabindex="-1">
     <div class="page-head">
       <h2 id="page-title">Page {{ page.number }} <span class="page-of">of {{ page.count }}</span></h2>
+      <p class="back-to-decision"><a href="#decision-title">Back to the decision</a></p>
       <p class="page-step">
         {% if page.prev_href %}<a href="{{ page.prev_href }}">Previous page</a>{% endif %}
         {% if page.next_href %}<a href="{{ page.next_href }}">Next page</a>{% endif %}
@@ -664,7 +665,7 @@
       </ol>
     </nav>
     {% endif %}
-    <div class="page-tools">
+    <div class="page-bar">
       {# Only the kinds of mark on this page (a selected decision's marks are blue). #}
       {% set tiers = page.tiers %}
       {% if tiers %}
@@ -678,6 +679,7 @@
       <a class="toggle-accepted" href="{{ page.accepted_href }}">{% if show_accepted %}Hide accepted{% else %}Show accepted{% if page.hidden_accepted %} ({{ page.hidden_accepted }}){% endif %}{% endif %}</a>
     </div>
     {% if page.omitted %}<p class="page-note page-left-out" id="page-left-out">This page is left out of the student file and of the review. <a href="#page-tools-summary">Put it back</a></p>{% endif %}
+    <p class="hint page-scroll-hint">The page is wider than a phone screen: scroll it sideways to see all of it.</p>
     <div class="page-scroll" role="region" tabindex="0" aria-label="Page {{ page.number }} image{% if page.boxes %} with {{ page.boxes|length }} {{ 'mark' if page.boxes|length == 1 else 'marks' }}{% endif %}">
       <div class="page-frame">
         <img class="page-image" src="{{ page.image_url }}" alt="Page {{ page.number }} of the PDF." width="{{ (page.width or 612)|round|int }}" height="{{ (page.height or 792)|round|int }}">

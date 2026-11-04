@@ -8,8 +8,9 @@ copies the document's address and gives it to the person.
   Google's verified email, the Microsoft directory's verification of the email claim
   (`xms_edov`, never `preferred_username`), or an emailed single-use link sent to that very
   address (`web.email_login`). A sign-in that proves nothing (an older session) is told to sign
-  in again (`routes.jobs.job_access`). The address is matched in lower case and in full; there is
-  no domain rule, no `+tag` folding, and a linked address (`LinkedEmail`) does not count.
+  in again (`routes.jobs.job_access`). The address is matched in full and ignoring letter case;
+  there is no domain rule, no `+tag` folding, no alias, and a linked address (`LinkedEmail`)
+  does not count.
   Whether they may sign in at all is still the service's own rule (`users.is_allowed`, or open
   sign-up), so a person who cannot sign in cannot use a share.
 - Two rights. `view` reads the result: the job page, the student preview, every download and
@@ -50,6 +51,11 @@ RANK = {VIEW: 1, REVIEW: 2, OWNER: 3}
 # What the owner can give.
 ROLES = (VIEW, REVIEW)
 ROLE_WORDS = {VIEW: "View", REVIEW: "Review"}
+# One line under each right on the sharing page (what the right lets the person do).
+ROLE_HELP = {
+    VIEW: "Reads the converted document, the student preview, the downloads and the review record.",
+    REVIEW: "Also makes review decisions and edits. Each one is recorded under their name.",
+}
 MAX_SHARES_PER_JOB = 10
 # One whole address: the characters an address uses (no `*` or `?`, so no pattern is ever an
 # address), then `@`, then a dotted domain. Stricter than the sign-in's own check on purpose:
@@ -160,7 +166,7 @@ class SharedDocument:
     title_override: str | None
     result_title: str | None
     role: str
-    owner: str  # the owner's name, else "The owner": never their address
+    owner: str  # the owner's name, else "": never their address
 
 
 def shared_with(session: Session, user: Any, now) -> list[SharedDocument]:
@@ -186,4 +192,4 @@ def shared_with(session: Session, user: Any, now) -> list[SharedDocument]:
         )
         .order_by(Job.created_at.desc(), Job.id)
     ).all()
-    return [SharedDocument(r[0], r[1], r[2], r[3], r[4], r[5] or "The owner") for r in rows]
+    return [SharedDocument(r[0], r[1], r[2], r[3], r[4], r[5] or "") for r in rows]

@@ -110,7 +110,7 @@
   {# Posts without confirm=yes: the next page asks before anything is deleted. #}
   <form method="post" action="/courses/{{ course.id }}/delete">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <button type="submit" class="button-danger">Delete course</button>
+    <button type="submit" class="button-danger-outline">Delete course</button>
   </form>
 </section>
 <p><a href="/courses">All your courses</a></p>

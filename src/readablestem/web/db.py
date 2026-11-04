@@ -81,7 +81,7 @@ class User(Base):
     # is `is_allowed`, in either tier: a blocked person keeps their tier. The server default
     # keeps rows inserted by an older release valid after a rollback.
     access_tier: Mapped[str] = mapped_column(String(8), default="invited", server_default="invited")
-    # "Keep my documents for 7 days by default" (Account page): the upload form's 7-day box
+    # "Keep new documents for 7 days by default" (Account page): the upload form's 7-day box
     # starts ticked. Each upload still decides (`web.retention.mode_for_upload`); this only
     # sets the box's starting state.
     keep_week_default: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())

@@ -325,6 +325,9 @@ def render(
         "open_rereads": ctx.settings.open_tier_daily_rereads,
         # Search engines: only the public pages are indexed (web.seo).
         "indexable": seo.is_indexable(request.url.path),
+        # Signed-in pages (everything that is not a public page) get the compact footer.
+        "compact_footer": current_user(request) is not None
+        and not seo.is_indexable(request.url.path),
         "showcase_on": seo.SHOWCASE_DIR.is_dir(),
         # Product analytics (web.analytics): off unless ANALYTICS_ENABLED; the events queued
         # by the page before are handed to its loader once.

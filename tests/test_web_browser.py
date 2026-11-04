@@ -445,6 +445,11 @@ def test_deleting_asks_first_then_the_notice_takes_focus(site, browser):
     page.get_by_role("button", name="Yes, delete it").focus()
     page.keyboard.press("Enter")
     page.wait_for_url(f"{site.base}/app")
+    # Chromium applies `autofocus` (base.html puts it on the first notice) at the next
+    # rendering opportunity after load, so right after the redirect focus can still be on <body>.
+    page.wait_for_function(
+        "document.activeElement && document.activeElement.classList.contains('notice')"
+    )
     assert "notice" in active_classes(page)
     assert "have been deleted" in page.evaluate("document.activeElement.textContent")
     context.close()

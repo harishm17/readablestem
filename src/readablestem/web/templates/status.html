@@ -3,6 +3,7 @@
 {% block description %}Whether ReadableSTEM is up right now, whether conversions are open today, and how many documents are waiting.{% endblock %}
 {% block content %}
 <h1>Service status</h1>
+<p class="status-checked" id="status-checked">Checked at {{ checked_at|utc }}. <a href="/status">Check again</a></p>
 <dl class="summary-list">
   <div><dt>Service</dt><dd>{{ "Up" if database_ok else "Having problems: the database is not answering. Please try again later." }}</dd></div>
   {% if database_ok %}
@@ -12,7 +13,10 @@
   <div><dt>Documents converting</dt><dd>{{ converting }}</dd></div>
   {% endif %}
 </dl>
-<p class="hint">This page shows the state right now. Whatever it says, uploaded documents
+<p class="hint" id="status-window">The AI service line comes from this server's own requests to
+  the model in the last 10 minutes. If none were sent in that time it reports no problem, which
+  does not test that the service is up. This page does not update by itself.</p>
+<p class="hint">This page shows the state when it was checked, at the time above. Whatever it says, uploaded documents
   are deleted {{ retention_hours }} hours after they were last worked on (7 days if the
   uploader chose to keep them, {{ opt_in_days }} if they also let us look at the results). What the tool cannot do yet is on the
   <a href="/limits">known limits</a> page.</p>

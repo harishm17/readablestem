@@ -16,21 +16,25 @@
   </ul>
 </div>
 {% endif %}
-<p><strong>{{ pending.filename }}</strong> has {{ pending.pages }} pages and is {{ size_mb }} MB.
+<p><strong>{{ pending.filename }}</strong> has {{ pending.pages }} pages and is {{ size_text }}.
   One conversion takes up to {{ limit }} pages and {{ max_upload_mb }} MB, so a larger file is converted
   in parts. Nothing has been converted yet, and no pages have been taken from your daily count.</p>
 {% if done_label %}
 <p id="parts-done">Pages {{ done_label }} {{ "is" if done_count == 1 else "are" }} already sent to be converted; they are left out below.</p>
 {% endif %}
 {% if remaining %}
+{% if left_out_label %}
+<p id="parts-left-out">One go takes at most {{ max_parts }} parts, so the suggestion stops short:
+  {{ "page" if left_out_count == 1 else "pages" }} {{ left_out_label }}
+  {{ "is" if left_out_count == 1 else "are" }} not in it. Send these parts first; this page then suggests the next ones.</p>
+{% endif %}
 <form method="post" action="/uploads/{{ pending.id }}" novalidate class="upload-form">
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
   {% set parts_error = field_errors.get("parts") %}
   <div class="field{% if parts_error %} field-error{% endif %}">
     <label for="parts">Pages for each part</label>
     <p class="hint" id="parts-hint">One part on each line. Pages are numbered from 1, as in a PDF
-      viewer. Write a range with a hyphen, and join ranges in one part with a comma: <code>1-10</code>
-      or <code>5-12, 20</code>. A part can have up to {{ limit }} pages. The parts below are a
+      viewer. Write a range with a hyphen, and join ranges in one part with a comma: {% for example in examples %}<code>{{ example }}</code>{{ " or " if loop.first and examples|length > 1 else "" }}{% endfor %}. A part can have up to {{ limit }} pages. The parts below are a
       suggestion that covers the {{ "page" if remaining == 1 else "pages" }} not yet sent; change them as you like.
       {% if pages_left is not none %}You can convert {{ pages_left }} more {{ "page" if pages_left == 1 else "pages" }}
       today; the count starts again at {{ next_reset|utc }}. Parts that do not fit today are not started, and
@@ -55,6 +59,6 @@
 <p class="hint">This file is kept until {{ pending.retain_until|utc }}, then deleted.</p>
 <form method="post" action="/uploads/{{ pending.id }}/delete" class="inline-form">
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-  <button type="submit" class="button-secondary">Discard this file</button>
+  <button type="submit" class="button-danger-outline">Discard this file</button>
 </form>
 {% endblock %}

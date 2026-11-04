@@ -155,6 +155,25 @@ def suggest_parts(total: int, limit: int, taken: set[int] | None = None) -> list
     return parts[:MAX_PARTS]
 
 
+def left_out(total: int, taken: set[int] | None, parts: list[Part]) -> list[int]:
+    """The pages (0-based) that no suggested part covers and that are not converted yet: what
+    `suggest_parts` cut off at `MAX_PARTS`. Empty when the suggestion covers everything."""
+    covered = {page for part in parts for page in part.pages}
+    return [p for p in range(total) if p not in covered and not (taken and p in taken)]
+
+
+def examples(limit: int, total: int) -> list[str]:
+    """Range examples for the instructions, valid for this file and the active page limit
+    (never "1-10" under a limit of 5, never a page the file does not have)."""
+    out = [f"1-{max(1, min(limit, 10, total))}"]
+    count = min(8, limit - 1)  # pages 5 to 5+count-1, plus one more page
+    last = 4 + count
+    single = min(20, total)
+    if count >= 2 and single > last:
+        out.append(f"5-{last}, {single}")
+    return out
+
+
 def suggestion_text(parts: list[Part]) -> str:
     """The suggested parts as the text box takes them: one per line."""
     return "\n".join(p.label for p in parts)
