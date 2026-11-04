@@ -1,21 +1,15 @@
 {% extends "base.html" %}
-{# T3-4: the answer to an upload of several files: what was queued, and what was not, and
-   why. The POST redirects here (`GET /app/upload/{id}`, kept for an hour), so a refresh opens
-   this page again and does not upload the files again; the reasons name the files, which
-   is why they are stored server-side and not in the session cookie. #}
+{# The answer to an upload of several files or a zip of documents, live (routes/batch.py): each
+   document with its status as it is now, the large files waiting for their pages, the files
+   that were not uploaded and why. The POST redirects here (kept for an hour), so a refresh
+   opens this page again and uploads nothing; the reasons name the files, which is why they are
+   stored server-side and not in the session cookie. #}
 {% block title %}{{ received }} of {{ total }} {{ "file" if total == 1 else "files" }} uploaded{% endblock %}
 {% block content %}
 <h1>{{ received }} of {{ total }} {{ "file" if total == 1 else "files" }} uploaded</h1>
-{% if queued %}
-<section aria-labelledby="queued-heading">
-  <h2 id="queued-heading">Converting</h2>
-  <ul>
-    {% for item in queued %}
-    <li><a href="/jobs/{{ item.id }}">{{ item.filename }}</a>, {{ item.pages }} {{ "page" if item.pages == 1 else "pages" }}</li>
-    {% endfor %}
-  </ul>
-</section>
-{% endif %}
+{# A stable live region: the poll rewrites its text, the node stays (a replaced node is not announced). #}
+<p id="batch-summary" class="batch-summary" role="status" aria-live="polite">{{ summary }}</p>
+{% include "_batch_rows.html" %}
 {% if choose %}
 <section aria-labelledby="choose-heading">
   <h2 id="choose-heading">Choose which pages to convert</h2>

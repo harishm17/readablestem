@@ -27,6 +27,7 @@ once from its result and the two facts are stored.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -177,11 +178,21 @@ def decided_by_you(fixes: object) -> int:
     return len(triage.units(f for f in _fixes(fixes) if f.decided_by_reviewer))
 
 
-def _live(user_id: str, now: datetime, course_id: str | None = None):
+def _live(
+    user_id: str,
+    now: datetime,
+    course_id: str | None = None,
+    job_ids: Sequence[str] | None = None,
+):
     # Expired jobs count as deleted before the purge removes them (`routes.jobs.job_access`).
-    # With `course_id`, only the documents converted for that course (T3-4).
+    # With `course_id`, only the documents converted for that course (T3-4); with `job_ids`,
+    # only those (the batch page, `routes/batch.py`: still only this person's).
     where = (Job.user_id == user_id, Job.retain_until > now)
-    return (*where, Job.course_id == course_id) if course_id else where
+    if course_id:
+        where = (*where, Job.course_id == course_id)
+    if job_ids is not None:
+        where = (*where, Job.id.in_(list(job_ids)))
+    return where
 
 
 def list_version(
@@ -191,11 +202,12 @@ def list_version(
     now: datetime,
     budget_closed: bool,
     course_id: str | None = None,
+    job_ids: Sequence[str] | None = None,
 ) -> str:
     """Changes whenever the list would look different, from the jobs' columns alone."""
     rows = session.execute(
         select(Job.id, Job.status, Job.pages_done, Job.result_version, Job.error_code)
-        .where(*_live(user_id, now, course_id))
+        .where(*_live(user_id, now, course_id, job_ids))
         .order_by(Job.id)
     ).all()
     return _version([tuple(row) for row in rows], budget_closed)
@@ -214,6 +226,7 @@ def documents(
     now: datetime,
     budget_closed: bool,
     course_id: str | None = None,
+    job_ids: Sequence[str] | None = None,
 ) -> DocumentList:
     jobs = session.execute(
         select(
@@ -229,7 +242,7 @@ def documents(
             Job.part_label,
             Job.is_sample,
         )
-        .where(*_live(user_id, now, course_id))
+        .where(*_live(user_id, now, course_id, job_ids))
         .order_by(Job.created_at.desc(), Job.id)
     ).all()
     stored = _stored_facts(session, [job.id for job in jobs if job.status == JobStatus.DONE])
