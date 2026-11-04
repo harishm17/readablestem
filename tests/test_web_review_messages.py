@@ -42,6 +42,7 @@ SRC = Path(readablestem.__file__).resolve().parent
 PIPELINE_MODULES = (
     "validate",
     "equation_step",
+    "glyph_reconcile",
     "flag_policy",
     "figure_step",
     "heading_step",

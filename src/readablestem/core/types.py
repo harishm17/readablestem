@@ -213,6 +213,10 @@ class EquationFix(BaseModel):
     other_source: Literal["crop", "page_witness"] | None = Field(
         default=None, exclude_if=lambda v: v is None
     )
+    # `EQUATION_GLYPH_RECONCILE`: the model's reading before the equation step corrected it from
+    # the PDF's own glyphs (`pipeline.glyph_reconcile`; the fix's `equation.pdf_correction` note
+    # says which rule). `latex` is the corrected reading. None: nothing was corrected.
+    model_latex: str | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 # --------------------------------------------------------------------------- tables
@@ -574,6 +578,14 @@ class GlyphContext(BaseModel):
     span: str = ""
     before: str = ""
     after: str = ""
+    # For `EQUATION_GLYPH_RECONCILE` (`pipeline.glyph_reconcile`): `tex`, the PDF is TeX-made and
+    # every non-ASCII glyph of the span is in a TeX font, so the text layer names its symbols
+    # exactly; `labels`, the equation numbers "(N)" printed at an edge of the box apart from the
+    # formula, space-separated; `scr`, the capitals drawn in an RSFS or EUSM script face
+    # (`\mathscr`, not CMSY's `\mathcal`). Empty or False when layout found none.
+    tex: bool = Field(default=False, exclude_if=lambda v: not v)
+    labels: str = Field(default="", exclude_if=lambda v: not v)
+    scr: str = Field(default="", exclude_if=lambda v: not v)
 
     @staticmethod
     def encode(glyphs: Iterable[tuple[str, str | None]]) -> str:

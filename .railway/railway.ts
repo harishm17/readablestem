@@ -139,6 +139,7 @@ const appVariables = [
 // set in the dashboard is not deleted by the next apply.
 const webOnlyVariables = [
   "EQUATION_GLYPH_CHECKS",
+  "EQUATION_GLYPH_RECONCILE",
   "EQUATION_LINE_CONTEXT",
   "FEATURE_BATCH_ZIP",
   "FEATURE_BEAMER_SOURCE",
