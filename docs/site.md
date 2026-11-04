@@ -2,8 +2,9 @@
 
 `site/` builds a small website that shows what ReadableSTEM does on real pages, for people who
 will not sign in or run anything: technical reviewers and university staff. It is plain HTML
-and one stylesheet. It has no scripts, no frameworks, no web fonts, no trackers and no
-requests to other sites.
+and two stylesheets (the web app's design tokens, copied by the build with the self-hosted fonts they
+name, and `site/assets/site.css`). It has no scripts, no frameworks, no trackers and no
+requests to other sites; the fonts are files in the build, not a font service.
 
     make site                 # writes site/_build (OUT=<dir> for another folder)
     open site/_build/index.html
@@ -136,3 +137,8 @@ endblock %}`: serif h1 and h2, 18px text in a 68ch column. App screens keep Sour
 headings at 16px. Fonts are self-hosted (`web/static/vendor/README.md`); no page makes an
 outside request. `tests/test_design_tokens.py` checks the contrast of every token pair, the
 14px floor and the font budget.
+
+The landing hero is built by `scripts/hero_assets.py` from `web/static/demo/` (crop, text layer, MathML,
+reading, font subset into `web/static/hero/` and `vendor/fonts/`); the app never runs it and
+`tests/test_hero_assets.py` regenerates and compares. The proof tiles on the landing page and /limits
+come from `web/proof_facts.py` (PROOF.md, parsed once into `proof_facts.json`).

@@ -764,6 +764,11 @@ class _Conversion:
             return ConfigError(message)
         if kind == "unknown_model":
             return UnknownModelError(message)
+        if kind == "source":  # a LaTeX source that could not be converted: a plain code
+            code = "".join(c for c in str(header.get("code", "")) if c.isalnum() or c == "_")[:40]
+            failure = ConversionFailed("the source could not be converted")
+            failure.code = code or "source_failed"
+            return failure
         if kind == "oom":
             return ConversionOom("the child ran out of memory")
         if kind == "startup":

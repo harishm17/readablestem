@@ -1,0 +1,24 @@
+\documentclass{article}
+\usepackage{amsmath,amssymb}
+\title{Equations}
+\begin{document}
+\maketitle
+\section{Systems}
+A system of equations:
+\begin{align}
+  a_1 x + b_1 y &= c_1 \label{eq:first}\\
+  a_2 x + b_2 y &= c_2
+\end{align}
+The solution uses the determinant
+\[
+  D = \begin{vmatrix} a_1 & b_1 \\ a_2 & b_2 \end{vmatrix} = a_1 b_2 - a_2 b_1 .
+\]
+Summation and integral: $\sum_{k=1}^{n} k = \frac{n(n+1)}{2}$ and
+\begin{equation}
+  \int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}.
+\end{equation}
+A piecewise definition:
+\begin{equation}
+  f(x) = \begin{cases} x^2 & x \ge 0 \\ -x & x < 0 \end{cases}
+\end{equation}
+\end{document}

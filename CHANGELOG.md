@@ -1,5 +1,126 @@
 # Changelog
 
+## Unreleased: zip intake and tiered batch limits (branch batch/b2-zip-intake)
+
+- A `.zip` of documents is a batch (`FEATURE_BATCH_ZIP`, off by default, `web/batch_intake.py`): each PDF and each
+  folder with a main `.tex` file (a LaTeX project, re-zipped and checked again by the LaTeX source path) becomes a
+  document of its own through the ordinary upload checks; a zip with a main file at its root is one project; strays
+  are left out; a zip with no document, a link, a bad path, a nested zip, EPS or SVG, or over the limits (the LaTeX
+  source's, with 80 MB unpacked) is refused. The zip counts once for the upload rate limit.
+- Memory: the unpacked budget of a batch is one per request (twice the upload limit, shared by every zip in it, not
+  80 MB per zip), the documents of a zip are read one at a time when their turn comes, a PDF over the upload limit
+  is refused by its header unread, and documents past the person's limit are named, never read (a zip met after
+  the limit is refused unopened). `batch_intake.split` returns lazy `Member`s.
+- Limits by tier: one upload takes 30 documents for invited people and pilots and 10 for an account made by open
+  sign-up (`access.files_per_upload`), and the same number is the cap on documents waiting or converting at once
+  (it was 10 for everyone). The upload form and the messages say the number for the person.
+- The batch page `/app/batch/{id}` (`routes/batch.py`) replaces the results page of an upload of several files
+  (`/app/upload/{id}` redirects to it): a row per document with its status now, a polite live summary line, polling
+  with 204 while nothing changed, "Download all" (`/app/batch/{id}/download`) once nothing is waiting, the large
+  files and the refusals as before. `documents.documents` and `list_version` take a list of job ids.
+- Tests: `tests/test_batch_intake.py`, `tests/test_web_batch.py`, the batch page in `tests/test_web_jobs_browser.py`
+  (axe at 1280 and 375); the tests that fixed 10 now use the tier.
+
+## Unreleased: Beamer source (branch latex/e2-beamer-source)
+
+- Beamer decks within LaTeX source (`FEATURE_BEAMER_SOURCE`, off by default, needs `FEATURE_LATEX_SOURCE`): frames
+  become headings with their content (sections the top level, frames below them), an overlay step is written only
+  when it shows something the frame's last step does not ("(step 2 of 3)"; the rule of the PDF slide decks), text a
+  step covers is not written, a list item a pause reveals is an item of its own, a title page drawn by Beamer is read
+  for its blocks. `source/beamer_compat.tex` gives LaTeXML 0.8.8's binding the block, column and `\institute`
+  definitions it lacks (read first, read-only in the sandbox). A deck counts a page per frame. Spike on five decks
+  written for it: 20 frames, none with an unknown command (3 had one without the compat file); no
+  real deck tried. `DocumentResult.origin` `beamer`, the student note says "a slide deck". Tests:
+  `tests/test_source_beamer.py`; fixtures `tests/fixtures/source/beamer/`.
+
+## Unreleased: LaTeX source upload (branch latex/e1-source-intake)
+
+- LaTeX source (`FEATURE_LATEX_SOURCE`, off by default; ADR 0008): a `.tex` file or a `.zip` of a project is
+  converted by LaTeXML in the bubblewrap sandbox of the sandbox probe change, into the document a PDF becomes. Equations
+  come from the source (LaTeXML's MathML through the sanitiser, the source's own LaTeX), figures use the
+  project's pictures and the ordinary figure step, tables become grids, headings, lists and links are read as
+  written. A formula LaTeXML cannot read and a figure with no picture are required decisions; a source that cannot be
+  converted fails the job with "Upload the PDF instead" and keeps nothing. The review is the list view. New
+  `web/archive_intake.py` (zip limits: 20 MB, 100 MB unpacked, 500 entries, no links, absolute or `..` paths,
+  nested zips, EPS or SVG; a header that lies is caught), `source/` (`intake`, `lint`, `envelope`, `latexml`,
+  `ltx_reader`, `figures`, `convert`), a one-line hook in `pipeline/run.py` (`convert_pdf`), `DocumentResult.origin`,
+  `render_html(origin=)` (the student note says "a LaTeX document"), `INSTALL_LATEXML` and `FEATURE_LATEX_SOURCE` in
+  `railway.ts`. LaTeXML runs with `kpsewhich` hidden in the sandbox: where TeX Live's base is installed (the image) it
+  otherwise read raw TeX for packages and spent over a minute failing on `siunitx`. Beamer decks are refused until their own change. Docs: docs/web.md "LaTeX source",
+  docs/security.md "Running uploaded TeX", docs/development.md. Tests: `tests/test_archive_intake.py`,
+  `test_source_intake.py`, `test_source_reader.py`, `test_source_convert.py`, `test_source_escapes.py` (hostile
+  files through the real sandbox), `test_source_child.py`, `test_web_source.py`.
+## Unreleased: design polish (branch design/d6-polish)
+
+- Fixes from the Impeccable audit and critique of the redesign: paragraphs, hints and list items are capped at 75ch;
+  Sign out, document-row links and check boxes meet the 24px target floor (header buttons 44px); the review screen's
+  desk colour is lighter so its links have 7.3:1; the current step on the review screen keeps the two-tone focus
+  ring; the three fonts the first view needs are preloaded (no layout shift on a phone); buttons and the page tools'
+  forms never overflow at 320px or 200% zoom; the file chooser button is styled as a secondary button; the
+  comparison table keeps its topic column in view and tints the ReadableSTEM column; a few legacy radii and an
+  off-token colour moved onto the tokens. The focus-style test reads the new tokens, light and dark.
+
+## Unreleased: comparison table and showcase on the tokens (branch design/d4-compare-showcase)
+
+- The comparison guide (`/guides/readablestem-mathpix-latexml`) now compares five tools: ReadableSTEM, Mathpix,
+  Aelira, general chatbots and LaTeXML, on what each takes in and gives back, its maths, what it automates,
+  review by a person, where the file goes, cost and licence, a published test of equations and its version.
+  Every cell names its source and the day it was read (Aelira's own page and Mathpix's pages for them; the
+  chatbot column is the recipe tested in PROOF.md, not a claim about any product); accuracy appears only where
+  we measured it (ReadableSTEM and the chatbot recipe). `tests/test_compare_table.py` checks the sources and
+  that no cell claims conformance. The title, `/guides`, the footer label and `llms.txt` name the five tools.
+- The static showcase (`site/`) is built on the web app's tokens: `build.py` copies `tokens.css` and its
+  fonts into `assets/` (no outside request; it still opens from a folder), `site.css` uses the tokens, the
+  footer has the same four columns, and the showcase follows light and dark. The converted output and the PDF
+  pages stay on white paper. The `/demo` page is the stored converted document and is not restyled.
+
+## Unreleased: LaTeXML in the image (branch latex/x1-latexml-image)
+
+## Unreleased: sandbox probe (branch latex/x0-sandbox-probe)
+
+- `readablestem ops sandbox-probe`: checks on the running image that the sandbox for uploaded TeX
+  works (bubblewrap, user namespaces, no network, empty environment, hidden `/proc/1/environ`,
+  memory, wall-clock and output caps), times a tiny LaTeXML run when LaTeXML is installed, reports
+  the kernel's seccomp mode, Landlock ABI and same-UID `/proc/<pid>/environ` readability, and
+  prints PASS or FAIL (exit 1). Nothing it prints is document content. Docs: docs/operations.md,
+  "Sandbox probe"; docs/security.md, "Running uploaded TeX".
+- The sandbox joins its cgroup before bubblewrap starts (a wrapper, not a move afterwards, so no child escapes it),
+  and without a cgroup the total is bounded by arithmetic: LaTeXML gets 4 tasks (it needs 3) and 512 MB of address
+  space each (`source.latexml.LIMITS`), one source conversion runs at a time on the machine (`sandbox.exclusive`),
+  and `ops sandbox-probe` prints `sandbox_total_bound_mb` and fails `--require-latexml` over
+  `SOURCE_SANDBOX_MAX_TOTAL_MB` (2048). The upload comment now assumes a 2 GB web service.
+- The sandbox also caps tasks and open files (`prlimit --nproc --nofile`), puts a seccomp filter in front of the
+  program (`core/seccomp.py`, built without libseccomp), counts the program's own output against the output budget,
+  and uses a cgroup v2 memory and pids limit for the whole group when the container allows one; the probe reports
+  `sandbox_task_cap`, `sandbox_file_cap`, `sandbox_seccomp` and `sandbox_cgroup`. docs/security.md says what is
+  capped per process and what in total.
+- New `core/sandbox.py` (the bubblewrap runner the probe tests and a later LaTeX upload uses) and
+  `source/latexml.py` (the `latexml` and `latexmlpost` calls). Nothing in the app calls them yet.
+  Tests: `tests/test_sandbox.py`, `tests/test_ops_sandbox_probe.py`.
+## Unreleased: LaTeXML in the image (branch latex/x1-latexml-image)
+
+- Dockerfile: `ARG INSTALL_LATEXML=false` also installs `bubblewrap` and `util-linux` (the sandbox and `prlimit`; the
+  build fails without them). It installs the distribution's `latexml` (0.8.8) with TeX
+  Live's base and ImageMagick, and replaces ImageMagick's `policy.xml` with a deny-by-default one
+  (PNG, JPEG, GIF only; PS, EPS, PDF, XPS, URL and `@file` denied by name:
+  `src/readablestem/source/imagemagick-policy.xml`). Measured on the pinned base: +270 MB
+  (324.3 MB to 594.4 MB). Off by default; nothing in the app uses it yet. `INSTALL_LATEXML` is
+  declared on `web` in `.railway/railway.ts`; CI builds once with the argument and checks the
+  versions and the policy. Docs: docs/deploy-railway.md, "LaTeXML"; THIRD_PARTY_NOTICES.md.
+  Tests: `tests/test_latexml_image.py`.
+## Unreleased: landing page and proof strip (branch design/d2-landing)
+
+- Landing page: the hero shows a real passage of the demo (OpenStax Physics 2.3, page 3): the PDF crop
+  and what a screen reader gets from its text layer, beside the converted paragraph with live MathML
+  and the reading `pipeline/speech.py` gives it. `scripts/hero_assets.py` builds the crop, text layer,
+  MathML, reading and a 7.8 KB subset of Latin Modern Math from the stored demo; `tests/test_hero_assets.py`
+  regenerates them and compares. Then Upload, review, post; what you get; the numbers; try it;
+  questions (who can use it, what happens to your documents) and about, in the same wording as before.
+- `web/proof_facts.py` reads PROOF.md once into `proof_facts.json` (regenerate with
+  `uv run python -m readablestem.web.proof_facts`); the landing page and /limits show four tiles from it, each with
+  its count, the set, the date, "blind", where a general chatbot scored the same or higher, and a "How it was
+  measured" link to the PROOF.md section. `tests/test_proof_facts.py` fails when the JSON and PROOF.md differ.
+
 ## Unreleased: design system (branch design/d1-tokens-components)
 
 - Site design tokens and components (`static/tokens.css`, `static/app.css`, `DESIGN.md`,

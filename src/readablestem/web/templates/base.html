@@ -31,6 +31,9 @@
   <link rel="icon" href="/favicon.ico" sizes="48x48">
   <link rel="icon" href="{{ static_url('icon-192.png') }}" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="{{ static_url('apple-touch-icon.png') }}">
+  <link rel="preload" href="/static/vendor/fonts/source-sans-3-5.3.1-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/vendor/fonts/source-sans-3-5.3.1-latin-700.woff2" as="font" type="font/woff2" crossorigin>
+  {% block font_preload %}{% endblock %}
   <link rel="stylesheet" href="{{ static_url('tokens.css') }}">
   <link rel="stylesheet" href="{{ static_url('app.css') }}">
   <script src="/static/vendor/htmx-2.0.11.min.js" integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg" defer></script>
@@ -129,7 +132,7 @@
           <ul>
             <li><a href="/guides"{% if active == "guides" %} aria-current="page"{% endif %}>All guides</a></li>
             <li><a href="/guides/ada-title-ii-stem-course-materials"{% if active == "guide-ada" %} aria-current="page"{% endif %}>ADA Title II guide</a></li>
-            <li><a href="/guides/readablestem-mathpix-latexml"{% if active == "guide-compare" %} aria-current="page"{% endif %}>Compared with Mathpix and LaTeXML</a></li>
+            <li><a href="/guides/readablestem-mathpix-latexml"{% if active == "guide-compare" %} aria-current="page"{% endif %}>Compared with other tools</a></li>
           </ul>
         </div>
         <div>

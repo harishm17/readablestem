@@ -1,0 +1,41 @@
+\documentclass{beamer}
+\usetheme{Madrid}
+\usepackage{amsmath}
+\title{Kinematics in One Dimension}
+\author{A. Author}
+\date{Fall 2026}
+\begin{document}
+\frame{\titlepage}
+\section{Motion}
+\begin{frame}{Position and velocity}
+  \begin{itemize}
+    \item Position $x(t)$ is where the object is.
+    \pause
+    \item Velocity is $v = \frac{dx}{dt}$.
+    \pause
+    \item Acceleration is $a = \frac{dv}{dt}$.
+  \end{itemize}
+\end{frame}
+\begin{frame}
+  \frametitle{Constant acceleration}
+  \framesubtitle{The four equations}
+  \begin{align*}
+    v &= v_0 + a t \\
+    x &= x_0 + v_0 t + \tfrac{1}{2} a t^2
+  \end{align*}
+  \only<2>{Only on slide two: $v^2 = v_0^2 + 2a\Delta x$}
+  \uncover<3->{A closing remark.}
+\end{frame}
+\begin{frame}{Blocks}
+  \begin{block}{Definition}
+    The average velocity is $\bar v = \Delta x / \Delta t$.
+  \end{block}
+  \begin{alertblock}{Careful}
+    Direction matters.
+  \end{alertblock}
+  \begin{columns}
+    \column{0.5\textwidth} Left column text.
+    \column{0.5\textwidth} Right column text.
+  \end{columns}
+\end{frame}
+\end{document}

@@ -4,7 +4,8 @@ job row, in one transaction (shared by the upload route and the page chooser for
 The caps are the launch audit's (docs/security.md), and they live here so no route that
 makes jobs can skip them:
 
-- `MAX_ACTIVE_JOBS_PER_USER`: documents waiting or being converted. A person with a full
+- `MAX_ACTIVE_JOBS_PER_USER` (the open tier's; `access.files_per_upload`: 30 for invited
+  people): documents waiting or being converted. A person with a full
   queue would hold everyone else back.
 - `MAX_LIVE_JOBS_PER_USER`: documents kept (finished or not) until their deletion time. A
   person with hundreds of kept files would fill the database. The sample document
@@ -97,6 +98,7 @@ def store_job(
     part_group: str | None = None,
     part_label: str | None = None,
     now: datetime | None = None,
+    media_type: str = "application/pdf",
 ) -> str:
     """Count the pages against today's quota and queue the job, in one transaction.
 
@@ -107,14 +109,15 @@ def store_job(
     now = now or utcnow()  # the caller's clock (the upload route's; tests move it)
     with session_scope(factory) as session:
         # Checked before the pages are counted: a refusal costs nothing.
-        if active_job_count(session, user_id) >= MAX_ACTIVE_JOBS_PER_USER:
+        tier = access.tier_of(session, user_id)
+        if active_job_count(session, user_id) >= access.files_per_upload(tier):
             raise TooManyJobs("too_many_active")
         if live_job_count(session, user_id, now) >= MAX_LIVE_JOBS_PER_USER:
             raise TooManyJobs("too_many_stored")
         # Before the pages are counted too, in this transaction with the person's row locked:
         # `StorageRefused` (their own cap) or `StorageFull` (the service's), `web.storage`.
         storage.check_room(session, settings, user_id, len(data), now)
-        quota = access.page_quota(settings, access.tier_of(session, user_id))
+        quota = access.page_quota(settings, tier)
         if not try_consume_pages(session, user_id, pages, quota=quota, day=utc_today(now)):
             left = pages_left(session, user_id, quota=quota, day=utc_today(now))
             raise QuotaRefused(pages, left or 0)
@@ -136,5 +139,5 @@ def store_job(
         )
         session.add(job)
         session.flush()
-        session.add(Blob(job_id=job.id, kind="upload", media_type="application/pdf", content=data))
+        session.add(Blob(job_id=job.id, kind="upload", media_type=media_type, content=data))
         return job.id

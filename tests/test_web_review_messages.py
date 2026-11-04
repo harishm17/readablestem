@@ -52,6 +52,7 @@ PIPELINE_MODULES = (
     "image_page",
     "image_page_vector",
     "image_page_reconcile",
+    "source/ltx_reader",  # LaTeX source: the codes it emits have sentences too
 )
 CHECK_NAME = re.compile(r"^[a-z_]+(\.[a-z_]+)+$")
 PLACEHOLDER = "{}"
@@ -166,7 +167,8 @@ def _call_name(call: ast.Call) -> str | None:
 
 
 def collect(module_name: str) -> Emitted:
-    path = SRC / "pipeline" / f"{module_name}.py"
+    folder = "" if "/" in module_name else "pipeline/"
+    path = SRC / f"{folder}{module_name}.py"
     module = _Module(ast.parse(path.read_text(encoding="utf-8")))
     out = Emitted()
     helper = module.functions.get("_check")

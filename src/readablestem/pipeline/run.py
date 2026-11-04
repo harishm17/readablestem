@@ -156,6 +156,7 @@ from readablestem.pipeline import (
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline import options as run_options
 from readablestem.pipeline import source_facts as pdf_facts
+from readablestem.source import envelope as source_envelope
 
 log = logging.getLogger(__name__)
 
@@ -1363,6 +1364,23 @@ def convert_pdf(
     can do (it has no keys and no network). `time_limit_s` is the job's own wall-clock limit when
     the caller has one: the second readings are kept inside what it leaves.
     """
+    if source_envelope.is_envelope(pdf_bytes):  # a LaTeX source job (`readablestem.source`)
+        from readablestem.source.convert import convert_source
+
+        return convert_source(
+            pdf_bytes,
+            settings=settings,
+            client=client,
+            progress=progress,
+            tracer=tracer,
+            concurrency=concurrency,
+            notice=notice,
+            source_note=source_note,
+            options=options,
+            stage_progress=stage_progress,
+            step_cache=step_cache,
+            call_observer=call_observer,
+        )
     if options is None:
         options = ConversionOptions.from_settings(settings)
     with run_options.using(options):

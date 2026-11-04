@@ -37,7 +37,7 @@ came from sits beside it. The page shows the pipeline's output as it came, with 
 decisions the review screen asks about (the repeated headings "Solution" and "Discussion"). The
 same demo is live at [readablestem.com/demo](https://readablestem.com/demo), and the site has two
 guides: [ADA Title II and STEM course materials](https://readablestem.com/guides/ada-title-ii-stem-course-materials)
-and [ReadableSTEM, Mathpix and LaTeXML compared](https://readablestem.com/guides/readablestem-mathpix-latexml).
+and [ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML compared](https://readablestem.com/guides/readablestem-mathpix-latexml).
 
 ## Results
 

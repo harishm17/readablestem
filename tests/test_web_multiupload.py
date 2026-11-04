@@ -26,9 +26,8 @@ from fixtures.web.support import (
     make_pdf,
     token,
 )
+from readablestem.web.access import INVITED_FILES_PER_UPLOAD as FILES_PER_UPLOAD
 from readablestem.web.db import Event, Job, QuotaDay, session_scope
-from readablestem.web.intake import MAX_ACTIVE_JOBS_PER_USER
-from readablestem.web.uploads import MAX_FILES_PER_UPLOAD
 
 
 def text_of(html: str) -> str:
@@ -67,7 +66,7 @@ def send(client, files: list[tuple[str, bytes]], **fields):
 def answer(client, response):
     """The page the redirect after an upload of several files leads to."""
     assert response.status_code == 303, response.status_code
-    assert response.headers["location"].startswith("/app/upload/")
+    assert response.headers["location"].startswith("/app/batch/")
     page = client.get(response.headers["location"])
     assert page.status_code == 200
     return page
@@ -129,10 +128,10 @@ def test_when_every_file_is_refused_nothing_is_queued_and_the_page_says_why(web)
 
 
 def test_more_files_than_allowed_is_refused_whole(web):
-    files = [(f"f{n}.pdf", make_pdf(1)) for n in range(MAX_FILES_PER_UPLOAD + 1)]
+    files = [(f"f{n}.pdf", make_pdf(1)) for n in range(FILES_PER_UPLOAD + 1)]
     response = send(web.alice, files)
     assert response.status_code == 400
-    assert f"more than {MAX_FILES_PER_UPLOAD} files" in text_of(response.text)
+    assert f"more than {FILES_PER_UPLOAD} files" in text_of(response.text)
     assert jobs_of(web) == []
 
 
@@ -173,27 +172,32 @@ def test_each_file_is_held_to_the_daily_page_quota(web):
 
 
 def test_the_cap_on_documents_waiting_holds_for_each_file(web):
-    send(web.alice, [(f"w{n}.pdf", make_pdf(1)) for n in range(MAX_FILES_PER_UPLOAD)])
-    assert len(jobs_of(web)) == MAX_ACTIVE_JOBS_PER_USER == MAX_FILES_PER_UPLOAD
+    send(web.alice, [(f"w{n}.pdf", make_pdf(1)) for n in range(FILES_PER_UPLOAD)])
+    assert len(jobs_of(web)) == FILES_PER_UPLOAD
     response = send(web.alice, [("late1.pdf", make_pdf(1)), ("late2.pdf", make_pdf(1))])
-    assert len(jobs_of(web)) == MAX_ACTIVE_JOBS_PER_USER
-    assert "You already have 10 documents waiting" in text_of(answer(web.alice, response).text)
+    assert len(jobs_of(web)) == FILES_PER_UPLOAD
+    assert f"You already have {FILES_PER_UPLOAD} documents waiting" in text_of(
+        answer(web.alice, response).text
+    )
 
 
-def test_every_file_after_the_first_counts_for_the_rate_limit(tmp_path):
+def test_every_file_after_the_first_counts_for_the_rate_limit(tmp_path, monkeypatch):
+    from readablestem.web import access
+
+    monkeypatch.setattr(access, "INVITED_FILES_PER_UPLOAD", 10)  # 30 would not fit in 15 either
     env = WebEnv(tmp_path, rate_limits_enabled=True, per_user_daily_page_quota=1000)
     with env.running() as client:
         env.allow(ALICE)
         login(client, ALICE)
         limit = env.ctx.limiter.rules["upload_user"].limit
-        files = [(f"f{n}.pdf", make_pdf(1)) for n in range(MAX_FILES_PER_UPLOAD)]
+        files = [(f"f{n}.pdf", make_pdf(1)) for n in range(10)]
         statuses = []
         for _ in range(3):
             statuses.append(send(client, files).status_code)
         # 10 files cost 10 of the 15 allowed uploads: the second request would need 10 more.
         assert limit == 15
         assert statuses[0] == 303 and statuses[1] == 429
-        assert len(jobs_of(env)) == MAX_FILES_PER_UPLOAD
+        assert len(jobs_of(env)) == 10
 
 
 def test_refreshing_the_results_page_does_not_upload_again(web):
@@ -219,7 +223,7 @@ def test_refreshing_the_results_page_does_not_upload_again(web):
         ],
         follow_redirects=True,
     )
-    assert str(followed.url).split("/")[-2:-1] == ["upload"] and followed.request.method == "GET"
+    assert str(followed.url).split("/")[-2:-1] == ["batch"] and followed.request.method == "GET"
 
 
 def test_the_results_page_is_for_its_owner_and_for_an_hour(web):
@@ -227,7 +231,7 @@ def test_the_results_page_is_for_its_owner_and_for_an_hour(web):
     url = response.headers["location"]
     assert "secret-name.pdf" in web.alice.get(url).text
     stranger = web.bob.get(url)
-    missing = web.bob.get("/app/upload/" + "0" * 32)
+    missing = web.bob.get("/app/batch/" + "0" * 32)
     assert stranger.status_code == missing.status_code == 404
     assert "secret-name.pdf" not in stranger.text
     assert web.client().get(url).status_code in {303, 401, 403}  # signed out
@@ -252,7 +256,7 @@ def test_the_upload_form_takes_several_files_and_says_so(web):
     page = web.alice.get("/app").text
     assert re.search(r'<input[^>]*type="file"[^>]*multiple', page)
     assert re.search(r'<input[^>]*name="pdf"', page)
-    assert "up to 10 files" in text_of(page).lower() or "10 files" in text_of(page)
+    assert f"up to {FILES_PER_UPLOAD} files" in text_of(page).lower()
 
 
 # --------------------------------------------------------------------------- the course page

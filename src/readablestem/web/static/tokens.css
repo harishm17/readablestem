@@ -125,7 +125,7 @@
   --mark-accepted: var(--ok);
   --mark-current: var(--accent);
   --on-mark: #ffffff;
-  --desk: #e7e9ee;
+  --desk: #eef1f5;
 
   /* Documents drawn as pictures stay white "paper" in dark mode. */
   --paper: #ffffff;
