@@ -78,11 +78,11 @@ def test_the_deletion_time_and_a_way_to_keep_it_longer_sit_by_the_address(tmp_pa
 
 def test_the_roles_are_native_radios_inside_whole_row_labels(tmp_path):
     page, _ = share_page(tmp_path)
-    rows = re.findall(r'<label class="choice-row" for="(share-role-\w+)">(.*?)</label>', page, re.S)
+    rows = re.findall(r'<label class="role-row" for="(share-role-\w+)">(.*?)</label>', page, re.S)
     assert [row_id for row_id, _ in rows] == ["share-role-view", "share-role-review"]
     for row_id, inner in rows:
         assert f'<input type="radio" id="{row_id}" name="role"' in inner
-        assert "choice-name" in inner and "choice-help" in inner  # name and what it allows
+        assert "role-name" in inner and "role-help" in inner  # name and what it allows
     assert "checked" in rows[0][1] and "checked" not in rows[1][1]  # View by default
 
 

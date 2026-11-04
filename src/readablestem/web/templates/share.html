@@ -28,14 +28,14 @@
     <fieldset class="field{% if role_error %} field-error{% endif %}" id="share-role">
       <legend>What they can do</legend>
       {% if role_error %}<p class="error-message" id="share-role-error"><span class="visually-hidden">Error: </span>{{ role_error }}</p>{% endif %}
-      <div class="choice-list">
+      <div class="role-list">
       {% for value, label, help in roles %}
-      <label class="choice-row" for="share-role-{{ value }}">
+      <label class="role-row" for="share-role-{{ value }}">
         <input type="radio" id="share-role-{{ value }}" name="role" value="{{ value }}"
                aria-labelledby="share-role-{{ value }}-name" aria-describedby="share-role-{{ value }}-help"{% if typed_role == value %} checked{% endif %}>
-        <span class="choice-text">
-          <span class="choice-name" id="share-role-{{ value }}-name">{{ label }}</span>
-          <span class="choice-help" id="share-role-{{ value }}-help">{{ help }}</span>
+        <span class="role-text">
+          <span class="role-name" id="share-role-{{ value }}-name">{{ label }}</span>
+          <span class="role-help" id="share-role-{{ value }}-help">{{ help }}</span>
         </span>
       </label>
       {% endfor %}
