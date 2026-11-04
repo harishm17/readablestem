@@ -102,6 +102,7 @@ def convert_for(page, site, course_name: str) -> str:
     page.get_by_label("PDF file").set_input_files(
         files=[{"name": "vectors.pdf", "mimeType": "application/pdf", "buffer": review_pdf()}]
     )
+    page.locator("#group-convert > summary").click()  # the groups are one line until opened
     page.get_by_label("Course (optional)").select_option(label=course_name)
     page.get_by_role("button", name="Upload and convert").click()
     page.wait_for_url(f"{site.base}/jobs/*")

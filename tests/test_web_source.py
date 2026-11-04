@@ -98,7 +98,7 @@ def test_the_form_offers_the_files_when_the_switch_is_on(web):
     page = web.browser.get("/app").text
     assert ".tex,.zip" in page and 'data-latex="1"' in page
     assert 'name="main_file"' in page and "Main file of a zip" in page
-    assert "one page for every 3,000 characters or figure" in " ".join(page.split())
+    assert "3,000 characters or figure count as one page" in " ".join(page.split())
 
 
 def test_the_switch_is_off_by_default():
@@ -289,7 +289,7 @@ def test_without_latexml_or_a_sandbox_the_answer_is_upload_the_pdf(web, monkeypa
     monkeypatch.setattr(latexml, "installed", lambda: False)
     response = send(web.browser, ARTICLE.encode(), "a.tex")
     assert response.status_code == 503 and "not available on this server" in response.text
-    assert "Compile it to a PDF and choose that file here instead" in response.text
+    assert "Compile it to a PDF and choose that here instead" in response.text
     assert response.headers["retry-after"] == "3600"
     assert jobs(web) == [] and pages_used(web) == 0
     monkeypatch.setattr(latexml, "installed", lambda: True)

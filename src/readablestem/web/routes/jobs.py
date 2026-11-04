@@ -91,7 +91,7 @@ from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are 
     store_job,
 )
 from readablestem.web.logsafe import log_event
-from readablestem.web.outcome import IMAGE_PAGE_FAILS, JobOutcome, job_outcome
+from readablestem.web.outcome import JobOutcome, job_outcome
 from readablestem.web.pending import MAX_PENDING_PER_USER
 from readablestem.web.quota import next_day_start, pages_left
 from readablestem.web.security import VIEW_CSP
@@ -116,9 +116,8 @@ NOT_FOUND = (
     "Page not found",
     # The same words for a document that never existed, one that was deleted and one the
     # person may not open (an access that was removed): the page must not say which.
-    "There is no document at this address that this account can open. Check the address, and "
-    "that you are signed in with the account the document was shared with, or ask the person "
-    "who sent it to you. It may also have been deleted.",
+    "There is no document at this address that this account can open. Check the address and "
+    "your account, or ask the sender.",
 )
 # What the owner of a deleted document sees at its old address (UX review MF10).
 DELETED = ("This document has been deleted", "This document has been deleted.")
@@ -137,10 +136,8 @@ IMAGE_PAGE_REFUSALS = frozenset({"scanned", "scanned_ocr", "handwritten", "handw
 # cannot convert them), and what to tick. What the person had set stays on the form; the file
 # has to be chosen again.
 IMAGE_PAGES_ADVICE = (
-    "Tick “Convert scanned or handwritten pages” and choose the file again (the form "
-    "cannot keep it for you): each page is read from its picture, which is slower, and "
-    "every converted equation and table needs your check. Or, if you have the original "
-    "(LaTeX, Word or PowerPoint), export a PDF from it and upload that."
+    "Tick “Convert scanned or handwritten pages” and choose the file again, or upload a PDF "
+    "exported from the original."
 )
 IMAGE_PAGE_WHAT = {
     "scanned": "has only scanned pages",
@@ -282,9 +279,8 @@ def upload_error_message(
     }.get(code, f"{name} cannot be converted.")
     if code in IMAGE_PAGE_REFUSALS and s.feature_image_pages:
         # Not "cannot convert it": the pages are read when asked for, and this upload did not.
-        why = IMAGE_PAGE_FAILS[code][1]
         return (
-            f"{name} {IMAGE_PAGE_WHAT[code]}, which are read only when you ask. {why} "
+            f"{name} {IMAGE_PAGE_WHAT[code]}, which are read only when you ask. "
             f"{NOTHING_TAKEN} {IMAGE_PAGES_ADVICE}"
         )
     return message
@@ -295,9 +291,8 @@ def source_messages(name: str, max_pages: int) -> dict[str, str]:
     refusal says what to do next, and nothing was converted or counted."""
     pdf = "upload the PDF instead."
     return {
-        "source_unavailable": f"LaTeX source (.tex files and project zips) is not available on "
-        f"this server at the moment, so {name} was not converted. Compile it to a PDF and "
-        f"choose that file here instead: your other choices are kept. {NOTHING_TAKEN}",
+        "source_unavailable": f"LaTeX source is not available on this server right now, so {name} "
+        f"was not converted. Compile it to a PDF and choose that here instead. {NOTHING_TAKEN}",
         "source_revises": "A revised version takes a PDF. Upload the LaTeX source as a new "
         "document.",
         "source_bad_zip": f"{name} could not be opened as a zip file. It may be damaged or "

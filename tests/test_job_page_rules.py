@@ -30,8 +30,6 @@ from readablestem.core.types import (
 from readablestem.web import job_page
 from readablestem.web.outcome import JobOutcome, job_outcome
 
-EST = " This is an estimate from recent documents; it can take longer."
-
 MATH = "http://www.w3.org/1998/Math/MathML"
 
 
@@ -96,9 +94,14 @@ def test_the_last_steps_follow_the_model_work():
 @pytest.mark.parametrize(
     ("ahead", "yours", "seconds", "sentence"),
     [
-        (0, 0, 20, "Your document is next in line, less than a minute to go." + EST),
-        (1, 0, 150, "1 document ahead of yours, about 2 minutes to go." + EST),
-        (4, 2, 600, "4 documents ahead of yours (2 are yours), about 10 minutes to go." + EST),
+        (0, 0, 20, "Your document is next in line, less than a minute to go (an estimate)."),
+        (1, 0, 150, "1 document ahead of yours, about 2 minutes to go (an estimate)."),
+        (
+            4,
+            2,
+            600,
+            "4 documents ahead of yours (2 are yours), about 10 minutes to go (an estimate).",
+        ),
         (2, 1, None, "2 documents ahead of yours (1 is yours)."),
     ],
 )

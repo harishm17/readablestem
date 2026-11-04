@@ -128,56 +128,41 @@ FAILED_MESSAGES = {
     # probe refuses these first; a job sees them only when the probe could not tell.
     # Never "run OCR": OCR'd scans are what these are.
     "scanned": "Every page of this PDF is a scanned image, so this tool cannot convert it. "
-    "It has no text this tool can use. If you have the original file (LaTeX, Word or "
-    "PowerPoint), export a PDF from it and upload that instead.",
+    "It has no text this tool can use. Export a PDF from the original file (LaTeX, Word or "
+    "PowerPoint) and upload that instead.",
     "scanned_ocr": "Every page of this PDF is a scanned image, so this tool cannot convert "
-    "it. Its text was guessed from the images by a text recognition (OCR) program. OCR "
-    "text is often wrong, most of all in maths, so this tool does not use it, and running "
-    "OCR again will not help. If you have the original file (LaTeX, Word or PowerPoint), "
-    "export a PDF from it and upload that instead.",
-    "handwritten": "This PDF is handwritten, so this tool cannot convert it. It also holds "
-    "hidden text that a tablet or a text recognition (OCR) program guessed from the "
-    "handwriting. That text is often wrong, most of all in maths, so this tool does not "
-    "use it. If you have a typed version (LaTeX, Word or PowerPoint), export a PDF from it "
-    "and upload that instead.",
+    "it. Its text was guessed by OCR, which is often wrong in maths, so it is not used. "
+    "Export a PDF from the original file (LaTeX, Word or PowerPoint) and upload that instead.",
+    "handwritten": "This PDF is handwritten, so this tool cannot convert it. Its hidden text, "
+    "guessed from the handwriting, is often wrong in maths, so it is not used. Export a PDF "
+    "from a typed version (LaTeX, Word or PowerPoint) and upload that instead.",
     "handwritten_no_text": "This PDF is handwritten, so this tool cannot convert it. "
-    "It has no text this tool can use. If you have a typed version (LaTeX, Word or "
-    "PowerPoint), export a PDF from it and upload that instead.",
+    "It has no text this tool can use. Export a PDF from a typed version (LaTeX, Word or "
+    "PowerPoint) and upload that instead.",
     "no_content": "This PDF has no text, equations or figures that could be converted.",
-    "model_not_configured": "Conversions are not set up on this server yet, so nothing "
-    "was converted and nothing was sent anywhere. Please tell the person who runs this "
-    "site.",
+    "model_not_configured": "Conversions are not set up on this server yet. Nothing was "
+    "converted or sent anywhere. Tell the person who runs this site.",
     "access_removed": "Your access to this tool was removed, so this document was not converted.",
     "page_too_large": "The PDF has a page that is too large to convert.",
-    "too_complex": "A page of this PDF is drawn with so many separate shapes (tens of "
-    "thousands of strokes or points) that reading it takes more time or memory than a "
-    "conversion may use. Nothing was converted. Export the PDF again as a flattened or "
-    "simpler PDF, or split the page off and upload the rest.",
+    "too_complex": "A page of this PDF has so many separate shapes that reading it takes more "
+    "time or memory than a conversion may use. Nothing was converted. Export a simpler or "
+    "flattened PDF, or split the page off and upload the rest.",
 }
 
 
-# The refusals of a PDF that is only scans or handwriting: what each says the PDF is, and why
-# its hidden text is not used. When the deployment offers "Convert scanned or handwritten
-# pages" (ADR 0007, FEATURE_IMAGE_PAGES) the message does not say the tool cannot convert it:
-# it says such pages are read only when asked for, and offers that route.
+# The refusals of a PDF that is only scans or handwriting, and what each says the PDF is. When
+# the deployment offers "Convert scanned or handwritten pages" (ADR 0007, FEATURE_IMAGE_PAGES)
+# the message does not say the tool cannot convert it: it says such pages are read only when
+# asked for, and offers that route.
 IMAGE_PAGE_FAILS = {
-    "scanned": ("Every page of this PDF is a scanned image", "It has no text this tool can use."),
-    "scanned_ocr": (
-        "Every page of this PDF is a scanned image",
-        "Its text was guessed from the images by a text recognition (OCR) program, which is "
-        "often wrong in maths, so it is not used; running OCR again will not help.",
-    ),
-    "handwritten": (
-        "This PDF is handwritten",
-        "It also holds hidden text that a tablet or a text recognition (OCR) program guessed "
-        "from the handwriting. That text is often wrong in maths, so it is not used.",
-    ),
-    "handwritten_no_text": ("This PDF is handwritten", "It has no text this tool can use."),
+    "scanned": "Every page of this PDF is a scanned image",
+    "scanned_ocr": "Every page of this PDF is a scanned image",
+    "handwritten": "This PDF is handwritten",
+    "handwritten_no_text": "This PDF is handwritten",
 }
 OPT_IN_ROUTE = (
-    "Upload it again with “Convert scanned or handwritten pages” ticked: each page is read "
-    "from its picture, which is slower, and you check every converted equation and table. "
-    "Or export a PDF from the original (LaTeX, Word or PowerPoint) and upload that."
+    "Upload it again with “Convert scanned or handwritten pages” ticked, or export a PDF from "
+    "the original."
 )
 
 
@@ -186,9 +171,9 @@ def failed_message(code: str, *, image_pages_offered: bool = False) -> str | Non
     `image_pages_offered`: the deployment offers to convert scanned and handwritten pages, so
     a PDF of only such pages was not converted because the option was not ticked."""
     if image_pages_offered and code in IMAGE_PAGE_FAILS:
-        what, why = IMAGE_PAGE_FAILS[code]
+        what = IMAGE_PAGE_FAILS[code]
         lead = f"{what}, so it was not converted: such pages are read only when you ask."
-        return f"{lead} {why} {OPT_IN_ROUTE}"
+        return f"{lead} {OPT_IN_ROUTE}"
     return FAILED_MESSAGES.get(code)
 
 

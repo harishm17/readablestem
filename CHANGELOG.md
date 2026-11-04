@@ -2,8 +2,11 @@
 
 ## Unreleased: upload, My documents, the job page and downloads, from the second independent review (branch ux2/lane-a)
 
-- Upload: the file field and its button are the form; "How to convert it" and "How long to keep it,
-  and who may look" are one line each (saying what is set) until opened. The scan box says first
+- Copy on these pages is about a third to a half shorter (upload form, My documents, job page in
+  each state, the stopped and deleted pages): one idea per sentence, detail only where it protects
+  the reader (retention times, what is sent where, what a refusal cost).
+- Upload: the file field and its button are the form; "How to convert it" and "How long to keep it"
+  are one line each (saying what is set) until opened. The scan box says first
   that a PDF of only scans is refused without it and a mixed PDF keeps its scanned pages as
   pictures; "Tick it every time" is now "Make this the default in Account"; "Main file of a zip"
   sits in a disclosure and appears only with LaTeX source on. After a refusal the form comes back

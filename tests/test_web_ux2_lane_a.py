@@ -113,7 +113,7 @@ def test_the_scan_box_says_first_what_it_is_for(offered):
     page = flat(offered.browser.get("/app").text)
     first = page.split("Convert scanned or handwritten pages", 1)[1][:260]
     assert "Needed for a PDF that is all scans or handwriting" in first
-    assert "scanned pages stay as pictures marked “Not converted” unless you tick it" in page
+    assert "scanned pages stay pictures marked “Not converted” unless you tick it" in page
     assert "Without it, such pages stay as pictures" not in page  # the old, half-true line
 
 
@@ -191,7 +191,7 @@ def test_with_the_option_offered_a_scan_refusal_does_not_say_the_tool_cannot_con
     page = flat(response.text)
     assert "cannot convert" not in page
     assert "which are read only when you ask" in page
-    assert "export a PDF from it and upload that" in page
+    assert "upload a PDF exported from the original" in page
     # the box to tick is where focus goes, in an open group, with the other choices kept
     assert re.search(r'<input type="checkbox" id="image_pages"[^>]*\sautofocus', response.text)
     assert re.search(r'<input type="checkbox" id="exam"[^>]*checked', response.text)
@@ -222,8 +222,8 @@ def test_source_that_is_not_available_says_what_is_unavailable_and_offers_the_pd
         page = flat(response.text)
         assert response.status_code in {400, 503}
         if response.status_code == 503:
-            assert "LaTeX source (.tex files and project zips) is not available" in page
-            assert "Compile it to a PDF and choose that file here instead" in page
+            assert "LaTeX source is not available on this server right now" in page
+            assert "Compile it to a PDF and choose that here instead" in page
             assert "cannot read that right now" not in page
             assert re.search(r'<input type="checkbox" id="exam"[^>]*checked', response.text)
 
@@ -326,7 +326,7 @@ def test_someone_it_was_shared_with_sees_only_the_groups_that_are_theirs(web):
 def test_the_seven_tiles_are_one_line_with_the_counts_on_request(web):
     page = web.browser.get(f"/jobs/{finish(web)}").text
     line = flat(page.split('id="results-line"', 1)[1].split("</p>", 1)[0])
-    assert line.lstrip("> ").startswith("Found ") and "decisions still to make" in line
+    assert line.lstrip("> ").startswith("Found ") and "decision" not in line
     detail = page.split('id="counts-detail"', 1)[1].split("</details>", 1)[0]
     assert "<summary>Counts in detail</summary>" in detail
     assert "Decisions to make" in flat(detail)
@@ -336,8 +336,8 @@ def test_the_seven_tiles_are_one_line_with_the_counts_on_request(web):
 def test_sharing_says_it_is_for_colleagues_and_is_not_how_students_get_it(web):
     page = flat(web.browser.get(f"/jobs/{finish(web)}").text)
     assert "Share with a colleague" in page
-    assert "including before your decisions are made" in page
-    assert "This is not how students get it" in page
+    assert "at any time" in page
+    assert "Not how students get it" in page
     assert "before you give it to students" in page  # the headline no longer says "share"
     assert "need you before you share it" not in page
 
@@ -348,8 +348,8 @@ def test_retention_is_explained_once_with_the_real_deletion_time_and_who_moves_i
     assert page.count('id="retention-line"') == 1
     line = flat(page.split('id="retention-line"', 1)[1].split("</div>", 1)[0])
     assert "Deleted automatically on" in line and "24 hours after you last work on it" in line
-    assert "Each decision, setting change or download by you starts that time again" in line
-    assert "Work by people you share it with does not" in line
+    assert "Your decisions, edits and downloads restart that time" in line
+    assert "sharing does not" in line
     # it sits in the Delete group, where the share page's "Keep it longer" link goes
     assert page.index('id="delete-heading"') < page.index('id="retention-line"')
     assert "after upload" not in line
@@ -412,7 +412,7 @@ def test_a_queued_document_says_how_long_it_has_waited_and_that_the_estimate_is_
     page = web.browser.get(f"/jobs/{job_id}").text
     assert "Waiting for less than a minute." in flat(page)
     assert re.search(r'class="wait-note" data-wait-since="[^"]+" data-wait-slow-after="\d+"', page)
-    assert "This is an estimate from recent documents; it can take longer." in flat(page)
+    assert "to go (an estimate)." in flat(page)
     assert '<p class="wait-slow" data-wait-slow hidden>' in page  # not slow yet: no alarm
     note = page.split('class="wait-note"', 1)[1].split('id="job-progress"', 1)[0]
     assert "%" not in flat(note)  # no percentage, no finish time: the tool has neither
@@ -425,7 +425,7 @@ def test_a_long_wait_says_so_plainly_and_a_running_one_counts_from_its_start(web
     assert "Waiting for 2 hours." in flat(page)
     assert '<p class="wait-slow" data-wait-slow>' in page  # shown: nothing hides it
     slow = page.split('<p class="wait-slow" data-wait-slow>', 1)[1].split("</p>", 1)[0]
-    assert "This is taking longer than usual." in flat(slow)
+    assert "Taking longer than usual." in flat(slow)
     assert 'href="/status"' in slow
 
     running = job_id_from(upload(web.browser, make_pdf(1)))
@@ -526,9 +526,9 @@ def test_a_deleted_documents_page_says_how_retention_works_now_and_offers_to_upl
     response = web.browser.get(f"/jobs/{job_id}")
     page = flat(response.text)
     assert response.status_code == 404
-    assert "after being kept 59 hours in all" in page
+    assert "after 59 hours in all" in page
     assert "hours after you last work on them" in page
-    assert "as promised when you uploaded it" in page
+    assert "Files you downloaded are not affected" in page
     assert "hours after upload" not in page  # not the old, wrong promise
     assert 'class="button" href="/app#upload-heading">Upload the PDF again</a>' in response.text
 
@@ -539,8 +539,8 @@ def test_a_document_that_is_not_yours_to_open_gets_neutral_help_that_does_not_sa
     login(bob, BOB)
     page = flat(bob.get(f"/jobs/{job_id}").text)
     missing = flat(bob.get("/jobs/" + "0" * 32).text)
-    assert "that this account can open" in page and "signed in with the account" in page
-    assert "ask the person who sent it to you" in page
+    assert "that this account can open" in page and "Check the address and your account" in page
+    assert "ask the sender" in page
     # identical for a document that never existed
     assert page == missing or page.replace(job_id, "") == missing
 

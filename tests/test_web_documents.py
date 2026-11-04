@@ -121,7 +121,7 @@ def test_the_list_refreshes_only_when_something_changed(web):
     match = re.search(r'hx-get="/app/documents\?v=([0-9a-f]+)" hx-trigger="every 5s"', page)
     assert match, "the list polls while a document is waiting"
     version = match.group(1)
-    assert "refresh the list" in page  # without JavaScript, a link does it
+    assert "Refresh the list" in page  # without JavaScript, a link does it
     assert web.browser.get(f"/app/documents?v={version}").status_code == 204
     assert web.run_worker() == waiting
     changed = web.browser.get(f"/app/documents?v={version}", headers={"HX-Request": "true"})
@@ -197,11 +197,8 @@ def test_an_expired_documents_link_says_it_was_deleted_as_promised(web):
         assert response.status_code == 404
         flat = text(response.text)
         assert "This document has been deleted" in flat
-        assert (
-            "deleted automatically, as promised when you uploaded it, after being kept 24 hours"
-            in flat
-        )
-        assert "24 hours after you last work on them" in flat and "after upload" in flat
+        assert "Deleted automatically after 24 hours in all" in flat
+        assert "24 hours after you last work on them" in flat and "from upload" in flat
         assert 'href="/app#upload-heading"' in response.text  # a direct way to upload again
         assert "Files you downloaded are not affected." in flat
         assert "not yours to see" not in flat
@@ -216,7 +213,7 @@ def test_after_the_purge_its_owner_still_learns_it_was_deleted(web):
     assert purge_expired(web.ctx.factory).jobs_deleted == 1
     flat = text(web.browser.get(f"/jobs/{job_id}").text)
     assert "This document has been deleted" in flat
-    assert "24 hours after you last work on them, 7 days if you chose to keep them" in flat
+    assert "24 hours after you last work on them (7 days if you keep them" in flat
     # Anyone else learns nothing, not even that the id existed.
     bob = web.client()
     login(bob, BOB)
@@ -268,7 +265,7 @@ def test_the_upload_form_carries_what_the_browser_needs_to_check_first(web):
     assert '<div id="pdf-check" aria-live="polite"></div>' in page
     assert '<p id="upload-status" class="upload-status" role="status"></p>' in page
     # The opt-in says what ticking it lets us do.
-    assert "may look at the results to find and fix mistakes in the tool" in text(page)
+    assert "find and fix mistakes in the tool" in text(page)
 
 
 def test_when_the_budget_is_spent_the_form_says_when_uploads_open_again(web):

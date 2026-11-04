@@ -105,7 +105,7 @@ def test_the_upload_form_has_two_separate_choices_both_off(ux):
         assert label in html
         tag = re.search(rf'<input[^>]*id="{box}"[^>]*>', html)
         assert tag and "checked" not in tag.group(0)
-    assert '<span class="group-name">How long to keep it, and who may look</span>' in html
+    assert '<span class="group-name">How long to keep it</span>' in html
 
 
 @pytest.mark.parametrize(
@@ -727,4 +727,4 @@ def test_the_checks_disclosure_counts_the_checks_that_ran(tmp_path):
         env.run_worker()
         html = page(env)
     block = text_of(html[html.index('id="checks-ran"') :].split("</details>")[0])
-    assert "Ran on this file: 1 checks of its structure" in block
+    assert "Ran on this file: 1 structure check." in block

@@ -4,7 +4,7 @@
    status box's label (`job_page.headline`), as on the review screen: "Ready to share" only when
    everything was converted.
 
-   ux2-lane-a: "Where will you post it?" lists the four ways the file leaves the tool, one
+   ux2-lane-a: "Where will you post it?" lists the ways the file leaves the tool, one
    recommended, each with its own link; the posting steps are said once, in the recommended
    one, and the checks before posting once, below. #}
 <section id="ready" aria-labelledby="ready-heading">
@@ -18,13 +18,10 @@
 
   <h3 id="post-heading">Where will you post it?</h3>
   <ul class="routes" aria-labelledby="post-heading">
-    {# The main way, and the one the posting help is written for. #}
     <li class="route route-recommended" id="route-web">
       <h4>A course site or any web page <span class="tag tag-ok">Recommended</span></h4>
-      <p>Use the HTML file above. Upload it to your course as a file and link to it where the
-        PDF was linked, so it is the main version; keep the PDF only as a print copy, labelled
-        as such. Do not paste it into a page editor: course sites remove the images and the
-        layout the equations need. <a href="/help/posting">How to post it in your course</a></p>
+      <p>Upload the HTML file to your course and link to it where the PDF was. Do not paste it
+        into a page editor. <a href="/help/posting">How to post it in your course</a></p>
     </li>
     {# For Canvas (pipeline/export_canvas.py): a plain GET form, so it works without
        JavaScript. The course number is optional; with it the zip also holds a page to paste. #}
@@ -32,9 +29,8 @@
       <form class="canvas-download" method="get" action="/jobs/{{ job.id }}/download/canvas"
             aria-labelledby="canvas-heading">
         <h4 id="canvas-heading">For Canvas</h4>
-        <p id="canvas-help" class="hint">Canvas removes pictures and styles from pasted pages,
-          so this zip keeps each picture as a file; with your course number (the number after
-          /courses/ in your course's web address) it also holds a page to paste.</p>
+        <p id="canvas-help" class="hint">Canvas strips pictures from pasted pages, so the zip keeps
+          each as a file; a course number (after /courses/ in its address) adds a page to paste.</p>
         <div class="field">
           <label for="canvas-course">Canvas course number (optional)</label>
           <input type="text" id="canvas-course" name="course" class="input-short" inputmode="numeric"
@@ -45,48 +41,41 @@
       {# T3-8: the same page as an IMS Common Cartridge, which Canvas, Blackboard, Moodle and
          D2L import. Not yet tried in a live course; the page says so. #}
       <p class="canvas-download"><a href="/jobs/{{ job.id }}/download/cartridge">Download as a Common Cartridge (.imscc)</a>
-        to import into Canvas, Blackboard, Moodle or D2L. Not yet tried in a live course:
-        <a href="/help/posting#cartridge">see the steps</a>.</p>
+        for Canvas, Blackboard, Moodle or D2L. Not tried in a live course:
+        <a href="/help/posting#cartridge">steps</a>.</p>
     </li>
     {# Word and EPUB (routes/exports.py): plain links to GET routes, so they work without
        JavaScript. Word needs pandoc on the server (`word_export`). #}
     {% if word_export|default(false) %}
     <li class="route" id="route-word">
       <h4>Word</h4>
-      <p>The equations stay equations. Check the file in your own Word before you share it.</p>
       <p><a class="button-secondary" href="/jobs/{{ job.id }}/download.docx">Download as Word (.docx)</a></p>
     </li>
     {% endif %}
     <li class="route" id="route-epub">
       <h4>EPUB</h4>
-      <p>The equations stay equations. Check the file in your own reading app before you share it.</p>
       <p><a class="button-secondary" href="/jobs/{{ job.id }}/download.epub">Download as EPUB</a></p>
     </li>
   </ul>
   {# T3-3: one file from the finished parts of a long source (GET /jobs/{id}/combine,
      web/combine.py). Only on a part, and only when two or more finished parts are kept. #}
   {% if job.part_label and job.combinable > 1 and job.is_owner %}
-  <p class="canvas-download"><a href="/jobs/{{ job.id }}/combine">Combine parts</a> into one
-    HTML file: the {{ job.combinable }} finished parts of this file that you still have,
-    in page order. A part you deleted, or one that is not finished or still has a decision
-    to make, is left out and the file names the missing pages. The same file as
+  <p class="canvas-download"><a href="/jobs/{{ job.id }}/combine">Combine parts</a> into one HTML
+    file ({{ job.combinable }} finished parts you still have, in page order; unfinished or
+    deleted parts are left out and named). Also as
     {% if word_export|default(false) %}<a href="/jobs/{{ job.id }}/combine?format=docx">Word (.docx)</a> or {% endif %}<a href="/jobs/{{ job.id }}/combine?format=epub">EPUB</a>.</p>
   {% endif %}
 
   <h3 id="before-heading">Before you share</h3>
   <ul aria-labelledby="before-heading">
-    <li><strong>Read the student version through once, and listen to it.</strong> The automatic
-      checks look at the structure of the file, not at whether each part says what you meant.
-      <a href="/jobs/{{ job.id }}/listen">Listen as a student</a> to hear roughly what a screen
-      reader will say; it is an approximation, so test with a real screen reader if you can.</li>
+    <li>Read the student version and <a href="/jobs/{{ job.id }}/listen">listen to it</a>: the
+      automatic checks cover structure, not meaning. Open Word and EPUB files in their own app.</li>
     {% if pg.finish.notes %}
     <li>{{ pg.finish.notes }} {{ "item was" if pg.finish.notes == 1 else "items were" }}
-      accepted for you with a note. Looking at {{ "it" if pg.finish.notes == 1 else "them" }}
-      is optional{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>{% endif %}.</li>
+      accepted with a note; looking is optional{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>{% endif %}.</li>
     {% endif %}
     {% if pg.finish.not_handled %}
-    <li>Some things are not handled in this file: see
-      <a href="#not-handled-heading">Not handled in this file</a>.</li>
+    <li>Not handled in this file: see <a href="#not-handled-heading">the list</a>.</li>
     {% endif %}
   </ul>
   {# ux-a's part under the download (the two questions); the posting link is in the

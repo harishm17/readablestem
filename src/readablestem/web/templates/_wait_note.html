@@ -15,9 +15,8 @@
      data-wait-lead="{{ wait_lead }}" data-wait-tail="{{ wait_tail|default('') }}">
   <p class="wait-elapsed" data-wait-text>{{ wait_lead }} {{ wait_text }}{{ wait_tail|default('') }}.</p>
   <div{% if wait_live|default(false) %} role="status"{% endif %}>
-    <p class="wait-slow" data-wait-slow{% if not wait_slow %} hidden{% endif %}>This is taking longer than
-      usual. You can leave this page: nothing is lost and your place is kept. If nothing has
-      changed in another hour, check the <a href="/status">service status</a>{% if contact_email %}
-      or <a href="mailto:{{ contact_email }}">email us</a>{% endif %}.</p>
+    <p class="wait-slow" data-wait-slow{% if not wait_slow %} hidden{% endif %}>Taking longer than usual.
+      Nothing is lost. <a href="/status">Service status</a>{% if contact_email %} ·
+      <a href="mailto:{{ contact_email }}">Email us</a>{% endif %}</p>
   </div>
 </div>

@@ -21,8 +21,7 @@
   <h2 id="jobs-heading">Your documents</h2>
   {% include "_documents.html" %}
   {% if documents.unfinished %}
-  <p class="hint">With JavaScript on, this list updates by itself. You can also
-    <a href="/app">refresh the list</a>.</p>
+  <p class="hint">This list updates by itself. <a href="/app">Refresh the list</a></p>
   {% endif %}
   {% if ready_documents %}
   <p><a id="download-all" href="/app/download">Download all {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} (zip)</a></p>
@@ -47,8 +46,7 @@
 {# T3-3: large files kept while their pages are chosen (web/pending.py). #}
 <section aria-labelledby="pending-heading" id="pending">
   <h2 id="pending-heading">Large files waiting for you</h2>
-  <p>These files are larger than one conversion takes. Choose which pages to convert, in parts.
-    Nothing has been converted, and no pages have been taken from your daily count.</p>
+  <p>Too large for one conversion. Choose the pages to convert; nothing is counted until you do.</p>
   <ul>
     {% for item in pending %}
     <li><a href="/uploads/{{ item.id }}">Choose the pages of {{ item.filename }}</a>,
@@ -64,9 +62,7 @@
    someone with documents it is the compact link beside "Convert a PDF". #}
 <section aria-labelledby="sample-heading" id="sample">
   <h2 id="sample-heading">Try a sample first</h2>
-  <p>See the review screen on a real conversion before you upload your own file. The sample is a
-    section of a physics textbook (OpenStax <em>Physics</em> 2.3, CC BY 4.0), converted ahead of
-    time. Opening it uses none of your pages and sends nothing to an AI service.</p>
+  <p>A real conversion to review (OpenStax <em>Physics</em> 2.3, CC BY 4.0). Uses none of your pages.</p>
   {% if sample_job %}
   <p><a class="button-secondary" href="/jobs/{{ sample_job }}">Open your sample document</a></p>
   {% else %}

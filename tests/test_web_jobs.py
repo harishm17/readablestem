@@ -327,7 +327,7 @@ def test_quota_is_per_user(web):
 def test_app_page_shows_pages_left_today(web):
     upload(web.browser, make_pdf(3))
     page = " ".join(web.browser.get("/app").text.split())
-    assert "You can convert 17 more pages today; the count starts again at <time" in page
+    assert "17 pages left today; resets at <time" in page
 
 
 def test_when_the_daily_spend_cap_is_reached_uploads_get_a_friendly_503(web):
@@ -351,17 +351,17 @@ def test_job_page_polls_with_htmx_and_reloads_without_javascript_only_on_request
     assert f'hx-get="/jobs/{job_id}/status?v=queued-none-0"' in page
     # No reload the user did not ask for (WCAG 2.2.1, F41); a no-JS user can opt in.
     assert "http-equiv" not in page
-    assert f'<a href="/jobs/{job_id}">refresh the status</a>' in page
+    assert f'<a href="/jobs/{job_id}">Refresh the status</a>' in page
     assert re.search(
-        rf'<noscript>\s*<p><a href="/jobs/{job_id}\?auto=1">Reload this page every 15 seconds',
+        rf'<noscript>\s*<p><a href="/jobs/{job_id}\?auto=1">Reload every 15 seconds',
         page,
     )
     assert "next in line" in page
 
     auto = web.browser.get(f"/jobs/{job_id}?auto=1").text
     assert '<noscript><meta http-equiv="refresh" content="15"></noscript>' in auto
-    assert f'<a href="/jobs/{job_id}">Stop reloading this page</a>' in auto
-    assert f'<a href="/jobs/{job_id}?auto=1">refresh the status</a>' in auto
+    assert f'<a href="/jobs/{job_id}">Stop reloading</a>' in auto
+    assert f'<a href="/jobs/{job_id}?auto=1">Refresh the status</a>' in auto
     assert "http-equiv" not in web.browser.get(f"/jobs/{job_id}?auto=yes").text
 
     web.run_worker()

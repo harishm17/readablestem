@@ -21,9 +21,8 @@
   {# T3-2: a new version of a document already converted. Its decisions carry over to the
      items that have not changed (web/carry.py). #}
   <h2 id="upload-heading">Upload a revised version</h2>
-  <p id="revises-note">This replaces nothing: <a href="/jobs/{{ revising.id }}">{{ revising.title }}</a>
-    stays as it is. The decisions you made on it are copied to the items in the new file
-    that are exactly the same. Anything that changed, and anything new, asks you again.
+  <p id="revises-note">A new version of <a href="/jobs/{{ revising.id }}">{{ revising.title }}</a>,
+    which stays as it is. Your decisions carry over to items that did not change.
     <a href="/app#upload-heading">Convert a different PDF instead</a></p>
   {% else %}
   <div class="heading-row">
@@ -47,14 +46,9 @@
      accounts is used up. #}
   <div class="notice notice-warning">
     {% if open_pool_closed %}
-    <p><strong>Conversions for new accounts are paused for today.</strong> The share of
-      today's budget set aside for new accounts has been used up. Uploads open again at
-      {{ next_reset|utc }}. Documents already in the queue wait until then. Accounts that
-      were invited are not affected.</p>
+    <p><strong>Conversions for new accounts are paused for today.</strong> Uploads open again at {{ next_reset|utc }}. Documents already queued wait until then.</p>
     {% else %}
-    <p><strong>Conversions are paused for today.</strong> Today's budget for conversions
-      has been used up. Uploads open again at {{ next_reset|utc }}. Documents already in
-      the queue wait until then.</p>
+    <p><strong>Conversions are paused for today.</strong> Uploads open again at {{ next_reset|utc }}. Documents already queued wait until then.</p>
     {% endif %}
   </div>
   {% elif pages_left == 0 %}
@@ -73,42 +67,30 @@
       {# One fact a line, so it scans; the input's aria-describedby points at the block. #}
       <div class="hint" id="pdf-hint">
         <ul>
-          {% if not revising %}
-          <li>Up to {{ max_files }} files at once; each becomes its own document.</li>
-          {% endif %}
-          <li>Up to {{ max_pages }} pages and {{ max_upload_mb }} MB {% if not revising %}each{% else %}for the file{% endif %}.</li>
-          {% if office_kinds %}
-          <li>Word (.docx){% if "pptx" in office_kinds %} and PowerPoint (.pptx){% endif %}
-            files also work.</li>
-          {% endif %}
+          <li>{% if not revising %}Up to {{ max_files }} files, each {% endif %}up to {{ max_pages }} pages and {{ max_upload_mb }} MB.{% if office_kinds %}
+            Word{% if "pptx" in office_kinds %} and PowerPoint{% endif %} work too.{% endif %}</li>
           {% if pages_left is not none %}
-          <li>You can convert {{ pages_left }} more
-            {{ "page" if pages_left == 1 else "pages" }} today{% if new_account %} (a new account
-            can convert {{ page_quota }} pages a day){% endif %}; the count starts again at
-            {{ next_reset|utc }}.</li>
+          <li>{{ pages_left }} {{ "page" if pages_left == 1 else "pages" }} left today{% if new_account %}
+            (new accounts get {{ page_quota }} a day){% endif %}; resets at {{ next_reset|utc }}.</li>
           {% endif %}
-          <li>Only upload materials you wrote or may adapt, with no student records.</li>
+          <li>Your own materials only, with no student records.</li>
         </ul>
       </div>
       <details class="more-detail" id="pdf-more">
         <summary>More about file types and size</summary>
         <ul>
           {% if not revising %}
-          <li>A bigger file, up to {{ source_pages }} pages and {{ upload_limit_mb }} MB, is kept
-            so you can choose which pages to convert.</li>
+          <li>Larger files (up to {{ source_pages }} pages, {{ upload_limit_mb }} MB) are kept so you choose the pages.</li>
           {% endif %}
           {% if office_kinds %}
-          <li>Word and PowerPoint files are turned into a PDF on the server first, so the page
-            count is the PDF's.</li>
+          <li>Word and PowerPoint become a PDF first; its page count applies.</li>
           {% endif %}
           {% if batch_zip and not revising %}
-          <li>A zip of PDFs and LaTeX project folders also works: each PDF and each project in
-            it becomes a document ({{ max_files }} at a time).</li>
+          <li>A zip of PDFs and LaTeX projects works: each becomes a document ({{ max_files }} at a time).</li>
           {% endif %}
           {% if latex_source and not revising %}
-          <li>A LaTeX file (.tex) or a zip of a LaTeX project also works (up to 100 MB unpacked
-            and 500 files). Its equations are read from the source, and its length is counted as
-            one page for every 3,000 characters or figure. Upload a Beamer deck as a PDF.</li>
+          <li>A LaTeX file (.tex) or project zip (up to 100 MB unpacked, 500 files) also works; every
+            3,000 characters or figure count as one page. Upload Beamer decks as PDF.</li>
           {% endif %}
         </ul>
       </details>
@@ -155,11 +137,9 @@
           {# T1-14: exam mode. Per job (Job.exam_mode); the figure step then describes what is
              shown and never the result. #}
           <div class="field checkbox-field exam-choice">
-            <input type="checkbox" id="exam" name="exam" value="on" aria-describedby="exam-hint"{% if exam_on %} checked{% endif %}
+            <input type="checkbox" id="exam" name="exam" value="on"{% if exam_on %} checked{% endif %}
                    data-on="Exam or quiz: figures described without answers" data-off="Figures described normally">
             <label for="exam">Exam or quiz: describe figures without giving answers</label>
-            <p class="hint" id="exam-hint">Figure descriptions say what is shown, not values, trends
-              or results a student is asked to work out.</p>
           </div>
           {# ADR 0007: scanned and handwritten pages are read from an image of the page when the
              owner asks (Job.image_pages). Offered by FEATURE_IMAGE_PAGES; used only for a PDF the
@@ -171,19 +151,10 @@
             <input type="checkbox" id="image_pages" name="image_pages" value="on" aria-describedby="image-pages-hint"{% if pages_on %} checked{% endif %}{% if focus_field|default("") == "image_pages" %} autofocus{% endif %}
                    data-on="Scanned and handwritten pages converted" data-off="Scanned pages kept as pictures">
             <label for="image_pages">Convert scanned or handwritten pages</label>
-            <p class="hint" id="image-pages-hint">Needed for a PDF that is all scans or handwriting:
-              without it that file is refused. In a PDF that also has typed pages, scanned pages
-              stay as pictures marked “Not converted” unless you tick it. Slower, and you check
-              every converted equation and table.</p>
-            <details class="more-detail">
-              <summary>What this does</summary>
-              <p>With it, each scanned or handwritten page is read from its picture, and the
-                original page stays in the file for checking. A tool can misread handwriting and
-                small symbols: you decide each equation and table before you share. It does
-                nothing for a PDF that has no scanned or handwritten pages. If an upload is
-                refused, your other choices are kept here; tick the box and choose the file
-                again.</p>
-            </details>
+            <p class="hint" id="image-pages-hint">Needed for a PDF that is all scans or handwriting;
+              it is refused without it. In a mixed PDF, scanned pages stay pictures marked
+              “Not converted” unless you tick it. Slower; you check every converted equation
+              and table.</p>
           </div>
           {% endif %}
         </div>
@@ -193,31 +164,29 @@
          `retention_hours` after the last activity. The privacy page (privacy.html) says the
          same. One wording for the 7 days everywhere: "Keep for 7 days". #}
       <details class="option-group retention-choices" id="group-keep" data-summary="retention"
-               data-text-default="Deleted {{ retention_hours }} hours after you last work on it. Only you, and anyone you share it with, can see it."
-               data-text-keep="Deleted 7 days after you last work on it. Only you, and anyone you share it with, can see it."
-               data-text-share="Kept {{ opt_in_days }} days from upload. We may look at the results to find and fix mistakes in the tool."{% if open_keep %} open{% endif %}>
+               data-text-default="Deleted {{ retention_hours }} hours after you last work on it."
+               data-text-keep="Deleted 7 days after you last work on it."
+               data-text-share="Kept {{ opt_in_days }} days. We may look at the results."{% if open_keep %} open{% endif %}>
         <summary>
-          <span class="group-name">How long to keep it, and who may look</span>
+          <span class="group-name">How long to keep it</span>
           <span class="group-change">Change</span>
           <span class="group-state" id="keep-state" data-group-state>
-            {%- if share_on %}Kept {{ opt_in_days }} days from upload. We may look at the results to find and fix mistakes in the tool.
-            {%- elif keep_on %}Deleted 7 days after you last work on it. Only you, and anyone you share it with, can see it.
-            {%- else %}Deleted {{ retention_hours }} hours after you last work on it. Only you, and anyone you share it with, can see it.{% endif -%}
+            {%- if share_on %}Kept {{ opt_in_days }} days. We may look at the results.
+            {%- elif keep_on %}Deleted 7 days after you last work on it.
+            {%- else %}Deleted {{ retention_hours }} hours after you last work on it.{% endif -%}
           </span>
         </summary>
         <div class="group-body">
-          <p class="hint" id="keep-hint">We do not use your uploads to train models.</p>
+          <p class="hint">Uploads are never used to train models.</p>
           <div class="field checkbox-field">
-            <input type="checkbox" id="keep" name="keep" value="on" aria-describedby="keep-hint keep-who"{% if keep_on %} checked{% endif %}>
+            <input type="checkbox" id="keep"name="keep" value="on" aria-describedby="keep-who"{% if keep_on %} checked{% endif %}>
             <label for="keep">Keep for 7 days</label>
-            <p class="hint" id="keep-who">Deleted 7 days after you last work on it, not {{ retention_hours }} hours.
-              {% if keep_default|default(false) %}Ticked because of your <a href="/account#account-keep">account setting</a>.{% else %}<a href="/account#account-keep">Make this the default in Account</a>.{% endif %}</p>
+            <p class="hint" id="keep-who">{% if keep_default|default(false) %}Ticked by your <a href="/account#account-keep">account setting</a>.{% else %}<a href="/account#account-keep">Make this the default in Account</a>.{% endif %}</p>
           </div>
           <div class="field checkbox-field">
             <input type="checkbox" id="share" name="share" value="on" aria-describedby="share-hint"{% if share_on %} checked{% endif %}>
             <label for="share">Also let us look at the results ({{ opt_in_days }} days)</label>
-            <p class="hint" id="share-hint">We may look at the results to find and fix mistakes in
-              the tool. Kept {{ opt_in_days }} days from upload, whichever box you ticked.</p>
+            <p class="hint" id="share-hint">To find and fix mistakes in the tool.</p>
           </div>
         </div>
       </details>

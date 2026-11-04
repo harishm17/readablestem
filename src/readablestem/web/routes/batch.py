@@ -159,11 +159,8 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
     ready = sum(r["state"] == "ready" for r in rows)
     # How long the batch has been going (`_wait_note.html`, the job page's part): since its
     # oldest unfinished document was uploaded.
-    waiting = [
-        by_id[r["id"]].created_at
-        for r in rows
-        if r["state"] in {"waiting", "converting"} and by_id[r["id"]].created_at is not None
-    ]
+    started = [by_id[r["id"]].created_at for r in rows if r["state"] in {"waiting", "converting"}]
+    waiting = [when for when in started if when is not None]
     wait: dict[str, Any] = {}
     if waiting:
         since = min(waiting)

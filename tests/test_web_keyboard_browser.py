@@ -439,7 +439,7 @@ def test_the_whole_review_is_decided_and_undone_by_keyboard_with_focus_on_the_ne
     setup_sign_in(page, site.base, ALICE)
     page.goto(f"{site.base}/jobs/{fresh}")
     start_of_page(page)
-    tab_to(page, "^Review")  # the job page's way into the decisions
+    tab_to(page, r"^Review \d+ decisions?")  # the job page's way into the decisions
     activate(page)
     assert "/review" in page.url
 

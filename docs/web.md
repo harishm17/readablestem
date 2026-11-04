@@ -192,7 +192,7 @@ Every `/jobs/*` route answers 404 for a job that does not exist or belongs to so
 else, admins included, so job ids cannot be probed and admins never see documents. Its
 owner, though, is told what happened to a document that is gone (UX review MF10): a job
 past its `retain_until` (not purged yet) shows "This document has been deleted. It was
-deleted automatically, as promised when you uploaded it, after being kept 24 hours in
+deleted automatically after 24 hours in
 all" (the time the job was kept, whatever the choice; not "after upload", since the time
 slides with the owner's work), and once the purge has removed the row, the owner's own
 `uploaded` event still says the id was theirs, so the page says it was deleted. Both say
@@ -547,10 +547,9 @@ descriptions then say what is shown and never the result (`pipeline/figure_step.
 
 **The form's shape** (`_upload_form.html`, ux2-lane-a): the file field with its facts, then two
 groups that are one line each until opened, then "Upload and convert". "How to convert it" (course,
-exam or quiz, scanned and handwritten pages when offered) and "How long to keep it, and who may
-look" each say what is set now ("No course · Figures described normally · Scanned pages kept as
-pictures"; "Deleted 24 hours after you last work on it. Only you, and anyone you share it with, can
-see it."); static/app.js rewrites that line as boxes change, and a group opens by itself when it
+exam or quiz, scanned and handwritten pages when offered) and "How long to keep it" each say what
+is set now ("No course · Figures described normally · Scanned pages kept as pictures"; "Deleted 24
+hours after you last work on it."); static/app.js rewrites that line as boxes change, and a group opens by itself when it
 holds a choice that is not its default. The scan box says first what it is for: needed for a PDF
 that is all scans or handwriting (refused without it), while a mixed PDF keeps its scanned pages
 as pictures marked "Not converted" unless it is ticked. "Main file of a zip" is offered only with
@@ -1601,7 +1600,7 @@ From top to bottom:
 
    | State | Label | Sentence |
    |---|---|---|
-   | queued | Waiting | "2 documents ahead of yours (1 is yours), about 3 minutes to go. This is an estimate from recent documents; it can take longer. You can leave this page; it keeps its place." |
+   | queued | Waiting | "2 documents ahead of yours (1 is yours), about 3 minutes to go (an estimate). You can leave this page; it keeps its place." |
    | queued, today's budget spent | Waiting | the `waiting_budget` outcome |
    | converting | Converting | the step it is on: "Reading the equations and checking each against your PDF's text." |
    | stopped by a spend cap | Stopped early | the outcome's message (and the open decisions) |
@@ -1622,9 +1621,8 @@ From top to bottom:
    4 minutes."; a waiting job that was tried again says nothing, since its upload is not
    when it began; `_wait_note.html`, `JobView.waiting_since`). static/app.js keeps the time
    current every half minute. Past ten minutes, or twice its own estimate, whichever is
-   more (`job_page.slow_after`), a plain note appears in its own polite region: "This is
-   taking longer than usual. You can leave this page: nothing is lost and your place is
-   kept. If nothing has changed in another hour, check the service status or email us."
+   more (`job_page.slow_after`), a plain note appears in its own polite region: "Taking
+   longer than usual. Nothing is lost." with links to the service status and an email link.
    There is no percentage and no finish time. The batch page includes the same part
    ("Uploaded 4 minutes ago.", slow after 15 minutes).
 2. **The steps**, outside the live region and polled on their own: "Reading the layout:
@@ -1661,8 +1659,8 @@ From top to bottom:
    a colleague, which says it is not how students get the file; and "If you change the PDF"),
    Record, and Delete (the one place retention is explained, with the real deletion date).
    Someone a document is shared with sees only the groups that are theirs. The results
-   are one line ("Found 19 equations, 7 figures and 36 headings on 13 pages. 3 decisions
-   still to make, 8 made.") with "Counts in detail" for the counts.
+   are one line ("Found 19 equations, 7 figures and 36 headings on 13 pages.") with "Counts in
+   detail" for the rest (list items, pages kept as images, decisions to make and made).
 
    A stopped job's explanation is in the status box, once; under it "What you can do" has
    "Try again" where it can help (`web/retry.py`) and always "Upload it again", "Back to My

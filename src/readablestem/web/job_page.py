@@ -207,9 +207,8 @@ def queue_sentence(ahead: int, yours: int, seconds: float | None) -> str:
             place += f" ({yours} {'is' if yours == 1 else 'are'} yours)"
     wait = wait_words(seconds)
     # An estimate from the pace of recent conversions, not a promise: it says so.
-    estimate = f", {wait} to go" if wait else ""
-    caveat = " This is an estimate from recent documents; it can take longer." if wait else ""
-    return f"{place}{estimate}.{caveat} You can leave this page; it keeps its place."
+    estimate = f", {wait} to go (an estimate)" if wait else ""
+    return f"{place}{estimate}. You can leave this page; it keeps its place."
 
 
 # --------------------------------------------------------------------------- how long

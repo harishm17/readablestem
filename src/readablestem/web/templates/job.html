@@ -43,19 +43,15 @@
    used, and nothing leaves the device. #}
 <div id="notify-box" class="notify-box" hidden>
   <button type="button" id="notify-button" class="button-secondary" aria-describedby="notify-hint">Notify me when it finishes</button>
-  <p class="hint" id="notify-hint">Your browser asks first. The notice shows on this device only, while this page stays open.</p>
+  <p class="hint" id="notify-hint">Your browser asks first. Works while this page is open.</p>
   <p class="hint" id="notify-state" role="status"></p>
 </div>
-<p>With JavaScript on, the status above updates by itself. You can also
-  <a href="/jobs/{{ job.id }}{% if auto_reload %}?auto=1{% endif %}">refresh the status</a>,
-  or leave and come back later.</p>
+<p class="hint"><a href="/jobs/{{ job.id }}{% if auto_reload %}?auto=1{% endif %}">Refresh the status</a></p>
 <noscript>
   {% if auto_reload %}
-  <p>This page reloads every {{ auto_reload_s }} seconds until the conversion finishes.
-    <a href="/jobs/{{ job.id }}">Stop reloading this page</a></p>
+  <p>Reloading every {{ auto_reload_s }} seconds. <a href="/jobs/{{ job.id }}">Stop reloading</a></p>
   {% else %}
-  <p><a href="/jobs/{{ job.id }}?auto=1">Reload this page every {{ auto_reload_s }} seconds
-    until the conversion finishes</a></p>
+  <p><a href="/jobs/{{ job.id }}?auto=1">Reload every {{ auto_reload_s }} seconds until it finishes</a></p>
   {% endif %}
 </noscript>
 {% endif %}
@@ -65,9 +61,8 @@
 {% set c = s.counts %}
 {% set pg = job.page %}
 {% set review_url = "/jobs/" ~ job.id ~ "/review" ~ ("?item=" ~ pg.first_open if pg.first_open else "") %}
-{# ux2-lane-a: the page is five groups, each one heading, with links to them under the status
-   (Review and download, For students, Settings and sharing, Record, Delete). What was found
-   and checked sits after the first group and has its own link. #}
+{# ux2-lane-a: five groups, each under one heading, with links to them under the status. What
+   was found and checked sits after the first group and has its own link. #}
 {% set owns = job.is_owner and not job.is_sample %}
 <nav class="jump-links" aria-label="On this page">
   <ul>
@@ -115,9 +110,8 @@
   <h2 id="results-heading">Results</h2>
   {% if outcome and outcome.partial %}
   <div class="notice notice-warning" id="partial-note">
-    <p><strong>{{ outcome.label }}:</strong> part of this document was not converted. The
-      status above says why and what to do; the HTML keeps those parts as images of the
-      original, marked “Not converted”.</p>
+    <p><strong>{{ outcome.label }}:</strong> part of this document was not converted. Those parts
+      stay as images marked “Not converted”.</p>
     {% if job.is_owner %}{% include "_job_retry.html" %}{% endif %}
   </div>
   {% endif %}
@@ -125,16 +119,11 @@
      page's biggest block). Decisions are the one unit (MF6, T1-3, T1-11): the same count here,
      on the review screen and in My documents. Items are not counted; a group of repeated
      headings is one decision. #}
-  <p id="results-line">{{ pg.found }} {% if c.decisions %}{{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} still {{ "to make" if job.can_review else "open" }}{% if c.decided_units %}, {{ c.decided_units }} made{% endif %}.{% else %}No decisions are left to make.{% endif %}</p>
+  <p id="results-line">{{ pg.found }}</p>
   <details class="more-detail" id="counts-detail">
   <summary>Counts in detail</summary>
   <dl class="summary-list">
-    <div><dt>Pages</dt><dd>{{ s.pages }}</dd></div>
-    <div><dt>Equations</dt><dd>{{ s.by_kind.get("equation", 0) }}</dd></div>
-    <div><dt>Figures</dt><dd>{{ s.by_kind.get("figure", 0) }}</dd></div>
-    <div><dt>Headings</dt><dd>{{ s.by_kind.get("heading", 0) }}</dd></div>
-    {% if s.by_kind.get("table") %}<div><dt>Tables</dt><dd>{{ s.by_kind["table"] }}</dd></div>{% endif %}
-    {# Pages and handwriting kept as images are figures in the data, not in words. #}
+    {# What was found is the line above; these are the counts it does not say. Pages and handwriting kept as images are figures in the data, not in words. #}
     {% if s.by_kind.get("page") %}<div><dt>Pages kept as images</dt><dd>{{ s.by_kind["page"] }}</dd></div>{% endif %}
     {% if s.by_kind.get("handwriting") %}<div><dt>Handwriting kept as images</dt><dd>{{ s.by_kind["handwriting"] }}</dd></div>{% endif %}
     <div><dt>List items</dt><dd>{{ s.list_items }}</dd></div>
@@ -142,9 +131,10 @@
     <div><dt>Decisions made</dt><dd>{{ c.decided_units }}</dd></div>
   </dl>
   </details>
-  {% if c.as_image %}<p id="items-count">{{ c.as_image_sentence }}</p>{% endif %}
+  {# Said by the status box when nothing else is: not with decisions open, or an outcome. #}
+  {% if c.as_image and (outcome or c.decisions) %}<p id="items-count">{{ c.as_image_sentence }}</p>{% endif %}
   {% if c.notes %}
-  <p id="notes-line">{{ c.notes }} {{ "part was" if c.notes == 1 else "parts were" }} accepted for you with a note{% if s.second_check %} ({{ s.second_check }} worth a look){% endif %}{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>{% endif %}. None of them holds up the file.</p>
+  <p id="notes-line">{{ c.notes }} {{ "part was" if c.notes == 1 else "parts were" }} accepted for you with a note{% if s.second_check %} ({{ s.second_check }} worth a look){% endif %}{% if job.can_review %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>{% endif %}. None holds up the file.</p>
   {% endif %}
   {% if c.decisions and job.can_review %}
   {# One link per kind, straight to its first decision on the review screen. A group of
@@ -157,8 +147,7 @@
   </p>
   {% endif %}
   {% if job.can_review %}
-  <p class="hint">The full list of items, with every note, is on
-    <a href="/jobs/{{ job.id }}/review/list">all items as a list</a>.</p>
+  <p class="hint"><a href="/jobs/{{ job.id }}/review/list">All items as a list</a></p>
   {% endif %}
   {% if s.checks_run %}
   <h3 id="checks-heading">Automatic checks of the HTML file</h3>
@@ -171,21 +160,15 @@
     {% endfor %}
   </ul>
   {% else %}
-  <p>All {{ s.checks_run }} checks passed. They look at the structure of the file (language,
-    title, headings, lists, image alt attributes), not at whether its content is right.</p>
+  <p>All {{ s.checks_run }} checks passed. They check structure, not whether the content is right.</p>
   {% endif %}
   {% endif %}
   {# T1-11: say what ran and what did not, so a pass is not read as more than it is. #}
   <details class="tech" id="checks-ran">
     <summary>What was checked, and what was not</summary>
-    <p><strong>Ran on this file:</strong>{% if s.checks_run %} {{ s.checks_run }} checks of its
-      structure: the language, the title, the order of the headings, lists, links, tables
-      and the alt attribute of every image.{% else %} no structure checks are stored for this
-      file.{% endif %}</p>
-    <p><strong>Did not run on this file:</strong> the axe accessibility test (it runs on
-      our own test documents, not on yours) and testing with a screen reader. Nobody has
-      listened to this file with NVDA, JAWS or VoiceOver. Read the student version through
-      once before you share it.</p>
+    <p><strong>Ran on this file:</strong>{% if s.checks_run %} {{ s.checks_run }} structure {{ "check" if s.checks_run == 1 else "checks" }}.{% else %} none stored.{% endif %}
+      <strong>Did not run on this file:</strong> the axe accessibility test (we run it on our own
+      documents) and testing with a screen reader.</p>
   </details>
 </section>
 
@@ -194,7 +177,6 @@
    title and contact line. One group; the parts are its sub-headings. #}
 <div class="job-group" id="for-students">
   <h2 id="for-students-heading">For students</h2>
-  <p>What students see in the file you post, and what a screen reader says for it.</p>
   {% with hl = 3 %}
   {% include "_job_language.html" %}
   {% include "_notation_suggestions.html" %}
@@ -208,9 +190,8 @@
   {% with hl = 3 %}{% include "_job_sharing.html" %}{% endwith %}
   <section aria-labelledby="revise-heading">
     <h3 id="revise-heading">If you change the PDF</h3>
-    <p>Fixed a typo or added a slide? Upload the new version and the decisions you made here
-      are copied to every item that did not change. This document stays as it is.</p>
-    <p><a href="/app?revises={{ job.id }}#upload-heading" data-role="revise">Upload a revised version</a></p>
+    <p><a href="/app?revises={{ job.id }}#upload-heading" data-role="revise">Upload a revised version</a>
+      (your decisions carry over)</p>
   </section>
 </div>
 {% endif %}
@@ -241,7 +222,7 @@
 <section aria-labelledby="delete-heading" class="job-group">
   <h2 id="delete-heading">Delete this document</h2>
   {% include "_job_retention.html" %}
-  <p>To delete it now, with the uploaded PDF and everything made from it, use the button. You are asked to confirm first.</p>
+  <p>Removes the PDF and everything made from it, after you confirm.</p>
   <form method="post" action="/jobs/{{ job.id }}/delete" class="inline-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     <button type="submit" class="button-danger-outline">Delete now</button>

@@ -9,12 +9,8 @@
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     <div class="field{% if title_error %} field-error{% endif %}">
       <label for="title">Title students hear</label>
-      <p class="hint" id="title-hint">Screen readers say it when the file opens, and it
-        names the downloaded file. {% if job.title_override %}You chose this title. Clear
-        the box to use the one from your PDF.{% else %}It comes from your PDF; change it if
-        it is not what students call this document.{% endif %} If the file has no top
-        heading, or one for every slide, the title is written as the top heading and the
-        slide titles go under it.</p>
+      <p class="hint" id="title-hint">Read out when the file opens; names the download.
+        {% if job.title_override %}Clear the box to use the title from your PDF.{% else %}Taken from your PDF.{% endif %}</p>
       {% if title_error %}
       <p class="error-message" id="title-error"><span class="visually-hidden">Error: </span>{{ title_error.message }}</p>
       {% endif %}
@@ -28,9 +24,8 @@
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     <div class="field{% if contact_error %} field-error{% endif %}">
       <label for="contact">Contact line for students (optional)</label>
-      <p class="hint" id="contact-hint">An email address or a web address. It is added to
-        the note at the end of the file, where students are told whom to ask about a part
-        they cannot read. Leave it empty for none.</p>
+      <p class="hint" id="contact-hint">An email or web address, shown at the end of the file
+        for students who cannot read a part.</p>
       {% if contact_error %}
       <p class="error-message" id="contact-error"><span class="visually-hidden">Error: </span>{{ contact_error.message }}</p>
       {% endif %}
