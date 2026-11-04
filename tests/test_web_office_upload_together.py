@@ -78,7 +78,7 @@ def send(client, files: list[tuple[str, bytes]], **fields):
 
 
 def results(client, response) -> str:
-    assert response.status_code == 303 and response.headers["location"].startswith("/app/upload/")
+    assert response.status_code == 303 and response.headers["location"].startswith("/app/batch/")
     return text_of(client.get(response.headers["location"]).text)
 
 

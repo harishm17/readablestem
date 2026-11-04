@@ -53,7 +53,12 @@ def zip_name(label: str, file_type: str = "html") -> str:
 
 
 def _zip_response(
-    request: Request, user, course_id: str | None, label: str, file_type: str = "html"
+    request: Request,
+    user,
+    course_id: str | None,
+    label: str,
+    file_type: str = "html",
+    job_ids: list[str] | None = None,
 ) -> Response:
     ctx = get_ctx(request)
     now = utcnow()
@@ -63,7 +68,7 @@ def _zip_response(
     with session_scope(ctx.factory) as session:
         ids = session.scalars(
             select(Job.id)
-            .where(*documents._live(user.id, now, course_id), Job.status == JobStatus.DONE)
+            .where(*documents._live(user.id, now, course_id, job_ids), Job.status == JobStatus.DONE)
             .order_by(Job.created_at.desc(), Job.id)
         ).all()
         items: list[tuple[str, str, str | bytes]] = []

@@ -132,10 +132,12 @@
   var office = (input.getAttribute("data-office") || "").split(" ").filter(Boolean);
   // A LaTeX file or a zip of a project (data-latex, FEATURE_LATEX_SOURCE): the server checks it.
   var latex = input.hasAttribute("data-latex");
+  // A zip of documents (data-zip, FEATURE_BATCH_ZIP): the server opens it.
+  var zip = input.hasAttribute("data-zip");
 
   function problem(file) {
     var pdf = /\.pdf$/i.test(file.name) || file.type === "application/pdf" ||
-      (latex && /\.(tex|zip)$/i.test(file.name));
+      (latex && /\.(tex|zip)$/i.test(file.name)) || (zip && /\.zip$/i.test(file.name));
     var word = office.some(function (kind) {
       return new RegExp("\\." + kind + "$", "i").test(file.name);
     });
