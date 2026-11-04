@@ -18,6 +18,9 @@ sealed check part of the development set (`data/dev-v2/check*`, `~/.cache/readab
 dev-v2/check-*`) and `proof/` are never read. `--extra DIR` adds the PDFs under DIR
 (each is written under a name made from its path).
 
+`LAYOUT_DISPLAY_GROUPING=true` in the environment runs the snapshot with the display-grouping
+rules on (off by default, as in production).
+
 The ink analysis of a document has a time budget (`page_type.INK_BUDGET_S`), so a PDF of
 very dense pages can read differently on a loaded machine: take both snapshots on a quiet
 machine, or look at such a PDF by hand.
@@ -71,7 +74,10 @@ def describe(path: str) -> dict[str, Any]:
 
     started = time.perf_counter()
     try:
-        result = layout.analyze(Path(path).read_bytes())
+        result = layout.analyze(
+            Path(path).read_bytes(),
+            display_grouping=os.environ.get("LAYOUT_DISPLAY_GROUPING", "").lower() == "true",
+        )
     except layout.LayoutError as exc:
         return {"error": exc.code, "seconds": round(time.perf_counter() - started, 2)}
     return {

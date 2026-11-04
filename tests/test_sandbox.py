@@ -14,7 +14,7 @@ import pytest
 from readablestem.core import sandbox, seccomp
 
 needs_sandbox = pytest.mark.skipif(
-    not (shutil.which("bwrap") and shutil.which("prlimit") and sandbox.available()),
+    not (shutil.which("bwrap") and shutil.which("prlimit") and sandbox.backend() == "bwrap"),
     reason="needs bubblewrap with user namespaces",
 )
 PERL = "/usr/bin/perl"
@@ -54,11 +54,13 @@ def test_missing_bubblewrap_is_refused_not_bypassed(monkeypatch):
     monkeypatch.setattr(sandbox.shutil, "which", lambda name: None)
     with pytest.raises(sandbox.SandboxUnavailable):
         sandbox.build_argv(["/usr/bin/true"])
-    sandbox.available.cache_clear()
+    monkeypatch.setenv(sandbox.BACKEND_ENV, "bwrap")  # only bubblewrap: no Landlock fallback
+    sandbox.backend.cache_clear()
     try:
         assert sandbox.available() is False
     finally:
-        sandbox.available.cache_clear()
+        monkeypatch.undo()
+        sandbox.backend.cache_clear()
 
 
 @needs_sandbox
@@ -215,6 +217,7 @@ def test_parent_environment_is_not_passed_to_bubblewrap(monkeypatch, tmp_path):
     monkeypatch.setattr(sandbox, "bwrap_path", lambda: "/usr/bin/bwrap")
     monkeypatch.setattr(sandbox, "prlimit_path", lambda: "/usr/bin/prlimit")
     monkeypatch.setattr(sandbox, "_nproc_counted_inside", lambda: True)
+    monkeypatch.setattr(sandbox, "backend", lambda: "bwrap")  # not the one the machine would pick
     monkeypatch.setattr(sandbox.subprocess, "Popen", popen)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     sandbox.run(["/usr/bin/true"], cgroup=False)
@@ -457,14 +460,23 @@ def test_the_exclusive_gate_lets_one_holder_in_at_a_time():
         pass
 
 
-def test_latexmls_limits_bound_the_worst_case_below_the_setting():
+def test_latexmls_limits_bound_the_worst_case_below_the_setting(monkeypatch):
+    import dataclasses
+
     from readablestem.config import Settings
     from readablestem.ops import sandbox_probe
     from readablestem.source import latexml
 
     limits = latexml.LIMITS
     assert limits.pids == 4 and limits.memory_bytes == 512 * 1024 * 1024
+    # tasks x address space, whichever backend is in use (4 x 512 MB: the Landlock backend's 2
+    # tasks of the program plus 2 of slack, or the bubblewrap sandbox's 4)
     assert sandbox_probe.total_bound_mb(cgroup=False) == 2048
+    for backend_name in ("bwrap", "landlock"):
+        assert limits.task_bound(backend_name) * limits.memory_bytes == 2048 * 1024 * 1024
+    monkeypatch.setattr(latexml, "LIMITS", dataclasses.replace(limits, landlock_pids=3))
+    monkeypatch.setattr(sandbox, "backend", lambda: "landlock")
+    assert sandbox_probe.total_bound_mb(cgroup=False) == 2560  # one more task: over the setting
     assert sandbox_probe.total_bound_mb(cgroup=True) == 512
     assert Settings(_env_file=None).source_sandbox_max_total_mb == 2048  # type: ignore[call-arg]
 

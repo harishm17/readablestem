@@ -7,7 +7,8 @@ running a program, reaching the network, writing outside its folder, running for
 all memory) does not work, and that nothing of it reaches the output. The last tests send the
 same kinds of file through `convert_source`, where the answer must be a content-free code.
 
-Skipped where LaTeXML or a working bubblewrap is missing (docs/development.md).
+Skipped where LaTeXML is missing, and per backend where bubblewrap or Landlock cannot start
+(docs/development.md).
 """
 
 from __future__ import annotations
@@ -27,6 +28,26 @@ from readablestem.source.convert import SourceFailed, convert_source
 from source_support import make_zip, needs_latexml
 
 pytestmark = needs_latexml
+
+
+@pytest.fixture(autouse=True, params=["bwrap", "landlock"])
+def backend(request):
+    """Every test here runs on both sandboxes: bubblewrap, and Landlock (the one used where user
+    namespaces are forbidden). Skipped where the named one cannot start."""
+    previous = os.environ.get(sandbox.BACKEND_ENV)
+    os.environ[sandbox.BACKEND_ENV] = request.param
+    sandbox.backend.cache_clear()
+    if sandbox.backend() != request.param:
+        os.environ.pop(sandbox.BACKEND_ENV, None)
+        sandbox.backend.cache_clear()
+        pytest.skip(f"the {request.param} sandbox cannot start here")
+    yield request.param
+    if previous is None:
+        os.environ.pop(sandbox.BACKEND_ENV, None)
+    else:
+        os.environ[sandbox.BACKEND_ENV] = previous
+    sandbox.backend.cache_clear()
+
 
 SECRET = "SECRET-VALUE-4417"
 FAST = sandbox.Limits(wall_s=60, cpu_s=60, memory_bytes=1_500_000_000)

@@ -192,7 +192,11 @@ def test_the_phone_comparison_topics_are_keyboard_disclosures(site, browser, axe
 def test_the_contents_links_move_focus_to_their_headings_and_fit_320_px(
     site, browser, axe_source, path
 ):
-    context, page = open_as(browser, site, path, viewport=SMALL, signed_in=False)
+    # Buttons and links transition colour for 120 ms unless the reader asks for reduced motion
+    # (controls.css): with it, axe cannot read a mid-way colour after the scheme switch.
+    context, page = open_as(
+        browser, site, path, viewport=SMALL, signed_in=False, reduced_motion="reduce"
+    )
     links = page.locator('nav.toc[aria-label="On this page"] a')
     assert links.count() >= 6
     for index in range(links.count()):
@@ -210,8 +214,6 @@ def test_the_contents_links_move_focus_to_their_headings_and_fit_320_px(
     assert overflow <= 0
     for scheme in ("light", "dark"):
         page.emulate_media(color_scheme=scheme)
-        # Buttons and links transition colour for 120 ms: axe must not read a mid-way colour.
-        page.evaluate("Promise.all(document.getAnimations().map(a => a.finished))")
         violations = axe_violations(page, axe_source)
         assert not violations, describe(violations)
     context.close()

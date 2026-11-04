@@ -160,7 +160,7 @@ def set_contact(
 
 @router.post("/jobs/{job_id}/keep", dependencies=[Depends(require_csrf)])
 def keep_longer(request: Request, job_id: str, user: UserDep) -> Response:
-    """ "Keep 7 more days": seven days from now, only the owner sees it. Refused (429, nothing
+    """ "Keep for 7 days": seven days from now, only the owner sees it. Refused (429, nothing
     changed) when keeping this document would put the person over the number of documents
     they may keep (`MAX_LIVE_JOBS_PER_USER`, the cap the upload also enforces)."""
     ctx = get_ctx(request)
@@ -176,14 +176,17 @@ def keep_longer(request: Request, job_id: str, user: UserDep) -> Response:
                     "This document was not kept longer",
                     f"You are keeping {others + 1} documents, and the most allowed is "
                     f"{MAX_LIVE_JOBS_PER_USER}. Delete one you no longer need, then choose "
-                    "Keep 7 more days again. Nothing was changed.",
+                    "Keep for 7 days again. Nothing was changed.",
                     context={"job_id": job_id},
                 )
         changed = retention.keep_seven_more_days(job)
     if changed:
         log_event(logger, "kept_longer", job_id=job_id)
         flash(
-            request, "This document will be kept for 7 more days. Only you can see it.", undo=False
+            request,
+            "This document will be kept for 7 days from now. Only you and the people you share "
+            "it with can see it.",
+            undo=False,
         )
     else:
         flash(request, "This document is already kept for longer than 7 days.", undo=False)

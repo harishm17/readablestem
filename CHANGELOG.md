@@ -12,6 +12,66 @@
   the glyphs"; `docs/eval-dev-baseline-2026-11-03.md`, "Reading push").
 
 ## Earlier: equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
+## Unreleased: Landlock sandbox backend (branch latex/landlock-sandbox)
+
+- New: a second sandbox for LaTeX source where bubblewrap cannot start (no user namespaces,
+  as on Railway): Landlock (read and execute on the system trees, read on the input, read and
+  write on the output and a private scratch folder, nothing else, not `/proc`) with a strict
+  seccomp filter (no sockets, no `setsid`, no `landlock_*`), `no_new_privs`, rlimits, the
+  one-at-a-time lock, a polled memory cap for the whole process group, and a launcher that is
+  the subreaper and dies with its caller. Chosen automatically; the same probe gates it
+  (`backend=bwrap|landlock`, new in-sandbox checks). The web process and the conversion child
+  call `PR_SET_DUMPABLE=0`. `tests/test_source_escapes.py` runs on both backends.
+- Hardened after review: Landlock ABI 6 is required (signal and abstract-socket scopes); the
+  strict filter also denies calls that name another process of the user (`prlimit64` and the
+  scheduler calls except on pid 0, `setpriority`, `ioprio_set`, pidfds, `kcmp`), memory and disk
+  outside the counters (`memfd_create`, System V and POSIX IPC, `execveat` of an open file), and
+  changes to file mode, owner, times and extended attributes; unlinked-but-open files count
+  against the output budget and the entries in the writable folders are capped; the task bound
+  is 4 x 512 MB and the probe fails over `SOURCE_SANDBOX_MAX_TOTAL_MB`; the memory poll is
+  every 0.1 s; the supervisor watches its caller's pid instead of `PR_SET_PDEATHSIG`.
+- Final review: `source_busy` is decided by the launcher's own observation (the user's task
+  count at the limit while the program has not used its allowance, written to a marker the
+  program cannot reach), no longer from the program's output, which a document could spoof.
+- Second review: `fallocate` denied, the output budget counts blocks and deleted files that are
+  still mapped, a fork that fails for lack of room fails the conversion as `source_busy`
+  (new message: "The server is busy right now ... Try again in a few minutes, or upload the
+  PDF instead."); running a written file through the dynamic loader is documented as a
+  residual (the loader's execute right cannot be withheld).
+## Unreleased: display grouping (branch eq/display-grouping)
+
+- New setting `LAYOUT_DISPLAY_GROUPING` (off; output byte-identical to before when off, no pipeline bump until it is turned on).
+  When on, layout joins pieces of one printed display: two formulas with a connective word between them
+  ("P_A = ... and P_B = ...", "0 < p < 1 for all i") are one display element holding the word and
+  the one equation number, where the word was a paragraph read after both equations; the right
+  half of a long aligned row and a row that starts with "=" join the display above them; a
+  trailing ellipsis ("j = 1, 2, 3, ...", "0 > s_1 > s_2 > ...") stays in an inline formula.
+  Conservative: any other word, two numbered equations, or a fraction far from the row keep the old
+  reading. `docs/layout.md` "One printed display, one element"; `scripts/layout_identity.py` lists
+  what changed on 149 repository PDFs and the development, fresh and held-out papers.
+## Unreleased: upload, job page and My documents (branch ux/upload-job-documents)
+
+- A person a document was shared with who can only view it is no longer told "N decisions need
+  you": the status says the decisions are still open and only the owner or a reviewer can make
+  them (a reviewer is told they can review them). The results tile reads "Decisions made" and,
+  for a viewer, "Decisions still open". In My documents a document whose owner has no name is
+  "shared with you" instead of "shared by The owner".
+- "Try again" says what it will do ("puts your document back in the queue"); the confirmation
+  comes after it worked.
+- Times in My documents stay in the reader's time zone after the list refreshes itself.
+- One wording for keeping a document, "Keep for 7 days", on the upload form, job page, Account
+  page, notices and the privacy page. The job page shows the deletion time once, under the
+  review and download actions, with the day "Keep for 7 days" would delete it. Delete entry
+  points (a document, a course, an account, a waiting file) have a red outline style
+  (`button-danger-outline`, `danger-link`), the confirmation pages keep the filled button.
+- Upload form: shorter, in three groups (file, how to convert it, how long to keep it) with one
+  line of consequence beside each option and the long text in disclosures. A refused scanned PDF
+  says to tick "Convert scanned or handwritten pages" and choose the file again.
+- Choosing pages: sizes under 0.1 MB show in KB (`pending.size_text`), the range examples follow
+  the active page limit and the file, and a suggestion cut off at 20 parts says which pages it
+  leaves out.
+- My documents has a compact "Practise on the sample" link beside "Convert a PDF"; signed-in
+  pages get a compact footer of trust and help links (public pages keep the full footer).
 ## Unreleased: spoken-equal scorer reads one print as one speech (branch eval/spoken-scorer-fix)
 
 - Evaluation only; the product's speech and `math_canonical.compare` are unchanged. The spoken-equal scorer

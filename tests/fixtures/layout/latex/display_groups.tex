@@ -1,0 +1,69 @@
+% Layout fixture: displays that TeX sets as one printed line or one printed equation but that
+% pieces of the page can make look like several: two formulas joined by "and" or "for all", and
+% a long aligned row whose right half starts clear of the row above it. Used by
+% tests/test_layout_display_groups.py.
+% Written for ReadableSTEM's tests; no third-party text.
+\documentclass[11pt]{article}
+% Computer Modern text fonts (CMR, CMBX), as pdfLaTeX writes them; XeTeX defaults to Latin Modern.
+\usepackage[OT1]{fontenc}
+\renewcommand{\rmdefault}{cmr}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=1in]{geometry}
+\pagestyle{empty}
+
+\begin{document}
+
+\section*{Two formulas on one line}
+
+The two partition coefficients of a species are the ratios of its concentrations in the
+phases,
+\begin{equation}
+  P_A = \frac{c_A^{(1)}}{c_A^{(2)}} \hspace{5em} \text{and} \hspace{5em}
+  P_B = \frac{c_B^{(1)}}{c_B^{(2)}} \;,
+\end{equation}
+which can be measured. In a trial, suppose that
+\[
+  P(A = 1 \mid L = 1) = 0.75 \quad \text{and} \quad P(A = 1 \mid L = 0) = 0.50.
+\]
+The weights must satisfy
+\[
+  0 < \pi(L_i) < 1 \quad \text{for all } i.
+\]
+
+\section*{A long aligned row}
+
+Shifting the contour gives
+\begin{align*}
+  \mathbb{E}[L_n] &= -\frac{1}{2\pi \mathrm{i}} \int_{\sigma-\mathrm{i}\infty}^{\sigma+\mathrm{i}\infty}
+    \frac{\widetilde{f}_n(s)}{s}\,\mathrm{d}s \\
+  &= -\frac{1}{2\pi \mathrm{i}} \int_{\sigma-\mathrm{i}\infty}^{\sigma+\mathrm{i}\infty}
+    \frac{1}{s^2(\psi(1-s)-\psi(1))}\,\mathrm{d}s
+    + \frac{1}{2\pi \mathrm{i}} \int_{\sigma-\mathrm{i}\infty}^{\sigma+\mathrm{i}\infty}
+    \frac{\Gamma(s)\Gamma(n)/\Gamma(n+s)}{s(\psi(1-s)-\psi(1))}\,\mathrm{d}s.
+\end{align*}
+
+\section*{Lists that go on}
+
+The gaps are computed for $j = 1,2,3,...$ obtained by diagonalisation, and the roots
+are ordered as $0 > s_1 > s_2 > ...$ denoting the negative roots.
+
+\section*{Words that do not join}
+
+We have $x = 1$ and $y = 2$ in this case, and nothing else. When
+\[
+  a = b \qquad \text{where we assume} \qquad c = d,
+\]
+the claim holds. Two numbered equations stay apart,
+\begin{align}
+  u &= \frac{1}{2} \\
+  v &= \frac{1}{3}
+\end{align}
+and so do two unrelated lines.
+
+\newpage
+\noindent $p_1 = 3$ and $q_1 = 4$\\
+is the tail of a sentence from the page before: it starts at the left margin and is no display.
+The rest of this page is running text, so that the column's margins can be measured against
+it, and it runs on for a few lines across the whole width of the column in the usual way.
+
+\end{document}

@@ -159,7 +159,10 @@ def test_a_partial_result_says_so_in_the_list(web):
 def test_the_lists_delete_is_a_link_to_the_confirmation(web):
     job_id = finish(web)
     page = web.browser.get("/app").text
-    assert f'<a id="del-{job_id}" href="/jobs/{job_id}/delete?from=app">Delete' in page
+    assert (
+        f'<a id="del-{job_id}" class="danger-link" href="/jobs/{job_id}/delete?from=app">Delete'
+        in page
+    )
     confirm = web.browser.get(f"/jobs/{job_id}/delete?from=app").text
     flat = text(confirm)
     assert "Delete Kinematics?" in flat and "notes.pdf, uploaded" in flat

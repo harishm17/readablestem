@@ -105,6 +105,33 @@
     {% block content %}{% endblock %}
   </main>
 
+  {% if compact_footer|default(false) %}
+  {# Signed-in pages: the trust and help links on one line. Public pages keep the full footer. #}
+  <footer class="site-footer site-footer-compact">
+    <div class="{{ self.main_class() }}">
+      <nav aria-label="Footer">
+        <ul class="footer-compact-links">
+          <li><a href="/privacy">Privacy</a></li>
+          <li><a href="/terms">Terms</a></li>
+          <li><a href="/limits">Known limits</a></li>
+          <li><a href="/help/posting">Posting in your course</a></li>
+          <li><a href="/status">Service status</a></li>
+          <li><a href="/for-accessibility-offices">For accessibility offices</a></li>
+          <li><a href="/guides">Guides</a></li>
+          {% if feedback_url %}
+          <li><a href="{{ feedback_url }}">Send feedback</a></li>
+          {% elif contact_email %}
+          <li><a href="mailto:{{ contact_email }}?subject=ReadableSTEM%20feedback">Send feedback by email</a></li>
+          {% endif %}
+          <li><a href="{{ source_url }}">Source code</a></li>
+          <li><a href="/terms#open-source">Open source</a></li>
+        </ul>
+      </nav>
+      <p class="footer-note">Built and maintained by <a href="https://harishmanoharan.com/?ref=readablestem">Harish Manoharan</a>.
+        <a href="{{ source_url }}">Open source</a>{% if contact_email %} · <a href="mailto:{{ contact_email }}">Contact</a>{% endif %}</p>
+    </div>
+  </footer>
+  {% else %}
   <footer class="site-footer">
     <div class="{{ self.main_class() }}">
       <nav aria-label="Footer" class="footer-cols">
@@ -156,6 +183,7 @@
         <a href="{{ source_url }}">Open source</a>{% if contact_email %} · <a href="mailto:{{ contact_email }}">Contact</a>{% endif %}</p>
     </div>
   </footer>
+  {% endif %}
   {% for event in analytics_events %}
   <span hidden data-ph-event="{{ event.name }}" data-ph-props='{{ event.props|tojson }}'></span>
   {% endfor %}

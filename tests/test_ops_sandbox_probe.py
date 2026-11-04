@@ -14,8 +14,8 @@ from readablestem.ops import sandbox_probe
 from readablestem.source import latexml
 
 needs_sandbox = pytest.mark.skipif(
-    not (shutil.which("bwrap") and shutil.which("prlimit") and sandbox.available()),
-    reason="needs bubblewrap with user namespaces",
+    not sandbox.available(),
+    reason="needs a working sandbox (bubblewrap with user namespaces, or Landlock)",
 )
 
 
@@ -50,11 +50,13 @@ def test_a_bubblewrap_that_exits_nonzero_fails_and_says_why(monkeypatch, capsys)
     assert out.strip().splitlines()[-1] == "FAIL"
 
 
-def test_no_bubblewrap_fails(monkeypatch, capsys):
+def test_no_sandbox_backend_at_all_fails(monkeypatch, capsys):
     monkeypatch.setattr(sandbox, "bwrap_path", lambda: None)
+    monkeypatch.setattr(sandbox, "backend", lambda: None)
     assert main(["ops", "sandbox-probe"]) == 1
     out = capsys.readouterr().out
-    assert "bwrap=fail" in out and out.strip().splitlines()[-1] == "FAIL"
+    assert "backend=none" in out and "sandbox_start=fail" in out
+    assert out.strip().splitlines()[-1] == "FAIL"
 
 
 @needs_sandbox

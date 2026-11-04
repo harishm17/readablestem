@@ -334,12 +334,32 @@ class Headline:
     state: str  # "queued", "running", "failed", "stopped", "decisions", "images", "ready"
 
 
+def open_decisions_line(count: int, audience: str = "owner") -> str:
+    """The sentence about the decisions still open, for who is reading. The owner has them to
+    make before sharing; a reviewer may make them; a person who can only view cannot, and
+    is told a download now is a draft."""
+    many = plural(count, "decision")
+    if audience == "view":
+        return (
+            f"{many} {'is' if count == 1 else 'are'} still open. Only the owner or a reviewer "
+            "can make them, so a download now is a draft."
+        )
+    if audience == "review":
+        return f"{many} {'is' if count == 1 else 'are'} still open. You can review them."
+    return f"{many} {'needs' if count == 1 else 'need'} you before you share it."
+
+
 def headline(
-    status: str, detail: str, outcome: JobOutcome | None, counts: Breakdown | None
+    status: str,
+    detail: str,
+    outcome: JobOutcome | None,
+    counts: Breakdown | None,
+    audience: str = "owner",
 ) -> Headline:
     """The status box for any job: `detail` is the plain status sentence
     (`views.JobView.status_detail`), `outcome` the job's outcome (`web.outcome`), `counts`
-    a finished job's breakdown."""
+    a finished job's breakdown, `audience` "owner", "review" or "view" (what the person
+    reading may do about the open decisions)."""
     if status == "queued":
         if outcome is not None:
             return Headline(outcome.label, outcome.message, "queued", "queued")
@@ -354,8 +374,7 @@ def headline(
         return Headline(outcome.label, outcome.message, "failed", state)
     counts = counts or Breakdown()
     if counts.decisions:
-        need = "needs" if counts.decisions == 1 else "need"
-        message = f"{plural(counts.decisions, 'decision')} {need} you before you share it."
+        message = open_decisions_line(counts.decisions, audience)
         return Headline("Converted", message, "running", "decisions")
     if counts.as_image:
         verb = "is" if counts.as_image == 1 else "are"

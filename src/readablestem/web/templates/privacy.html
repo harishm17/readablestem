@@ -25,16 +25,17 @@
 <ul>
   {# What the code does (T1-8): the
      24-hour and 7-day clocks restart on every review decision, language, title or contact
-     change, and download; "Keep 7 more days" on the job page makes a 24-hour document a
-     7-day one; the "let us look" choice is 30 days from upload and does not restart. #}
+     change, and download; "Keep for 7 days" on the job page makes a 24-hour document a
+     7-day one, counted from that moment; the "let us look" choice is 30 days from upload and does not restart. #}
   <li>If you tick neither box on the upload form, all of it is deleted automatically
     <strong>{{ retention_hours }} hours</strong> after you last worked on it: after your
     last review decision or download, or the upload if there is none. From that moment it
     can no longer be opened or downloaded; an hourly clean-up then removes it from the
     database, normally within the hour.</li>
-  <li>If you tick "Keep it for 7 days after I last work on it", it is deleted
+  <li>If you tick "Keep for 7 days", it is deleted
     <strong>7 days</strong> after you last worked on it instead. Nobody else looks at it.
-    "Keep 7 more days" on the document's page does the same later.</li>
+    "Keep for 7 days" on the document's page does the same later, and shows the day it
+    will then be deleted.</li>
   <li>If you also tick "Also let us look at the results ({{ opt_in_days }} days)", it is
     deleted <strong>{{ opt_in_days }} days</strong> after upload. During that time the people
     who run ReadableSTEM may look at the conversion results to find and fix mistakes in the

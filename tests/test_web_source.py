@@ -361,7 +361,8 @@ def test_the_student_note_of_a_source_says_so_also_after_a_review_render():
 
 
 @pytest.mark.parametrize(
-    "code", ["source_failed", "source_unreadable", "source_refused", "source_unavailable"]
+    "code",
+    ["source_failed", "source_unreadable", "source_refused", "source_unavailable", "source_busy"],
 )
 def test_every_source_failure_code_has_a_plain_message(code):
     from readablestem.web.views import job_error_message

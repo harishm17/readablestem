@@ -124,6 +124,13 @@ class Settings(BaseSettings):
     # on the fix and keeps the reading before it. Off until measured (docs/eval-dev-baseline-
     # 2026-11-03.md, "Reading push").
     equation_glyph_reconcile: bool = False
+    # One printed display, one element (`layout.analyze(display_grouping=True)`, docs/layout.md):
+    # two formulas joined by "and"/"for all", the right half of a long aligned row, a row that
+    # starts with "=", and a trailing ellipsis stay together. Off: output is byte-identical to
+    # before. Not enabled; revisit after fresh5. Turning it on changes equation crops and
+    # requests on TeX papers with such displays, so PIPELINE_VERSION must be bumped (0.5.10 or
+    # later) in the change that enables it.
+    layout_display_grouping: bool = False
     # A calibrated rule on top of the checks (`pipeline/flag_policy.py`): an accepted equation
     # that looks like the readings that turned out wrong (a small logistic model over content-free
     # features, fitted on the development splits) becomes a required decision. It only adds

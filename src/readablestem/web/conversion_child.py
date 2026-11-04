@@ -40,6 +40,8 @@ import time
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
+from readablestem.core import sandbox
+
 if TYPE_CHECKING:
     from readablestem.core.types import Element, Fix, ModelCall, ProgressEvent
     from readablestem.models.base import VisionRequest
@@ -415,6 +417,7 @@ def main(argv: list[str] | None = None) -> int:
     (out of memory even for the error report) or `EXIT_BROKEN` (this process failed, not
     the PDF). `--check` only imports what a conversion needs: 0 or `EXIT_BROKEN`."""
     args = sys.argv[1:] if argv is None else argv
+    sandbox.make_undumpable()  # a sandboxed program of the same user cannot read this process
     try:
         if args and args[0] == "--check":
             _prepare({"settings": {}})

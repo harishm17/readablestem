@@ -93,6 +93,8 @@ JOB_ERROR_MESSAGES = {
     "source_unreadable": "This LaTeX source could not be converted. Upload the PDF instead.",
     "source_refused": "This LaTeX source uses something this tool will not run. Remove it, "
     "or upload the PDF instead.",
+    "source_busy": "The server is busy right now and could not start converting this LaTeX "
+    "source. Try again in a few minutes, or upload the PDF instead.",
     "source_unavailable": "LaTeX source cannot be converted on this server right now. "
     "Upload the PDF instead.",
     "internal_error": "Something went wrong on our side. The error was recorded without any "
@@ -539,9 +541,10 @@ def job_view(
 
 def _owner_name(session: Session, job: Job) -> str:
     """Who owns the document, for the person it was shared with: their name only (an address
-    is for the owner to see), else "The owner"."""
+    is for the owner to see), else "" (the pages then say "the owner" or "shared with you",
+    never a name that looks like a placeholder)."""
     person = session.get(User, job.user_id)
-    return (person.name if person is not None and person.name else None) or "The owner"
+    return (person.name if person is not None and person.name else None) or ""
 
 
 def carry_view(job: Job, result: DocumentResult) -> CarryView | None:
