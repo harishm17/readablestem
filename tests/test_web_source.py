@@ -248,6 +248,20 @@ def test_a_beamer_deck_is_refused_until_it_is_switched_on(web):
     assert "Beamer" in text and "Upload the compiled PDF" in text
 
 
+def test_a_beamer_deck_is_taken_with_its_own_switch_and_counted_by_frame(tmp_path, available):
+    env = WebEnv(tmp_path, feature_latex_source=True, feature_beamer_source=True)
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        frames = "".join(f"\\begin{{frame}}{{T{i}}}x\\end{{frame}}" for i in range(4))
+        deck = f"\\documentclass{{beamer}}\\begin{{document}}{frames}\\end{{document}}"
+        response = send(client, deck.encode(), "slides.tex")
+        assert response.status_code == 303
+        [job] = jobs(env)
+        assert job.page_count == 4
+        assert envelope.unwrap(bytes(stored(env, job.id).content))[0] == "tex"
+
+
 def test_a_source_over_the_page_limit_is_refused(web):
     assert web.settings.max_pages_per_job == 5
     long = "\\documentclass{article}\\begin{document}" + "word " * 3200 + "\\end{document}"

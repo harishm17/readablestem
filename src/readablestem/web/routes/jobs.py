@@ -1007,7 +1007,11 @@ def _place_source(
         return Placed(file.filename, code="source_unavailable", status=503, retry_after="3600")
     try:
         info = source_intake.inspect(
-            file.filename, file.data, main=main_file, max_pages=s.max_pages_per_job
+            file.filename,
+            file.data,
+            main=main_file,
+            max_pages=s.max_pages_per_job,
+            beamer_ok=s.feature_beamer_source,
         )
     except source_intake.SourceRefused as exc:
         return Placed(file.filename, code=exc.code, status=SOURCE_STATUS.get(exc.code, 422))

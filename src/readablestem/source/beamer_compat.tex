@@ -1,0 +1,13 @@
+% Definitions for the Beamer parts LaTeXML 0.8.8's beamer.cls binding does not have. They are
+% read before the document (latexml --preload, `source/latexml.py`) when the main file's class
+% is beamer, so a frame that uses a block or columns converts instead of ending in an
+% unknown-command error. Plain text stands in for the visual box: a block is its title and its
+% body, columns follow one another. Written for this project; no part of Beamer itself.
+\makeatletter
+\newenvironment{block}[1]{\par\medskip\noindent\textbf{#1}\par}{\par\medskip}
+\newenvironment{alertblock}[1]{\par\medskip\noindent\textbf{#1}\par}{\par\medskip}
+\newenvironment{exampleblock}[1]{\par\medskip\noindent\textbf{#1}\par}{\par\medskip}
+\newenvironment{columns}[1][]{\par}{\par}
+\newenvironment{column}[2][]{\par}{\par}
+\newcommand{\institute}[2][]{}
+\makeatother

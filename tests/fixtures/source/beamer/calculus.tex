@@ -1,0 +1,29 @@
+\documentclass{beamer}
+\usepackage{amsmath}
+\title{Derivatives}
+\begin{document}
+\begin{frame}{Rules}
+  \begin{itemize}[<+->]
+    \item Power rule: $\frac{d}{dx} x^n = n x^{n-1}$
+    \item Product rule: $(fg)' = f'g + fg'$
+    \item Chain rule: $(f\circ g)' = (f'\circ g)\, g'$
+  \end{itemize}
+\end{frame}
+\begin{frame}{Steps}
+  First $x^2$.\pause\ Then $x^3$.\pause\ Finally $x^4$.
+  \onslide<2->{This appears from step 2.}
+  \visible<3>{Only visible on step 3.}
+  \alt<1>{Early}{Late}
+\end{frame}
+\begin{frame}[fragile]{Code}
+\begin{verbatim}
+def f(x):
+    return x**2
+\end{verbatim}
+\end{frame}
+\begin{frame}{Limits}
+  \[ \lim_{h\to 0} \frac{f(x+h)-f(x)}{h} \]
+  \pause
+  is the derivative at $x$.
+\end{frame}
+\end{document}

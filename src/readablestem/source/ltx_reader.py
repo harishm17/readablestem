@@ -61,6 +61,13 @@ UNKNOWN_FIGURE_REASON = "source_figure_missing"
 SOURCE_ERROR_NOTICE = "source_error"
 _SPACE = re.compile("[ \\t\\r\\n\\u00a0]+")
 _LEVEL = re.compile(r"^h([1-6])$")
+# What a step of a frame does not show (`\\pause`, `\\only`, `\\visible`).
+HIDDEN = frozenset({"ltx_covered", "ltx_invisible"})
+_SECTION_TITLES = {
+    "ltx_title_section",
+    "ltx_title_subsection",
+    "ltx_title_subsubsection",
+}
 
 
 class ReadError(ValueError):
@@ -95,8 +102,13 @@ class Reading:
 
 
 class _Reader:
-    def __init__(self, project: Path, graphics: dict[str, str] | None = None) -> None:
+    def __init__(
+        self, project: Path, graphics: dict[str, str] | None = None, beamer: bool = False
+    ) -> None:
         self.project = project
+        self.beamer = beamer
+        self.section_level = 0  # the depth of the section a frame sits in (beamer)
+        self.deferred: list[Node] = []  # `span` list items found inside a paragraph (beamer)
         self.graphics = graphics or {}
         self.out = Reading()
         self.chars = 0
@@ -139,6 +151,13 @@ class _Reader:
         tag = _local(node.tag)
         classes = _classes(node)
         if tag in ("head", "script", "style", "nav") or classes & {"ltx_page_footer", "ltx_dates"}:
+            return
+        if classes & HIDDEN:  # not shown on this step of a frame (beamer)
+            return
+        if tag == "p" and any(_local(n.tag) == "foreignObject" for n in node.iter()):
+            # beamer draws a title page inside an svg: the blocks in it are the content
+            for box in (n for n in node.iter() if _local(n.tag) == "foreignObject"):
+                self._walk_children(box, depth + 1)
             return
         if tag == "math":  # display maths outside any equation table
             self._display_math([node], None)
@@ -183,21 +202,72 @@ class _Reader:
                 self._new(Kind.PARAGRAPH, text=text)
                 self.chars += len(text)
             return
-        for child in _children(node):
-            self.walk(child, depth + 1)
+        self._walk_children(node, depth)
+
+    # ------------------------------------------------------------------ slides (beamer)
+
+    def _walk_children(self, node: Node, depth: int) -> None:
+        """The children in order; the steps of one frame (`ltx_slide` divs that share a frame
+        id) are handled together."""
+        children = _children(node)
+        index = 0
+        while index < len(children):
+            child = children[index]
+            if "ltx_slide" in _classes(child):
+                key = _frame_key(child)
+                group = [child]
+                while (
+                    index + 1 < len(children)
+                    and "ltx_slide" in _classes(children[index + 1])
+                    and _frame_key(children[index + 1]) == key
+                ):
+                    index += 1
+                    group.append(children[index])
+                self._frame(group, depth)
+            else:
+                self.walk(child, depth + 1)
+            index += 1
+
+    def _frame(self, steps: list[Node], depth: int) -> None:
+        """One frame: its last step, and any earlier step that shows something the last one
+        does not (an `\\only` step), headed "(step 1 of 2)". An earlier step whose every block
+        is also on the last one is left out: it is the same slide still being built."""
+        signatures = [_visible_blocks(step) for step in steps]
+        last = len(steps) - 1
+        for number, step in enumerate(steps):
+            if number != last and _contained(signatures[number], signatures[last]):
+                continue
+            note = f" (step {number + 1} of {len(steps)})" if number != last else ""
+            self._slide(step, note, depth)
+
+    def _slide(self, step: Node, note: str, depth: int) -> None:
+        for child in _children(step):
+            classes = _classes(child)
+            if "ltx_frame_title" in classes:
+                text, _ = self._inline_text(child, skip_tags=True)
+                if text:
+                    level = self.section_level + 1 if self.section_level >= 1 else 2
+                    heading = self._new(Kind.HEADING, text=text + note, bold=True)
+                    self._heading_fix(heading, min(level, 6), text + note)
+                    self.chars += len(heading.text or "")
+            else:
+                self.walk(child, depth + 1)
 
     def _section_heading(self, node: Node, level: int, classes: set[str]) -> None:
         if "ltx_runin" in classes:  # a theorem's "Theorem 1." title: handled with its body
             return
         if "ltx_title_abstract" in classes:
             level = 2
+        if self.beamer and classes & _SECTION_TITLES:
+            level = max(level - 1, 1)  # a deck's sections are its top level; frames sit below
+            self.section_level = level
         text, _ = self._inline_text(node, skip_tags=True)
         if not text:
             return
         element = self._new(Kind.HEADING, text=text, bold=True)
         self._heading_fix(element, level, text)
         self.chars += len(text)
-        if "ltx_title_document" in classes and self.out.title is None:
+        if classes & {"ltx_title_document", "ltx_title_titlepage"} and self.out.title is None:
             self.out.title = text
 
     def _theorem(self, node: Node, depth: int) -> None:
@@ -255,6 +325,11 @@ class _Reader:
             tag = _local(item.tag)
             classes = _classes(item)
             if skip_tags and "ltx_tag" in classes:
+                return
+            if classes & HIDDEN:  # not shown on this step of a frame
+                return
+            if tag == "span" and "ltx_item" in classes:
+                self.deferred.append(item)  # a list item the frame reveals later: its own item
                 return
             if tag == "math":
                 if owner is not None:
@@ -377,6 +452,7 @@ class _Reader:
             element.text = texts[0] if texts else ""
             self._apply_spans(element, spans)
             self.chars += len(element.text or "")
+            self._deferred_items(ordered, level)
             for sub in rest:
                 if _local(sub.tag) in ("ul", "ol") or _classes(sub) & {
                     "ltx_itemize",
@@ -385,6 +461,30 @@ class _Reader:
                     self._list(sub, level + 1)
                 else:
                     self.walk(sub, 1)
+
+    def _deferred_items(self, ordered: bool, level: int) -> None:
+        """List items a frame reveals later arrive as `span` items inside the paragraph of the
+        one before (`\\pause` in an itemize): each is an item of its own, in order."""
+        while self.deferred:
+            span = self.deferred.pop(0)
+            marker = ""
+            body: list[Node] = []
+            for child in _children(span):
+                if "ltx_tag" in _classes(child):
+                    marker = _squash(self._plain(child))
+                else:
+                    body.append(child)
+            element = self._new(
+                Kind.LIST_ITEM, text="", list_marker=marker or None, list_ordered=ordered,
+                list_level=level,
+            )  # fmt: skip
+            holder = Node("span")
+            holder.extend(body)
+            text, spans = self._inline_text(holder, owner=element, skip_tags=True)
+            element.text = text
+            self._apply_spans(element, spans)
+            self.chars += len(text)
+            self._deferred_items(ordered, level)  # items found inside this one
 
     def _description(self, node: Node) -> None:
         term = ""
@@ -609,6 +709,85 @@ class _Reader:
         return None
 
 
+def _frame_key(slide: Node) -> str:
+    """The frame a step belongs to: its id without the trailing `.slideN`."""
+    ident = slide.get("id") or ""
+    return ident.rsplit(".slide", 1)[0] if ".slide" in ident else ident
+
+
+def _visible_maths(node: Node) -> list[str]:
+    """The `alttext` of each formula under `node` that is not covered on this step."""
+    found: list[str] = []
+    for child in _children(node):
+        if _classes(child) & HIDDEN:
+            continue
+        if _local(child.tag) == "math":
+            found.append(child.get("alttext") or "")
+        else:
+            found.extend(_visible_maths(child))
+    return found
+
+
+def _contained(step: set[str], last: set[str]) -> bool:
+    """Whether everything on a step is also on the last one: a formula or picture equal to one
+    there, a paragraph or heading that is the text of one there or a part of it (a paragraph
+    that a pause is still writing)."""
+    texts = [s[2:] for s in last if s[:2] in ("p:", "h:")]
+    for block in step:
+        if block in last:
+            continue
+        if block[:2] in ("p:", "h:") and any(_within(block[2:], text) for text in texts):
+            continue
+        return False
+    return True
+
+
+def _within(part: str, whole: str) -> bool:
+    """Whether the words of `part` appear in `whole` in the same order (not necessarily next to
+    each other: a paragraph a pause is still writing has the later sentences missing in the
+    middle of what the last step shows)."""
+    words = iter(whole.split())
+    return all(word in words for word in part.split())
+
+
+def _visible_blocks(node: Node) -> set[str]:
+    """What a step of a frame shows, as one string per block (paragraph, formula, picture,
+    heading): what is covered on that step is not in it."""
+    found: set[str] = set()
+
+    def visit(item: Node, depth: int) -> None:
+        if depth > MAX_DEPTH or _classes(item) & HIDDEN:
+            return
+        tag = _local(item.tag)
+        if tag == "math":
+            found.add("m:" + (item.get("alttext") or ""))
+            return
+        if tag == "span" and "ltx_item" in _classes(item):
+            for child in _children(item):
+                visit(child, depth + 1)
+            return
+        if tag == "img":
+            found.add("i:" + (item.get("id") or item.get("src") or ""))
+            return
+        if tag == "p" or "ltx_p" in _classes(item):
+            text = _squash(_text_without_tag(item))
+            if text:
+                found.add("p:" + text)
+            for alt in _visible_maths(item):
+                found.add("m:" + alt)
+            return
+        if _LEVEL.match(tag):
+            text = _squash(_text_without_tag(item))
+            if text:
+                found.add("h:" + text)
+            return
+        for child in _children(item):
+            visit(child, depth + 1)
+
+    visit(node, 0)
+    return found
+
+
 def _is_figure(node: Node) -> bool:
     return _local(node.tag) == "figure" or bool(_classes(node) & {"ltx_figure", "ltx_table"})
 
@@ -645,7 +824,7 @@ def _text_without_tag(node: Node) -> str:
     parts: list[str] = []
 
     def visit(item: Node) -> None:
-        if _classes(item) & {"ltx_tag", "ltx_note_mark"}:
+        if _classes(item) & {"ltx_tag", "ltx_note_mark", *HIDDEN}:
             return
         if item.text:
             parts.append(item.text)
@@ -866,7 +1045,9 @@ def graphics_of(xml: bytes) -> dict[str, str]:
     return found
 
 
-def read(xhtml: bytes, project: Path, graphics: dict[str, str] | None = None) -> Reading:
+def read(
+    xhtml: bytes, project: Path, graphics: dict[str, str] | None = None, *, beamer: bool = False
+) -> Reading:
     """The document in LaTeXML's `xhtml` (no DOCTYPE; `ReadError` when it is not usable).
     `graphics`: `graphics_of` the XML of the same run."""
     if len(xhtml) > MAX_XHTML_BYTES:
@@ -875,7 +1056,7 @@ def read(xhtml: bytes, project: Path, graphics: dict[str, str] | None = None) ->
         root = SafeET.fromstring(xhtml, forbid_dtd=True, forbid_entities=True)
     except Exception:
         raise ReadError("not well formed") from None
-    reader = _Reader(project, graphics)
+    reader = _Reader(project, graphics, beamer)
     reader.out.lang = (
         root.get("lang") or root.get("{http://www.w3.org/XML/1998/namespace}lang") or "en"
     )[:35]

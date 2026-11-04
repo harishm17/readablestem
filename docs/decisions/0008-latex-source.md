@@ -46,7 +46,12 @@ holds the model API keys and the database address in its environment, in the sam
    required decision with no picture. EPS and SVG are refused in this release.
 6. **Quota:** one page per 3,000 characters of TeX (comments removed) or per figure, whichever
    is larger, counted at upload as an estimate.
-7. **Beamer** is refused with "upload the compiled PDF" until its own spike passes.
+7. **Beamer** has its own switch (`FEATURE_BEAMER_SOURCE`, off) and is refused with "upload the
+   compiled PDF" without it. The spike (frames become sections with their titles as headings,
+   fewer than 5 percent of frames with an unknown command) passed on five decks written for it,
+   with a small file of definitions for what LaTeXML's Beamer binding lacks; it has not been run
+   on real decks, which is the reason for the separate switch. Overlay steps follow the PDF
+   path's slide-deck rule: the last step, plus any step that shows something the last does not.
 
 ## Consequences
 
