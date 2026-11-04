@@ -291,11 +291,13 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         # Courses and their notation (FEATURE_NOTATION_MEMORY): CSRF before the flag.
         "/courses",
         "/courses/{course_id}/delete",
+        "/courses/{course_id}/documents",  # add converted documents to a course
         "/courses/{course_id}/entries",
         "/courses/{course_id}/entries/{entry_id}",
         "/courses/{course_id}/entries/{entry_id}/delete",
         "/courses/{course_id}/remember",
         "/courses/{course_id}/rename",
+        "/courses/{course_id}/starter",  # add the ticked starter symbols
         "/courses/{course_id}/suggestions",
         "/dev-login",
         "/internal/cron/aggregate-and-purge",  # token-authenticated, no session

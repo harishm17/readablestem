@@ -120,7 +120,7 @@ def test_the_page_for_choosing_suggests_parts_that_cover_the_whole_file(web):
     page = web.alice.get(f"/uploads/{upload_id}")
     assert page.status_code == 200
     text = text_of(page.text)
-    assert "chapter2.pdf : 12 pages" in text
+    assert "chapter2.pdf has 12 pages" in text
     assert "each part is its own document of up to 5 pages" in text.lower()
     assert "Nothing is converted or counted yet" in text
     area = re.search(r'<textarea[^>]*id="parts"[^>]*>(.*?)</textarea>', page.text, re.S)
