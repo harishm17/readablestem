@@ -376,3 +376,114 @@ def test_a_cgroup_gets_a_memory_and_a_pids_limit_when_one_can_be_made(tmp_path):
     assert (group.path / "pids.max").read_text() == "7"
     assert group.add(4242) and (group.path / "cgroup.procs").read_text() == "4242"
     assert sandbox.Cgroup.make(sandbox.Limits(), parent=tmp_path / "missing") is None
+
+
+# ----------------------------------------------------------- cgroup before exec, one at a time
+
+
+@needs_sandbox
+def test_the_process_joins_the_cgroup_before_it_becomes_bubblewrap(tmp_path, monkeypatch):
+    seen: dict[str, object] = {}
+    real = sandbox.subprocess.Popen
+
+    def spy(argv, **kwargs):
+        proc = real(argv, **kwargs)
+        seen["argv"], seen["pid"] = argv, proc.pid
+        return proc
+
+    monkeypatch.setattr(sandbox.subprocess, "Popen", spy)
+    out = tmp_path / "out"
+    out.mkdir()
+    parent = tmp_path / "cg"
+    parent.mkdir()
+    outcome = sandbox.run(
+        [PERL, "-e", "print 1"], rw=((out, "/out"),), cgroup_parent=parent, limits=sandbox.Limits()
+    )
+    assert outcome.ok
+    argv = seen["argv"]
+    assert argv[:3] == ["/bin/sh", "-c", sandbox.JOIN_SCRIPT]  # type: ignore[index]
+    groups = list(parent.glob("readablestem-sandbox-*"))
+    assert len(groups) == 1
+    # the shell wrote its own pid before exec: that pid is the process that became bubblewrap
+    assert (groups[0] / "cgroup.procs").read_text().strip() == str(seen["pid"])
+    assert (groups[0] / "memory.max").read_text() == str(sandbox.Limits().memory_bytes)
+
+
+@needs_sandbox
+def test_a_failed_join_does_not_stop_the_sandbox(tmp_path, monkeypatch):
+    out = tmp_path / "out"
+    out.mkdir()
+    parent = tmp_path / "cg"
+    parent.mkdir()
+    real_make = sandbox.Cgroup.make
+
+    def make(limits, where=None):
+        group = real_make(limits, where)
+        assert group is not None
+        (group.path / "cgroup.procs").mkdir()  # a directory: `echo > it` fails
+        return group
+
+    monkeypatch.setattr(sandbox.Cgroup, "make", staticmethod(make))
+    log = tmp_path / "log"
+    outcome = sandbox.run(
+        [PERL, "-e", "print 'ran'"], rw=((out, "/out"),), cgroup_parent=parent, log=log
+    )
+    assert outcome.ok and log.read_text() == "ran"  # under the per-process limits
+
+
+@needs_sandbox
+@pytest.mark.skipif(
+    sandbox.Cgroup.make(sandbox.Limits()) is None, reason="needs a delegated cgroup v2"
+)
+def test_every_process_of_the_tree_is_in_the_child_cgroup(tmp_path):
+    program = (
+        "my $c = `cat /proc/self/cgroup`; my $p = fork(); if ($p == 0) "
+        "{ print STDERR `cat /proc/self/cgroup`; exit 0 } waitpid($p, 0); print $c;"
+    )
+    _outcome, text = perl(program, tmp_path)
+    lines = {line for line in text.splitlines() if line.startswith("0::")}
+    assert len(lines) == 1 and "readablestem-sandbox-" in lines.pop()  # parent and child alike
+
+
+def test_the_exclusive_gate_lets_one_holder_in_at_a_time():
+    with (
+        sandbox.exclusive("test-gate", 1),
+        pytest.raises(TimeoutError),
+        sandbox.exclusive("test-gate", 0.3),
+    ):
+        pass
+    with sandbox.exclusive("test-gate", 1):  # free again
+        pass
+
+
+def test_latexmls_limits_bound_the_worst_case_below_the_setting():
+    from readablestem.config import Settings
+    from readablestem.ops import sandbox_probe
+    from readablestem.source import latexml
+
+    limits = latexml.LIMITS
+    assert limits.pids == 4 and limits.memory_bytes == 512 * 1024 * 1024
+    assert sandbox_probe.total_bound_mb(cgroup=False) == 2048
+    assert sandbox_probe.total_bound_mb(cgroup=True) == 512
+    assert Settings(_env_file=None).source_sandbox_max_total_mb == 2048  # type: ignore[call-arg]
+
+
+def test_both_steps_of_a_conversion_keep_the_task_and_memory_limits(tmp_path, monkeypatch):
+    from readablestem.source import latexml
+
+    seen: list[sandbox.Limits] = []
+
+    def fake_run(command, **kwargs):
+        seen.append(kwargs["limits"])
+        for folder in (
+            tmp_path / "out",
+            tmp_path / "out" / "xml",
+        ):  # where the XML goes, by version
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / latexml.XML_NAME).write_text("<x/>")
+        return sandbox.Outcome(0)
+
+    monkeypatch.setattr(sandbox, "run", fake_run)
+    latexml.convert(tmp_path, "main.tex", tmp_path / "out")
+    assert len(seen) == 2
+    assert {(limit.pids, limit.memory_bytes) for limit in seen} == {(4, 512 * 1024 * 1024)}
