@@ -575,18 +575,25 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   frame is a heading (its title) and its content: sections are the top level, frames sit one level
   below the section they are in (the title page's title is the document title). Of a frame's
   steps only the last is written, plus any earlier step that shows something the last one does
-  not (`\\only`, `\\alt`, a formula or picture that changes), headed "(step 2 of 3)": the rule of
-  the PDF path's slide decks (docs/layout.md, "Slide decks"). Text a step covers (`\\pause`,
-  `\\uncover`, `\\visible`) is not written for that step, and a list item a pause reveals is an
+  not (`\only`, `\alt`, a formula or picture that changes), headed "(step 2 of 3)": the rule of
+  the PDF path's slide decks (docs/layout.md, "Slide decks"). Text a step covers (`\pause`,
+  `\uncover`, `\visible`) is not written for that step, and a list item a pause reveals is an
   item of its own. LaTeXML 0.8.8's binding has no `block`, `alertblock`, `exampleblock`,
-  `columns`, `column` or `\\institute`: `source/beamer_compat.tex` gives them as plain text and is
+  `columns`, `column` or `\institute`: `source/beamer_compat.tex` gives them as plain text and is
   read first for a deck (`--preload`, mounted read-only in the sandbox). A deck counts one page
   per frame (or per figure), not by characters; `DocumentResult.origin` is `beamer` and the student
   note says "a slide deck". The spike behind it (E2) used five decks written for the purpose
   (`tests/fixtures/source/beamer/`: 20 frames, 3 to 5 overlay steps in two of them): with the
   compat file none of the 20 frames hit an unknown command (without it 3 did, 15 percent: a
-  block, a column and a block with `\\institute`); **no real decks were tried**, which is why the
+  block, a column and a block with `\institute`); **no real decks were tried**, which is why the
   switch stays off.
+- **TeX Live is not read.** LaTeXML finds a package's own TeX with `kpsewhich`. With TeX Live's base
+  installed (the image has `texlive-latex-base`, which `latexml` depends on) it then reads raw TeX for a
+  package it has a binding for and runs expl3 under its own interpreter: `\usepackage{siunitx}` took 72 s
+  and ended in over 100 errors (found by the CI job that runs the real sandbox). The sandbox puts an empty
+  file over `kpsewhich` (`sandbox.run(hide=)`, `latexml.HIDDEN_FILES`), so LaTeXML uses only its own
+  bindings, as it does where TeX Live is not installed: 2 s and the right answer. A package it has no
+  binding for is then an unknown-command decision, never a slow raw-TeX run.
 - **Review.** A source has no pages to show, so its review is the list view; the split view
   redirects to it. `DocumentResult.origin` is `latex`; the student note says "a LaTeX document".
 - **Failure.** A source that cannot be converted fails the job with `source_failed`,

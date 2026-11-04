@@ -111,10 +111,12 @@ def build_argv(
     env: dict[str, str] | None = None,
     cwd: str = "/",
     limits: Limits | None = None,
+    hide: tuple[str, ...] = (),
 ) -> list[str]:
     """The `bwrap` command line for `command` (a list, never a shell string). `ro` and `rw` are
     (host path, path inside) pairs; every path is absolute and `inside` never overlaps
-    `/proc`, `/dev` or `/tmp`."""
+    `/proc`, `/dev` or `/tmp`. `hide`: files of the system that exist here and are replaced by an
+    empty file inside (the program sees them as present and empty)."""
     limits = limits or Limits()
     bwrap, prlimit = bwrap_path(), prlimit_path()
     if bwrap is None:
@@ -133,6 +135,9 @@ def build_argv(
     # bubblewrap is pid 1 of the sandbox: hide what it was started with.
     for hidden in ("/proc/1/environ", "/proc/1/cmdline"):
         args += ["--ro-bind", "/dev/null", hidden]
+    for path in hide:
+        if Path(path).is_file():  # an absent file needs no hiding (and cannot be mounted over)
+            args += ["--ro-bind", "/dev/null", path]
     for key, value in {"PATH": "/usr/local/bin:/usr/bin:/bin", **(env or {})}.items():
         args += ["--setenv", key, value]
     args += [
@@ -162,13 +167,14 @@ def run(
     cwd: str = "/",
     limits: Limits | None = None,
     log: Path | None = None,
+    hide: tuple[str, ...] = (),
 ) -> Outcome:
     """Run `command` in the sandbox and wait. The caller's own environment is not passed on, not
     even to bubblewrap. A wall-clock timeout, or more than `limits.out_bytes` in the `rw` host
     folders, kills the whole group. `log` receives the program's stdout and stderr (never
     read here); without it they are discarded."""
     limits = limits or Limits()
-    argv = build_argv(command, ro=ro, rw=rw, env=env, cwd=cwd, limits=limits)
+    argv = build_argv(command, ro=ro, rw=rw, env=env, cwd=cwd, limits=limits, hide=hide)
     sink = log.open("wb") if log is not None else None
     try:
         proc = subprocess.Popen(
