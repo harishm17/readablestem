@@ -277,3 +277,27 @@ def test_browser_job_caches_what_it_downloads_and_runs_in_parallel():
     assert {"~/.cache/ms-playwright", ".cache/axe-core"} <= cached
     run = next(s["run"] for s in steps if "pytest -m browser" in s.get("run", ""))
     assert "-n 3" in run and "--dist loadfile" in run and '--shard "$SHARD"' in run
+
+
+# A merge that left a conflict marker in a tracked file (docs/web.md carried one into main once).
+_CONFLICT_MARKER = re.compile(r"^(<{7}|\|{7}|={7}|>{7})( |$)", re.MULTILINE)
+
+
+def test_no_tracked_file_holds_a_merge_conflict_marker():
+    files = subprocess.run(
+        ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True
+    ).stdout.split(b"\0")
+    found = []
+    for name in filter(None, files):
+        path = ROOT / name.decode()
+        if path.suffix in {".pdf", ".png", ".jpg", ".woff2", ".zip", ".lock", ".imscc"}:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        found += [
+            f"{name.decode()}:{text.count(chr(10), 0, m.start()) + 1}"
+            for m in _CONFLICT_MARKER.finditer(text)
+        ]
+    assert not found, f"merge conflict markers left in: {found}"
