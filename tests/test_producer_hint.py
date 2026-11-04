@@ -34,6 +34,22 @@ def hint(producer: str = "", creator: str = "") -> str:
         ("GPL Ghostscript 10.02", "LaTeX with Beamer class"),
         ("Tectonic 0.15", ""),
         ("", "TeX output 2021.03.01:1200"),
+        # Every distinct TeX producer/creator pair in the repo's PDF corpora (tests, data, the gold
+        # sets), as the files carry them.
+        ("pikepdf 8.15.1", "arXiv GenPDF (tex2pdf:)"),  # arXiv's own build: "tex2pdf" is one word
+        ("pikepdf 8.15.1", "arXiv GenPDF (tex2pdf:c0aef68)"),
+        ("pdfTeX-1.40.25", "LaTeX with log_2024.sty"),
+        ("pdfTeX-1.40.29", "Simone Chiarella"),
+        ("pdfTeX-1.40.29", "LaTeX with Beamer class"),
+        ("pdfTeX-1.40.21", "LaTeX with hyperref"),
+        ("pdfLaTeX with theoretics.cls v0.91 ", "LaTeX with hyperref"),
+        ("GPL Ghostscript 10.01.2", "LaTeX with hyperref"),
+        ("dvips + GPL Ghostscript GIT PRERELEASE 9.22", "LaTeX with hyperref"),
+        ("xdvipdfmx (0.1)", "LaTeX with Beamer class"),
+        ("xdvipdfmx (0.1)", "LaTeX with hyperref"),
+        ("xdvipdfmx (20260317)", "LaTeX with hyperref"),
+        ("", "LaTeX with hyperref"),
+        ("Acrobat Distiller 9.4.5 (Windows)", "VTeX PDF Tools"),
     ],
 )
 def test_a_pdf_that_says_tex_made_it_is_tex(producer, creator):
@@ -53,6 +69,20 @@ def test_a_pdf_that_says_tex_made_it_is_tex(producer, creator):
         ("GPL Ghostscript 9.55.0", "PScript5.dll Version 5.2.2", "other"),
         ("GPL Ghostscript 10.02", "", "other"),
         ("", "", "other"),
+        # Real strings from the corpora that hold "tex" only inside another word.
+        (
+            "iOS Version 16.6 (Build 20G75) Quartz PDFContext",
+            "iOS Version 16.6 Quartz PDFContext",
+            "apple_mobile",
+        ),
+        ("macOS Version 14.1.1 (Build 23B81) Quartz PDFContext", "", "other"),
+        ("macOS Version 10.14.6 (Build 18G95) Quartz PDFContext", "Keynote", "other"),
+        ("MiKTeX GPL Ghostscript 9.25", "(ImageMagick)", "other"),  # a Ghostscript build, not TeX
+        ("Skia/PDF m156", "Chromium", "chromium"),
+        ("LibreOffice 26.2.6.3 (X86_64)", "Writer", "other"),
+        ("OCRmyPDF 16 / Tesseract", "OCRmyPDF 16 / Tesseract", "ocr_tool"),
+        ("ReadableSTEM fixtures", "ReadableSTEM fixtures", "other"),
+        ("Matplotlib pdf backend v3.11.2", "Matplotlib v3.11.2", "other"),
     ],
 )
 def test_other_producers_are_not_tex(producer, creator, expected):
