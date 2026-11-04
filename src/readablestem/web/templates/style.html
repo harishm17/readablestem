@@ -5,12 +5,30 @@
 {% block content %}
 {# A working page for the people who build the site, not a public page: it is noindex (it is
    not in web.seo.PUBLIC_PAGES) and nothing links to it. Its strings are labels for the
-   components, not site copy. DESIGN.md says how the tokens are used. #}
+   components, not site copy. DESIGN.md says how the tokens are used. Every control here is an
+   inert example (a button of type "button", a link to the page where the component is in use),
+   and each box of examples says so. #}
 <h1>Style</h1>
 <p class="lede">The tokens and components every page is built from, in the theme your browser
   asks for. Colours are the CSS custom properties in <code>tokens.css</code>.</p>
+<div class="notice" role="note"><p><strong>Everything in a dashed box is an inert example.</strong>
+  Its buttons, fields and links do nothing and no form is sent. Where a component is in use,
+  the line under it links to the page.</p></div>
 
-<h2>Type</h2>
+{% from "_contents.html" import contents %}
+{{ contents([
+  ("type", "Type"),
+  ("colour", "Colour"),
+  ("states", "Light, dark and forced colours"),
+  ("buttons", "Buttons and links"),
+  ("fields", "Form fields and errors"),
+  ("notices", "Notices"),
+  ("cards", "Card, stat tile, panes"),
+  ("table", "Comparison table"),
+  ("faq", "Questions")
+]) }}
+
+<h2 id="type">Type</h2>
 <div class="style-specimen">
   <p class="style-display">Display, Source Serif 4 600</p>
   <p class="style-h1">Page heading, Source Serif 4 600</p>
@@ -22,7 +40,7 @@
   <p><code>\frac{\Delta d}{\Delta t}</code> in Source Code Pro. <a href="#type">A link is always underlined</a>.</p>
 </div>
 
-<h2>Colour</h2>
+<h2 id="colour">Colour</h2>
 <ul class="style-swatches">
   <li><span class="swatch swatch-ink"></span>Ink</li>
   <li><span class="swatch swatch-ink-muted"></span>Ink muted</li>
@@ -37,39 +55,87 @@
   <span class="tag tag-err">Not converted</span>
 </p>
 
-<h2>Buttons and links</h2>
+<h2 id="states">Light, dark and forced colours</h2>
+<p>The same sample in the three colour states. The page itself follows your browser's setting
+  (there is no toggle); the dark panel carries the dark tokens, and the forced-colour panel
+  approximates the system colours. For the real thing, switch on forced colours or Windows high
+  contrast and read this page.</p>
+{% macro sample(name, ident) %}
+<h3 id="{{ ident }}">{{ name }}</h3>
 <p class="button-row">
-  <a class="button" href="#buttons">Primary</a>
-  <a class="button-secondary" href="#buttons">Secondary</a>
-  <button type="button" class="button-danger-outline">Delete (opens a confirmation)</button>
-  <button type="button" class="button-danger">Yes, delete it</button>
-  <button type="button" class="button" disabled>Disabled</button>
-  <a class="button-secondary button-small" href="#buttons">Small</a>
+  <button type="button" class="button">Primary</button>
+  <button type="button" class="button-secondary">Secondary</button>
+  <button type="button" class="button-danger-outline">Delete</button>
 </p>
-
-<h2>Form fields</h2>
-<div class="style-form">
-  <div class="field">
-    <label for="style-course">Course name</label>
-    <p class="hint" id="style-course-hint">A hint sits between the label and the field.</p>
-    <input type="text" id="style-course" value="PHYS 2325" aria-describedby="style-course-hint">
-  </div>
-  <div class="field field-error">
-    <label for="style-bad">Field with an error</label>
-    <p class="error-message" id="style-bad-error"><span class="visually-hidden">Error: </span>Say what is wrong and how to fix it.</p>
-    <input type="text" id="style-bad" value="" aria-invalid="true" aria-describedby="style-bad-error">
-  </div>
-  <div class="field checkbox-field">
-    <input type="checkbox" id="style-check" checked>
-    <label for="style-check">A checkbox</label>
-  </div>
+<p>
+  <span class="tag tag-warn">Needs your decision</span>
+  <span class="tag tag-ok">Accepted</span>
+  <span class="tag tag-err">Not converted</span>
+</p>
+<p class="error-message">Error: say what is wrong and how to fix it.</p>
+<div class="notice"><p>An information notice.</p></div>
+<p><a href="#states">A link</a>, and <span class="style-focus">the focus ring</span>.</p>
+{% endmacro %}
+<div class="style-states">
+  <section class="style-scheme" aria-labelledby="state-light">{{ sample("Light", "state-light") }}</section>
+  <section class="style-scheme style-scheme-dark" aria-labelledby="state-dark">{{ sample("Dark", "state-dark") }}</section>
+  <section class="style-scheme style-scheme-forced" aria-labelledby="state-forced">{{ sample("Forced colours (approximation)", "state-forced") }}</section>
 </div>
 
-<h2>Notices</h2>
-<div class="notice" role="note"><p>An information notice.</p></div>
-<div class="notice notice-warning" role="note"><h3>A warning notice</h3><p>With its heading, in words first.</p></div>
+<h2 id="buttons">Buttons and links</h2>
+<div class="style-example" role="group" aria-label="Example: buttons (inert)">
+  <p class="style-example-label">Inert example</p>
+  <p class="button-row">
+    <button type="button" class="button">Primary</button>
+    <button type="button" class="button-secondary">Secondary</button>
+    <button type="button" class="button-danger-outline">Delete (opens a confirmation)</button>
+    <button type="button" class="button-danger">Yes, delete it</button>
+    <button type="button" class="button" disabled>Disabled</button>
+    <button type="button" class="button-secondary button-small">Small</button>
+  </p>
+  <p class="style-live">In use: <a href="/app">the documents page</a> (sign in first), and the
+    confirmation pages that follow Delete.</p>
+</div>
 
-<h2>Card, stat tile, panes</h2>
+<h2 id="fields">Form fields and errors</h2>
+<div class="style-example" role="group" aria-label="Example: form fields (inert)">
+  <p class="style-example-label">Inert example</p>
+  <div class="style-form">
+    <div class="field">
+      <label for="style-course">Course name</label>
+      <p class="hint" id="style-course-hint">A hint sits between the label and the field.</p>
+      <input type="text" id="style-course" value="PHYS 2325" aria-describedby="style-course-hint">
+    </div>
+    <div class="field field-error">
+      <label for="style-bad">Field with an error</label>
+      <p class="error-message" id="style-bad-error"><span class="visually-hidden">Error: </span>Say what is wrong and how to fix it.</p>
+      <input type="text" id="style-bad" value="" aria-invalid="true" aria-describedby="style-bad-error">
+    </div>
+    <div class="field checkbox-field">
+      <input type="checkbox" id="style-check" checked>
+      <label for="style-check">A checkbox</label>
+    </div>
+  </div>
+  <div class="error-summary" aria-labelledby="style-summary-title">
+    <h3 id="style-summary-title">There is a problem</h3>
+    <ul>
+      <li><a href="#style-bad">Field with an error: say what is wrong and how to fix it</a></li>
+    </ul>
+  </div>
+  <p class="style-live">In use: the error summary takes focus when <a href="/app">the upload form</a>
+    (sign in first) refuses a file; a field with an error is on the same form.</p>
+</div>
+
+<h2 id="notices">Notices</h2>
+<div class="style-example" role="group" aria-label="Example: notices (inert)">
+  <p class="style-example-label">Inert example</p>
+  <div class="notice" role="note"><p>An information notice.</p></div>
+  <div class="notice notice-warning" role="note"><h3>A warning notice</h3><p>With its heading, in words first.</p></div>
+  <p class="style-live">In use: <a href="/status">the status page</a> reports a paused service
+    in words, and a document that needs decisions says so on its page.</p>
+</div>
+
+<h2 id="cards">Card, stat tile, panes</h2>
 <div class="stat-row">
   <div class="card card-surface">
     <h3>A card</h3>
@@ -78,7 +144,7 @@
   <div class="stat">
     <p class="stat-value">00</p>
     <p class="stat-label">What the number counts</p>
-    <p class="stat-note">Set, date and sample size. <a href="#stat">How it was measured</a></p>
+    <p class="stat-note">Set, date and sample size. <a href="/limits#accuracy">How it was measured</a></p>
   </div>
 </div>
 <div class="panes style-panes">
@@ -91,22 +157,27 @@
     <p>The text layer and its reading go in a mono box.</p>
   </section>
 </div>
+<p class="style-live">In use: <a href="/">the landing page</a> shows the panes; the decision
+  states (needs your decision, accepted, not converted) are on the review screen of any
+  document, for example the sample on <a href="/app">the documents page</a>.</p>
 
-<h2>Comparison table</h2>
-<div class="table-scroll" role="group" aria-label="Comparison table" tabindex="0">
+<h2 id="table">Comparison table</h2>
+<div class="table-scroll" role="group" aria-label="Comparison table (inert example)" tabindex="0">
   <table class="compare-table">
     <caption>Facts, each with its source and the date it was read</caption>
     <thead><tr><th scope="col">Topic</th><th scope="col">One</th><th scope="col">Two</th></tr></thead>
     <tbody>
-      <tr><th scope="row">Takes in</th><td>A cell with a fact. <a href="#table">Source</a>, read on a date.</td><td>Another cell.</td></tr>
+      <tr><th scope="row">Takes in</th><td>A cell with a fact. <span class="source-note">Source, read on a date</span></td><td>Another cell.</td></tr>
       <tr><th scope="row">Gives back</th><td>A cell.</td><td>A cell.</td></tr>
     </tbody>
   </table>
 </div>
+<p class="style-live">In use: <a href="/guides/readablestem-mathpix-latexml">the comparison guide</a>.</p>
 
-<h2>Questions</h2>
+<h2 id="faq">Questions</h2>
 <div class="faq">
   <details><summary>A question in a native disclosure</summary><p>The answer.</p></details>
   <details><summary>Another question</summary><p>The answer.</p></details>
 </div>
+<p class="style-live">In use: <a href="/#who">the questions on the landing page</a>.</p>
 {% endblock %}

@@ -1,23 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Service status{% endblock %}
 {% block description %}Whether ReadableSTEM is up right now, whether conversions are open today, and how many documents are waiting.{% endblock %}
+{% block head %}
+{# Optional automatic refresh (`?refresh=1`): a plain page reload every minute, off unless the
+   visitor turns it on, and the page says how to stop it. #}
+{% if refresh %}<meta http-equiv="refresh" content="60">{% endif %}
+{% endblock %}
 {% block content %}
 <h1>Service status</h1>
-<p class="status-checked" id="status-checked">Checked at {{ checked_at|utc }}. <a href="/status">Check again</a></p>
+<p class="status-checked" id="status-checked">Checked at {{ checked_at|utc }}. <a href="/status{{ '?refresh=1' if refresh else '' }}">Check again</a>{% if refresh %}. This page refreshes itself every minute: <a href="/status">stop refreshing</a>.{% else %}, or <a href="/status?refresh=1">refresh it every minute</a>.{% endif %}</p>
 <dl class="summary-list">
   <div><dt>Service</dt><dd>{{ "Up" if database_ok else "Having problems: the database is not answering. Please try again later." }}</dd></div>
   {% if database_ok %}
   <div><dt>Conversions today</dt><dd>{% if conversions_open %}Open{% else %}Paused: today's budget is used up. They start again at {{ next_reset|utc }}.{% endif %}</dd></div>
-  <div><dt>AI service</dt><dd>{% if provider_down_since %}Not answering since {{ provider_down_since|utc }}. Documents converting now may stop early, with parts not converted. When it answers again, open the document and use “Try again” or “Convert the missing parts”: nothing is lost and no pages are used up.{% else %}No problems seen in the last 10 minutes.{% endif %}</dd></div>
+  <div><dt>AI service</dt><dd>{% if provider_down_since %}Not answering since {{ provider_down_since|utc }}. Documents converting now may stop early, with parts not converted. When it answers again, open the document and use “Try again” or “Convert the missing parts”: nothing is lost and no pages are used up.{% elif not provider_requests %}No recent requests; availability untested.{% elif provider_failed %}Mixed: {{ provider_failed }} of {{ provider_requests }} requests in the last 10 minutes failed. The last one was at {{ provider_last_at|utc }}.{% else %}Recent requests were answered: {{ provider_requests }} in the last 10 minutes, the last at {{ provider_last_at|utc }}.{% endif %}</dd></div>
   <div><dt>Documents waiting</dt><dd>{{ waiting }}</dd></div>
   <div><dt>Documents converting</dt><dd>{{ converting }}</dd></div>
   {% endif %}
 </dl>
 <p class="hint" id="status-window">The AI service line comes from this server's own requests to
-  the model in the last 10 minutes. If none were sent in that time it reports no problem, which
-  does not test that the service is up. This page does not update by itself.</p>
-<p class="hint">This page shows the state when it was checked, at the time above. Whatever it says, uploaded documents
-  are deleted {{ retention_hours }} hours after they were last worked on (7 days if the
-  uploader chose to keep them, {{ opt_in_days }} if they also let us look at the results). What the tool cannot do yet is on the
-  <a href="/limits">known limits</a> page.</p>
+  the model in the last 10 minutes. With none in that time it says so: it does not test that
+  the service is up. The page changes only when you check again{% if not refresh %} or turn on
+  refreshing{% endif %}. What the tool cannot do yet is on the <a href="/limits">known limits</a>
+  page.</p>
 {% endblock %}

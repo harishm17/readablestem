@@ -174,6 +174,7 @@ def _with_preview_tags(page: str, site: str) -> str:
 def privacy(request: Request) -> Response:
     ctx = get_ctx(request)
     context = privacy_context(ctx.settings, tracer_on=ctx.tracer is not None)
+    context["latex_source"] = _features(request)["latex_source"]
     return render(request, "privacy.html", context)
 
 
@@ -190,6 +191,8 @@ def for_accessibility_offices(request: Request) -> Response:
     Public, and written from the settings (web.offices)."""
     ctx = get_ctx(request)
     context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
+    context["latex_source"] = _features(request)["latex_source"]
+    context["proof_facts"] = proof_facts.load()
     return render(request, "offices.html", context)
 
 
@@ -199,6 +202,7 @@ def for_accessibility_offices_summary(request: Request) -> Response:
     carries inline style and no script, and is served sandboxed like a converted document."""
     ctx = get_ctx(request)
     context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
+    context["latex_source"] = _features(request)["latex_source"]
     context["as_of"] = utcnow().date().isoformat()
     context["style_tag"] = offices.summary_style_tag()
     return render(
@@ -281,7 +285,11 @@ def guide_ada_title_ii(request: Request) -> Response:
 def guide_compare(request: Request) -> Response:
     """ReadableSTEM beside Mathpix, Aelira, chatbots and LaTeXML, each fact with source and date."""
     path = seo.COMPARE_GUIDE
-    context = _guide_context(path, "guide-compare") | _features(request)
+    context = (
+        _guide_context(path, "guide-compare")
+        | _features(request)
+        | {"proof_facts": proof_facts.load()}
+    )
     return render(request, "guide_compare.html", context)
 
 
@@ -305,6 +313,14 @@ def status(request: Request) -> Response:
         "checked_at": utcnow(),
         # The AI service, as this server's own recent requests saw it (web.provider_health).
         "provider_down_since": HEALTH.down_since(),
+        # Optional: the page reloads itself every minute while this is on (`?refresh=1`).
+        "refresh": request.query_params.get("refresh") == "1",
+    }
+    requests_seen, requests_failed, last_request = HEALTH.observed()
+    context |= {
+        "provider_requests": requests_seen,
+        "provider_failed": requests_failed,
+        "provider_last_at": last_request,
     }
     if database_ok:
         with session_scope(ctx.factory) as session:

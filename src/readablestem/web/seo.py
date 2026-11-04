@@ -73,6 +73,8 @@ class Guide:
     path: str
     title: str
     summary: str
+    # Who it is for and what it helps them do, one line, shown under the title on /guides.
+    audience: str = ""
 
 
 # The guides, in the order /guides lists them (templates/guides.html); each is also in
@@ -83,12 +85,14 @@ GUIDES = (
         "ADA Title II and STEM course materials",
         "What the Justice Department's web rule asks of STEM course materials, its technical "
         "standard and dates, with sources, and what ReadableSTEM does and does not do.",
+        "For instructors and accessibility staff. Read it to learn what to do this term.",
     ),
     Guide(
         COMPARE_GUIDE,
-        "ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML compared",
-        "What each takes in and gives back, what it automates and what it costs, each fact "
-        "with its source and date.",
+        "Choosing a tool for STEM course files",
+        "ReadableSTEM, Mathpix, Aelira, general chatbots and LaTeXML: what each takes in and "
+        "gives back, what it automates and what it costs, each fact with its source and date.",
+        "For anyone deciding which tool fits the file they have. Start with the short guide.",
     ),
 )
 PUBLIC_PAGES = (
@@ -227,8 +231,9 @@ def llms_txt(site: str, showcase: bool) -> str:
         f"- [ADA Title II and STEM course materials]({site}{ADA_GUIDE}): "
         "the Justice Department's web rule, its technical standard and dates, with sources, "
         "and what ReadableSTEM does and does not do",
-        f"- [ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML]({site}{COMPARE_GUIDE}): "
-        "what each takes in and gives back, from each project's own documentation",
+        f"- [Choosing a tool for STEM course files]({site}{COMPARE_GUIDE}): "
+        "ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML: what each takes in and gives "
+        "back, from each project's own documentation",
         "",
         "## Evidence",
         "",

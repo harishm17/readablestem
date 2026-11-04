@@ -4,22 +4,43 @@
 {% block description %}For accessibility and procurement offices: where a document goes, who receives it, how long it is kept, student records, and what the tool does not do.{% endblock %}
 {% block content %}
 {% from "_recipients.html" import retention %}
-{# T1 of the trust work. Every fact that depends on how the server is set up (who receives
-   a document, which features are on, the retention times) is read from the settings through
-   web/offices.py and web/recipients.py, the same source as /privacy. The rest repeats what
-   /privacy, /terms and /limits say; when one of them changes, change this page. No sentence
-   here may say that the tool or a document meets a standard or a law. The one-page summary
-   (offices_summary.html) carries the same facts in short. #}
+{# Every fact that depends on how the server is set up (who receives a document, which features
+   are on, the retention times) is read from the settings through web/offices.py and
+   web/recipients.py, the same source as /privacy; the two tables are written from one list
+   (`data_items`) and so is the one-page summary (offices_summary.html). The rest repeats what
+   /privacy, /terms and /limits say; when one of them changes, change this page. The summary,
+   the two tables and the chart come first; each section's detail is folded below its heading.
+   No sentence here may say that the tool or a document meets a standard or a law. #}
 <h1>For accessibility offices</h1>
 <p class="lede">ReadableSTEM assists instructors who turn a STEM course PDF into an accessible
   web page. This page is for the office that decides whether instructors may use it.</p>
-<p class="hint">This page describes the beta as it works today. It is not a contract or an
-  audit. <a href="{{ summary_path }}" download="{{ summary_filename }}">Download the one-page
+<p class="hint">It describes the beta as it works today. It is not a contract or an audit.
+  <a href="{{ summary_path }}" download="{{ summary_filename }}">Download the one-page
   summary</a> (an HTML file that prints on one page).</p>
+
+<h2 id="glance">At a glance</h2>
+{% from "_table_scroll.html" import table_scroll %}
+{% from "_data_matrix.html" import matrix, matrix_stack %}
+<div class="matrix-wide-view">
+{% call table_scroll("What is sent where, and for how long") %}
+{{ matrix(data_items, "What is sent where, and for how long") }}
+{% endcall %}
+</div>
+{{ matrix_stack(data_items, "What is sent where, and for how long") }}
+<ul>
+  <li>Students never sign in. Instructors upload course material they wrote or may adapt.</li>
+  <li>Uploads are not used to train models. The terms forbid student records, and no data
+    processing agreement is offered.</li>
+  <li>It makes no claim that a document meets WCAG, the ADA or Section 508. The instructor
+    decides every change the tool is unsure about.</li>
+</ul>
+
+<h2 id="evidence">How accurate it is</h2>
+{% from "_proof_chart.html" import proof_chart %}
+{{ proof_chart(proof_facts) }}
 
 {% from "_contents.html" import contents %}
 {{ contents([
-  ("glance", "At a glance"),
   ("data-flow", "Where a document goes"),
   ("subprocessors", "Who receives what"),
   ("retention", "How long it is kept"),
@@ -31,183 +52,164 @@
   ("more", "More")
 ]) }}
 
-<h2 id="glance">At a glance</h2>
-<ul>
-  <li>Instructors upload course material they wrote or may adapt. Students never sign in.</li>
-  <li>The app runs on Railway in the United States. Pictures of equations and figures, with a
-    little nearby text, go to {{ model_names }}. No one else receives a document.</li>
-  <li>A document is deleted {{ retention_hours }} hours after the instructor last works on it,
-    unless the instructor chooses to keep it longer.</li>
-  <li>Uploads are not used to train models. Student records are forbidden by the terms, and no
-    data processing agreement is offered.</li>
-  <li>Every change the tool is unsure about goes to the instructor, who decides. In a held-out
-    test, 0.79 of the equations came out exactly right end to end, and the tool asked about
-    fewer than half of the wrong ones, so the review matters.</li>
-  <li>It makes no claim that a document meets WCAG, the ADA or Section 508.</li>
-</ul>
-
 <h2 id="data-flow">Where a document goes</h2>
 <figure class="data-flow-figure">
   {% include "_data_flow.html" %}
   <figcaption>The same steps are listed below.</figcaption>
 </figure>
-<ol class="steps-list">
-  <li>The instructor signs in and uploads a PDF over HTTPS to the ReadableSTEM app, which
-    Railway hosts in the United States. Students do not sign in and have no account.</li>
-  <li>The app opens the PDF in a separate short-lived process and cuts out images of the
-    equations and figures{% if tables_on %} and tables{% endif %}, with a little of the nearby text.</li>
-  <li>Those images and that text are sent to the API of {{ model_names }}, which returns
-    proposed LaTeX and descriptions.{% if notation_on %} For a document uploaded for one of
-    the instructor's courses, that course's notation (its symbols and what they mean) is sent
-    with the equations.{% endif %}{% if image_pages_on %} If the instructor ticks “Convert
-    scanned or handwritten pages”, a picture of each such page is sent as well.{% endif %}
-    The PDF file itself, its file name and the instructor's email address are not sent.</li>
-  <li>Automatic checks compare each proposal with the PDF's own text. The instructor decides
-    what the tool is unsure about on a review screen and can edit anything. The instructor can
-    share a document with named colleagues, to view it or to help review it; they must sign in
-    with the exact email address the instructor entered.</li>
-  <li>The instructor downloads the result and posts it in the course: a web page (one HTML
-    file), and if wanted the same document as {% if word_export %}Word, {% endif %}EPUB, a zip
-    for a Canvas page or a Common Cartridge.</li>
-  <li>The PDF, the images, the result and the review decisions stay in the database until
-    they are deleted on the schedule below.</li>
-</ol>
+<details>
+  <summary>The steps in words</summary>
+  <ol class="steps-list">
+    <li>The instructor signs in and uploads a PDF{% if latex_source %} (or a LaTeX file or a zip
+      of a LaTeX project){% endif %} over HTTPS to the ReadableSTEM app, which Railway hosts in
+      the United States.</li>
+    <li>The app opens the PDF in a separate short-lived process and cuts out images of the
+      equations and figures{% if tables_on %} and tables{% endif %}, with a little of the nearby text.{% if latex_source %}
+      A LaTeX file or project is read on the server instead, with LaTeXML in a sandbox: its
+      equations come from the source, and its figures are described as a PDF's are.{% endif %}</li>
+    <li>Those images and that text are sent to the API of {{ model_names }}, which returns
+      proposed LaTeX and descriptions.{% if notation_on %} For a document uploaded for one of
+      the instructor's courses, that course's notation (its symbols and what they mean) is sent
+      with the equations.{% endif %}{% if image_pages_on %} If the instructor ticks “Convert
+      scanned or handwritten pages”, a picture of each such page is sent as well.{% endif %}
+      The PDF file itself, its file name and the instructor's email address are not sent.</li>
+    <li>Automatic checks compare each proposal with the PDF's own text. The instructor decides
+      what the tool is unsure about and can edit anything. A document can be shared with named
+      colleagues, who must sign in with the exact email address entered.</li>
+    <li>The instructor downloads the result and posts it in the course: a web page (one HTML
+      file), and if wanted the same document as {% if word_export %}Word, {% endif %}EPUB, a zip
+      for a Canvas page or a Common Cartridge.</li>
+  </ol>
+</details>
 
 <h2 id="subprocessors">Who receives what</h2>
-{# One row per recipient, from web/recipients.py: the privacy page lists the same companies. #}
-<div class="table-scroll">
-<table>
-  <caption>Companies that receive data from a conversion</caption>
-  <thead>
-    <tr><th scope="col">Company</th><th scope="col">What it receives</th><th scope="col">What it says about training and retention</th></tr>
-  </thead>
-  <tbody>
-    {% for r in recipients %}
-    <tr>
-      <th scope="row">{{ r.name }}</th>
-      {% if "model" in r.purposes %}
-      <td>Images of equations and figures{% if tables_on %} and tables{% endif %}, and a little
-        nearby text{% if "handwriting" in r.purposes %}; also a close-up of a handwritten
-        expression, to be read a second time{% endif %}.</td>
-      <td>{{ retention(r.name) }}</td>
-      {% elif "handwriting" in r.purposes %}
-      <td>A close-up picture of a handwritten expression, to be read a second time. No other
-        text goes with it.</td>
-      <td>{{ retention(r.name) }}</td>
-      {% elif "hosting" in r.purposes %}
-      <td>Hosts the app and its database, in its United States region: everything that is
-        stored (the PDF, images, results, review decisions and account details).</td>
-      <td>Daily database backups are kept about 6 days.</td>
-      {% elif "tracing" in r.purposes %}
-      <td>Timings, model names, token counts, costs and error categories, with random ids.
-        Never document text, images, file names or email addresses.</td>
-      <td>Set in the Langfuse project; see the privacy notice.</td>
-      {% endif %}
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
-{% if analytics_on %}
-<p>Page views and a few named events (for example “uploaded a document”, with a count at
-  most) are sent to PostHog in the United States through this site's own address. They never
-  contain document content, and nobody is identified.</p>
-{% endif %}
-<p>No one else receives a document. The <a href="/privacy">privacy notice</a> lists the same
-  companies and is the page to cite.</p>
+<details>
+  <summary>The same data, by company</summary>
+  {# One row per recipient, from web/recipients.py; what each receives is read from the same
+     `data_items` list as the first table. #}
+  {% call table_scroll("Companies that receive data from a conversion") %}
+  <table class="recipients-table">
+    <caption>Companies that receive data from a conversion</caption>
+    <thead>
+      <tr><th scope="col">Company</th><th scope="col">What it receives</th><th scope="col">What it says about training and retention</th></tr>
+    </thead>
+    <tbody>
+      {% for r in recipients %}
+      <tr>
+        <th scope="row">{{ r.name }}</th>
+        <td>
+          {% if "hosting" in r.purposes %}
+          Hosts the app and its database, in its United States region. It holds every row of the
+          first table that goes to Railway.
+          {% else %}
+          <ul class="cell-list">
+            {% for what in received_by(r.name) %}<li>{{ what }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+        </td>
+        {% if r.gets_documents %}
+        <td>{{ retention(r.name) }}</td>
+        {% elif "hosting" in r.purposes %}
+        <td>Daily database backups are kept about {{ backup_days }} days.</td>
+        {% elif "tracing" in r.purposes %}
+        <td>Set in the Langfuse project; see the privacy notice.</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endcall %}
+  <p>The <a href="/privacy">privacy notice</a> lists the same companies and is the page to cite.</p>
+</details>
 
 <h2 id="retention">How long it is kept</h2>
-<ul>
-  <li>By default a document and everything made from it is deleted
-    <strong>{{ retention_hours }} hours</strong> after the instructor last worked on it.</li>
-  <li>If the instructor chooses “Keep for 7 days”, it is deleted <strong>7 days</strong> after
-    the last activity. Only the instructor, and the people the instructor names, can see it.</li>
-  <li>If the instructor also lets us look at the results, it is deleted
-    <strong>{{ opt_in_days }} days</strong> after upload, and the people who run ReadableSTEM may
-    look at it to find mistakes in the tool. Both choices are off unless the instructor ticks
-    them.</li>
-  <li>The instructor can delete a document at any time. It leaves the database at once.</li>
-  <li>Database backups keep a deleted document for up to about a week. {{ model_names }} may
-    keep what it received for the time in the table above.</li>
-  <li>An instructor can delete their account, with all their documents.</li>
-</ul>
+{% set retention_voice = "instructor" %}
+{% call table_scroll("How long a document is kept") %}
+{% include "_retention_table.html" %}
+{% endcall %}
 
 <h2 id="training">No training, and what is stored by the model company</h2>
 <p>ReadableSTEM does not use uploads to train any model, and does not sell or share them
-  beyond the companies in the table.
-  {% if model_company == "OpenAI" %}Requests to OpenAI are sent with the <code>store</code>
-  setting off, so OpenAI does not keep the response for later retrieval. See OpenAI's own
-  API data policies for how long it keeps requests.
-  {% else %}This server sends its model requests to {{ model_company }}. The
-  <code>store</code> setting belongs to the OpenAI path only and is not used here: for
-  {{ model_company }}, the retention statement in the table applies. No zero-retention
-  agreement is in place.{% endif %}
-  What the model companies say is their own statement; ReadableSTEM cannot check it.</p>
+  beyond the companies in the table.</p>
+<details>
+  <summary>What the model company keeps</summary>
+  <p>{% if model_company == "OpenAI" %}Requests to OpenAI are sent with the <code>store</code>
+    setting off, so OpenAI does not keep the response for later retrieval. See OpenAI's own
+    API data policies for how long it keeps requests.
+    {% else %}This server sends its model requests to {{ model_company }}. The
+    <code>store</code> setting belongs to the OpenAI path only and is not used here: for
+    {{ model_company }}, the retention statement in the table applies. No zero-retention
+    agreement is in place.{% endif %}
+    What the model companies say is their own statement; ReadableSTEM cannot check it.</p>
+</details>
 
 <h2 id="ferpa">Student records (FERPA)</h2>
-<p>ReadableSTEM is for course material the instructor wrote or may adapt: lecture notes,
-  slides and problem sets. It is not meant to process education records. The
-  <a href="/terms">terms</a> forbid uploading student records, graded work or anything with
-  students' personal information, and the upload page says so.</p>
-<ul>
-  <li><strong>Processed:</strong> the instructor's course material, and the instructor's email
-    address, name and sign-in id.</li>
-  <li><strong>Not processed:</strong> student names, grades, submissions or accounts. Students
-    open the converted file in their browser and never sign in to ReadableSTEM.</li>
-  <li><strong>No data agreement is offered.</strong> ReadableSTEM does not sign a school-official
-    agreement or a data processing agreement. If your institution requires one for any tool
-    that handles course material, ReadableSTEM does not meet that yet.</li>
-</ul>
-<p>This page is not legal advice. Your privacy or legal office decides what applies.</p>
+<p><strong>No data agreement is offered.</strong> ReadableSTEM does not sign a school-official
+  agreement or a data processing agreement. If your institution requires one for any tool that
+  handles course material, ReadableSTEM does not meet that yet. Students never sign in to
+  ReadableSTEM.</p>
+<details>
+  <summary>What is and is not processed</summary>
+  <ul>
+    <li><strong>Processed:</strong> the instructor's course material, and the instructor's email
+      address, name and sign-in id.</li>
+    <li><strong>Not processed:</strong> student names, grades, submissions or accounts. Students
+      open the converted file in their browser and never sign in to ReadableSTEM.</li>
+  </ul>
+  <p>The <a href="/terms">terms</a> forbid uploading student records, graded work or anything
+    with students' personal information. This page is not legal advice. Your privacy or legal
+    office decides what applies.</p>
+</details>
 
 <h2 id="not-certify">What the tool does not certify</h2>
-<ul>
-  <li>It assists the instructor. It does not make a document accessible by itself, and it
-    does not say that a document meets WCAG, the ADA, Section 508 or any other standard or
-    law.</li>
-  <li>Its proposals can be wrong. In a pre-registered test on 26 documents it had not seen
-    (arXiv papers, OpenStax sections and course documents made with LaTeX; version 0.5.9,
-    4 November 2026), 0.79 of the equations came out exactly right end to end, against 0.77
-    for a general chatbot given the same PDFs, and the test could detect no difference between
-    them in how a screen reader reads the equations (0.840 against 0.836). In 3 chemistry
-    sections, 0.33 of the equations were right as chemistry. The tool asks the instructor about the parts it
-    is unsure about and accepts the rest on its own checks.
-    <a href="/limits#accuracy">The measured numbers and their limits</a>.</li>
-  <li>The automatic checks look at structure (language, title, headings, lists, tables, links,
-    the alt attribute of images), not at whether a description or an equation reading is
-    right.</li>
-  <li>The output has not been tested by listening with NVDA, JAWS or VoiceOver, and it has not
-    been tried in a live course site.</li>
-  <li>There is no accessibility conformance report (VPAT) published for the ReadableSTEM web
-    application itself. A report in the VPAT 2.5 layout (WCAG 2.2, levels A and AA) is in
-    preparation; it will say what has been tested and claim nothing more. Automated tests walk
-    every page of the app with the keyboard alone and run axe-core on the main screens.</li>
-  <li>There has been no independent security test.</li>
-  <li>Scanned and handwritten pages are converted only when the instructor asks, and a person
-    must check each converted equation and table. Chemistry is the weakest area.
-    <a href="/limits">All known limits</a>.</li>
-</ul>
+<p>It assists the instructor. It does not make a document accessible by itself, and it does not
+  say that a document meets WCAG, the ADA, Section 508 or any other standard or law.</p>
+<details>
+  <summary>More on what it does not do</summary>
+  <ul>
+    <li>Its proposals can be wrong: the chart above is the measured result, and
+      <a href="/limits#accuracy">the evidence page</a> has all of it, including earlier tests.
+      In 3 chemistry sections, 0.33 of the equations were right as chemistry. The tool asks the
+      instructor about the parts it is unsure about and accepts the rest on its own checks.</li>
+    <li>The automatic checks look at structure (language, title, headings, lists, tables, links,
+      the alt attribute of images), not at whether a description or an equation reading is
+      right.</li>
+    <li>The output has not been tested by listening with NVDA, JAWS or VoiceOver, and it has not
+      been tried in a live course site.</li>
+    <li>There is no accessibility conformance report (VPAT) published for the ReadableSTEM web
+      application itself. A report in the VPAT 2.5 layout (WCAG 2.2, levels A and AA) is in
+      preparation; it will say what has been tested and claim nothing more. Automated tests walk
+      every page of the app with the keyboard alone and run axe-core on the main screens.</li>
+    <li>There has been no independent security test.</li>
+    <li>Scanned and handwritten pages are converted only when the instructor asks, and a person
+      must check each converted equation and table. Chemistry is the weakest area.
+      <a href="/limits">All known limits</a>.</li>
+  </ul>
+</details>
 
 <h2 id="pilot">Pilot checklist</h2>
 <p>A small trial for one course. Each step is for the office or the instructor to do.</p>
-<ol class="steps-list">
-  <li>Pick one course and one document the instructor wrote or may adapt, with no student
-    records in it.</li>
-  <li>Read the <a href="/privacy">privacy notice</a> and this page with your privacy or legal
-    contact, and decide whether the data flow and the companies above are acceptable.</li>
-  <li>The instructor signs in, uploads the PDF, and works through every decision on the review
-    screen.</li>
-  <li>Check the downloaded file with your own screen readers (for example NVDA, JAWS or
-    VoiceOver): equations, headings, figure descriptions and tables.</li>
-  <li>Check the file with the checker and the review your office normally uses, against the
-    standard your institution applies. ReadableSTEM makes no claim about the result.</li>
-  <li>Post the file as described in <a href="/help/posting">Posting in your course</a>, then
-    open it as a student would.</li>
-  <li>Download the file and the review record (a page to print, and a CSV) before the document
-    is deleted, and keep them where your office keeps its own records.</li>
-  <li>Tell us what was wrong or missing, using “Report this item” on the review screen
-    {% if feedback_url or contact_email %}or the feedback link in the footer{% endif %}.</li>
-</ol>
+<details>
+  <summary>The eight steps</summary>
+  <ol class="steps-list">
+    <li>Pick one course and one document the instructor wrote or may adapt, with no student
+      records in it.</li>
+    <li>Read the <a href="/privacy">privacy notice</a> and this page with your privacy or legal
+      contact, and decide whether the data flow and the companies above are acceptable.</li>
+    <li>The instructor signs in, uploads the PDF, and works through every decision on the review
+      screen.</li>
+    <li>Check the downloaded file with your own screen readers (for example NVDA, JAWS or
+      VoiceOver): equations, headings, figure descriptions and tables.</li>
+    <li>Check the file with the checker and the review your office normally uses, against the
+      standard your institution applies. ReadableSTEM makes no claim about the result.</li>
+    <li>Post the file as described in <a href="/help/posting">Posting in your course</a>, then
+      open it as a student would.</li>
+    <li>Download the file and the review record (a page to print, and a CSV) before the document
+      is deleted, and keep them where your office keeps its own records.</li>
+    <li>Tell us what was wrong or missing, using “Report this item” on the review screen
+      {% if feedback_url or contact_email %}or the feedback link in the footer{% endif %}.</li>
+  </ol>
+</details>
 
 {# Owner decision (2026-11-04): plain facts on continuity, no service-level promise. Self-hosting
    is docs/deploy.md; the licence wording stays on /terms. #}
@@ -218,10 +220,7 @@
     <a href="{{ source_url }}/blob/main/docs/deploy.md">how to deploy it</a>. The licence terms
     are on the <a href="/terms#open-source">terms page</a>.</li>
   <li>Nothing is locked in. Every result can be downloaded as a web page,
-    {% if word_export %}Word, {% endif %}EPUB and a Canvas package, with the review record, and
-    those files work without ReadableSTEM.</li>
-  <li>If the service stopped, stored documents would be deleted on their normal schedule and
-    nothing would be kept.</li>
+    {% if word_export %}Word, {% endif %}EPUB and a Canvas package, with the review record.</li>
   <li>There is no support contract or service-level agreement. To report a problem, use
     “Report this item” on the review screen{% if contact_email %} or email
     <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% endif %}.</li>
@@ -232,12 +231,10 @@
   <li><a href="/privacy">Privacy</a>, <a href="/terms">Terms</a> and
     <a href="/limits">Known limits</a>.</li>
   <li><a href="{{ source_url }}/blob/main/docs/vendor-information.md">The information sheet</a>
-    for procurement offices (in the source repository), and
-    <a href="{{ source_url }}/blob/main/docs/security.md">the security notes</a>.</li>
+    for procurement offices, and
+    <a href="{{ source_url }}/blob/main/docs/security.md">the security notes</a> (in the source
+    repository).</li>
   <li><a href="/guides/ada-title-ii-stem-course-materials">The ADA Title II guide</a>, and
     <a href="/demo">an example conversion</a> that needs no sign-in.</li>
-  {% if contact_email %}
-  <li>Questions: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.</li>
-  {% endif %}
 </ul>
 {% endblock %}

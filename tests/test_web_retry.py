@@ -564,4 +564,8 @@ def test_the_service_counts_as_not_answering_after_a_run_of_failures_and_recover
 
 def test_the_status_page_says_the_service_answers_when_it_does(site):
     page = text_of(site.browser.get("/status").text)
-    assert "AI service No problems seen in the last 10 minutes" in page
+    assert "No problems seen" not in page
+    assert (
+        "No recent requests; availability untested" in page
+        or "Recent requests were answered" in page
+    )

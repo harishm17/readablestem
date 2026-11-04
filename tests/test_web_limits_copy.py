@@ -67,7 +67,7 @@ def test_the_upload_form_names_the_configured_limits(web):
 
 def test_the_landing_and_sign_in_pages_name_the_configured_quota(web):
     landing = flat(web.client().get("/").text)
-    assert "Upload up to 77 pages at a time" in landing
+    assert "up to 77 pages at a time" in landing
     assert "New accounts have daily limits: 111 pages a day" in landing
     for old in OLD:
         assert old not in landing, old

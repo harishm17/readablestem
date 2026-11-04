@@ -27,7 +27,8 @@ def cells(page: str) -> list[list[str]]:
 
 
 def test_five_tools_in_the_header(page):
-    head = page.split("<thead>", 1)[1].split("</thead>", 1)[0]
+    table = page.split('<table class="compare-table compare-wide">', 1)[1]
+    head = table.split("<thead>", 1)[1].split("</thead>", 1)[0]
     names = re.findall(r'<th scope="col">([^<]+)</th>', head)
     assert names == ["Topic", "ReadableSTEM", "Mathpix", "Aelira", "Chatbots", "LaTeXML"]
 

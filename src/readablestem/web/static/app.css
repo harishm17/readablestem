@@ -130,11 +130,16 @@ main:focus { outline: none; }
 .site-footer { margin-top: var(--space-8); padding: var(--space-7) 0 var(--space-6); border-top: 1px solid var(--border-subtle); background: var(--surface); }
 .footer-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-6) var(--space-5); }
 .footer-cols h2 { font-family: var(--font-sans); font-weight: 700; font-size: var(--step-0); margin: 0 0 var(--space-3); }
-.footer-cols ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
-.footer-cols a { display: inline-block; min-height: 1.5rem; }
+.footer-cols ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.footer-cols a { display: inline-flex; align-items: center; min-height: 2.75rem; }
 .footer-note { margin: var(--space-6) 0 0; padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); color: var(--ink-muted); }
 @media (max-width: 52rem) { .footer-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 30rem) { .footer-cols { grid-template-columns: minmax(0, 1fr); } }
+/* On a phone each column's links run in a row that wraps, so 44px targets do not make the
+   footer taller than the short pages above it. */
+@media (max-width: 30rem) {
+  .footer-cols { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+  .footer-cols ul { display: flex; flex-wrap: wrap; gap: 0 var(--space-4); }
+}
 
 .small { font-size: var(--step--1); color: var(--ink-muted); max-width: 48rem; }
 
@@ -1178,9 +1183,10 @@ fieldset.option-group > .hint { margin-top: var(--space-1); }
 
 /* App (signed-in) pages: the trust and help links on one line; public pages keep the full
    footer. */
-.site-footer-compact { padding: var(--space-4) 0; margin-top: var(--space-6); }
-.footer-compact-links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); }
-.footer-compact-links a { display: inline-flex; align-items: center; min-height: 1.5rem; }
+.site-footer-compact { padding: var(--space-3) 0 var(--space-4); margin-top: var(--space-6); }
+.site-footer-compact .footer-note { margin-top: var(--space-2); padding-top: var(--space-2); }
+.footer-compact-links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0 var(--space-5); }
+.footer-compact-links a { display: inline-flex; align-items: center; min-height: 2.75rem; }
 /* The deletion time and "Keep for 7 days", once, under the actions of the job page. */
 .retention-line { margin: var(--space-5) 0; }
 .retention-line p { margin: 0 0 var(--space-2); }
@@ -1277,3 +1283,143 @@ fieldset.option-group > .hint { margin-top: var(--space-1); }
 .batch-elapsed { color: var(--ink-muted); }
 @media (forced-colors: active) { .account-keep { border-color: CanvasText; } }
 /* ==== end ux2-lane-c ==================================================================== */
+
+/* ===== ux2-lane-d: public pages and the shared chrome =====================================
+   Offices, privacy, limits, the comparison guide, guides, status, sign-in, the /style page,
+   the signed-in navigation and the footer targets. Colours and sizes are tokens; nothing here
+   adds a second accent. */
+
+/* Signed in: the workspace links first, the public ones quieter. */
+.nav-list .nav-secondary a, .nav-list .nav-secondary a:visited { color: var(--ink-muted); }
+
+/* Tables that may be wider than a phone scroll in a focusable box (templates/_table_scroll.html);
+   a table that fits is not squeezed. */
+.recipients-table, .retention-table { min-width: 34rem; }
+.recipients-table td:nth-child(2) { width: 42%; }
+.cell-list { margin: 0; padding-left: var(--space-4); }
+.cell-list li { margin: 0 0 var(--space-1); }
+.cell-list li:last-child { margin-bottom: 0; }
+.table-scroll:focus-visible { outline-offset: 0; }
+
+/* What is sent where (templates/_data_matrix.html): a table from 40rem, a list on a phone. */
+.matrix-stack { display: none; }
+.matrix-caption { margin: 0 0 var(--space-2); font-weight: 700; }
+.matrix-stack li { padding: var(--space-3) 0; border-top: 1px solid var(--border-subtle); }
+.matrix-stack li:last-child { border-bottom: 1px solid var(--border-subtle); }
+.matrix-line { display: block; margin-top: var(--space-1); color: var(--ink-muted); }
+.matrix-key { font-weight: 700; color: var(--ink); }
+@media (max-width: 39.99rem) {
+  .matrix-wide-view { display: none; }
+  .matrix-stack { display: block; }
+  .mode-read main > .matrix-stack { max-width: none; }
+}
+
+/* Limits: a term and what it is, side by side from 40rem. */
+.limits-list { margin: var(--space-3) 0 var(--space-5); }
+.limits-list > div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: var(--space-1) var(--space-4); padding: var(--space-3) 0; border-top: 1px solid var(--border-subtle); }
+.limits-list > div:last-child { border-bottom: 1px solid var(--border-subtle); }
+.limits-list dt { font-weight: 700; }
+.limits-list dd { margin: 0; }
+@media (max-width: 39.99rem) { .limits-list > div { grid-template-columns: minmax(0, 1fr); } }
+
+/* The comparison guide's short decision list, and the guides index's audience line. */
+.decision-list { padding-left: var(--space-5); }
+.decision-list li { margin: 0 0 var(--space-3); }
+.guide-for { margin: 0 0 var(--space-1); font-weight: 700; color: var(--ink-muted); }
+.compare-table .source-note { display: block; margin-top: var(--space-1); color: var(--ink-muted); font-size: var(--step--1); }
+
+/* Sign-in: the consent is plain text right under the buttons it is about. */
+.signin-consent { max-width: 40rem; margin: var(--space-4) 0 var(--space-5); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
+.signin-form { margin: 0 0 var(--space-3); }
+
+/* Status: when it was checked, and the optional refresh, above the facts. */
+.status-checked { margin: 0 0 var(--space-4); font-weight: 700; }
+.status-checked a { font-weight: 400; }
+
+/* Landing: the one line under the buttons keeps the real before/after near the top. */
+.mode-landing .hero .hero-actions { margin-bottom: var(--space-3); }
+.hero-hint { margin: 0 0 var(--space-6); }
+@media (max-width: 39.99rem) { .hero-hint { margin-bottom: var(--space-5); } }
+
+/* Cancel and keep actions beside a button ("No, keep it" under a delete confirmation, the
+   table cell and notation forms' Cancel): links with a target of at least 44px. The selectors
+   cover the pages without touching their templates; `.cancel-link` is for a new one. */
+.cancel-link, .inline-form + p > a:only-child, .inline-controls > a:not([class]), .actions > li > a:not([class]) { display: inline-flex; align-items: center; min-height: 2.75rem; }
+
+/* /style: every demonstration control is an inert example, and the three states are shown. */
+.style-example { margin: 0 0 var(--space-5); padding: var(--space-4); border: 1px dashed var(--border-control); border-radius: var(--radius-frame); }
+.style-example > :last-child { margin-bottom: 0; }
+.style-example-label { margin: 0 0 var(--space-3); font-weight: 700; color: var(--ink-muted); }
+.style-live { margin: var(--space-2) 0 0; color: var(--ink-muted); }
+.style-states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin: 0 0 var(--space-5); }
+@media (max-width: 63.99rem) { .style-states { grid-template-columns: minmax(0, 1fr); } }
+.style-scheme { padding: var(--space-4); border: 1px solid var(--border-control); border-radius: var(--radius-frame); background: var(--bg); color: var(--ink); min-width: 0; }
+.style-scheme h3 { margin: 0 0 var(--space-3); font-size: var(--step-1); }
+.style-scheme p { margin: 0 0 var(--space-3); max-width: none; }
+.style-scheme .button-row { margin: 0 0 var(--space-3); }
+.style-focus { display: inline-block; padding: var(--space-1) var(--space-3); outline: 3px solid var(--focus-outline); outline-offset: 2px; box-shadow: 0 0 0 5px var(--focus-halo); }
+/* The dark preview carries the dark tokens of tokens.css (a test keeps the two equal). */
+.style-scheme-dark {
+  color-scheme: dark;
+  --bg: #0f1115; --surface: #171a20; --surface-2: #1e222a; --ink: #e9ebef; --ink-muted: #b4bac4;
+  --border-control: #7d8491; --border-subtle: #343944; --accent: #8ab4ff; --accent-hover: #a8c4ff;
+  --accent-tint: #1a2540; --on-accent: #0f1115; --visited: #c9a7f0; --focus-outline: #ffd33d;
+  --focus-halo: #0f1115; --ok: #7fd69b; --ok-tint: #12261a; --warn: #ffc46b; --warn-tint: #2a2010;
+  --err: #ff9a92; --err-tint: #2c1515; --err-strong: #ffb8b2;
+}
+/* The forced-colour preview approximates the system colours: the real rules are in the
+   forced-colors media queries of this file and controls.css, shown by switching the mode on. */
+.style-scheme-forced {
+  --bg: Canvas; --surface: Canvas; --ink: CanvasText; --ink-muted: CanvasText; --accent: LinkText;
+  --border-control: ButtonText; --border-subtle: CanvasText; --on-accent: ButtonFace;
+  --focus-outline: Highlight; --focus-halo: Canvas; --ok: CanvasText; --ok-tint: Canvas;
+  --warn: CanvasText; --warn-tint: Canvas; --err: CanvasText; --err-tint: Canvas;
+  border-color: CanvasText; forced-color-adjust: none; color-scheme: light;
+}
+.style-scheme-forced .button { background: ButtonText; color: ButtonFace; border: 2px solid ButtonText; }
+.style-scheme-forced .button-secondary, .style-scheme-forced .button-danger-outline { background: ButtonFace; color: ButtonText; border: 2px solid ButtonText; }
+.style-scheme-forced .tag { border: 1px solid CanvasText; background: Canvas; color: CanvasText; }
+.style-scheme-forced .notice { border: 1px solid CanvasText; background: Canvas; }
+.style-scheme-forced .style-focus { box-shadow: none; }
+@media (forced-colors: active) {
+  .style-example, .style-scheme { border-color: CanvasText; }
+}
+/* The comparison chart (templates/_proof_chart.html): horizontal bars, a name and a number on
+   every bar, three fills (solid, hatched, dotted) so colour is not the only difference. */
+.proof-chart { margin: var(--space-5) 0; max-width: 52rem; }
+.mode-read main > .proof-chart { max-width: 52rem; }
+.proof-chart-title { margin: 0 0 var(--space-3); font-size: var(--step-1); }
+.chart-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.chart-row { margin: 0 0 var(--space-4); }
+.chart-measure { margin: 0 0 var(--space-1); font-weight: 700; }
+.chart-better { margin-left: var(--space-2); font-weight: 400; color: var(--ink-muted); font-size: var(--step--1); }
+.chart-line { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr) 6rem; align-items: center; gap: var(--space-3); min-height: 1.75rem; }
+.chart-name { font-size: var(--step-0); }
+.chart-value { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
+.chart-bar { display: block; width: 100%; height: 16px; }
+.chart-track { fill: var(--surface-2); stroke: var(--border-subtle); stroke-width: 1; }
+.chart-sys-1 .chart-fill { fill: var(--accent); }
+.chart-sys-2 .chart-fill { fill: url(#chart-hatch); stroke: var(--ink-muted); stroke-width: 1; }
+.chart-sys-3 .chart-fill { fill: url(#chart-dots); stroke: var(--ink-muted); stroke-width: 1; }
+.pat-bg { fill: var(--bg); }
+.pat-stroke, .pat-fill { fill: var(--ink-muted); }
+.proof-chart figcaption { margin-top: var(--space-3); }
+.proof-chart figcaption p, .chart-source { margin: 0 0 var(--space-2); }
+.chart-mini { margin-top: var(--space-4); }
+.chart-mini caption { font-weight: 700; color: var(--ink); }
+.chart-source { color: var(--ink-muted); }
+@media (max-width: 39.99rem) {
+  .chart-line { grid-template-columns: minmax(0, 1fr) auto; gap: 0 var(--space-3); margin-bottom: var(--space-2); }
+  .chart-bar { grid-column: 1 / -1; grid-row: 2; }
+  .chart-value { grid-column: 2; grid-row: 1; }
+  .chart-name { grid-column: 1; grid-row: 1; }
+}
+@media (forced-colors: active) {
+  .chart-bar { forced-color-adjust: none; }
+  .chart-track { fill: Canvas; stroke: CanvasText; }
+  .chart-sys-1 .chart-fill { fill: CanvasText; }
+  .chart-sys-2 .chart-fill, .chart-sys-3 .chart-fill { stroke: CanvasText; }
+  .pat-bg { fill: Canvas; }
+  .pat-stroke, .pat-fill { fill: CanvasText; }
+}
+/* ===== end ux2-lane-d ====================================================================== */
