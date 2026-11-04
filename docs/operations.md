@@ -70,6 +70,46 @@ dump a day and keeps the last 6, and there are no point-in-time-recovery logs, s
 to about a week after the purge (deploy-railway.md, "As deployed"); the privacy page says so
 ("about 6 days", "up to about a week") and has to keep saying so if the schedule changes.
 
+### How much the uploads weigh
+
+An upload is stored in Postgres as bytes until its job is deleted: up to `MAX_UPLOAD_MB` (50) for
+a document and up to `MAX_LARGE_UPLOAD_MB` (100) for a large file waiting for its pages (2 a
+person), which were 20 and 30 before 2026-11-03. The database is on a 5000 MB volume
+(`.railway/railway.ts`, `postgresVolume`), so two caps keep it from filling (`web/storage.py`):
+
+- **Per person**: `STORAGE_PER_USER_MB` (300) for invited people, `STORAGE_OPEN_TIER_MB` (250) for
+  accounts made by open sign-up. It counts everything of theirs that is not past its deletion
+  time: source PDFs, crops, the HTML and result, and kept large files. A new upload that would
+  go over is refused with "You are storing N MB of the M MB you can keep" and the advice to delete
+  documents; no pages are taken. Open sign-up makes up to 100 accounts a day, so the person cap
+  alone is not enough (100 x 250 MB is 25 GB): the global one is the bound.
+- **Whole service**: `STORAGE_GLOBAL_MAX_MB` (2000) of stored upload bytes. Over it new
+  uploads get a 503 page ("Uploads are paused while storage catches up", logged as
+  `upload_rejected code=storage_full`) and `/healthz/ops` answers 503 with `"stale": ["storage"]`
+  and `"storage": {"stored_mb", "limit_mb", "full"}`, which the GitHub uptime job reads. Why
+  2000 and not 60% of the volume: the daily backup restores its dump into a second database on
+  the same volume (`restore_check`), so the volume holds about twice the data for those minutes.
+  Raise it only with the volume (`allowOnlineResize` is on), and set the three variables in the
+  Railway `web` service (declared in `webOnlyVariables`).
+
+**How retention frees space, and how fast.** A document stops counting at its `retain_until`
+(`RETENTION_HOURS` after the person last worked on it, 24 by default), before the purge runs,
+so uploads resume as soon as enough documents pass their time, not at the next purge. The
+hourly cron (minute 7) then deletes the rows (`blobs`, `pending_uploads`, `jobs`: the large
+bytes are in `blobs.content` and `pending_uploads.content`, deleted with their rows, and
+Postgres deletes their TOAST rows with them), and when it deleted anything it runs a plain
+`VACUUM` of those three tables (`ops.retention.vacuum_after_purge`, log `vacuum_done`). That
+makes the space reusable by new uploads at once, instead of after autovacuum's 20% of dead
+rows, and returns empty pages at the end of a file to the volume. It does not shrink the
+files: **the volume's usage in Railway's Metrics stays near its high-water mark**, which the
+global cap keeps bounded; the live data is what the cap counts. If the Metrics number keeps
+rising while the stored total is flat, that is bloat: run `VACUUM FULL blobs` in a quiet hour
+(it locks the table for its length and needs room for a copy), or `pg_repack`. After a burst
+the stored total falls by what was uploaded 24 hours earlier, an hour at a time. A person can
+free their own space at once by deleting documents ("Delete" on My documents).
+
+Every daily backup copies what is stored that day, so look at the `backup` volume too.
+
 ### Large files waiting for their pages
 
 A PDF over the page or size limit is kept as a `pending_uploads` row (`web/pending.py`, docs/web.md
@@ -403,7 +443,7 @@ leaves nothing running.
 readablestem.web.conversion_child`, started by `web/isolated_convert.py`), so a PDF that crashes,
 exhausts memory or hangs MuPDF fails that one job and the web process, its sessions and the
 worker go on. The child is limited to `CONVERSION_MEMORY_MB` of address space (default 3072, plus
-twice the PDF; resident memory is far lower, 330-460 MB measured) and 4 times the job's time limit
+twice the PDF; resident memory is far lower: 330-460 MB measured on short documents, 494 MB for 100 pages and 745 MB for 100 pages with 51 MB of pictures) and 4 times the job's time limit
 in CPU seconds, and is killed at the job's time limit, when the job is deleted or taken over, and
 at shutdown. Web service and child share the service's RAM: while a job converts, expect the web
 process plus one child; a service limit below about 1 GB would not hold both (docs/deploy-railway.md,

@@ -46,7 +46,7 @@ decided and when, what was not converted, and what was not checked.
   in 3 equations were exactly right. Otherwise such pages stay pictures marked "Not converted".
 - **Other limits** are on the Known limits page.
 - **Files:** PDF. Word and PowerPoint are taken only where the server has LibreOffice;
-  readablestem.com takes PDF only. Up to 30 pages and 20 MB per upload by default.
+  readablestem.com takes PDF only. Up to 100 pages and 50 MB per upload by default; a bigger file is converted in parts.
 - **Checks look at structure, not meaning:** language, title, headings, lists, tables, links
   and image alt attributes. Nobody has tested the output by listening with NVDA, JAWS or
   VoiceOver, and it has not been tried in a live course site.

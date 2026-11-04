@@ -188,7 +188,7 @@ def limit_memory(max_bytes: int = MEMORY_LIMIT_BYTES) -> None:
 # --------------------------------------------------------------------------- review images
 
 # Longest side of any image this child renders, whatever it is asked for: a 2400 px RGB
-# pixmap is 17 MB, well inside `MEMORY_LIMIT_BYTES` next to a 20 MB PDF.
+# pixmap is 17 MB, well inside `MEMORY_LIMIT_BYTES` next to a large PDF.
 RENDER_MAX_SIDE_PX = 2400
 RENDER_MAX_ZOOM = 12.0  # 864 dpi: only reached for a small region (an inline equation)
 MARK_COLOR = (0.643, 0.086, 0.102)  # the app's --danger, #a4161a: 7.0:1 against white

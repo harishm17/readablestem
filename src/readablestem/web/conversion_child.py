@@ -46,7 +46,8 @@ if TYPE_CHECKING:
 
 # The largest frame the parent reads from the child: a result with its crops is tens of
 # megabytes (the parent holds at most this much of the child's output at once). The child
-# reads the parent's frames, which are trusted and carry one PDF (at most 30 MB): a looser cap.
+# reads the parent's frames, which are trusted and carry one PDF (at most
+# `MAX_LARGE_UPLOAD_MB`): a looser cap.
 MAX_FRAME_BYTES = 128 * 1024 * 1024
 MAX_PARENT_FRAME_BYTES = 512 * 1024 * 1024
 MAX_PARTS = 100_000

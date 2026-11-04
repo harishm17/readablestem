@@ -420,7 +420,7 @@ removes roles, aria attributes, classes, styles and `hr` and checks that.
 
 ## Combining the parts of a long source
 
-A source over the page limit is converted in parts of at most 30 pages, each a document of
+A source over the page limit is converted in parts of at most `MAX_PAGES_PER_JOB` (100) pages, each a document of
 its own (web.md, "Large files in parts"). The results page of a part links "Combine parts" when
 two or more finished parts of the same source are kept: `GET /jobs/{id}/combine` (owner only;
 a GET like the other downloads, so it needs no token) returns one HTML file. `pipeline/combine.py` joins the parts' elements, decisions and pictures and

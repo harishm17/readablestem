@@ -59,6 +59,7 @@ from readablestem.web import combine as combine_rules
 from readablestem.web import feedback as feedback_questions
 from readablestem.web import job_page as page_rules
 from readablestem.web import retry as retry_rules
+from readablestem.web import storage as stored_bytes
 from readablestem.web.database import as_utc, utc_today
 from readablestem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import (
@@ -132,6 +133,13 @@ IMAGE_PAGES_ADVICE = (
     "Or upload it again with “Convert scanned or handwritten pages” ticked: the pages are "
     "read from their images, which is slower, and every converted equation and table needs "
     "your check."
+)
+# Uploads are turned away while the service holds as much as it will (`web.storage`).
+STORAGE_FULL_TITLE = "Uploads are paused while storage catches up"
+STORAGE_FULL_MESSAGE = (
+    "The service holds as much uploaded material as it can for now. Documents are deleted "
+    "{hours} hours after their owners last work on them, so room frees up through the day. "
+    "Try again in an hour. Nothing was uploaded."
 )
 # A refused upload costs nothing: the probe runs before the daily page count.
 NOTHING_TAKEN = "Nothing was converted, and no pages were taken from your daily allowance."
@@ -251,6 +259,11 @@ def upload_error_message(
         "too_many_stored": f"You are keeping {MAX_LIVE_JOBS_PER_USER} documents, the most "
         f"allowed. Delete one you no longer need, then upload {name} again. Nothing was "
         "uploaded.",
+        # `pages` is the megabytes used and `left` the person's limit (see `Placed`).
+        "storage_user": f"You are storing {pages or 0} MB of the {left or 0} MB you can keep, "
+        f"and {name} would go over it. Delete documents you no longer need (My documents, "
+        f"then Delete), then upload {name} again. Nothing was uploaded.",
+        "storage_full": STORAGE_FULL_MESSAGE.format(hours=s.retention_hours),
     }.get(code, f"{name} cannot be converted.")
     if code in IMAGE_PAGE_REFUSALS and s.feature_image_pages:
         message += " " + IMAGE_PAGES_ADVICE
@@ -649,6 +662,14 @@ async def create_job(request: Request, user: UserDep) -> Response:
     if (closed := await run_in_threadpool(conversions_closed, ctx, user)) is not None:
         log_event(logger, "upload_rejected", code="spend_cap" if closed == "daily" else "open_pool")
         raise PageError(*conversions_paused(closed, kept=False), headers={"Retry-After": "3600"})
+    if await run_in_threadpool(_storage_full, ctx):  # before the body is read
+        log_event(logger, "upload_rejected", code="storage_full")
+        raise PageError(
+            503,
+            STORAGE_FULL_TITLE,
+            STORAGE_FULL_MESSAGE.format(hours=ctx.settings.retention_hours),
+            headers={"Retry-After": "3600"},
+        )
     if (refused := ctx.uploads.enter(user.id)) is not None:
         log_event(logger, "upload_rejected", code=f"upload_{refused}")
         raise PageError(*UPLOAD_BUSY[refused], headers={"Retry-After": "10"})
@@ -656,6 +677,11 @@ async def create_job(request: Request, user: UserDep) -> Response:
         return await _take_upload(request, ctx, user)
     finally:
         ctx.uploads.leave(user.id)
+
+
+def _storage_full(ctx: AppContext) -> bool:
+    with session_scope(ctx.factory) as session:
+        return stored_bytes.global_full(session, ctx.settings)
 
 
 def conversions_paused(closed: str, *, kept: bool) -> tuple[int, str, str]:
@@ -709,6 +735,8 @@ class Placed:
     pending_id: str = ""
     code: str = ""
     status: int = 0
+    # For "page_quota": the pages left today. For "storage_user": `pages` is the megabytes the
+    # person stores and `left` their limit in MB (both saved with the answer, `upload_result`).
     left: int | None = None
     retry_after: str = ""
     office: bool = False  # the file was Word or PowerPoint, made into a PDF first (T3-30)
@@ -901,6 +929,31 @@ def _place_files(
                 Placed(file.filename, code=exc.code, status=429, retry_after="60", office=office)
             )
             continue
+        except stored_bytes.StorageRefused as exc:
+            log_event(logger, "upload_rejected", code="storage_user")
+            placed.append(
+                Placed(
+                    file.filename,
+                    exc.used_mb,
+                    code="storage_user",
+                    status=413,
+                    left=exc.limit_mb,
+                    office=office,
+                )
+            )
+            continue
+        except stored_bytes.StorageFull:
+            log_event(logger, "upload_rejected", code="storage_full")
+            placed.append(
+                Placed(
+                    file.filename,
+                    code="storage_full",
+                    status=503,
+                    retry_after="3600",
+                    office=office,
+                )
+            )
+            continue
         except QuotaRefused as exc:
             placed.append(
                 Placed(
@@ -1025,6 +1078,14 @@ def _keep_for_parts(
             pending_id = row.id
     except pending.TooManyPending:
         return Placed(file.filename, pages, code="too_many_pending", status=429, retry_after="60")
+    except stored_bytes.StorageRefused as exc:
+        log_event(logger, "upload_rejected", code="storage_user")
+        return Placed(
+            file.filename, exc.used_mb, code="storage_user", status=413, left=exc.limit_mb
+        )
+    except stored_bytes.StorageFull:
+        log_event(logger, "upload_rejected", code="storage_full")
+        return Placed(file.filename, code="storage_full", status=503, retry_after="3600")
     log_event(logger, "upload_kept_for_parts", pending_id=pending_id, pages=pages)
     return Placed(file.filename, pages, pending_id=pending_id)
 

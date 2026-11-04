@@ -56,7 +56,9 @@ CHECK_ARCHIVE = "check.sealed.tar.gz"
 PARTS = ("dev", "check")
 NEAR_DUP = 0.05  # same threshold as proof/selection/features.py
 MIN_WORDS = 300
-# The pipeline refuses a PDF of more pages than this (config.Settings.max_pages_per_job).
+# A section printing to more pages than this is not used. It was the pipeline's page limit
+# (config.Settings.max_pages_per_job) when the set was chosen; the limit is 100 now, and the
+# number stays so that the committed set and its manifests are the same set.
 MAX_SECTION_PAGES = 30
 CHECK_SHARE = 0.15  # share of the candidate pool whose hash puts it in the check part
 LICENSE_AUTHORED = {

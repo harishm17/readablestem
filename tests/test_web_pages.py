@@ -222,7 +222,8 @@ def test_launch_check_wants_tables_and_notation_in_the_privacy_notice(tmp_path, 
     items = launch.launch_blockers(settings=on)
     assert any("FEATURE_TABLES" in item for item in items)
     assert any("FEATURE_NOTATION_MEMORY" in item for item in items)
-    assert launch.launch_blockers(settings=make_settings(tmp_path)) == [
+    # a day's cap above one job's cap ($6.00), as in production, so no spend warning is listed
+    assert launch.launch_blockers(settings=make_settings(tmp_path, daily_spend_cap_usd=10.0)) == [
         item for item in launch.launch_blockers() if "privacy" in item
     ]
     privacy.write_text("<p>OpenAI ... and to rebuild tables ... the course's notation ...</p>")
