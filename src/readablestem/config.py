@@ -222,7 +222,7 @@ class Settings(BaseSettings):
     # production values: they only apply in open mode, and the first three only to accounts
     # that were not invited ("open tier"). Invited people keep PER_USER_DAILY_PAGE_QUOTA.
     # Pages an open-tier account may submit per UTC day.
-    open_tier_daily_page_quota: int = Field(default=150, gt=0)
+    open_tier_daily_page_quota: int = Field(default=250, gt=0)
     # Model reads from review (a marked equation region, a table cell read as maths) an
     # open-tier account may start per UTC day. Each one costs model spend that no page count
     # bounds. 0 turns them off for that tier.
@@ -268,10 +268,11 @@ class Settings(BaseSettings):
     # Stored bytes (web/storage.py): uploads live in Postgres on a volume of fixed size (5000 MB,
     # .railway/railway.ts), and with 50 and 100 MB uploads one person could fill it. Per person,
     # by tier: everything they have stored (sources, crops, results, kept large files); a new
-    # upload that would pass it is refused. Open sign-up makes 100 accounts a day, so the open
-    # tier is smaller.
+    # upload that would pass it is refused. The open tier's 250 holds a 100 MB file kept for
+    # choosing pages and a 50 MB part cut from it; with 100 new accounts a day the global cap
+    # below, not these, protects the volume.
     storage_per_user_mb: int = Field(default=300, gt=0)
-    storage_open_tier_mb: int = Field(default=150, gt=0)
+    storage_open_tier_mb: int = Field(default=250, gt=0)
     # Stored upload bytes of everybody: over it new uploads are refused until the hourly purge
     # has caught up. 2000 and not more: the daily backup restores the dump into a second
     # database on the same volume (`restore_check`), so the volume holds about twice the data

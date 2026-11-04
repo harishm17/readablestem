@@ -112,7 +112,7 @@ def test_the_cap_is_read_from_the_settings_by_tier(web):
     from readablestem.config import Settings
 
     defaults = Settings(_env_file=None)  # type: ignore[call-arg]
-    assert (defaults.storage_per_user_mb, defaults.storage_open_tier_mb) == (300, 150)
+    assert (defaults.storage_per_user_mb, defaults.storage_open_tier_mb) == (300, 250)
     assert defaults.storage_global_max_mb == 2000
 
 
@@ -368,3 +368,47 @@ def test_vacuum_runs_after_a_purge_on_postgres_only(web):
 def test_the_limits_page_names_the_storage_from_the_settings(web):
     text = flat(web.alice.get("/limits").text)
     assert "keep up to 3 MB of uploads and results at once" in text
+
+
+def test_an_open_tier_account_can_keep_a_full_size_file_and_convert_a_full_size_part(tmp_path):
+    """The default open-tier cap holds a 100 MB file waiting for its pages and a 50 MB part cut
+    from it (`MAX_LARGE_UPLOAD_MB` and `MAX_UPLOAD_MB`)."""
+    env = WebEnv(tmp_path, signup_mode="open", per_user_daily_page_quota=1000)
+    from readablestem.config import Settings
+
+    d = Settings(_env_file=None)  # type: ignore[call-arg]
+    settings = env.settings.model_copy(
+        update={
+            "max_upload_mb": d.max_upload_mb,
+            "max_large_upload_mb": d.max_large_upload_mb,
+            "storage_open_tier_mb": d.storage_open_tier_mb,
+            "storage_global_max_mb": d.storage_global_max_mb,
+            "max_pages_per_job": d.max_pages_per_job,
+        }
+    )
+    assert (d.max_upload_mb, d.max_large_upload_mb) == (50, 100)
+    with env.running():
+        env.allow(BOB)
+        with session_scope(env.ctx.factory) as session:
+            bob = session.scalar(select(User).where(User.email == BOB))
+            bob.access_tier = access.OPEN
+            bob_id = bob.id
+        with session_scope(env.ctx.factory) as session:
+            pending.create(
+                session,
+                settings,
+                user_id=bob_id,
+                filename="book.pdf",
+                data=bytes(100 * MB),
+                pages=400,
+                mode="day",
+                course_id=None,
+                exam=False,
+            )
+        part = store_job(env.ctx.factory, settings, bob_id, "part.pdf", bytes(50 * MB), 90, "day")
+        assert part
+        with session_scope(env.ctx.factory) as session:
+            assert storage.user_bytes(session, bob_id) < 250 * MB
+        # and the cap is still a cap: 101 MB more does not fit
+        with pytest.raises(storage.StorageRefused):
+            store_job(env.ctx.factory, settings, bob_id, "more.pdf", bytes(101 * MB), 90, "day")

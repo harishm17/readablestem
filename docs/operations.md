@@ -77,12 +77,12 @@ a document and up to `MAX_LARGE_UPLOAD_MB` (100) for a large file waiting for it
 person), which were 20 and 30 before 2026-11-03. The database is on a 5000 MB volume
 (`.railway/railway.ts`, `postgresVolume`), so two caps keep it from filling (`web/storage.py`):
 
-- **Per person**: `STORAGE_PER_USER_MB` (300) for invited people, `STORAGE_OPEN_TIER_MB` (150) for
+- **Per person**: `STORAGE_PER_USER_MB` (300) for invited people, `STORAGE_OPEN_TIER_MB` (250) for
   accounts made by open sign-up. It counts everything of theirs that is not past its deletion
   time: source PDFs, crops, the HTML and result, and kept large files. A new upload that would
   go over is refused with "You are storing N MB of the M MB you can keep" and the advice to delete
   documents; no pages are taken. Open sign-up makes up to 100 accounts a day, so the person cap
-  alone is not enough (100 x 150 MB is 15 GB): the global one is the bound.
+  alone is not enough (100 x 250 MB is 25 GB): the global one is the bound.
 - **Whole service**: `STORAGE_GLOBAL_MAX_MB` (2000) of stored upload bytes. Over it new
   uploads get a 503 page ("Uploads are paused while storage catches up", logged as
   `upload_rejected code=storage_full`) and `/healthz/ops` answers 503 with `"stale": ["storage"]`
