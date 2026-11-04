@@ -33,10 +33,11 @@ from readablestem.web.routes.jobs import (
     content_disposition,
     current_html,
     download_filename,
-    owned_job,
+    job_access,
     require_done,
 )
 from readablestem.web.security import VIEW_CSP
+from readablestem.web.shares import VIEW
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -58,13 +59,14 @@ def _source(request: Request, job_id: str, user) -> tuple[str, str, int]:
     deletion clock restarts, as for the HTML download."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user)
+        job = job_access(session, job_id, user, VIEW)
         require_done(job)
         job = current_html(ctx, session, job)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename, job.title_override)
         still_open = documents.open_decisions(result.get("fixes"))
-        retention.restart_clock(job, ctx.settings)  # a download is activity (T1-8)
+        if job.user_id == user.id:  # only the owner's use keeps a document longer (G1)
+            retention.restart_clock(job, ctx.settings)  # a download is activity (T1-8)
         return job.html or "", title, still_open
 
 
