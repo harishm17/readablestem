@@ -46,6 +46,11 @@ def text_of(html: str) -> str:
     return " ".join(" ".join(parser.parts).split())
 
 
+def recipients_table(html: str) -> str:
+    """The by-company table (the first table on the page is the by-data one)."""
+    return html.split('class="recipients-table"', 1)[1].split("</table>", 1)[0]
+
+
 def get(tmp_path, path=PATH, **settings):
     env = WebEnv(tmp_path, **settings)
     with env.running() as client:
@@ -87,7 +92,7 @@ def test_the_page_names_the_companies_and_the_numbers_the_settings_give(tmp_path
     text = text_of(settings_page.text)
     assert "<strong>36 hours</strong>" in " ".join(settings_page.text.split())
     assert "45 days" in text
-    table = settings_page.text.split("<tbody>", 1)[1].split("</tbody>", 1)[0]
+    table = recipients_table(settings_page.text)
     assert "Anthropic" in table and "OpenAI" not in table
     assert "sends its model requests to Anthropic" in text
     assert "Railway" in text and "Langfuse" not in text
@@ -107,7 +112,7 @@ def test_the_table_has_one_row_per_recipient_in_the_privacy_pages_order(tmp_path
         html = client.get(PATH).text
         privacy = client.get("/privacy").text
     found = recipients(env.settings)
-    table = html.split("<tbody>", 1)[1].split("</tbody>", 1)[0]
+    table = recipients_table(html)
     assert re.findall(r'<th scope="row">([^<]+)</th>', table) == [r.name for r in found]
     assert "Anthropic and OpenAI" in text_of(html)
     for r in found:
@@ -174,7 +179,7 @@ def test_the_summary_is_a_self_contained_download_with_the_same_facts(tmp_path):
     assert '<html lang="en">' in html and html.count("<h1>") == 1
     assert 'content="noindex"' in html
     text = text_of(html)
-    assert "Deleted 36 hours after" in text
+    assert "36 hours after the instructor last works on it" in text
     assert "Anthropic" in text and "Railway" in text
     assert "does not say that a document meets WCAG" in text
     assert "No school-official or data processing agreement" in text

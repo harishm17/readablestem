@@ -119,7 +119,8 @@ def test_the_university_button_comes_first_and_google_second(ms):
     )
     assert 'action="/login/microsoft"' in page and 'action="/login"' in page
     assert "your university's Microsoft account, or with the Google account" in page
-    assert "Sign in with your university account (Microsoft)" in ms.browser.get("/").text
+    landing = " ".join(ms.browser.get("/").text.split())
+    assert 'href="/login"' in landing  # the buttons themselves are on /login
 
 
 def test_without_microsoft_settings_only_google_is_offered(tmp_path):

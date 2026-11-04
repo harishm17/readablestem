@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block body_class %}mode-read{% endblock %}
-{% block title %}ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML compared{% endblock %}
+{% block title %}Choosing a tool for STEM course files{% endblock %}
 {% block description %}What ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML take in, give back and cost, each fact with its source and date. The right one depends on your file.{% endblock %}
 {% block og_type %}article{% endblock %}
 {% block head %}
@@ -17,50 +17,45 @@
    when this page changes. No accuracy comparison: neither tool was run on the held-out
    test (PROOF.md). No "better" claims beyond which input each tool starts from. #}
 <p class="crumb"><a href="/guides">All guides</a></p>
-<h1>ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML compared</h1>
+<h1>Choosing a tool for STEM course files</h1>
+<p class="lede">Which tool fits depends first on the file you have and what you need back. Where
+  another tool fits better, this page says so.</p>
 <p class="hint">Last updated <time datetime="{{ updated }}">{{ updated_text }}</time>. By
-  <a href="https://harishmanoharan.com">Harish Manoharan</a>, who made ReadableSTEM. The
-  facts about the other tools come from their own pages; each one in the table names its source
-  and the day it was read.</p>
-<p class="lede">The right tool depends first on the file you have. This page sets out what each
-  tool takes in and gives back, what it automates, and what it costs, so you can choose.
-  Where another tool fits your file better, it says so.</p>
-
-{% from "_contents.html" import contents %}
-{{ contents([
-  ("start", "Start with the file you have"),
-  ("side-by-side", "Side by side"),
-  ("readablestem", "ReadableSTEM"),
-  ("mathpix", "Mathpix"),
-  ("latexml", "LaTeXML"),
-  ("aelira", "Aelira"),
-  ("chatbots", "General chatbots"),
-  ("accessibility-office", "Check with your accessibility office"),
-  ("sources", "Sources")
-]) }}
+  <a href="https://harishmanoharan.com">Harish Manoharan</a>, who made ReadableSTEM. Facts about
+  the other tools come from their own pages, each with its source and the day it was read.</p>
 
 <h2 id="start">Start with the file you have</h2>
-<ul>
-  <li><strong>You have the LaTeX source.</strong> LaTeXML is the better fit. It converts the
-    source itself, so nothing has to be recognized from a PDF. ReadableSTEM starts from the
-    PDF{% if latex_source %}; it also takes a LaTeX file or a zip of a LaTeX project, which it
-    converts with LaTeXML, but not the source of a Beamer deck{% else %} and does not work from
-    LaTeX sources{% endif %}.</li>
-  <li><strong>You have only a PDF and want a web page.</strong> Mathpix and ReadableSTEM both
-    do this. Mathpix is a paid service with a free tier. ReadableSTEM is a free beta with a
-    review screen for the instructor.</li>
-  <li><strong>The file has to stay a PDF.</strong> Mathpix documents an accessible PDF output
-    (a tagged PDF that keeps the original pages). ReadableSTEM returns a web page, not a
-    PDF. Mathpix is the better fit.</li>
-  <li><strong>You have other formats, images, handwriting or a large batch.</strong> Mathpix
-    takes more kinds of input, has an API for batches, and exports to more formats.
-    ReadableSTEM takes a PDF{% if office_on %} (or a Word or PowerPoint file){% endif %}{% if image_pages_on %},
-    reads scanned and handwritten pages only when you ask{% endif %}, and returns a web page,
-    with {% if word_export %}Word, {% endif %}EPUB, a zip for Canvas and a Common Cartridge.</li>
-  <li><strong>You want to check each uncertain change before students see it.</strong>
-    ReadableSTEM is built around that step. The Mathpix and LaTeXML pages we read describe no
-    such step.</li>
+{# The short decision guide: what you hold and what you need, then the tool to look at first.
+   The evidence (sources, dates, prices, test results) comes after it. #}
+<ul class="decision-list">
+  <li><strong>The LaTeX source: LaTeXML.</strong> It converts the source itself, so nothing
+    has to be recognized from a PDF.{% if latex_source %} ReadableSTEM also takes a LaTeX file
+    or a zip of a LaTeX project, which it converts with LaTeXML, but not the source of a Beamer
+    deck.{% else %} ReadableSTEM starts from the PDF and does not work from LaTeX
+    sources.{% endif %}</li>
+  <li><strong>Only a PDF, and you want a web page: Mathpix or ReadableSTEM.</strong> Mathpix is
+    a paid service with a free tier. ReadableSTEM is a free beta with a review screen for the
+    instructor.</li>
+  <li><strong>The file has to stay a PDF: Mathpix.</strong> It documents an accessible PDF
+    output, a tagged PDF that keeps the original pages. ReadableSTEM returns a web page, not a
+    PDF.</li>
+  <li><strong>Other formats, images, handwriting or a large batch: Mathpix.</strong> It takes
+    more kinds of input, has an API for batches and exports to more formats. ReadableSTEM takes
+    a PDF{% if office_on %} (or a Word or PowerPoint file){% endif %}{% if latex_source %}, or LaTeX
+    source{% endif %}{% if image_pages_on %}, reads scanned and handwritten pages only when you
+    ask{% endif %}, and returns a web page, with {% if word_export %}Word, {% endif %}EPUB, a zip
+    for Canvas and a Common Cartridge.</li>
+  <li><strong>You want to check each uncertain change before students see it:
+    ReadableSTEM.</strong> It is built around that step. The Mathpix and LaTeXML pages we read
+    describe no such step.</li>
 </ul>
+
+<h2 id="equations">How they compare on equations</h2>
+{% from "_proof_chart.html" import proof_chart %}
+{{ proof_chart(proof_facts, first_test=false) }}
+<p>Mathpix, Aelira and LaTeXML were not run on this test, so this page makes no accuracy
+  comparison with them. <a href="/limits#accuracy">All results, including earlier tests, and how
+  they were measured</a>.</p>
 
 <h2 id="side-by-side">Side by side</h2>
 {# Each cell says where it comes from and the day that source was read: Mathpix and LaTeXML on
@@ -77,7 +72,7 @@
 {% set AE = "https://aelira.ai/us" %}
 {% set LX = "https://dlmf.nist.gov/LaTeXML/manual/usage/" %}
 {% macro cell_0(tool) -%}
-{% if tool == 0 %}A STEM course PDF, including Beamer slide decks{% if office_on %}; also Word (DOCX) and PowerPoint (PPTX), turned into a PDF first{% endif %}{% if image_pages_on %}. Scanned and handwritten pages only when you ask{% endif %}. {{ src(RS, "2026-11-03") }}
+{% if tool == 0 %}A STEM course PDF, including Beamer slide decks{% if office_on %}; also Word (DOCX) and PowerPoint (PPTX), turned into a PDF first{% endif %}{% if latex_source %}; also LaTeX source (a .tex file or a zip of a LaTeX project, not Beamer source), converted with LaTeXML{% endif %}{% if image_pages_on %}. Scanned and handwritten pages only when you ask{% endif %}. {{ src(RS, "2026-11-03") }}
 {% elif tool == 1 %}PDF, EPUB, Word (DOCX, DOC), PowerPoint (PPTX), OpenDocument Text (ODT), DjVu, WordPerfect (WPD), Mobipocket (MOBI) and Amazon Kindle (AZW3); also images and handwriting strokes. {{ src(MX, "2026-10-28") }}
 {% elif tool == 2 %}Scanning workflows for PDF, PowerPoint, Word, Excel, LaTeX, images, video captions and web pages; remediation depth varies by format. {{ src(AE, "2026-11-03") }}
 {% elif tool == 3 %}In the recipe we tested: the PDF and a 150 dpi image of every page, with one sentence of prompt. {{ src(PF_FIRST, "2026-10-14", "PROOF.md") }}
@@ -200,75 +195,54 @@
   {% endfor %}
 </div>
 
-<h2 id="readablestem">ReadableSTEM</h2>
-<p>ReadableSTEM assists instructors who need to turn a STEM course PDF into an accessible web
-  page. It reads the PDF, rebuilds equations as MathML a screen reader can speak, restores
-  headings and lists{% if tables_on %}, rebuilds tables with header cells{% endif %} and
-  writes alt text for figures. Every change it is unsure about goes to a review screen where
-  the instructor accepts, edits or rejects it. The result is one self-contained HTML file,
-  with {% if word_export %}Word, {% endif %}EPUB and Canvas versions if wanted.</p>
-<p><strong>It assists; it does not certify.</strong> Nothing here establishes conformance with
-  WCAG, the ADA or any other standard, and the output still needs a person to look at it. That
-  is what the review screen is for.</p>
-<p>It makes mistakes, so look over the equations your students rely on. We have not run
-  Mathpix or LaTeXML on our held-out test, so this page makes no accuracy comparison.
-  <a href="{{ source_url }}/blob/main/PROOF.md">The full results</a> compare ReadableSTEM with a
-  general chatbot, and in the first test with three open parsers. It starts from a PDF, and
-  its <a href="/limits">known limits</a> list what it does not do yet.</p>
-
-<h2 id="mathpix">Mathpix</h2>
-<p>Mathpix recognizes printed and handwritten STEM content, including math, text, tables and
-  chemistry diagrams, from images, stroke data or PDF files. Its documentation describes
-  Mathpix Markdown as the main output, with conversion to DOCX, XLSX, LaTeX, HTML, PDF and
-  PPTX. For HTML, equations are SVG by default, and the options include MathML.</p>
-<p>It fits when you have more than a PDF to convert: other file types, images, handwriting, a
-  batch of documents or an API. It is also the one to look at if the file has to stay a PDF:
-  its accessible PDF output adds a text layer and PDF/UA tags to the PDF you sent, so that
-  headings, tables and lists are announced as such and formulas are spoken. Mathpix says
-  figures there get a short alternative built from the caption, not a description of the
-  picture.</p>
-<p>Mathpix's own page on its HTML output says that headings are headings, tables are tables
-  and equations carry their source, and that alt text for figures is not something
-  recognition can invent, so that remains yours to write.</p>
-
-<h2 id="latexml">LaTeXML</h2>
-<p>LaTeXML converts TeX and LaTeX sources to XML, HTML, MathML and ePub. It was written for
-  the Digital Library of Mathematical Functions at the U.S. National Institute of Standards and
-  Technology (NIST), and the project says plainly that emulating TeX is hard and that there
-  are gaps in fidelity and coverage.</p>
-<p>If you have the LaTeX source of your notes or problem sets, it is the better fit: the
-  conversion is automatic, the math comes out as MathML, and it is free. If you only have the
-  PDF, LaTeXML cannot use it. This guide has not tested how accessible LaTeXML's output is; it
-  is a converter, and the result still needs checking like any other.</p>
-
-<h2 id="aelira">Aelira</h2>
-<p>Aelira calls itself open-core accessibility tooling for higher education, in beta. Its site says
-  it checks course materials, applies partial fixes to supported content, including structure and
-  suggested alt text, and leaves the review to people. It also describes work across a whole
-  course, with a Canvas connection and Brightspace in beta. It says automated scores do not
-  establish WCAG conformance. We have not run it, so this page makes no accuracy comparison.</p>
-
-<h2 id="chatbots">General chatbots</h2>
-<p>What many instructors do today is upload the PDF to a general chatbot and type one sentence.
-  We tested that recipe, with a prompt Purdue publishes, on Claude Opus against ReadableSTEM
-  on the same 26 held-out documents (1,715 equations, registered before the run). Scored by
-  whether a screen reader reads each equation the same as the original, it was 0.836 against
-  0.840: the test found no difference it could detect. Exactly right, symbol for symbol, it was
-  0.770 against 0.793. ReadableSTEM left fewer wrong equations without a question to the
-  reader (5.0 against 9.6 per 100), but not as few as the goal registered before the run.
-  <a href="{{ source_url }}/blob/main/docs/eval-equation-fresh5.md">The
-  full result</a>. An earlier test, on 15 textbook sections, had the chatbot ahead on equations
-  exactly right (0.62 against 0.50); it ran on version 0.4.0, and
-  <a href="{{ source_url }}/blob/main/PROOF.md#comparison-with-the-chatbot-recipe">its
-  comparison</a> is kept as history. This page does not compare the features of any particular chatbot.</p>
-
-<h2 id="accessibility-office">Check with your accessibility office</h2>
+<h2 id="notes">Notes on each tool</h2>
+<details>
+  <summary>ReadableSTEM</summary>
+  <p>It assists instructors who turn a STEM course PDF into an accessible web page, with a
+    review screen for every change it is unsure about. <strong>It assists; it does not
+    certify.</strong> Nothing here establishes conformance with WCAG, the ADA or any other
+    standard. It makes mistakes, so look over the equations your students rely on. Its
+    <a href="/limits">known limits</a> list what it does not do yet.</p>
+</details>
+<details>
+  <summary>Mathpix</summary>
+  <p>Mathpix recognizes printed and handwritten STEM content, including math, text, tables and
+    chemistry diagrams, from images, stroke data or PDF files, and converts it to DOCX, XLSX,
+    LaTeX, HTML, PDF and PPTX. For HTML, equations are SVG by default, with MathML as an option.
+    Its accessible PDF output adds a text layer and PDF/UA tags to the PDF you sent. Mathpix
+    says alt text for figures is not something recognition can invent, so that remains yours to
+    write.</p>
+</details>
+<details>
+  <summary>LaTeXML</summary>
+  <p>LaTeXML converts TeX and LaTeX sources to XML, HTML, MathML and ePub. It was written for the
+    Digital Library of Mathematical Functions at NIST, and the project says plainly that
+    emulating TeX is hard and there are gaps in fidelity and coverage. If you have the LaTeX
+    source it is the better fit; if you only have the PDF it cannot use it. We have not tested
+    how accessible its output is.</p>
+</details>
+<details>
+  <summary>Aelira</summary>
+  <p>Aelira calls itself open-core accessibility tooling for higher education, in beta. Its
+    site says it checks course materials, applies partial fixes to supported content (structure
+    and suggested alt text) and leaves the review to people, and that automated scores do not
+    establish WCAG conformance. We have not run it.</p>
+</details>
+<details>
+  <summary>General chatbots</summary>
+  <p>What many instructors do today is upload the PDF to a general chatbot with one sentence.
+    We tested that recipe, with a prompt Purdue publishes, on Claude Opus and Claude Haiku
+    against ReadableSTEM on the same documents (the chart above). This page does not compare
+    the features of any particular chatbot.</p>
+</details>
 <p>This page is guidance, not legal advice. Your campus accessibility office can say what your
   courses need, and may already license one of these tools. What the rule asks of course
   materials is in <a href="/guides/ada-title-ii-stem-course-materials">ADA Title II and STEM
   course materials</a>.</p>
 
 <h2 id="sources">Sources</h2>
+<details>
+<summary>The pages read, with their dates</summary>
 <p class="hint">Accessed on October 28, 2026, except where the line says otherwise and the cells above that name November 3, 2026.</p>
 <ul>
   <li><a href="https://docs.mathpix.com/">Mathpix OCR API introduction</a> (Mathpix docs: inputs, outputs and conversion formats)</li>
@@ -283,4 +257,5 @@
   <li><a href="https://github.com/brucemiller/LaTeXML/blob/master/LICENSE">LaTeXML licence file</a> and <a href="https://github.com/brucemiller/LaTeXML/releases/tag/v0.8.8">release v0.8.8</a> (GitHub)</li>
   <li><a href="{{ source_url }}/blob/main/README.md">ReadableSTEM README</a>, <a href="/limits">known limits</a>, <a href="/help/posting">posting in your course</a> and <a href="{{ source_url }}/blob/main/PROOF.md">PROOF.md</a></li>
 </ul>
+</details>
 {% endblock %}

@@ -7,59 +7,44 @@
 <title>ReadableSTEM: summary for accessibility offices</title>
 {# A self-contained file: its stylesheet (static/offices-summary.css) is put inline by
    web/offices.py, no script, no outside request. It is the short form of
-   /for-accessibility-offices and is written from the same settings (web/offices.py); keep the
-   two in step. It must fit one printed Letter or A4 page. #}
+   /for-accessibility-offices and is written from the same settings and the same list of data
+   (web/offices.py `data_items`), so the two cannot name different recipients or times. It
+   should fit one printed Letter or A4 page; tests/test_web_offices_print.py prints it. #}
 {{ style_tag }}
 </head>
 <body>
+{% from "_data_matrix.html" import matrix %}
 <main>
 <h1>ReadableSTEM: summary for accessibility offices</h1>
-<p class="meta">Facts as they were on {{ as_of }}. The live version is at
-  <a href="{{ site_url }}{{ page_path }}">{{ site_url }}{{ page_path }}</a>. This describes the
-  beta; it is not a contract or an audit.</p>
+<p class="meta">Facts as they were on {{ as_of }}. This describes the beta; it is not a
+  contract or an audit. <a href="{{ site_url }}{{ page_path }}">Open the live page</a>, which
+  may be newer.</p>
 <p>ReadableSTEM assists instructors who turn a STEM course PDF into an accessible web page:
-  equations as MathML, real headings{% if tables_on %} and tables{% endif %}, alt text for figures. The result is a web
-  page, with {% if word_export %}Word, {% endif %}EPUB and Canvas versions if wanted. The instructor reviews what the tool is
-  unsure about. Built and maintained by Harish Manoharan; the code is
-  open source ({{ source_url }}).</p>
+  equations as MathML, real headings{% if tables_on %}, tables{% endif %} and alt text for
+  figures. The result is a web page, with {% if word_export %}Word, {% endif %}EPUB and Canvas
+  versions if wanted. The instructor reviews what the tool is unsure about. Built and
+  maintained by Harish Manoharan; the code is open source
+  (<a href="{{ source_url }}">source code</a>).</p>
 
-<h2>Where a document goes</h2>
+<h2>What is sent where</h2>
 <p>The instructor uploads a PDF over HTTPS to the app, hosted by Railway in the United States.
-  Images of equations and figures{% if tables_on %} and tables{% endif %}, with a little nearby
-  text, are sent to {{ model_names }}. The PDF file, its file name and the instructor's email
-  address are not sent. Students do not sign in.</p>
-<table>
-  <caption>Companies that receive data</caption>
-  <thead><tr><th scope="col">Company</th><th scope="col">Receives</th></tr></thead>
-  <tbody>
-    {% for r in recipients %}
-    <tr>
-      <th scope="row">{{ r.name }}</th>
-      <td>{% if "model" in r.purposes %}Images and nearby text of equations and figures{% if "handwriting" in r.purposes %}, and close-ups of handwriting{% endif %}.
-        {%- elif "handwriting" in r.purposes %}Close-ups of handwritten expressions.
-        {%- elif "hosting" in r.purposes %}Hosts the app and database (United States); holds everything stored.
-        {%- elif "tracing" in r.purposes %}Timings, counts and costs; never document content.{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-<h2>Retention and training</h2>
-<ul>
-  <li>Deleted {{ retention_hours }} hours after the instructor last works on it; 7 days if the
-    instructor keeps it; {{ opt_in_days }} days if the instructor also lets us look at the results.
-    Deleting by hand is immediate. Database backups keep a deleted document up to about a week.</li>
-  <li>Uploads are not used to train any model. {{ model_names }} states that it does not train
-    on API data by default and keeps API data for a limited time; see its own policy.
-    {% if model_company == "OpenAI" %}Requests are sent with <code>store</code> off.{% else %}The <code>store</code> setting is for the OpenAI path only.{% endif %}</li>
-</ul>
+  Students do not sign in. The PDF file, its file name and the instructor's email address are
+  never sent to {{ model_names }}.</p>
+{{ matrix(data_items, "What is sent where, and for how long") }}
+<p>{{ model_names }} {{ "states" if model_companies|length == 1 else "state" }} that
+  {{ "it does" if model_companies|length == 1 else "they do" }} not train on API data by
+  default; see {{ "its" if model_companies|length == 1 else "their" }} own policies.
+  {% if model_company == "OpenAI" %}Requests are sent with <code>store</code> off.{% else %}The <code>store</code> setting is for the OpenAI path only.{% endif %}
+  Uploads are not used to train any model. Deleting by hand is immediate.</p>
 
 <h2>Student records (FERPA)</h2>
-<p>Only course material the instructor wrote or may adapt is to be uploaded. Student records,
-  graded work and students' personal information are forbidden by the terms. Processed: the
-  course material and the instructor's email, name and sign-in id. Not processed: student
-  names, grades, submissions or accounts. No school-official or data processing agreement is
-  offered.</p>
+<ul>
+  <li>Only course material the instructor wrote or may adapt is to be uploaded. The terms
+    forbid student records, graded work and students' personal information.</li>
+  <li>Processed: the course material, and the instructor's email, name and sign-in id. Not
+    processed: student names, grades, submissions or accounts.</li>
+  <li>No school-official or data processing agreement is offered.</li>
+</ul>
 
 <h2>What it does not certify</h2>
 <ul>
@@ -67,20 +52,20 @@
     law. Proposals can be wrong: in a pre-registered test on 26 documents, 0.79 of the
     equations were exactly right end to end, against 0.77 for a general chatbot, and the tool
     asked about 46% of its wrong equations.</li>
-  <li>Its checks look at structure, not meaning. Not tested by listening with NVDA, JAWS or
-    VoiceOver. No accessibility conformance report (VPAT) published yet (one is in
-    preparation) and no independent security test.</li>
-  <li>Scanned and handwritten pages convert only on request and a person checks them. Chemistry
-    is the weakest area.</li>
+  <li>Its checks look at structure, not meaning. It has not been tested by listening with NVDA,
+    JAWS or VoiceOver. No accessibility conformance report (VPAT) is published yet (one is in
+    preparation) and there has been no independent security test.</li>
+  <li>Scanned and handwritten pages convert only on request, and a person checks them.
+    Chemistry is the weakest area.</li>
 </ul>
 
 <h2>Pilot in eight steps</h2>
-<p>1 One course, one document, no student records. 2 Read the privacy notice with your privacy
-  contact. 3 The instructor uploads and reviews every decision. 4 Check the file with your
-  screen readers. 5 Check it with your usual checker and review; no result is claimed. 6 Post
-  it in the course and open it as a student. 7 Download the file and the review record before
-  deletion. 8 Report what was wrong.</p>
-{% if contact_email %}<p>Questions: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>{% endif %}
+<ol class="pilot">
+  {% for step in pilot_steps %}
+  <li>{{ step }}</li>
+  {% endfor %}
+</ol>
+{% if contact_email %}<p class="meta">Questions: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>{% endif %}
 </main>
 </body>
 </html>

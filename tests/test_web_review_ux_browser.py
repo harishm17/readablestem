@@ -188,8 +188,8 @@ def test_the_keyboard_reaches_the_decision_and_follows_it(site, browser, job, ja
     while not focused(page).startswith("Use bold ω"):
         page.keyboard.press("Tab")
         tabs += 1
-        # "Show on the page", "Enlarge", the equation's "Hear this" (now also from its MathML) and the
-        # compare's focusable math boxes come first.
+        # "Show on the page", "Enlarge", the equation's "Hear this" (also from its MathML) and
+        # the compare's focusable math boxes come first.
         assert tabs <= 7, f"more than 7 Tab stops to the decision (at {focused(page)!r})"
     page.keyboard.press("Enter")
     page.wait_for_url(f"{url}?item=p1-e6")

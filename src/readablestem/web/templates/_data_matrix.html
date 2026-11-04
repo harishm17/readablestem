@@ -1,0 +1,39 @@
+{# What is sent where, and for how long: a row per kind of data, from `data_items`
+   (web/offices.py). The offices page and its one-page summary are written from the same
+   list, and so is the by-company table on the page. The caller gives the caption.
+   `matrix` is the table. `matrix_stack` writes the same rows as a list, which the stylesheet
+   shows instead of the table on a phone (three columns of sentences do not fit 320px; the
+   view that is not shown is not rendered, so a screen reader reads each row once; app.css,
+   "ux2-lane-d"). #}
+{% macro matrix(items, caption) -%}
+<table class="data-matrix">
+  <caption>{{ caption }}</caption>
+  <thead>
+    <tr><th scope="col">Data</th><th scope="col">Goes to</th><th scope="col">Kept for</th></tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      <th scope="row">{{ item.label }}</th>
+      <td>{{ item.sent_to|join(", ") }}</td>
+      <td>{{ item.kept }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{%- endmacro %}
+
+{% macro matrix_stack(items, caption) -%}
+<div class="matrix-stack">
+  <p class="matrix-caption">{{ caption }}</p>
+  <ul class="plain-list">
+    {% for item in items %}
+    <li>
+      <strong>{{ item.label }}</strong>
+      <span class="matrix-line"><span class="matrix-key">Goes to:</span> {{ item.sent_to|join(", ") }}</span>
+      <span class="matrix-line"><span class="matrix-key">Kept for:</span> {{ item.kept }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{%- endmacro %}
