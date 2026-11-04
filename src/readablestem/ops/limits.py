@@ -207,6 +207,15 @@ def spend_findings(settings: Settings) -> list[Finding]:
             f"PER_USER_DAILY_PAGE_QUOTA {quota} is below MAX_PAGES_PER_JOB "
             f"{settings.max_pages_per_job}: a full-size document is refused"
         )
+    if (
+        settings.feature_image_pages
+        and settings.image_pages_max_usd_per_job < settings.max_usd_per_job
+    ):
+        warning(
+            f"IMAGE_PAGES_MAX_USD_PER_JOB ${settings.image_pages_max_usd_per_job:.2f} is below "
+            f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f}: a job that asked for its scanned "
+            f"pages would be allowed less than one that did not"
+        )
     if settings.signup_open:
         _open_signup_findings(settings, largest, warning)
     return out
@@ -229,6 +238,12 @@ def _open_signup_findings(
             f"OPEN_TIER_DAILY_SPEND_CAP_USD ${pool:.2f} is above DAILY_SPEND_CAP_USD "
             f"${daily:.2f}: the daily cap still applies to new accounts, so the pool is never "
             f"the limit"
+        )
+    if settings.open_tier_daily_page_quota < settings.max_pages_per_job:
+        warning(
+            f"OPEN_TIER_DAILY_PAGE_QUOTA {settings.open_tier_daily_page_quota} is below "
+            f"MAX_PAGES_PER_JOB {settings.max_pages_per_job}: a full-size document is refused "
+            f"for a new account"
         )
     invited = settings.per_user_daily_page_quota
     if invited is not None and settings.open_tier_daily_page_quota > invited:

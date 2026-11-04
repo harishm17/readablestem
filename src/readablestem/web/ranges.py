@@ -1,8 +1,8 @@
 """Page ranges for converting a large file in parts (T3-3).
 
-A file over the limits (30 pages, 20 MB) is not refused: the instructor chooses which pages
-to convert, in parts that each fit. This module is the words and the arithmetic, with no
-file in it:
+A file over the limits (`MAX_PAGES_PER_JOB` pages, `MAX_UPLOAD_MB`) is not refused: the
+instructor chooses which pages to convert, in parts that each fit. This module is the words
+and the arithmetic, with no file in it:
 
 - `parse_parts` reads what the person typed: one part per line (or separated by semicolons),
   each part one or more ranges separated by commas: `1-30`, `31-59`, `1-10, 15-20; 25`.
@@ -84,7 +84,7 @@ def parse_parts(text: str, *, total: int, limit: int, taken: set[int] | None = N
     """
     entries = [e.strip() for e in re.split(r"[\n;]+", text or "") if e.strip()]
     if not entries:
-        raise PartsError("Type the pages to convert, for example 1-30.")
+        raise PartsError("Type the pages to convert, for example 1-10.")
     if len(entries) > MAX_PARTS:
         raise PartsError(f"That is {len(entries)} parts; convert at most {MAX_PARTS} at a time.")
     parts: list[Part] = []

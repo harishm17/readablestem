@@ -77,6 +77,11 @@ from readablestem.proof.replay import (
 )
 
 DEFAULT_MAX_CALLS = 5000
+# The page limit the recorded runs were made under and their sections were chosen for (rule A
+# of the pre-registration: at most 30 printed pages). The recorded identity names it, so a
+# proof run pins it instead of following the production default (100 since 2026-11-03), and the
+# replay stays the run that was recorded.
+PROOF_MAX_PAGES_PER_JOB = 30
 # The settings that decide what the pipeline produces; secrets and web settings are not
 # part of the identity of a run.
 IDENTITY_SETTINGS = (
@@ -126,7 +131,7 @@ def proof_settings(
     environment variable does not change what a proof is recorded or replayed with.
     `main_model` and `cheap_model` name models of `provider`.
     """
-    base = Settings(_env_file=None)  # type: ignore[call-arg]
+    base = Settings(_env_file=None, max_pages_per_job=PROOF_MAX_PAGES_PER_JOB)  # type: ignore[call-arg]
     if provider == "openai" and main_model is None and cheap_model is None:
         # The environment may set another provider; a proof does not follow it.
         return base if base.model_provider == "openai" else with_provider(base, "openai")

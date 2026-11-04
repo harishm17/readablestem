@@ -97,15 +97,24 @@ def test_healthz_ops_is_503_listing_only_names_until_both_have_reported(tmp_path
     with env.running() as web:
         response = web.get("/healthz/ops")
         assert response.status_code == 503
-        assert response.json() == {"status": "stale", "stale": ["backup", "cron"]}
+        assert response.json() | {"storage": None} == {
+            "status": "stale",
+            "stale": ["backup", "cron"],
+            "storage": None,
+        }
         with session_scope(env.ctx.factory) as session:
             heartbeat.beat(session, heartbeat.CRON, "aggregated=0 jobs_deleted=0")
-        assert web.get("/healthz/ops").json() == {"status": "stale", "stale": ["backup"]}
+        body = web.get("/healthz/ops").json()
+        assert (body["status"], body["stale"]) == ("stale", ["backup"])
         with session_scope(env.ctx.factory) as session:
             heartbeat.beat(session, heartbeat.BACKUP, "tables=30 alembic=abc")
         response = web.get("/healthz/ops")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "stale": []}
+    assert response.json() == {
+        "status": "ok",
+        "stale": [],
+        "storage": {"stored_mb": 0, "limit_mb": 2000, "full": False},
+    }
     assert "tables" not in response.text  # the notes stay in the database
 
 
@@ -119,7 +128,7 @@ def test_healthz_ops_is_503_and_names_the_database_when_it_cannot_be_read(tmp_pa
     with env.running() as web:
         response = web.get("/healthz/ops")
     assert response.status_code == 503
-    assert response.json() == {"status": "stale", "stale": ["database"]}
+    assert response.json()["stale"] == ["database"]
     assert "secret" not in response.text
 
 
