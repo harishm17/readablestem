@@ -41,7 +41,8 @@
   nested zips, EPS or SVG; a header that lies is caught), `source/` (`intake`, `lint`, `envelope`, `latexml`,
   `ltx_reader`, `figures`, `convert`), a one-line hook in `pipeline/run.py` (`convert_pdf`), `DocumentResult.origin`,
   `render_html(origin=)` (the student note says "a LaTeX document"), `INSTALL_LATEXML` and `FEATURE_LATEX_SOURCE` in
-  `railway.ts`. Beamer decks are refused until their own change. Docs: docs/web.md "LaTeX source",
+  `railway.ts`. LaTeXML runs with `kpsewhich` hidden in the sandbox: where TeX Live's base is installed (the image) it
+  otherwise read raw TeX for packages and spent over a minute failing on `siunitx`. Beamer decks are refused until their own change. Docs: docs/web.md "LaTeX source",
   docs/security.md "Running uploaded TeX", docs/development.md. Tests: `tests/test_archive_intake.py`,
   `test_source_intake.py`, `test_source_reader.py`, `test_source_convert.py`, `test_source_escapes.py` (hostile
   files through the real sandbox), `test_source_child.py`, `test_web_source.py`.

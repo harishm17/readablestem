@@ -220,3 +220,31 @@ def test_parent_environment_is_not_passed_to_bubblewrap(monkeypatch, tmp_path):
     assert seen["env"] == {"PATH": "/usr/bin:/bin"}
     assert seen["start_new_session"] is True
     assert os.environ["ANTHROPIC_API_KEY"] == "sk-test"
+
+
+@needs_sandbox
+def test_a_file_can_be_hidden_so_the_program_sees_it_empty(tmp_path):
+    program = (
+        'print(((-e "/usr/bin/true") ? "present" : "absent")'
+        ' . ((-s "/usr/bin/true") ? "+content" : "+empty"));'
+    )
+    out = tmp_path / "out"
+    out.mkdir()
+    shown = tmp_path / "shown.log"
+    sandbox.run([PERL, "-e", program], rw=((out, "/out"),), log=shown)
+    assert shown.read_text() == "present+content"
+    hidden = tmp_path / "hidden.log"
+    sandbox.run(
+        [PERL, "-e", program],
+        rw=((out, "/out"),),
+        log=hidden,
+        hide=("/usr/bin/true", "/nonexistent/file"),  # a file that is not there is skipped
+    )
+    assert hidden.read_text() == "present+empty"
+
+
+def test_hiding_is_in_the_command_line_only_for_files_that_exist():
+    if not (shutil.which("bwrap") and shutil.which("prlimit")):
+        pytest.skip("needs bubblewrap and prlimit to build the command")
+    argv = sandbox.build_argv(["/usr/bin/x"], hide=("/usr/bin/true", "/nonexistent/file"))
+    assert argv.count("/usr/bin/true") == 1 and "/nonexistent/file" not in argv
