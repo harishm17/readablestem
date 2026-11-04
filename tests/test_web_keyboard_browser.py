@@ -35,6 +35,7 @@ import pytest
 
 from fixtures.web.keyboard import (
     activate,
+    choose_file_by_keyboard,
     focus_state,
     focus_summary,
     skip_link_works,
@@ -338,10 +339,8 @@ def test_upload_by_keyboard_lands_on_the_job_and_a_wrong_file_is_explained(site,
     # Enter on the button does not send it but puts focus on the field that has the problem.
     start_of_page(page)
     tab_to(page, "^PDF files?$")
-    with page.expect_file_chooser() as chooser:
-        page.keyboard.press("Space")
-    chooser.value.set_files(
-        files=[{"name": "notes.txt", "mimeType": "text/plain", "buffer": b"not a pdf"}]
+    choose_file_by_keyboard(
+        page, [{"name": "notes.txt", "mimeType": "text/plain", "buffer": b"not a pdf"}]
     )
     page.locator("#pdf-check .error-message").wait_for()
     tab_to(page, "Upload and convert")
@@ -351,10 +350,8 @@ def test_upload_by_keyboard_lands_on_the_job_and_a_wrong_file_is_explained(site,
     assert page.get_attribute("#pdf", "aria-invalid") == "true"
     # Now a real one: the chooser by keyboard, the button by keyboard, the job page after it.
     tab_to(page, "^PDF files?$", shift=True)
-    with page.expect_file_chooser() as chooser:
-        page.keyboard.press("Enter")
-    chooser.value.set_files(
-        files=[{"name": "notes.pdf", "mimeType": "application/pdf", "buffer": review_pdf()}]
+    choose_file_by_keyboard(
+        page, [{"name": "notes.pdf", "mimeType": "application/pdf", "buffer": review_pdf()}]
     )
     tab_to(page, "Upload and convert")
     activate(page)
@@ -574,7 +571,7 @@ def test_a_document_is_deleted_by_keyboard_and_the_notice_takes_focus(site, brow
     tab_to(page, "Yes, delete it")
     activate(page)
     page.wait_for_url(re.compile(r"/app"))
-    state = focus_summary(page)
+    state = wait_focus(page)
     assert state["role"] == "status" and "deleted" in state["text"].lower(), state
     context.close()
 
@@ -594,7 +591,7 @@ def test_an_account_is_deleted_by_keyboard_after_a_confirmation_page(site, brows
     assert keep["tag"] == "a"
     tab_to(page, "Yes, delete my account", shift=True)
     activate(page)
-    state = focus_summary(page)
+    state = wait_focus(page)  # the notice takes focus at the next rendering opportunity
     assert state["role"] == "status" and "deleted" in state["text"].lower(), state
     assert page.url == f"{site.base}/"
     context.close()
