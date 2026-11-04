@@ -158,9 +158,8 @@
   <li>Decisions it asked for: 2.9 per page. It asked about 46% of the wrong equations; the goal
     was 60%, so it was not met.</li>
   <li>Cost: about $0.02 a page for ReadableSTEM, $0.07 for the chatbot on Opus.</li>
-  <li>By kind of document (point estimates): arXiv papers 0.848 against 0.860 for the chatbot,
-    OpenStax sections 0.704 against 0.667, course documents made with LaTeX 0.896 against
-    0.880.</li>
+  <li>By kind of document (point estimates, ReadableSTEM): arXiv papers 0.848, OpenStax sections
+    0.704, course documents made with LaTeX 0.896. The full report has every arm for each kind.</li>
   <li>Chemistry (3 OpenStax sections, 123 equations): 0.33 right as chemistry, against a goal
     of 0.80, so it was not met. The chatbot comparison for chemistry is not measured: the
     scorer does not read the chatbots' chemistry notation.</li>
@@ -172,9 +171,8 @@
 <ul>
   <li><strong>The first registered test</strong> (15 sections of five OpenStax textbooks, 242
     pages, 2,738 equations, version 0.4.0, October 2026; <a href="{{ source_url }}/blob/main/PROOF.md">full
-    results</a>). Equations: it found about as many as the chatbot (Claude Opus given the PDF
-    and one sentence), 89% of them in both cases, but fewer came out exactly right end to end:
-    about half (0.50) against 0.62 for the chatbot. Given each equation on its own, about two in
+    results</a>). Equations: it found 89% of them, and about half came out exactly right end to
+    end (0.50). Given each equation on its own, about two in
     three were right (0.68). Headings: F1 0.96, with every matched heading at the right level.
     (F1 is a score out of 1 that counts both headings missed and headings invented.) Figure
     descriptions: 97% passed a model judge, a second AI model asked whether each description is
@@ -182,19 +180,17 @@
     asked about only a third of the equations that were wrong.</li>
   <li><strong>Research papers typeset with LaTeX, held out</strong> (15 arXiv papers, 71
     pages, 1,826 equations, registered before the run): 0.58 of equations exactly right end to
-    end, against 0.64 for the chatbot on Opus and on Haiku. The set is too small to show a
-    difference. It asked for about 5.6 decisions a page.
+    end. The registered comparison with the chatbots found no difference this set can detect. It asked for about 5.6 decisions a page.
     <a href="{{ source_url }}/blob/main/docs/eval-realworld.md">How it was measured</a>.</li>
   <li><strong>The same 15 textbook sections, measured again</strong> (2026-10-21, version 0.5.0
     and later): 0.596 of equations exactly right end to end, against 0.504 in the registered
-    run and 0.622 for the chatbot. This is <strong>not a blind result</strong>: those sections had
+    run. This is <strong>not a blind result</strong>: those sections had
     been examined since the registered run, so the numbers are optimistic.
     <a href="{{ source_url }}/blob/main/README.md#re-measurement-on-the-same-sections-2026-10-21-not-a-blind-result">How
     it was measured</a>.</li>
   <li><strong>Development set, not held out</strong> (25 arXiv papers, 114 pages, 2,350
     equations, 2026-11-03, with the settings the live service uses): 0.735 exactly right end
-    to end, against 0.675 for the chatbot on Haiku; on the 6 papers with an Opus answer, 0.764
-    against 0.784. These papers were used to build and tune the tool, so expect less on your
+    to end. These papers were used to build and tune the tool, so expect less on your
     documents. <a href="{{ source_url }}/blob/main/docs/eval-dev-baseline-2026-11-03.md">The
     development report</a>.</li>
   <li><strong>Chemistry, held out</strong> (5 OpenStax chemistry sections, 377 equations): 0.56

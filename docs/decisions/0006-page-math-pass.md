@@ -134,7 +134,7 @@ variant that only compares readings and never changes spans was not built or mea
 
 ## Update 2026-11-04: still not on
 
-`FEATURE_PAGE_MATH` is still off by default in code and is not among the flags that are on in production ([deploy-railway.md](../deploy-railway.md), "Feature flags in production"). The status above stands: Proposed. Equation work since then went into other settings (`EQUATION_LINE_CONTEXT`, `EQUATION_GLYPH_CHECKS`, `EQUATION_GLYPH_RECONCILE`, `FLAG_POLICY`), which are on in production.
+`FEATURE_PAGE_MATH` is still off by default in code and is not among the flags that are on in production ([deploy-railway.md](../deploy-railway.md), "Feature flags in production"). The status above stands: Proposed. Equation work since then went into other settings (`EQUATION_LINE_CONTEXT`, `EQUATION_GLYPH_CHECKS`, `EQUATION_GLYPH_RECONCILE`, `FLAG_POLICY`), which are on in production. A second mechanism with the same aim, the page witness (`FEATURE_PAGE_WITNESS`, 2026-11-03: one model call per maths page whose disagreements with the crop readings become decisions), is not in this record. It was tested on twelve development papers ([eval-equation-round5.md](../eval-equation-round5.md)), changed no reading, hit its registered stop rule (a gain of 0.0 points against the 2 needed) and stays off.
 
 ## Update 2026-10-21: real LaTeX PDFs
 

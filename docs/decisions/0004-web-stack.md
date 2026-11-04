@@ -32,6 +32,8 @@ database dump. See [deploy-railway.md](../deploy-railway.md). The rest of the de
 
 **Update (2026-11-04).** Sign-in also offers Microsoft accounts for universities listed in `MS_ALLOWED_TENANTS` ([deploy-railway.md](../deploy-railway.md), "Microsoft sign-in on Railway"); the allowlist or `SIGNUP_MODE=open` decides who may then use the app.
 
+**Update (2026-11-04), queue and conversion.** The claim order in the bullet above is now fewest attempts first, then the owner served longest ago (round-robin by person, `web/fair_queue.py`), then oldest; the lease and the three attempts are unchanged. The whole conversion runs in a child process the worker can kill (`web/isolated_convert.py`: a 3072 MB address cap, a CPU limit, the job's wall-clock limit, and no keys or database URL in the child), so a crash, an out-of-memory or a hang fails one job and not the web process. Model requests, spend reservations and database writes stay in the web process.
+
 ## Consequences
 
 Drafted from what the repository shows; the author confirms or edits.

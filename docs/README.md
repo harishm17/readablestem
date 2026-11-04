@@ -25,9 +25,9 @@ arrived at; read them by question, not front to back.
 | What is reader B (a second reading of a handwritten expression), what does it cost, and what must change before one is turned on? | [math-readers.md](math-readers.md) |
 | How does it do on real LaTeX PDFs from arXiv (not Chromium prints), against the chatbot recipe? | [eval-realworld.md](eval-realworld.md) |
 | Where does ReadableSTEM stand today on the 25 real-world development papers, against the recorded Opus and Haiku chatbot answers (pipeline 0.5.3, production flags)? | [eval-dev-baseline-2026-11-03.md](eval-dev-baseline-2026-11-03.md) |
-| Why did it lose equations to the chatbot recipe on real papers, what was fixed, and what did a fresh set of papers say? | [eval-equation-rootcause.md](eval-equation-rootcause.md) |
+| Which causes held back its equation score on real papers, what was fixed, and what did a fresh set of papers say? | [eval-equation-rootcause.md](eval-equation-rootcause.md) |
 | What did the second round of equation fixes do, on a third registered set of papers? | [eval-equation-round2.md](eval-equation-round2.md) |
-| Why did it trail a chatbot on equations, and what did reading each inline equation with its line do? | [eval-equation-round3.md](eval-equation-round3.md) |
+| What did reading each inline equation with its line do, on a fourth registered set of papers? | [eval-equation-round3.md](eval-equation-round3.md) |
 | Which 50 figures will long descriptions and chart data tables be judged on, how were they drawn, and what is pre-registered (draft, unsigned: no model has run on it)? | [eval-figures-long.md](eval-figures-long.md) |
 | What did the page witness do on twelve development papers (round 5, no default changed)? | [eval-equation-round5.md](eval-equation-round5.md) |
 | How well are chemistry formulas read on five held-out sections, and what did a second round of chemistry prompts do (not shipped)? | [eval-chemistry-heldout.md](eval-chemistry-heldout.md); [eval-chemistry-round2.md](eval-chemistry-round2.md) |

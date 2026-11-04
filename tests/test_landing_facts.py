@@ -85,9 +85,10 @@ def test_limits_first_registered_result_is_history_and_matches_proof_md(pages):
     assert proof_field("Pipeline version") == "0.4.0"
     assert "version 0.4.0, October 2026" in text and "Earlier results, kept as history" in text
     assert proof_field("Run recorded on").startswith("2026-10")
-    assert f"{round(proof_cell('detection_recall') * 100)}% of them in both cases" in text
+    assert f"it found {round(proof_cell('detection_recall') * 100)}% of them" in text
     assert 0.45 <= proof_cell("end_to_end_exact_lenient (all gold equations)") <= 0.55
-    assert "about half (0.50) against 0.62 for the chatbot" in text
+    assert "about half came out exactly right end to end (0.50)" in text
+    assert "for the chatbot" not in text.split("Earlier results, kept as history")[1]
     equations_alone = float(re.search(r"^\| exact_lenient \| ([0-9.]+)", PROOF, re.M).group(1))  # type: ignore[union-attr]
     assert 0.62 <= equations_alone <= 0.71 and "about two in three were right (0.68)" in text
     assert f"Headings: F1 {proof_cell('heading F1'):.2f}" in text
@@ -117,13 +118,12 @@ def test_the_other_results_match_their_reports_and_development_is_labelled(pages
     assert "15 held-out papers (71 pages, 1,826 gold equations" in REALWORLD
     assert "0.583" in REALWORLD and "on Opus 0.641" in REALWORLD and "on Haiku 0.641" in REALWORLD
     assert "15 arXiv papers, 71 pages, 1,826 equations" in text
-    assert "0.58 of equations exactly right end to end, against 0.64" in text
+    assert "0.58 of equations exactly right end to end." in text
+    assert "no difference this set can detect" in text.split("Research papers typeset with LaTeX")[1]
     # Development baseline: labelled as development, never as held out.
-    assert "0.735" in DEV_BASELINE and "0.675" in DEV_BASELINE
-    assert "0.764" in DEV_BASELINE and "Opus 0.784" in DEV_BASELINE
+    assert "0.735" in DEV_BASELINE
     assert "Development set, not held out (25 arXiv papers, 114 pages, 2,350 equations" in text
-    assert "0.735 exactly right end to end, against 0.675" in text
-    assert "0.764 against 0.784" in text
+    assert "0.735 exactly right end to end." in text
     # Chemistry and handwriting.
     assert "**211 (0.560)**" in CHEMISTRY and "377 gold equations, 5 sections" in CHEMISTRY
     assert "5 OpenStax chemistry sections, 377 equations): 0.56 right as chemistry" in text
@@ -142,7 +142,9 @@ def test_the_landing_page_summarises_without_overclaiming(pages):
     )
     assert "0.836 against 0.840 for ReadableSTEM (26 documents, 1,715 equations)" in landing
     assert "5.0 against 9.6 per 100" in landing and "so it was not met" in landing
-    assert "0.62 against 0.50" in landing  # the earlier result is not hidden
+    # The earlier result is kept as history, without a chatbot comparison (Harish, 2026-11-04).
+    assert "Earlier tests (October 2026, version 0.4.0) are kept as history" in landing
+    assert "0.62 against 0.50" not in landing and "ahead" not in landing.lower()
     assert "beat" not in landing.lower().replace("beats", "")
     assert (
         "“Exactly right” means the whole equation matches the original symbol for symbol" in landing
