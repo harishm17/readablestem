@@ -611,3 +611,73 @@ uv run python scripts/realworld_report.py --part dev --tag base-0508 --rescore-c
 # add --neutral or --spoken, or drop --reading cells for reading A
 uv run python scripts/dev_miss_places.py --part dev --tag base-0508
 ```
+
+## Reading push (pipeline 0.5.9, `EQUATION_GLYPH_RECONCILE`)
+
+Added 2026-11-04. Development part only; no held-out, fresh or chatbot arm was asked. The corrections of
+`docs/steps.md` ("Corrections from the glyphs") replayed on the 25 development papers (2,350 gold, 2,069
+found) at the head of branch `eq/read-push` merged with main (spoken-equal scored with the fixed scorer of
+#143, `math_canonical.speakable_latex`; reading B), tag `read-0508`, against `base-0508`. Same flags as
+`base-0508` plus `--glyph-reconcile`; same recorded answers. Intervals are 95% cluster bootstraps over the
+25 papers (10,000 resamples), descriptive.
+
+**Result.** Spoken-equal 0.820 to 0.826 (1,928 to 1,940 of 2,350, +12, +0.51 points, 95% +0.21 to +0.94).
+exact_lenient 0.743 to 0.750 (1,747 to 1,763, +16, +0.68 points, +0.21 to +1.28). Wrong without being
+asked (review none or optional): spoken 97 to 89 (-8, -0.34 per 100 gold, -0.68 to -0.09), exact 226 to
+213 (-13, -0.55 per 100, -1.11 to -0.13). Required decisions 225 to 223 (-2, -0.26 to 0.00). Right to
+wrong: 0 under both scorers. 22 of the 2,069 aligned readings changed.
+
+| rule | changed | spoken | exact | the equations |
+|---|---|---|---|---|
+| symbol (F1) | 4 | +3 | +3 | `\succsim` to `\asymp` (2305.06353 eq-109, eq-162), `v` to `\upsilon` (2412.12319 eq-046); 2505.03099 eq-031 `\text{^}` to `\wedge`, still wrong (gold writes `10^\wedge(-11)`) |
+| unit past the box (F2) | 5 | +4 | +4 | 2404.15495 eq-009, eq-011, eq-045 and 2505.11658 eq-038; eq-039 lost its last unit only (`0\ \text{s} < t < 915`), score unchanged |
+| slash (F3) | 3 | +3 | +3 | 2501.06896 eq-002, 2503.00937 eq-041, 2503.02792 eq-093 |
+| equation number (F4) | 3 | +2 | +1 | 2404.15495 eq-034 (both scorers), 2404.14123 eq-023 (spoken only); 2412.12319 eq-022 lost its `(5.5)` and stays wrong (gold row split) |
+| script face (F7) | 6 | 0 | +5 | 2503.07628 eq-069 to eq-073; eq-074 stays wrong (gold mixes `\mathscr` and `\mathcal`) |
+| table cell `\bm` (F7) | 0 | 0 | 0 | not reached, see below |
+
+One more reading changed review tier without a change of score (2412.12319 eq-048, required to optional).
+Every correction is an optional note on the fix and keeps the reading before it (`EquationFix.model_latex`).
+
+**What did not work, and what differs from the spec.**
+- The table-cell `restyle_bold_italic` (`table_step.restyle_cells`) changed none of the 4 cells of 2504.03499:
+  a table's local cell text is plain (`∥gτ∥`), with no bold-italic letters, so the restyle has nothing to read.
+  Reading the cell's glyphs needs the PDF in `table_step`, which it does not have; left for a separate change.
+  The function and its test stay (it works on text that carries styled letters).
+- The label gap is half an em, not one: the printed numbers stand 0.7 em from the formula on their row (7 pt at
+  10 pt) in both papers; `f(1)` stands 0 em away. The comma or `\quad` is required as in the spec.
+- Notes of a correction do not make a cheap answer escalate and do not end the single-reading band
+  (`_needs_escalation`, `_band_only`): the first version did, which cost new Opus calls for readings the rule
+  had already settled.
+- 2404.14123 eq-023 has its label inside `\begin{array}`; the rule handles a number before `\end{...}`, and the
+  checks compare the reading with the PDF text less that number.
+
+**Requests and spend.** The final replay has 0 misses and asks nothing new (2,752 hits). Getting there took a
+live top-up on the dev part, $0.1318 of the $0.50 allowed: $0.0347 for the 8 new escalations of the first
+version of the rules (a second pass was a free replay), and $0.0971 from a first start of the same top-up
+that ran with the deployed settings in its environment (3 figure calls and 1 equation call, killed after 4
+calls; every later start passed only the key). Logged in `data/realworld/spend-log.jsonl`. The final code
+needs none of them.
+
+**Generality, $0, over the recorded fresh2 to fresh4 and held-out items.** Two passes, no model call; the bar
+is 0 right to wrong:
+- Text only (F1, F3; the span text of every recorded aligned reading of 8 recorded ReadableSTEM arms, the PDF
+  taken as TeX-made, an upper bound): 2 fires in 2 papers, both in fresh3 (2503.00504: `n \succsim d^{\gamma}`
+  to `\asymp`, still wrong against gold `\gamma: n \asymp d^{\gamma}`; 2503.22999: `\frac{1}{3}` to `1/3`, wrong
+  to right).
+- Offline replays of the four parts with and without the setting (F2 and F4 need the glyphs; the recorded
+  answers of 2026-10 only partly match today's requests: hits 179 of 2,901 in fresh2, 266 of 3,016 in fresh3,
+  1,355 of 1,631 in fresh4, 26 of 3,568 in held-out, so these cover few elements): 1 change, 2502.21009
+  eq-008 in fresh4, `\quad (11)` taken off a display, wrong to right.
+- Together: 3 fires in 3 papers outside dev (2503.00504, 2503.22999, 2502.21009), 2 gains, 0 right to wrong
+  (exact and spoken where the gold is on disk; held-out has none, so exact is compared with the recorded
+  score). The replays' coverage is thin; fresh4 is the only one with half its requests answered. Nothing was
+  tuned on these parts.
+
+Reproduce (dev):
+
+```
+R="uv run python scripts/realworld_run.py rs --part dev --tag read-0508 --tables --notation-memory --line-context --glyph-checks --flag-policy --glyph-reconcile --seed-answers-from base-0508"
+$R --offline --max-usd 0.01   # replay; a live pass needs only the key in the environment
+uv run python scripts/realworld_report.py --part dev --tag read-0508 --rescore-chat --extra-arm rs0508=base-0508 --reading cells --spoken
+```
