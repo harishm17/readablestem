@@ -139,7 +139,9 @@ def test_the_first_decision_is_the_equation_with_a_same_size_compare(split):
     assert re.search(r'class="button" data-role="suggest"[^>]*>Use bold ω<', suggest)
     assert '<details class="edit-box" open>' in body and "Edit the LaTeX" in body
     assert re.search(
-        r'value="accept" class="button-secondary" data-role="accept">Accept anyway<', body
+        r'value="accept" class="button-secondary" data-role="accept"'
+        r' data-tone="caution">Accept anyway<',
+        body,
     )
     assert 'name="view" value="split"' in body
 
