@@ -577,6 +577,10 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   paragraphs, lists, tables, exact equations (LaTeXML's MathML through the sanitiser, accepted),
   and figures with the project's own picture through the ordinary figure step. A formula
   LaTeXML could not read, and a figure with no picture, are required decisions.
+- **One at a time.** A source conversion takes a machine-wide lock (`sandbox.exclusive`, an `flock`)
+  before LaTeXML starts and others wait for it, so the sandbox's limits (4 tasks, 512 MB of address
+  space each) bound the whole server and not each conversion; the worker already runs one job at a
+  time, and the lock also covers a job whose abandoned conversion is still ending.
 - **TeX Live is not read.** LaTeXML finds a package's own TeX with `kpsewhich`. With TeX Live's base
   installed (the image has `texlive-latex-base`, which `latexml` depends on) it then reads raw TeX for a
   package it has a binding for and runs expl3 under its own interpreter: `\\usepackage{siunitx}` took 72 s

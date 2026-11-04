@@ -61,6 +61,12 @@ FAILURE_CODES = {
 }
 
 
+# The lock every source conversion takes, and how long one may wait for its turn (a conversion
+# holds it at most `latexml.LIMITS.wall_s`; the job's own time limit is what ends a longer wait).
+GATE_NAME = "source-conversion"
+GATE_WAIT_S = 600.0
+
+
 class SourceFailed(ConversionFailed):
     """The source could not be converted; `code` becomes the job's error code."""
 
@@ -154,7 +160,12 @@ def run_latexml(project: Path, main: str, out: Path) -> bytes:
     if not latexml.installed():
         raise SourceFailed("source_unavailable")
     try:
-        outcome = latexml.convert(project, main, out)
+        # One conversion at a time on this machine, so that the sandbox's tasks x address
+        # space is the bound for the whole server (docs/security.md); others wait their turn.
+        with sandbox.exclusive(GATE_NAME, GATE_WAIT_S):
+            outcome = latexml.convert(project, main, out)
+    except TimeoutError:
+        raise SourceFailed("timeout") from None
     except (sandbox.SandboxUnavailable, OSError):
         raise SourceFailed("source_unavailable") from None
     if outcome.timed_out:
