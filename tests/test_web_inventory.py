@@ -152,13 +152,13 @@ def test_the_screen_lists_each_symbol_with_its_count_grouped_by_look_alike(symbo
     html = page(symbols)
     assert text_of(section(html, "<h1", "</h1>")) == "Symbols in the handwritten equations"
     intro = text_of(section(html, 'class="symbols-intro"', "</div>"))
-    assert "6 different symbols, 10 in all, in 3 equations" in intro
+    assert "6 symbols, 10 places, in 3 equations" in intro
     x_form = text_of(form_of(html, "sym-x"))
     assert "Small x" in x_form and "Read 3 times, in 2 equations." in x_form
     capital = text_of(form_of(html, "sym-X"))
     assert "Capital X" in capital and "Read 2 times, in 2 equations." in capital
     # 1 of the capital X is in the equation already accepted, and is not changed
-    assert "1 of them is in equations you already decided, and is not changed." in capital
+    assert "1 in decided equations stay." in capital
     # x, X, p and rho are in families with more than one symbol read: those come first
     headings = [text_of(h) for h in re.findall(r"<h2[^>]*>.*?</h2>", html, re.S)]
     assert headings[0].startswith("Looks alike: x X \u00d7") and "small x, capital X" in headings[0]
@@ -176,12 +176,19 @@ def test_each_place_shows_the_equation_picture_and_where_the_symbol_is(symbols):
     # the second x of "x + x = ..." is named, and marked in its LaTeX
     assert "the 2nd one in it" in text_of(form)
     assert re.search(r'<mark class="said-diff">x</mark>', form)
-    # one checkbox to leave each waiting place out, named by what it leaves out
-    boxes = re.findall(r'<input type="checkbox" name="exclude" value="([^"]+)"', form)
+    # one checkbox for each waiting place, ticked: ticked is "will change" (no double negative)
+    boxes = re.findall(r'<input type="checkbox" name="include" value="([^"]+)" checked', form)
     assert boxes == ["p1-e2:1", "p1-e5:1", "p1-e5:2"]
-    assert re.search(r"Leave this one as it is\s*: Equation", text_of(form))
-    # nothing is ticked or chosen before the person acts
-    assert "checked" not in form and "selected" not in form
+    assert 'name="exclude"' not in form
+    assert re.search(r"Change\s*: Equation", text_of(form))
+    assert 'name="places" value="chosen"' in form
+    # where it lands is said in words before the list is opened, and what to do first
+    assert "Changes: Equation 1 (page 1), Equation 2 (page 1, 2 times)." in text_of(form)
+    assert "Places (3 of 3 ticked)" in text_of(form)
+    status = section(form, "data-symbol-affect", "</p>")
+    assert 'role="status"' in form and "Choose a symbol first." in status
+    # no replacement is chosen before the person acts
+    assert "selected" not in form
     # the choices are the family's other symbols, each by its name
     options = re.findall(r"<option value=\"([^\"]*)\">([^<]*)</option>", form)
     assert options[0] == ("", "Choose a symbol")
@@ -194,8 +201,8 @@ def test_each_place_shows_the_equation_picture_and_where_the_symbol_is(symbols):
 def test_a_decided_equation_is_listed_and_has_no_checkbox(symbols):
     capital = form_of(page(symbols), "sym-X")
     assert capital.count('class="place"') == 2
-    assert capital.count('name="exclude"') == 1  # equation 1's; equation 3 is decided
-    assert "Already decided: not changed." in text_of(capital)
+    assert capital.count('name="include"') == 1  # equation 1's; equation 3 is decided
+    assert "Decided: stays." in text_of(capital)
 
 
 def test_the_review_screen_links_to_the_symbols_when_there_is_handwritten_maths(symbols):
@@ -204,7 +211,7 @@ def test_the_review_screen_links_to_the_symbols_when_there_is_handwritten_maths(
         (f"/jobs/{symbols.job_id}/review/list", f"/jobs/{symbols.job_id}/symbols?view=list"),
     ):
         body = symbols.browser.get(path).text
-        assert f'href="{link}"' in body and "Symbols in the handwritten equations" in body
+        assert f'href="{link}"' in body and ">Symbols</a>" in body
 
 
 def test_a_typed_document_has_no_link_and_an_empty_screen(tmp_path):
@@ -221,7 +228,7 @@ def test_a_typed_document_has_no_link_and_an_empty_screen(tmp_path):
             not in client.get(f"/jobs/{env.job_id}/review").text
         )
         empty = text_of(page(env))
-        assert "no handwritten equations" in empty
+        assert "No symbols to change yet" in empty
 
 
 def test_a_scanned_page_of_printed_maths_is_not_listed(tmp_path):
@@ -297,7 +304,7 @@ def test_everything_left_out_changes_nothing_and_says_so(symbols):
     written = symbols.job(symbols.job_id).result_version
     response = change(symbols, "x", "X", leave=("p1-e2:1", "p1-e5:1", "p1-e5:2"))
     assert response.status_code == 422
-    assert "Nothing to change: every place was left out, or is already decided." in text_of(
+    assert "Nothing to change: no place is ticked, or every one is already decided." in text_of(
         response.text
     )
     assert latex_of(symbols, "p1-e5") == "x + x = \\rho v"
@@ -444,3 +451,49 @@ def test_symbols_url_refuses_a_bad_job_id(job_id: str) -> None:
 
     with pytest.raises(PageError):
         symbols_url(job_id, "split")
+
+
+def choose(env, symbol: str, to: str, *, include: tuple[str, ...], version: str | None = None):
+    """The screen's own form: the places that stay ticked are posted, `places=chosen`."""
+    html = page(env)
+    data: dict[str, object] = {
+        "csrf_token": token(env.browser, f"/jobs/{env.job_id}/review"),
+        "version": version if version is not None else version_of(html),
+        "view": "split",
+        "symbol": symbol,
+        "to": to,
+        "places": "chosen",
+        "include": list(include),
+    }
+    return followed(env, env.browser.post(f"/jobs/{env.job_id}/symbols", data=data))
+
+
+def test_only_the_ticked_places_change(symbols):
+    choose(symbols, "x", "X", include=("p1-e5:1",))
+    assert latex_of(symbols, "p1-e5") == "X + x = \\rho v"  # only the first x was ticked
+    assert latex_of(symbols, "p1-e2") == "x + X = p"  # its x was not ticked: as it was
+
+
+def test_nothing_ticked_changes_nothing_and_says_so(symbols):
+    written = symbols.job(symbols.job_id).result_version
+    response = choose(symbols, "x", "X", include=())
+    assert response.status_code == 422
+    assert "no place is ticked" in text_of(response.text)
+    assert symbols.job(symbols.job_id).result_version == written
+
+
+def test_the_empty_screen_says_when_it_helps_and_shows_a_small_example(tmp_path):
+    env = WebEnv(tmp_path)
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        html = page(env)
+        empty = text_of(section(html, 'class="symbols-empty"', "</section>"))
+        assert "Symbols appear once handwritten equations have been read" in empty
+        assert "Convert scanned or handwritten pages" in empty
+        assert "Example, not part of your document" in empty
+        assert "<form" not in section(html, 'class="symbols-example"', "</figure>")
+        assert 'href="/jobs/' in html.split("<h1", 1)[0].rsplit("<main", 1)[-1]  # Back, above

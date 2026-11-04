@@ -97,24 +97,20 @@ def advice(result: DocumentResult, members: list[Fix]) -> Advice:
         if under == total:
             which = "The copy sits" if total == 1 else "Each copy sits"
             fact = (
-                f"{which} directly under a heading with the same words, so as headings "
-                "students would hear it twice in a row."
+                f"{which} directly under a heading with the same words, so students would "
+                "hear it twice."
             )
         else:
             fact = (
-                f"{under} of the {total} copies sit directly under a heading with the same "
-                "words, so as headings students would hear those twice in a row."
+                f"{under} of the {total} copies sit directly under a heading with the same words."
             )
         return Advice("bold", fact, under, total)
     if _words(label) in RUN_IN_LABELS:
         fact = (
-            f"“{label.strip()}” is a label that starts part of a worked example. Labels "
-            "like it are usually bold text, not headings."
+            f"“{label.strip()}” starts part of a worked example: usually bold text, not a heading."
         )
         return Advice("bold", fact, under, total)
-    fact = (
-        "No copy sits directly under a heading with the same words, so the tool's proposal stands."
-    )
+    fact = "No copy sits directly under a heading with the same words, so the proposal stands."
     return Advice("keep", fact, under, total)
 
 

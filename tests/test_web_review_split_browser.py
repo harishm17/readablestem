@@ -305,7 +305,7 @@ def test_the_whole_review_can_be_done_without_javascript(site, browser, job):
     )
     # Decision 2: write better alt text.
     page.get_by_label("Alt text for figure 1").fill("A car drives along a road from a house.")
-    page.get_by_role("button", name="Save edit to figure 1").click()
+    page.get_by_role("button", name="Save and accept (figure 1)").click()
     page.wait_for_url(f"{url}?item={GROUP}")
     # Decision 3: the group, one button for all three.
     page.get_by_role("button", name=re.compile("^Keep as headings at level 2")).click()
@@ -457,7 +457,7 @@ def test_keyboard_shortcuts_are_opt_in_and_never_fire_while_typing(site, browser
     page.keyboard.press("n")
     assert page.url == url  # off by default
     page.locator("#shortcuts summary").click()
-    page.get_by_label("Use keyboard shortcuts on this screen").check()
+    page.get_by_label("Use keyboard shortcuts").check()
     page.locator("details.edit-box:has(#latex-p1-e2)").evaluate(
         "d => { d.open = true; }"
     )  # closed by default

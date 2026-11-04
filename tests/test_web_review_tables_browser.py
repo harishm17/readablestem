@@ -115,7 +115,7 @@ def walk(page, site, job: str, check) -> None:
     page.locator(".error-summary").wait_for()
     check("a refused cell")
     page.goto(url)
-    page.locator(".table-edit summary").click()
+    page.locator(".table-edit > summary").click()
     page.get_by_label("The first row is a header").check()
     page.get_by_role("button", name="Save headers of table 1").click()
     page.wait_for_url(f"{url}?item=p1-e1")
@@ -226,12 +226,13 @@ def test_the_keyboard_reaches_everything_in_reading_order(site, browser, job, ja
     page.locator("#decision-title").focus()
     seen = tab_until(page, "button:Keep as image")
     stops = [s for s in seen if not s.startswith("a:Decision") and s != "a:"]
-    assert stops[:6] == [
+    assert stops[:7] == [
         "a:Show on the page",
+        "a:Enlarge",
         "div:Proposed table 1",
-        "summary:Change the table",
-        "summary:The grid read from the PDF",
+        "a:Change the table",  # the finding's correction
         "button:Accept",
+        "summary:Change the table",  # the grid read from the PDF is inside it
         "button:Keep as image",
     ], seen
     # Open "Change the table" from the keyboard: the cell list, then the header boxes.
@@ -310,7 +311,7 @@ def test_the_shortcuts_reach_the_table_card(site, browser, job):
     url = f"{site.base}/jobs/{job}/review"
     page.goto(url)
     page.locator("#shortcuts summary").click()
-    page.get_by_label("Use keyboard shortcuts on this screen").check()
+    page.get_by_label("Use keyboard shortcuts").check()
     page.locator("#decision-title").focus()
     page.keyboard.press("e")
     assert page.evaluate("document.activeElement.id") == "cell-pick-p1-e1"

@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: the review screens, list view, Symbols and bulk accept (branch ux2/lane-b)
+
+- Review (split view and list): the choices and what each does are one block (the recommended
+  repair and Accept first; "Keep as image" apart, named for what students get); the card's details,
+  codes and report link are folded into "More about this item". Phone: a Decision / Page bar,
+  "Fit to width" and "Enlarge" for the picture of the PDF. Shared markup of the two views is in
+  `_review_shared.html`.
+- Figures: **Save and accept**, **Save, decide later** (saved, still waiting) and **Accept**; alt-text
+  help for the kind of figure; "Keep without a description" needs a tick box saying what it means for
+  students (the server refuses it without; `FIGURE_KEEP_ACK`).
+- Tables: findings name the part of the table (a check with no sentence of its own no longer says only
+  that "a check did not pass") and each has its correction; headers, a cell and the grid read from the
+  PDF are one folded place; "Keep as image" and "This grid is not a table" are apart from the repair.
+- Repeated headings can be decided one by one on the review screen.
+- List view: the first decision comes first; sections, filter and accept-many are one folded disclosure;
+  compact rows from the second decision.
+- Symbols: places are ticked until unticked (`include`, `places=chosen`; `exclude` still works);
+  "Change all" waits for a replacement, a live status line says what will change, and the empty screen
+  says when it becomes useful with a small example. Bulk accept: shorter opening, and with nothing to
+  accept it names the next step.
+- Less copy on these screens: shorter headline, hints, consequences and the bulk titles ("Accept
+  equations that passed every check", "Accept figures with generated alt text").
 ## Unreleased: upload, My documents, the job page and downloads, from the second independent review (branch ux2/lane-a)
 
 - Copy on these pages is about a third to a half shorter (upload form, My documents, job page in

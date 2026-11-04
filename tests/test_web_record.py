@@ -40,7 +40,10 @@ def text_of(html: str) -> str:
 
 
 def decide(env, target: str, **fields) -> None:
-    data = {"csrf_token": token(env.browser, f"/jobs/{env.job_id}/review")} | fields
+    data = {
+        "csrf_token": token(env.browser, f"/jobs/{env.job_id}/review"),
+        "acknowledge": "on",
+    } | fields
     response = env.browser.post(f"/jobs/{env.job_id}/review/{target}", data=data)
     assert response.status_code == 303, response.text
 

@@ -867,6 +867,10 @@ input[type="number"].input-short { width: 6rem; }
 .bulk-confirm .button, .leave-out .button-secondary, .notify-box .button-secondary { min-height: 2.75rem; }
 .filter-fields { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); align-items: flex-start; }
 .decision-filter .field { margin-bottom: var(--space-2); }
+/* A flex item will not shrink below its widest child (the Kind select's longest option), so at 320px with
+   WCAG 1.4.12 text spacing the form ran 4px past the viewport; let it shrink and the select follow. */
+.filter-fields > .field { min-width: 0; max-width: 100%; }
+.filter-fields select { width: 100%; }
 .decision-filter select, .decision-filter input[type="number"] { min-height: 2.75rem; }
 .filter-result { font-weight: 700; }
 .bulk-preview { padding-left: var(--space-5); }
@@ -1132,16 +1136,6 @@ button[data-tone="quiet"]:hover { background: var(--surface); color: var(--ink);
       var(--desk);
   }
 }
-/* On a wide screen the row of choices (Accept, Keep as image) sticks to the bottom of the window
-   while the decision above it is longer than the window, then rests in its place. */
-@media (min-width: 64rem) and (min-height: 40rem) {
-  .decision-area .decide-row[id^="actions-"] {
-    position: sticky; bottom: 0; z-index: 3;
-    background: var(--bg); border-top: 1px solid var(--border-subtle);
-    margin: var(--space-4) calc(-1 * var(--space-5)) 0; padding: var(--space-3) var(--space-5);
-  }
-}
-@media (forced-colors: active) { .decision-area .decide-row[id^="actions-"] { border-top: 1px solid CanvasText; } }
 
 /* Review list: a compact row per waiting decision. */
 .compact-item { border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); margin: 0 0 var(--space-3); }
@@ -1193,6 +1187,119 @@ fieldset.option-group > .hint { margin-top: var(--space-1); }
 .retention-line form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
 .retention-line .hint { margin: 0; }
 /* ==== end ux-lane-b ===================================================================== */
+
+/* ==== ux2-lane-b: the review screens ======================================================
+   The decision bar (the choices and what each one does, in one block that sticks to the bottom
+   of the window on a wide screen), fallbacks kept apart from the choices, table findings with
+   their corrections, "More about this item", a heading group's own members, the phone's
+   Decision / Page bar, the enlarged picture, the list view's tools, and the Symbols screen.
+   Tokens only; flat, with borders and tints (DESIGN.md). */
+
+.decision-bar {
+  margin: var(--space-4) 0 var(--space-3); padding: var(--space-3) var(--space-4);
+  background: var(--surface); border: 1px solid var(--border-control); border-radius: var(--radius-frame);
+}
+.decision-bar .bar-lead { margin: 0 0 var(--space-2); font-weight: 700; }
+.decision-bar .decide-row { margin: 0 0 var(--space-2); }
+.decision-bar .decide-note { margin: var(--space-1) 0 0; }
+.decision-bar .error-message { margin-top: 0; }
+@media (min-width: 64rem) and (min-height: 40rem) {
+  .decision-area .decision-bar { position: sticky; bottom: var(--space-2); z-index: 3; }
+}
+@media (forced-colors: active) { .decision-bar { border: 2px solid CanvasText; } }
+
+/* What is kept apart from the choices: leaving the original, or the item out of the conversion. */
+.fallback { margin: var(--space-5) 0 var(--space-3); padding: var(--space-3) 0 0; border-top: 1px dashed var(--border-control); }
+fieldset.fallback { border-width: 1px 0 0; border-style: dashed; border-color: var(--border-control); border-radius: 0; min-width: 0; }
+.fallback-title, fieldset.fallback > legend { font-weight: 700; color: var(--ink-muted); padding: 0; margin: 0 0 var(--space-2); }
+fieldset.fallback > legend { padding-right: var(--space-2); }
+.fallback .hint { margin: 0 0 var(--space-2); }
+.fallback .checkbox-field { margin: var(--space-2) 0 var(--space-3); }
+.fallback-choice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-bottom: var(--space-2); }
+.fallback-choice .hint { margin: 0; flex: 1 1 16rem; }
+.fallback .not-a-table { margin-top: var(--space-2); }
+.saved-state { margin: var(--space-2) 0; font-weight: 700; color: var(--ok); }
+
+/* Equation: the PDF's picture can be shown larger. */
+.enlarge-link { display: inline-flex; align-items: center; min-height: 1.5rem; margin: var(--space-1) 0 var(--space-2); font-size: var(--step--1); }
+@media (max-width: 63.99rem) { .enlarge-link { min-height: 2.75rem; } }
+.enlarge-dialog { width: min(96vw, 60rem); max-height: 92vh; padding: var(--space-3); border: 2px solid var(--ink); border-radius: var(--radius-frame); background: var(--bg); color: var(--ink); }
+.enlarge-dialog::backdrop { background: rgb(0 0 0 / 0.6); }
+.enlarge-body { overflow: auto; max-height: 72vh; margin-bottom: var(--space-3); background: var(--paper); border: 1px solid var(--border-subtle); }
+.enlarge-image { display: block; width: auto; min-width: 100%; max-width: none; height: auto; }
+
+/* Table: what the checks found, each with its correction; one place to change it. */
+/* A table shown as paper keeps the light surface for its header cells in dark mode too. */
+.table-view { --surface: #f5f6f8; }
+.finding-list { list-style: none; margin: 0; padding: 0; }
+.finding { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-4); padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
+.finding:first-child { border-top: 0; }
+.finding-text { flex: 1 1 18rem; min-width: 0; }
+.finding-action { margin: 0; }
+a.finding-action { display: inline-flex; align-items: center; min-height: 2.25rem; font-weight: 700; }
+.table-source-grid { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
+.table-source-grid .part-label { margin-top: 0; }
+
+/* "More about this item": the details and the report link, folded. */
+.more-box { margin-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+.more-box > summary { cursor: pointer; display: list-item; min-height: 1.5rem; padding: var(--space-2) 0; color: var(--ink-muted); }
+.more-box .tech { margin-top: 0; }
+
+/* A heading group: each heading on its own. */
+.member-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
+.member { padding: var(--space-3) 0; border-top: 1px solid var(--border-subtle); }
+.member:first-child { border-top: 0; }
+.member-where { margin: 0 0 var(--space-1); font-weight: 700; }
+.member .region-image { margin: var(--space-1) 0 var(--space-2); }
+.member .decide-row { margin: 0; }
+
+/* A phone: the Decision / Page bar stays at the bottom of the window. */
+.view-toggle { display: none; }
+@media (max-width: 63.99rem) {
+  .view-toggle {
+    display: flex; gap: var(--space-2); position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    padding: var(--space-2) var(--space-3); background: var(--bg); border-top: 1px solid var(--border-control);
+  }
+  .view-toggle a {
+    flex: 1 1 0; display: flex; align-items: center; justify-content: center; min-height: 2.75rem;
+    border: 2px solid var(--accent); border-radius: var(--radius-control); background: var(--bg);
+    color: var(--accent); font-weight: 700; text-decoration: none;
+  }
+  .view-toggle a[aria-current="true"] { background: var(--accent); color: var(--on-accent); text-decoration: underline; text-underline-offset: 0.25em; }
+  .wrap-review { padding-bottom: 5rem; }
+  html:has(.view-toggle) { scroll-padding-bottom: 5rem; } /* a focused control is never under the bar */
+  /* The footer's last links stay above the bar when the page is scrolled to its end. */
+  body:has(.view-toggle) .site-footer { padding-bottom: calc(var(--space-4) + 4rem); }
+  .page-scroll-hint .button-small { margin-top: var(--space-1); }
+}
+@media (forced-colors: active) {
+  .view-toggle a { border-color: ButtonText; }
+  .view-toggle a[aria-current="true"] { background: Highlight; color: HighlightText; border-color: Highlight; }
+}
+/* Fit the page to the screen: no sideways scrolling of the page image. */
+.page-scroll.fit-width .page-frame { min-width: 0; }
+
+/* The list view: the first decision first; the tools for finding or speeding up the others folded. */
+.list-links { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: var(--space-1) 0 0; }
+.list-links a { display: inline-flex; align-items: center; min-height: 1.75rem; }
+.list-tools { margin: var(--space-2) 0 var(--space-4); padding: 0 var(--space-4); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); }
+.list-tools[open] { padding-bottom: var(--space-3); }
+.list-tools > summary { cursor: pointer; display: list-item; min-height: 2.75rem; padding: var(--space-3) 0; font-weight: 700; }
+.list-tools .review-toc { margin: var(--space-3) 0; }
+.list-tools .review-toc h3 { font-size: var(--step-0); margin: var(--space-3) 0 var(--space-1); }
+.compact-item .fix-meta { display: none; }
+@media (forced-colors: active) { .list-tools { border-color: CanvasText; } }
+
+/* Symbols: where a change lands, and an empty state with a small example. */
+.symbol-where { margin: var(--space-2) 0; overflow-wrap: anywhere; }
+.symbol-where-label { font-weight: 700; }
+.symbols-empty { max-width: 40rem; }
+.symbols-example { margin: var(--space-4) 0; max-width: 24rem; }
+.symbols-example figcaption { margin-bottom: var(--space-2); font-size: var(--step--1); color: var(--ink-muted); }
+.symbols-example-card { padding: var(--space-3) var(--space-4); background: var(--surface); border: 1px dashed var(--border-control); border-radius: var(--radius-control); }
+.symbols-example-card p { margin: 0 0 var(--space-1); }
+.symbols-example-name { font-weight: 700; }
+/* ==== end ux2-lane-b ======================================================================= */
 
 /* ==== ux2-lane-a: upload, My documents, the job page's groups, waiting ====================
    Flat: 1px rules and the existing tints, no cards inside cards, no new colours. */
@@ -1260,6 +1367,7 @@ section.job-group { padding-top: 0; }
   .wait-slow, .jump-links, .option-groups, details.option-group, .route, .job-group { border-color: CanvasText; }
 }
 /* ==== end ux2-lane-a ==================================================================== */
+
 /* ==== ux2-lane-c: confirmations, account, sharing, courses, page picking, batch ===========
    Everything below belongs to the second UX round, lane C. Same tokens, no new colours.
    Confirmations: the danger button names its object and "No, keep it" is a button of the same

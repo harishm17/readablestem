@@ -634,7 +634,7 @@ def test_kept_pages_are_named_as_pages_not_repeated_figures(env):
     assert "Pages kept as images 3" in page
     listing = text_of(env.browser.get(f"/jobs/{job_id}/review/list").text)
     assert "repeated figures" not in listing and "Figures (" not in listing
-    assert "2 decisions are still needed: the handwritten pages and the scanned page." in listing
+    assert "2 decisions left: the handwritten pages and the scanned page." in listing
     assert "Pages kept as images (2 decisions)" in listing
     assert re.search(r"Pages kept as images\s*:\s*3 not converted", listing)
 

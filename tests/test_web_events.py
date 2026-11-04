@@ -66,7 +66,7 @@ def finished(env, *, filename: str = "notes.pdf", data: bytes | None = None) -> 
 def decide(env, job_id: str, element_id: str, action: str = "reject"):
     return env.browser.post(
         f"/jobs/{job_id}/review/{element_id}",
-        data={"csrf_token": token(env.browser), "action": action},
+        data={"csrf_token": token(env.browser), "action": action, "acknowledge": "on"},
     )
 
 

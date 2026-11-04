@@ -99,19 +99,24 @@ def relabel(
     symbol: Annotated[str, Form()] = "",
     to: Annotated[str, Form()] = "",
     exclude: Annotated[list[str] | None, Form()] = None,
+    include: Annotated[list[str] | None, Form()] = None,
+    places: Annotated[str, Form()] = "",
     version: Annotated[str, Form()] = "",
     view: Annotated[str, Form()] = "",
 ) -> Response:
-    """Write `symbol` as `to` in every place it stands in the equations still waiting, except
-    the places in `exclude` ("element id:nth"), in one write."""
+    """Write `symbol` as `to` in every place it stands in the equations still waiting, in one
+    write: the places in `include` ("element id:nth") when the form says it chose them
+    (`places=chosen`: the screen's own form, every place ticked until unticked), else all of
+    them except the places in `exclude`."""
     view = _view(view)
     left_out = inventory.excluded_places(exclude or [])
+    chosen = inventory.excluded_places(include or []) if places == "chosen" else None
     if not version.strip():  # a form without the version it was drawn at proves nothing
         return _page(request, job_id, user, view=view, stale=True, status_code=409)
     outcome: list[inventory.Relettering] = []
 
     def make(result):
-        done = inventory.relabel(result, symbol, to, left_out)
+        done = inventory.relabel(result, symbol, to, left_out, chosen)
         outcome.append(done)
         return done.changes
 

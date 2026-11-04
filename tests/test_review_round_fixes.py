@@ -46,7 +46,7 @@ def test_the_review_split_has_back_to_decision_and_a_page_hint_and_a_named_toolb
     assert (
         '<p class="back-to-decision"><a href="#decision-title">Back to the decision</a></p>' in page
     )
-    assert "scroll it sideways to see all of it" in page
+    assert "Scroll the page sideways" in page
     assert '<div class="page-bar">' in page and '<div class="page-tools">' not in page
     assert 'id="page-tools"' in page  # the "Change page" disclosure keeps its name
 

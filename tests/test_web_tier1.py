@@ -571,10 +571,10 @@ def test_the_advice_counts_the_copies_when_only_some_sit_under_the_same_words():
 def test_a_run_in_label_is_bold_text_and_other_labels_keep_the_proposal():
     result, members = group_result([None, None], label="Solution")
     got = heading_groups.advice(result, members)
-    assert got.suggest == "bold" and "usually bold text, not headings" in got.fact
+    assert got.suggest == "bold" and "usually bold text, not a heading" in got.fact
     result, members = group_result([None, None], label="Key Terms")
     got = heading_groups.advice(result, members)
-    assert got.suggest == "keep" and "the tool's proposal stands" in got.fact
+    assert got.suggest == "keep" and "the proposal stands" in got.fact
 
 
 def test_the_crops_are_the_first_middle_and_last_copy():
@@ -599,7 +599,8 @@ def test_the_group_card_names_the_fact_shows_crops_and_suggests_keeping(ux):
     assert "No copy sits directly under a heading with the same words" in text
     for eid in ("p1-e3", "p1-e7", "p2-e0"):
         assert f"/jobs/{ux.job_id}/regions/{eid}.png" in html
-    assert html.count('class="region-image" loading="lazy"') == 3
+    # the three copies at the top, and each heading's own picture under "Decide them one by one"
+    assert html.count('class="region-image" loading="lazy"') == 6
     keep = re.search(
         r'<button[^>]*class="(button[^"]*)"[^>]*data-role="accept">Keep as headings', html
     )
@@ -675,7 +676,7 @@ def test_when_only_headers_are_missing_that_is_the_main_button(tables):
     main = re.search(r'<button[^>]*class="button"[^>]*>Use the first row as headers', html)
     assert main
     assert re.search(
-        r'class="button-secondary"[^>]*data-role="accept">Accept without headers', html
+        r'class="button-secondary"[^>]*data-role="accept"[^>]*>Accept without headers', html
     )
     assert html.index("Use the first row as headers") < html.index("Accept without headers")
 

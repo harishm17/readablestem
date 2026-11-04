@@ -126,17 +126,20 @@ def statuses(site, job_id: str) -> dict[str, str]:
 def test_accept_all_equations_from_the_keyboard_then_undo(site, browser, job):
     context, page = open_page(browser, site)
     page.goto(f"{site.base}/jobs/{job}/review/list")
-    link = page.get_by_role("link", name=re.compile("Accept all remaining equations whose checks"))
+    # The tools (sections, filter, accepting many at once) are one folded disclosure.
+    tab_to(page, page.locator("details.list-tools > summary"))
+    page.keyboard.press("Enter")
+    link = page.get_by_role("link", name=re.compile("Accept equations that passed every check"))
     assert "(2)" in link.inner_text()
     tab_to(page, link.first)
     page.keyboard.press("Enter")
     page.wait_for_url(re.compile(r"/accept/equations"))
     expect = sync_api.expect
     expect(page.get_by_role("heading", level=1)).to_have_text(
-        "Accept all remaining equations whose checks passed"
+        "Accept equations that passed every check"
     )
     assert page.locator(".bulk-preview > li").count() == 2
-    accept = page.get_by_role("button", name="Accept all 2 equations")
+    accept = page.get_by_role("button", name="Accept these 2 equations")
     presses = tab_to(page, accept)
     assert presses <= 20
     page.keyboard.press("Enter")
@@ -169,6 +172,7 @@ def test_cancel_is_a_link_back_and_changes_nothing(site, browser, job):
 def test_the_decision_filter_is_used_by_keyboard_and_moves_focus_to_the_result(site, browser, job):
     context, page = open_page(browser, site)
     page.goto(f"{site.base}/jobs/{job}/review/list")
+    page.locator("details.list-tools > summary").click()  # the filter is folded until needed
     kind = page.get_by_label("Kind")
     tab_to(page, kind.first)
     page.keyboard.type("Figures")  # a select answers typed letters
@@ -210,6 +214,7 @@ def test_leave_this_page_out_from_the_card_by_keyboard_and_undo(site, browser, j
 def test_report_this_item_is_a_link_with_a_full_name(site, browser, job):
     context, page = open_page(browser, site)
     page.goto(f"{site.base}/jobs/{job}/review?item=p1-e6")
+    page.locator("#more-about > summary").click()  # "More about this item"
     link = page.locator('[data-role="report-item"]')
     href = link.get_attribute("href") or ""
     assert href.startswith("mailto:") and job in href and "p1-e6" in href.replace("%20", " ")
@@ -376,6 +381,7 @@ def test_forced_colors_and_reduced_motion_keep_the_controls_visible_and_still(si
     page.goto(f"{site.base}/jobs/{job}/review/list")
     assert page.evaluate("matchMedia('(forced-colors: active)').matches")
     assert page.evaluate("matchMedia('(prefers-reduced-motion: reduce)').matches")
+    page.locator("details.list-tools").evaluate("d => { d.open = true; }")
     for selector in (".bulk-list a", ".decision-filter button", ".decision-filter select"):
         box = page.locator(selector).first
         expect(box).to_be_visible()

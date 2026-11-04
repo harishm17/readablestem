@@ -154,7 +154,7 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/jobs/{id}/crops/{element_id}.png` | view | Original image of one equation, figure or table |
 | GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | review | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
 | GET `/jobs/{id}/review/list?kind=&page=` | review | "All items as a list": every fix, grouped by kind; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below) |
-| GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept all remaining equations whose checks passed" or "Accept all figures that have generated alt text" would accept, its count, and the form that does it (404 for another kind) |
+| GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept equations that passed every check" or "Accept figures with generated alt text" would accept, its count, and the form that does it; with nothing to accept it says why and names the next step (the first of that kind still waiting, else the next decision) (404 for another kind) |
 | POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item that list shows, as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
 | GET `/jobs/{id}/symbols?view=` | review | The Symbols screen of a document with handwritten equations: every symbol read in them, grouped with the ones that look alike, with counts and places ("Symbols in handwritten equations" below) |
 | POST `/jobs/{id}/symbols` | review | Write one symbol as another of its family in every handwritten equation still waiting, except the places the form ticked; one write (CSRF, review `version` checked: 409 and nothing changed when the document changed since the page was drawn; 422 when no symbol, or one outside the family, is chosen); one Undo takes it back |
@@ -1816,12 +1816,28 @@ queue and outline prototypes.
 
 ### The review screen (`/jobs/{id}/review`)
 
-**Top.** One sentence, counting decisions (a heading group is one): "3 things need your
-decision. Everything else was accepted; optional checks are below." ("2 of 3 decisions
-left. ...", "All decisions made. ..."). No instruction paragraph: the buttons say what
-they do. Beside it, the decisions as numbered steps (made, current, waiting; a bar when
-there are more than 12, nothing when there is one), "All items as a list" and "Back to
-the results".
+**Top.** One short line, counting decisions (a heading group is one): "3 decisions to make."
+("2 of 3 decisions left.", "All decisions made."). No instruction paragraph: the buttons say
+what they do. Beside it, the decisions as numbered steps (made, current, waiting; a bar when
+there are more than 12, nothing when there is one), "List view", "Symbols" and "Accept many
+equations (N)" when they apply, and "Results".
+
+**The choices come first, with what each does** (`.decision-bar`). For an equation the bar
+follows the comparison and holds the recommended repair (when the checks point to one) and Accept
+(or "Accept anyway" when the proposal changes the meaning), each with one line saying what it does;
+the edit box, the table of differences and "Keep as image" (with what students get) come after it,
+so the repair is in the first screen at laptop height. The bar sticks to the bottom of the window on
+a wide screen while the decision is longer than the window. A figure, a table, text and a heading
+use the same bar; the choices that give the original up ("Keep as image", "Keep without a description")
+are a separate block under it, named for what students get. The markup both views share (hidden
+fields, the equation's speech lines and LaTeX field, the figure's alt fields and choices, the
+keep-the-original block) is in `templates/_review_shared.html`; the two layouts keep their own.
+"More about this item" folds the details, the codes and the report link.
+
+**A phone** has a Decision / Page bar fixed at the bottom of the window (plain links; with script it
+remembers where you were in each, so going back lands on the same place), "Fit to width" for the page
+image (kept for the tab), and "Enlarge" under each picture of the PDF, which opens it in a dialog (the
+image itself without script).
 
 **The decision** (right on a wide screen, first on a phone). "Decision 1 of 3", what it is
 ("Equation 5, page 1, in a sentence"), its state in words ("Needs your decision",
@@ -1917,7 +1933,12 @@ the results".
   `review.is_clean_table` leave them out whatever their checks say (ADR 0007, point 12). Tests: `tests/test_web_review_chips.py`,
   `tests/test_web_review_chips_browser.py` (axe, keyboard, target size, forced-colors).
 - *Figure*: its image (the stored crop), the caption, and the alt text field with
-  Accept, Save edit and **Keep without a description**. With long descriptions on (docs/steps.md), a chart's
+  **Accept**, **Save and accept** (the reviewer's own text, one step: the figure is decided) and **Save, decide
+  later** (the text is saved and the figure keeps waiting; the notice says "Saved, not accepted yet"), and, apart
+  from them, **Keep without a description**: the one choice that takes the description from students who use
+  a screen reader, so it needs a tick box ("I understand: screen reader users get no description"; the server
+  refuses it without the tick, `FIGURE_KEEP_ACK`). The alt-text help is for the kind of figure it is
+  (`routes/review.ALT_GUIDANCE`: chart, diagram, photo, illustration, table image, other). With long descriptions on (docs/steps.md), a chart's
   data table comes right under the image (`table_html`, in a box that scrolls sideways
   and takes focus; its cells never break a number across lines, `table-view`). When its
   values were read from the image it is not in the student file: it is offered as an
@@ -1947,7 +1968,9 @@ the results".
   body text size.", the first one in its band of the page (`compare.band_clip`, the
   heading outlined), the pages it is on, **Keep as headings at level 3** and **Make bold
   text**, "Choose another level" folded (open when keeping them at the proposed level
-  would skip a level), and "Decide them one by one" in the list view. The band is
+  would skip a level), and "Decide them one by one" folded below: each heading's own picture with
+  **Keep heading** and **Make it bold**, on the review screen (the form sends `stay=<group key>`, so the
+  reviewer comes back to the group while any heading of it waits). The band is
   snapped to whole lines in the render child (`pdf_probe.snap_band`, from the page's own
   text): the line across its top comes in whole (a box title right above a heading is
   the context that matters), a later line across its bottom is left out, the words its
@@ -2216,16 +2239,19 @@ an image is a decision the screen shows and the job can be done. The card has:
   columns shows. Its label says whether the document has it now ("Proposal, as students
   would get it", "Rebuilt, as students get it", "Proposal (the document has the image
   instead)");
-- **What the checks found**: the step's failed checks as sentences from
-  `web/messages.py`, and any structural problem of the proposal's grid
-  (`core.types.grid_problems`, in plain English: `web.review.GRID_PROBLEM_SENTENCES`)
-  that no check already reported. The codes stay in "Details for this item";
-- **Change the table** (folded): "Cell to change", a list of every cell ("Row 4,
+- **What the checks found** (`table_card.TableCard.findings`): the step's failed checks as sentences from
+  `web/messages.py` (a table check with no sentence of its own is named by the part of the table it is
+  about: "A check on the header cells of this table did not pass ..."), and any structural problem of the
+  proposal's grid (`core.types.grid_problems`, `web.review.GRID_PROBLEM_SENTENCES`) that no check already
+  reported. Each finding has the one correction that answers it: **Use the first row as headers**, **Use
+  the grid read from the PDF**, or **Change the table** (opens the folded place below). The codes stay in
+  "More about this item";
+- **Change the table** (folded; one place for headers, a cell and the grid read from the PDF): "Cell to change", a list of every cell ("Row 4,
   columns 2 to 3: v = d / t") with **Change this cell**, a GET that comes back with that
   cell's form open and its field focused (`?item=<id>&cell=r3c1`); and **Headers**, two
   boxes, "The first row is a header" and "The first column is a header", with **Save
   headers**;
-- **The grid read from the PDF** (folded), when layout built one (`Element.table`) that
+- **The grid read from the PDF**, in the same place, with a folded "Compare the grid" and **Use this grid instead**, when layout built one (`Element.table`) that
   has no structural problem and differs from the proposal: the grid, and **Use this grid
   instead**;
 - **Accept** and **Keep as image** (Reject, named for what it does: "Students see a
@@ -2442,8 +2468,11 @@ whose write was then refused as stale is spent.
 
 Every fix of the document, grouped by kind, as the review screen was before the split
 view. Its forms send `view=list`, so a decision there comes back to the list's next card.
-Accept-many links and the kind and page filter are at the top of "Needs your decision"
-("Review at scale" below).
+The first decision comes first: the file name and page count, one line of what is left, then
+"Needs your decision". The sections of the page, the kind and page filter and the accept-many
+links are one folded disclosure at the top of that section ("Sections, filter and accepting many
+at once"; open while a filter is in use; "Review at scale" below). With more than one decision
+in a kind each is a compact row and the first is open.
 
 **Order.** Only meaning-level problems ask for a decision, so the page has three sections:
 
@@ -2595,12 +2624,12 @@ The measured load is about 1.8 decisions per page (the 15 held-out sections; `/l
 100-page document for about 180. Two kinds of decision wait only
 because the model was not sure enough to accept them itself:
 
-- **Accept all remaining equations whose checks passed**: equations still undecided
+- **Accept equations that passed every check**: equations still undecided
   (`needs_review`) with a usable proposal, no failed check of any kind, no reason code, no
   second-check answer other than "ran and found nothing" (a possible mismatch, or an answer that
   failed open or was not judged, `flagged` not false, keeps it for a person; a fix the check never
   looked at has nothing to doubt), and on their own (not in a group);
-- **Accept all figures that have generated alt text**: figures in the same state with a
+- **Accept figures with generated alt text**: figures in the same state with a
   non-empty alt text that are not marked decorative.
 
 Nothing else is touched: a fix with a failed check (even a warning), a flagged one, an item
@@ -2703,12 +2732,18 @@ o O 0, s S 5 σ, and so on; families with more than one symbol read come first, 
 "Other symbols". Each symbol has its name in words ("small x", "capital X", "Greek rho"), how often
 it was read and in how many equations, and a list of every place under a fold: the equation's small
 picture, a link to its card, the LaTeX with the symbol marked, and "the 2nd one in it" when it
-stands more than once. Places in equations already decided are listed as "Already decided: not
-changed."
+stands more than once. Places in equations already decided are listed as "Decided: stays." Under each
+symbol's select a line says where the change lands ("Changes: Equation 1 (page 1), Equation 2 (page 1, 2
+times)") before the list is opened. With no handwritten equation the screen says when it becomes useful
+(handwritten and scanned pages are read when "Convert scanned or handwritten pages" is ticked at upload) and
+shows a small example that is not part of the document.
 
 *The change.* One form per symbol: a select with the other symbols of its family (nothing chosen
-beforehand; the server refuses anything else), a checkbox "Leave this one as it is" on each place,
-and "Change all ...". `POST /jobs/{id}/symbols` goes through `routes/edits.write_review`: the job
+beforehand; the server refuses anything else), a checkbox on each place, ticked until it is unticked (ticked means "will change", so there is no
+double negative), and "Change all ...", which waits for a replacement and at least one ticked place (with
+script: `aria-disabled`, and a status line that is a live region and says "3 of 3 places change to capital
+X."; without it the button is always there and the server says what is missing). The form posts the ticked
+places (`include`, with `places=chosen`); `exclude` still works for a script. `POST /jobs/{id}/symbols` goes through `routes/edits.write_review`: the job
 is locked, the review version must be the one the page was drawn at, and each equation still waiting
 is edited the way an ordinary edit is checked (`web.edit_check`: the LaTeX must convert and must not
 differ from the PDF's text where that changes the meaning). An equation that fails is left as it was
@@ -2725,7 +2760,7 @@ equations at once ... Each equation stayed waiting for a decision."), not one pe
 *What it does not do.* It does not look at the pictures: the small picture is the whole equation, not
 the symbol. It lists inline maths in prose no more than the review does. Typed (text-layer)
 equations are not part of it. Interface: the form is plain HTML (no script); the screen has
-44 px targets for the select, the fold, the button, each link and each "Leave this one as it is"
+44 px targets for the select, the fold, the button, each link and each tick
 label, a visible border in forced-colors mode, and the marked symbol is underlined, not only
 coloured. `tests/test_web_inventory.py` and `tests/test_web_inventory_browser.py` (keyboard only,
 axe at 1440 and 390 px, 44 px at 320 px, forced-colors) cover it.

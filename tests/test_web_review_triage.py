@@ -227,9 +227,9 @@ def test_page_puts_decisions_first_then_optional_checks_then_the_rest(tri):
     # optional checks, then the accepted ones.
     assert cards(page) == ["p2-e2", *MEMBERS, "p1-e2", "p2-e1", "p3-e1", "p1-e0"]
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
-    assert "2 decisions are still needed:</strong>" in progress
+    assert "2 decisions left:</strong>" in progress
     assert "1 equation, 1 group of repeated headings." in progress
-    assert "2 optional checks can be looked at if you want" in progress
+    assert "2 optional checks below" in progress
 
 
 def test_a_heading_group_is_one_card_with_one_decision(tri):

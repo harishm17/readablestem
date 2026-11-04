@@ -99,6 +99,16 @@ logger = logging.getLogger(__name__)
 
 ACTIONS = ("accept", "edit", "reject")
 STATUS_FOR_ACTION = {"accept": Status.ACCEPTED, "edit": Status.EDITED, "reject": Status.REJECTED}
+# A figure's alt text saved without deciding (the form's "Save, decide later"): posted as its
+# own action, applied as an edit that leaves a waiting item waiting (`apply_review(keep_open)`).
+SAVE_ONLY = "save"
+_TICKED = {"on", "true", "1"}
+# "Keep without a description" is the one choice that takes a description away from students
+# who use a screen reader, so it is made with a tick box, not by one click.
+FIGURE_KEEP_ACK = (
+    "Tick the box to confirm. Students who use a screen reader will get no description of "
+    "this figure."
+)
 # A chart's data table read from the image is an optional extra, not in the student file
 # (`figure_details.data_table_offered`): the reviewer adds it with this action, which
 # changes nothing else about the figure (`add_data_table`).
@@ -202,6 +212,8 @@ class ReviewChange:
     note: str = ""
     # An edit used although it differs from the PDF where it changes the meaning.
     anyway: bool = False
+    # A figure's text saved without deciding ("Save, decide later"): the item still waits.
+    kept_open: bool = False
     # What the same edit changed in another fix: a table cell and the equation behind it are one
     # reading (`pipeline.table_math`), so editing one writes the other. Recorded and undone with it.
     also: list[ReviewChange] = field(default_factory=list)
@@ -510,8 +522,13 @@ def apply_review(
     anyway: bool = False,
     witness: bool = False,
     through: bool = True,
+    keep_open: bool = False,
 ) -> ReviewChange:
     """Apply one decision to `result` in place. Raises LookupError or ReviewInvalid.
+
+    `keep_open`: a figure's alt text saved without deciding (the figure form's "Save, decide
+    later"): the same edit and checks as "Save and accept", but an item still waiting keeps
+    waiting, so the reviewer can come back and accept it.
 
     `witness`: the page witness is on (`FEATURE_PAGE_WITNESS`), so an edit that is its other
     reading can be recorded as a choice of it.
@@ -530,8 +547,13 @@ def apply_review(
         raise ReviewInvalid([FieldError(field_id("actions", element_id), KEPT_IMAGE_ONLY)])
     if action == ADD_DATA_TABLE:
         return add_data_table(result, fix)
-    if action not in ACTIONS:
+    if action not in ACTIONS or (keep_open and (action != "edit" or fix.kind is not Kind.FIGURE)):
         raise ReviewInvalid([FieldError(field_id("actions", element_id), "Choose an action.")])
+    # Students who use a screen reader get nothing for this figure: say so before it is kept
+    # that way (the figure form's tick box; a form without it is refused).
+    keeps_bare = action == "reject" and fix.kind is Kind.FIGURE and not is_kept_image(fix)
+    if keeps_bare and form.get("acknowledge") not in _TICKED:
+        raise ReviewInvalid([FieldError(field_id("acknowledge", element_id), FIGURE_KEEP_ACK)])
     element = next((e for e in result.elements if e.id == element_id), None)
     before = snapshot(fix)
     origin = form.get("origin", "")
@@ -559,6 +581,8 @@ def apply_review(
     places = heading_places(result) if fix.kind is Kind.HEADING else {}
     overridden = False
     status = STATUS_FOR_ACTION[action]
+    if keep_open and fix.pending:
+        status = fix.status  # saved, and still waiting for its decision
     if action == "edit" and fix.kind is Kind.TABLE:
         warnings, note = edit_table(fix, element, form, anyway=anyway)
         overridden = anyway and any(c.code in MEANING_CODES for c in warnings)
@@ -591,6 +615,7 @@ def apply_review(
         moved=_moved_by(places, heading_places(result), element_id) if places else [],
         note=note,
         anyway=overridden,
+        kept_open=keep_open and status in PENDING,
     )
     if through and action == "edit":
         made.also = _written_through(result, fix, element, form, anyway=anyway)

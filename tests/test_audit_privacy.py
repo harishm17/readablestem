@@ -192,7 +192,10 @@ def test_retention_follows_the_clock_through_the_whole_app(web, clock):
     while web.run_worker():
         pass
     csrf = token(client, f"/jobs/{short}/review")
-    client.post(f"/jobs/{short}/review/p1-e4", data={"csrf_token": csrf, "action": "reject"})
+    client.post(
+        f"/jobs/{short}/review/p1-e4",
+        data={"csrf_token": csrf, "action": "reject", "acknowledge": "on"},
+    )
     assert count(web, ReviewEdit) == 1 and count(web, Blob) > 2
 
     clock.advance(hours=23, minutes=59)
@@ -250,7 +253,10 @@ def test_erasing_a_person_removes_everything_of_theirs_and_nothing_of_anyone_els
     while web.run_worker():
         pass
     csrf = token(web.browser, f"/jobs/{mine}/review")
-    web.browser.post(f"/jobs/{mine}/review/p1-e4", data={"csrf_token": csrf, "action": "reject"})
+    web.browser.post(
+        f"/jobs/{mine}/review/p1-e4",
+        data={"csrf_token": csrf, "action": "reject", "acknowledge": "on"},
+    )
     web.browser.post(f"/jobs/{mine}/feedback", data={"csrf_token": csrf, "saved_minutes": "30"})
     with session_scope(web.ctx.factory) as session:
         alice_id = session.scalar(select(db.User.id).where(db.User.email == ALICE))

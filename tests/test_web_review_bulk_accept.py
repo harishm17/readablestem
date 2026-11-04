@@ -192,7 +192,7 @@ def test_the_confirm_page_gives_the_count_and_lists_exactly_what_would_be_accept
     response = confirm_page(scaled, "equations")
     assert response.status_code == 200
     page = response.text
-    assert "<h1>Accept all remaining equations whose checks passed</h1>" in page
+    assert "<h1>Accept equations that passed every check</h1>" in page
     assert "2 equations are waiting" in " ".join(page.split())
     listed = re.findall(r'<li id="bulk-([\w-]+)"', page)
     assert listed == EQUATION_CANDIDATES
@@ -205,8 +205,8 @@ def test_the_confirm_page_gives_the_count_and_lists_exactly_what_would_be_accept
 def test_the_list_and_the_review_screen_offer_the_actions_with_counts(scaled):
     listing = scaled.browser.get(f"/jobs/{scaled.job_id}/review/list").text
     assert f'href="/jobs/{scaled.job_id}/accept/equations?view=list"' in listing
-    assert "Accept all remaining equations whose checks passed (2)" in listing
-    assert "Accept all figures that have generated alt text (2)" in listing
+    assert "Accept equations that passed every check (2)" in listing
+    assert "Accept figures with generated alt text (2)" in listing
     split = scaled.browser.get(f"/jobs/{scaled.job_id}/review").text
     assert f'href="/jobs/{scaled.job_id}/accept/figures?view=split"' in split
 
@@ -561,7 +561,6 @@ def test_handwriting_on_a_typed_page_has_no_leave_out_button(tmp_path):
 def test_the_preview_shows_the_original_crop_beside_each_proposal(scaled):
     page = confirm_page(scaled, "equations").text
     assert f"/jobs/{scaled.job_id}/crops/p1-e2.png" in page
-    assert "Original in the PDF" in page
     figures = confirm_page(scaled, "figures").text
     assert f"/jobs/{scaled.job_id}/crops/p1-e6.png" in figures
 
@@ -670,8 +669,5 @@ def test_the_confirm_button_comes_after_the_previews_and_asks_for_a_comparison(s
     page = confirm_page(scaled, "figures").text
     flat = " ".join(page.split())
     assert page.index('class="bulk-preview"') < page.index('class="bulk-confirm"')
-    assert page.index("What would be accepted") < page.index(
-        'class="button" aria-describedby="bulk-summary"'
-    )
-    assert "with the image of the original before you accept" in flat
-    assert "The button to accept is after the list." in flat
+    assert page.index("To accept") < page.index('class="button" aria-describedby="bulk-summary"')
+    assert "Compare each with the original, then accept." in flat

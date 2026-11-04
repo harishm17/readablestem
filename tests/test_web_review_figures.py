@@ -343,7 +343,7 @@ def test_marking_it_decorative_drops_both(card):
 
 
 def test_reject_keeps_the_figure_flagged_without_its_details(card):
-    assert post(card, "p1-e6", action="reject", **SHOWN).status_code == 303
+    assert post(card, "p1-e6", action="reject", acknowledge="on", **SHOWN).status_code == 303
     html = download(card)
     assert "<details" not in html and "Needs a description." in html
 
