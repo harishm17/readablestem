@@ -83,4 +83,4 @@ def test_automatic_refresh_is_off_until_asked_for_and_can_be_stopped(tmp_path):
     on = get_status(tmp_path / "b", "/status?refresh=1")
     assert '<meta http-equiv="refresh" content="60">' in on
     assert "This page refreshes itself every minute" in status_text(on)
-    assert '<a href="/status">Stop refreshing</a>' in on
+    assert '<a href="/status">stop refreshing</a>' in on

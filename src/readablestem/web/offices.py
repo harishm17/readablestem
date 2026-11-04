@@ -58,7 +58,7 @@ class DataItem:
 # What each model company says about keeping API requests (the long wording is in
 # `templates/_recipients.html`; keep the two in step: a test compares their numbers).
 COMPANY_KEEPS = {
-    "Anthropic": "up to 30 days with Anthropic, longer if its safety systems flag the material",
+    "Anthropic": "up to 30 days, longer if its safety systems flag the material",
     "OpenAI": "as set out in OpenAI's API data policies",
 }
 
@@ -74,7 +74,7 @@ def data_items(context: dict[str, Any]) -> list[DataItem]:
         f"{hours} hours after the instructor last works on it; 7 days if the instructor keeps "
         f"it; {days} days if the instructor also lets us look at the results"
     )
-    same = "Deleted on the same schedule"
+    same = "With us: the same schedule"
 
     def with_company(names: tuple[str, ...]) -> str:
         return "; ".join(
@@ -120,7 +120,7 @@ def data_items(context: dict[str, Any]) -> list[DataItem]:
         DataItem(
             "The result and the review decisions",
             ("Railway",),
-            f"{same}; database backups keep a deleted document up to about {BACKUP_DAYS} days",
+            f"The same schedule; database backups keep a deleted document up to about {BACKUP_DAYS} days",
         ),
         DataItem(
             "The instructor's email address, name and sign-in id",

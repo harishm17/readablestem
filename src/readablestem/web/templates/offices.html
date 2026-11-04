@@ -95,9 +95,14 @@
     <tr>
       <th scope="row">{{ r.name }}</th>
       <td>
+        {% if "hosting" in r.purposes %}
+        Hosts the app and its database, in its United States region. It holds every row of the
+        first table that goes to Railway.
+        {% else %}
         <ul class="cell-list">
           {% for what in received_by(r.name) %}<li>{{ what }}</li>{% endfor %}
         </ul>
+        {% endif %}
       </td>
       {% if r.gets_documents %}
       <td>{{ retention(r.name) }}</td>
