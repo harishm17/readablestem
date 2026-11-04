@@ -1083,3 +1083,9 @@ button[data-tone="quiet"]:hover { background: var(--surface); color: var(--ink);
 /* Small controls on the review screen are at least 24px high. */
 .shortcuts > summary, .tech > summary { display: list-item; min-height: 1.5rem; padding: var(--space-1) 0; }
 .toggle-accepted { display: inline-flex; align-items: center; min-height: 1.5rem; }
+
+/* "Hear this" next to a decision, and the Play controls on the landing page. */
+.hear { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: var(--space-2) 0; }
+.hear button[hidden] { display: none; }
+.hear-note { color: var(--ink-muted); max-width: var(--prose-max); }
+.hear-note:empty { display: none; }

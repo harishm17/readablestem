@@ -27,6 +27,7 @@ from readablestem.web.provider_health import HEALTH
 from readablestem.web.quota import next_day_start
 from readablestem.web.recipients import privacy_context
 from readablestem.web.security import VIEW_CSP
+from readablestem.web.speech_diff import read_text_layer
 
 router = APIRouter()
 
@@ -41,6 +42,9 @@ def _hero() -> dict[str, object]:
     data = json.loads((STATIC_DIR / "hero" / "hero.json").read_text(encoding="utf-8"))
     png = (STATIC_DIR / "hero" / "before.png").read_bytes()
     data["crop_width"], data["crop_height"] = struct.unpack(">II", png[16:24])
+    # How the speech rules read that text layer, for the hero's Play control (the same
+    # reading the review screen shows beside an equation).
+    data["text_layer_speech"] = read_text_layer(str(data["text_layer"]))
     return data
 
 
@@ -154,7 +158,14 @@ def _with_preview_tags(page: str, site: str) -> str:
         count=1,
         flags=re.S,
     )
-    return re.sub(r"<head[^>]*>", lambda m: m.group(0) + "\n" + "\n".join(lines), page, count=1)
+    page = re.sub(r"<head[^>]*>", lambda m: m.group(0) + "\n" + "\n".join(lines), page, count=1)
+    # The demo file is sandboxed (no script), so it cannot play anything itself: its note
+    # links to the page that can (`/demo/listen`). Only the copy sent for /demo has the link.
+    return page.replace(
+        '<a href="/">Back to ReadableSTEM</a>.',
+        '<a href="/">Back to ReadableSTEM</a>. <a href="/demo/listen">Listen as a student</a>.',
+        1,
+    )
 
 
 @router.get("/privacy")

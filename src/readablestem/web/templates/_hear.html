@@ -1,0 +1,11 @@
+{# "Hear this": one small button beside a decision that plays the proposal's spoken form
+   and, for an equation, how the PDF's own text layer reads, with the browser's own speech
+   (static/listen.js). Hidden until the script finds a speech engine, so without JavaScript
+   there is no dead button. The note after it says why nothing played, politely. #}
+{% macro hear_button(item) %}
+{% if item.hear %}
+<p class="hear"><button type="button" class="button-secondary button-small" data-hear hidden
+    data-hear-a="{{ item.hear.a }}"{% if item.hear.a_lead %} data-hear-a-lead="{{ item.hear.a_lead }}"{% endif %}{% if item.hear.b %}
+    data-hear-b="{{ item.hear.b }}" data-hear-b-lead="{{ item.hear.b_lead }}"{% endif %}><span data-hear-label>Hear this</span><span class="visually-hidden"> ({{ item.label|lower }})</span></button><span class="hear-note" data-hear-note role="status"></span></p>
+{% endif %}
+{% endmacro %}

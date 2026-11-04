@@ -4,6 +4,8 @@
 {% from "_describe.html" import describe_box with context %}
 {% from "_report_item.html" import report_link with context %}
 {% from "_leave_out.html" import leave_out_forms with context %}
+{% from "_hear.html" import hear_button %}
+{% block head %}<script src="{{ static_url('listen.js') }}" defer></script>{% endblock %}
 
 {% macro notice_box(notice) %}
 <div class="notice" role="status"{% if notice.element_id %} data-saved="/jobs/{{ job.id }}/review/{{ notice.element_id }}"{% endif %}>
@@ -83,12 +85,14 @@
     {# What a screen reader gets from the PDF itself: its text layer (owner only). #}
     {% if item.text_layer %}<p><strong>From your PDF a screen reader gets:</strong> “<span class="text-layer">{{ item.text_layer }}</span>”</p>
     {% else %}<p><strong>From your PDF a screen reader gets</strong> nothing here: the PDF has no text for this equation.</p>{% endif %}
+    {{ hear_button(item) }}
     {% elif item.kind == "figure" %}
     <p class="part-label">Proposed alt text</p>
     {% if item.decorative %}
     <p>Marked as decorative (no alt text).</p>
     {% elif item.alt %}
     <p class="alt-proposal">{{ item.alt }}</p>
+    {{ hear_button(item) }}
     {% else %}
     <p>No proposal yet: this figure needs a description.</p>
     {% endif %}
@@ -111,6 +115,7 @@
     {% elif item.kind == "heading" %}
     <p class="part-label">Heading text</p>
     <p class="heading-proposal">{{ item.heading_text or "(no text)" }}</p>
+    {{ hear_button(item) }}
     {% if item.heading_level %}<p>Proposed level: {{ item.heading_level }}</p>{% endif %}
     {% if item.heading_shown %}
     {# The outline repair (web.review.heading_places) writes another level: say which. #}
@@ -383,7 +388,8 @@
   {% if symbols_offer %}<a href="/jobs/{{ job.id }}/symbols?view=list">Symbols in the handwritten equations</a> ·
   {% endif %}
   <a href="/jobs/{{ job.id }}">Back to the results</a> ·
-  <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Open the accessible HTML</a></p>
+  <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Open the accessible HTML</a> ·
+  <a href="/jobs/{{ job.id }}/listen">Listen as a student</a></p>
 
 {% if not groups %}
 <p>There is nothing to review in this document.</p>

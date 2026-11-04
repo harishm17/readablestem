@@ -30,7 +30,7 @@ import jinja2
 import pymupdf
 
 from readablestem.core.types import DocumentResult, Element, Fix, Kind
-from readablestem.web import messages, speech_diff
+from readablestem.web import listen, messages, speech_diff
 from readablestem.web.compare import band_clip, compare_equation, context_clip
 from readablestem.web.review import group_fixes, item_labels
 from readablestem.web.routes.review import reject_words
@@ -961,7 +961,14 @@ NAV = [
 
 def make_env() -> jinja2.Environment:
     env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(SITE_DIR / "templates"),
+        # The site's own templates first, then the app's, for the listening component
+        # (`_listen_player.html`), which is one file for both.
+        loader=jinja2.ChoiceLoader(
+            [
+                jinja2.FileSystemLoader(SITE_DIR / "templates"),
+                jinja2.FileSystemLoader(APP_STATIC.parent / "templates"),
+            ]
+        ),
         autoescape=jinja2.select_autoescape(["html"]),
         undefined=jinja2.StrictUndefined,
         trim_blocks=True,
@@ -1070,6 +1077,17 @@ def build_site(out_dir: Path, *, proof_path: Path | None = None) -> list[str]:
             findings=check_findings(example), page_checks=page_checks(example),
             notices=notices_of(example), speech_rows=example.speech[:3],
         )  # fmt: skip
+    for example in examples:
+        page(
+            f"{example.base}/listen.html", "listen_page.html", "examples",
+            f"Listen as a student: {example.title}",
+            description=f"Roughly what a screen reader says for {example.title}, as a "
+            "transcript you can read and play.",
+            example=example,
+            items=listen.build_transcript(
+                example.document, listen.stored_speeches(example.result)
+            ),
+        )  # fmt: skip
     page(
         "before-after/index.html",
         "before_after.html",
@@ -1111,6 +1129,9 @@ def build_site(out_dir: Path, *, proof_path: Path | None = None) -> list[str]:
     for name in fonts:
         out.put(f"assets/fonts/{name}", (APP_FONTS / name).read_bytes())
     out.put("assets/converted.css", converted_css(examples))
+    # The player's script and styles are the app's own files (src/.../web/static/listen.*).
+    out.put("assets/listen.js", (APP_STATIC / "listen.js").read_text(encoding="utf-8"))
+    out.put("assets/listen.css", (APP_STATIC / "listen.css").read_text(encoding="utf-8"))
     out.put(".nojekyll", "")
     out.write(out_dir)
     return sorted(out.files)
