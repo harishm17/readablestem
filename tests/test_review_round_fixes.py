@@ -59,11 +59,10 @@ def test_the_equation_decision_offers_hear_this_even_without_a_stored_reading(en
 def test_the_listening_player_has_a_sticky_transport_with_follow_along_and_a_lesson_start(env):
     page = env.alice.get(f"/jobs/{env.job_id}/listen").text
     assert "data-listen-transport" in page and "data-listen-follow" in page
-    assert 'data-listen="lesson"' in page and "Start at the lesson" in page
+    # Play starts at the lesson; the first item is "Play from the beginning" in the disclosure
+    assert 'data-listen="beginning"' in page and "Play starts at the lesson." in page
     # the settings live in a disclosure, away from the transport
-    assert re.search(
-        r'<details class="listen-more">\s*<summary>Speed, voice and keyboard shortcuts', page
-    )
+    assert re.search(r'<details class="listen-more">\s*<summary>More controls', page)
     assert page.index("data-listen-transport") < page.index("listen-more")
 
 

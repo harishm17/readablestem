@@ -1,14 +1,16 @@
 {% extends "base.html" %}
+{# Confirm discarding a large file kept while its pages are chosen (routes/parts.py). #}
 {% block title %}Discard {{ filename }}?{% endblock %}
+{% block body_class %}page-confirm{% endblock %}
 {% block content %}
-<h1>Discard {{ filename }}?</h1>
-<p>This deletes the copy of the file kept here while you choose its pages. Parts you have already
-  sent to be converted are not affected. It cannot be undone; your own copy of the file is
-  not changed.</p>
-<form method="post" action="/uploads/{{ upload_id }}/delete" class="inline-form">
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-  <input type="hidden" name="confirm" value="yes">
-  <button type="submit" class="button-danger">Yes, discard it</button>
-</form>
-<p><a href="/uploads/{{ upload_id }}">No, keep it</a></p>
+<h1>Discard “{{ filename }}”?</h1>
+<p>Deletes the copy kept here while you choose pages. Parts already sent are not affected. Your own copy is not changed.</p>
+<div class="confirm-actions">
+  <form method="post" action="/uploads/{{ upload_id }}/delete" class="inline-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <input type="hidden" name="confirm" value="yes">
+    <button type="submit" class="button-danger">Discard “{{ filename|truncate(48, True, "…") }}”</button>
+  </form>
+  <a class="button-secondary" href="/uploads/{{ upload_id }}">No, keep it</a>
+</div>
 {% endblock %}

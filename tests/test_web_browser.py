@@ -217,7 +217,7 @@ def queued_job(site, browser):
     yield job_id
     page.goto(f"{site.base}/jobs/{job_id}")
     page.get_by_role("button", name="Delete now").click()
-    page.get_by_role("button", name="Yes, delete it").click()
+    page.get_by_role("button", name="Delete “notes.pdf”").click()
     page.wait_for_url(f"{site.base}/app")
     context.close()
 
@@ -439,11 +439,11 @@ def test_deleting_asks_first_then_the_notice_takes_focus(site, browser):
     sign_in(page, site.base, ALICE)
     job_id = upload_pdf(page, site.base)
     page.get_by_role("button", name="Delete now").click()
-    assert page.get_by_role("heading", level=1).inner_text() == "Delete notes.pdf?"
+    assert page.get_by_role("heading", level=1).inner_text() == "Delete “notes.pdf”?"
     page.get_by_role("link", name="No, keep it").click()
     assert page.url.endswith(f"/jobs/{job_id}")
     page.get_by_role("button", name="Delete now").click()
-    page.get_by_role("button", name="Yes, delete it").focus()
+    page.get_by_role("button", name="Delete “notes.pdf”").focus()
     page.keyboard.press("Enter")
     page.wait_for_url(f"{site.base}/app")
     # Chromium applies `autofocus` (base.html puts it on the first notice) at the next

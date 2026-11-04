@@ -128,7 +128,8 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/app/upload/{id}` | owner | The old address of the answer to an upload of several files: 303 to `/app/batch/{id}` for the owner, 404 for anyone else |
 | GET `/app/download` | signed in | One zip of the person's ready documents ("Several files, courses and download all"); `?format=docx` or `?format=epub` makes the zip of Word or EPUB files (400 for any other value, 503 for Word without pandoc) |
 | POST `/sample` | signed in | Opens the person's sample document, made from the recorded conversion; 303 to its job page ("The sample document") |
-| GET `/uploads/{id}` | owner | A large file kept for choosing its pages: the suggested parts, the box to change them, "Shrink large pictures first" ("Large files in parts") |
+| GET `/uploads/{id}` | owner | A large file kept for choosing its pages: two page fields with "Add part" (`static/parts.js`), the parts as a list with their page counts, the typed box under "Type the pages instead", "Shrink large pictures first" ("Large files in parts") |
+| GET `/uploads/{id}/preview?parts=` | owner | The parts list and its summary line for the text typed so far (an htmx fragment, nothing stored; 404 for anyone else's) |
 | POST `/uploads/{id}` | owner | Convert the chosen parts: each is cut out, checked, counted against the quota and queued as a document of its own; rate limited like an upload. 400 for pages that cannot be used, 413 for a part over the size limit, 429 for the quota or the caps |
 | POST `/uploads/{id}/delete` | owner | "Discard this file": only a POST with `confirm=yes` deletes it, any other POST shows the confirmation page |
 | GET `/jobs/{id}` | view | The job page: status, live progress, what is left to do, the before/after card, notices, results, language (below) |
@@ -169,11 +170,13 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/jobs/{id}/pages/{n}/omit`, `/restore` | review | Leave page `n` out of review and of the student file (T3-16), and put it back. From a kept-image card the form also sends `after=review` (and `view`): the reviewer then goes on to the next decision instead of the page tools |
 | POST `/jobs/{id}/tables/accept-clean` | review | Accept every table that waits with nothing wrong found in it (T3-11), one write |
 | POST `/jobs/{id}/tables/{element_id}/read-cell` | review | Read a table's maths cell with the equation step and check it like a typed edit (T3-11); rate limited (`reread`), one read at a time, spend capped |
-| GET, POST `/jobs/{id}/delete` | owner | A "Delete <title>? This cannot be undone" confirmation page (the file, its upload time, the decisions made on it); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list |
+| GET, POST `/jobs/{id}/delete` | owner | A "Delete “<title>”?" confirmation page (the file, its upload time, the decisions made on it; the button is named `Delete “<title>”`, cut at 48 characters, and "No, keep it" is a button of the same size); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list. The account, course and upload-discard confirmations follow the same pattern (`page-confirm` body class, compact footer) |
 | GET, POST `/jobs/{id}/feedback` | view | The two optional questions after a download, on a page of their own; POST stores them as usage events, once per document (404 when the questions are off) |
 | GET, POST `/courses` | signed in | Courses (with `FEATURE_NOTATION_MEMORY` only, else 404): the user's courses; add one ("Courses and notation" below) |
 | GET `/courses/{id}/download` | owner | One zip of the ready documents converted for the course ("Several files, courses and download all"); `?format=` as for `/app/download` |
-| GET `/courses/{id}`; POST `/courses/{id}/rename`, `/courses/{id}/entries` | owner | A course's notation; rename; add a symbol |
+| GET `/courses/{id}`; POST `/courses/{id}/rename`, `/courses/{id}/entries` | owner | A course's notation (an editable starter set of common bold vectors and matrices while it has none), its documents, rename and delete as separate sections; add a symbol |
+| POST `/courses/{id}/starter` | owner | Add the ticked starter rows as edited (`notation.add_starter`); nothing is added unticked |
+| POST `/courses/{id}/documents` | owner of the course and of each document | Put finished documents that are in no course into this course (`notation.attach_documents`): listed under it, their review screen and edit checks use its notation; they are not converted again (to read the PDF with the notation, upload it again for the course) |
 | GET, POST `/courses/{id}/entries/{entry}`; POST `.../delete` | owner | Edit or remove one symbol |
 | GET, POST `/courses/{id}/delete` | owner | "Delete <course>?" confirmation; only a POST with `confirm=yes` deletes |
 | GET `/jobs/{id}/record`, `/jobs/{id}/record.csv` | view | The review record (T3-6, "The review record" below): a page to print and a CSV; owner only, finished jobs only (409 otherwise), changes nothing |
@@ -728,7 +731,10 @@ converting, htmx polls the page with the version of what it drew (`documents.lis
 unfinished the polling stops. **Download all** (`/app/batch/{id}/download`, `routes/bundle._zip_response` for
 the batch's ids) is offered once nothing is waiting or converting: one zip of the batch's documents with no
 decision open (the same rules as "Download all" on My documents), and the page says how many were left out for
-their decisions. The outcomes are kept an hour (`upload_results`); past it the page is 404 and the documents
+their decisions. Above the table a "next step" line says what to do (nothing yet while documents are waiting; review the first
+document that needs decisions; look at stopped ones; every document is ready) with how long ago the batch was uploaded (the
+minute is part of the poll's version, so the line is never stale); documents that came out with the same title lead with their
+file names. The outcomes are kept an hour (`upload_results`); past it the page is 404 and the documents
 are on My documents. Axe passes on the page at 1280 and 375 CSS px (`tests/test_web_jobs_browser.py`).
 
 ### Large files in parts (`web/pending.py`, `web/routes/parts.py`, `web/ranges.py`)
@@ -738,13 +744,18 @@ A PDF over `MAX_PAGES_PER_JOB` pages or `MAX_UPLOAD_MB`, and within `MAX_SOURCE_
 (`pending_uploads`: the bytes, the page count and the course, exam and keeping choices made
 with it), nothing is converted or counted, and the person is sent to `/uploads/{id}`:
 
-- **The page** says how many pages and MB the file is and what one conversion takes, and
-  suggests parts: as few as fit and of nearly equal size, one per line (59 pages: `1-30` and
-  `31-59`; `ranges.suggest_parts`). The person edits the box: one part per line (or after a
-  semicolon), ranges with a hyphen, ranges joined with commas in one part, pages numbered
-  from 1 as in a PDF viewer. What cannot be used is said in words naming the part and the
-  page ("Part 2: page 70 is not in this file, which has 59 pages", `ranges.parse_parts`).
-  Pages already sent are left out and cannot be sent twice.
+- **The page** says how many pages and MB the file is, what one part can hold and the pages
+  left today (once), and suggests parts: as few as fit and of nearly equal size (59 pages:
+  `1-30` and `31-59`; `ranges.suggest_parts`). The parts are a list with a page count each and
+  one summary line ("3 parts, 12 pages."); with script, two page fields and "Add part" append a
+  line to the text box and "Remove" takes one out (`static/parts.js`). The box is the form's one
+  field and stays under "Type the pages instead" (open without script and when something needs
+  fixing): one part per line (or after a semicolon), ranges with a hyphen, ranges joined with
+  commas in one part, pages numbered from 1 as in a PDF viewer. What cannot be used is said in
+  words naming the part and the page ("Part 2: page 70 is not in this file, which has 59
+  pages", `ranges.parse_parts`); the preview (`ranges.preview`, `GET /uploads/{id}/preview`,
+  refreshed by htmx as the box changes and drawn again after an error) marks the part that is
+  wrong and still counts the others. Pages already sent are left out and cannot be sent twice.
 - **Cutting.** Each part is cut out in the probe's child process (`pdf_probe extract`,
   same memory cap, 60 s), so MuPDF never touches the file in the web process, checked again
   by the probe like any upload (a part of only scanned pages is refused as a scanned
@@ -803,14 +814,16 @@ documents (zip)". My documents offers the same for everything the person has
 The owner of a finished document can let named people open it (G1). It is for an instructor who
 wants a colleague or an accessibility coordinator to read it or to review it with them.
 
-- **The owner's side.** The job page's "Share this document" opens `/jobs/{id}/share`: the
-  people with access and their right, a form (email address; View or Review as whole-row
-  choices, each with what it allows), "Change ... to" and "Remove ..." (a danger button) per
-  person, and the document's address to copy: a selectable field, plus a "Copy link" button
+- **The owner's side.** The job page's "Share this document" opens `/jobs/{id}/share`: a
+  one-line "add a person, copy the link, send it yourself", a form (email address; View or
+  Review as whole-row choices, each with what it allows; the Share button has when access ends
+  beside it), the people with access with "Change ... to" and "Remove ..." (a danger button)
+  per person, the document's address to copy: a selectable field, plus a "Copy link" button
   that `static/copy-link.js` shows (with a polite confirmation; without script the field is
   copied by hand). Beside the address the page says when the document is deleted (every share
   ends then) and links to the job page's keep controls. The sign-in wording names only the
-  providers this server has (`routes.sharing.sign_in_words`). Nothing is emailed; the
+  providers this server has (`routes.sharing.sign_in_words`); the exact-address rule is under
+  "Help with sharing", and an error summary sits directly above the form. Nothing is emailed; the
   owner sends the address. At most 10 people per document; the sample document and an
   unfinished one cannot be shared; the owner's own address is refused. The address is stored in
   lower case, matched ignoring letter case but as the same whole address (an alias or another
@@ -1218,13 +1231,20 @@ the site is built, with the same component and the same script).
 - **Kept per job result version** in memory (`listen.CACHE`, the last 32; the key also holds a
   digest of the HTML). Nothing is stored in the database, logged, or put in a downloaded or
   exported file.
-- **The page** says "Roughly what a screen reader says. NVDA, JAWS and VoiceOver each speak
-  differently; test with one before you rely on it." Each item is a block with its role. The
-  transcript is plain text, so it works without JavaScript and in a browser that cannot
-  speak; the controls are hidden until `listen.js` finds `speechSynthesis`.
+- **The page** says "Roughly what a screen reader says. Each one speaks differently: test with
+  yours." Each item is a line with its role, divided by a hairline (no boxes). The items before
+  the lesson (title, language, notices, licence) are folded under "Before the lesson", an index
+  of headings and equations is a list of links, and a filter (text and kind) narrows the list
+  (script). The transcript is plain text, so it works without JavaScript and in a browser that
+  cannot speak; the controls are hidden until `listen.js` finds `speechSynthesis`.
 - **The player** uses the browser's Web Speech API (a static file under `script-src
-  'self'`): Play, Pause, Stop, speed, voice, previous and next item, next heading and next
-  equation, the item being spoken marked (a bar and a tint, `aria-current`) and scrolled into
+  'self'`). The transport is Play (which becomes Pause), Previous and Next, and stays in view;
+  Play starts at the lesson. Under "More controls": Stop, Play from the beginning, next
+  heading, next equation, Follow along, speed, voice, keys. Why Play is off (no voice, or only
+  online voices) is a line right under it with "Read the transcript" (and "Choose a voice").
+  While the filter is on, Previous, Next and playing move through the items shown. The scroll
+  offset is the transport's measured height (`--listen-sticky`), so it holds at enlarged text.
+  The item being spoken is marked (a bar and a tint, `aria-current`) and scrolled into
   view (instantly under `prefers-reduced-motion`). Keys (`p`, `s` or Esc, `[`, `]`, `h`, `e`)
   work only while focus is inside the page's content, never with a modifier or in a menu. State
   changes go to a polite status line; the item being spoken is not announced again. It never
@@ -2828,7 +2848,10 @@ white text on the numbered discs at least 4.5:1.
 - Logs carry event names, ids, counts, costs and category codes only
   (`web/logsafe.py`). Exceptions are logged as their type and code location, never their
   message, which can quote document text. `SafeErrorMiddleware` turns any unhandled
-  error into a plain 500 page so the server never logs the message either. A test runs
+  error into a plain 500 page so the server never logs the message either. The fixed 500 and 503
+  pages (`templates/500.html`, `503.html`, read as they are by `app._static_error_page`) carry the
+  wordmark, My documents, the status page and a contact link (the settings' `CONTACT_EMAIL`);
+  the 404 says what a missing document or course can mean without saying which. A test runs
   upload, conversion, review and failure with marker strings in every kind of content and
   checks none reach the logs.
 - File names, emails and document content are not written to logs or error codes; the

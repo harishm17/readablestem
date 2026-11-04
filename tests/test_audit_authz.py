@@ -97,6 +97,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/courses/{course_id}/entries/{entry_id}/delete"): USER,
     ("POST", "/courses/{course_id}/remember"): USER,
     ("POST", "/courses/{course_id}/suggestions"): USER,  # T3-12: CSRF, owner of course (and job)
+    ("POST", "/courses/{course_id}/starter"): USER,  # CSRF, owner of the course; adds ticked rows
+    ("POST", "/courses/{course_id}/documents"): USER,  # CSRF, owner of course and of each document
     ("POST", "/courses/{course_id}/rename"): USER,
     ("GET", "/jobs/{job_id}"): USER,
     ("GET", "/jobs/{job_id}/crops/{element_id}.png"): USER,
@@ -160,6 +162,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/share/{share_id}/revoke"): USER,  # CSRF, owner only
     # T3-3: a large file kept while its owner chooses the pages; owner only like a job
     ("GET", "/uploads/{upload_id}"): USER,
+    ("GET", "/uploads/{upload_id}/preview"): USER,  # owner only: the parts list for typed pages
     ("POST", "/uploads/{upload_id}"): USER,  # CSRF, rate limited, quota and caps as an upload
     ("POST", "/uploads/{upload_id}/delete"): USER,  # asks first (confirm=yes)
     # T3-4: the answer to an upload of several files, a page of its own for an hour: the batch

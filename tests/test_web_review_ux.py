@@ -719,8 +719,9 @@ def test_a_form_from_before_signing_in_again_links_back_to_its_decision(ux):
     assert response.status_code == 403
     assert "This form has expired" in response.text
     assert "Go back to the decision and choose again." in response.text
-    assert f'<a href="/jobs/{ux.job_id}/review?item=p1-e2">Back to the decision</a>' in (
-        response.text
+    assert (
+        f'<a class="button" href="/jobs/{ux.job_id}/review?item=p1-e2">Back to the decision</a>'
+        in response.text
     )
     assert stored(ux).fix_for("p1-e2").status.value == "needs_review"
 
