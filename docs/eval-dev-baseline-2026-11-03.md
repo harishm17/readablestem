@@ -469,3 +469,145 @@ uv run python scripts/realworld_report.py --part dev --tag base-0507 --rescore-c
 # add --neutral or --spoken, or drop --reading cells for reading A
 uv run python scripts/dev_miss_places.py --part dev --tag base-0507
 ```
+
+## Pipeline 0.5.8
+
+Added 2026-11-04. ReadableSTEM re-run on the 25 development papers at commit `d4f0023` (origin/main at
+the deploy; pipeline 0.5.8: tex2pdf/VTeX producer recognised as TeX, symbol-only table cells, column-clipped
+cell crops), tag `base-0508`, against the `base-0507` run of pipeline 0.5.7 and the recorded Opus and Haiku
+chatbot answers (all 25 papers, 114 pages, 2,350 gold; development part only, no held-out or fresh paper
+touched, no chatbot asked). Same flags, models, tooling, scorer and reading B as the 0.5.7 section; intervals
+are 95% cluster bootstraps over the 25 papers (10,000 resamples), p-values sign-flip, descriptive and not
+registered. The set was used to tune the pipeline.
+
+**The short version.** Pipeline 0.5.8 writes 0.743 of the equations exactly right (reading B, 0.688 to
+0.788), pipeline 0.5.7 0.736, the Opus chatbot 0.708 (0.613 to 0.787), the Haiku chatbot 0.674. The paired
+difference against Opus is +0.036 (95% -0.022 to +0.103, p = 0.471): ahead on the point estimate, and the
+interval still includes zero, so these papers do not show a difference. The same holds under the
+notation-neutral (+0.044, -0.017 to +0.115) and spoken-equal readings (+0.063, -0.006 to +0.146). Against
+Haiku the difference is +0.069 (+0.012 to +0.129, p = 0.046). The change from 0.5.7 to 0.5.8 is +0.007
+(0.000 to +0.017, p = 0.250): 17 more of 2,350 equations right (1,730 to 1,747), 14 fewer wrong without
+being asked (240 to 226). The gain sits in three papers (2505.11658 +9, 2506.16486 +4, 2408.09889 +4); the
+other 22 papers are unchanged in the number right. Detection recall is 0.880 (0.879 before).
+
+### How it was run
+
+- `scripts/realworld_run.py rs --part dev --tag base-0508` with the flags of the base-0507 run (`--tables
+  --notation-memory --line-context --glyph-checks --flag-policy`; page math and page witness off;
+  `--section-workers 1 --concurrency 2`), from a worktree at `d4f0023` (a branch of it, no code changes). The
+  key came from the environment through `railway run -s web`; the process was started with `env -i`, the key
+  only, so no application setting reached a request. Pipeline version recorded in the report: 0.5.8;
+  models `claude-opus-5-5` (main) and `claude-haiku-5-5` (cheap), as before.
+- Answers: the run started from the recorded answers of `base-0507`. A request whose text matches a recorded
+  answer is replayed; one that the code changes had altered is asked live. The offline pass reported 178
+  requests without a recorded answer; the first live pass asked them (a request's text depends on earlier
+  answers, so the set can grow as answers arrive) and the second pass reported 2,754 hits and 0 misses.
+  Cost per page is the list price of all recorded calls (replayed ones included), as before.
+- Recordings in `~/.cache/readablestem/realworld/runs/dev/base-0508/` next to `base-0507`.
+
+### Results (reading B, n = 25 papers, 2,350 gold, 114 pages)
+
+| | ReadableSTEM 0.5.8 | ReadableSTEM 0.5.7 | Chatbot, Opus | Chatbot, Haiku |
+|---|---|---|---|---|
+| exact_lenient, end to end | 0.743 [0.688, 0.788] | 0.736 [0.679, 0.783] | 0.708 [0.613, 0.787] | 0.674 [0.605, 0.738] |
+| notation-neutral | 0.772 [0.716, 0.817] | 0.765 [0.707, 0.812] | 0.728 [0.631, 0.811] | 0.693 [0.619, 0.759] |
+| spoken-equal (exploratory) | 0.792 [0.733, 0.839] | 0.784 [0.723, 0.833] | 0.728 [0.633, 0.808] | 0.723 [0.655, 0.782] |
+| symbols, credited (secondary) | 0.786 [0.729, 0.834] | 0.779 [0.720, 0.829] | 0.744 [0.644, 0.826] | 0.712 [0.639, 0.778] |
+| detection recall | 0.880 [0.831, 0.917] | 0.879 [0.830, 0.915] | 0.819 [0.730, 0.891] | 0.840 [0.786, 0.884] |
+| detection precision | 0.860 [0.830, 0.888] | 0.861 [0.831, 0.889] | 0.767 [0.686, 0.846] | 0.876 [0.829, 0.918] |
+| wrong, not asked, per 100 gold (exact_lenient) | 9.62 [7.50, 12.00] | 10.21 [7.83, 12.94] | 11.15 [8.25, 14.65] | 16.51 [11.91, 21.65] |
+| wrong, not asked, per 100 gold (notation-neutral) | 7.45 [5.60, 9.60] | 8.04 [5.85, 10.64] | 9.11 [6.16, 12.64] | 14.64 [10.15, 19.96] |
+| wrong, not asked, per 100 gold (spoken-equal) | 6.30 [4.20, 8.89] | 6.89 [4.45, 9.92] | 9.11 [6.14, 12.75] | 11.66 [8.50, 15.22] |
+| equation flags, recall | 0.321 [0.216, 0.420] | 0.300 [0.191, 0.409] | 0 | 0 |
+| equation flags, precision | 0.333 [0.202, 0.477] | 0.330 [0.199, 0.474] | n/a | n/a |
+| required decisions per PDF page, all kinds | 3.72 [2.67, 4.89] | 3.62 [2.61, 4.75] | 0 | 0 |
+| of which on an aligned equation | 1.97 [1.27, 2.78] | 1.96 [1.26, 2.77] | 0 | 0 |
+| cost per PDF page | $0.0298 [0.0236, 0.0361] | $0.0304 [0.0239, 0.0373] | $0.0865 [0.0809, 0.0924] | $0.0022 [0.0021, 0.0024] |
+
+Under reading A (the registered table reading) exact_lenient is 0.723 [0.665, 0.770] for 0.5.8 and 0.716
+[0.657, 0.764] for 0.5.7 (difference +0.007, 0.000 to +0.017, p = 0.250); against Opus +0.015 (-0.051 to
++0.088, p = 0.966), against Haiku +0.049 (-0.019 to +0.115, p = 0.272). The 0.5.7, Opus and Haiku columns
+reproduce the 0.5.7 section above.
+
+### Paired differences (reading B, 95% cluster interval, sign-flip p, n = 25 papers)
+
+| metric | 0.5.8 minus Opus | p | 0.5.8 minus Haiku | p | 0.5.8 minus 0.5.7 | p |
+|---|---|---|---|---|---|---|
+| exact_lenient | +0.036 [-0.022, +0.103] | 0.471 | +0.069 [+0.012, +0.129] | 0.046 | +0.007 [0.000, +0.017] | 0.250 |
+| notation-neutral | +0.044 [-0.017, +0.115] | 0.340 | +0.079 [+0.023, +0.137] | 0.008 | +0.007 [0.000, +0.017] | 0.250 |
+| spoken-equal | +0.063 [-0.006, +0.146] | 0.221 | +0.069 [+0.021, +0.121] | 0.011 | +0.007 [0.000, +0.017] | 0.250 |
+| symbols, credited | +0.043 [-0.015, +0.110] | 0.373 | +0.074 [+0.021, +0.132] | 0.017 | +0.007 [0.000, +0.017] | 0.250 |
+| detection recall | +0.061 [-0.003, +0.143] | 0.180 | +0.041 [0.000, +0.089] | 0.081 | +0.002 [0.000, +0.006] | 1.000 |
+| wrong, not asked, per 100 gold (exact_lenient) | -1.53 [-4.09, +0.69] | 0.366 | -6.89 [-11.97, -2.39] | 0.020 | -0.60 [-1.64, 0.00] | 0.500 |
+| wrong, not asked, per 100 gold (notation-neutral) | -1.66 [-4.17, +0.49] | 0.267 | -7.19 [-12.12, -2.97] | 0.005 | -0.60 [-1.64, 0.00] | 0.500 |
+| wrong, not asked, per 100 gold (spoken-equal) | -2.81 [-5.11, -0.69] | 0.104 | -5.36 [-8.52, -2.29] | 0.010 | -0.60 [-1.64, 0.00] | 0.500 |
+
+Is ReadableSTEM ahead of Opus on these 25 papers? On the point estimate, yes, by 4 points (exact), 4
+(neutral) and 6 (spoken); on detection precision by 9 points and on cost by 2.9 times. No interval for
+exact_lenient, notation-neutral or spoken-equal excludes zero (lower ends -0.022, -0.017, -0.006) and the
+p-values are 0.22 to 0.47, so this set does not show a difference against Opus. Against Haiku the interval
+excludes zero under all three readings (lower ends +0.012, +0.023, +0.021). The 0.5.8 gain over 0.5.7 is
+small and one-sided: no paper got worse in the number right, so the interval has its lower end at zero, and
+the sign-flip p, which only papers that changed can move, cannot go below 0.25 with three papers changed.
+Read the +0.007 as 17 equations in three papers, not as a measured improvement in general.
+
+### Where the misses are (reading B, exact_lenient, counts of gold equations, per 100 gold in brackets)
+
+`scripts/dev_miss_places.py --part dev --tag base-0508`, same buckets as above. Opus and Haiku columns are
+unchanged from the 0.5.7 section.
+
+| miss bucket | 0.5.8 | 0.5.7 | Opus | Haiku |
+|---|---|---|---|---|
+| right | 1,747 (74.3) | 1,730 (73.6) | 1,663 (70.8) | 1,585 (67.4) |
+| in tables and figures (any failure) | 168 (7.1) | 173 (7.4) | 173 (7.4) | 252 (10.7) |
+| inline span edges (running text) | 88 (3.7) | 96 (4.1) | 65 (2.8) | 71 (3.0) |
+| short inline expressions in running text, not found (1 to 3 symbols) | 120 (5.1) | 122 (5.2) | 153 (6.5) | 121 (5.1) |
+| other | 227 (9.7) | 229 (9.7) | 296 (12.6) | 321 (13.7) |
+| misses, total | 603 (25.7) | 620 (26.4) | 687 (29.2) | 765 (32.6) |
+
+| ReadableSTEM by place | gold | right 0.5.8 (0.5.7) | scorer | span | recognition | no proposal | not found 0.5.8 (0.5.7) |
+|---|---|---|---|---|---|---|---|
+| running text and algorithm | 1,950 | 1,515 (1,503) | 81 | 88 | 99 | 3 | 164 (168) |
+| table | 223 | 99 (95) | 11 | 6 | 22 | 0 | 85 (85) |
+| figure (caption or panel) | 177 | 133 (132) | 4 | 7 | 0 | 1 | 32 (32) |
+
+Most of the gain is in running text (12 more right, span edges 96 to 88), table equations gained 4 (found
+and read wrong 26 to 22; not found stays at 85), figures 1. The 85 table equations not found and the 120
+short inline expressions not found did not move. Single run; run-to-run variation of the models is not
+measured here.
+
+### Per paper (reading B, exact_lenient, equations right of gold)
+
+| paper | gold | right 0.5.7 | right 0.5.8 | change | wrong, not asked, 0.5.7 to 0.5.8 | required decisions, 0.5.7 to 0.5.8 | cost per paper, 0.5.7 to 0.5.8 |
+|---|---|---|---|---|---|---|---|
+| 2505.11658 | 88 | 55 | 64 | +9 | 23 to 13 | 5 to 7 | $0.062 to $0.075 |
+| 2506.13076 | 61 | 55 | 55 | 0 | 4 to 4 | 10 to 9 | $0.077 to $0.092 |
+| 2506.16486 | 90 | 75 | 79 | +4 | 5 to 5 | 3 to 3 | $0.030 to $0.030 |
+| 2404.05746 | 59 | 23 | 23 | 0 | 3 to 3 | 5 to 5 | $0.108 to $0.108 |
+| 2410.12036 | 75 | 56 | 56 | 0 | 10 to 10 | 31 to 31 | $0.197 to $0.199 |
+| 2408.09889 | 124 | 82 | 86 | +4 | 14 to 10 | 22 to 32 | $0.258 to $0.160 |
+
+Across all 25 papers the right count goes 1,730 to 1,747, and those three papers are the only ones where it
+changed; 2506.13076 changed in predictions (65 to 64 equations found) but not in the number right. Wrong
+without being asked goes 240 to 226 (2505.11658 -10, 2408.09889 -4); required decisions 413 to 424
+(2408.09889 +10). Cost per paper is the list price of the recorded calls, so a paper whose requests changed
+shows the new calls and not the old ones.
+
+### Spend
+
+Cap $3.00 for the measurement; **$0.1351 spent**, all of it ReadableSTEM's own pipeline calls: the first
+live pass $0.1351 (cap $1.50); the second asked nothing ($0.00, 0 misses). Two lines in
+`data/realworld/spend-log.jsonl`, tag `base-0508`. Re-scores, miss places and the paired differences cost
+nothing. No chatbot arm was run; the full run's recorded calls are $3.40 at list price ($0.0298 per page).
+
+### Reproduce
+
+```
+R="uv run python scripts/realworld_run.py"
+$R rs --part dev --tag base-0508 --tables --notation-memory --line-context --glyph-checks \
+  --flag-policy --seed-answers-from base-0507 --max-usd 3 --section-workers 1 --concurrency 2
+# repeat until the offline pass (--offline) reports 0 misses; run at d4f0023 with the key only in the environment
+uv run python scripts/realworld_report.py --part dev --tag base-0508 --rescore-chat --extra-arm rs0507=base-0507 --reading cells
+# add --neutral or --spoken, or drop --reading cells for reading A
+uv run python scripts/dev_miss_places.py --part dev --tag base-0508
+```
