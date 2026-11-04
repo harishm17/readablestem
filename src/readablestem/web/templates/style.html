@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Style{% endblock %}
+{% block body_class %}mode-read{% endblock %}
+{% block description %}The colours, type and components the site is built from.{% endblock %}
+{% block content %}
+{# A working page for the people who build the site, not a public page: it is noindex (it is
+   not in web.seo.PUBLIC_PAGES) and nothing links to it. Its strings are labels for the
+   components, not site copy. DESIGN.md says how the tokens are used. #}
+<h1>Style</h1>
+<p class="lede">The tokens and components every page is built from, in the theme your browser
+  asks for. Colours are the CSS custom properties in <code>tokens.css</code>.</p>
+
+<h2>Type</h2>
+<div class="style-specimen">
+  <p class="style-display">Display, Source Serif 4 600</p>
+  <p class="style-h1">Page heading, Source Serif 4 600</p>
+  <p class="style-h2">Section heading, Source Serif 4 600</p>
+  <p class="style-h3">Sub-heading, Source Sans 3 700</p>
+  <p>Prose, Source Sans 3 400 at 18px on pages people read, 16px in the app. Real letters:
+    θ = 0 km, α ≥ 10 min, Δt. A plain zero, never slashed.</p>
+  <p class="small">Meta text, 14px, the smallest size used.</p>
+  <p><code>\frac{\Delta d}{\Delta t}</code> in Source Code Pro. <a href="#type">A link is always underlined</a>.</p>
+</div>
+
+<h2>Colour</h2>
+<ul class="style-swatches">
+  <li><span class="swatch swatch-ink"></span>Ink</li>
+  <li><span class="swatch swatch-ink-muted"></span>Ink muted</li>
+  <li><span class="swatch swatch-accent"></span>Accent</li>
+  <li><span class="swatch swatch-surface"></span>Surface</li>
+  <li><span class="swatch swatch-border-control"></span>Control border</li>
+  <li><span class="swatch swatch-focus-halo"></span>Focus halo</li>
+</ul>
+<p>
+  <span class="tag tag-warn">Needs your decision</span>
+  <span class="tag tag-ok">Accepted</span>
+  <span class="tag tag-err">Not converted</span>
+</p>
+
+<h2>Buttons and links</h2>
+<p class="button-row">
+  <a class="button" href="#buttons">Primary</a>
+  <a class="button-secondary" href="#buttons">Secondary</a>
+  <button type="button" class="button-danger">Danger</button>
+  <button type="button" class="button" disabled>Disabled</button>
+  <a class="button-secondary button-small" href="#buttons">Small</a>
+</p>
+
+<h2>Form fields</h2>
+<div class="style-form">
+  <div class="field">
+    <label for="style-course">Course name</label>
+    <p class="hint" id="style-course-hint">A hint sits between the label and the field.</p>
+    <input type="text" id="style-course" value="PHYS 2325" aria-describedby="style-course-hint">
+  </div>
+  <div class="field field-error">
+    <label for="style-bad">Field with an error</label>
+    <p class="error-message" id="style-bad-error"><span class="visually-hidden">Error: </span>Say what is wrong and how to fix it.</p>
+    <input type="text" id="style-bad" value="" aria-invalid="true" aria-describedby="style-bad-error">
+  </div>
+  <div class="field checkbox-field">
+    <input type="checkbox" id="style-check" checked>
+    <label for="style-check">A checkbox</label>
+  </div>
+</div>
+
+<h2>Notices</h2>
+<div class="notice" role="note"><p>An information notice.</p></div>
+<div class="notice notice-warning" role="note"><h3>A warning notice</h3><p>With its heading, in words first.</p></div>
+
+<h2>Card, stat tile, panes</h2>
+<div class="stat-row">
+  <div class="card card-surface">
+    <h3>A card</h3>
+    <p>A framed container: 8px radius, a 1px border, no shadow.</p>
+  </div>
+  <div class="stat">
+    <p class="stat-value">00</p>
+    <p class="stat-label">What the number counts</p>
+    <p class="stat-note">Set, date and sample size. <a href="#stat">How it was measured</a></p>
+  </div>
+</div>
+<div class="panes style-panes">
+  <section class="pane" aria-labelledby="style-pane-a">
+    <h3 id="style-pane-a">Pane one <span class="tag tag-err">Tag</span></h3>
+    <p>Two equal panes; below 52rem they stack, first one first.</p>
+  </section>
+  <section class="pane" aria-labelledby="style-pane-b">
+    <h3 id="style-pane-b">Pane two <span class="tag tag-ok">Tag</span></h3>
+    <p>The text layer and its reading go in a mono box.</p>
+  </section>
+</div>
+
+<h2>Comparison table</h2>
+<div class="table-scroll" role="group" aria-label="Comparison table" tabindex="0">
+  <table class="compare-table">
+    <caption>Facts, each with its source and the date it was read</caption>
+    <thead><tr><th scope="col">Topic</th><th scope="col">One</th><th scope="col">Two</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Takes in</th><td>A cell with a fact. <a href="#table">Source</a>, read on a date.</td><td>Another cell.</td></tr>
+      <tr><th scope="row">Gives back</th><td>A cell.</td><td>A cell.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Questions</h2>
+<div class="faq">
+  <details><summary>A question in a native disclosure</summary><p>The answer.</p></details>
+  <details><summary>Another question</summary><p>The answer.</p></details>
+</div>
+{% endblock %}

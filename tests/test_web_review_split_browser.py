@@ -340,7 +340,7 @@ def test_typing_a_fix_then_pressing_accept_keeps_the_fix_without_javascript(site
         page.get_by_role("button", name=n).evaluate("e => getComputedStyle(e).backgroundColor")
         for n in ("Save edit to equation 1", "Accept anyway equation 1")
     )
-    assert save == "rgb(26, 79, 160)" and accept != save
+    assert save == "rgb(28, 70, 173)" and accept != save
     page.get_by_role("button", name="Save edit to equation 1").click()
     page.wait_for_url(f"{url}?item=p1-e6")
     assert (

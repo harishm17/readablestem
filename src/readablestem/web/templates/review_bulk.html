@@ -44,7 +44,7 @@
     <div class="proposal">
     {% if item.kind == "equation" %}
     {% if item.mathml %}<div class="mathml-preview" tabindex="0" role="group" aria-label="Proposed {{ item.label|lower }}">{{ item.mathml }}</div>{% endif %}
-    {% if item.speech %}<p>Read aloud roughly as: {{ item.speech }}</p>{% endif %}
+    {% if item.speech|speakable %}<p>Read aloud roughly as: {{ item.speech|speakable }}</p>{% endif %}
     {% else %}
     <p class="alt-proposal"><span class="part-label">Alt text:</span> {{ item.alt }}</p>
     {% endif %}
