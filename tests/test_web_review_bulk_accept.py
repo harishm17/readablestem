@@ -662,3 +662,16 @@ def test_an_item_read_from_an_image_is_never_a_bulk_candidate_whatever_its_check
     assert result.fix_for("p1-e2").pending  # type: ignore[union-attr]
     # the table rule too: an image-page table is not a clean table
     assert not is_clean_table(result.fixes[0], element)
+
+
+def test_the_confirm_button_comes_after_the_previews_and_asks_for_a_comparison(scaled):
+    """The evidence (each original beside its proposal) is read before the button that accepts
+    them; the Cancel link and Undo after accepting stay (tests above)."""
+    page = confirm_page(scaled, "figures").text
+    flat = " ".join(page.split())
+    assert page.index('class="bulk-preview"') < page.index('class="bulk-confirm"')
+    assert page.index("What would be accepted") < page.index(
+        'class="button" aria-describedby="bulk-summary"'
+    )
+    assert "with the image of the original before you accept" in flat
+    assert "The button to accept is after the list." in flat
