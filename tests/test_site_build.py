@@ -233,7 +233,27 @@ def test_css_loads_nothing_from_outside(built):
     for css in out.glob("assets/*.css"):
         text = css.read_text(encoding="utf-8")
         assert "@import" not in text
-        assert not re.search(r"url\(\s*['\"]?(?!data:)", text), css.name
+        # data: images and the self-hosted fonts beside the stylesheet (assets/fonts/), nothing else
+        for target in re.findall(r"url\(\s*['\"]?([^'\")]+)", text):
+            assert target.startswith("data:") or re.fullmatch(r"fonts/[\w.-]+\.woff2", target), (
+                css.name,
+                target,
+            )
+        assert "://" not in text.replace("https://", "x"), css.name
+
+
+def test_the_site_ships_the_app_tokens_and_the_fonts_they_name(built):
+    out, _ = built
+    tokens = (out / "assets" / "tokens.css").read_text(encoding="utf-8")
+    assert "--accent: #1c46ad" in tokens and "/static/" not in tokens
+    named = re.findall(r'url\("fonts/([^"]+)"\)', tokens)
+    assert named and all((out / "assets" / "fonts" / name).is_file() for name in named)
+    assert sum((out / "assets" / "fonts" / name).stat().st_size for name in named) < 120_000
+    for page in ("index.html", "examples/index.html"):
+        text = (out / page).read_text(encoding="utf-8")
+        assert text.index("assets/tokens.css") < text.index("assets/site.css")
+        for heading in ("Product", "Trust", "Guides", "Source"):
+            assert f"<h2>{heading}</h2>" in text, (page, heading)
 
 
 def test_no_fonts_trackers_or_cdns_are_named_anywhere_in_own_pages(built):

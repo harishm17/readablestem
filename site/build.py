@@ -971,6 +971,20 @@ def make_env() -> jinja2.Environment:
     return env
 
 
+APP_STATIC = REPO_ROOT / "src" / "readablestem" / "web" / "static"
+APP_FONTS = APP_STATIC / "vendor" / "fonts"
+
+
+def site_tokens() -> tuple[str, list[str]]:
+    """The web app's design tokens (static/tokens.css) for this site, with the font files they
+    name: the stylesheet's /static/vendor/fonts/ addresses become fonts/ beside it, and the
+    files are copied into the build, so the site still makes no request to another origin and
+    opens from a folder."""
+    css = (APP_STATIC / "tokens.css").read_text(encoding="utf-8")
+    names = sorted(set(re.findall(r'url\("/static/vendor/fonts/([^"]+)"\)', css)))
+    return css.replace("/static/vendor/fonts/", "fonts/"), names
+
+
 def converted_css(examples: list[Example]) -> str:
     seen: list[str] = []
     for example in examples:
@@ -1092,6 +1106,10 @@ def build_site(out_dir: Path, *, proof_path: Path | None = None) -> list[str]:
     )
     page("404.html", "not_found.html", "", "Page not found")
     out.put("assets/site.css", (SITE_DIR / "assets" / "site.css").read_text(encoding="utf-8"))
+    tokens, fonts = site_tokens()
+    out.put("assets/tokens.css", tokens)
+    for name in fonts:
+        out.put(f"assets/fonts/{name}", (APP_FONTS / name).read_bytes())
     out.put("assets/converted.css", converted_css(examples))
     out.put(".nojekyll", "")
     out.write(out_dir)

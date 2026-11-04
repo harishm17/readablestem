@@ -17,6 +17,21 @@
   docs/security.md "Running uploaded TeX", docs/development.md. Tests: `tests/test_archive_intake.py`,
   `test_source_intake.py`, `test_source_reader.py`, `test_source_convert.py`, `test_source_escapes.py` (hostile
   files through the real sandbox), `test_source_child.py`, `test_web_source.py`.
+## Unreleased: comparison table and showcase on the tokens (branch design/d4-compare-showcase)
+
+- The comparison guide (`/guides/readablestem-mathpix-latexml`) now compares five tools: ReadableSTEM, Mathpix,
+  Aelira, general chatbots and LaTeXML, on what each takes in and gives back, its maths, what it automates,
+  review by a person, where the file goes, cost and licence, a published test of equations and its version.
+  Every cell names its source and the day it was read (Aelira's own page and Mathpix's pages for them; the
+  chatbot column is the recipe tested in PROOF.md, not a claim about any product); accuracy appears only where
+  we measured it (ReadableSTEM and the chatbot recipe). `tests/test_compare_table.py` checks the sources and
+  that no cell claims conformance. The title, `/guides`, the footer label and `llms.txt` name the five tools.
+- The static showcase (`site/`) is built on the web app's tokens: `build.py` copies `tokens.css` and its
+  fonts into `assets/` (no outside request; it still opens from a folder), `site.css` uses the tokens, the
+  footer has the same four columns, and the showcase follows light and dark. The converted output and the PDF
+  pages stay on white paper. The `/demo` page is the stored converted document and is not restyled.
+
+## Unreleased: LaTeXML in the image (branch latex/x1-latexml-image)
 
 ## Unreleased: sandbox probe (branch latex/x0-sandbox-probe)
 

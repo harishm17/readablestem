@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block body_class %}mode-read{% endblock %}
-{% block title %}ReadableSTEM, Mathpix and LaTeXML compared{% endblock %}
-{% block description %}What ReadableSTEM, Mathpix and LaTeXML take in and give back, and what each automates and costs, from their own documentation. The right one depends on your file.{% endblock %}
+{% block title %}ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML compared{% endblock %}
+{% block description %}What ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML take in, give back and cost, each fact with its source and date. The right one depends on your file.{% endblock %}
 {% block og_type %}article{% endblock %}
 {% block head %}
 <meta property="article:published_time" content="{{ published }}">
@@ -17,11 +17,11 @@
    when this page changes. No accuracy comparison: neither tool was run on the held-out
    test (PROOF.md). No "better" claims beyond which input each tool starts from. #}
 <p class="crumb"><a href="/guides">All guides</a></p>
-<h1>ReadableSTEM, Mathpix and LaTeXML compared</h1>
+<h1>ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML compared</h1>
 <p class="hint">Last updated <time datetime="{{ updated }}">{{ updated_text }}</time>. By
   <a href="https://harishmanoharan.com">Harish Manoharan</a>, who made ReadableSTEM. The
-  facts about the other two tools come from their own documentation, read on 28 October
-  2026 and linked under Sources.</p>
+  facts about the other tools come from their own pages; each one in the table names its source
+  and the day it was read.</p>
 <p class="lede">The right tool depends first on the file you have. This page sets out what each
   tool takes in and gives back, what it automates, and what it costs, so you can choose.
   Where another tool fits your file better, it says so.</p>
@@ -47,54 +47,96 @@
 </ul>
 
 <h2>Side by side</h2>
-<div class="table-scroll" role="group" aria-label="ReadableSTEM, Mathpix and LaTeXML side by side" tabindex="0">
-  <table class="compare-table">
-    <caption>Facts from each project's own pages, read on October 28, 2026</caption>
+{# Each cell says where it comes from and the day that source was read: Mathpix and LaTeXML on
+   2026-10-28, Aelira and the rest on 2026-11-03; the chatbot column is the recipe tested in
+   PROOF.md (run recorded 2026-10-14), not a claim about any chatbot's features. No conformance
+   claims, and accuracy only where we measured it. #}
+{% macro src(href, day, label="Source") -%}
+<span class="source-note"><a href="{{ href }}">{{ label }}</a>, read <time datetime="{{ day }}">{{ {"2026-10-28": "October 28, 2026", "2026-11-03": "November 3, 2026", "2026-10-14": "October 14, 2026"}[day] }}</time></span>
+{%- endmacro %}
+{% set RS = source_url ~ "/blob/main/README.md" %}
+{% set PF = source_url ~ "/blob/main/PROOF.md#comparison-with-the-chatbot-recipe" %}
+{% set MX = "https://mathpix.com/pdf-to-html" %}
+{% set AE = "https://aelira.ai/us" %}
+{% set LX = "https://dlmf.nist.gov/LaTeXML/manual/usage/" %}
+<div class="table-scroll" role="group" aria-label="ReadableSTEM, Mathpix, Aelira, chatbots and LaTeXML side by side" tabindex="0">
+  <table class="compare-table compare-wide">
+    <caption>Facts from each project's own pages, each with its source and the day it was read</caption>
     <thead>
-      <tr><th scope="col">Topic</th><th scope="col">ReadableSTEM</th><th scope="col">Mathpix</th><th scope="col">LaTeXML</th></tr>
+      <tr><th scope="col">Topic</th><th scope="col">ReadableSTEM</th><th scope="col">Mathpix</th><th scope="col">Aelira</th><th scope="col">Chatbots</th><th scope="col">LaTeXML</th></tr>
     </thead>
     <tbody>
       <tr>
         <th scope="row">Takes in</th>
-        <td>A STEM course PDF.</td>
-        <td>PDF, EPUB, Word (DOCX, DOC), PowerPoint (PPTX), OpenDocument Text (ODT), DjVu, WordPerfect (WPD), Mobipocket (MOBI) and Amazon Kindle (AZW3); also images and handwriting strokes.</td>
-        <td>TeX and LaTeX sources (and BibTeX).</td>
+        <td>A STEM course PDF. {{ src(RS, "2026-11-03") }}</td>
+        <td>PDF, EPUB, Word (DOCX, DOC), PowerPoint (PPTX), OpenDocument Text (ODT), DjVu, WordPerfect (WPD), Mobipocket (MOBI) and Amazon Kindle (AZW3); also images and handwriting strokes. {{ src(MX, "2026-10-28") }}</td>
+        <td>Scanning workflows for PDF, PowerPoint, Word, Excel, LaTeX, images, video captions and web pages; remediation depth varies by format. {{ src(AE, "2026-11-03") }}</td>
+        <td>In the recipe we tested: the PDF and a 150 dpi image of every page, with one sentence of prompt. {{ src(PF, "2026-10-14", "PROOF.md") }}</td>
+        <td>TeX and LaTeX sources (and BibTeX). {{ src(LX, "2026-10-28") }}</td>
       </tr>
       <tr>
         <th scope="row">Gives back</th>
-        <td>One self-contained HTML file. Also a zip for a Canvas page and a Common Cartridge.</td>
-        <td>Mathpix Markdown, DOCX, XLSX, LaTeX, HTML, PDF and PPTX. Also a tagged accessible PDF (PDF/UA) of the PDF you sent.</td>
-        <td>XML, HTML5 (also XHTML and HTML4) and ePub; the project page also names JATS.</td>
+        <td>One self-contained HTML file. Also a zip for a Canvas page and a Common Cartridge. {{ src(RS, "2026-11-03") }}</td>
+        <td>Mathpix Markdown, DOCX, XLSX, LaTeX, HTML, PDF and PPTX. Also a tagged accessible PDF (PDF/UA) of the PDF you sent. {{ src("https://docs.mathpix.com/guides/accessible-pdf", "2026-10-28") }}</td>
+        <td>A revised file and findings to review with your team; its supported fixes are partial and include structure and suggested alt text. {{ src(AE, "2026-11-03") }}</td>
+        <td>HTML in the reply. {{ src(PF, "2026-10-14", "PROOF.md") }}</td>
+        <td>XML, HTML5 (also XHTML and HTML4) and ePub; the project page also names JATS. {{ src("https://dlmf.nist.gov/LaTeXML/manual/commands/latexmlpost.html", "2026-10-28") }}</td>
       </tr>
       <tr>
         <th scope="row">Math in the HTML</th>
-        <td>MathML.</td>
-        <td>SVG by default. MathML or LaTeX (for MathJax or KaTeX) by option. An accessibility option adds assistive MathML.</td>
-        <td>Presentation MathML by default for HTML5 and XHTML. Content MathML, OpenMath and math images by option.</td>
+        <td>MathML. {{ src(RS, "2026-11-03") }}</td>
+        <td>SVG by default. MathML or LaTeX (for MathJax or KaTeX) by option. An accessibility option adds assistive MathML. {{ src("https://docs.mathpix.com/reference/shared-types", "2026-10-28") }}</td>
+        <td>Not stated on the page we read. {{ src(AE, "2026-11-03") }}</td>
+        <td>MathJax TeX or MathML, as the model writes it; our scorer reads both. {{ src(PF, "2026-10-14", "PROOF.md") }}</td>
+        <td>Presentation MathML by default for HTML5 and XHTML. Content MathML, OpenMath and math images by option. {{ src("https://dlmf.nist.gov/LaTeXML/manual/commands/latexmlpost.html", "2026-10-28") }}</td>
       </tr>
       <tr>
         <th scope="row">What is automated</th>
-        <td>Finding and rebuilding equations, restoring headings and lists, and writing short alt text for figures, with AI models.</td>
-        <td>Recognition and export, through the Snip web editor, an API, a command-line tool and a Files API for batches.</td>
-        <td>The whole conversion, from the command line (<code>latexmlc</code>).</td>
+        <td>Finding and rebuilding equations, restoring headings and lists, and writing short alt text for figures, with AI models. {{ src(RS, "2026-11-03") }}</td>
+        <td>Recognition and export, through the Snip web editor, an API, a command-line tool and a Files API for batches. {{ src("https://docs.mathpix.com/", "2026-10-28") }}</td>
+        <td>Scans with axe-core, and partial fixes for supported content. {{ src(AE, "2026-11-03") }}</td>
+        <td>Whatever one prompt gets from the model. {{ src(PF, "2026-10-14", "PROOF.md") }}</td>
+        <td>The whole conversion, from the command line (<code>latexmlc</code>). {{ src(LX, "2026-10-28") }}</td>
       </tr>
       <tr>
         <th scope="row">Review by a person</th>
-        <td>A review screen where the instructor accepts, edits or rejects each change it is unsure about.</td>
-        <td>The pages we read describe none. Figure alt text &ldquo;remains yours to write&rdquo;.</td>
-        <td>None built in. The manual lists the errors it reports.</td>
+        <td>A review screen where the instructor accepts, edits or rejects each change it is unsure about. {{ src(RS, "2026-11-03") }}</td>
+        <td>The pages we read describe none. Figure alt text &ldquo;remains yours to write&rdquo;. {{ src(MX, "2026-10-28") }}</td>
+        <td>Its site says supported fixes need human review and that the team handles remaining issues. {{ src(AE, "2026-11-03") }}</td>
+        <td>None in the recipe: the reply is scored as it comes. {{ src(PF, "2026-10-14", "PROOF.md") }}</td>
+        <td>None built in. The manual lists the errors it reports. {{ src(LX, "2026-10-28") }}</td>
+      </tr>
+      <tr>
+        <th scope="row">Where the file goes</th>
+        <td>Uploaded to the service and deleted {{ retention_hours }} hours after you last work on it; longer only if you choose. {{ src("/privacy", "2026-11-03", "Privacy notice") }}</td>
+        <td>Uploaded to Mathpix. For its accessible PDF, the original is otherwise deleted once the pages have been recognized. {{ src("https://docs.mathpix.com/guides/accessible-pdf", "2026-11-03") }}</td>
+        <td>Self-hosted on your own servers, or a managed cloud; its site says retention depends on the deployment. {{ src(AE, "2026-11-03") }}</td>
+        <td>Sent to the model's provider; its terms apply. Not compared here.</td>
+        <td>A command-line program you run yourself. {{ src(LX, "2026-10-28") }}</td>
       </tr>
       <tr>
         <th scope="row">Cost and licence</th>
-        <td>Free beta, with daily limits. The code is MIT. The hosted service's terms are on the <a href="/terms">terms page</a>.</td>
-        <td>Free plan: 10 PDF pages a month (double with an .edu email). Pro: $4.99 a month with 1,000 PDF pages. API: $0.005 a page, after a one-time $19.99 setup fee.</td>
-        <td>Free. Public domain, from its source repository's licence file.</td>
+        <td>Free beta, with daily limits. The code is MIT. The hosted service's terms are on the <a href="/terms">terms page</a>. {{ src(RS, "2026-11-03") }}</td>
+        <td>Free plan: 10 PDF pages a month (double with an .edu email). Pro: $4.99 a month with 1,000 PDF pages. API: $0.005 a page, after a one-time $19.99 setup fee. {{ src("https://mathpix.com/pricing/snip", "2026-10-28") }}</td>
+        <td>Open source and self-hosted (command-line tools MIT, engine AGPL-3.0); managed cloud plans by order form; pilot pricing available. {{ src(AE, "2026-11-03") }}</td>
+        <td>Depends on the chatbot's plan. Not compared here.</td>
+        <td>Free. Public domain, from its source repository's licence file. {{ src("https://github.com/brucemiller/LaTeXML/blob/master/LICENSE", "2026-10-28") }}</td>
+      </tr>
+      <tr>
+        <th scope="row">Published test of equations</th>
+        <td>15 OpenStax sections held out: 89% of equations found and 50% exactly right end to end (1,379 of 2,738). {{ src(PF, "2026-10-14", "PROOF.md") }}</td>
+        <td>We have not run it, so this page makes no accuracy comparison.</td>
+        <td>We have not run it. Its FAQ says automated scores do not establish WCAG conformance. {{ src(AE, "2026-11-03") }}</td>
+        <td>The same test with one prompt on Claude Opus: 89% found and 62% exactly right end to end. {{ src(PF, "2026-10-14", "PROOF.md") }}</td>
+        <td>We have not run it; it starts from LaTeX source.</td>
       </tr>
       <tr>
         <th scope="row">Version or date</th>
         <td>Beta; the live service.</td>
         <td>Prices and documentation as read on October 28, 2026.</td>
-        <td>Version 0.8.8, released February 26, 2024, the latest release on GitHub.</td>
+        <td>Beta software, as its site says on November 3, 2026.</td>
+        <td>Run recorded on October 14, 2026, with claude-opus-5-5.</td>
+        <td>Version 0.8.8, released February 26, 2024, the latest release on GitHub. {{ src("https://github.com/brucemiller/LaTeXML/releases/tag/v0.8.8", "2026-10-28") }}</td>
       </tr>
     </tbody>
   </table>
@@ -140,6 +182,21 @@
   PDF, LaTeXML cannot use it. This guide has not tested how accessible LaTeXML's output is; it
   is a converter, and the result still needs checking like any other.</p>
 
+<h2 id="aelira">Aelira</h2>
+<p>Aelira calls itself open-core accessibility tooling for higher education, in beta. Its site says
+  it checks course materials, applies partial fixes to supported content, including structure and
+  suggested alt text, and leaves the review to people. It also describes work across a whole
+  course, with a Canvas connection and Brightspace in beta. It says automated scores do not
+  establish WCAG conformance. We have not run it, so this page makes no accuracy comparison.</p>
+
+<h2 id="chatbots">General chatbots</h2>
+<p>What many instructors do today is upload the PDF to a general chatbot and type one sentence.
+  We tested that recipe, with a prompt Purdue publishes, against ReadableSTEM on the same 15
+  held-out sections. It found as many equations (89% each), and more of them came out exactly right
+  end to end (62% against 50%); for headings the test found no difference it could detect.
+  <a href="{{ source_url }}/blob/main/PROOF.md#comparison-with-the-chatbot-recipe">The full
+  comparison</a>. This page does not compare the features of any particular chatbot.</p>
+
 <h2>Check with your accessibility office</h2>
 <p>This page is guidance, not legal advice. Your campus accessibility office can say what your
   courses need, and may already license one of these tools. What the rule asks of course
@@ -147,7 +204,7 @@
   course materials</a>.</p>
 
 <h2>Sources</h2>
-<p class="hint">All accessed on October 28, 2026.</p>
+<p class="hint">Accessed on October 28, 2026, except where the line says otherwise and the cells above that name November 3, 2026.</p>
 <ul>
   <li><a href="https://docs.mathpix.com/">Mathpix OCR API introduction</a> (Mathpix docs: inputs, outputs and conversion formats)</li>
   <li><a href="https://docs.mathpix.com/reference/shared-types">Mathpix shared types</a> (the HTML options <code>math_output_format</code> and <code>accessibility</code>)</li>
@@ -156,6 +213,8 @@
   <li><a href="https://mathpix.com/pricing/snip">Mathpix Snip pricing</a> and <a href="https://mathpix.com/pricing/api">OCR API pricing</a></li>
   <li><a href="https://dlmf.nist.gov/LaTeXML/">LaTeXML home page</a> and <a href="https://math.nist.gov/~BMiller/LaTeXML/">project description</a> (NIST)</li>
   <li><a href="https://dlmf.nist.gov/LaTeXML/manual/usage/">LaTeXML manual: using LaTeXML</a> and <a href="https://dlmf.nist.gov/LaTeXML/manual/commands/latexmlpost.html">latexmlpost options</a> (version 0.8.8, February 26, 2024)</li>
+  <li><a href="https://aelira.ai/us">Aelira, United States</a> (what it checks and fixes, its formats, plans and FAQ; read on November 3, 2026)</li>
+  <li><a href="{{ source_url }}/blob/main/PROOF.md#comparison-with-the-chatbot-recipe">PROOF.md, comparison with the chatbot recipe</a> (the recipe and its results; run recorded on October 14, 2026)</li>
   <li><a href="https://github.com/brucemiller/LaTeXML/blob/master/LICENSE">LaTeXML licence file</a> and <a href="https://github.com/brucemiller/LaTeXML/releases/tag/v0.8.8">release v0.8.8</a> (GitHub)</li>
   <li><a href="{{ source_url }}/blob/main/README.md">ReadableSTEM README</a>, <a href="/limits">known limits</a>, <a href="/help/posting">posting in your course</a> and <a href="{{ source_url }}/blob/main/PROOF.md">PROOF.md</a></li>
 </ul>
