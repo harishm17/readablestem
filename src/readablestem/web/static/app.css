@@ -1260,7 +1260,6 @@ section.job-group { padding-top: 0; }
   .wait-slow, .jump-links, .option-groups, details.option-group, .route, .job-group { border-color: CanvasText; }
 }
 /* ==== end ux2-lane-a ==================================================================== */
-||||||| d585276e
 /* ===== ux2-lane-d: public pages and the shared chrome =====================================
    Offices, privacy, limits, the comparison guide, guides, status, sign-in, the /style page,
    the signed-in navigation and the footer targets. Colours and sizes are tokens; nothing here

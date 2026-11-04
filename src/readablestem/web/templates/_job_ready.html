@@ -41,7 +41,7 @@
       {# T3-8: the same page as an IMS Common Cartridge, which Canvas, Blackboard, Moodle and
          D2L import. Not yet tried in a live course; the page says so. #}
       <p class="canvas-download"><a href="/jobs/{{ job.id }}/download/cartridge">Download as a Common Cartridge (.imscc)</a>
-        for Canvas, Blackboard, Moodle or D2L. Not tried in a live course:
+        for Canvas, Blackboard, Moodle or D2L. Not yet tried in a live course:
         <a href="/help/posting#cartridge">steps</a>.</p>
     </li>
     {# Word and EPUB (routes/exports.py): plain links to GET routes, so they work without
@@ -60,9 +60,10 @@
   {# T3-3: one file from the finished parts of a long source (GET /jobs/{id}/combine,
      web/combine.py). Only on a part, and only when two or more finished parts are kept. #}
   {% if job.part_label and job.combinable > 1 and job.is_owner %}
-  <p class="canvas-download"><a href="/jobs/{{ job.id }}/combine">Combine parts</a> into one HTML
-    file ({{ job.combinable }} finished parts you still have, in page order; unfinished or
-    deleted parts are left out and named). Also as
+  <p class="canvas-download"><a href="/jobs/{{ job.id }}/combine">Combine parts</a> into one
+    HTML file: the {{ job.combinable }} finished parts of this file that you still have,
+    in page order. A part you deleted, or one that is not finished or still has a decision
+    to make, is left out and the file names the missing pages. The same file as
     {% if word_export|default(false) %}<a href="/jobs/{{ job.id }}/combine?format=docx">Word (.docx)</a> or {% endif %}<a href="/jobs/{{ job.id }}/combine?format=epub">EPUB</a>.</p>
   {% endif %}
 

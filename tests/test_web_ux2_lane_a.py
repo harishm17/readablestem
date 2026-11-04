@@ -552,5 +552,5 @@ def test_privacy_and_limits_name_the_saved_default_where_they_give_the_default(w
     privacy = flat(web.browser.get("/privacy").text)
     limits = flat(web.browser.get("/limits").text)
     assert "unless you saved 7 days in Account" in privacy
-    assert "Both boxes start unticked, except that" in privacy
+    assert "can be made the default for new uploads in" in privacy
     assert "as your default in Account" in limits
