@@ -172,7 +172,7 @@ def test_on_a_phone_each_document_is_a_block_and_no_badge_is_cut(site, browser, 
     row = page.locator(f"#doc-{documents['decide']}").locator("xpath=ancestor::tr")
     assert row.evaluate("el => getComputedStyle(el).display") == "block"
     badge = row.locator(".status-badge")
-    assert badge.evaluate("el => getComputedStyle(el).borderTopLeftRadius") == "6.4px"
+    assert badge.evaluate("el => getComputedStyle(el).borderTopLeftRadius") == "4px"
     label = row.locator("td[data-label='Status']")
     assert label.evaluate("el => getComputedStyle(el, '::before').content").startswith('"Status')
     context.close()

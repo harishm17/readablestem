@@ -1,0 +1,16 @@
+{# The proof numbers, from web/proof_facts.py (read from PROOF.md once). Each tile names what it
+   counts, its sample size, where a general chatbot did better or the number means less than it
+   seems, and links to how it was measured. The set, date and whether it is blind come first. #}
+<div class="proof-strip">
+  <p class="proof-set">{{ proof_facts.set_label[0]|upper }}{{ proof_facts.set_label[1:] }}, run recorded {{ proof_facts.date }}
+    ({{ proof_facts.pipeline }}). {{ proof_facts.blind }}</p>
+  <ul class="stat-row">
+    {% for fact in proof_facts.facts %}
+    <li class="stat">
+      <p class="stat-value">{{ fact.value }}</p>
+      <p class="stat-label">{{ fact.label }}</p>
+      <p class="stat-note">{{ fact.count }}. {{ fact.caveat }} <a href="{{ fact.href }}">How it was measured</a></p>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
