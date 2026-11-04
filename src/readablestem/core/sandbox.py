@@ -45,6 +45,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 POLL_SECONDS = 0.1
+# How long the Landlock supervisor has to kill and reap the program's tree after SIGTERM.
+TERM_GRACE_SECONDS = 3.0
 # Processes (threads count) the program and what it starts may add to what this user already has,
 # and open files. RLIMIT_NPROC counts every task of the user, the web app's threads included, so
 # the limit is "now plus this much", worked out when the sandbox starts (`_nproc_limit`).
@@ -236,7 +238,8 @@ def backend_failure(name: str) -> tuple[str, str, int] | None:
     when it was not tried or worked. Codes: `abi_below_min`, `landlock_create_ruleset`,
     `landlock_add_rule:<exec|read|write|files_rw|files_read>`, `no_new_privs`,
     `landlock_restrict_self`, `seccomp_install`, `prlimit_<resource>`, `chdir`, `fork`, `exec`,
-    `no_report` (the launcher ended without naming a step), `unavailable`."""
+    `caller_gone`, `supervisor_gone`, `count_tasks`, `launcher_exception`, `no_report` (the
+    launcher ended without naming a step), `unavailable`."""
     return _FAILURES.get(name)
 
 
@@ -620,6 +623,7 @@ def _landlock_spec(
         "seccomp": base64.b64encode(program).decode() if program else "",
         "cmd": command,
         "busy_marker": busy_marker,
+        "parent_pid": os.getpid(),  # the launcher checks its parent is the process that started it
         "step_file": step_file,
     }  # fmt: skip
 
@@ -724,6 +728,14 @@ def _run(
             over = written > limits.out_bytes or entries > limits.max_entries
             heavy = bool(limits.group_memory_bytes) and resident > limits.group_memory_bytes
             if timed_out or over or heavy:
+                if landlock:
+                    # The supervisor first: it kills what the program started and reaps it
+                    # (nothing is left as a zombie for pid 1), then ends. The group kill below
+                    # is the backstop for a supervisor that does not.
+                    with contextlib.suppress(ProcessLookupError):
+                        os.kill(proc.pid, signal.SIGTERM)
+                    with contextlib.suppress(subprocess.TimeoutExpired):
+                        proc.wait(timeout=TERM_GRACE_SECONDS)
                 with contextlib.suppress(ProcessLookupError):
                     os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait()

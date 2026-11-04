@@ -90,3 +90,21 @@ def test_notices_and_deploy_docs_name_it():
     assert "LaTeXML" in (ROOT / "THIRD_PARTY_NOTICES.md").read_text()
     deploy = (ROOT / "docs" / "deploy-railway.md").read_text()
     assert "**LaTeXML.**" in deploy and "INSTALL_LATEXML" in deploy
+
+
+def test_tini_is_pid_1_so_the_orphans_of_the_sandbox_are_reaped():
+    text = (ROOT / "Dockerfile").read_text()
+    assert "install -y --no-install-recommends tini" in text and "tini --version" in text
+    assert 'ENTRYPOINT ["tini", "--"]' in text
+    assert text.index('ENTRYPOINT ["tini", "--"]') < text.index('CMD ["readablestem", "serve"')
+    # CMD is the app: the entrypoint only puts an init in front of it
+    assert text.rstrip().splitlines()[-1].startswith('CMD ["readablestem", "serve"')
+
+
+def test_the_web_service_does_not_override_the_start_command_that_carries_the_entrypoint():
+    """Railway runs the image's CMD behind its ENTRYPOINT; a `start` on `web` would replace the
+    CMD (and may bypass the init), so `web` has none. The cron service has one but runs no
+    sandbox (docs/deploy-railway.md, "LaTeXML")."""
+    text = (ROOT / ".railway" / "railway.ts").read_text()
+    web = text[text.index('service("web", {') : text.index('service("cron", {')]
+    assert "start:" not in web

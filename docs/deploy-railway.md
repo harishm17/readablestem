@@ -497,17 +497,65 @@ on `/healthz/ops` under `sandbox`, and keeps the source features switched off in
 passed, so a flag set by mistake does nothing under a FAIL.
 
 **Status today (2026-11-04).** The LaTeX source, Beamer and zip-batch features exist in the code and
-the image can carry LaTeXML, but all three are off in production because the sandbox probe fails on
-Railway: bubblewrap cannot start there. A Landlock backend was added as the fallback (`core/landlock_exec.py`; docs/security.md,
-"Landlock backend"), and the probe now reports which step of it fails (`landlock_step=`,
-`landlock_errno=` and the `can_<call>` lines). Until a deploy of the web service shows PASS on
-`/healthz/ops`, keep the three flags off.
+the image can carry LaTeXML, but all three are off in production until the sandbox probe passes on
+Railway. What the probe found there:
 
-TODO(coordinator): fill in the sandbox probe's findings (landlock_step, landlock_errno, can_<call>) from /healthz/ops after the next deploy.
+- **Bubblewrap cannot start on Railway.** The platform gives no unprivileged user namespaces (the
+  probe reported `bwrap=ok` but `sandbox_start=fail`), and the container already runs under seccomp
+  mode 2 as uid 10001 (`seccomp_mode=2`, `user=uid-10001`). So the sandbox is the Landlock backend
+  (`core/landlock_exec.py`; docs/security.md, "Landlock backend"): the kernel reported Landlock
+  ABI 7, and every call the launcher needs worked in a throwaway child under the container's own
+  filter (`can_landlock_create_ruleset`, `can_landlock_restrict_self`, `can_no_new_privs`,
+  `can_seccomp_syscall`, `can_seccomp_prctl`, `can_prlimit_self` all `yes`; `process_dumpable=0`).
+- **The launcher had a bug there**, found by the probe's step codes and the container reproduction
+  below: it exited silently when its parent was pid 1, and the web process is pid 1 in the
+  container, so the Landlock backend never started (`landlock_step=no_report`, `landlock_exit=125`).
+  Fixed in PR #153 (the launcher now checks its parent is the process that started it, and every
+  launcher-side check has a step code). The fix is verified in the container reproduction, not yet
+  on Railway: the next deploy's start-up probe decides.
+- **Orphans and pid 1.** With the web app as pid 1 of the container, nothing reaps what the
+  sandbox leaves when its caller is killed (a deadline kill of the conversion child, a crash): the
+  program's orphans and the launcher itself are re-parented to pid 1 and stay as zombies, and a
+  hostile document can cause that on purpose. The image therefore has `tini` as its ENTRYPOINT
+  (`ENTRYPOINT ["tini", "--"]`, then the unchanged CMD), so tini is pid 1 and reaps every orphan.
+  `web` has no `start` command in `railway.ts` (a start command replaces the image's CMD, and
+  whether Railway keeps the ENTRYPOINT behind a custom start command is not something this
+  repository has verified): it runs the image's CMD behind the ENTRYPOINT. `cron` and `backup` do
+  have start commands; they run no sandbox. After a deploy, `init_process=tini` in the probe on
+  `/healthz/ops` (`sandbox.checks`) shows the ENTRYPOINT is in force; any other name means the
+  app is pid 1 again. In the container reproduction below, the cleanup probe leaves one zombie
+  with the app as pid 1 and none with an init (`podman run --init`).
+- **When LaTeX source is switched on.** `FEATURE_LATEX_SOURCE` takes effect only after the web
+  process's start-up probe reports PASS (`/healthz/ops`, `sandbox.result`); the flag stays off
+  until a deploy shows PASS there. `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` stay off even
+  then, until real Beamer decks and real course sources (zips of projects) have been tried through
+  the Landlock sandbox on the deployed service.
 
 CI builds the image with the argument once and checks the
 versions and the policy (job `docker build (no push)`); the sandbox itself cannot be probed inside CI's
 Docker, which does not allow user namespaces.
+
+**Reproducing the probe in a container like Railway's** (no shell on Railway; this is how a
+failing probe is found without a deploy). Build the image with LaTeXML, then run the probe as the
+service's user, with a read-only root, the runtime's default seccomp profile, `/proc` as the runtime
+mounts it, and no extra privileges (the app's code is the process that starts the sandbox, and it
+may be pid 1 there, as in a container):
+
+```
+docker build --build-arg INSTALL_LATEXML=true -t readablestem-probe .
+docker run --rm --user 10001:10001 --read-only --tmpfs /tmp:rw,exec --cap-drop=ALL \
+  readablestem-probe readablestem ops sandbox-probe --require-latexml
+```
+
+With podman the same flags work (`podman run`; add `--init` to put an init in front, as the
+image's ENTRYPOINT does, and compare the zombies `ps -eo stat,pid,ppid,cmd` shows after the
+sandbox's caller is killed). On a host where unprivileged user namespaces are
+allowed, bubblewrap will start and the Landlock backend is not tried; to see the Landlock path
+there, add `-e READABLESTEM_SANDBOX_BACKEND=landlock`. The output ends in `PASS` or `FAIL`; when the
+Landlock backend does not start, `landlock_step=` names the setup step that failed
+(docs/security.md, "Why it did not start") and `can_<call>=` says whether the container's seccomp
+profile allows each call the launcher needs. This reproduction is how the pid-1 bug above was
+found (the pre-fix image printed `landlock_step=no_report` in it, as Railway did).
 
 **pandoc.** The Dockerfile installs pandoc from the distribution in every build (no build argument):
 it makes the Word download (docs/output.md, "The Word export"). It adds about 200 MB to the image (the

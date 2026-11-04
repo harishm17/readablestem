@@ -9,8 +9,11 @@ from __future__ import annotations
 import errno
 import importlib.util
 import json
+import os
+import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -130,7 +133,7 @@ def test_each_rlimit_step_names_its_resource(launcher, monkeypatch, name):
     monkeypatch.setattr(launcher.resource, "setrlimit", refuse)
     spec = {"limits": {name: 1 << 30}, "cmd": ["/usr/bin/true"], "env": {}}
     with pytest.raises(Failed) as caught:
-        launcher.confine_and_exec(FakeLibc(set()), spec, 100)
+        launcher.confine_and_exec(FakeLibc(set()), spec, 100, os.getppid())
     assert caught.value.code == f"prlimit_{name}" and caught.value.number == errno.EPERM
 
 
@@ -146,7 +149,9 @@ def test_the_nproc_step_names_itself(launcher, monkeypatch):
 
     monkeypatch.setattr(launcher.resource, "setrlimit", refuse)
     with pytest.raises(Failed) as caught:
-        launcher.confine_and_exec(FakeLibc(set()), {"limits": {}, "cmd": ["/x"], "env": {}}, 5)
+        launcher.confine_and_exec(
+            FakeLibc(set()), {"limits": {}, "cmd": ["/x"], "env": {}}, 5, os.getppid()
+        )
     assert caught.value.code == "prlimit_nproc"
 
 
@@ -350,3 +355,184 @@ def test_the_launcher_file_still_imports_only_the_standard_library():
         elif isinstance(node, ast.ImportFrom) and node.module:
             roots.add(node.module.split(".")[0])
     assert roots <= set(sys.stdlib_module_names)
+
+
+# ------------------------------------------- the launcher's own (supervisor-side) checks
+
+
+def _spec(tmp_path: Path, cmd=None, **limits) -> dict:
+    out = tmp_path / "out"
+    out.mkdir(exist_ok=True)
+    return sandbox._landlock_spec(
+        cmd or ["/usr/bin/true"], ro=(), rw=((out, "/out"),), tools=(), env=None, cwd="/",
+        limits=sandbox.Limits(wall_s=20, **limits), hide=(), scratch=out, stubs=out,
+        program=seccomp.program(strict=True), busy_marker=str(tmp_path / "busy"),
+        step_file=str(tmp_path / "step"),
+    )  # fmt: skip
+
+
+def _launch(spec: dict) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, "-I", "-S", str(sandbox.LAUNCHER), json.dumps(spec)],
+        capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+        timeout=30,
+        start_new_session=True,  # as `sandbox.run` starts it: the leader of a group of its own
+    )
+
+
+@needs_landlock
+def test_a_launcher_whose_parent_is_not_the_process_that_started_it_names_caller_gone(tmp_path):
+    spec = _spec(tmp_path)
+    spec["parent_pid"] = 1  # the real parent is this test, not pid 1
+    done = _launch(spec)
+    assert done.returncode == 125
+    assert (tmp_path / "step").read_text() == "caller_gone"
+
+
+@needs_landlock
+def test_a_launcher_does_not_care_what_its_callers_pid_is(tmp_path):
+    """The web process can be pid 1 in a container: the check is "my parent is the process that
+    started me" (the spec names it), never "my parent is not pid 1"."""
+    spec = _spec(tmp_path)
+    assert spec["parent_pid"] == os.getpid()
+    done = _launch(spec)
+    assert done.returncode == 0 and not (tmp_path / "step").exists()
+    source = Path(sandbox.LAUNCHER).read_text()
+    assert "parent == 1" not in source and "getppid() == 1" not in source
+
+
+@needs_landlock
+def test_a_launcher_that_cannot_count_the_users_tasks_names_count_tasks(tmp_path):
+    spec = _spec(tmp_path)
+    empty = tmp_path / "noproc"
+    empty.mkdir()
+    spec["proc_root"] = str(empty)  # /proc is not readable
+    done = _launch(spec)
+    assert done.returncode == 125 and (tmp_path / "step").read_text() == "count_tasks"
+
+
+@needs_landlock
+def test_a_bug_in_the_launcher_names_itself_instead_of_ending_silently(tmp_path):
+    spec = _spec(tmp_path)
+    del spec["limits"]  # a malformed spec: a KeyError inside the supervisor
+    done = _launch(spec)
+    assert done.returncode == 125 and (tmp_path / "step").read_text() == "launcher_exception"
+
+
+def test_a_supervisor_that_is_gone_is_named_by_the_child(launcher, monkeypatch):
+    monkeypatch.setattr(launcher.os, "getppid", lambda: 4242)
+    with pytest.raises(Failed) as caught:
+        launcher.confine_and_exec(FakeLibc(set()), {"limits": {}}, 5, supervisor=1)
+    assert caught.value.code == "supervisor_gone"
+
+
+def test_no_launcher_path_ends_with_a_bare_exit():
+    """Every exit of the launcher with its own status goes through `fail`, which names the step."""
+    source = Path(sandbox.LAUNCHER).read_text()
+    assert source.count("os._exit(125)") == 1  # the one inside `fail` itself
+
+
+@needs_landlock
+def test_without_the_subreaper_the_process_group_is_killed_and_nothing_is_left(tmp_path):
+    spec = _spec(
+        tmp_path,
+        cmd=["/usr/bin/perl", "-e", 'my $p = fork(); if ($p == 0) { exec("/bin/sleep", "891") }'],
+    )
+    spec["no_subreaper"] = True
+    done = _launch(spec)
+    assert done.returncode == 0
+
+    time.sleep(0.3)
+    ps = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True).stdout
+    assert "sleep 891" not in ps
+
+
+def test_a_launcher_that_is_not_its_groups_leader_kills_no_group(tmp_path):
+    """Run in the caller's own group it would be the caller it killed: it does nothing then."""
+    code = (
+        "import importlib.util, subprocess, sys, time\n"
+        f"spec = importlib.util.spec_from_file_location('l', {str(sandbox.LAUNCHER)!r})\n"
+        "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n"
+        "kid = subprocess.Popen(['/bin/sleep', '893'])\n"
+        "m.kill_group()\n"
+        "time.sleep(0.2)\n"
+        "print(kid.poll() is None); kid.kill()\n"
+    )
+    # started from a shell-less child in a new session, then made a non-leader by a fork
+    wrapper = (
+        "import os, subprocess, sys\n"
+        "pid = os.fork()\n"
+        "if pid == 0:\n"
+        "    os.execv(sys.executable, [sys.executable, '-I', '-c', sys.argv[1]])\n"
+        "os.waitpid(pid, 0)\n"
+    )
+    done = subprocess.run(
+        [sys.executable, "-I", "-c", wrapper, code],
+        capture_output=True,
+        text=True,
+        start_new_session=True,
+        timeout=30,
+    )
+    assert done.stdout.strip() == "True", done.stderr
+
+
+def test_kill_group_kills_the_others_of_the_group_and_not_itself(tmp_path):
+    code = (
+        "import importlib.util, subprocess, sys, time\n"
+        f"spec = importlib.util.spec_from_file_location('l', {str(sandbox.LAUNCHER)!r})\n"
+        "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n"
+        "kids = [subprocess.Popen(['/bin/sleep', '892']) for _ in range(2)]\n"
+        "m.kill_group()\n"
+        "time.sleep(0.2)\n"
+        "print([k.poll() is not None for k in kids])\n"
+    )
+    done = subprocess.run(
+        [sys.executable, "-I", "-c", code],
+        capture_output=True,
+        text=True,
+        start_new_session=True,  # its own group: the test's processes are not in it
+        timeout=30,
+    )
+    assert done.stdout.strip() == "[True, True]", done.stderr
+
+
+@pytest.mark.skipif(
+    shutil.which("podman") is None
+    or subprocess.run(
+        ["podman", "image", "exists", "localhost/mini-latexml"], capture_output=True
+    ).returncode
+    != 0,
+    reason="needs podman and the localhost/mini-latexml image (docs/deploy-railway.md)",
+)
+def test_the_backend_starts_in_a_container_where_the_caller_is_pid_1():
+    """Railway's shape: a non-root user, a read-only root, the default seccomp profile, and the
+    process that starts the sandbox is pid 1 of the container."""
+    root = Path(sandbox.LAUNCHER).parents[2]
+    code = (
+        "import os, sys; sys.path.insert(0, '/src');"
+        "os.environ['READABLESTEM_SANDBOX_BACKEND'] = 'landlock';"
+        "from readablestem.core import sandbox;"
+        "print(os.getpid(), sandbox.backend(), sandbox.backend_failure('landlock'))"
+    )
+    done = subprocess.run(
+        [
+            "podman", "run", "--rm", "--user", "10001:10001", "--read-only",
+            "--tmpfs", "/tmp:rw,exec", "--cap-drop=ALL", "-v", f"{root}:/src:ro",
+            "localhost/mini-latexml", "python3", "-c", code,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )  # fmt: skip
+    assert done.stdout.strip() == "1 landlock None", (done.stdout, done.stderr)
+
+
+def test_the_probe_names_pid_1_so_the_entrypoint_can_be_seen_to_be_in_force(monkeypatch):
+    name = sandbox_probe._init_process()
+    assert name == "unknown" or name == "other" or name.replace("-", "").replace("_", "").isalnum()
+    report = sandbox_probe.Report()
+    monkeypatch.setattr(sandbox_probe, "can_do", lambda name: (True, ""))
+    sandbox_probe._information(report)
+    assert any(check.name == "init_process" and not check.required for check in report.checks)

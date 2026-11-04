@@ -95,6 +95,15 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && pandoc --version | head -n 1
 
+# pid 1. Without an init the web app is pid 1 of the container, and nothing reaps what the LaTeX
+# sandbox leaves behind when its caller is killed (the program's orphans are re-parented to pid 1):
+# they pile up as zombies, and a hostile document can make that happen on purpose. tini is the
+# ENTRYPOINT below; it forwards signals to the app and reaps every orphan.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && tini --version
+
 # LaTeX and Beamer source uploads are converted by LaTeXML, run as a Perl child inside
 # bubblewrap (src/readablestem/core/sandbox.py, src/readablestem/source/). The distribution's
 # `latexml` package (with bubblewrap, the sandbox it runs in, and util-linux's `prlimit`; the
@@ -141,4 +150,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=4)"]
 
+# tini is pid 1 (see above); Railway runs the image's CMD behind this ENTRYPOINT.
+ENTRYPOINT ["tini", "--"]
 CMD ["readablestem", "serve", "--host", "0.0.0.0", "--port", "8080"]
