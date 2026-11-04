@@ -202,7 +202,12 @@ log = logging.getLogger(__name__)
 # `\geq 90\%`) is one inline formula in a TeX-made PDF (`glyph_math.relation_runs`, docs/layout.md
 # "Short formulas the runs miss"); the run finder had dropped the relation as the tail of a formula.
 # Rarely changes a paper (3 formulas in 25 development papers). Results from 0.5.5 load unchanged.
-PIPELINE_VERSION = "0.5.6"
+# 0.5.7 (2026-11-03): a PDF is TeX-made when its producer or creator names TeX as a whole word
+# (`page_type.TEX_PRODUCER`): XeLaTeX and Tectonic (`xdvipdfmx`), LuaTeX, dvips and dvipdfm(x) now
+# get the TeX reading rules, and Quartz ("PDFContext") and iText no longer do. TeX files with
+# those producers read differently: units out of a formula, table-cell and inline-formula edges.
+# Results from 0.5.6 load unchanged.
+PIPELINE_VERSION = "0.5.7"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

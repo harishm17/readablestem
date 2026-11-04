@@ -49,7 +49,7 @@ BAR_HEIGHT = 0.18  # ... and at most this share of its height
 NUMBER_BAND = 0.12  # a slide number alone is in this top or bottom share
 STEP_REASON = "slide_step"
 TITLE_REASON = "slide_title"
-_BEAMER = re.compile(r"beamer", re.IGNORECASE)
+_BEAMER = re.compile(r"\bbeamer\b", re.IGNORECASE)
 _SLIDE_NUMBER = re.compile(r"^\s*\d{1,3}(?:\s*/\s*\d{1,3})?\s*$")
 
 
