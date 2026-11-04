@@ -1030,6 +1030,11 @@ input[type="number"].input-short { width: 6rem; }
 .mode-read .proof-strip .stat-row { list-style: none; }
 .stat-count { margin: 0; }
 
+@media (max-width: 39.99rem) {
+  /* A headline of 36px runs to five or six lines on a phone; 30px keeps it to four. */
+  .mode-landing .hero h1 { font-size: 1.875rem; line-height: 1.15; }
+  .hero-actions { margin-bottom: var(--space-6); }
+}
 @media (max-width: 51.99rem) {
   .three-steps { grid-template-columns: minmax(0, 1fr); }
   .mode-landing .hero { padding-top: var(--space-4); }
@@ -1053,3 +1058,28 @@ input[type="file"]::file-selector-button:hover { background: var(--accent-tint);
 .compare-wide thead th:nth-child(2), .compare-wide tbody td:nth-child(2) { background: var(--surface); }
 .compare-wide thead th:first-child { position: sticky; left: 0; z-index: 2; }
 @media (forced-colors: active) { input[type="file"]::file-selector-button { border-color: ButtonText; } }
+
+/* Review choices: the primary action is filled; "Accept anyway" (the proposal changes the
+   meaning) is cautioned in the warning colours, and the option that keeps the original
+   ("Keep as image", "Make bold text") is quiet, so none of them looks like Save edit.
+   In forced colours the caution has a dashed border, so it differs without colour. */
+button[data-tone="caution"] { background: var(--warn-tint); color: var(--warn); border-color: var(--warn); }
+button[data-tone="caution"]:hover { background: var(--warn-tint); color: var(--warn); border-color: var(--warn); text-decoration: underline; }
+button[data-tone="quiet"] { background: var(--bg); color: var(--ink); border-color: var(--border-control); }
+button[data-tone="quiet"]:hover { background: var(--surface); color: var(--ink); border-color: var(--ink); }
+@media (forced-colors: active) { button[data-tone="caution"] { border-style: dashed; } }
+
+/* "On this page" on the offices page. */
+.toc { margin: 0 0 var(--space-5); padding: var(--space-3) var(--space-4); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--surface); max-width: var(--prose-max); }
+.toc-label { margin: 0 0 var(--space-2); font-weight: 700; }
+.toc ul { margin: 0; padding-left: var(--space-5); columns: 2 18rem; column-gap: var(--space-5); }
+.toc li { margin: 0 0 var(--space-1); break-inside: avoid; }
+.toc a { display: inline-flex; align-items: center; min-height: 1.5rem; }
+@media (forced-colors: active) { .toc { border-color: CanvasText; } }
+/* The data-flow diagram is drawn for white; it stays on white paper in dark mode. */
+.data-flow-figure { background: var(--paper); color: var(--paper-ink); padding: var(--space-4); border-radius: var(--radius-frame); border: 1px solid var(--border-subtle); }
+.data-flow-figure figcaption { color: #474c55; }
+
+/* Small controls on the review screen are at least 24px high. */
+.shortcuts > summary, .tech > summary { display: list-item; min-height: 1.5rem; padding: var(--space-1) 0; }
+.toggle-accepted { display: inline-flex; align-items: center; min-height: 1.5rem; }
