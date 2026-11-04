@@ -1,20 +1,24 @@
 {% extends "base.html" %}
 {# What the owner of a deleted document finds at its old address (routes/jobs.py
-   `_missing`, UX review MF10). `kept`: how long it was kept ("24 hours", "30 days") when
-   the row still says so; empty once the purge has removed it, when only the owner's
-   usage events remember the upload. #}
+   `_missing`, UX review MF10). `kept`: how long it was kept ("24 hours", "30 days") when the
+   row still says so; empty once the purge has removed it, when only the owner's usage events
+   remember the upload. Retention is a sliding time (web/retention.py): the document is deleted
+   a set time after its owner last worked on it, so what it was kept for is not said as "after
+   upload", and the page says how long documents are kept now. #}
 {% block title %}Document deleted{% endblock %}
 {% block content %}
 <h1>This document has been deleted</h1>
 {% if kept %}
-<p>It was deleted automatically {{ kept }} after upload, as promised when you uploaded it.</p>
-{% else %}
-<p>Documents are deleted automatically {{ retention_hours }} hours after you last worked on
-  them (7 days if you chose to keep them, {{ opt_in_days }} if you also let us look at the
-  results), or earlier if you delete them yourself.</p>
+<p>It was deleted automatically, as promised when you uploaded it, after being kept
+  {{ kept }} in all.</p>
 {% endif %}
+<p>Documents are deleted {{ retention_hours }} hours after you last work on them, 7 days if you
+  chose to keep them (or made that your default in <a href="/account">Account</a>), and
+  {{ opt_in_days }} days after upload if you also let us look at the results. Deleting one
+  yourself is immediate.</p>
 <p>Files you downloaded are not affected. To start again, upload the PDF again.</p>
 <ul class="actions">
+  <li><a class="button" href="/app#upload-heading">Upload the PDF again</a></li>
   <li><a href="/app">Go to my documents</a></li>
   <li><a href="/">Go to the home page</a></li>
 </ul>

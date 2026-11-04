@@ -197,7 +197,8 @@ def wait_words(seconds: float | None) -> str | None:
 
 
 def queue_sentence(ahead: int, yours: int, seconds: float | None) -> str:
-    """The waiting status (MF17): place, an estimate, and that leaving is fine."""
+    """The waiting status (MF17): place, an estimate that says what it is made from, and
+    that leaving is fine."""
     if ahead == 0:
         place = "Your document is next in line"
     else:
@@ -205,8 +206,37 @@ def queue_sentence(ahead: int, yours: int, seconds: float | None) -> str:
         if yours:
             place += f" ({yours} {'is' if yours == 1 else 'are'} yours)"
     wait = wait_words(seconds)
+    # An estimate from the pace of recent conversions, not a promise: it says so.
     estimate = f", {wait} to go" if wait else ""
-    return f"{place}{estimate}. You can leave this page; it keeps its place."
+    caveat = " This is an estimate from recent documents; it can take longer." if wait else ""
+    return f"{place}{estimate}.{caveat} You can leave this page; it keeps its place."
+
+
+# --------------------------------------------------------------------------- how long
+
+# A document waiting or converting for longer than this (and than twice its own estimate) is
+# "taking longer than usual". The page says so and says what to do; it never shows a
+# percentage or a finish time it does not have.
+SLOW_FLOOR_S = 600.0
+
+
+def elapsed_words(seconds: float) -> str:
+    """ "less than a minute", "3 minutes", "1 hour 5 minutes": how long something has taken.
+    static/app.js writes the same words as the page stays open."""
+    minutes = int(max(seconds, 0) // 60)
+    if minutes < 1:
+        return "less than a minute"
+    if minutes < 60:
+        return plural(minutes, "minute")
+    hours, rest = divmod(minutes, 60)
+    text = plural(hours, "hour")
+    return f"{text} {plural(rest, 'minute')}" if rest else text
+
+
+def slow_after(expected_s: float | None) -> float:
+    """Seconds after which a wait is called longer than usual: ten minutes, or twice what
+    the document was expected to take, whichever is more."""
+    return max(SLOW_FLOOR_S, 2 * expected_s) if expected_s else SLOW_FLOOR_S
 
 
 # --------------------------------------------------------------------------- counts
@@ -346,7 +376,9 @@ def open_decisions_line(count: int, audience: str = "owner") -> str:
         )
     if audience == "review":
         return f"{many} {'is' if count == 1 else 'are'} still open. You can review them."
-    return f"{many} {'needs' if count == 1 else 'need'} you before you share it."
+    # "Before you give it to students", not "before you share it": sharing with a colleague
+    # to work on it together is fine at any time, and is a different act (`_job_sharing.html`).
+    return f"{many} {'needs' if count == 1 else 'need'} you before you give it to students."
 
 
 def headline(

@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased: upload, My documents, the job page and downloads, from the second independent review (branch ux2/lane-a)
+
+- Upload: the file field and its button are the form; "How to convert it" and "How long to keep it,
+  and who may look" are one line each (saying what is set) until opened. The scan box says first
+  that a PDF of only scans is refused without it and a mixed PDF keeps its scanned pages as
+  pictures; "Tick it every time" is now "Make this the default in Account"; "Main file of a zip"
+  sits in a disclosure and appears only with LaTeX source on. After a refusal the form comes back
+  before the documents list with every choice kept, the error links to the file chooser and focus
+  goes there. LaTeX source that is not available says so and offers the PDF route; a scan refusal
+  where the scan option is offered no longer says the tool cannot convert it.
+- My documents: rows lead with the uploaded file name (a part with its pages; the generated title
+  under it; a title you set leads), one next step and Delete per row ("Upload a revised version" is
+  on the document's page), "Upload another file" beside the heading; a first-time visitor gets the
+  form first, then the sample.
+- Job page: five groups with links to them (Review and download, For students, Settings and
+  sharing, Record, Delete); the seven tiles are one line with "Counts in detail"; sharing says it
+  is for working with a colleague and not how students get the file; the headline says "before you
+  give it to students"; retention is explained once, in the Delete group, with the real deletion
+  date, that your own work restarts the time and that people you share with do not extend it.
+- Downloads: "Where will you post it?" lists the web page (recommended), Canvas, Word and EPUB, each
+  with its own link; the posting steps and the checks are said once.
+- Waiting and running: elapsed time ("Waiting for 3 minutes."), a qualified estimate, and a plain
+  "taking longer than usual" note with no percentage; the batch page shares the part.
+- Stopped: the reason is in the status box once, and "What you can do" gives Try again or safe ways
+  on (upload again, My documents, service status, email); scanned and handwritten messages depend
+  on whether the scan option is offered.
+- Deleted and unavailable documents: "kept N hours in all" instead of "after upload", the current
+  retention times, "Upload the PDF again"; a document that cannot be opened gets the same
+  help text whatever the reason. Privacy and Limits name the saved Account default.
+
 ## Unreleased: the Landlock launcher counts the user's tasks as the kernel does (branch latex/nproc-hidden-tasks)
 
 - The program's task count is bounded by the supervisor's check (every 0.05 s) and the caller's

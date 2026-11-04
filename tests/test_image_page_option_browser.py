@@ -121,6 +121,7 @@ def upload(page, site, *, ask: bool) -> None:
         files=[{"name": "notes.pdf", "mimeType": "application/pdf", "buffer": SCAN}]
     )
     if ask:
+        page.locator("#group-convert > summary").click()  # the groups are one line until opened
         page.get_by_label(OFFER).check()
     page.get_by_role("button", name="Upload and convert").click()
 
@@ -194,7 +195,7 @@ def test_a_scan_without_the_option_is_refused_with_the_way_to_ask(browser, site,
     upload(page, site, ask=False)
     page.wait_for_load_state("networkidle")
     body = " ".join(page.locator("main").inner_text().split())
-    assert "is scanned, so this tool cannot convert it" in body
+    assert "has only scanned pages, which are read only when you ask" in body
     assert "Convert scanned or handwritten pages" in body
     assert page.get_by_label(OFFER).count() == 1  # the form is still there to tick it
     found = strict_axe(page, axe_source)

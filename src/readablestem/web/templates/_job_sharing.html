@@ -1,7 +1,12 @@
-{# A link from the job page to the sharing page (routes/sharing.py). Owner only. #}
+{# A link from the job page to the sharing page (routes/sharing.py). Owner only. Sharing is for
+   working with a colleague: it is not how students get the document, and the page says so
+   (ux2-lane-a). Included inside the "Settings and sharing" group, one heading level down. #}
 <section aria-labelledby="sharing-heading">
-  <h2 id="sharing-heading">Share this document</h2>
-  <p>Let a named person read it, or review it with you. They sign in with their own email
-    address; there are no public links.</p>
+  <h{{ hl|default(2) }} id="sharing-heading">Share with a colleague</h{{ hl|default(2) }}>
+  <p>Let a named person read this document, or review it with you. They sign in with their own
+    email address; nothing is emailed and there are no public links. You can do this at any
+    time, including before your decisions are made.</p>
+  <p>This is not how students get it. To give it to students, download the HTML file when your
+    decisions are made and post it in your course.</p>
   <p><a href="/jobs/{{ job.id }}/share">Share this document</a></p>
 </section>

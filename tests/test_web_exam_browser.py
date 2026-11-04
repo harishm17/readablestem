@@ -35,6 +35,7 @@ def test_the_upload_form_with_the_exam_box_passes_axe(site, browser, axe_source,
     expect(box).not_to_be_checked()
     violations = strict_axe(page, axe_source)
     assert not violations, describe(violations)
+    page.locator("#group-convert > summary").click()  # the groups are one line until opened
     box.check()
     violations = strict_axe(page, axe_source)
     assert not violations, f"ticked: {describe(violations)}"
@@ -47,6 +48,7 @@ def test_the_box_is_described_by_its_hint_and_toggles_from_the_label(site, brows
     page.goto(f"{site.base}/app")
     box = page.get_by_label(LABEL)
     assert box.get_attribute("aria-describedby") == "exam-hint"
+    page.locator("#group-convert > summary").click()
     page.locator("label[for=exam]").click()
     expect(box).to_be_checked()
     page.keyboard.press("Space")  # the box has focus after the label click
@@ -60,6 +62,7 @@ def test_an_upload_with_the_box_ticked_is_an_exam_job(site, browser):
     page.get_by_label("PDF file").set_input_files(
         files=[{"name": "quiz.pdf", "mimeType": "application/pdf", "buffer": review_pdf()}]
     )
+    page.locator("#group-convert > summary").click()
     page.get_by_label(LABEL).check()
     page.get_by_role("button", name="Upload and convert").click()
     page.wait_for_url(f"{site.base}/jobs/*")

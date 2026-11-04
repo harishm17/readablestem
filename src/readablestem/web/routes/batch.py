@@ -33,6 +33,7 @@ from fastapi.responses import Response
 from readablestem.web import documents, upload_result
 from readablestem.web.db import JobStatus, session_scope, utcnow
 from readablestem.web.deps import JOB_ID, PageError, UserDep, conversions_closed, get_ctx, render
+from readablestem.web.job_page import elapsed_words
 from readablestem.web.routes.bundle import _zip_response
 from readablestem.web.routes.jobs import (
     UPLOAD_RESULT_GONE,
@@ -41,6 +42,10 @@ from readablestem.web.routes.jobs import (
 )
 
 router = APIRouter()
+
+# A batch still going after this long is "taking longer than usual" (`job_page.slow_after`'s
+# floor: a batch is several documents, so the one document's own estimate is not used).
+BATCH_SLOW_AFTER_S = 900
 
 
 def _batch(request: Request, result_id: str, user) -> tuple[list[Placed], list[str]]:
@@ -152,7 +157,24 @@ def _context(request: Request, result_id: str, user) -> dict[str, Any] | None:
     ]
     unfinished = any(r["state"] in {"waiting", "converting"} for r in rows)
     ready = sum(r["state"] == "ready" for r in rows)
-    return {
+    # How long the batch has been going (`_wait_note.html`, the job page's part): since its
+    # oldest unfinished document was uploaded.
+    waiting = [
+        by_id[r["id"]].created_at
+        for r in rows
+        if r["state"] in {"waiting", "converting"} and by_id[r["id"]].created_at is not None
+    ]
+    wait: dict[str, Any] = {}
+    if waiting:
+        since = min(waiting)
+        seconds = max(0.0, (now - since).total_seconds())
+        wait = {
+            "wait_since": since.isoformat(),
+            "wait_text": elapsed_words(seconds),
+            "wait_slow_after": BATCH_SLOW_AFTER_S,
+            "wait_slow": seconds > BATCH_SLOW_AFTER_S,
+        }
+    return wait | {
         "result_id": result_id,
         "rows": rows,
         "choose": [{"id": i.pending_id, "filename": i.filename, "pages": i.pages} for i in choose],

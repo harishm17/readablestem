@@ -17,7 +17,7 @@ import logging
 import re
 import time
 import unicodedata
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from functools import partial
@@ -91,7 +91,7 @@ from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are 
     store_job,
 )
 from readablestem.web.logsafe import log_event
-from readablestem.web.outcome import JobOutcome, job_outcome
+from readablestem.web.outcome import IMAGE_PAGE_FAILS, JobOutcome, job_outcome
 from readablestem.web.pending import MAX_PENDING_PER_USER
 from readablestem.web.quota import next_day_start, pages_left
 from readablestem.web.security import VIEW_CSP
@@ -114,8 +114,11 @@ router = APIRouter()
 
 NOT_FOUND = (
     "Page not found",
-    "There is no document at this address. It may have been deleted, or the link may be "
-    "incomplete.",
+    # The same words for a document that never existed, one that was deleted and one the
+    # person may not open (an access that was removed): the page must not say which.
+    "There is no document at this address that this account can open. Check the address, and "
+    "that you are signed in with the account the document was shared with, or ask the person "
+    "who sent it to you. It may also have been deleted.",
 )
 # What the owner of a deleted document sees at its old address (UX review MF10).
 DELETED = ("This document has been deleted", "This document has been deleted.")
@@ -130,11 +133,21 @@ FRESH_COPY = (
 # The refusals of a PDF that is only scans or handwriting, and what is offered instead when
 # the deployment offers the conversion of such pages (ADR 0007).
 IMAGE_PAGE_REFUSALS = frozenset({"scanned", "scanned_ocr", "handwritten", "handwritten_no_text"})
+# With that option offered, the refusal says the pages were not asked for (not that the tool
+# cannot convert them), and what to tick. What the person had set stays on the form; the file
+# has to be chosen again.
 IMAGE_PAGES_ADVICE = (
-    "Or tick “Convert scanned or handwritten pages” and choose the file again (the form "
-    "cannot keep it for you): the pages are read from their images, which is slower, and "
-    "every converted equation and table needs your check."
+    "Tick “Convert scanned or handwritten pages” and choose the file again (the form "
+    "cannot keep it for you): each page is read from its picture, which is slower, and "
+    "every converted equation and table needs your check. Or, if you have the original "
+    "(LaTeX, Word or PowerPoint), export a PDF from it and upload that."
 )
+IMAGE_PAGE_WHAT = {
+    "scanned": "has only scanned pages",
+    "scanned_ocr": "has only scanned pages",
+    "handwritten": "has only handwritten pages",
+    "handwritten_no_text": "has only handwritten pages",
+}
 # Uploads are turned away while the service holds as much as it will (`web.storage`).
 STORAGE_FULL_TITLE = "Uploads are paused while storage catches up"
 STORAGE_FULL_MESSAGE = (
@@ -268,7 +281,12 @@ def upload_error_message(
         "storage_full": STORAGE_FULL_MESSAGE.format(hours=s.retention_hours),
     }.get(code, f"{name} cannot be converted.")
     if code in IMAGE_PAGE_REFUSALS and s.feature_image_pages:
-        message += " " + IMAGE_PAGES_ADVICE
+        # Not "cannot convert it": the pages are read when asked for, and this upload did not.
+        why = IMAGE_PAGE_FAILS[code][1]
+        return (
+            f"{name} {IMAGE_PAGE_WHAT[code]}, which are read only when you ask. {why} "
+            f"{NOTHING_TAKEN} {IMAGE_PAGES_ADVICE}"
+        )
     return message
 
 
@@ -277,8 +295,9 @@ def source_messages(name: str, max_pages: int) -> dict[str, str]:
     refusal says what to do next, and nothing was converted or counted."""
     pdf = "upload the PDF instead."
     return {
-        "source_unavailable": f"{name} is LaTeX source, and this server cannot read that right "
-        f"now. Upload the PDF instead. {NOTHING_TAKEN}",
+        "source_unavailable": f"LaTeX source (.tex files and project zips) is not available on "
+        f"this server at the moment, so {name} was not converted. Compile it to a PDF and "
+        f"choose that file here instead: your other choices are kept. {NOTHING_TAKEN}",
         "source_revises": "A revised version takes a PDF. Upload the LaTeX source as a new "
         "document.",
         "source_bad_zip": f"{name} could not be opened as a zip file. It may be damaged or "
@@ -656,6 +675,7 @@ def _upload_error_page(
     course: str = "",
     revises: str = "",
     office: bool = False,
+    fields: Mapping[str, str] | None = None,
 ) -> Response:
     ctx = get_ctx(request)
     log_event(logger, "upload_rejected", code=code, office=office)
@@ -666,6 +686,10 @@ def _upload_error_page(
     # The course chosen stays chosen (the form marks it only among the user's courses),
     # so the file chosen again is read with the course's notation.
     context["chosen_course"] = course
+    # Everything else the person set stays set too: only the file has to be chosen again
+    # (a browser cannot keep a chosen file across a refused form).
+    if fields is not None:
+        context["form_values"] = form_values(fields)
     if revises:  # the form stays the revised version's
         context |= revision_context(ctx, user, revises) | {"chosen_course": course}
     # With no pages left the form is replaced by a notice (app.html): the summary's link
@@ -681,14 +705,30 @@ def _upload_error_page(
             "scanned or handwritten pages” and choose the file again."
         )
         summary_field = "image_pages"
+        context["open_convert"] = True  # the box to tick is in this group
     else:
         summary_field = field_id
     errors = [{"field_id": summary_field, "message": summary}]
     context |= {
         "errors": errors,
         "field_errors": {"pdf": {"field_id": field_id, "message": message}},
+        # Focus goes to what the summary links to (the file chooser, or the box to tick for a
+        # scan), not to the summary: the error is announced and the next step is under the
+        # keyboard. With no form (no pages left) the summary keeps focus.
+        "focus_field": summary_field if summary_field != "upload-closed" else "",
     }
     return render(request, "app.html", context, status_code=status, headers=headers)
+
+
+def form_values(fields: Mapping[str, str]) -> dict[str, Any]:
+    """The upload form's options as the person sent them, to show the form again as it was."""
+    return {
+        "exam": fields.get("exam") == "on",
+        "image_pages": fields.get("image_pages") == "on",
+        "keep": fields.get("keep") == "on",
+        "share": fields.get("share") == "on",
+        "main_file": (fields.get("main_file") or "").strip()[:200],
+    }
 
 
 @router.post("/jobs", dependencies=[limited("upload")])
@@ -819,6 +859,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
                 filename,
                 course=chosen,
                 revises=revises or "",
+                fields=form.fields,
             )
         )
 
@@ -829,7 +870,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     if not form.files:
         return await refuse("missing_file")
     if course_id is not None and not await run_in_threadpool(_users_course, ctx, user, course_id):
-        return await run_in_threadpool(_course_error_page, request, user)
+        return await run_in_threadpool(_course_error_page, request, user, form.fields)
     for _ in form.files[1:]:  # every file after the first is an upload for the rate limits
         enforce(request, "upload_user", user.id)
     mode = retention.mode_for_upload(
@@ -853,7 +894,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
                 source="image" if image_pages else "pdf",
             )
     if len(placed) == 1 and not placed.batch:  # a zip of documents is answered by the batch page
-        return await _answer_one(request, user, placed[0], chosen, revises or "")
+        return await _answer_one(request, user, placed[0], chosen, revises or "", form.fields)
     return await run_in_threadpool(_results_redirect, ctx, user, placed)
 
 
@@ -1211,7 +1252,12 @@ def _keep_for_parts(
 
 
 async def _answer_one(
-    request: Request, user: CurrentUser, item: Placed, chosen: str, revises: str
+    request: Request,
+    user: CurrentUser,
+    item: Placed,
+    chosen: str,
+    revises: str,
+    fields: Mapping[str, str] | None = None,
 ) -> Response:
     """The answer to an upload of one file: its job page, the page for choosing its pages,
     or the upload form again with the reason."""
@@ -1234,6 +1280,7 @@ async def _answer_one(
             course=chosen,
             revises=revises,
             office=item.office,
+            fields=fields,
         )
     )
 
@@ -1338,7 +1385,9 @@ def _users_revision(ctx: AppContext, user: CurrentUser, job_id: str) -> bool:
         )
 
 
-def _course_error_page(request: Request, user: CurrentUser) -> Response:
+def _course_error_page(
+    request: Request, user: CurrentUser, fields: Mapping[str, str] | None = None
+) -> Response:
     """The upload form again when its course is not one of the user's (deleted meanwhile
     in another tab, or a changed form). Nothing was uploaded."""
     ctx = get_ctx(request)
@@ -1346,6 +1395,9 @@ def _course_error_page(request: Request, user: CurrentUser) -> Response:
     message = "That course was not found. Choose one of your courses, or \u201cNo course\u201d."
     errors = [{"field_id": "course", "message": message}]
     context = app_context(ctx, user) | {"errors": errors, "field_errors": {"course": errors[0]}}
+    if fields is not None:
+        context["form_values"] = form_values(fields)
+    context["focus_field"] = "course"
     return render(request, "app.html", context, status_code=400)
 
 
@@ -1373,6 +1425,7 @@ def load_job_status(
         error_code=error_code,
         result_json=result_json,
         budget_closed=budget_closed,
+        image_pages_offered=ctx.settings.feature_image_pages,
     )
     return view, outcome
 

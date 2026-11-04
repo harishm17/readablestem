@@ -6,6 +6,10 @@
    link after a swap. Without JavaScript this is a plain list: reload the page. #}
 <div id="batch-rows"{% if unfinished %} hx-get="/app/batch/{{ result_id }}?v={{ version }}" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
   {% if oob|default(false) %}<p id="batch-summary" class="batch-summary" hx-swap-oob="innerHTML">{{ summary }}</p>{% endif %}
+  {# ux2-lane-a: how long the batch has been going, the part the job page uses. #}
+  {% if unfinished and wait_since|default("") %}
+  {% with wait_lead = "Uploaded", wait_tail = " ago" %}{% include "_wait_note.html" %}{% endwith %}
+  {% endif %}
   {% if rows %}
   <section aria-labelledby="batch-docs-heading">
     <h2 id="batch-docs-heading">Your documents</h2>

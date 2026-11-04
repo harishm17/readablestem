@@ -288,7 +288,8 @@ def test_a_revised_version_takes_a_pdf(web):
 def test_without_latexml_or_a_sandbox_the_answer_is_upload_the_pdf(web, monkeypatch):
     monkeypatch.setattr(latexml, "installed", lambda: False)
     response = send(web.browser, ARTICLE.encode(), "a.tex")
-    assert response.status_code == 503 and "Upload the PDF instead" in response.text
+    assert response.status_code == 503 and "not available on this server" in response.text
+    assert "Compile it to a PDF and choose that file here instead" in response.text
     assert response.headers["retry-after"] == "3600"
     assert jobs(web) == [] and pages_used(web) == 0
     monkeypatch.setattr(latexml, "installed", lambda: True)

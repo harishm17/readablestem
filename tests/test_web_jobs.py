@@ -390,7 +390,7 @@ def test_status_fragment_is_204_until_something_changes(web):
         f'<p><a href="/jobs/{job_id}/review">Start the review</a> or '
         f'<a href="/jobs/{job_id}">show the results</a></p>'
     ) in finished.text
-    assert "3 decisions need you before you share it." in finished.text
+    assert "3 decisions need you before you give it to students." in finished.text
     assert "show the results" not in web.browser.get(f"/jobs/{job_id}").text
     # htmx takes the document title from the fragment, so the tab title follows it.
     assert finished.text.startswith(

@@ -156,14 +156,52 @@ FAILED_MESSAGES = {
 }
 
 
+# The refusals of a PDF that is only scans or handwriting: what each says the PDF is, and why
+# its hidden text is not used. When the deployment offers "Convert scanned or handwritten
+# pages" (ADR 0007, FEATURE_IMAGE_PAGES) the message does not say the tool cannot convert it:
+# it says such pages are read only when asked for, and offers that route.
+IMAGE_PAGE_FAILS = {
+    "scanned": ("Every page of this PDF is a scanned image", "It has no text this tool can use."),
+    "scanned_ocr": (
+        "Every page of this PDF is a scanned image",
+        "Its text was guessed from the images by a text recognition (OCR) program, which is "
+        "often wrong in maths, so it is not used; running OCR again will not help.",
+    ),
+    "handwritten": (
+        "This PDF is handwritten",
+        "It also holds hidden text that a tablet or a text recognition (OCR) program guessed "
+        "from the handwriting. That text is often wrong in maths, so it is not used.",
+    ),
+    "handwritten_no_text": ("This PDF is handwritten", "It has no text this tool can use."),
+}
+OPT_IN_ROUTE = (
+    "Upload it again with “Convert scanned or handwritten pages” ticked: each page is read "
+    "from its picture, which is slower, and you check every converted equation and table. "
+    "Or export a PDF from the original (LaTeX, Word or PowerPoint) and upload that."
+)
+
+
+def failed_message(code: str, *, image_pages_offered: bool = False) -> str | None:
+    """The message of a stopped job's error code, or None for a code with no message here.
+    `image_pages_offered`: the deployment offers to convert scanned and handwritten pages, so
+    a PDF of only such pages was not converted because the option was not ticked."""
+    if image_pages_offered and code in IMAGE_PAGE_FAILS:
+        what, why = IMAGE_PAGE_FAILS[code]
+        lead = f"{what}, so it was not converted: such pages are read only when you ask."
+        return f"{lead} {why} {OPT_IN_ROUTE}"
+    return FAILED_MESSAGES.get(code)
+
+
 def job_outcome(
     *,
     status: str,
     error_code: str | None,
     result_json: dict[str, Any] | None = None,
     budget_closed: bool = False,
+    image_pages_offered: bool = False,
 ) -> JobOutcome | None:
-    """The outcome to show for a job, or None when its status says it all."""
+    """The outcome to show for a job, or None when its status says it all.
+    `image_pages_offered`: see `failed_message`."""
     if status == JobStatus.QUEUED and budget_closed:
         return JobOutcome(
             "waiting_budget",
@@ -173,7 +211,8 @@ def job_outcome(
             "this page.",
         )
     if status == JobStatus.FAILED and error_code in FAILED_MESSAGES:
-        return JobOutcome(error_code, "Stopped", FAILED_MESSAGES[error_code])
+        message = failed_message(error_code, image_pages_offered=image_pages_offered)
+        return JobOutcome(error_code, "Stopped", message or FAILED_MESSAGES[error_code])
     if status == JobStatus.DONE and not error_code and (outage := _outage(result_json)):
         n, total, kinds = outage
         message = (

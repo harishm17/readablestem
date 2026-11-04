@@ -8,10 +8,12 @@ ready to download, then the rest, each document under its own title.
   only partly converted (a budget stop, scanned pages) says so in its status.
 - "Converting, waiting or stopped": newest first, as uploaded.
 
-A document is shown by its title (the PDF's title or its first heading, as in the HTML's
-`<title>`), with the file name under it; before it is converted, or when the PDF had no
-title, by its file name. Titles and file names are document-derived: shown to their
-owner only, never logged.
+A document is led by the file name the person uploaded (with the pages of a part), and its
+title (the PDF's title or its first heading, as in the HTML's `<title>`) sits under it when it
+says something else: generated titles repeat across a course's files, file names do not. The
+recorded sample, which has no file of the person's, and a title the person chose themselves
+(T1-7) lead with the title. Titles and file names are document-derived: shown to their owner
+only, never logged.
 
 The list reads no stored result. The two facts it needs from one, the title and how many
 decisions are open, are columns of the job (`jobs.result_title`, `jobs.open_decisions`),
@@ -69,6 +71,25 @@ class DocumentRow:
     # One part of a larger file converted in parts (T3-3): the pages it holds, "31-59".
     part_label: str = ""
     is_sample: bool = False  # the recorded sample document (T3-9)
+    titled_by_you: bool = False  # the owner set the title students hear (T1-7): it leads
+
+    @property
+    def name(self) -> str:
+        """What the list leads with: the file the person uploaded, with the pages of a part,
+        because generated titles repeat (two parts of one file, or two files of one course
+        share a title) and the file name is what the person recognises. A title the person
+        chose themselves leads instead, and so does the recorded sample's (no file of
+        theirs)."""
+        if self.is_sample or self.titled_by_you:
+            return self.title
+        return f"{self.filename}, pages {self.part_label}" if self.part_label else self.filename
+
+    @property
+    def title_note(self) -> str:
+        """The document's own title, shown under the name when it says something else."""
+        if self.is_sample or self.titled_by_you:
+            return ""
+        return "" if self.title == self.filename else self.title
 
     @property
     def group(self) -> str:
@@ -266,6 +287,7 @@ def documents(
             open_decisions=open_count,
             part_label=job.part_label or "",
             is_sample=bool(job.is_sample),
+            titled_by_you=bool(own),
         )
         _label(row, job.error_code, budget_closed)
         by_key[row.group].rows.append(row)

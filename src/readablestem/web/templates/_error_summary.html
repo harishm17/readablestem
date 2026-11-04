@@ -1,7 +1,9 @@
 {% if errors|default([]) %}
 {# autofocus: after a failed form the summary takes focus (with or without JavaScript),
-   so keyboard and screen reader users start at the list of problems. #}
-<div class="error-summary" role="alert" aria-labelledby="error-summary-title" tabindex="-1" autofocus>
+   so keyboard and screen reader users start at the list of problems. `focus_field`: the
+   id of the control the summary's first link goes to, when the page puts focus there
+   instead (the upload form's file chooser): the summary still announces itself. #}
+<div class="error-summary" role="alert" aria-labelledby="error-summary-title" tabindex="-1"{% if not focus_field|default("") %} autofocus{% endif %}>
   <h2 id="error-summary-title">There is a problem</h2>
   <ul>
     {% for error in errors %}

@@ -2,7 +2,10 @@
    waiting or converting, htmx polls GET /app/documents and swaps the whole list when
    something changed (204 otherwise); every link keeps its id, so htmx puts focus back
    on the same link after a swap. The list is not a live region: a document finishing
-   changes the tab title ("My documents (4 of 6 finished)"), not what is being read. #}
+   changes the tab title ("My documents (4 of 6 finished)"), not what is being read.
+   ux2-lane-a: a row leads with the file name (`DocumentRow.name`), because generated titles
+   repeat; its title sits under it when different. One next step and Delete per row: a revised
+   version is offered on the document's own page. #}
 {% if page_title|default("") %}<title>{{ page_title }} | ReadableSTEM</title>
 {% endif %}
 {% set list_url = list_url|default("/app/documents") %}
@@ -10,7 +13,7 @@
   <p class="documents-summary">{{ documents.summary }}.</p>
   {% set next = documents.review_next %}
   {% if next %}
-  <p><a class="button" id="review-next" href="/jobs/{{ next.id }}/review">Review next<span class="visually-hidden">: {{ next.title }}</span></a></p>
+  <p><a class="button" id="review-next" href="/jobs/{{ next.id }}/review">Review next<span class="visually-hidden">: {{ next.name }}</span></a></p>
   {% endif %}
   {% for group in documents.groups if group.rows %}
   <h3 id="docs-{{ group.key }}">{{ group.heading }} ({{ group.rows|length }})</h3>
@@ -23,29 +26,26 @@
         <th scope="col" role="columnheader">Document</th>
         <th scope="col" role="columnheader">Status</th>
         <th scope="col" role="columnheader">Deleted automatically</th>
-        <th scope="col" role="columnheader"><span class="visually-hidden">Delete</span></th>
+        <th scope="col" role="columnheader">Actions</th>
       </tr>
     </thead>
     <tbody role="rowgroup">
       {% for row in group.rows %}
       <tr role="row">
         <th scope="row" role="rowheader">
-          {% if row.is_sample %}<span class="status-badge status-sample">Sample</span> {% endif %}<a id="doc-{{ row.id }}" href="/jobs/{{ row.id }}">{{ row.title }}</a>
-          <span class="doc-file">{% if row.part_label %}Pages {{ row.part_label }} of a larger file · {% endif %}{% if row.title != row.filename %}{{ row.filename }} · {% endif %}{{ row.pages }} {{ "page" if row.pages == 1 else "pages" }} · uploaded {{ row.created_at|utc }}</span>
+          {% if row.is_sample %}<span class="status-badge status-sample">Sample</span> {% endif %}<a id="doc-{{ row.id }}" href="/jobs/{{ row.id }}">{{ row.name }}</a>
+          <span class="doc-file">{% if row.title_note %}Titled “{{ row.title_note }}”<br>{% endif %}{{ row.pages }} {{ "page" if row.pages == 1 else "pages" }}{% if row.part_label %}, part of a larger file{% endif %} · uploaded {{ row.created_at|utc }}</span>
         </th>
-        <td role="cell" data-label="Status">
-          <span class="status-badge status-{{ row.badge }}">{{ row.label }}</span>
-          {% if row.action == "review" %}
-          <a id="act-{{ row.id }}" href="/jobs/{{ row.id }}/review">Review<span class="visually-hidden"> {{ row.title }}</span></a>
-          {% elif row.action == "download" %}
-          <a id="act-{{ row.id }}" href="/jobs/{{ row.id }}/download">Download<span class="visually-hidden"> {{ row.title }}</span></a>
-          {% endif %}
-          {% if row.status == "done" and not row.is_sample %}
-          <a id="rev-{{ row.id }}" class="row-link" href="/app?revises={{ row.id }}#upload-heading">Upload a revised version<span class="visually-hidden"> of {{ row.title }}</span></a>
-          {% endif %}
-        </td>
+        <td role="cell" data-label="Status"><span class="status-badge status-{{ row.badge }}">{{ row.label }}</span></td>
         <td role="cell" data-label="Deleted automatically">{{ row.retain_until|utc }}</td>
-        <td role="cell"><a id="del-{{ row.id }}" class="danger-link" href="/jobs/{{ row.id }}/delete?from=app">Delete<span class="visually-hidden"> {{ row.title }}</span></a></td>
+        <td role="cell" class="row-actions">
+          {% if row.action == "review" %}
+          <a id="act-{{ row.id }}" class="row-primary" href="/jobs/{{ row.id }}/review">Review<span class="visually-hidden"> {{ row.name }}</span></a>
+          {% elif row.action == "download" %}
+          <a id="act-{{ row.id }}" class="row-primary" href="/jobs/{{ row.id }}/download">Download<span class="visually-hidden"> {{ row.name }}</span></a>
+          {% endif %}
+          <a id="del-{{ row.id }}" class="danger-link" href="/jobs/{{ row.id }}/delete?from=app">Delete<span class="visually-hidden"> {{ row.name }}</span></a>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

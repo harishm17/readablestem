@@ -240,7 +240,7 @@ def test_it_is_deleted_by_the_same_clock_as_every_document(web):
 def test_my_documents_offers_it_first_to_someone_with_nothing_then_after_the_upload_form(web):
     page = web.alice.get("/app").text
     assert "Try a sample first" in page
-    assert page.index('id="sample-heading"') < page.index('id="upload-heading"')
+    assert page.index('id="upload-heading"') < page.index('id="sample-heading"')  # the form leads
     assert 'action="/sample"' in page
     job_id = open_sample(web.alice)
     upload(web.alice, make_pdf(1))

@@ -243,6 +243,93 @@
   });
 })();
 
+/* Upload form option groups (_upload_form.html). Each group is a <details> whose summary
+ * line says what is set ("No course · Figures described normally · ..."). The server writes
+ * that line for the first view; this rewrites it as the boxes inside change, so a closed
+ * group never states a choice that is no longer the one made. Without this file the line
+ * stays as the page was sent, and the form still submits what is ticked.
+ */
+(function () {
+  "use strict";
+
+  function describe(group) {
+    if (group.getAttribute("data-summary") === "retention") {
+      var share = group.querySelector("#share");
+      var keep = group.querySelector("#keep");
+      var key = share && share.checked ? "share" : keep && keep.checked ? "keep" : "default";
+      return group.getAttribute("data-text-" + key) || "";
+    }
+    var parts = [];
+    var course = group.querySelector("select#course");
+    if (course && course.selectedIndex >= 0) {
+      parts.push(course.value ? course.options[course.selectedIndex].text : "No course");
+    }
+    group.querySelectorAll("input[type='checkbox'][data-on]").forEach(function (box) {
+      parts.push(box.getAttribute(box.checked ? "data-on" : "data-off"));
+    });
+    return parts.join(" · ");
+  }
+
+  document.querySelectorAll("details.option-group[data-summary]").forEach(function (group) {
+    var state = group.querySelector("[data-group-state]");
+    if (!state) return;
+    function update() {
+      var text = describe(group);
+      if (text && state.textContent.trim() !== text) state.textContent = text;
+    }
+    group.addEventListener("change", update);
+    window.addEventListener("pageshow", update); // the browser may restore ticked boxes
+    update();
+  });
+})();
+
+/* How long a document or batch has been waiting or converting (_wait_note.html). The page
+ * says the time as it was when it was sent; this keeps it current every half minute and, once
+ * the wait passes what is usual for it, shows the "taking longer than usual" note. The words
+ * are the server's (job_page.elapsed_words). Nothing here estimates when it will finish.
+ */
+(function () {
+  "use strict";
+
+  if (!document.querySelector("[data-wait-since]")) return;
+
+  function words(seconds) {
+    var minutes = Math.floor(Math.max(seconds, 0) / 60);
+    if (minutes < 1) return "less than a minute";
+    function plural(n, one) { return n + " " + one + (n === 1 ? "" : "s"); }
+    if (minutes < 60) return plural(minutes, "minute");
+    var hours = Math.floor(minutes / 60);
+    var rest = minutes % 60;
+    return plural(hours, "hour") + (rest ? " " + plural(rest, "minute") : "");
+  }
+
+  function update() {
+    // Looked up each time: htmx swaps the batch page's rows, and the job page's status box
+    // says "finished" without reloading the page (then there is nothing left to count).
+    var finished = !!document.querySelector("#job-status[data-finished]");
+    document.querySelectorAll("[data-wait-since]").forEach(function (note) {
+      note.hidden = finished;
+      var since = Date.parse(note.getAttribute("data-wait-since"));
+      if (finished || isNaN(since)) return;
+      var seconds = (Date.now() - since) / 1000;
+      var text = note.querySelector("[data-wait-text]");
+      if (text) {
+        text.textContent =
+          note.getAttribute("data-wait-lead") + " " + words(seconds) +
+          (note.getAttribute("data-wait-tail") || "") + ".";
+      }
+      var slow = note.querySelector("[data-wait-slow]");
+      if (slow && seconds > Number(note.getAttribute("data-wait-slow-after"))) slow.hidden = false;
+    });
+  }
+
+  window.setInterval(update, 30000);
+  document.addEventListener("htmx:afterSwap", update);
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) update();
+  });
+})();
+
 /* After a download (_after_download.html, web/feedback.py): the two optional questions
  * are in the page but hidden until the download link is used. Without JavaScript they
  * show on the next visit, and a link leads to them.

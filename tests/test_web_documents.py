@@ -95,14 +95,14 @@ def test_my_documents_is_a_to_do_list(web):
     )
     assert f'<a class="button" id="review-next" href="/jobs/{older}/review">Review next' in page
     assert "3 decisions to make" in flat and "Ready to download" in flat
-    assert f'id="act-{older}" href="/jobs/{older}/review">Review' in page
-    assert f'id="act-{ready}" href="/jobs/{ready}/download">Download' in page
+    assert f'id="act-{older}" class="row-primary" href="/jobs/{older}/review">Review' in page
+    assert f'id="act-{ready}" class="row-primary" href="/jobs/{ready}/download">Download' in page
 
-    # By title, with the file name, pages and upload time under it.
-    assert f'<a id="doc-{older}" href="/jobs/{older}">Week 1: Vectors</a>' in page
-    assert "week1.pdf · 1 page · uploaded" in flat
+    # By file name (generated titles repeat), with the title, pages and upload time under it.
+    assert f'<a id="doc-{older}" href="/jobs/{older}">week1.pdf</a>' in page
+    assert "Titled “Week 1: Vectors” 1 page · uploaded" in flat
     assert f'<a id="doc-{waiting}" href="/jobs/{waiting}">slides.pdf</a>' in page  # no title yet
-    assert "slides.pdf · 2 pages" not in flat  # the file name is not said twice
+    assert "Titled “slides.pdf”" not in flat  # the file name is not said twice
     # Partial results, failures and badges say it in words.
     for badge in re.findall(r'<span class="status-badge status-(\w+)">([^<]+)</span>', page):
         assert badge[1].strip(), badge
@@ -197,7 +197,12 @@ def test_an_expired_documents_link_says_it_was_deleted_as_promised(web):
         assert response.status_code == 404
         flat = text(response.text)
         assert "This document has been deleted" in flat
-        assert "deleted automatically 24 hours after upload, as promised" in flat
+        assert (
+            "deleted automatically, as promised when you uploaded it, after being kept 24 hours"
+            in flat
+        )
+        assert "24 hours after you last work on them" in flat and "after upload" in flat
+        assert 'href="/app#upload-heading"' in response.text  # a direct way to upload again
         assert "Files you downloaded are not affected." in flat
         assert "not yours to see" not in flat
 
@@ -211,14 +216,14 @@ def test_after_the_purge_its_owner_still_learns_it_was_deleted(web):
     assert purge_expired(web.ctx.factory).jobs_deleted == 1
     flat = text(web.browser.get(f"/jobs/{job_id}").text)
     assert "This document has been deleted" in flat
-    assert "deleted automatically 24 hours after you last worked on them (7 days if" in flat
+    assert "24 hours after you last work on them, 7 days if you chose to keep them" in flat
     # Anyone else learns nothing, not even that the id existed.
     bob = web.client()
     login(bob, BOB)
     other = bob.get(f"/jobs/{job_id}")
     assert other.status_code == 404
     assert "This document has been deleted" not in text(other.text)
-    assert "There is no document at this address." in text(other.text)
+    assert "There is no document at this address that this account can open." in text(other.text)
 
 
 def test_someone_elses_live_document_is_a_plain_not_found(web):
@@ -226,7 +231,7 @@ def test_someone_elses_live_document_is_a_plain_not_found(web):
     bob = web.client()
     login(bob, BOB)
     flat = text(bob.get(f"/jobs/{job_id}").text)
-    assert "There is no document at this address." in flat
+    assert "There is no document at this address that this account can open." in flat
     assert "has been deleted" not in flat and "not yours to see" not in flat
 
 

@@ -4,7 +4,7 @@
 {% set title_error = field_errors.get("title") %}
 {% set contact_error = field_errors.get("contact") %}
 <section aria-labelledby="student-file-heading">
-  <h2 id="student-file-heading">For students</h2>
+  <h{{ hl|default(2) }} id="student-file-heading">{{ "Title and contact line" if hl|default(2) > 2 else "For students" }}</h{{ hl|default(2) }}>
   <form method="post" action="/jobs/{{ job.id }}/title" class="student-setting">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     <div class="field{% if title_error %} field-error{% endif %}">
