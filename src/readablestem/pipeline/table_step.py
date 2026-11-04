@@ -149,6 +149,7 @@ from readablestem.pipeline.equation_step import (
     _mathml_symbols,
     _symbol_bag,
     read_latex,
+    restyle_bold_italic,
     text_layer_similarity,
     text_layer_style,
     text_layer_symbols_differ,
@@ -997,12 +998,42 @@ def with_split_rows(grid: TableGrid, element: Element) -> TableGrid:
     return grid
 
 
-def _evaluate(output: TableOutput | None, calls: list[ModelCall], element: Element) -> _Candidate:
+def restyle_cells(grid: TableGrid, element: Element) -> TableGrid:
+    r"""`grid` with each maths cell's `\mathbf{x}` written `\boldsymbol{x}` where the PDF cell it
+    stands on draws that letter in a bold italic face: the equation step's `restyle_bold_italic`,
+    which the crop path has always applied and a table's maths cells never did (`\bm g` in a cell
+    came out `\mathbf{g}`). Only for a grid of the PDF's own size; a cell is changed only when its
+    new LaTeX converts."""
+    local = _local(element)
+    if local is None or not _aligned(grid, local):
+        return grid
+    owner = _owners(local)
+    cells = []
+    for cell in grid.cells:
+        if cell.latex and "\\mathbf" in cell.latex:
+            layer = " ".join(local.cells[i].text for i in _counterparts(cell, owner))
+            latex = restyle_bold_italic(cell.latex, layer)
+            mathml = to_mathml(latex) if latex != cell.latex else None
+            if mathml is not None:
+                cell = cell.model_copy(update={"latex": latex, "mathml": mathml})
+        cells.append(cell)
+    return grid.model_copy(update={"cells": cells})
+
+
+def _evaluate(
+    output: TableOutput | None,
+    calls: list[ModelCall],
+    element: Element,
+    *,
+    reconcile: bool = False,
+) -> _Candidate:
     if output is None:
         return _Candidate(output, calls)
     placed = _grid_with_policy(output, caption=caption_of(element))
     if placed is not None and output.is_data_table:
         placed = (with_split_rows(placed[0], element), placed[1])
+        if reconcile:
+            placed = (restyle_cells(placed[0], element), placed[1])
     candidate = _Candidate(output, calls, placed[0] if placed is not None else None)
     if candidate.grid is not None and output.is_data_table:
         candidate.checks = table_checks(candidate.grid, element)
@@ -1135,7 +1166,7 @@ def rebuild(
             output, calls = _call_once(client, request, TableOutput)
         else:
             output, calls = _call(client, request, TableOutput, settings)
-        return _evaluate(output, calls, element)
+        return _evaluate(output, calls, element, reconcile=settings.equation_glyph_reconcile)
 
     candidate = attempt(settings.cheap_model)
     calls = list(candidate.calls)

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: equation reading push (branch eq/read-push)
+
+- Pipeline 0.5.9. New setting `EQUATION_GLYPH_RECONCILE` (off; needs `EQUATION_GLYPH_CHECKS`):
+  an equation's reading is corrected from the PDF's own glyphs where they leave one answer: one
+  named lookalike symbol in a TeX-made PDF, a unit the line context added after the box, a printed
+  slash kept as a slash, a display's equation number taken out of its LaTeX, `\mathscr` for an RSFS
+  or EUSM face, and `restyle_bold_italic` for a table's maths cells. A correction is a note on the
+  fix (`equation.pdf_correction`, review "optional") and the model's reading is kept
+  (`EquationFix.model_latex`). No request or prompt changes (`docs/steps.md`, "Corrections from
+  the glyphs"; `docs/eval-dev-baseline-2026-11-03.md`, "Reading push").
+
+## Earlier: equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
 ## Unreleased: Landlock sandbox backend (branch latex/landlock-sandbox)
 
 - New: a second sandbox for LaTeX source where bubblewrap cannot start (no user namespaces,

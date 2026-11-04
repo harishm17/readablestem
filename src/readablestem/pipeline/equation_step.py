@@ -95,6 +95,7 @@ from readablestem.models.prompts import load_prompt
 from readablestem.pipeline import (
     equation_images,
     flag_policy,
+    glyph_reconcile,
     layout,
     notation_memory,
     page_math,
@@ -494,7 +495,9 @@ MEANING_MISMATCH_FACTOR = 0.6
 SPEECH_CODES = frozenset({"speech_failed", "speech_empty"})
 # The cheap answer was not read a second time (see `SKIP_ESCALATION_FROM`): a note only.
 SINGLE_READING_CODE = "single_reading"
-NOTE_CODES = frozenset({"style_cosmetic", SINGLE_READING_CODE, *SPEECH_CODES})
+NOTE_CODES = frozenset(
+    {"style_cosmetic", SINGLE_READING_CODE, *SPEECH_CODES, *glyph_reconcile.CODES}
+)
 # A picture of an equation: no text layer to check the reading against, so a person decides.
 NO_TEXT_LAYER_CODE = "no_text_layer"
 # Layout found a fraction bar against the equation's region with the bar's other side
@@ -814,6 +817,12 @@ class _Candidate:
     speech: str = ""
     checks: list[Check] = field(default_factory=list)
     confidence: float | None = None
+    # `EQUATION_GLYPH_RECONCILE`: the corrections made from the PDF's glyphs (codes of
+    # `glyph_reconcile.CODES`), the reading before the first, and the equation number a display
+    # had read into its LaTeX (`glyph_reconcile.edge_label`).
+    corrections: list[str] = field(default_factory=list)
+    model_latex: str | None = None
+    label: str | None = None
 
     @property
     def valid(self) -> bool:
@@ -905,6 +914,7 @@ def _evaluate(
     *,
     course_bold: frozenset[str] = frozenset(),
     spoken: dict[str, str] | None = None,
+    reconcile: bool = False,
 ) -> _Candidate:
     if output is None:
         return _Candidate(output, calls)
@@ -913,6 +923,8 @@ def _evaluate(
         return candidate
     span = element.glyphs.span_glyphs if element.glyphs is not None else ()
     candidate.latex = restyle_bold_italic(read_latex(output.latex), element.text, span)
+    if reconcile and element.glyphs is not None:
+        candidate.latex = glyph_reconcile.restyle_script(candidate.latex, element.glyphs.scr)
     if display == "inline":
         candidate.latex = strip_trailing_punctuation(candidate.latex)
         candidate.latex = drop_neighbour_brackets(candidate.latex, element.text)
@@ -920,6 +932,12 @@ def _evaluate(
     candidate.mathml, candidate.checks = _convert(candidate.latex, display)
     if candidate.mathml is None:
         return candidate
+    if reconcile:
+        _reconcile(candidate, element, display)
+        if candidate.label:  # the number is no part of the formula the glyphs are checked against
+            element = element.model_copy(
+                update={"text": glyph_reconcile.without_label(element.text, candidate.label)}
+            )
     candidate.speech, speech_check = _speech(candidate.mathml, spoken)
     candidate.checks.append(speech_check)
     meaning = False  # a meaning-level difference from the text layer
@@ -1011,7 +1029,65 @@ def _evaluate(
         meaning = meaning or species.differ
     if meaning and candidate.confidence is not None:
         candidate.confidence *= MEANING_MISMATCH_FACTOR
+    candidate.checks.extend(
+        glyph_reconcile.NOTES[code].model_copy() for code in dict.fromkeys(candidate.corrections)
+    )
     return candidate
+
+
+def _reconcile(candidate: _Candidate, element: Element, display: Display) -> None:
+    """Correct a valid reading from the glyphs where they are plain (`glyph_reconcile`, behind
+    `Settings.equation_glyph_reconcile`). Each rule that fires re-converts the reading and is kept
+    only if the result converts; the checks that follow then compare the corrected reading with
+    the PDF, so a correction that is not the PDF's is still flagged. In any doubt, nothing."""
+    context = element.glyphs
+    if context is None or candidate.mathml is None:
+        return
+    first = candidate.latex
+
+    def take(latex: str | None, code: str, label: str | None = None) -> None:
+        if latex is None or latex == candidate.latex:
+            return
+        mathml, checks = _convert(latex, display)
+        if mathml is None:
+            return
+        candidate.model_latex = candidate.model_latex or first
+        candidate.latex, candidate.mathml, candidate.checks = latex, mathml, checks
+        candidate.corrections.append(code)
+        if label is not None:
+            candidate.label = label
+
+    if display == "inline":
+        take(
+            glyph_reconcile.drop_unit_past_box(
+                candidate.latex,
+                candidate.mathml,
+                element.text,
+                context.span_glyphs,
+                context.after_glyphs,
+            ),
+            glyph_reconcile.UNIT_CODE,
+        )
+        take(
+            glyph_reconcile.keep_slash(
+                candidate.latex,
+                element.text,
+                fraction_bar="fraction bar" in element.reasons,
+            ),
+            glyph_reconcile.SLASH_CODE,
+        )
+    else:
+        numbered = glyph_reconcile.edge_label(candidate.latex, context.labels.split())
+        if numbered is not None:
+            take(numbered[0], glyph_reconcile.NUMBER_CODE, numbered[1])
+    if candidate.mathml is not None:
+        layer = reading_layer(element, candidate.mathml)
+        take(
+            glyph_reconcile.reconcile_symbol(
+                candidate.latex, candidate.mathml, layer.text or "", context.tex
+            ),
+            glyph_reconcile.SYMBOL_CODE,
+        )
 
 
 def _accept_at(candidate: _Candidate, settings: Settings) -> float:
@@ -1039,7 +1115,10 @@ def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
         return False  # the fallback was the main model: nothing better to ask
     if _band_only(candidate, settings):
         return False
-    disagrees = any(not c.passed and c.code not in SPEECH_CODES for c in candidate.checks)
+    disagrees = any(
+        not c.passed and c.code not in SPEECH_CODES and c.code not in glyph_reconcile.CODES
+        for c in candidate.checks
+    )
     return (
         candidate.confidence < _accept_at(candidate, settings) or not candidate.usable or disagrees
     )
@@ -1056,7 +1135,7 @@ def _band_only(candidate: _Candidate, settings: Settings) -> bool:
         and candidate.usable
         and candidate.output is not None
         and candidate.output.is_equation
-        and all(c.passed for c in candidate.checks)
+        and all(c.passed or c.code in glyph_reconcile.CODES for c in candidate.checks)
     )
 
 
@@ -1165,6 +1244,7 @@ def _settle_witness(
     *,
     course_bold: frozenset[str],
     spoken: dict[str, str] | None,
+    reconcile: bool = False,
 ) -> tuple[_Candidate, tuple[str, Literal["crop", "page_witness"]] | None]:
     """Record how the final reading stands against the page witness's, and settle a
     disagreement: the candidate whose symbols are closer to the glyphs of the extent is the
@@ -1206,6 +1286,7 @@ def _settle_witness(
         display,
         course_bold=course_bold,
         spoken=spoken,
+        reconcile=reconcile,
     )
     winner = (
         witness_reconcile.adjudicate(element.text, candidate.mathml, rival.mathml)
@@ -1253,6 +1334,7 @@ def _fix(
                 mathml=candidate.mathml,
                 speech=candidate.speech,
                 display=display,
+                model_latex=candidate.model_latex if candidate.corrections else None,
             )
         return Fix(
             element_id=element.id,
@@ -1340,7 +1422,15 @@ def transcribe(
             output, calls = _call_once(client, request, EquationOutput)
         else:
             output, calls = _call(client, request, EquationOutput, settings)
-        return _evaluate(output, calls, element, display, course_bold=course_bold, spoken=spoken)
+        return _evaluate(
+            output,
+            calls,
+            element,
+            display,
+            course_bold=course_bold,
+            spoken=spoken,
+            reconcile=settings.equation_glyph_reconcile,
+        )
 
     first_model = _first_model(element, settings)
     # The text around the equation goes to the main model only when it re-reads a cheap
@@ -1403,7 +1493,12 @@ def transcribe(
     other: tuple[str, Literal["crop", "page_witness"]] | None = None
     if element.witness_latex is not None or element.witness_status is not None:
         candidate, other = _settle_witness(
-            element, candidate, display, course_bold=course_bold, spoken=spoken
+            element,
+            candidate,
+            display,
+            course_bold=course_bold,
+            spoken=spoken,
+            reconcile=settings.equation_glyph_reconcile,
         )
     if layout.REASON_HALF_FRACTION in element.reasons:
         candidate.checks.append(
@@ -1416,6 +1511,9 @@ def transcribe(
         )
         if candidate.confidence is not None:
             candidate.confidence = min(candidate.confidence, settings.auto_accept_confidence - 0.01)
+    if candidate.label and not element.equation_label:
+        # The number a display had read into its LaTeX is its number (`glyph_reconcile.edge_label`).
+        element.equation_label = candidate.label
     fix = _fix(element, candidate, calls, display, settings)
     outcome = _escalation_outcome(first, reread, skipped)
     if outcome is not None:
