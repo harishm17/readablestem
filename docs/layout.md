@@ -715,7 +715,7 @@ Found by the error analysis of the real-world set ([eval-equation-rootcause.md](
 a paper page is mostly `$x$` in running text, in a font the OpenStax prints never use. What the
 layout learned from it, all from the text layer and the glyph boxes, no model call. The rules that
 come from what a TeX author types (italic variables, bold letters with an index, the edges: parentheses, units,
-citations, word spaces) apply to PDFs typeset by TeX only (`_TEX_MADE`, from `page_type.producer_hint`: the producer or creator names pdfTeX, XeTeX or XeLaTeX (`xdvipdfmx`, what Overleaf offers), LuaTeX, LuaHBTeX, dvips, dvipdfm(x), Tectonic, or says LaTeX or TeX, as whole words in `page_type.TEX_PRODUCER`; a substring match took Quartz's "PDFContext" and iText for TeX): an
+citations, word spaces) apply to PDFs typeset by TeX only (`_TEX_MADE`, from `page_type.producer_hint`: the producer or creator names pdfTeX, XeTeX or XeLaTeX (`xdvipdfmx`, what Overleaf offers), LuaTeX, LuaHBTeX, dvips, dvipdfm(x), Tectonic, arXiv's `tex2pdf` ("arXiv GenPDF (tex2pdf:...)", one word that `tex` does not match) or VTeX, or says LaTeX or TeX, as whole words in `page_type.TEX_PRODUCER`; a substring match took Quartz's "PDFContext" and iText for TeX): an
 OpenStax print from Chromium, where emphasis is italic and the unit is inside the maths, is read as before
 (`scripts/layout_identity.py` on 126 PDFs: 111 identical, the rest explained in
 [eval-equation-rootcause.md](eval-equation-rootcause.md) section 7). Captions, ellipsis lists and `:=` apply to every producer.

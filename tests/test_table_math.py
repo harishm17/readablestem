@@ -9,6 +9,8 @@ test, grids and fixes written by hand.
 
 from __future__ import annotations
 
+import subprocess
+
 import pymupdf
 import pytest
 
@@ -18,16 +20,24 @@ from readablestem.core.types import (
     Element,
     EquationFix,
     Fix,
+    GlyphContext,
     Kind,
     Status,
     TableCell,
     TableFix,
     TableGrid,
 )
+from readablestem.gold import safe_tex
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import equation_step, figure_step, layout, run, table_math, table_step
 from readablestem.pipeline.assemble import render_html
-from readablestem.pipeline.layout import Layout, analyze
+from readablestem.pipeline.layout import (
+    Layout,
+    analyze,
+    crop_line,
+    line_across,
+    line_glyphs,
+)
 
 # ------------------------------------------------------------------ the layout side
 
@@ -79,6 +89,149 @@ def test_a_table_cell_that_is_a_formula_is_an_equation_of_the_table():
 def test_a_document_not_made_by_tex_has_no_cell_equations():
     _, found = tables_of(cell_page("Skia/PDF m120"))
     assert all(c.equation_id is None for t in found for c in t.table.cells)
+
+
+def symbol_page(producer: str, marks: list[tuple[str, str]]) -> bytes:
+    """A ruled table, a word column and a column of one glyph each: `marks` are (text, font)."""
+    doc = pymupdf.open()
+    doc.set_metadata({"producer": producer})
+    page = doc.new_page(width=612, height=792)
+    x = [100, 220, 340]
+    y = [100 + 30 * k for k in range(len(marks) + 2)]
+    for k in x:
+        page.draw_line((k, y[0]), (k, y[-1]))
+    for k in y:
+        page.draw_line((x[0], k), (x[-1], k))
+    page.insert_text((106, y[0] + 19), "Method", fontsize=11, fontname="helv")
+    page.insert_text((226, y[0] + 19), "Seen", fontsize=11, fontname="helv")
+    for r, (text, font) in enumerate(marks, start=1):
+        page.insert_text((106, y[r] + 19), f"Row {r}", fontsize=11, fontname="helv")
+        page.insert_text((226, y[r] + 19), text, fontsize=11, fontname=font)
+    page.insert_text((106, y[-2] + 19), "Last", fontsize=11, fontname="helv")
+    return doc.tobytes()
+
+
+def cell_equation_texts(data: bytes) -> list[str]:
+    layout, found = tables_of(data)
+    by_id = {e.id: e for e in layout.elements}
+    return [
+        by_id[c.equation_id].text for t in found for c in t.table.cells if c.equation_id is not None
+    ]
+
+
+def test_a_cell_of_only_a_maths_symbol_glyph_is_an_equation():
+    """A lone `\\checkmark` or `\\times` (a maths symbol font) has no run of its own: the cell
+    is the formula. "Symbol" is the PDF base-14 maths symbol face."""
+    texts = cell_equation_texts(
+        symbol_page("pdfTeX-1.40.25", [("\N{MULTIPLICATION SIGN}", "symb"), ("±", "symb")])
+    )
+    assert sorted(texts) == ["±", "\N{MULTIPLICATION SIGN}"]
+
+
+def test_a_symbol_glyph_cell_needs_a_tex_made_pdf():
+    assert (
+        cell_equation_texts(symbol_page("Skia/PDF m120", [("\N{MULTIPLICATION SIGN}", "symb")]))
+        == []
+    )
+
+
+def test_a_dingbat_or_a_symbol_bullet_in_a_cell_is_not_maths():
+    """ZapfDingbats ticks and the list bullet of the plain Symbol face are decoration."""
+    marks = [("4", "zadb"), ("•", "symb")]
+    assert cell_equation_texts(symbol_page("pdfTeX-1.40.25", marks)) == []
+
+
+def test_a_symbol_glyph_outside_a_table_is_not_an_equation():
+    doc = pymupdf.open()
+    doc.set_metadata({"producer": "pdfTeX-1.40.25"})
+    page = doc.new_page(width=612, height=792)
+    page.insert_text((100, 100), "A note on bullets", fontsize=11, fontname="helv")
+    page.insert_text((100, 130), "•", fontsize=11, fontname="symb")
+    page.insert_text((115, 130), "an item of a list", fontsize=11, fontname="helv")
+    assert [e for e in analyze(doc.tobytes()).elements if e.kind == Kind.EQUATION] == []
+
+
+def neighbour_page() -> bytes:
+    """A ruled table whose formula cell has the next column's "(5)" 20 points to its right."""
+    doc = pymupdf.open()
+    doc.set_metadata({"producer": "pdfTeX-1.40.25"})
+    page = doc.new_page(width=612, height=792)
+    x = [100, 220, 340]
+    y = [100, 130, 160]
+    for k in x:
+        page.draw_line((k, y[0]), (k, y[-1]))
+    for k in y:
+        page.draw_line((x[0], k), (x[-1], k))
+    page.insert_text((106, y[0] + 19), "Name", fontsize=11, fontname="helv")
+    page.insert_text((226, y[0] + 19), "Ref", fontsize=11, fontname="helv")
+    x0 = 106
+    for text, font in (
+        ("T", "heit"),
+        (" = 2", "helv"),
+        ("p", "heit"),
+        ("/", "helv"),
+        ("w", "heit"),
+    ):
+        page.insert_text((x0, y[1] + 19), text, fontsize=11, fontname=font)
+        x0 += pymupdf.get_text_length(text, fontname=font, fontsize=11)
+    page.insert_text((226, y[1] + 19), "(5)", fontsize=11, fontname="helv")
+    return doc.tobytes()
+
+
+def test_a_cell_equations_line_is_cut_to_its_own_column():
+    """The line the equation step sees (the crop and the glyphs around the box) stops at the
+    cell's column: the table's width took the next column's "(5)" into the reading."""
+    data = neighbour_page()
+    layout, found = tables_of(data)
+    table = found[0]
+    cell = next(c for c in table.table.cells if c.equation_id)
+    equation = next(e for e in layout.elements if e.id == cell.equation_id)
+    across = line_across(table, equation)
+    assert across == (cell.bbox[0], cell.bbox[2])
+    assert across[1] < 226  # not the table's right edge
+    glyphs = glyph_context(data, equation, across)
+    assert "(" not in glyphs.after and "5" not in glyphs.after
+    wide = glyph_context(data, equation, (table.bbox[0], table.bbox[2]))
+    assert "(5)" in "".join(c for c, _ in GlyphContext.decode(wide.after))
+    narrow_png = crop_line(data, equation, across)
+    wide_png = crop_line(data, equation, (table.bbox[0], table.bbox[2]))
+    assert len(narrow_png) != len(wide_png)
+
+
+def test_a_paragraph_equations_line_still_spans_the_paragraph():
+    parent = Element(id="p1-e0", kind=Kind.PARAGRAPH, page=0, bbox=(72, 100, 500, 120), order=0)
+    child = Element(id="p1-e1", kind=Kind.EQUATION, page=0, bbox=(100, 100, 120, 110), order=1)
+    assert line_across(parent, child) == (72, 500)
+    assert line_across(None, child) is None
+
+
+def glyph_context(data: bytes, equation: Element, across: tuple[float, float]) -> GlyphContext:
+    context = line_glyphs(data, equation, across)
+    assert context is not None
+    return context
+
+
+TECTONIC_CACHE = safe_tex.tectonic_cache().is_dir()
+
+
+@pytest.mark.skipif(
+    safe_tex.tectonic_path() is None or not TECTONIC_CACHE, reason="needs Tectonic and its cache"
+)
+def test_a_tex_table_of_checkmarks_gives_one_equation_per_mark(tmp_path):
+    (tmp_path / "t.tex").write_text(
+        "\\documentclass{article}\\usepackage{amssymb}\\begin{document}\n"
+        "\\begin{tabular}{|l|c|c|}\\hline Method & A & B\\\\\\hline\n"
+        "Ours & $\\checkmark$ & \\\\\\hline Base & & $\\checkmark$\\\\\\hline\n"
+        "Other & $\\times$ & $\\checkmark$\\\\\\hline\\end{tabular}\\end{document}\n"
+    )
+    done = subprocess.run(
+        [safe_tex.tectonic_path(), "-X", "compile", "t.tex"],
+        cwd=tmp_path, capture_output=True, timeout=180, check=False,
+    )  # fmt: skip
+    if done.returncode:
+        pytest.skip("Tectonic could not compile offline")
+    texts = cell_equation_texts((tmp_path / "t.pdf").read_bytes())
+    assert sorted(texts) == ["\N{MULTIPLICATION SIGN}", "✓", "✓", "✓"]
 
 
 # ------------------------------------------------------------------ the page side

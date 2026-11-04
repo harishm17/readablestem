@@ -208,7 +208,13 @@ log = logging.getLogger(__name__)
 # get the TeX reading rules, and Quartz ("PDFContext") and iText no longer do. TeX files with
 # those producers read differently: units out of a formula, table-cell and inline-formula edges.
 # Results from 0.5.6 load unchanged.
-PIPELINE_VERSION = "0.5.7"
+# 0.5.8 (2026-11-03): arXiv's own build ("arXiv GenPDF (tex2pdf:...)") and VTeX count as TeX
+# producers again (0.5.7's whole-word match lost them: 3 of 25 development papers read with no TeX
+# rules, so units stayed in formulas); a table cell of only maths-symbol glyphs (a lone
+# `\checkmark`, `\times`) is an inline cell equation; a cell equation's line crop and glyph
+# context are cut to its own column (the next column's "(5)" was read into it). Results from 0.5.7
+# load unchanged.
+PIPELINE_VERSION = "0.5.8"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -922,7 +928,7 @@ class _Run:
         ):
             return None
         parent = self.parents.get(element.parent_id or "")
-        across = (parent.bbox[0], parent.bbox[2]) if parent is not None else None
+        across = layout.line_across(parent, element)
         try:
             return layout.crop_line(self.pdf_bytes, element, across)
         except Exception as exc:
@@ -939,7 +945,7 @@ class _Run:
             return
         reach = self.settings.equation_line_context and element.display == "inline"
         parent = self.parents.get(element.parent_id or "")
-        across = (parent.bbox[0], parent.bbox[2]) if parent is not None else None
+        across = layout.line_across(parent, element)
         try:
             glyphs = layout.line_glyphs(self.pdf_bytes, element, across, reach=reach)
         except Exception as exc:
