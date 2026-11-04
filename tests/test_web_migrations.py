@@ -239,7 +239,8 @@ OPEN_SIGNUP_REVISION = "a6c2e9f4b713"  # open sign-up (tests/test_web_open_signu
 IMAGE_PAGES_REVISION = "c4e7a2b9d150"  # the image pages choice (tests/test_web_image_pages.py)
 OPS_MONITORING_REVISION = "e1a7c3b95d24"  # (tests/test_ops_monitoring.py)
 JOB_SHARES_REVISION = "b7112167eb0d"  # (tests/test_job_shares.py)
-LOGIN_LINK_ADDRESS_REVISION = "ecb0b22515e0"  # the head (tests/test_job_shares.py)
+LOGIN_LINK_ADDRESS_REVISION = "ecb0b22515e0"  # (tests/test_job_shares.py)
+KEEP_WEEK_DEFAULT_REVISION = "5d8e1f2a7c39"  # the head (tests/test_web_keep_default.py)
 SIGN_IN_TABLES = {"linked_emails", "login_links"}
 
 
@@ -270,7 +271,38 @@ def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
     assert shares is not None and shares.down_revision == OPS_MONITORING_REVISION
     link = script.get_revision(LOGIN_LINK_ADDRESS_REVISION)
     assert link is not None and link.down_revision == JOB_SHARES_REVISION
-    assert migration_heads() == {LOGIN_LINK_ADDRESS_REVISION}  # one head, the newest
+    keep = script.get_revision(KEEP_WEEK_DEFAULT_REVISION)
+    assert keep is not None and keep.down_revision == LOGIN_LINK_ADDRESS_REVISION
+    assert migration_heads() == {KEEP_WEEK_DEFAULT_REVISION}  # one head, the newest
+
+
+def test_the_keep_week_default_migration_adds_an_off_column_and_drops_it(tmp_path):
+    """Accounts made before it get the setting off; an older release inserting a user
+    without the column still gets a valid row; the downgrade removes it."""
+    url = f"sqlite:///{tmp_path}/keep.db"
+    migrate(url, LOGIN_LINK_ADDRESS_REVISION)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+    finally:
+        engine.dispose()
+    migrate(url, KEEP_WEEK_DEFAULT_REVISION)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER.replace("'u1', 'a@", "'u2', 'b@")))
+            values = conn.execute(text("SELECT keep_week_default FROM users ORDER BY id"))
+            assert [bool(v) for (v,) in values] == [False, False]
+    finally:
+        engine.dispose()
+    migrate(url, LOGIN_LINK_ADDRESS_REVISION, down=True)
+    engine = create_engine(url)
+    try:
+        columns = {c["name"] for c in inspect(engine).get_columns("users")}
+        assert "keep_week_default" not in columns
+    finally:
+        engine.dispose()
 
 
 def test_the_job_page_migration_keeps_jobs_and_maps_the_old_opt_in(tmp_path):

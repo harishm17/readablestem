@@ -529,6 +529,10 @@ Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep it for
 I last work on it" (`keep`) and "Also let us look at the results (30 days)" (`share`; implies
 keeping). They set `jobs.retention_mode`: `day` (neither), `week` or `dev`; `dev` is also
 `jobs.opt_in_retention`, which `ops.export` reads, so only `dev` jobs can be looked at.
+The Account page has "Keep my documents for 7 days by default" (`users.keep_week_default`,
+`POST /account/keep-default`): when it is on, the `keep` box starts ticked; each upload still
+decides. The job page says near the top when the document will be deleted, with "Keep it for 7
+days" (the same `POST /jobs/{id}/keep`) while it is a 24-hour document.
 `retain_until` is a full window from upload: `RETENTION_HOURS`, 7 days, or
 `OPT_IN_RETENTION_DAYS`. For `day` and `week` jobs the window restarts on activity (a
 review write, a language, title or contact change, a download), never earlier than it

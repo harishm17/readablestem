@@ -27,6 +27,14 @@
   term". On the review screen "Edit the LaTeX" is closed when a one-click fix is offered, and
   the compare box says "at the same scale". `scripts/design_shots.py` uses the production
   limits.
+- Footer: "Built and maintained by Harish Manoharan. Open source · Contact". The offices page
+  has "Support and continuity" (open source and self-hostable, every result downloadable, no
+  service-level agreement, how to report a problem).
+- Retention: an account setting "Keep my documents for 7 days by default"
+  (`users.keep_week_default`, migration `5d8e1f2a7c39`, `POST /account/keep-default`) starts the
+  upload form's 7-day box ticked; each upload still decides. The job page says near the top when
+  the document will be deleted, with a one-click "Keep it for 7 days". Retention wording says the
+  clock restarts on each decision or download.
 
 ## Unreleased: design polish (branch design/d6-polish)
 

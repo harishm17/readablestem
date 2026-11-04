@@ -56,7 +56,7 @@ from readablestem.web import feedback as feedback_questions
 from readablestem.web import job_page as page_rules
 from readablestem.web import retry as retry_rules
 from readablestem.web.database import as_utc, utc_today
-from readablestem.web.db import Blob, Job, JobStatus, session_scope, utcnow
+from readablestem.web.db import Blob, Job, JobStatus, User, session_scope, utcnow
 from readablestem.web.deps import (
     CSRF_FIELD,
     ELEMENT_ID,
@@ -440,6 +440,9 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         )
         # The recorded sample document the person already has, if any (T3-9).
         sample_job = sample.live_sample(session, user.id, now)
+        # "Keep my documents for 7 days by default" (Account): the 7-day box starts ticked.
+        account = session.get(User, user.id)
+        keep_default = bool(account is not None and account.keep_week_default)
         # Documents other people shared with this person's address (G1).
         shared = [
             {
@@ -497,6 +500,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "image_pages_offered": ctx.settings.feature_image_pages,
         "office_what": phrases[0],
         "office_choose": phrases[1],
+        "keep_default": keep_default,
     }
 
 

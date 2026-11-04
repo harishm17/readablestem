@@ -281,6 +281,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
     )
     assert posts == [
         "/account/delete",  # a person deletes their own account (open sign-up)
+        "/account/keep-default",  # a person's own "keep 7 days by default" setting
         "/admin/allowlist",
         "/admin/allowlist/remove",
         "/admin/linked-emails",  # another Google account for an instructor (T3-10)

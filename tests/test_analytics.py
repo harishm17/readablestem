@@ -412,7 +412,10 @@ def test_the_converted_document_keeps_the_sandbox_policy(on):
 
 # --------------------------------------------------------------------------- footer credit
 
-CREDIT = 'Built by <a href="https://harishmanoharan.com/?ref=readablestem">Harish Manoharan</a>'
+CREDIT = (
+    'Built and maintained by <a href="https://harishmanoharan.com/?ref=readablestem">'
+    "Harish Manoharan</a>"
+)
 
 
 def test_the_footer_credit_is_on_app_pages_and_not_in_generated_documents(off):
@@ -423,7 +426,7 @@ def test_the_footer_credit_is_on_app_pages_and_not_in_generated_documents(off):
     job = job_id_from(upload(client, make_pdf(1)))
     off.run_worker()
     for path in (f"/jobs/{job}/view", f"/jobs/{job}/download", "/demo"):
-        assert "Built by" not in client.get(path).text, path
+        assert "Built and maintained by" not in client.get(path).text, path
 
 
 def test_the_relay_is_rate_limited_per_address(tmp_path, upstream):

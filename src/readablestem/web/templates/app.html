@@ -180,12 +180,13 @@
     <fieldset class="field retention-choices">
       <legend>How long to keep my document</legend>
       <p class="hint" id="keep-hint">If you tick neither box, your document, results and
-        decisions are deleted {{ retention_hours }} hours after you last work on them.
-        We do not use your uploads to train models.</p>
+        decisions are deleted {{ retention_hours }} hours after you last work on them; each
+        decision or download starts the clock again. We do not use your uploads to train models.</p>
       <div class="field checkbox-field">
-        <input type="checkbox" id="keep" name="keep" value="on" aria-describedby="keep-hint keep-who">
+        <input type="checkbox" id="keep" name="keep" value="on" aria-describedby="keep-hint keep-who"{% if keep_default|default(false) %} checked{% endif %}>
         <label for="keep">Keep it for 7 days after I last work on it</label>
-        <p class="hint" id="keep-who">Only you, and anyone you share it with, can see it.</p>
+        <p class="hint" id="keep-who">Only you, and anyone you share it with, can see it.
+          {% if keep_default|default(false) %}Ticked because of your <a href="/account#account-keep">account setting</a>; untick it for this upload if you like.{% else %}To have this ticked every time, use your <a href="/account#account-keep">account setting</a>.{% endif %}</p>
       </div>
       <div class="field checkbox-field">
         <input type="checkbox" id="share" name="share" value="on" aria-describedby="share-hint">
