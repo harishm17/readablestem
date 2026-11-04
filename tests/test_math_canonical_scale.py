@@ -1,8 +1,8 @@
 """The comparator's size behaviour, and its agreement with the registered scorer scripts.
 
-The scripts `rw_notation_neutral.py` and `rw_spoken.py` are hashed by registrations and stay as
-they are; the library repeats their folding and speech steps, and these tests fail if the two
-ever disagree.
+The script `rw_notation_neutral.py` is hashed by registrations and stays as it is; the library
+repeats its folding and the as-written speech step of `rw_spoken.py`, and these tests fail if
+the two ever disagree.
 """
 
 from __future__ import annotations

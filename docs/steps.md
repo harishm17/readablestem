@@ -981,8 +981,10 @@ braces around one symbol, `x^b_a` as `x_a^b`); `spoken` (`speech.mathml_to_speec
 `holds` lists every one that is true. When none holds, `reason` is a code (`empty_a`, `empty_b`,
 `unreadable_a`, `unreadable_b`, `order`, `symbols`) and `detail` points at the first differing
 symbol; `detail` is formula text and is never logged. It makes no model call. The registered scorer
-scripts `scripts/rw_notation_neutral.py` and `scripts/rw_spoken.py` do not import it (their hashes are
-part of the registrations); a test checks that its folding, conversion and speech helpers agree with theirs.
+script `scripts/rw_notation_neutral.py` does not import it (its hash is part of the registrations); a
+test checks that its folding, conversion and speech helpers agree with theirs. The spoken-equal scorer
+`scripts/rw_spoken.py` imports `speakable_latex` and `repair_converter_gaps` from it (docs/eval-realworld.md,
+"The spoken-equal scorer"); `compare` does not use them.
 
 ## Privacy
 

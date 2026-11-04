@@ -180,3 +180,17 @@ def test_forced_colors_keep_the_forms_and_buttons_visible(site, browser, job):
     )
     assert "underline" in underline  # the marked symbol does not rely on its colour
     context.close()
+
+
+def test_the_count_beside_change_all_follows_the_places_left_out(site, browser, job):
+    context, page = open_page(browser, site, viewport=DESKTOP)
+    open_screen(page, site, job, unfold=True)
+    form = page.locator("form.symbol-form", has=page.locator(".symbol-affect")).first
+    line = form.locator(".symbol-affect")
+    before = int(line.locator("[data-affect-count]").inner_text())
+    left_before = int(line.locator("[data-affect-left]").inner_text())
+    assert before >= 1 and "left as they are" in line.inner_text()
+    form.locator("input[name=exclude]").first.check()
+    assert int(line.locator("[data-affect-count]").inner_text()) == before - 1
+    assert int(line.locator("[data-affect-left]").inner_text()) == left_before + 1
+    context.close()

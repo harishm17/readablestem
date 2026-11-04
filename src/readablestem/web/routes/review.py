@@ -876,6 +876,7 @@ def _item(
             text_layer=(element.text or "").strip()
             if element is not None and fix.kind is Kind.EQUATION
             else "",
+            mathml=fix.equation.mathml if fix.equation else None,
         ),
         kept_image=is_kept_image(fix),
         kept_state=KEPT_IMAGE_STATE if is_kept_image(fix) and not fix.pending else "",

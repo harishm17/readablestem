@@ -35,6 +35,25 @@ FRESH5_FILES = (  # hashed when the owner signs PREREGISTRATION-FRESH5.md, not b
     "../../src/readablestem/pipeline/math_canonical.py",
     "../../src/readablestem/gold/arxiv_gold.py",
     "../../scripts/rw_notation_neutral.py",
+    # the primary score (spoken-equal, section 4): the scorer, its LaTeX folding and the speech
+    # rules it asks (the gold's own converter step is `gold/arxiv_gold.py`, above)
+    "../../scripts/rw_spoken.py",
+    "../../src/readablestem/pipeline/speech.py",
+    "../../src/readablestem/pipeline/speech_chem.py",
+    "../../src/readablestem/pipeline/speech_nuclides.py",
+    "../../src/readablestem/pipeline/speech_units.py",
+    "../../src/readablestem/core/mathml_intent.py",
+    "../../src/readablestem/core/notation.py",
+    "../../src/readablestem/eval/equations.py",
+    # the converter: how gold and predicted LaTeX become MathML (`equation_step.clean_latex`,
+    # `validate.safe_latex_to_mathml` and the modules that shape its output)
+    "../../src/readablestem/pipeline/equation_step.py",
+    "../../src/readablestem/pipeline/validate.py",
+    "../../src/readablestem/core/latex_groups.py",
+    "../../src/readablestem/core/mathchars.py",
+    "../../src/readablestem/pipeline/chem.py",
+    "../../src/readablestem/pipeline/chem_mathml.py",
+    "../../src/readablestem/pipeline/mathml_shape.py",
 )
 FRESH4_FILES = (
     "PREREGISTRATION-FRESH4.md",
