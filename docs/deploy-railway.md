@@ -455,7 +455,7 @@ change because `gcloud builds submit --tag` cannot pass build arguments.)
 **LaTeXML.** The Dockerfile declares `ARG INSTALL_LATEXML=false` in its final stage. Setting the
 service variable `INSTALL_LATEXML=true` (declared in `railway.ts`, so an apply keeps it) and
 redeploying installs the distribution's `latexml` package (0.8.8) with `--no-install-recommends`; it
-depends on TeX Live's base (`texlive-latex-base`), ImageMagick and their Perl bindings. Right after
+depends on TeX Live's base (`texlive-latex-base`), ImageMagick and their Perl bindings. The same step installs `bubblewrap` (the sandbox LaTeX source runs in) and `util-linux` (`prlimit`), and the build fails if `bwrap` or `prlimit` is missing, so `readablestem ops sandbox-probe` on Railway tests the sandbox of this image (whether the platform allows user namespaces is what the probe decides). Right after
 the install the build replaces ImageMagick's `policy.xml` with `src/readablestem/source/imagemagick-policy.xml`:
 nothing is allowed except PNG, JPEG and GIF, and PS, EPS, PDF, XPS, URL, HTTP(S), FTP, MVG, MSL, TEXT,
 LABEL, SVG and `@file` paths are named as denied. The build fails if no policy file was replaced or

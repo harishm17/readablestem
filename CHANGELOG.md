@@ -36,7 +36,8 @@
   Tests: `tests/test_sandbox.py`, `tests/test_ops_sandbox_probe.py`.
 ## Unreleased: LaTeXML in the image (branch latex/x1-latexml-image)
 
-- Dockerfile: `ARG INSTALL_LATEXML=false` installs the distribution's `latexml` (0.8.8) with TeX
+- Dockerfile: `ARG INSTALL_LATEXML=false` also installs `bubblewrap` and `util-linux` (the sandbox and `prlimit`; the
+  build fails without them). It installs the distribution's `latexml` (0.8.8) with TeX
   Live's base and ImageMagick, and replaces ImageMagick's `policy.xml` with a deny-by-default one
   (PNG, JPEG, GIF only; PS, EPS, PDF, XPS, URL and `@file` denied by name:
   `src/readablestem/source/imagemagick-policy.xml`). Measured on the pinned base: +270 MB
