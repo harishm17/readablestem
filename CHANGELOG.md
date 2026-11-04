@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: TeX producers (branch eq/tex-producer-xetex, on eq/inline-simple-maths)
+
+- `page_type.producer_hint` calls a PDF TeX-made when its producer or creator names TeX as a whole word
+  (`page_type.TEX_PRODUCER`): pdfTeX, XeTeX and XeLaTeX (`xdvipdfmx`, offered by Overleaf), LuaTeX, LuaHBTeX, dvips,
+  dvipdfm(x), Tectonic, and "LaTeX" or "TeX" in a creator (Ghostscript alone is not). It matched the substring "tex",
+  so XeLaTeX and Tectonic files missed every TeX rule (the unit after a number, index punctuation, table-cell maths,
+  short formulas) while Quartz ("PDFContext", a Mac-saved Word file) and iText were taken for TeX. The Beamer check of
+  `slides.py` is a whole word too. Every caller of `producer_hint` (layout, the page-type refusal and image-page counts,
+  the page-type eval) takes the value from this one function.
+- Layout identity over 149 PDFs: 136 identical, 13 different, every one a TeX-made file read by the TeX rules now (7 only
+  record the producer; 6 change: units leave their formulas, table cells gain equation elements); letters and digits of
+  every page equal before and after. The golden `flags_off_problem_set.html` is regenerated: its `t = 4.0 s` formulas no
+  longer hold the unit.
+- Tests: `tests/test_producer_hint.py`.
+- Pipeline version 0.5.6 to 0.5.7; results from 0.5.6 load unchanged.
+
 ## Unreleased: short inline maths from glyphs (branch eq/inline-simple-maths, on eq/t10-table-cell-maths)
 
 - A relation set in a maths font before a number (`\approx 0.14`, `\geq 2`, `\geq 90\%`) is one inline formula in a
