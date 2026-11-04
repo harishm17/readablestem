@@ -214,7 +214,12 @@ log = logging.getLogger(__name__)
 # `\checkmark`, `\times`) is an inline cell equation; a cell equation's line crop and glyph
 # context are cut to its own column (the next column's "(5)" was read into it). Results from 0.5.7
 # load unchanged.
-PIPELINE_VERSION = "0.5.8"
+# 0.5.9 (2026-11-03): corrections from the PDF's own glyphs, behind EQUATION_GLYPH_RECONCILE (off by
+# default, so results are unchanged until it is turned on): one named lookalike symbol of a
+# TeX-made PDF, a unit past the box, a printed slash, a display's equation number, `\mathscr` for
+# an RSFS face, and `\boldsymbol` for a table cell's bold italic letter. Results from 0.5.8 load
+# unchanged.
+PIPELINE_VERSION = "0.5.9"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

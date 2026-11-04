@@ -162,6 +162,8 @@ def cmd_rs(args: argparse.Namespace) -> int:
         os.environ["EQUATION_LINE_CONTEXT"] = "true"
     if args.glyph_checks:
         os.environ["EQUATION_GLYPH_CHECKS"] = "true"
+    if args.glyph_reconcile:
+        os.environ["EQUATION_GLYPH_RECONCILE"] = "true"
     if args.flag_policy:
         os.environ["FLAG_POLICY"] = "true"
     if args.no_agreement_lift:
@@ -399,6 +401,9 @@ def main() -> int:
             p.add_argument("--tables", action="store_true", help="FEATURE_TABLES on")
             p.add_argument("--line-context", action="store_true", help="EQUATION_LINE_CONTEXT on")
             p.add_argument("--glyph-checks", action="store_true", help="EQUATION_GLYPH_CHECKS on")
+            p.add_argument(
+                "--glyph-reconcile", action="store_true", help="EQUATION_GLYPH_RECONCILE on"
+            )
             p.add_argument("--flag-policy", action="store_true", help="FLAG_POLICY on")
             p.add_argument(
                 "--notation-memory", action="store_true", help="FEATURE_NOTATION_MEMORY on"

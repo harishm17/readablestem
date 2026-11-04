@@ -118,6 +118,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         part=PART, max_usd=args.max_usd, tag=tag, offline=args.offline,
         page_math=False, tables=True, notation_memory=True, line_context=True,
         no_agreement_lift=False, page_math_tokens=None, glyph_checks=False, flag_policy=False,
+        glyph_reconcile=False,
         seed_answers_from=args.seed_from or seed,
         papers=",".join(args.papers.split(",") if args.papers else paper_ids()),
         section_workers=args.workers, concurrency=args.concurrency,

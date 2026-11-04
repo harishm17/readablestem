@@ -93,6 +93,7 @@ from readablestem.pipeline import (
     chem,
     equation_images,
     glyph_math,
+    glyph_reconcile,
     hyphens,
     outline,
     page_labels,
@@ -719,6 +720,9 @@ def line_glyphs(
             height = max(y1 - y0, 4.0)
             row = (y0 - LINE_GLYPH_ROW * height, y1 + LINE_GLYPH_ROW * height)
             span: list[tuple[str, str | None]] = []
+            items: list[glyph_reconcile.Item] = []
+            fonts_exact = page_type.producer_hint(doc) == "tex"
+            scripts: set[str] = set()
             left: list[tuple[float, tuple[str, str | None]]] = []
             right: list[tuple[float, tuple[str, str | None]]] = []
             for block in _text_blocks(page, clip=clip):
@@ -743,6 +747,11 @@ def line_glyphs(
                             entry = (" " if glyph.blank else glyph.styled, glyph_style(glyph))
                             if x0 - 0.5 <= cx <= x1 + 0.5 and y0 - 0.5 <= cy <= y1 + 0.5:
                                 span.append(entry)
+                                items.append(glyph_reconcile.Item(text, gx0, gx1, cy, size))
+                                if not text.isascii() and not glyph_reconcile.tex_font(font):
+                                    fonts_exact = False
+                                if text.isalpha() and glyph_reconcile.script_font(font):
+                                    scripts.add(base_char(text))
                             elif inline and row[0] <= cy <= row[1]:
                                 (left if cx < x0 else right).append(
                                     (abs(cx - (x0 if cx < x0 else x1)), entry)
@@ -755,6 +764,9 @@ def line_glyphs(
                 span=GlyphContext.encode(span),
                 before=GlyphContext.encode(g for _, g in left[:LINE_GLYPH_REACH]),
                 after=GlyphContext.encode(g for _, g in right[:LINE_GLYPH_REACH]),
+                tex=fonts_exact,
+                labels=" ".join(glyph_reconcile.edge_labels(items)),
+                scr="".join(sorted(c for c in scripts if len(c) == 1 and c.isupper())),
             )
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()
