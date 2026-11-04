@@ -262,7 +262,7 @@ def test_a_viewer_reads_and_downloads_but_cannot_write(site):
     viewer = site.who[VIEWER]
     page = viewer.get(f"/jobs/{site.job_id}")
     assert page.status_code == 200
-    assert "document was shared with you. You can read it" in page.text
+    assert "document was shared with you. You can read it" in " ".join(page.text.split())
     for owner_only in ("Delete now", "Keep for 7 days", "/share", "Upload a revised version"):
         assert owner_only not in page.text, owner_only
     assert f"/jobs/{site.job_id}/review" not in page.text  # a viewer is not offered the review
