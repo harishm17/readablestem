@@ -27,10 +27,9 @@ import zipfile
 
 from readablestem.source import intake as source_intake
 from readablestem.web import archive_intake as arc
-from readablestem.web.uploads import UploadedFile
 
 # What a member that does not read can raise (a bad CRC, a bad stream, a refusal).
-_READ_ERRORS = (
+READ_ERRORS = (
     arc.ArchiveRefused,
     OSError,
     EOFError,
@@ -39,8 +38,16 @@ _READ_ERRORS = (
     ValueError,
     zipfile.BadZipFile,
 )
-# A batch is held in memory while it is placed: tighter than a single project's 100 MB.
-BATCH_LIMITS = arc.ArchiveLimits(max_unpacked_bytes=80 * 1024 * 1024)
+# What one request may unpack, in all its zips together, as a multiple of the upload limit
+# (`Settings.upload_limit_bytes`): `RequestBudget`. Every byte read out of any zip of the request
+# is charged, whatever it is read for, and the request is refused (`zip_limits`) when it is spent.
+UNPACKED_FACTOR = 2
+# What one request holds in memory at its peak, besides the body itself (at most the upload limit,
+# zips included): the text of the `.tex` files being looked at (`TEXT_TOTAL_BYTES`, freed before
+# any document is placed) and then one document at a time, a PDF (at most the upload limit, a
+# bigger one is refused without being read) or a project (at most the budget), released before
+# the next is read. The upload gate (`web.uploads.UploadGate`) lets 3 requests in at once.
+TEXT_TOTAL_BYTES = source_intake.MAX_TEXT_TOTAL_BYTES
 _ZIP_CODES = {
     "not_zip": "zip_bad",
     "bad_zip": "zip_bad",
@@ -56,65 +63,132 @@ _ZIP_CODES = {
 }
 
 
-def _read_members(
-    archive: zipfile.ZipFile, chosen: list[tuple[zipfile.ZipInfo, arc.Entry]], wanted
-) -> dict[str, bytes]:
-    """Bytes of the members whose path `wanted` accepts, counted as they are read (a header may
-    lie about its size, `archive_intake.extract`)."""
-    out: dict[str, bytes] = {}
-    budget = BATCH_LIMITS.max_unpacked_bytes
-    for info, entry in chosen:
-        if not wanted(entry.path):
-            continue
-        with archive.open(info) as handle:
-            raw = handle.read(min(BATCH_LIMITS.max_file_bytes, budget) + 1)
-        budget -= len(raw)
-        if budget < 0 or len(raw) > BATCH_LIMITS.max_file_bytes:
+class RequestBudget:
+    """The bytes one request may unpack out of all its zips together."""
+
+    def __init__(self, total: int) -> None:
+        self.total = total
+        self.used = 0
+
+    @classmethod
+    def for_upload_limit(cls, upload_limit_bytes: int) -> RequestBudget:
+        return cls(UNPACKED_FACTOR * upload_limit_bytes)
+
+    @property
+    def left(self) -> int:
+        return max(self.total - self.used, 0)
+
+    def take(self, n: int) -> None:
+        self.used += n
+        if self.used > self.total:
             raise arc.ArchiveRefused("unpacked_too_large")
-        out[entry.path] = raw
-    return out
 
 
-def split(filename: str, data: bytes) -> list[UploadedFile] | str | None:
-    """The documents of a batch zip as uploaded files, a refusal code, or None when the zip is
-    not a batch (it is one LaTeX project, or it is not a zip: the caller goes on as before)."""
+def _read_member(
+    archive: zipfile.ZipFile, info: zipfile.ZipInfo, budget: RequestBudget, cap: int
+) -> bytes:
+    """One member's bytes, at most `cap`, charged to `budget` as they are read (a header may lie
+    about its size, `archive_intake.extract`): reading stops at what is left of the budget."""
+    with archive.open(info) as handle:
+        raw = handle.read(min(cap, budget.left) + 1)
+    budget.take(len(raw))
+    if len(raw) > cap:
+        raise arc.ArchiveRefused("unpacked_too_large")
+    return raw
+
+
+class Member:
+    """A document of a batch zip, read only when it is its turn: `data` reads it (and charges the
+    request's budget), `release` lets the bytes go. `size` is the header's claim, used to refuse a
+    PDF over the upload limit before any of it is read."""
+
+    def __init__(self, filename: str, size: int, load) -> None:
+        self.filename = filename
+        self.size = size
+        self._load = load
+        self._data: bytes | None = None
+
+    @property
+    def data(self) -> bytes:
+        if self._data is None:
+            self._data = self._load()
+        return self._data
+
+    def release(self) -> None:
+        self._data = None
+
+
+def split(
+    filename: str,
+    data: bytes,
+    *,
+    budget: RequestBudget | None = None,
+    limits: arc.ArchiveLimits | None = None,
+    member_cap: int | None = None,
+) -> list[Member] | str | None:
+    """The documents of a batch zip, not yet read, a refusal code, or None when the zip is not a
+    batch (it is one LaTeX project, or it is not a zip: the caller goes on as before).
+
+    Only the `.tex` files are read here (to find the projects), charged to `budget` (a fresh one
+    of `UNPACKED_FACTOR` times the zip's own size when none is given); each PDF and project is
+    read when its `Member.data` is asked for. `member_cap`: the most a member may be."""
     if not arc.looks_like_zip(data):
         return None
+    spend = budget or RequestBudget.for_upload_limit(max(len(data), 1))
+    limits = limits or arc.ArchiveLimits(max_unpacked_bytes=spend.total)
+    cap = member_cap or limits.max_file_bytes
     try:
-        archive, chosen = arc.plan(data, BATCH_LIMITS)
+        archive, chosen = arc.plan(data, limits)
     except arc.ArchiveRefused as exc:
         return _ZIP_CODES.get(exc.code, "zip_bad")
     try:
-        try:
-            tex = _read_members(archive, chosen, lambda p: p.lower().endswith((".tex", ".ltx")))
-        except _READ_ERRORS:
-            return "zip_limits"
-        texts = {path: source_intake._decode(raw) for path, raw in tex.items()}
-        roots = _project_roots(texts)
-        if "" in roots:
-            return None  # the zip is one project: the LaTeX source path takes it
-        pdfs = {
-            e.path
-            for _, e in chosen
-            if e.path.lower().endswith(".pdf") and _under(e.path, roots) is None
-        }
-        if not pdfs and not roots:
-            return "zip_empty"
-        try:
-            members = _read_members(
-                archive, chosen, lambda p: p in pdfs or _under(p, roots) is not None
-            )
-        except _READ_ERRORS:
-            return "zip_limits"
-    finally:
+        texts: dict[str, str] = {}
+        text_bytes = 0
+        for info, entry in chosen:
+            if not entry.path.lower().endswith((".tex", ".ltx")):
+                continue
+            raw = _read_member(archive, info, spend, min(source_intake.MAX_TEXT_FILE_BYTES, cap))
+            text_bytes += len(raw)
+            if text_bytes > TEXT_TOTAL_BYTES:
+                raise arc.ArchiveRefused("unpacked_too_large")
+            texts[entry.path] = source_intake._decode(raw)
+    except READ_ERRORS:
         archive.close()
-    out = [
-        UploadedFile(posixpath.basename(path), members[path])
-        for path in sorted(pdfs, key=str.lower)
-    ]
+        return "zip_limits"
+    roots = _project_roots(texts)
+    del texts
+    if "" in roots:
+        archive.close()
+        return None  # the zip is one project: the LaTeX source path takes it
+    infos = {entry.path: (info, entry) for info, entry in chosen}
+    pdfs = sorted(
+        (p for p in infos if p.lower().endswith(".pdf") and _under(p, roots) is None),
+        key=str.lower,
+    )
+    if not pdfs and not roots:
+        archive.close()
+        return "zip_empty"
+    out: list[Member] = []
+    for path in pdfs:
+        info = infos[path][0]
+        out.append(
+            Member(
+                posixpath.basename(path),
+                info.file_size,
+                lambda info=info: _read_member(archive, info, spend, cap),
+            )
+        )
     for root in sorted(roots, key=str.lower):
-        files = {p[len(root) + 1 :]: raw for p, raw in members.items() if p.startswith(root + "/")}
-        out.append(UploadedFile(f"{posixpath.basename(root)}.zip", _zip_of(files)))
+        paths = [p for p in infos if p.startswith(root + "/")]
+        size = sum(infos[p][0].file_size for p in paths)
+
+        def build(paths=paths, root=root) -> bytes:
+            files = {
+                p[len(root) + 1 :]: _read_member(archive, infos[p][0], spend, cap) for p in paths
+            }
+            return _zip_of(files)
+
+        out.append(Member(f"{posixpath.basename(root)}.zip", size, build))
     return out
 
 

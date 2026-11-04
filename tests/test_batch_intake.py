@@ -8,6 +8,8 @@ import io
 import stat
 import zipfile
 
+import pytest
+
 from fixtures.web.support import make_pdf
 from readablestem.source import intake
 from readablestem.web import archive_intake as arc
@@ -16,6 +18,13 @@ from source_support import make_zip, png_bytes
 
 ARTICLE = "\\documentclass{article}\n\\begin{document}\nHello $x$.\n\\end{document}\n"
 PDF = make_pdf(1)
+
+
+def _noise(n: int) -> bytes:
+    """Bytes that do not compress (a bomb is refused by its ratio before the budget matters)."""
+    import os
+
+    return os.urandom(n)
 
 
 def names(result) -> list[str]:
@@ -109,17 +118,60 @@ def test_a_bomb_and_an_oversize_zip_are_refused_before_anything_is_read():
     assert batch_intake.split("x.zip", b"PK\x03\x04" + b"0" * (21 * 1024 * 1024)) == "zip_limits"
 
 
-def test_the_batch_limit_is_tighter_than_a_single_project_s():
-    assert batch_intake.BATCH_LIMITS.max_unpacked_bytes < arc.DEFAULT_LIMITS.max_unpacked_bytes
+def test_the_budget_is_shared_by_every_zip_of_a_request():
+    budget = batch_intake.RequestBudget(5 * 1024 * 1024)
+    big = make_zip({"a.pdf": b"%PDF-1.7 " + _noise(3_000_000)})  # about 3 MB
+    first = batch_intake.split("one.zip", big, budget=budget)
+    second = batch_intake.split("two.zip", big, budget=budget)
+    assert isinstance(first, list) and isinstance(second, list)
+    assert len(first[0].data) > 3_000_000  # the first zip reads its member
+    assert budget.used == len(first[0].data)
+    with pytest.raises(arc.ArchiveRefused) as raised:
+        second[0].data  # noqa: B018 - the second would take it past the budget
+    assert raised.value.code == "unpacked_too_large"
+    assert budget.used <= budget.total + 3_100_000  # stopped at the budget, not after the member
 
 
-def test_a_header_that_understates_its_size_cannot_smuggle_bytes_in():
-    real = b"\0" * (3 * 1024 * 1024)
-    data = bytearray(make_zip({"a.pdf": real}))
-    for marker, offset in ((b"PK\x03\x04", 22), (b"PK\x01\x02", 24)):
-        at = data.find(marker)
-        data[at + offset : at + offset + 4] = (10).to_bytes(4, "little")
-    outcome = batch_intake.split("x.zip", bytes(data))
-    assert outcome in {"zip_limits", "zip_bad"} or (
-        isinstance(outcome, list) and len(outcome[0].data) <= 3 * 1024 * 1024
-    )
+def test_nothing_is_read_until_a_member_s_turn_and_only_text_for_the_projects():
+    budget = batch_intake.RequestBudget(50 * 1024 * 1024)
+    data = make_zip({"a.pdf": PDF, "b.pdf": PDF, "p/main.tex": ARTICLE})
+    members = batch_intake.split("x.zip", data, budget=budget)
+    assert isinstance(members, list) and len(members) == 3
+    assert budget.used == len(ARTICLE.encode())  # only the .tex was read, to find the project
+    members[0].data  # noqa: B018
+    assert budget.used == len(ARTICLE.encode()) + len(PDF)
+    members[0].release()
+    assert members[0]._data is None
+
+
+def test_a_member_is_never_read_past_the_cap_or_the_header_s_claim():
+    data = make_zip({"a.pdf": b"%PDF" + _noise(3 * 1024 * 1024)})
+    members = batch_intake.split("x.zip", data, member_cap=1024 * 1024)
+    assert isinstance(members, list)
+    with pytest.raises(arc.ArchiveRefused):
+        members[0].data  # noqa: B018
+    assert members[0].size > 1024 * 1024  # the caller can refuse on this before any read
+
+
+def test_ten_zips_of_bombs_in_one_request_cannot_hold_more_than_the_budget():
+    import tracemalloc
+
+    member = _noise(2 * 1024 * 1024)
+    zips = [make_zip({"a.pdf": member, "b.pdf": member[: 1024 * 1024]}) for _ in range(10)]
+    budget = batch_intake.RequestBudget(6 * 1024 * 1024)
+    tracemalloc.start()
+    held = 0
+    for n, data in enumerate(zips):
+        members = batch_intake.split(f"z{n}.zip", data, budget=budget)
+        assert isinstance(members, list)
+        for member_ in members:
+            try:
+                held = max(held, len(member_.data))
+            except arc.ArchiveRefused:
+                break
+            member_.release()
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    assert budget.used <= budget.total + 2 * 1024 * 1024 + 1  # the read that crosses it is cut
+    assert peak < 3 * 6 * 1024 * 1024  # never the 10 zips' 30 MB at once
+    assert held <= 2 * 1024 * 1024

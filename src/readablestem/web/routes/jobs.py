@@ -16,6 +16,7 @@ import logging
 import re
 import time
 import unicodedata
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from functools import partial
@@ -756,7 +757,7 @@ def _place_files(
     office_left = OFFICE_BUDGET_S
     placed = PlacedList()
     files = _expand_batches(ctx, user, files, placed)
-    for file in files:
+    for file in _loaded(files, placed, s.upload_limit_bytes):
         # A LaTeX source (a .tex file or a zip of a project) is converted by LaTeXML in a
         # sandbox (`readablestem.source`); it has its own checks and never becomes a PDF.
         if s.feature_latex_source and source_intake.kind_of(file.filename, file.data):
@@ -885,18 +886,33 @@ class PlacedList(list[Placed]):
 
 def _expand_batches(
     ctx: AppContext, user: CurrentUser, files: list[UploadedFile], placed: PlacedList
-) -> list[UploadedFile]:
+) -> list[Any]:
     """With `FEATURE_BATCH_ZIP`, a `.zip` that is a batch (PDFs and LaTeX projects in folders,
     `web.batch_intake`) is replaced by its documents, each placed like an uploaded file; a zip
     that is one LaTeX project, and every other file, stays as it is. A zip that is refused is
-    one refusal in `placed`; documents past the person's limit (`access.files_per_upload`) are
-    refused one by one, not started."""
+    one refusal in `placed`.
+
+    What one request may cost in memory is bounded here, not per zip: one `RequestBudget`
+    (twice the upload limit) is shared by every zip of the request, the documents are read one at
+    a time when their turn comes (`_loaded`), a PDF over the upload limit is refused without being
+    read, and nothing is read for a document past the person's limit
+    (`access.files_per_upload`): those are refused by name, and a zip met after the limit is
+    reached is refused whole, unopened."""
     if not ctx.settings.feature_batch_zip:
         return files
     limit = access.files_per_upload(user.access_tier)
-    out: list[UploadedFile] = []
+    cap = ctx.settings.upload_limit_bytes
+    budget = batch_intake.RequestBudget.for_upload_limit(cap)
+    out: list[Any] = []
     for file in files:
-        members = batch_intake.split(file.filename, file.data) if _is_zip_name(file) else None
+        if not _is_zip_name(file):
+            out.append(file)
+            continue
+        if len(out) >= limit:
+            placed.batch = True
+            placed.append(Placed(file.filename, code="batch_limit", status=400))
+            continue
+        members = batch_intake.split(file.filename, file.data, budget=budget, member_cap=cap)
         if members is None:
             out.append(file)
         elif isinstance(members, str):
@@ -910,6 +926,28 @@ def _expand_batches(
     for extra in out[limit:]:
         placed.append(Placed(extra.filename, code="batch_limit", status=400))
     return out[:limit]
+
+
+def _loaded(files: list[Any], placed: PlacedList, cap: int) -> Iterator[Any]:
+    """The files in order, each read just before its turn and let go after it. A document of a zip
+    that is over `cap` is refused without being read, and one that does not read (a bad
+    member, the request's budget spent) is a refusal in `placed`."""
+    for file in files:
+        size = getattr(file, "size", None)
+        if size is not None and size > cap:
+            placed.append(Placed(file.filename, code="too_large", status=413))
+            continue
+        try:
+            file.data  # noqa: B018  (reads a lazy member; a plain upload is already bytes)
+        except batch_intake.READ_ERRORS:
+            placed.append(Placed(file.filename, code="zip_limits", status=413))
+            continue
+        try:
+            yield file
+        finally:
+            release = getattr(file, "release", None)
+            if release is not None:
+                release()
 
 
 def _is_zip_name(file: UploadedFile) -> bool:

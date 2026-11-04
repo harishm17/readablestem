@@ -650,8 +650,8 @@ be a revised version if it fits one conversion; a large one cannot.
 
 ### Zip of documents and the batch page (`FEATURE_BATCH_ZIP`, `web/batch_intake.py`, `web/routes/batch.py`)
 
-With `FEATURE_BATCH_ZIP` on, a `.zip` upload is read (`web/archive_intake.py`: 20 MB, 80 MB unpacked
-for a batch, 500 entries, no links, no absolute or `..` paths, no nested zip, EPS or SVG, an
+With `FEATURE_BATCH_ZIP` on, a `.zip` upload is read (`web/archive_intake.py`: the upload limit zipped,
+500 entries, no links, no absolute or `..` paths, no nested zip, EPS or SVG, an
 extension allowlist) and **each document in it becomes a job of its own**, through exactly what an uploaded
 file goes through (`_place_files`: the probe, the page quota, the caps):
 
@@ -665,6 +665,17 @@ file goes through (`_place_files`: the probe, the page quota, the caps):
   at once (`intake.store_job`). Documents past the limit are refused one by one, by name, and cost nothing; a
   zip counts once, not once per document, against the upload rate limit (its documents are held to the limits
   by the quota and the cap, and the zip to its bytes);
+- **memory, per request** (`batch_intake.RequestBudget`, `routes.jobs._expand_batches` and `_loaded`): one
+  budget of twice the upload limit (`UNPACKED_FACTOR` times `Settings.upload_limit_bytes`) is shared by every
+  zip of the request; every byte read out of any zip is charged and reading stops where it runs out (the zip
+  is then `zip_limits`). Only the `.tex` files are read to find the projects (at most 24 MB, freed at once);
+  each PDF and project is then read when its turn comes and let go after it, so a request holds the body
+  (at most the upload limit, zips included), that text, and one document (a PDF over the upload limit is
+  refused by its header without any of it being read; a project is at most the budget) plus the usual
+  copies an upload makes. Documents past the person's limit are only named, never read, and a zip met
+  after the limit is reached is refused unopened. With the defaults (20 MB) that is about 150 MB at the
+  peak of a request and 3 requests at once (the upload gate), under the service's 1 GiB; when the upload
+  limit is raised the budgets follow it, so check this sum against the gate and the memory size;
 - every refusal of a zip (`zip_bad`, `zip_limits`, `zip_unsafe`, `zip_unsupported`, `zip_empty`,
   `batch_limit`) is a category with a sentence (`routes.jobs.batch_messages`), a row on the batch page, and
   costs nothing.

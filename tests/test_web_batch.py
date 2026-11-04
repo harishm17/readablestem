@@ -246,6 +246,100 @@ def test_documents_waiting_are_capped_by_tier_too(web):
     assert late.status_code == 429 and "You already have 10 documents waiting" in text_of(late.text)
 
 
+# --------------------------------------------------------------------------- memory, per request
+
+
+def many_zips(client, n: int, members: dict[str, bytes]):
+    token_ = token(client)
+    files = [("pdf", (f"z{i}.zip", make_zip(members), "application/zip")) for i in range(n)]
+    return client.post("/jobs", data={"csrf_token": token_}, files=files)
+
+
+def test_the_unpacked_budget_is_one_per_request_not_one_per_zip(web, monkeypatch):
+    """Ten zips of two 900 KB members each would unpack 18 MB; the request's budget is twice the
+    upload limit (2 MB here), so the zips after the first few are refused unread."""
+    from readablestem.web import batch_intake
+
+    reads: list[int] = []
+    real = batch_intake._read_member
+
+    def spy(archive, info, budget, cap):
+        raw = real(archive, info, budget, cap)
+        reads.append(len(raw))
+        return raw
+
+    monkeypatch.setattr(batch_intake, "_read_member", spy)
+    member = b"%PDF-1.7 " + b"A" * 900_000  # under the ratio floor: not judged by its ratio
+    response = many_zips(web.alice, 10, {"a.pdf": member, "b.pdf": member})
+    assert response.status_code == 303
+    text = text_of(web.alice.get(response.headers["location"]).text)
+    assert "too big or has too many files" in text  # the budget ran out part-way
+    assert sum(reads) <= 2 * web.settings.upload_limit_bytes + 900_010  # cut where it ran out
+    assert len(jobs(web)) <= 3  # most of the 20 documents were never read
+
+
+def test_a_zip_met_after_the_documents_limit_is_refused_unopened(web, monkeypatch):
+    from readablestem.web import batch_intake
+
+    make_open(web, ALICE)
+    opened: list[str] = []
+    real = batch_intake.split
+
+    def spy(filename, data, **kwargs):
+        opened.append(filename)
+        return real(filename, data, **kwargs)
+
+    monkeypatch.setattr(batch_intake, "split", spy)
+    first = make_zip({f"d{i:02d}.pdf": make_pdf(1) for i in range(10)})
+    second = make_zip({"late.pdf": make_pdf(1)})
+    response = web.alice.post(
+        "/jobs",
+        data={"csrf_token": token(web.alice)},
+        files=[
+            ("pdf", ("first.zip", first, "application/zip")),
+            ("pdf", ("second.zip", second, "application/zip")),
+        ],
+    )
+    text = text_of(web.alice.get(response.headers["location"]).text)
+    assert opened == ["first.zip"]  # the second was never opened
+    assert "second.zip was not uploaded: one upload takes 10 documents" in text
+
+
+def test_documents_past_the_limit_are_not_read_at_all(web, monkeypatch):
+    from readablestem.web import batch_intake
+
+    make_open(web, ALICE)
+    reads: list[int] = []
+    real = batch_intake._read_member
+    monkeypatch.setattr(
+        batch_intake,
+        "_read_member",
+        lambda archive, info, budget, cap: reads.append(1) or real(archive, info, budget, cap),
+    )
+    send_zip(web.alice, make_zip({f"d{i:02d}.pdf": make_pdf(1) for i in range(30)}))
+    assert len(reads) == 10  # ten read and placed; the other twenty only named
+
+
+def test_a_pdf_over_the_upload_limit_is_refused_without_being_read(web, monkeypatch):
+    from readablestem.web import batch_intake
+
+    reads: list[int] = []
+    real = batch_intake._read_member
+    monkeypatch.setattr(
+        batch_intake,
+        "_read_member",
+        lambda archive, info, budget, cap: reads.append(1) or real(archive, info, budget, cap),
+    )
+    block = __import__("os").urandom(8192)  # repeats: compresses 50x, under the ratio cap
+    big = b"%PDF-1.7 " + block * (web.settings.upload_limit_bytes // 8192 + 20)
+    ok = make_pdf(1)
+    url = batch_url(send_zip(web.alice, make_zip({"big.pdf": big, "ok.pdf": ok}), name="b.zip"))
+    text = text_of(web.alice.get(url).text)
+    assert "big.pdf is larger than" in text
+    assert len(reads) == 1  # only ok.pdf was read
+    assert [j.filename for j in jobs(web)] == ["ok.pdf"]
+
+
 # --------------------------------------------------------------------------- the batch page
 
 

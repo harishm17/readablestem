@@ -7,6 +7,10 @@
   document of its own through the ordinary upload checks; a zip with a main file at its root is one project; strays
   are left out; a zip with no document, a link, a bad path, a nested zip, EPS or SVG, or over the limits (the LaTeX
   source's, with 80 MB unpacked) is refused. The zip counts once for the upload rate limit.
+- Memory: the unpacked budget of a batch is one per request (twice the upload limit, shared by every zip in it, not
+  80 MB per zip), the documents of a zip are read one at a time when their turn comes, a PDF over the upload limit
+  is refused by its header unread, and documents past the person's limit are named, never read (a zip met after
+  the limit is refused unopened). `batch_intake.split` returns lazy `Member`s.
 - Limits by tier: one upload takes 30 documents for invited people and pilots and 10 for an account made by open
   sign-up (`access.files_per_upload`), and the same number is the cap on documents waiting or converting at once
   (it was 10 for everyone). The upload form and the messages say the number for the person.
