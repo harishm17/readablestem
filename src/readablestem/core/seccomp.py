@@ -86,6 +86,23 @@ _DENIED: dict[str, tuple[int, int]] = {
     "swapon": (167, 224),
     "swapoff": (168, 225),
 }
+# Added by `program(strict=True)`, for the Landlock backend, which has no network namespace and no
+# pid namespace: every way to open a socket or to leave the process group, and the Landlock
+# calls themselves (the launcher has finished with them before the filter is installed).
+_STRICT_DENIED: dict[str, tuple[int, int]] = {
+    "socket": (41, 198),
+    "socketpair": (53, 199),
+    "connect": (42, 203),
+    "bind": (49, 200),
+    "listen": (50, 201),
+    "accept": (43, 202),
+    "accept4": (288, 242),
+    "setsid": (112, 157),
+    "setpgid": (109, 154),
+    "landlock_create_ruleset": (444, 444),
+    "landlock_add_rule": (445, 445),
+    "landlock_restrict_self": (446, 446),
+}
 _CLONE = (56, 220)
 _CLONE3 = (435, 435)
 
@@ -94,19 +111,21 @@ def supported() -> bool:
     return platform.machine() in _AUDIT_ARCH
 
 
-def denied_names() -> list[str]:
-    return sorted([*_DENIED, "clone(CLONE_NEW*)", "clone3"])
+def denied_names(strict: bool = False) -> list[str]:
+    extra = list(_STRICT_DENIED) if strict else []
+    return sorted([*_DENIED, *extra, "clone(CLONE_NEW*)", "clone3"])
 
 
 def number(name: str, machine: str | None = None) -> int:
     """The system call number of a denied call on this machine (for tests)."""
     index = 0 if (machine or platform.machine()) == "x86_64" else 1
-    table = {**_DENIED, "clone": _CLONE, "clone3": _CLONE3}
+    table = {**_DENIED, **_STRICT_DENIED, "clone": _CLONE, "clone3": _CLONE3}
     return table[name][index]
 
 
-def program(machine: str | None = None) -> bytes | None:
-    """The filter as bytes for `bwrap --seccomp`, or None on an architecture not known here."""
+def program(machine: str | None = None, *, strict: bool = False) -> bytes | None:
+    """The filter as bytes for `bwrap --seccomp` (or the Landlock launcher), or None on an
+    architecture not known here. `strict` adds the socket, process-group and Landlock calls."""
     machine = machine or platform.machine()
     if machine not in _AUDIT_ARCH:
         return None
@@ -123,7 +142,7 @@ def program(machine: str | None = None) -> bytes | None:
     op(_LD_W_ABS, _OFF_NR)
     if machine == "x86_64":
         op(_JSET_K, _X32_BIT, jt="deny")  # x32 calls are another table
-    for numbers in _DENIED.values():
+    for numbers in (*_DENIED.values(), *(_STRICT_DENIED.values() if strict else ())):
         op(_JEQ_K, numbers[index], jt="deny")
     op(_JEQ_K, _CLONE[index], jt="clone")
     op(_JEQ_K, _CLONE3[index], jt="nosys")

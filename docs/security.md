@@ -294,15 +294,79 @@ bound is 4 x 512 MB = 2 GB for the whole server. `ops sandbox-probe` prints it a
 space is more than memory in use, so the bound is loose, and it can only be approached by code that
 runs inside LaTeXML's Perl first (a LaTeXML bug); the container's memory limit and the host's OOM
 killer are what is left behind it. The caller kills the group at a wall-clock limit
-(120 s) or when the output folders and the program's log pass 200 MB. If bubblewrap or user namespaces are not available the run is
-refused; there is no unsandboxed fallback (a plain child of the web process shares its user, so
-it could read the web process's files). Whether the platform allows it is checked on the deployed
+(120 s) or when the output folders and the program's log pass 200 MB. Where bubblewrap cannot start (no unprivileged user namespaces, as on Railway) the second backend
+("Landlock backend" below) is used; where neither can, the run is refused: there is no unsandboxed
+fallback (a plain child of the web process shares its user, so it could read the web process's
+files). Whether the platform allows it is checked on the deployed
 image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"; the web process also runs it at start-up and LaTeX source is
 refused with a 503 unless it passed, `web/sandbox_status.py`); a FAIL there means
 LaTeX upload must stay off.
 
+**Landlock backend** (`core/landlock_exec.py`, `core/sandbox.py`; `tests/test_sandbox_landlock.py`).
+Chosen automatically when bubblewrap cannot start (`sandbox.backend()`; `READABLESTEM_SANDBOX_BACKEND`
+= `bwrap` or `landlock` limits the choice, for tests and the probe) and gated by the same probe. It
+has no mount, pid or network namespace; what holds is a launcher that runs in a process of its own
+as the same user and, in this order, forks the program as its child, then in the child: closes every
+inherited descriptor, builds a Landlock ruleset that handles every filesystem right of the kernel's
+ABI (3 or later is required: path rights plus `REFER` and `TRUNCATE`; the strongest the ABI has is
+used: `IOCTL_DEV` from 5, TCP bind and connect from 4, abstract unix sockets and signals to other
+domains from 6), sets `no_new_privs`, applies `landlock_restrict_self`, installs the strict seccomp
+filter, sets the rlimits and `execve`s with exactly the environment named.
+
+- Readable and executable: `/usr`, `/bin`, `/sbin`, `/lib*` and the LaTeXML tree under them.
+  Readable: the job's input folder, and of `/etc` only `ld.so.cache`, `ld.so.conf(.d)`,
+  `alternatives`, `perl`, `texmf`, `xml`, `fonts`, `ImageMagick-6` and `-7`, and `/var/lib/texmf`
+  (what Perl, TeX and ImageMagick read; `sandbox._SYSTEM_FILES`). Readable and writable: the job's
+  output folder and a private scratch folder (`HOME` and `TMPDIR`; any environment value of
+  exactly `/tmp` becomes it), made for the run and deleted after it. Devices: `/dev/null` read and
+  write, `/dev/zero`, `/dev/urandom`, `/dev/random` read. Nothing else: not `/app`, not
+  `/etc/passwd` or `/etc/shadow`, not `/home`, not another job's folder, **not `/proc` at all**
+  (so not `/proc/1/environ`, nor any other process's `environ`, `mem` or `maps`), not `/tmp`.
+  The input folder cannot be changed and an input file cannot be hard-linked or renamed out of it.
+- seccomp, in addition to the list the bubblewrap backend has: `socket` (every family: Landlock's
+  TCP rules are not relied on, and AF_UNIX is not needed), `socketpair`, `connect`, `bind`,
+  `listen`, `accept`, `accept4`, `setsid`, `setpgid` (so a program cannot leave its process group
+  to outlive the kill), and the three `landlock_*` calls (the launcher is finished with them).
+- The web process and the conversion child call `PR_SET_DUMPABLE=0` at start
+  (`sandbox.make_undumpable`): a program of the same user cannot read their `/proc/<pid>/environ`
+  or memory even if it could open `/proc`; the probe checks the property
+  (`dumpable0_protects_environ`) and that the child's own environment holds only what the caller
+  named (`child_env`; `sandbox_env`, `sandbox_no_secrets`).
+- Limits: `RLIMIT_AS` 512 MB, CPU, file size, no core, 256 files, and `RLIMIT_NPROC` set to the
+  user's tasks at that moment plus 4 plus 8 (the web app's own threads come and go while it runs,
+  and the limit counts them), one conversion at a time (the `flock`), and the caller kills the
+  whole group at the wall clock limit or the output budget. Without a cgroup the sum over the
+  tasks is held by polling: every 0.2 s the resident memory of the program and its descendants
+  is added up and the group is killed over `Limits.group_memory_bytes` (768 MB for LaTeXML);
+  `sandbox_total_bound_mb` is that figure. The launcher is the subreaper of what the program
+  starts, dies with its caller (`PR_SET_PDEATHSIG`) taking the group with it, and kills what the
+  program leaves behind when it exits.
+- Probe: `backend=bwrap|landlock`, and from inside the sandbox that `/etc/passwd`, `/etc/shadow`
+  and `/app` cannot be read, `/proc/1/environ` and the parent's are unreadable, a TCP connect
+  fails, nothing beside the job's folder can be written, a denied call (`ptrace`, `socket`) answers
+  `EPERM`; PASS needs all of it and the total bound.
+
+Residual risks of the Landlock backend, which a platform without user namespaces leaves:
+
+- **Same user, same pid and network namespaces.** There is no namespace between the program and
+  the web process. What keeps it out is the ruleset (no `/proc`, no files of the app) and
+  `PR_SET_DUMPABLE=0`; a Linux kernel bug in Landlock, seccomp or a system call the filter allows
+  would meet a program that can signal and `ptrace`-attach processes of the same user only if
+  the filter's `ptrace` denial and Landlock's signal scope (ABI 6) fail too. ABI below 6 does not
+  scope signals: the program could signal other processes of the user (the web process): it can
+  kill the service, not read it. The probe prints `landlock_abi`.
+- **The network is closed by seccomp alone** (no network namespace): a program that gets a
+  socket by a call the filter lacks could connect out. Landlock's TCP rules (ABI 4) back it up for
+  TCP only; UDP and raw sockets have only the filter.
+- **Metadata is visible.** Landlock does not restrict `stat`, so the program can learn that a
+  file exists and its size and owner, though not read it; `/proc` directory listings are denied.
+- **Memory is bounded by polling**, not by a cgroup: a burst between two polls (0.2 s) can pass
+  the cap by what the allowed tasks (4 plus the slack) can touch in that time, each limited to
+  512 MB of address space; the container's own limit is behind it.
+- A kernel without Landlock ABI 3, or a platform that filters the calls, leaves LaTeX source off.
+
 What each layer is for, and what is tested (`tests/test_source_escapes.py` runs these through the
-real sandbox with the lint switched off):
+real sandbox, on both backends, with the lint switched off):
 
 | Layer | Stops | Not relied on for |
 |---|---|---|

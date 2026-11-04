@@ -14,8 +14,8 @@ from readablestem.ops import sandbox_probe
 from readablestem.source import latexml
 
 needs_sandbox = pytest.mark.skipif(
-    not (shutil.which("bwrap") and shutil.which("prlimit") and sandbox.available()),
-    reason="needs bubblewrap with user namespaces",
+    not sandbox.available(),
+    reason="needs a working sandbox (bubblewrap with user namespaces, or Landlock)",
 )
 
 
@@ -50,11 +50,13 @@ def test_a_bubblewrap_that_exits_nonzero_fails_and_says_why(monkeypatch, capsys)
     assert out.strip().splitlines()[-1] == "FAIL"
 
 
-def test_no_bubblewrap_fails(monkeypatch, capsys):
+def test_no_sandbox_backend_at_all_fails(monkeypatch, capsys):
     monkeypatch.setattr(sandbox, "bwrap_path", lambda: None)
+    monkeypatch.setattr(sandbox, "backend", lambda: None)
     assert main(["ops", "sandbox-probe"]) == 1
     out = capsys.readouterr().out
-    assert "bwrap=fail" in out and out.strip().splitlines()[-1] == "FAIL"
+    assert "backend=none" in out and "sandbox_start=fail" in out
+    assert out.strip().splitlines()[-1] == "FAIL"
 
 
 @needs_sandbox
@@ -106,13 +108,13 @@ def test_the_probe_reports_the_cgroup_and_the_filter(monkeypatch, capsys):
 def test_a_total_bound_over_the_setting_fails_the_probe_when_latex_is_required(monkeypatch):
     from readablestem.config import get_settings
 
-    monkeypatch.setenv("SOURCE_SANDBOX_MAX_TOTAL_MB", "1024")
+    monkeypatch.setenv("SOURCE_SANDBOX_MAX_TOTAL_MB", "600")
     get_settings.cache_clear()
     try:
         report = sandbox_probe.Report()
         sandbox_probe._check_total_bound(report, cgroup=False)
         lines = report.lines()
-        assert "sandbox_total_bound_mb=2048" in lines and "sandbox_total_bound=fail" in lines
+        assert "sandbox_total_bound_mb=768" in lines and "sandbox_total_bound=fail" in lines
         assert report.passed  # information until LaTeX is required
         for check in report.checks:
             if check.name == "sandbox_total_bound":
@@ -120,6 +122,8 @@ def test_a_total_bound_over_the_setting_fails_the_probe_when_latex_is_required(m
         assert not report.passed
         cgroup_report = sandbox_probe.Report()
         sandbox_probe._check_total_bound(cgroup_report, cgroup=True)
-        assert "sandbox_total_bound=ok" in cgroup_report.lines()  # 512 MB under a cgroup
+        assert (
+            "sandbox_total_bound=ok" in cgroup_report.lines()
+        )  # 512 MB under a cgroup (768 MB polled without one)
     finally:
         get_settings.cache_clear()

@@ -36,6 +36,7 @@ from starlette.responses import HTMLResponse
 from starlette.types import ASGIApp
 
 from readablestem.config import ConfigError, Settings, get_settings
+from readablestem.core import sandbox
 from readablestem.observability.logging import configure_logging, request_logging_middleware
 from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
@@ -409,6 +410,7 @@ def create_app(
         if settings.env == "prod" and (blockers := launch_blockers(settings=settings)):
             # Not a refusal: a staging deploy runs as prod before the copy is final.
             log_event(logger, "launch_blockers", logging.WARNING, count=len(blockers))
+        sandbox.make_undumpable()  # TeX of the same user cannot read our /proc/<pid>/environ
         if settings.sandbox_probe_at_startup:
             # In the background: neither start-up nor /healthz waits for it.
             run_probe(ctx.sandbox, timeout_s=settings.sandbox_probe_timeout_s)

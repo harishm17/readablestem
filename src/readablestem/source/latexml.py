@@ -41,6 +41,7 @@ LIMITS = sandbox.Limits(
     file_bytes=50_000_000,
     out_bytes=200_000_000,
     pids=4,
+    group_memory_bytes=768 * 1024 * 1024,
 )
 
 # LaTeXML finds a package's own TeX with `kpsewhich`. With TeX Live's base installed (the image's
@@ -73,17 +74,19 @@ def installed() -> bool:
 
 
 def _program(name: str) -> tuple[list[str], dict[str, str], tuple[tuple[Path, str], ...]]:
-    """(argv prefix, extra environment, extra read-only mounts) to run program `name` inside."""
+    """(argv prefix, extra environment, tool mounts) to run program `name` inside: the image's own
+    LaTeXML, or the development root's, which is mounted (bubblewrap) or read in place
+    (Landlock; `sandbox.where`)."""
     root = _dev_root()
     if root is None:
         return [f"/usr/bin/{name}"], {}, ()
-    inside = f"{_DEV_MOUNT}/usr"
+    inside = sandbox.where(root / "usr", f"{_DEV_MOUNT}/usr")
     perl_dirs = [f"{inside}/share/perl5"]
     arch = root / "usr" / "lib"
     for lib in sorted(arch.glob("*/perl5/*")):
         perl_dirs.append(f"{inside}/lib/{lib.relative_to(arch).as_posix()}")
     env = {"PERL5LIB": ":".join(perl_dirs)}
-    return ["/usr/bin/perl", f"{inside}/bin/{name}"], env, ((root / "usr", inside),)
+    return ["/usr/bin/perl", f"{inside}/bin/{name}"], env, ((root / "usr", f"{_DEV_MOUNT}/usr"),)
 
 
 def _env(extra: dict[str, str]) -> dict[str, str]:
@@ -114,35 +117,41 @@ def convert(
     xml_dir.mkdir(parents=True, exist_ok=True)
     html_dir.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
+    work = sandbox.where(src, "/work")
     ro = ((src, "/work"),)
+    xml_out = sandbox.where(xml_dir, "/out")
 
-    prefix, extra, mounts = _program("latexml")
+    prefix, extra, tools = _program("latexml")
     preload: list[str] = []
+    beamer_file = sandbox.where(BEAMER_COMPAT, _BEAMER_MOUNT)
     if beamer:  # definitions for the Beamer parts LaTeXML's binding lacks (the file's header)
-        preload = [f"--preload={_BEAMER_MOUNT}"]
-        mounts += ((BEAMER_COMPAT, _BEAMER_MOUNT),)
+        preload = [f"--preload={beamer_file}"]
+        ro += ((BEAMER_COMPAT, _BEAMER_MOUNT),)
     first = sandbox.run(
         [
-            *prefix, "--nocomments", "--path=/work", *preload, f"--destination=/out/{XML_NAME}",
-            "--log=/out/latexml.log", f"/work/{main}",
+            *prefix, "--nocomments", f"--path={work}", *preload,
+            f"--destination={xml_out}/{XML_NAME}", f"--log={xml_out}/latexml.log",
+            f"{work}/{main}",
         ],
-        ro=ro + mounts, rw=((xml_dir, "/out"),), env=_env(extra), cwd="/work", limits=limits,
+        ro=ro, tools=tools, rw=((xml_dir, "/out"),), env=_env(extra), cwd=work, limits=limits,
         log=out / "latexml.out", hide=HIDDEN_FILES,
     )  # fmt: skip
     # latexml exits 0 for "no obvious problems" and for warnings; 10 or more means fatal.
     if not first.ok or not (xml_dir / XML_NAME).is_file():
         return first if not first.ok else sandbox.Outcome(1)
 
-    prefix, extra, mounts = _program("latexmlpost")
+    prefix, extra, tools = _program("latexmlpost")
     remaining = max(5, limits.wall_s - int(time.monotonic() - started))
     second_limits = dataclasses.replace(limits, wall_s=remaining)
+    html_out = sandbox.where(html_dir, "/out")
+    xml_in = sandbox.where(xml_dir, "/xml")
     return sandbox.run(
         [
             *prefix, "--format=xhtml", "--omitdoctype", "--pmml", "--nomathimages",
             "--nographicimages", "--nopictureimages", "--nodefaultresources",
-            "--sourcedirectory=/work", f"--destination=/out/{DOC_NAME}",
-            "--log=/out/post.log", f"/xml/{XML_NAME}",
+            f"--sourcedirectory={work}", f"--destination={html_out}/{DOC_NAME}",
+            f"--log={html_out}/post.log", f"{xml_in}/{XML_NAME}",
         ],
-        ro=ro + mounts + ((xml_dir, "/xml"),), rw=((html_dir, "/out"),), env=_env(extra),
-        cwd="/out", limits=second_limits, log=out / "post.out", hide=HIDDEN_FILES,
+        ro=(*ro, (xml_dir, "/xml")), tools=tools, rw=((html_dir, "/out"),), env=_env(extra),
+        cwd=html_out, limits=second_limits, log=out / "post.out", hide=HIDDEN_FILES,
     )  # fmt: skip

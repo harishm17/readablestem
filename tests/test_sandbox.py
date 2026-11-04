@@ -14,7 +14,7 @@ import pytest
 from readablestem.core import sandbox, seccomp
 
 needs_sandbox = pytest.mark.skipif(
-    not (shutil.which("bwrap") and shutil.which("prlimit") and sandbox.available()),
+    not (shutil.which("bwrap") and shutil.which("prlimit") and sandbox.backend() == "bwrap"),
     reason="needs bubblewrap with user namespaces",
 )
 PERL = "/usr/bin/perl"
@@ -54,11 +54,13 @@ def test_missing_bubblewrap_is_refused_not_bypassed(monkeypatch):
     monkeypatch.setattr(sandbox.shutil, "which", lambda name: None)
     with pytest.raises(sandbox.SandboxUnavailable):
         sandbox.build_argv(["/usr/bin/true"])
-    sandbox.available.cache_clear()
+    monkeypatch.setenv(sandbox.BACKEND_ENV, "bwrap")  # only bubblewrap: no Landlock fallback
+    sandbox.backend.cache_clear()
     try:
         assert sandbox.available() is False
     finally:
-        sandbox.available.cache_clear()
+        monkeypatch.undo()
+        sandbox.backend.cache_clear()
 
 
 @needs_sandbox
@@ -457,14 +459,18 @@ def test_the_exclusive_gate_lets_one_holder_in_at_a_time():
         pass
 
 
-def test_latexmls_limits_bound_the_worst_case_below_the_setting():
+def test_latexmls_limits_bound_the_worst_case_below_the_setting(monkeypatch):
+    import dataclasses
+
     from readablestem.config import Settings
     from readablestem.ops import sandbox_probe
     from readablestem.source import latexml
 
     limits = latexml.LIMITS
     assert limits.pids == 4 and limits.memory_bytes == 512 * 1024 * 1024
-    assert sandbox_probe.total_bound_mb(cgroup=False) == 2048
+    assert sandbox_probe.total_bound_mb(cgroup=False) == 768  # the polled group cap
+    monkeypatch.setattr(latexml, "LIMITS", dataclasses.replace(limits, group_memory_bytes=0))
+    assert sandbox_probe.total_bound_mb(cgroup=False) == 2048  # tasks x address space
     assert sandbox_probe.total_bound_mb(cgroup=True) == 512
     assert Settings(_env_file=None).source_sandbox_max_total_mb == 2048  # type: ignore[call-arg]
 

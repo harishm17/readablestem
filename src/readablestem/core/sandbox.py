@@ -14,8 +14,13 @@ builds:
   and the caller kills the whole group at a wall-clock limit or when the output folder grows past
   a byte budget.
 
-When bubblewrap, user namespaces or the mounts are not available the call is refused with
-`SandboxUnavailable`: there is no unsandboxed fallback (docs/security.md, "Source uploads").
+Where bubblewrap cannot start (a platform without unprivileged user namespaces) a second backend
+takes over automatically: Landlock plus a stricter seccomp filter, applied by a launcher
+(`core/landlock_exec.py`) in a process of its own just before the program is exec'd. It has no
+mount namespace, so the program sees the host's real paths: callers name a path with `where()`,
+which is the path inside for bubblewrap and the host path for Landlock. When neither backend can
+run the call is refused with `SandboxUnavailable`: there is no unsandboxed fallback
+(docs/security.md, "Running uploaded TeX").
 `readablestem ops sandbox-probe` (ops/sandbox_probe.py) checks all of this on the deployed
 image, because a platform may forbid user namespaces.
 
@@ -31,6 +36,8 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,6 +48,11 @@ POLL_SECONDS = 0.2
 # the limit is "now plus this much", worked out when the sandbox starts (`_nproc_limit`).
 NPROC_EXTRA = 64
 NOFILE = 256
+# Landlock backend: RLIMIT_NPROC counts every task of the user, the web app's threads included,
+# which come and go while a conversion runs; this many more than asked for keep a thread started
+# meanwhile from making LaTeXML's own forks fail. The sum over tasks is bounded by
+# `Limits.group_memory_bytes`, not by this.
+LANDLOCK_NPROC_SLACK = 8
 TMPFS_BYTES = 128_000_000
 
 # Read-only system trees; each is skipped when absent. No /home, /root, /var, /mnt or /srv.
@@ -138,6 +150,10 @@ class Limits:
     file_bytes: int = 50_000_000
     out_bytes: int = 200_000_000  # all the program may leave in its writable folders and its log
     pids: int = NPROC_EXTRA  # tasks the program may have at once (a cgroup limit when there is one)
+    # Resident memory of the whole group together, checked every poll (0: not checked). Where a
+    # cgroup cannot be made it is what bounds the sum over tasks that the per-process address
+    # space limit does not.
+    group_memory_bytes: int = 0
 
 
 @dataclass
@@ -145,10 +161,16 @@ class Outcome:
     returncode: int
     timed_out: bool = False
     over_quota: bool = False
+    over_memory: bool = False
 
     @property
     def ok(self) -> bool:
-        return self.returncode == 0 and not self.timed_out and not self.over_quota
+        return (
+            self.returncode == 0
+            and not self.timed_out
+            and not self.over_quota
+            and not self.over_memory
+        )
 
 
 def bwrap_path() -> str | None:
@@ -159,14 +181,77 @@ def prlimit_path() -> str | None:
     return shutil.which("prlimit")
 
 
+BACKEND_ENV = "READABLESTEM_SANDBOX_BACKEND"  # "bwrap" or "landlock": try only that one
+LANDLOCK_MIN_ABI = 3  # path rights plus REFER (2) and TRUNCATE (3)
+LAUNCHER = Path(__file__).with_name("landlock_exec.py")
+# Shown in place of a file of the system that must look absent (`hide`), on the Landlock backend:
+# an executable that does nothing, first on PATH.
+_STUB = "#!/bin/sh\nexit 0\n"
+
+
 @functools.cache
+def backend() -> str | None:
+    """The sandbox this machine can start: "bwrap", else "landlock", else None. Found by running
+    `true` inside each; cached for the life of the process. `READABLESTEM_SANDBOX_BACKEND` limits
+    the choice to one (for tests and for the probe)."""
+    forced = os.environ.get(BACKEND_ENV)
+    for name in (forced,) if forced in ("bwrap", "landlock") else ("bwrap", "landlock"):
+        try:
+            if _run(name, ["/usr/bin/true"], limits=Limits(wall_s=20)).ok:
+                return name
+        except (SandboxUnavailable, OSError):
+            continue
+    return None
+
+
 def available() -> bool:
-    """Whether a sandbox can be started here at all (bubblewrap, prlimit, user namespaces):
-    `true` run inside one. Cached for the life of the process."""
+    """Whether a sandbox can be started here at all."""
+    return backend() is not None
+
+
+def make_undumpable() -> bool:
+    """`PR_SET_DUMPABLE=0` for this process: another process of the same user (a sandboxed
+    program on the Landlock backend, which shares the user and the pid namespace) can no longer
+    read this process's `/proc/<pid>/environ`, `mem` or `maps`, which hold the keys. Called at
+    start by the web process and the conversion child (their parents of the sandbox). It is
+    not inherited by a program that is exec'd. False when the call failed."""
+    import ctypes
+
     try:
-        return run(["/usr/bin/true"], limits=Limits(wall_s=20)).ok
-    except (SandboxUnavailable, OSError):
+        return ctypes.CDLL(None, use_errno=True).prctl(4, 0, 0, 0, 0) == 0  # PR_SET_DUMPABLE
+    except OSError:
         return False
+
+
+def where(host: Path, inside: str) -> str:
+    """The path the sandboxed program uses for `host`: `inside` under bubblewrap (which mounts
+    it there), the host path itself under Landlock (which has no mounts)."""
+    return inside if backend() == "bwrap" else str(host)
+
+
+def landlock_abi() -> int:
+    """The Landlock ABI of this kernel (0: none, or the call is filtered), and 0 when seccomp is
+    not known on this machine (the backend needs its filter)."""
+    import ctypes
+
+    from readablestem.core import seccomp
+
+    if not seccomp.supported():
+        return 0
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        value = libc.syscall(444, None, 0, 1)  # landlock_create_ruleset(NULL, 0, VERSION)
+    except OSError:
+        return 0
+    return int(value) if value > 0 else 0
+
+
+def system_paths() -> tuple[list[str], list[str]]:
+    """(trees to read and execute, files and folders to read) of the system that exist here: the
+    same list the bubblewrap root is built from."""
+    trees = [n for n in _SYSTEM_TREES if Path(n).exists()]
+    reads = [n for n in _SYSTEM_FILES if Path(n).exists()]
+    return trees, reads
 
 
 def _system_mounts() -> list[str]:
@@ -231,6 +316,35 @@ def build_argv(
         f"--nproc={nproc_limit(limits.pids)}", "--", *command,
     ]  # fmt: skip
     return args
+
+
+def group_rss_bytes(root: int) -> int:
+    """Resident memory, in bytes, of process `root` and every descendant of it (from /proc: the
+    tree by parent, which holds whatever the program does to its own group or session)."""
+    page = os.sysconf("SC_PAGE_SIZE")
+    parents: dict[int, int] = {}
+    pages: dict[int, int] = {}
+    with contextlib.suppress(OSError):
+        for entry in os.scandir("/proc"):
+            if not entry.name.isdigit():
+                continue
+            try:
+                stat = Path(f"/proc/{entry.name}/stat").read_text()
+                parents[int(entry.name)] = int(stat[stat.rindex(")") + 2 :].split()[1])
+                pages[int(entry.name)] = int(
+                    Path(f"/proc/{entry.name}/statm").read_text().split()[1]
+                )
+            except (OSError, ValueError, IndexError):
+                continue
+    tree = {root}
+    grew = True
+    while grew:
+        grew = False
+        for pid, parent in parents.items():
+            if parent in tree and pid not in tree:
+                tree.add(pid)
+                grew = True
+    return sum(pages.get(pid, 0) for pid in tree) * page
 
 
 def _tree_bytes(*roots: Path) -> int:
@@ -312,6 +426,7 @@ def run(
     *,
     ro: tuple[tuple[Path, str], ...] = (),
     rw: tuple[tuple[Path, str], ...] = (),
+    tools: tuple[tuple[Path, str], ...] = (),
     env: dict[str, str] | None = None,
     cwd: str = "/",
     limits: Limits | None = None,
@@ -321,32 +436,130 @@ def run(
     cgroup: bool = True,
     cgroup_parent: Path | None = None,
 ) -> Outcome:
-    """Run `command` in the sandbox and wait. The caller's own environment is not passed on, not
-    even to bubblewrap. A wall-clock timeout, or more than `limits.out_bytes` in the `rw` host
-    folders plus `log`, kills the whole group. `log` receives the program's stdout and stderr
-    (never read here); without it they are discarded. `seccomp`: the filter of `core.seccomp`
-    (when this machine is one it knows). `cgroup`: a memory and pids limit for the whole group
-    when the container allows one."""
+    """Run `command` in the sandbox this machine has (`backend()`) and wait. The caller's own
+    environment is not passed on, not even to the launcher. A wall-clock timeout, or more than
+    `limits.out_bytes` in the `rw` host folders plus `log`, kills the whole group. `ro`: read-only
+    inputs; `tools`: read-only and executable (programs the command runs); `rw`: writable
+    folders. All are (host path, path inside) pairs: the second is where bubblewrap mounts it,
+    and Landlock ignores it (`where()`). The same goes for `cwd` and for the paths in `command`
+    and `env`; an environment value of exactly "/tmp" is a private scratch folder on the Landlock
+    backend. `log` receives the program's stdout and stderr (never read here); without it they
+    are discarded. `seccomp`: the filter of `core.seccomp`. `cgroup`: a memory and pids limit for
+    the whole group when the container allows one."""
+    name = backend()
+    if name is None:
+        raise SandboxUnavailable("no sandbox can start here (bubblewrap and Landlock both failed)")
+    return _run(
+        name, command, ro=ro, rw=rw, tools=tools, env=env, cwd=cwd, limits=limits, log=log,
+        hide=hide, seccomp=seccomp, cgroup=cgroup, cgroup_parent=cgroup_parent,
+    )  # fmt: skip
+
+
+def _landlock_spec(
+    command: list[str],
+    *,
+    ro: tuple[tuple[Path, str], ...],
+    rw: tuple[tuple[Path, str], ...],
+    tools: tuple[tuple[Path, str], ...],
+    env: dict[str, str] | None,
+    cwd: str,
+    limits: Limits,
+    hide: tuple[str, ...],
+    scratch: Path,
+    stubs: Path,
+    program: bytes | None,
+) -> dict:
+    import base64
+
+    trees, reads = system_paths()
+    # The files of /dev a Perl uses; nothing else of /dev, and nothing of /proc.
+    names = ("/dev/null", "/dev/zero", "/dev/urandom", "/dev/random")
+    devices = [d for d in names if Path(d).exists()]
+    for path in hide:  # must look absent: a do-nothing program of that name, first on PATH
+        if Path(path).is_file():
+            stub = stubs / Path(path).name
+            stub.write_text(_STUB)
+            stub.chmod(0o755)
+    wanted = {"PATH": f"{stubs}:/usr/local/bin:/usr/bin:/bin", **(env or {})}
+    environment = {k: (str(scratch) if v == "/tmp" else v) for k, v in wanted.items()}
+    return {
+        "min_abi": LANDLOCK_MIN_ABI,
+        "cwd": cwd,
+        "exec": [*trees, str(stubs), *(str(h) for h, _ in tools)],
+        "read": [*reads, *(str(h) for h, _ in ro)],
+        "write": [str(scratch), *(str(h) for h, _ in rw)],
+        "files_rw": ["/dev/null"],
+        "files_read": [d for d in devices if d != "/dev/null"],
+        "env": environment,
+        "limits": {
+            "as": limits.memory_bytes, "cpu": limits.cpu_s, "fsize": limits.file_bytes,
+            "core": 0, "nofile": NOFILE, "pids": limits.pids, "slack": LANDLOCK_NPROC_SLACK,
+        },
+        "seccomp": base64.b64encode(program).decode() if program else "",
+        "cmd": command,
+    }  # fmt: skip
+
+
+def _run(
+    name: str,
+    command: list[str],
+    *,
+    ro: tuple[tuple[Path, str], ...] = (),
+    rw: tuple[tuple[Path, str], ...] = (),
+    tools: tuple[tuple[Path, str], ...] = (),
+    env: dict[str, str] | None = None,
+    cwd: str = "/",
+    limits: Limits | None = None,
+    log: Path | None = None,
+    hide: tuple[str, ...] = (),
+    seccomp: bool = True,
+    cgroup: bool = True,
+    cgroup_parent: Path | None = None,
+) -> Outcome:
+    """`run` on a named backend ("bwrap" or "landlock")."""
+    import json
+
     from readablestem.core import seccomp as filters
 
     limits = limits or Limits()
-    program = filters.program() if seccomp else None
+    landlock = name == "landlock"
     read_end = write_end = None
-    if program is not None:
-        read_end, write_end = os.pipe()
-        os.write(write_end, program)
-        os.close(write_end)
-    argv = build_argv(
-        command, ro=ro, rw=rw, env=env, cwd=cwd, limits=limits, hide=hide, seccomp_fd=read_end
-    )
-    sink = log.open("wb") if log is not None else None
-    group = Cgroup.make(limits, cgroup_parent) if cgroup else None
-    if group is not None:
-        # The process joins the cgroup before it becomes bubblewrap, so everything bubblewrap
-        # starts is born in it: moving a running process would leave the children it has
-        # already forked outside the limits.
-        argv = ["/bin/sh", "-c", JOIN_SCRIPT, str(group.path / "cgroup.procs"), *argv]
+    scratch = stubs = None
+    sink = None
+    group = None
+    if landlock:
+        if landlock_abi() < LANDLOCK_MIN_ABI:
+            raise SandboxUnavailable("Landlock is not available here (kernel too old or filtered)")
+        program = filters.program(strict=True) if seccomp else None
+        if program is None:
+            raise SandboxUnavailable("the Landlock backend needs its seccomp filter")
+        scratch = Path(tempfile.mkdtemp(prefix="rs-sandbox-"))
+        stubs = Path(tempfile.mkdtemp(prefix="rs-stubs-"))
+        spec = _landlock_spec(
+            command, ro=ro, rw=rw, tools=tools, env=env, cwd=cwd, limits=limits, hide=hide,
+            scratch=scratch, stubs=stubs, program=program,
+        )  # fmt: skip
+        argv = [sys.executable, "-I", "-S", str(LAUNCHER), json.dumps(spec)]
+        rw_hosts = (*(host for host, _ in rw), scratch)
+    else:
+        program = filters.program() if seccomp else None
+        if program is not None:
+            read_end, write_end = os.pipe()
+            os.write(write_end, program)
+            os.close(write_end)
+        argv = build_argv(
+            command, ro=(*ro, *tools), rw=rw, env=env, cwd=cwd, limits=limits, hide=hide,
+            seccomp_fd=read_end,
+        )  # fmt: skip
+        rw_hosts = tuple(host for host, _ in rw)
     try:
+        sink = log.open("wb") if log is not None else None
+        group = Cgroup.make(limits, cgroup_parent) if cgroup else None
+        if group is not None:
+            # The process joins the cgroup before it becomes the sandbox, so everything it starts
+            # is born in it: moving a running process would leave the children it has already
+            # forked outside the limits.
+            argv = ["/bin/sh", "-c", JOIN_SCRIPT, str(group.path / "cgroup.procs"), *argv]
         proc = subprocess.Popen(
             argv,
             env={"PATH": "/usr/bin:/bin"},
@@ -354,10 +567,10 @@ def run(
             stdout=sink or subprocess.DEVNULL,
             stderr=subprocess.STDOUT if sink else subprocess.DEVNULL,
             start_new_session=True,
+            close_fds=True,
             pass_fds=(read_end,) if read_end is not None else (),
         )
         deadline = time.monotonic() + limits.wall_s
-        roots = tuple(host for host, _ in rw)
         while True:
             try:
                 proc.wait(timeout=POLL_SECONDS)
@@ -365,17 +578,28 @@ def run(
             except subprocess.TimeoutExpired:
                 pass
             timed_out = time.monotonic() > deadline
-            written = _tree_bytes(*roots) + (log.stat().st_size if log and log.exists() else 0)
+            written = _tree_bytes(*rw_hosts) + (log.stat().st_size if log and log.exists() else 0)
             over = written > limits.out_bytes
-            if timed_out or over:
+            heavy = bool(limits.group_memory_bytes) and (
+                group_rss_bytes(proc.pid) > limits.group_memory_bytes
+            )
+            if timed_out or over or heavy:
                 with contextlib.suppress(ProcessLookupError):
                     os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait()
-                return Outcome(-9, timed_out=timed_out, over_quota=over)
+                return Outcome(-9, timed_out=timed_out, over_quota=over, over_memory=heavy)
     finally:
+        if landlock:
+            # No pid namespace to end with the program: whatever it left in its group (it cannot
+            # leave the group: setsid and setpgid are denied) is killed with it.
+            with contextlib.suppress(ProcessLookupError, UnboundLocalError, PermissionError):
+                os.killpg(proc.pid, signal.SIGKILL)
         if read_end is not None:
             os.close(read_end)
         if sink is not None:
             sink.close()
         if group is not None:
             group.remove()
+        for folder in (scratch, stubs):
+            if folder is not None:
+                shutil.rmtree(folder, ignore_errors=True)

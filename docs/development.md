@@ -46,7 +46,7 @@ suite runs on a developer machine or a host with user namespaces). Install `late
 distribution (`apt install latexml bubblewrap`), or, without root, unpack the packages and point at them:
 `apt-get download latexml <its dependencies>`, `dpkg -x` each into one folder, and set
 `READABLESTEM_LATEXML_ROOT` to it (it needs a `usr/` folder; the folder is mounted read-only in the sandbox and
-Perl is pointed at it; production never sets it). `uv run readablestem ops sandbox-probe` says whether the sandbox
+Perl is pointed at it; production never sets it). `uv run readablestem ops sandbox-probe` (`READABLESTEM_SANDBOX_BACKEND=landlock` to force the Landlock backend) says whether the sandbox
 works on the machine.
 
 CLI:

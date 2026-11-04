@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import io
 import os
-import shutil
 import zipfile
 from pathlib import Path
 
@@ -24,8 +23,8 @@ FIXTURES = Path(__file__).parent / "fixtures" / "source"
 REQUIRED = bool(os.environ.get("READABLESTEM_REQUIRE_SANDBOX_TESTS"))
 
 needs_latexml = pytest.mark.skipif(
-    not REQUIRED and not (latexml.installed() and shutil.which("bwrap") and sandbox.available()),
-    reason="needs LaTeXML and a working bubblewrap sandbox",
+    not REQUIRED and not (latexml.installed() and sandbox.available()),
+    reason="needs LaTeXML and a working sandbox (bubblewrap or Landlock)",
 )
 
 

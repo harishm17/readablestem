@@ -13,7 +13,11 @@ status is 0 for PASS and 1 for FAIL. Nothing it prints is document content.
 
 What it checks, and what each answer means:
 
-- `bwrap`, `prlimit`, `userns`, `sandbox_start`: the sandbox can start at all.
+- `backend`: which sandbox this machine uses, `bwrap` or, where bubblewrap cannot start (no
+  unprivileged user namespaces), `landlock` (docs/security.md, "Landlock backend"); `bwrap`,
+  `prlimit` and `landlock_abi` say what is installed. `sandbox_start`: the chosen one can start.
+  On the Landlock backend also `sandbox_no_proc`, `sandbox_outside_readonly`,
+  `sandbox_seccomp_strict` and `dumpable0_protects_environ`.
 - `sandbox_env`, `sandbox_no_secrets`, `sandbox_no_etc`, `sandbox_no_network`: inside it, a
   secret set in this process's environment is absent, `/etc/passwd` and the application are not
   visible, `/proc/1/environ` is empty, and a socket cannot reach an address.
@@ -60,24 +64,32 @@ _CLONE_NEWNET = 0x40000000
 # Run inside the sandbox: one "name:value" line per fact.
 INSIDE_PERL = r"""
 use Socket;
-my %seen = map { $_ => 1 } grep { !/^(PATH|PWD|HOME|SHLVL|_)$/ } keys %ENV;
+my $out = $ARGV[0];
+my %seen = map { $_ => 1 } grep { !/^(PATH|PWD|HOME|SHLVL|_|TMPDIR)$/ } keys %ENV;
 print "keys:", join(",", sort keys %seen), "\n";
 my $all = join("", values %ENV);
 print "secret:", ($all =~ /probe-secret/ ? "visible" : "absent"), "\n";
-for my $p ("/etc/passwd", "/app", "/home") {
-    print "vis_$p:", (-e $p ? "yes" : "no"), "\n";
+for my $p ("/etc/passwd", "/etc/shadow", "/app/pyproject.toml", "/proc/self/environ") {
+    if ($p eq "/proc/self/environ") { next }
+    print "vis_$p:", (open(V, "<", $p) ? "yes" : "no"), "\n";
 }
 my $n = 0;
 if (open(F, "<", "/proc/1/environ")) { local $/; my $x = <F>; $n = length($x // ""); }
 print "pid1_environ_bytes:", $n, "\n";
+my $m = 0;
+my $pp = getppid();
+if (open(G, "<", "/proc/$pp/environ")) { local $/; my $x = <G>; $m = length($x // ""); }
+print "ppid_environ_bytes:", $m, "\n";
 my $net = "none";
 if (socket(S, PF_INET, SOCK_STREAM, 0)) {
     $net = connect(S, sockaddr_in(80, inet_aton("1.1.1.1"))) ? "reached" : "unreachable";
 }
 print "net:", $net, "\n";
-open(W, ">", "/out/w") && print W "x"; close W;
-print "out_writable:", (-s "/out/w" ? "yes" : "no"), "\n";
+open(W, ">", "$out/w") && print W "x"; close W;
+print "out_writable:", (-s "$out/w" ? "yes" : "no"), "\n";
 print "root_writable:", (open(R, ">", "/usr/probe") ? "yes" : "no"), "\n";
+my $beside = $out; $beside =~ s{/[^/]*$}{};
+print "outside_writable:", (open(X, ">", "$beside/escape-probe") ? "yes" : "no"), "\n";
 """
 
 TINY_TEX = (
@@ -126,7 +138,8 @@ def _perl(
     memory_bytes: int | None = None,
     limits: sandbox.Limits | None = None,
 ):
-    """Run a Perl one-liner in the sandbox with a writable /out; returns (outcome, its output).
+    """Run a Perl one-liner in the sandbox with a writable output folder, its path the first
+    argument (`$ARGV[0]`); returns (outcome, its output).
     Perl is in every Debian image (perl-base)."""
     out = tmp / "out"
     out.mkdir(exist_ok=True)
@@ -135,7 +148,7 @@ def _perl(
         wall_s=wall_s, **({"memory_bytes": memory_bytes} if memory_bytes else {})
     )
     outcome = sandbox.run(
-        ["/usr/bin/perl", "-e", code],
+        ["/usr/bin/perl", "-e", code, sandbox.where(out, "/out")],
         rw=((out, "/out"),),
         env={"HOME": "/tmp"},
         limits=limits,
@@ -146,9 +159,14 @@ def _perl(
 
 
 def _check_sandbox(report: Report, tmp: Path) -> bool:
-    report.add("bwrap", "ok" if sandbox.bwrap_path() else "fail")
-    report.add("prlimit", "ok" if sandbox.prlimit_path() else "fail")
-    if not sandbox.bwrap_path() or not sandbox.prlimit_path():
+    report.add("bwrap", "ok" if sandbox.bwrap_path() else "missing", required=False)
+    report.add("prlimit", "ok" if sandbox.prlimit_path() else "missing", required=False)
+    abi = sandbox.landlock_abi()
+    report.add("landlock_abi", str(abi) if abi else "unavailable", required=False)
+    name = sandbox.backend()
+    report.add("backend", name or "none", required=False)
+    if name is None:  # neither bubblewrap nor Landlock can start here
+        report.add("sandbox_start", "fail")
         return False
     # os.environ is passed to nobody: bubblewrap gets only PATH, the program only what we name.
     os.environ[SECRET_NAME] = SECRET_VALUE
@@ -169,9 +187,18 @@ def _check_sandbox(report: Report, tmp: Path) -> bool:
     visible = [k for k in seen if k.startswith("vis_") and seen[k] != "no"]
     report.add("sandbox_no_etc", "ok" if not visible else "fail")
     report.add("sandbox_pid1_environ", "ok" if seen.get("pid1_environ_bytes") == "0" else "fail")
+    report.add("sandbox_no_proc", "ok" if seen.get("ppid_environ_bytes") == "0" else "fail")
     report.add("sandbox_no_network", "ok" if seen.get("net") in ("unreachable", "none") else "fail")
     report.add("sandbox_output_writable", "ok" if seen.get("out_writable") == "yes" else "fail")
     report.add("sandbox_root_readonly", "ok" if seen.get("root_writable") == "no" else "fail")
+    # Landlock: nothing beside the job's folder is writable. (Under bubblewrap the root is a
+    # throwaway tmpfs the program may write to; it is not the host's.)
+    outside_ok = seen.get("outside_writable") == "no"
+    report.add(
+        "sandbox_outside_readonly",
+        "ok" if outside_ok else ("fail" if name == "landlock" else "tmpfs"),
+        required=name == "landlock",
+    )
     return True
 
 
@@ -197,7 +224,8 @@ def _check_limits(report: Report, tmp: Path) -> None:
         [
             "/usr/bin/perl",
             "-e",
-            'open(W, ">", "/out/big"); while (1) { print W "x" x 100000; }',
+            'open(W, ">", "$ARGV[0]/big"); while (1) { print W "x" x 100000; }',
+            sandbox.where(out, "/out"),
         ],
         rw=((out, "/out"),),
         limits=limits,
@@ -210,7 +238,11 @@ def _check_limits(report: Report, tmp: Path) -> None:
         tmp=tmp,
         limits=sandbox.Limits(wall_s=20, pids=16),
     )
-    report.add("sandbox_task_cap", "ok" if text.strip().isdigit() and int(text) <= 16 else "fail")
+    # (Landlock: the user's own threads start and stop meanwhile, so a few more are allowed.)
+    allowed = 16 + (sandbox.LANDLOCK_NPROC_SLACK if sandbox.backend() == "landlock" else 0)
+    report.add(
+        "sandbox_task_cap", "ok" if text.strip().isdigit() and int(text) <= allowed else "fail"
+    )
     # Files: opens stop at the limit.
     _outcome, text = _perl(
         'my $n = 0; for (1..600) { open(my $f, "<", "/usr/bin/perl") or last; push @h, $f; $n++ }'
@@ -221,6 +253,17 @@ def _check_limits(report: Report, tmp: Path) -> None:
         "sandbox_file_cap",
         "ok" if text.strip().isdigit() and int(text) <= sandbox.NOFILE else "fail",
     )
+    # Memory of the group together: three processes that each hold 100 MB under a group cap of
+    # 150 MB are killed (the poll in `sandbox.run`, which bounds the sum where no cgroup does).
+    outcome, _ = _perl(
+        "my @k; for (1..3) { my $p = fork(); next unless defined $p; if ($p == 0) "
+        '{ my $x = "a" x 100_000_000; sleep 20; exit 0 } push @k, $p } sleep 20;',
+        tmp=tmp,
+        limits=sandbox.Limits(
+            wall_s=20, memory_bytes=300_000_000, pids=8, group_memory_bytes=150_000_000
+        ),
+    )
+    report.add("sandbox_group_memory_cap", "ok" if outcome.over_memory else "fail")
     # seccomp: ptrace answers EPERM inside (the filter, `core/seccomp.py`).
     if seccomp.supported():
         _outcome, text = _perl(
@@ -229,6 +272,13 @@ def _check_limits(report: Report, tmp: Path) -> None:
             tmp=tmp,
         )
         report.add("sandbox_seccomp", "ok" if text.strip() == "denied" else "fail")
+        if sandbox.backend() == "landlock":  # the strict filter: no sockets, no setsid
+            _outcome, text = _perl(
+                f"my $r = syscall({seccomp.number('socket')}, 2, 1, 0); use Errno qw(EPERM);"
+                'print(($r < 0 && $! == EPERM) ? "denied" : "allowed");',
+                tmp=tmp,
+            )
+            report.add("sandbox_seccomp_strict", "ok" if text.strip() == "denied" else "fail")
     else:
         report.add("sandbox_seccomp", "unsupported", required=False)
     # cgroup v2: a child cgroup with memory and pids limits, when the container delegates one.
@@ -241,12 +291,19 @@ def _check_limits(report: Report, tmp: Path) -> None:
 
 def total_bound_mb(*, cgroup: bool) -> int:
     """What a source conversion may use in all, in MB: the cgroup's memory limit when there is a
-    cgroup, else the tasks it may have times the address space each may map (the worst case,
-    and a loose one: address space is more than memory in use)."""
+    cgroup; else the resident-memory cap of the whole group that `sandbox.run` polls for
+    (`Limits.group_memory_bytes`; it is enforced every 0.2 s, so a burst between two polls can
+    pass it by what the allowed tasks can touch in that time); else the tasks it may have times
+    the address space each may map (the worst case, and a loose one)."""
     from readablestem.source import latexml
 
     limits = latexml.LIMITS
-    total = limits.memory_bytes if cgroup else limits.pids * limits.memory_bytes
+    if cgroup:
+        total = limits.memory_bytes
+    elif limits.group_memory_bytes:
+        total = limits.group_memory_bytes
+    else:
+        total = limits.pids * limits.memory_bytes
     return -(-total // (1024 * 1024))
 
 
@@ -356,7 +413,6 @@ def _plain_child_can_unshare_net() -> str:
 
 def _information(report: Report) -> None:
     report.add("seccomp_mode", seccomp_mode(), required=False)
-    report.add("landlock_abi", landlock_abi(), required=False)
     report.add("user", f"uid-{os.getuid()}", required=False)
     report.add("pid1_environ_readable", "yes" if _can_read_pid1() else "no", required=False)
     report.add(
@@ -364,13 +420,28 @@ def _information(report: Report) -> None:
         "yes" if _readable_environ(True) else "no",
         required=False,
     )
+    # On the Landlock backend the program shares this user: a process that called
+    # PR_SET_DUMPABLE=0 must be unreadable to it, and this process must have called it.
+    landlock = sandbox.backend() == "landlock"
+    unreadable = not _readable_environ(False)
     report.add(
         "same_uid_environ_readable_dumpable0",
-        "yes" if _readable_environ(False) else "no",
+        "no" if unreadable else "yes",
         required=False,
     )
+    if landlock:
+        report.add("dumpable0_protects_environ", "ok" if unreadable else "fail")
+    report.add("process_dumpable", _dumpable(), required=False)
     report.add("fallback_unshare_net", _plain_child_can_unshare_net(), required=False)
     report.add("fallback", "never-used-shows-all-files", required=False)
+
+
+def _dumpable() -> str:
+    """PR_GET_DUMPABLE of this process: 0 once `sandbox.make_undumpable` was called."""
+    try:
+        return str(ctypes.CDLL(None).prctl(3, 0, 0, 0, 0))
+    except OSError:
+        return "unknown"
 
 
 def _can_read_pid1() -> bool:

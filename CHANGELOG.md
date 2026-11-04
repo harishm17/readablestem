@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: Landlock sandbox backend (branch latex/landlock-sandbox)
+
+- New: a second sandbox for LaTeX source where bubblewrap cannot start (no user namespaces,
+  as on Railway): Landlock (read and execute on the system trees, read on the input, read and
+  write on the output and a private scratch folder, nothing else, not `/proc`) with a strict
+  seccomp filter (no sockets, no `setsid`, no `landlock_*`), `no_new_privs`, rlimits, the
+  one-at-a-time lock, a polled memory cap for the whole process group, and a launcher that is
+  the subreaper and dies with its caller. Chosen automatically; the same probe gates it
+  (`backend=bwrap|landlock`, new in-sandbox checks). The web process and the conversion child
+  call `PR_SET_DUMPABLE=0`. `tests/test_source_escapes.py` runs on both backends.
+
 ## Unreleased: equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
 
 - Pipeline 0.5.8. arXiv PDFs built by arXiv's own `tex2pdf` ("arXiv GenPDF (tex2pdf:...)") and VTeX
