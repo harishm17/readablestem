@@ -13,8 +13,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-CSS = (Path(__file__).parents[1] / "src/readablestem/web/static/app.css").read_text()
-COLOURS = dict(re.findall(r"(--[\w-]+):\s*(#[0-9a-fA-F]{6})", CSS))
+STATIC = Path(__file__).parents[1] / "src/readablestem/web/static"
+CSS = (STATIC / "app.css").read_text()
+TOKENS = (STATIC / "tokens.css").read_text()
+_LIGHT, _, _DARK = TOKENS.partition("@media (prefers-color-scheme: dark)")
+COLOURS = dict(re.findall(r"(--[\w-]+):\s*(#[0-9a-fA-F]{6})", _LIGHT))
+DARK = {**COLOURS, **dict(re.findall(r"(--[\w-]+):\s*(#[0-9a-fA-F]{6})", _DARK.split("}\n}")[0]))}
 
 
 def luminance(hex_colour: str) -> float:
@@ -36,16 +40,21 @@ def rule(selector: str) -> str:
 
 def test_the_focus_ring_is_thick_and_has_a_halo():
     body = rule(":focus-visible")
-    width = re.search(r"outline:\s*(\d+)px solid var\(--focus\)", body)
+    width = re.search(r"outline:\s*(\d+)px solid var\(--focus-outline\)", body)
     assert width and int(width.group(1)) >= 2, body
     assert "box-shadow: 0 0 0 5px var(--focus-halo)" in body
 
 
 def test_the_focus_colour_has_three_to_one_against_every_background_it_sits_on():
-    ring = COLOURS["--focus"]
-    for background in ("--bg", "--panel", "--desk"):
+    ring = COLOURS["--focus-outline"]
+    for background in ("--bg", "--surface", "--desk"):
         assert contrast(ring, COLOURS[background]) >= 3, background
     assert contrast(ring, COLOURS["--focus-halo"]) >= 3  # ring against its own halo
+    # dark theme: a yellow ring with a dark gap
+    dark_ring = DARK["--focus-outline"]
+    for background in ("--bg", "--surface", "--desk"):
+        assert contrast(dark_ring, DARK[background]) >= 3, background
+    assert contrast(dark_ring, DARK["--focus-halo"]) >= 3
 
 
 def test_only_script_focused_containers_drop_the_ring():

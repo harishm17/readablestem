@@ -31,6 +31,7 @@ CRON = "cron"
 ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/"): PUBLIC,
     ("GET", "/demo"): PUBLIC,
+    ("GET", "/style"): PUBLIC,
     ("GET", "/privacy"): PUBLIC,
     ("GET", "/terms"): PUBLIC,
     ("GET", "/limits"): PUBLIC,

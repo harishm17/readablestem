@@ -72,7 +72,7 @@ def test_the_page_has_one_h1_a_text_equivalent_for_the_diagram_and_the_asked_for
     ):
         assert f">{heading}</h2>" in page, heading
     # The diagram is an image with a title and a description, and the steps are also a list.
-    svg = page.split("<svg", 1)[1].split("</svg>", 1)[0]
+    svg = page.split('<svg class="data-flow"', 1)[1].split("</svg>", 1)[0]
     assert 'role="img"' in svg and "<title" in svg and "<desc" in svg
     assert "The same steps are listed below." in page
     checklist = page.split('id="pilot"', 1)[1]

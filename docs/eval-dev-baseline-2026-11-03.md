@@ -7,6 +7,9 @@ are 95% cluster bootstraps over papers (`scripts/realworld_report.py`, 10,000 re
 papers, and 6 for Opus, they are wide. The development papers were used to build the extractor and to
 tune the pipeline before: these numbers are a baseline for this set, not an estimate for new papers.
 
+*Update: the Opus chatbot arm now covers all 25 papers (see "Opus arm on all 25 development papers" at
+the end). The Opus figures in this first part are for the 6 papers that had it then.*
+
 **The short version.** On 25 development papers (114 pages, 2,350 gold equations), ReadableSTEM writes
 0.735 of the equations exactly right end to end (reading B, 95% interval 0.677 to 0.783), the Haiku
 chatbot 0.675 (0.605 to 0.738), and on the 6 papers that have an Opus answer ReadableSTEM writes 0.764
@@ -210,3 +213,132 @@ uv run python scripts/dev_converter_effect.py --gold ~/.cache/readablestem/realw
 
 A paid start needs a key and the application's own settings removed from the environment
 (`scripts/eq_dev_run.py`, `scrub_environment`), so that a deployed value cannot change a request.
+
+## Opus arm on all 25 development papers
+
+Added 2026-11-03 (the last call ended 2026-11-04 02:07 UTC). The baseline above had a recorded Opus
+chatbot answer for 6 of the 25 development papers. This section records the Opus arm on the other 19, so
+both chatbot arms and ReadableSTEM cover all 25 (114 PDF pages, 2,350 gold equations). Development part
+only; no held-out or fresh paper was touched, and ReadableSTEM was not run again (its answers are the
+`base-0503` recording, scored as above). Intervals are 95% cluster bootstraps over papers (10,000
+resamples); n = 25 papers throughout unless stated.
+
+**The short version.** With Opus on all 25 papers, ReadableSTEM writes 0.735 of the equations exactly
+right (reading B, 0.677 to 0.783), the Opus chatbot 0.708 (0.613 to 0.787) and the Haiku chatbot 0.674
+(0.605 to 0.738). The paired difference against Opus is +0.027 (95% -0.029 to +0.093, sign-flip
+p = 0.654, n = 25 papers); against Haiku +0.060 (+0.004 to +0.120, p = 0.080, n = 25). No difference
+against Opus is detected under any reading, and the interval is wide enough to include a gap of about
+3 points either way. On the 6 papers of the baseline the Opus chatbot had scored 0.784; on the 19 new
+papers it scores about 0.685 (1,235 of 1,804 gold, derived from the totals), so those 6 were an easy
+draw and the "ReadableSTEM -0.020 against Opus" of the baseline was a 6-paper figure, not a 25-paper
+one. ReadableSTEM leaves 9.5 wrong equations in 100 unasked, Opus 11.1, Haiku 16.5. Opus's detection
+precision is lower (0.767 against 0.866 for ReadableSTEM): it writes more equation text that is not in
+the gold.
+
+### How the arm was recorded
+
+- Arm `chatbot-opus-purdue` (`claude-opus-5-5`), `scripts/realworld_run.py chat --part dev --papers
+  <19 ids> --max-usd 12 --workers 2`, which is `proof.chatbot.record_arms` with the settings of the 6
+  existing recordings: the PDF as a document block, a 150 dpi PNG of every page, the Purdue sentence
+  verbatim, no system prompt, default effort, 64,000 maximum output tokens, streamed. Recorded next to
+  the existing ones (`~/.cache/readablestem/realworld/runs/dev/chat/systems/chatbot-opus-purdue/`, same
+  file format). The 19 papers are the 25 of `manifest-dev.json` minus the 6 already recorded.
+- All 25 recordings end with `response_status end_turn`: none cut off, none empty; no cut-off answer was
+  asked again. One paper (2412.08797) was re-asked once by the runner after an `APIConnectionError`
+  (the runner's existing retry for connection errors; its cost is estimated from usage and flagged
+  `cost_estimated` in its file).
+- The key came from the environment through `railway run`; every other setting was removed from the
+  process before the run (`env -i`, key only).
+
+### Results (reading B)
+
+| | ReadableSTEM (25) | Chatbot, Opus (25) | Chatbot, Haiku (25) |
+|---|---|---|---|
+| gold equations / PDF pages | 2,350 / 114 | 2,350 / 114 | 2,350 / 114 |
+| exact_lenient, end to end | 0.735 [0.677, 0.783] | 0.708 [0.613, 0.787] | 0.674 [0.605, 0.738] |
+| notation-neutral | 0.763 [0.704, 0.812] | 0.728 [0.631, 0.811] | 0.693 [0.619, 0.759] |
+| spoken-equal (exploratory) | 0.783 [0.721, 0.833] | 0.728 [0.633, 0.808] | 0.723 [0.655, 0.782] |
+| symbols, credited (secondary) | 0.777 [0.718, 0.826] | 0.744 [0.644, 0.826] | 0.712 [0.639, 0.778] |
+| detection recall | 0.871 [0.820, 0.911] | 0.819 [0.730, 0.891] | 0.840 [0.786, 0.884] |
+| detection precision | 0.866 [0.838, 0.894] | 0.767 [0.686, 0.846] | 0.876 [0.829, 0.918] |
+| wrong, not asked, per 100 gold (exact_lenient) | 9.53 [7.41, 11.91] | 11.15 [8.25, 14.65] | 16.51 [11.91, 21.65] |
+| wrong, not asked, per 100 gold (notation-neutral) | 7.40 [5.52, 9.58] | 9.11 [6.16, 12.64] | 14.64 [10.15, 19.96] |
+| wrong, not asked, per 100 gold (spoken-equal) | 6.26 [4.04, 8.86] | 9.11 [6.14, 12.75] | 11.66 [8.49, 15.22] |
+| required decisions per PDF page, all kinds | 3.87 [2.69, 5.25] | 0 | 0 |
+| cost per PDF page | $0.0313 [0.0238, 0.0402] | $0.0865 [0.0809, 0.0924] | $0.0022 [0.0021, 0.0024] |
+
+Under reading A (the registered table reading) exact_lenient is 0.703 [0.636, 0.759] for ReadableSTEM,
+0.708 [0.613, 0.787] for Opus and 0.674 [0.605, 0.738] for Haiku (the chatbots are the same under both
+readings). The ReadableSTEM and Haiku columns equal the baseline's; only the Opus column is new.
+
+### Paired differences (ReadableSTEM minus the chatbot, reading B, 95% cluster interval, n = 25 papers)
+
+| metric | minus Opus | sign-flip p | minus Haiku | sign-flip p |
+|---|---|---|---|---|
+| exact_lenient | +0.027 [-0.029, +0.093] | 0.654 | +0.060 [+0.004, +0.120] | 0.080 |
+| notation-neutral | +0.035 [-0.024, +0.106] | 0.488 | +0.070 [+0.016, +0.129] | 0.016 |
+| spoken-equal | +0.055 [-0.013, +0.138] | 0.318 | +0.060 [+0.013, +0.112] | 0.023 |
+| symbols, credited | +0.033 [-0.023, +0.100] | 0.548 | +0.065 [+0.012, +0.123] | 0.035 |
+| detection recall | +0.052 [-0.012, +0.135] | 0.297 | +0.032 [-0.007, +0.080] | 0.154 |
+| wrong, not asked, per 100 gold (exact_lenient) | -1.62 [-4.01, +0.54] | 0.306 | -6.98 [-12.00, -2.60] | 0.015 |
+| wrong, not asked, per 100 gold (notation-neutral) | -1.70 [-4.03, +0.33] | 0.223 | -7.23 [-12.12, -3.06] | 0.004 |
+| wrong, not asked, per 100 gold (spoken-equal) | -2.85 [-5.05, -0.75] | 0.087 | -5.40 [-8.36, -2.45] | 0.007 |
+
+Under reading A the differences are -0.004 (-0.073 to +0.069, p = 0.557) against Opus and +0.029
+(-0.040 to +0.096, p = 0.676) against Haiku; wrong, not asked, against Opus is -2.89 (-5.95 to -0.47,
+p = 0.022). No interval for exact_lenient against Opus excludes zero under any reading. The p-values are
+descriptive; none of the comparisons is registered, and the set was used to tune the pipeline.
+
+### Where the misses are (reading B, exact_lenient, n = 25 papers, 2,350 gold each)
+
+The same buckets as above (`scripts/dev_miss_places.py`, which reproduces the baseline's ReadableSTEM and
+Haiku counts exactly). Counts of gold equations, per 100 gold in brackets.
+
+| miss bucket | ReadableSTEM | Chatbot, Opus | Chatbot, Haiku |
+|---|---|---|---|
+| right | 1,727 (73.5) | 1,663 (70.8) | 1,585 (67.4) |
+| in tables and figures (any failure) | 180 (7.7) | 173 (7.4) | 252 (10.7) |
+| inline span edges (running text) | 90 (3.8) | 65 (2.8) | 71 (3.0) |
+| short inline expressions in running text, not found (1 to 3 symbols) | 125 (5.3) | 153 (6.5) | 121 (5.1) |
+| other | 228 (9.7) | 296 (12.6) | 321 (13.7) |
+| misses, total | 623 (26.5) | 687 (29.2) | 765 (32.6) |
+
+| Opus chatbot, 25 papers | gold | right | scorer | span | recognition | no proposal | not found |
+|---|---|---|---|---|---|---|---|
+| running text and algorithm | 1,950 | 1,436 | 68 | 65 | 78 | 9 | 294 |
+| table | 223 | 97 | 7 | 6 | 17 | 0 | 96 |
+| figure (caption or panel) | 177 | 130 | 3 | 8 | 1 | 0 | 35 |
+
+Opus gets more table equations right than ReadableSTEM (97 of 223 against 86) and more of the aligned
+display equations (align-like 0.449 against 0.410, 78 gold). It does not find 294 of the 1,950
+running-text equations, against 171 for ReadableSTEM, which is where its larger "other" comes from (42
+display equations and 99 longer inline expressions not found, against 12 and 34). Its spans are cut too
+long 66 times and too short 13.
+
+### Spend
+
+The Opus arm cost **$7.4938** at list price, measured from the usage of the 19 recorded answers (87
+pages; estimate $5.22 at the script's per-page figure, cap $12.00, nothing refused by the cap). One line in
+`data/realworld/spend-log.jsonl` (arm `chatbot-opus-purdue`, part `dev`). The run was cut twice by an
+`APIConnectionError` and restarted by the script; a call lost that way is not recorded, so a partial answer
+billed by the provider and not recorded is possible and is not counted here. The re-scoring (three
+readings, reading A, the miss places) cost nothing. ReadableSTEM was not run again.
+
+### Limits of this section
+
+- 25 development papers the pipeline was tuned against: a baseline for this set, not an estimate for new
+  papers. One run of each arm; the models are not deterministic.
+- The Opus 6-paper figures in the baseline above come from the same recordings and are unchanged; this
+  section adds the other 19.
+- The interval for Opus (0.613 to 0.787) is wide because of papers where it drops whole running-text
+  equations; with 25 papers a difference of 3 points either way is within the interval.
+
+### Reproduce
+
+```
+R="uv run python scripts/realworld_run.py"
+$R chat --part dev --arm chatbot-opus-purdue --papers <the 19 ids> --max-usd 12 --workers 2
+uv run python scripts/realworld_report.py --part dev --tag base-0503 --rescore-chat --reading cells
+# add --neutral or --spoken, or drop --reading cells for reading A
+uv run python scripts/dev_miss_places.py --part dev --tag base-0503
+```

@@ -6,13 +6,14 @@
 <title>{% if current != "home" and title %}{{ title }} | ReadableSTEM demo{% else %}{{ title }}{% endif %}</title>
 <meta name="description" content="{% block description %}{{ description }}{% endblock %}">
 {% block head %}{% endblock %}
+<link rel="stylesheet" href="{{ root }}assets/tokens.css">
 <link rel="stylesheet" href="{{ root }}assets/site.css">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to the content</a>
 <header class="site-header">
   <div class="bar">
-    <a class="brand" href="{{ root }}index.html">ReadableSTEM <span class="visually-hidden">reviewer demo, home</span></a>
+    <a class="brand" href="{{ root }}index.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 9h8M8 13h5M8 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>ReadableSTEM <span class="visually-hidden">reviewer demo, home</span></a>
     <nav class="site-nav" aria-label="Site">
       <ul>
         {% for key, label, href in nav %}
@@ -26,18 +27,55 @@
 {% block content %}{% endblock %}
 </main>
 <footer class="site-footer">
-  <p>Made by <a href="{{ author_url }}">{{ author }}</a>. The code, and the text and code of this site, are under the MIT licence.
-    The OpenStax pages, figures and equations shown here are under
-    <a href="{{ cc_by }}">CC BY 4.0</a>; credits are on the
-    <a href="{{ root }}attribution/index.html">attribution page</a>.
-    <a href="{{ stemcheck_url }}">stemcheck</a> is a separate project, also MIT.</p>
-  <p>This is a demonstration. ReadableSTEM assists a person who makes course material
-    accessible. It does not certify anything. It is not affiliated with or endorsed by
-    OpenStax.</p>
-  <p><a href="{{ app_url }}">readablestem.com</a> ·
-    <a href="{{ repo_url }}">Source repository</a> ·
-    <a href="{{ repo_url }}/blob/main/README.md">README</a> ·
-    <a href="{{ repo_url }}/blob/main/PROOF.md">PROOF.md</a></p>
+  <div>
+    <nav aria-label="Footer" class="footer-cols">
+      <div>
+        <h2>Product</h2>
+        <ul>
+          <li><a href="{{ app_url }}/">readablestem.com</a></li>
+          <li><a href="{{ app_url }}/demo">Demo</a></li>
+          <li><a href="{{ app_url }}/help/posting">Posting in your course</a></li>
+          <li><a href="{{ root }}examples/index.html">Worked examples</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Trust</h2>
+        <ul>
+          <li><a href="{{ app_url }}/privacy">Privacy</a></li>
+          <li><a href="{{ app_url }}/terms">Terms</a></li>
+          <li><a href="{{ app_url }}/limits">Known limits</a></li>
+          <li><a href="{{ app_url }}/for-accessibility-offices">For accessibility offices</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Guides</h2>
+        <ul>
+          <li><a href="{{ app_url }}/guides">All guides</a></li>
+          <li><a href="{{ app_url }}/guides/ada-title-ii-stem-course-materials">ADA Title II guide</a></li>
+          <li><a href="{{ app_url }}/guides/readablestem-mathpix-latexml">Compared with other tools</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Source</h2>
+        <ul>
+          <li><a href="{{ repo_url }}">Source repository</a></li>
+          <li><a href="{{ repo_url }}/blob/main/README.md">README</a></li>
+          <li><a href="{{ repo_url }}/blob/main/PROOF.md">PROOF.md</a></li>
+          <li><a href="{{ root }}method/index.html">Method and limits</a></li>
+        </ul>
+      </div>
+    </nav>
+    <div class="footer-legal">
+      <p>Made by <a href="{{ author_url }}">{{ author }}</a>. The code, and the text and code of this site, are under the MIT licence.
+        The OpenStax pages, figures and equations shown here are under
+        <a href="{{ cc_by }}">CC BY 4.0</a>; credits are on the
+        <a href="{{ root }}attribution/index.html">attribution page</a>.
+        <a href="{{ stemcheck_url }}">stemcheck</a> is a separate project, also MIT.</p>
+      <p>This is a demonstration. ReadableSTEM assists a person who makes course material
+        accessible. It does not certify anything. It is not affiliated with or endorsed by
+        OpenStax.</p>
+    </div>
+  </div>
 </footer>
 </body>
 </html>

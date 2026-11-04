@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import re
 import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -145,6 +146,14 @@ def _utc_text(value: datetime | None) -> str:
     return f"{value.day} {value:%b %Y, %H:%M} UTC" if value else ""
 
 
+def _speakable(text: str | None) -> str:
+    """A spoken reading to show, or "" when the text is not one. Speech is words ("v equals d
+    over t"); a string with a backslash, braces, a caret or an underscore is LaTeX that stood
+    in for a reading, and the review screen must never present that as what a person hears."""
+    value = (text or "").strip()
+    return "" if not value or re.search(r"[\\{}^_]", value) else value
+
+
 def _utc(value: datetime | None) -> Markup:
     """A time for the page body: `<time datetime>` saying it in UTC, which app.js rewrites
     in the reader's own time zone ("Fri, Oct 9, 6:32 PM CDT (in 23 hours)"); without
@@ -174,6 +183,7 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     env.filters["utc"] = _utc
     env.filters["utc_text"] = _utc_text
     env.filters["usd"] = _usd
+    env.filters["speakable"] = _speakable
     # /static/app.<hash>.css, cached for a year (jinja2 types `globals` as its own defaults)
     env.globals["static_url"] = static_url  # ty: ignore[invalid-assignment]
     # Absolute address for link previews (og:image and og:url must be absolute); empty in
