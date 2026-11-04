@@ -705,7 +705,7 @@ table of a TeX paper now has a second reader for the cells whose glyphs say they
    equation: a LaTeX typed into the table card's cell is replaced by the equation's reading when the page is written.
 
 Measured offline with the layout alone (`scripts/eq_span_edges.py`, [eval-equation-diagnostics.md](eval-equation-diagnostics.md),
-"Table-cell maths"): gold equations typed in floats found 657 to 908 of 2,153 over the five development and replay parts.
+"Table-cell maths"): gold equations typed in floats found 661 to 892 of 2,153 over the five development and replay parts.
 What the glyphs cannot see: a number set in maths mode in a text font (`0.50` in `0.50 kg`, `1.57 s`) has no glyph that says
 so. Revised uploads carry the equation like any inline equation (by its element), which moves when the table's cells do.
 

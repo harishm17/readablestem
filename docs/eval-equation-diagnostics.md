@@ -233,29 +233,31 @@ a figure or an algorithm: `in_float`) is the nearest the gold has to "typed in a
 
 | part | inline gold | recall (found) | gold in floats found | precision (predicted) | cell equations: predicted, aligned |
 |---|---|---|---|---|---|
-| dev2 (tuned on) | 2,153 | 0.814 to 0.844 (1,752 to 1,818) | 186 to 247 of 442 | 0.902 to 0.902 | 73, 67 (0.918) |
-| held-out | 1,739 | 0.780 to 0.819 (1,357 to 1,424) | 94 to 161 of 326 | 0.880 to 0.881 | 75, 68 (0.907) |
-| fresh2 | 1,555 | 0.767 to 0.803 (1,193 to 1,249) | 112 to 167 of 329 | 0.910 to 0.905 | 69, 61 (0.884) |
-| fresh3 | 1,637 | 0.725 to 0.751 (1,187 to 1,229) | 85 to 125 of 473 | 0.898 to 0.898 | 46, 42 (0.913) |
-| fresh4 | 1,513 | 0.658 to 0.679 (996 to 1,028) | 180 to 208 of 583 | 0.931 to 0.892 | 83, 34 (0.410) |
-| held-out and fresh2 to 4 (replay only) | 6,444 | 0.734 to 0.765 (4,733 to 4,930) | 471 to 661 of 1,711 | 0.902 to 0.893 (5,245 to 5,518) | 273, 205 (0.751) |
+| dev2 (tuned on) | 2,153 | 0.810 to 0.839 (1,745 to 1,806) | 186 to 242 of 442 | 0.898 to 0.898 | 67, 62 (0.925) |
+| held-out | 1,739 | 0.780 to 0.818 (1,357 to 1,423) | 94 to 160 of 326 | 0.880 to 0.881 | 74, 67 (0.905) |
+| fresh2 | 1,555 | 0.752 to 0.785 (1,170 to 1,220) | 116 to 165 of 329 | 0.892 to 0.889 | 61, 54 (0.885) |
+| fresh3 | 1,637 | 0.725 to 0.751 (1,187 to 1,230) | 85 to 126 of 473 | 0.892 to 0.893 | 47, 43 (0.915) |
+| fresh4 | 1,513 | 0.660 to 0.675 (998 to 1,021) | 180 to 199 of 583 | 0.933 to 0.905 | 58, 25 (0.431) |
+| held-out and fresh2 to 4 (replay only) | 6,444 | 0.731 to 0.759 (4,712 to 4,894) | 475 to 650 of 1,711 | 0.897 to 0.891 (5,254 to 5,494) | 240, 189 (0.788) |
 
 Only dev2 was read to build the rule. Overall precision of the predicted inline equations falls on one part, fresh4
-(0.931 to 0.892), and the reason is one paper: 2309.04589 sets 39 results as `68.8±0.7`, whose gold types only the
+(0.933 to 0.905), and the reason is one paper: 2309.04589 sets 39 results as `68.8±0.7`, whose gold types only the
 plus-or-minus sign (`68.8$\pm$0.7`), so each cell is a formula for a reader and none for the gold; they are 39 of the 49
-unaligned cell equations of that part. The cells have real maths glyphs (the sign is in a maths font): the precision is
+unaligned cell equations of that part (33 of 58 predictions here). The cells have real maths glyphs (the sign is in a maths font): the precision is
 against the gold's typing, not against what a reader needs. The other unaligned cell equations are a few per paper (a
-number with a star or a bracket: `6.09e-03⋆`, `Ca∗[-]`). Papers whose predictions change: dev2 9 of 25, held-out 5 of 15,
-fresh2 6, fresh3 4, fresh4 7.
+number with a star or a bracket: `6.09e-03⋆`, `Ca∗[-]`). A glyph now belongs to one cell and a cell is an equation only when its glyphs spell its own text (before: 73 cells on dev2, one
+with a glyph of its neighbour's `p<0.05` in `65.1±0.4p`).
 
-Layout identity, 148 PDFs of `scripts/layout_identity.py`, before and after, no model: 147 identical, 1 different
-(`tests/fixtures/layout/latex/beamer_columns_table.pdf`: 6 equation elements added for 6 of the table's 8 maths cells,
-no element lost; the letters and digits of every page are equal). The other TeX tables of the repository have no cell
-whose glyphs say it is maths, so nothing in them moves.
+Layout identity, 148 PDFs of `scripts/layout_identity.py`, before and after, no model: two differ, both TeX-made and both
+because their tables gain cell equations (`beamer_columns_table.pdf`: 6 equation elements for 6 of the table's 8 maths cells;
+`real-tables/2407.13734.pdf`: 4 elements). The comparison was made against a snapshot of the previous change taken before
+its edge rules were gated on a TeX producer, so a third PDF (`real-tables-heldout/2311.16525.pdf`) showed up too: its producer
+is not one `page_type.producer_hint` calls TeX, so the gate returns it to the main-branch output. No element lost, the letters
+and digits of every page equal.
 
 Not measured here: whether the equation step reads these cells right (it needs a model: they go through the same step,
-checks and review as any inline equation), the cost (one model call per cell equation, at most 60 a table: the 346 cells
-of the five parts are about 4 a paper) and the effect on exact and spoken-equal scores.
+checks and review as any inline equation), the cost (one model call per cell equation, at most 60 a table: the 307 cells
+of the five parts are about 3.6 a paper) and the effect on exact and spoken-equal scores.
 
 ## Limits
 

@@ -8,10 +8,10 @@
   the table step wrote that cell as text (`pipeline/table_math.py`, `assemble.render_html`); a cell the model already
   wrote as maths, a failed reading and a table kept as a picture are left as they are. With tables off, `run.py` drops
   the cell equations. docs/tables.md "Maths cells from glyphs".
-- Measured offline (layout alone, no model): gold equations typed in a float found 657 to 908 of 2,153 over the five
-  development and replay parts; overall inline recall 0.734 to 0.765 on held-out and fresh2 to 4 (6,444 gold), precision
-  0.902 to 0.893 (one paper, `68.8±0.7`, holds most of the fall); 147 of 148 layout-identity PDFs identical, the one
-  that differs is the Beamer table deck (6 equation elements added, no text lost).
+- Measured offline (layout alone, no model): gold equations typed in a float found 661 to 892 of 2,153 over the five
+  development and replay parts; overall inline recall 0.731 to 0.759 on held-out and fresh2 to 4 (6,444 gold), precision
+  0.897 to 0.891 (one paper, `68.8±0.7`, holds most of the fall); 146 of 148 layout-identity PDFs identical, the two
+  that differ are TeX-made (the Beamer table deck gains 6 equation elements, `real-tables/2407.13734` 4; no text lost).
 - `scripts/eq_span_edges.py` also counts the cell equations (predicted, aligned to a gold equation).
 - Tests: `tests/test_table_math.py`; `tests/test_layout_beamer_math.py` (the table-cell test now asserts the equation
   elements; the inline count of the table deck stays a strict xfail: its two cells with a number set in maths mode and a
