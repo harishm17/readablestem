@@ -146,7 +146,7 @@ def test_the_landing_page_summarises_without_overclaiming(pages):
     assert "26 documents the tool had never seen" in landing and "1,715 equations" in landing
     assert "a test set up before it ran, 4 November 2026, version 0.5.9" in landing
     assert "0.62 against 0.50" not in landing and "chatbot ahead" not in landing
-    assert "All results, including earlier tests" in landing
+    assert "with all results including earlier tests" in landing
     assert "beat" not in landing.lower().replace("beats", "")
     limits = squash(pages["/limits"])
     assert "about half (0.50) against 0.62 for the chatbot" in limits  # the history stays there

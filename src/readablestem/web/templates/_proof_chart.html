@@ -44,7 +44,8 @@
     </div>
     {% endfor %}
   </div>
-  <table class="visually-hidden">
+  <div class="visually-hidden">
+  <table>
     <caption>ReadableSTEM, the chatbot on Opus and the chatbot on Haiku, on {{ proof_facts.set_label }}: {{ proof_facts.pipeline }}, run recorded {{ proof_facts.date }}</caption>
     <thead>
       <tr><th scope="col">Measure</th>{% for line in proof_facts.chart[0].lines %}<th scope="col">{{ line.system }}</th>{% endfor %}</tr>
@@ -55,6 +56,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   <figcaption>
     <p>26 documents the tool had never seen (arXiv papers, textbook sections, course notes),
       1,715 equations, a test set up before it ran, 4 November 2026, version 0.5.9
@@ -76,8 +78,9 @@
       <tr><th scope="row">Figure descriptions a model judge found contradicting the picture</th><td>{{ t.errors_ours }}</td><td>{{ t.errors_chatbot }}</td></tr>
     </tbody>
   </table>
-  <p class="chart-source">The judge is a model, not yet checked against people.
-    <a href="/limits#accuracy">All results, including earlier tests, and how they were measured</a>.</p>
+  <p class="chart-source">The judge is a model, not yet checked against people.</p>
   {% endif %}
+  <p class="chart-source"><a href="/limits#accuracy">Evidence: the four measures, how each was
+    measured and what they do not show, with all results including earlier tests</a>.</p>
 </figure>
 {% endmacro %}

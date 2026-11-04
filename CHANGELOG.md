@@ -18,9 +18,16 @@
   before the table, and LaTeX source in the Inputs cell; the landing, limits, ADA, offices and
   privacy pages name LaTeX source under the same flag. The guides index gives each guide an
   audience line.
-- Landing: one opening paragraph, a one-line sign-in hint, and the four measures with their
-  methods are behind one evidence link to `/limits`; the headline result is stated as the
-  registered report words it.
+- Landing: a headline, one line, the real before/after, a comparison chart (ReadableSTEM, the Opus
+  chatbot and the Haiku chatbot on the newest registered test, drawn from
+  `data/realworld/results-fresh5.json` by `web/proof_facts.py`, with a data table behind it, and the
+  first test's heading and figure counts), three lines on what it handles, and the questions
+  folded; under half the words shown before. The earlier chatbot-ahead result is history on
+  `/limits`, in PROOF.md and the README, not on the landing or comparison pages. The same chart
+  is on the comparison guide and the offices page (`_proof_chart.html`).
+- Long public pages (offices, privacy, terms, limits, the ADA guide, posting help, the comparison
+  guide) open with a summary or table and fold their detail into disclosures under the same
+  headings.
 - Demo: the note above the paper is two short paragraphs with the licence, original page and the
   Teacher Support explanation in a disclosure (the committed demo file carries the new note; the
   conversion itself is unchanged).

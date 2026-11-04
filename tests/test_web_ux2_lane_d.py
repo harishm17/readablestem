@@ -372,3 +372,45 @@ def test_the_demo_note_is_short_and_keeps_the_licence_and_the_teacher_support_no
     assert "Teacher Support" in note.split("<details>", 1)[1]
     assert note.count("Teacher Support") == 1  # explained once
     assert "AGPL" not in note
+
+
+# ------------------------------------------------------------- the comparison chart
+
+
+@pytest.mark.parametrize("path", ["/", seo.COMPARE_GUIDE, offices.PAGE_PATH])
+def test_the_chart_is_one_shared_component_with_the_numbers_in_a_real_table(tmp_path, path):
+    page = get(tmp_path, path)
+    assert page.count('class="proof-chart"') == 1  # the patterns are defined once per page
+    chart = page.split('<figure class="proof-chart"', 1)[1].split("</figure>", 1)[0]
+    # The bars are for the eye; the same numbers are a table a screen reader always reads.
+    assert '<div class="chart" aria-hidden="true">' in chart
+    hidden = chart.split('<div class="visually-hidden">', 1)[1].split("</table>", 1)[0]
+    assert "<caption>" in hidden and hidden.count('<th scope="row">') == 6
+    assert "0.840" in hidden and "$0.068" in hidden and "never asks" in hidden
+    # Every bar has its system's name and number beside it, and no style attribute (the CSP).
+    assert chart.count('class="chart-name"') == chart.count('class="chart-value"') == 18
+    assert " style=" not in chart
+    assert "ReadableSTEM and the Opus chatbot are" in " ".join(text_of(chart).split())
+    assert "level" in text_of(chart) and "beat" not in text_of(chart).lower()
+    assert "26 documents the tool had never seen" in text_of(chart)
+
+
+def test_the_chart_is_not_on_pages_that_do_not_need_it(tmp_path):
+    for path in ("/privacy", "/terms", "/status", "/guides"):
+        assert "proof-chart" not in get(tmp_path / path[1:], path)
+
+
+def test_the_earlier_chatbot_ahead_result_is_history_not_a_headline(tmp_path):
+    for path in ("/", seo.COMPARE_GUIDE):
+        text = text_of(get(tmp_path / path[-5:].strip("/") or "x", path))
+        assert "0.62 against 0.50" not in text and "chatbot ahead" not in text, path
+    limits = text_of(get(tmp_path / "limits", "/limits"))
+    assert "about half (0.50) against 0.62 for the chatbot" in limits  # kept as history there
+    assert "Earlier results, kept as history" in limits
+
+
+def test_the_chart_css_has_forced_colour_and_phone_rules():
+    css = (STATIC / "app.css").read_text(encoding="utf-8")
+    chart = css.split("The comparison chart (templates/_proof_chart.html)", 1)[1]
+    assert "@media (max-width: 39.99rem)" in chart and "forced-colors: active" in chart
+    assert "url(#chart-hatch)" in chart and "url(#chart-dots)" in chart  # not colour alone
