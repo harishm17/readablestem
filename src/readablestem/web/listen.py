@@ -899,6 +899,7 @@ def hear_for(
     heading_level: int | None = None,
     heading_text: str | None = None,
     text_layer: str = "",
+    mathml: str | None = None,
 ) -> Hear | None:
     """The spoken forms of a decision's proposal, or None when it has none worth playing
     (a table, a paragraph, an equation with no reading). The equation's reading is the
@@ -906,6 +907,14 @@ def hear_for(
     .read_text_layer`, the same speech rules applied to the text layer."""
     if kind == "equation":
         said = speakable(speech)
+        if not said and mathml:
+            # No stored reading (or one that is LaTeX): speak the MathML, as the transcript does.
+            from readablestem.pipeline.speech import SpeechError, mathml_to_speech
+
+            try:
+                said = speakable(mathml_to_speech(mathml))
+            except (SpeechError, ValueError):
+                said = ""
         if not said:
             return None
         from readablestem.web.speech_diff import read_text_layer

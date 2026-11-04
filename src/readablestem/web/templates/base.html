@@ -35,6 +35,7 @@
   <link rel="preload" href="/static/vendor/fonts/source-sans-3-5.3.1-latin-700.woff2" as="font" type="font/woff2" crossorigin>
   {% block font_preload %}{% endblock %}
   <link rel="stylesheet" href="{{ static_url('tokens.css') }}">
+  <link rel="stylesheet" href="{{ static_url('controls.css') }}">
   <link rel="stylesheet" href="{{ static_url('app.css') }}">
   <script src="/static/vendor/htmx-2.0.11.min.js" integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg" defer></script>
   <script src="{{ static_url('app.js') }}" defer></script>
@@ -115,6 +116,7 @@
           <li><a href="/limits">Known limits</a></li>
           <li><a href="/help/posting">Posting in your course</a></li>
           <li><a href="/status">Service status</a></li>
+          <li><a href="/for-accessibility-offices">For accessibility offices</a></li>
           <li><a href="/guides">Guides</a></li>
           {% if feedback_url %}
           <li><a href="{{ feedback_url }}">Send feedback</a></li>
@@ -122,8 +124,11 @@
           <li><a href="mailto:{{ contact_email }}?subject=ReadableSTEM%20feedback">Send feedback by email</a></li>
           {% endif %}
           <li><a href="{{ source_url }}">Source code</a></li>
+          <li><a href="/terms#open-source">Open source</a></li>
         </ul>
       </nav>
+      <p class="footer-note">Built and maintained by <a href="https://harishmanoharan.com/?ref=readablestem">Harish Manoharan</a>.
+        <a href="{{ source_url }}">Open source</a>{% if contact_email %} · <a href="mailto:{{ contact_email }}">Contact</a>{% endif %}</p>
     </div>
   </footer>
   {% else %}

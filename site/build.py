@@ -1126,6 +1126,7 @@ def build_site(out_dir: Path, *, proof_path: Path | None = None) -> list[str]:
     out.put("assets/site.css", (SITE_DIR / "assets" / "site.css").read_text(encoding="utf-8"))
     tokens, fonts = site_tokens()
     out.put("assets/tokens.css", tokens)
+    out.put("assets/controls.css", (APP_STATIC / "controls.css").read_text(encoding="utf-8"))
     for name in fonts:
         out.put(f"assets/fonts/{name}", (APP_FONTS / name).read_bytes())
     out.put("assets/converted.css", converted_css(examples))
