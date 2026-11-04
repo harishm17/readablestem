@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: display grouping (branch eq/display-grouping)
+
+- Pipeline 0.5.10 (0.5.9 is the glyph-reconcile branch; the two do not depend on each other).
+  Layout joins pieces of one printed display: two formulas with a connective word between them
+  ("P_A = ... and P_B = ...", "0 < p < 1 for all i") are one display element holding the word and
+  the one equation number, where the word was a paragraph read after both equations; the right
+  half of a long aligned row and a row that starts with "=" join the display above them; a
+  trailing ellipsis ("j = 1, 2, 3, ...", "0 > s_1 > s_2 > ...") stays in an inline formula.
+  Conservative: any other word, two numbered equations, or a fraction far from the row keep the old
+  reading. `docs/layout.md` "One printed display, one element"; `scripts/layout_identity.py` lists
+  what changed on 149 repository PDFs and the development, fresh and held-out papers.
+
 ## Unreleased: equation findings of the 0.5.7 baseline (branch eq/fix-0507-findings)
 
 - Pipeline 0.5.8. arXiv PDFs built by arXiv's own `tex2pdf` ("arXiv GenPDF (tex2pdf:...)") and VTeX

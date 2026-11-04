@@ -112,8 +112,8 @@ def convert(s: Settings | None = None, **kw):
 
 
 def test_the_pipeline_version_records_the_content_features(recorder):
-    assert run.PIPELINE_VERSION == "0.5.8"
-    assert convert().result.pipeline_version == "0.5.8"
+    assert run.PIPELINE_VERSION == "0.5.10"
+    assert convert().result.pipeline_version == "0.5.10"
 
 
 def test_options_default_to_the_settings_flags_in_every_step(recorder):

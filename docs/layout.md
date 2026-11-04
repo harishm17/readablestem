@@ -583,6 +583,40 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   other side of the bar gets the reason `"half a fraction"` (`_flag_half_fractions`). The
   equation step adds the warning `equation.region: half_fraction`, holds the confidence
   under the accept bar and never accepts without a decision.
+- **One printed display, one element (pipeline 0.5.10).** Three patterns cut one printed
+  formula into several elements, and each is joined on evidence from the page; anything less
+  clear keeps the old behaviour.
+  1. *Two formulas and a word.* "P_A = ... and P_B = ...", "0 < p < 1 for all i": a connective
+     (`_CONNECTIVES`: and, or, for, for all/any/every/each, where, with, if, when, otherwise)
+     alone in its row, between two formulas on its line. `_join_connectives` joins the formula
+     before it (a whole equation) and the one after it (a whole equation, or after "for" a
+     condition of three glyphs or fewer) when both reach it within `CONNECTIVE_GAP` (9 font
+     sizes) and the word sits at the height of their middle (a fraction's bar); the word becomes
+     a maths row, so the crop, the text layer and the reading hold it, and the display's one
+     number (at the right margin) belongs to it. A row that is one line of text and holds only
+     this (`_joined_formulas`: one connective, a relation with something on both sides of it,
+     the rest maths; "P(A) = 1 and P(B) = 2,") is a display row too. Any other word
+     ("where we assume", "Let x = 1 and y = 2") leaves the row as text; two numbered equations
+     are never joined. Before, the word was a paragraph read after both equations and an
+     inline "and" row was two inline equations.
+  2. *The right half of a long row.* Lines are stacked top to bottom, so a long second row
+     whose right half is a bare fraction (no main row on the baseline to chain it) opened a
+     region of its own beside the row above, and the row's left pieces, starting with "=",
+     joined that one. `_merge_continued_regions` joins a region whose leftmost top line starts
+     with a relation or operator to the display above it (within the line gap, `MAX_LINE_GAP`
+     x 1.5, or overlapping it: limits and numerators hang below), and a region whose line
+     starts level with, and at most `MAX_COLUMN_GAP` sizes to the right of, a line of another
+     (one of the two not a whole equation). Two numbered displays are never merged.
+  3. *A trailing ellipsis.* `_trim_run` kept the dots of "j = 1, 2, 3, ..." and
+     "0 > s_1 > s_2 > ..." out of the inline formula as a full stop; three dots after a comma
+     or a relation or operator (`_trailing_ellipsis`) stay in it. Four dots are an ellipsis
+     and the sentence's full stop, and the full stop still goes.
+
+  Not done, and why: aligned rows that the gold writes one by one stay one element with rows
+  (that is the form a screen reader reads best, and `scripts/rw_spoken.py` scores it per
+  row); a display set with function names in a text font (`PMI`, `Unif` in Times) is still
+  cut at the word, and an equation number set above the first row of a tall display is still
+  an element of its own.
 - **Inline maths split or merged (T2-6).** A middle dot `·` or `∙` in the text font (Chromium
   prints a product so) is an operator, so a run goes on through it. A blank in a text font
   between maths-font glyphs ends the run (`_between_formulas`): Chromium puts the spaces
