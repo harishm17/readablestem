@@ -1640,7 +1640,7 @@ From top to bottom:
    one real run) the card has 7 rows and its first example is Equation 2.4: "capital
    delta d capital delta t period" against "capital delta bold d over capital delta t".
 6. **Results**: what was found, and decisions as the one unit everywhere (MF6, T1-3,
-   T1-11): "Decisions to make" and "Decisions you made", counted as on the review
+   T1-11): "Decisions to make" and "Decisions made" ("Decisions still open" for a person who can only view it), counted as on the review
    screen and in My documents (a group of repeated headings is one decision). A heading
    made bold text is a decision, never "shown as an image" (`job_page.shown_as_image`),
    so a job whose decisions are done is "Ready to share". Items are not counted, and

@@ -328,6 +328,25 @@ def test_the_questions_work_without_javascript(site, browser):
 # --------------------------------------------------------------------------- the list
 
 
+def test_the_list_refreshes_in_place_and_keeps_focus(site, browser):
+    """While a document converts, htmx swaps the list when something changed; the link
+    that had focus has it again afterwards, and the tab title follows the count."""
+    context = browser.new_context()
+    page = context.new_page()
+    sign_in(page, site.base, BOB)
+    job_id = upload_pdf(page, site.base)
+    page.goto(f"{site.base}/app")
+    assert page.title() == "My documents (0 of 1 finished) | ReadableSTEM"
+    delete = page.locator(f"#del-{job_id}")
+    delete.focus()
+    assert site.run_worker() == job_id
+    page.wait_for_function("() => document.title === 'My documents | ReadableSTEM'", timeout=15000)
+    assert "decisions to make" in page.locator("#documents").inner_text()
+    assert page.evaluate("document.activeElement.id") == f"del-{job_id}"
+    assert page.locator("#documents[hx-get]").count() == 0  # nothing left to wait for
+    context.close()
+
+
 def test_a_refreshed_list_keeps_the_readers_time_zone(site, browser):
     """The list swapped in by htmx shows times in the reader's zone, as the first render does
     (the server only knows UTC; app.js rewrites both)."""
@@ -348,23 +367,4 @@ def test_a_refreshed_list_keeps_the_readers_time_zone(site, browser):
     for index in range(times.count()):
         shown = times.nth(index).inner_text()
         assert "UTC" not in shown and re.search(r"\b(CDT|CST)\b", shown), shown
-    context.close()
-
-
-def test_the_list_refreshes_in_place_and_keeps_focus(site, browser):
-    """While a document converts, htmx swaps the list when something changed; the link
-    that had focus has it again afterwards, and the tab title follows the count."""
-    context = browser.new_context()
-    page = context.new_page()
-    sign_in(page, site.base, BOB)
-    job_id = upload_pdf(page, site.base)
-    page.goto(f"{site.base}/app")
-    assert page.title() == "My documents (0 of 1 finished) | ReadableSTEM"
-    delete = page.locator(f"#del-{job_id}")
-    delete.focus()
-    assert site.run_worker() == job_id
-    page.wait_for_function("() => document.title === 'My documents | ReadableSTEM'", timeout=15000)
-    assert "decisions to make" in page.locator("#documents").inner_text()
-    assert page.evaluate("document.activeElement.id") == f"del-{job_id}"
-    assert page.locator("#documents[hx-get]").count() == 0  # nothing left to wait for
     context.close()

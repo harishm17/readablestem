@@ -1,4 +1,4 @@
-"""The account's "Keep my documents for 7 days by default" and the job page's retention line.
+"""The account's "Keep new documents for 7 days by default" and the job page's retention line.
 
 The setting is remembered on the account (`users.keep_week_default`) and only sets the starting
 state of the upload form's 7-day box: each upload still decides, and the job page says, near the
@@ -51,7 +51,7 @@ def save(env, on: bool):
 def test_the_setting_is_off_by_default_and_the_box_starts_unticked(web):
     assert stored(web) is False
     account = web.browser.get("/account").text
-    assert "Keep my documents for 7 days by default" in account
+    assert "Keep new documents for 7 days by default" in account
     assert "checked" not in re.search(r'<input type="checkbox" id="keep-default"[^>]*>', account)[0]
     assert "checked" not in keep_box(web.browser.get("/app").text)
 

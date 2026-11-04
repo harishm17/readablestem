@@ -105,7 +105,7 @@ def test_the_upload_form_has_two_separate_choices_both_off(ux):
         assert label in html
         tag = re.search(rf'<input[^>]*id="{box}"[^>]*>', html)
         assert tag and "checked" not in tag.group(0)
-    assert "<legend>How long to keep my document</legend>" in html
+    assert "<legend>How long to keep it, and who may look</legend>" in html
 
 
 @pytest.mark.parametrize(
@@ -178,9 +178,7 @@ def test_keep_7_more_days_on_the_job_page(ux):
     job = stored_job(ux)
     assert (job.retention_mode, job.opt_in_retention) == ("week", False)
     assert timedelta(days=6, hours=23) < retain_in(ux) <= timedelta(days=7)
-    assert "kept for 7 days, and only you and the people you share it with can see it" in text_of(
-        page(ux)
-    )
+    assert "7 days after you last work on it" in text_of(page(ux))
 
 
 def test_a_developer_look_job_is_not_offered_more_days(ux):
@@ -418,11 +416,11 @@ def test_no_model_cost_or_internal_codes_on_the_job_page(ux):
 
 def test_the_job_page_counts_decisions_and_nothing_else(ux):
     text = text_of(page(ux))
-    assert "Decisions to make 3" in text and "Decisions you made 0" in text
+    assert "Decisions to make 3" in text and "Decisions made 0" in text
     assert "Accepted for you" not in text and "Of the" not in text
     decide(ux, GROUP, action="reject")
     text = text_of(page(ux))
-    assert "Decisions to make 2" in text and "Decisions you made 1" in text
+    assert "Decisions to make 2" in text and "Decisions made 1" in text
 
 
 def test_the_list_view_has_no_codes_or_confidence_and_no_model_cost(ux):

@@ -184,7 +184,7 @@ def test_passing_checks_are_summarised_and_old_results_show_none(web):
 def test_a_reviewers_accept_counts_as_reviewed_not_as_automatic(web):
     job_id = convert(web)
     before = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "results-heading"))
-    assert "Decisions to make 3" in before and "Decisions you made 0" in before
+    assert "Decisions to make 3" in before and "Decisions made 0" in before
     page = web.browser.get(f"/jobs/{job_id}/review").text
     token = re.search(r'name="csrf_token" value="([^"]+)"', page)
     assert token
@@ -193,7 +193,7 @@ def test_a_reviewers_accept_counts_as_reviewed_not_as_automatic(web):
     )
     assert response.status_code == 303
     after = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "results-heading"))
-    assert "Decisions to make 2" in after and "Decisions you made 1" in after
+    assert "Decisions to make 2" in after and "Decisions made 1" in after
     review = page_text(web.browser.get(f"/jobs/{job_id}/review/list").text)
     assert "Accepted by you" in review and "Accepted automatically" in review
 
@@ -214,7 +214,7 @@ def test_results_stored_before_the_reviewed_flag_still_load_and_count(web):
         ]
         job.result_json = stored
     text = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "results-heading"))
-    assert "Decisions to make 2" in text and "Decisions you made 2" in text
+    assert "Decisions to make 2" in text and "Decisions made 2" in text
 
 
 def test_fix_reviewed_defaults_to_false_for_stored_json():
