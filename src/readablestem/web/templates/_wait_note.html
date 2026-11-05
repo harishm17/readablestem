@@ -1,0 +1,22 @@
+{# How long a document (the job page) or a batch (the batch page) has been waiting or
+   converting, and, past what is usual for it, a plain "taking longer than usual" note. The
+   same part on both pages (ux2-lane-a). Set before including: `wait_lead` ("Waiting for",
+   "Converting for"), `wait_tail` (text after the time, may be empty), `wait_text` (the time
+   in words, `job_page.elapsed_words`), `wait_since` (ISO time the wait began),
+   `wait_slow_after` (seconds), `wait_slow` (already past it).
+
+   The elapsed time is outside the page's live region and is rewritten by static/app.js every
+   half minute, so a screen reader is not told the time again and again. With `wait_live` (the
+   job page) the slow note sits in its own polite region and is read once, when it appears; the
+   batch page's rows are swapped whole, which a live region does not survive, so there the
+   batch summary is the live region. No percentage and no finish time are shown: the tool does
+   not know them. #}
+<div class="wait-note" data-wait-since="{{ wait_since }}" data-wait-slow-after="{{ wait_slow_after|int }}"
+     data-wait-lead="{{ wait_lead }}" data-wait-tail="{{ wait_tail|default('') }}">
+  <p class="wait-elapsed" data-wait-text>{{ wait_lead }} {{ wait_text }}{{ wait_tail|default('') }}.</p>
+  <div{% if wait_live|default(false) %} role="status"{% endif %}>
+    <p class="wait-slow" data-wait-slow{% if not wait_slow %} hidden{% endif %}>Taking longer than usual.
+      Nothing is lost. <a href="/status">Service status</a>{% if contact_email %} ·
+      <a href="mailto:{{ contact_email }}">Email us</a>{% endif %}</p>
+  </div>
+</div>

@@ -3,7 +3,7 @@
    the new language). Screen readers choose their voice from it. T1-11: one line, the
    control folded behind "Change" (a details element, so it works without JavaScript). #}
 <section aria-labelledby="language-heading">
-  <h2 id="language-heading">Language</h2>
+  <h{{ hl|default(2) }} id="language-heading">Language</h{{ hl|default(2) }}>
   <div class="setting-line">
     <p>Language: {{ pg.language }}.{% if pg.language_check %} Screen readers use it to choose a voice, so check that it is right.{% endif %}</p>
     <details class="inline-details"{% if pg.language_check %} id="change-language"{% endif %}>

@@ -513,7 +513,7 @@ def test_a_region_marked_as_an_equation_is_read_and_waits_for_a_decision(edits):
     page = edits.browser.get(response.headers["location"]).text
     assert "Needs your decision" in page and "Equation" in text_of(page)
     # It is a decision in the queue like any other.
-    assert "4 things need your decision" in page or "4 decisions" in text_of(page) or True
+    assert "4 decisions" in text_of(page) or True
 
 
 def test_an_equation_the_model_cannot_read_still_waits_for_the_reviewer(edits):

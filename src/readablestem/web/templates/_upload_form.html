@@ -1,0 +1,200 @@
+{# The upload section of My documents (app.html): the file and its submit button together, the
+   options as two short groups that each say their current setting in one line and open to
+   change it (ux2-lane-a). `form_values`: what the person had set when a refusal sent the form
+   back, so nothing but the file has to be chosen again (routes/jobs.py `_upload_error_page`).
+   The error summary takes focus and links to the file chooser (or the scan box). The summaries
+   are written here for the first view and rewritten by static/app.js as boxes change. #}
+{% set fv = form_values|default(none) %}
+{% set revising = revises|default(none) %}
+{% set exam_on = fv.exam if fv else exam_default|default(false) %}
+{% set pages_on = fv.image_pages if fv else image_pages_default|default(false) %}
+{% set keep_on = fv.keep if fv else keep_default|default(false) %}
+{% set share_on = fv.share if fv else false %}
+{% set picked = chosen_course|default("") %}
+{% set course_name = (courses|selectattr("id", "equalto", picked)|map(attribute="name")|first|default("")) if courses else "" %}
+{% set course_error = field_errors.get("course") %}
+{# A group opens by itself when it holds a choice that is not its default, or an error. #}
+{% set open_convert = exam_on or pages_on or picked or course_error or open_convert|default(false) %}
+{% set open_keep = share_on or (fv and keep_on) %}
+<section aria-labelledby="upload-heading" id="upload">
+  {% if revising %}
+  {# T3-2: a new version of a document already converted. Its decisions carry over to the
+     items that have not changed (web/carry.py). #}
+  <h2 id="upload-heading">Upload a revised version</h2>
+  <p id="revises-note">A new version of <a href="/jobs/{{ revising.id }}">{{ revising.title }}</a>,
+    which stays as it is. Your decisions carry over to items that did not change.
+    <a href="/app#upload-heading">Convert a different PDF instead</a></p>
+  {% else %}
+  <div class="heading-row">
+    <h2 id="upload-heading">Convert a PDF</h2>
+    {# ux-lane-b: for someone who has documents, the sample is a compact link here. #}
+    {% if own_documents|default(false) and sample_available|default(false) %}
+    {% if sample_job %}
+    <a class="sample-link" href="/jobs/{{ sample_job }}">Practise on the sample</a>
+    {% else %}
+    <form method="post" action="/sample" class="inline-form sample-link">
+      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      <button type="submit" class="link-button">Practise on the sample</button>
+    </form>
+    {% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if spend_closed %}
+  {# The form would only send the whole file to be refused (UX review MF20): say when
+     uploads open again instead. `open_pool_closed`: only the budget set aside for new
+     accounts is used up. #}
+  <div class="notice notice-warning">
+    {% if open_pool_closed %}
+    <p><strong>Conversions for new accounts are paused for today.</strong> Uploads open again at {{ next_reset|utc }}. Documents already queued wait until then.</p>
+    {% else %}
+    <p><strong>Conversions are paused for today.</strong> Uploads open again at {{ next_reset|utc }}. Documents already queued wait until then.</p>
+    {% endif %}
+  </div>
+  {% elif pages_left == 0 %}
+  {# The same for this person's daily page limit (MF20): no form that can only fail. #}
+  <div class="notice" id="upload-closed" tabindex="-1">
+    <p><strong>You have converted all {{ page_quota }} pages {% if new_account %}a new account can convert{% else %}you can{% endif %} today.</strong>
+      Uploads open again at {{ next_reset|utc }}.</p>
+  </div>
+  {% else %}
+  {% set pdf_error = field_errors.get("pdf") %}
+  <form method="post" action="/jobs" enctype="multipart/form-data" novalidate class="upload-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    {% if revising %}<input type="hidden" name="revises" value="{{ revising.id }}">{% endif %}
+    <div class="field file-field{% if pdf_error %} field-error{% endif %}">
+      <label for="pdf">{% if revising %}PDF file{% else %}PDF files{% endif %}</label>
+      {# One fact a line, so it scans; the input's aria-describedby points at the block. #}
+      <div class="hint" id="pdf-hint">
+        <ul>
+          <li>{% if not revising %}Up to {{ max_files }} files, each {% endif %}up to {{ max_pages }} pages and {{ max_upload_mb }} MB.{% if office_kinds %}
+            Word{% if "pptx" in office_kinds %} and PowerPoint{% endif %} work too.{% endif %}</li>
+          {% if pages_left is not none %}
+          <li>{{ pages_left }} {{ "page" if pages_left == 1 else "pages" }} left today{% if new_account %}
+            (a new account can convert {{ page_quota }} pages a day){% endif %}; resets at {{ next_reset|utc }}.</li>
+          {% endif %}
+          <li>Your own materials only, with no student records.</li>
+        </ul>
+      </div>
+      <details class="more-detail" id="pdf-more">
+        <summary>More about file types and size</summary>
+        <ul>
+          {% if not revising %}
+          <li>Larger files (up to {{ source_pages }} pages, {{ upload_limit_mb }} MB) are kept so you choose the pages.</li>
+          {% endif %}
+          {% if office_kinds %}
+          <li>Word and PowerPoint become a PDF first; its page count applies.</li>
+          {% endif %}
+          {% if batch_zip and not revising %}
+          <li>A zip of PDFs and LaTeX projects works: each becomes a document ({{ max_files }} at a time).</li>
+          {% endif %}
+          {% if latex_source and not revising %}
+          <li>A LaTeX file (.tex) or project zip (up to 100 MB unpacked, 500 files) also works; every
+            3,000 characters or figure count as one page. Upload Beamer decks as PDF.</li>
+          {% endif %}
+        </ul>
+      </details>
+      {% if pdf_error %}
+      <p class="error-message" id="pdf-error"><span class="visually-hidden">Error: </span>{{ pdf_error.message }}</p>
+      {% endif %}
+      {# app.js checks the size and type as soon as a file is chosen and puts what is
+         wrong here, before anything is sent (UX review MF21). #}
+      <div id="pdf-check" aria-live="polite"></div>
+      <input type="file" id="pdf" name="pdf"{% if not revising %} multiple{% endif %}
+             accept="application/pdf,.pdf{% if latex_source and not revising %},.tex,.zip,application/zip{% elif batch_zip and not revising %},.zip,application/zip{% endif %}{% if "docx" in office_kinds %},.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document{% endif %}{% if "pptx" in office_kinds %},.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation{% endif %}"
+             {% if latex_source and not revising %}data-latex="1" {% endif %}{% if batch_zip and not revising %}data-zip="1" {% endif %}{% if office_kinds %}data-office="{{ office_kinds|join(' ') }}" data-office-what="{{ office_what }}" data-office-choose="{{ office_choose }}" {% endif %}data-max-bytes="{{ max_upload_mb * 1024 * 1024 }}" data-max-mb="{{ max_upload_mb }}"
+             data-limit-bytes="{{ upload_limit_mb * 1024 * 1024 }}" data-limit-mb="{{ upload_limit_mb }}"
+             data-max-files="{{ 1 if revising else max_files }}"
+             aria-describedby="pdf-hint{% if pdf_error %} pdf-error{% endif %}"{% if pdf_error %} aria-invalid="true"{% endif %}>
+    </div>
+    {# Only with LaTeX source on, and only for a zip that holds more than one main file. #}
+    {% if latex_source and not revising %}
+    <details class="more-detail main-file-detail"{% if fv and fv.main_file %} open{% endif %}>
+      <summary>Uploading a LaTeX project zip with more than one main file?</summary>
+      <div class="field">
+        <label for="main_file">Main file of a zip (only if it has more than one)</label>
+        <input type="text" id="main_file" name="main_file" maxlength="200" autocomplete="off"
+               value="{{ fv.main_file if fv else '' }}">
+      </div>
+    </details>
+    {% endif %}
+
+    {# Two groups, in the order they are decided. Each says its setting in one line; the
+       choices and their longer explanations open under it. #}
+    <div class="option-groups">
+      <details class="option-group conversion-options" id="group-convert" data-summary="join"{% if open_convert %} open{% endif %}>
+        <summary>
+          <span class="group-name">How to convert it</span>
+          <span class="group-change">Change</span>
+          <span class="group-state" id="convert-state" data-group-state>
+            {%- if courses %}{{ course_name or "No course" }} · {% endif -%}
+            {{ "Exam or quiz: figures described without answers" if exam_on else "Figures described normally" }}
+            {%- if image_pages_offered|default(false) %} · {{ "Scanned and handwritten pages converted" if pages_on else "Scanned pages kept as pictures" }}{% endif %}
+          </span>
+        </summary>
+        <div class="group-body">
+          {% include "_course_choice.html" %}
+          {# T1-14: exam mode. Per job (Job.exam_mode); the figure step then describes what is
+             shown and never the result. #}
+          <div class="field checkbox-field exam-choice">
+            <input type="checkbox" id="exam" name="exam" value="on"{% if exam_on %} checked{% endif %}
+                   data-on="Exam or quiz: figures described without answers" data-off="Figures described normally">
+            <label for="exam">Exam or quiz: describe figures without giving answers</label>
+          </div>
+          {# ADR 0007: scanned and handwritten pages are read from an image of the page when the
+             owner asks (Job.image_pages). Offered by FEATURE_IMAGE_PAGES; used only for a PDF the
+             server finds scanned or handwritten pages in. The first line is the rule: a PDF that
+             is only scans is refused without the box, a mixed one keeps its scanned pages as
+             pictures. #}
+          {% if image_pages_offered|default(false) %}
+          <div class="field checkbox-field image-pages-choice">
+            <input type="checkbox" id="image_pages" name="image_pages" value="on" aria-describedby="image-pages-hint"{% if pages_on %} checked{% endif %}
+                   data-on="Scanned and handwritten pages converted" data-off="Scanned pages kept as pictures">
+            <label for="image_pages">Convert scanned or handwritten pages</label>
+            <p class="hint" id="image-pages-hint">Needed for a PDF that is all scans or handwriting;
+              it is refused without it. In a mixed PDF, scanned pages stay pictures marked
+              “Not converted” unless you tick it. Slower; you check every converted equation
+              and table.</p>
+          </div>
+          {% endif %}
+        </div>
+      </details>
+
+      {# T1-8: two separate choices (UX review MF10 part 1). Neither ticked: deleted
+         `retention_hours` after the last activity. The privacy page (privacy.html) says the
+         same. One wording for the 7 days everywhere: "Keep for 7 days". #}
+      <details class="option-group retention-choices" id="group-keep" data-summary="retention"
+               data-text-default="Deleted {{ retention_hours }} hours after you last work on it."
+               data-text-keep="Deleted 7 days after you last work on it."
+               data-text-share="Kept {{ opt_in_days }} days. We may look at the results."{% if open_keep %} open{% endif %}>
+        <summary>
+          <span class="group-name">How long to keep it</span>
+          <span class="group-change">Change</span>
+          <span class="group-state" id="keep-state" data-group-state>
+            {%- if share_on %}Kept {{ opt_in_days }} days. We may look at the results.
+            {%- elif keep_on %}Deleted 7 days after you last work on it.
+            {%- else %}Deleted {{ retention_hours }} hours after you last work on it.{% endif -%}
+          </span>
+        </summary>
+        <div class="group-body">
+          <p class="hint">Uploads are never used to train models.</p>
+          <div class="field checkbox-field">
+            <input type="checkbox" id="keep"name="keep" value="on" aria-describedby="keep-who"{% if keep_on %} checked{% endif %}>
+            <label for="keep">Keep for 7 days</label>
+            <p class="hint" id="keep-who">{% if keep_default|default(false) %}Ticked by your <a href="/account#account-keep">account setting</a>.{% else %}<a href="/account#account-keep">Make this the default in Account</a>.{% endif %}</p>
+          </div>
+          <div class="field checkbox-field">
+            <input type="checkbox" id="share" name="share" value="on" aria-describedby="share-hint"{% if share_on %} checked{% endif %}>
+            <label for="share">Also let us look at the results ({{ opt_in_days }} days)</label>
+            <p class="hint" id="share-hint">To find and fix mistakes in the tool.</p>
+          </div>
+        </div>
+      </details>
+    </div>
+    <div class="submit-row">
+      <button type="submit" class="button">Upload and convert</button>
+      <p id="upload-status" class="upload-status" role="status"></p>
+    </div>
+  </form>
+  {% endif %}
+</section>

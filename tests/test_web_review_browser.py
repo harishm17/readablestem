@@ -157,6 +157,7 @@ def walk_states(page, site, job: str, check) -> None:
     assert "Your edit passed the required checks" in page.locator("#review-progress").inner_text()
     check("just edited")
 
+    page.locator("#acknowledge-p1-e2").check()  # what it means for students
     page.get_by_role("button", name="Keep without a description (figure 1)", exact=True).click()
     page.wait_for_url(f"{url}#item-*")
     check("just rejected")
@@ -319,7 +320,8 @@ def test_every_button_names_the_fix_or_group_it_acts_on(site, browser, job):
     }
     for item in ("equation 1", "equation 2", "figure 1", "heading 2", "heading 5"):
         reject = rejects.get(item, r"Make (bold|plain) text")
-        assert f"Save edit to {item}" in names
+        save = "Save and accept (figure 1)" if item == "figure 1" else f"Save edit to {item}"
+        assert save in names
         assert [n for n in names if re.fullmatch(rf"{reject} \({item}\)", n)], (item, names)
     assert "Accept equation 1" in names
     assert "Accept equation 2" not in names  # failed: nothing to accept
@@ -334,7 +336,7 @@ def test_every_control_has_a_visible_label(site, browser, job):
     for label in (
         "LaTeX for equation 1",
         "Alt text for figure 1",
-        "Decorative: it adds nothing a reader needs, so it gets no alt text",
+        "Decorative: adds nothing, so no alt text",
         "Level for heading 2",
     ):
         control = page.get_by_label(label).first
@@ -350,7 +352,7 @@ def test_every_control_has_a_visible_label(site, browser, job):
     # 6 LaTeX boxes, 4 alt text boxes, 4 "decorative" boxes, 5 heading levels and the
     # "Describe it in words" box of the one equation kept as an image (T3-16), and the two
     # fields of the decision filter (kind, page).
-    assert (controls, unlabelled) == (22, 0)
+    assert (controls, unlabelled) == (26, 0)  # with the figure's tick box and the filter
 
 
 def test_status_is_written_in_words_not_only_colour(site, browser, job):
@@ -391,6 +393,8 @@ def test_decisions_work_without_javascript(site, browser, job):
     url = review_url(site, job)
     page.goto(url)
     assert page.get_by_role("button", name=re.compile("^Accept (all|these)")).count() == 0
+    page.locator("#item-p3-e1 > details > summary").click()  # the rows are folded after the first
+    page.locator("#acknowledge-p3-e1").check()
     page.locator("#fix-p3-e1").get_by_role(
         "button", name="Keep without a description (figure 2)"
     ).click()

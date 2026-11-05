@@ -11,7 +11,10 @@
      button a second time (a one-line "Hear this").
    - State changes (playing, paused, stopped, which item) go to a polite status line; the item
      being spoken is not announced again, because the voice is already saying it.
-   - Motion follows prefers-reduced-motion. */
+   - Motion follows prefers-reduced-motion.
+   - Play starts at the lesson (past the title, notices and licence); "Play from the
+     beginning" starts at the first item. The transcript can be filtered; while it is,
+     Previous, Next and playing move through the items shown. */
 (function () {
   "use strict";
 
@@ -147,6 +150,14 @@
     var status = root.querySelector("[data-listen-status]");
     var position = root.querySelector("[data-listen-position]");
     var voiceNote = root.querySelector("[data-listen-voice-note]");
+    var voiceText = root.querySelector("[data-listen-voice-text]");
+    var readLink = root.querySelector("[data-listen-read-link]");
+    var chooseVoice = root.querySelector("[data-listen-choose-voice]");
+    var moreControls = root.querySelector(".listen-more");
+    var filterBox = root.querySelector("[data-listen-filter]");
+    var findInput = root.querySelector("[data-listen-find]");
+    var kindSelect = root.querySelector("[data-listen-kind]");
+    var filterCount = root.querySelector("[data-listen-filter-count]");
     var voiceSelect = root.querySelector("[data-listen-voice]");
     var rateSelect = root.querySelector("[data-listen-rate]");
     var voiceField = root.querySelector("[data-listen-voice-field]");
@@ -159,8 +170,8 @@
     }
     var items = Array.prototype.slice.call(list.querySelectorAll("[data-listen-item]"));
     var button = {};
-    ["play", "pause", "stop", "prev", "next", "heading", "equation", "lesson"].forEach(function (name) {
-      button[name] = transport.querySelector('[data-listen="' + name + '"]');
+    ["play", "stop", "prev", "next", "heading", "equation", "beginning"].forEach(function (name) {
+      button[name] = root.querySelector('[data-listen="' + name + '"]');
     });
 
     // "Follow along": the transcript scrolls to the item being spoken. On by default (the person
@@ -218,13 +229,49 @@
     }
 
     function paint() {
-      enable(button.play, ready() && state !== "playing");
-      enable(button.pause, state === "playing");
+      // One button plays and pauses: its label says what pressing it does now.
+      button.play.textContent = state === "playing" ? "Pause" : "Play";
+      enable(button.play, ready());
       enable(button.stop, state !== "idle");
-      ["prev", "next", "heading", "equation", "lesson"].forEach(function (name) {
+      ["prev", "next", "heading", "equation", "beginning"].forEach(function (name) {
         if (button[name]) button[name].disabled = !ready();
       });
-      position.textContent = index >= 0 ? "Item " + (index + 1) + " of " + items.length : "";
+      var total = shownCount();
+      position.textContent = index >= 0
+        ? "Item " + (index + 1) + " of " + items.length +
+          (total < items.length ? " (" + total + " shown)" : "")
+        : "";
+    }
+
+    // ------------------------------------------------------------ what is shown (the filter)
+
+    function shown(i) {
+      return !items[i].hidden;
+    }
+
+    function shownCount() {
+      return items.filter(function (el) { return !el.hidden; }).length;
+    }
+
+    function nextShown(from, by) {
+      // The next item shown after `from` (in direction `by`), or -1.
+      for (var i = from + by; i >= 0 && i < items.length; i += by) if (shown(i)) return i;
+      return -1;
+    }
+
+    function lessonIndex() {
+      // The main content: past the title, language, notices and licence.
+      var at = -1;
+      items.forEach(function (el, i) {
+        var role = el.querySelector(".listen-role");
+        if (at < 0 && role && /^Main landmark/.test(role.textContent.trim())) at = i;
+      });
+      if (at < 0) {
+        items.forEach(function (el, i) {
+          if (at < 0 && (el.getAttribute("data-kinds") || "").split(" ")[0] === "heading") at = i;
+        });
+      }
+      return at < 0 ? 0 : at;
     }
 
     function mark(i) {
@@ -236,6 +283,8 @@
       var el = items[i];
       el.classList.add("is-current");
       el.setAttribute("aria-current", "true");
+      var folded = el.closest("details");
+      if (folded) folded.open = true; // the items before the lesson are folded away
       if (follow && !follow.checked) return;
       el.scrollIntoView({
         block: "center",
@@ -273,7 +322,8 @@
         mine,
         current,
         function () {
-          if (keepGoing && i + 1 < items.length) speakItem(i + 1, true);
+          var after = nextShown(i, 1);
+          if (keepGoing && after >= 0) speakItem(after, true);
           else if (keepGoing) {
             finished = true;
             index = -1;
@@ -294,10 +344,24 @@
         setState("playing", "Playing.");
         return;
       }
+      var from = index >= 0 && !finished ? index : firstToPlay();
+      if (from < 0) return say(status, "No items match. Clear the filter to play.");
       state = "playing";
-      var from = index >= 0 && !finished ? index : 0;
       speakItem(from, true);
       say(status, "Playing.");
+    }
+
+    function firstToPlay() {
+      // Play starts at the lesson, or at the next item shown when the filter hides it.
+      var at = lessonIndex();
+      if (shown(at)) return at;
+      var later = nextShown(at, 1);
+      return later >= 0 ? later : nextShown(-1, 1);
+    }
+
+    function togglePlay() {
+      if (state === "playing") pause();
+      else play();
     }
 
     function pause() {
@@ -324,13 +388,17 @@
     }
 
     function step(by) {
-      var from = index < 0 ? (by > 0 ? -1 : items.length) : index;
-      if (!go(from + by)) say(status, by > 0 ? "That was the last item." : "That is the first item.");
+      var from = index < 0 ? (by > 0 ? lessonIndex() - 1 : items.length) : index;
+      var at = nextShown(from, by);
+      if (at < 0 || !go(at)) {
+        say(status, by > 0 ? "That was the last item." : "That is the first item.");
+      }
     }
 
     function jump(token_name, label) {
       var from = index;
       for (var i = from + 1; i < items.length; i += 1) {
+        if (!shown(i)) continue;
         var kinds = (items[i].getAttribute("data-kinds") || "").split(" ");
         if (kinds.indexOf(token_name) !== -1) {
           go(i, label + ", item " + (i + 1) + " of " + items.length + ".");
@@ -345,33 +413,19 @@
         if (button[name].getAttribute("aria-disabled") !== "true") action();
       });
     }
-    press("play", play);
-    press("pause", pause);
+    press("play", togglePlay);
     press("stop", stop);
     button.prev.addEventListener("click", function () { step(-1); });
     button.next.addEventListener("click", function () { step(1); });
     button.heading.addEventListener("click", function () { jump("heading", "Heading"); });
     button.equation.addEventListener("click", function () { jump("equation", "Equation"); });
-    if (button.lesson) {
-      // Skip the title, language, the page's notices and licence: start at the main content.
-      button.lesson.addEventListener("click", function () {
-        var at = -1;
-        items.forEach(function (el, i) {
-          var role = el.querySelector(".listen-role");
-          if (at < 0 && role && /^Main landmark/.test(role.textContent.trim())) at = i;
-        });
-        if (at < 0) {
-          items.forEach(function (el, i) {
-            if (at < 0 && (el.getAttribute("data-kinds") || "").split(" ")[0] === "heading") at = i;
-          });
-        }
-        if (at < 0) return say(status, "No separate lesson start was found.");
-        var keep = state !== "idle";
-        state = "playing";
-        speakItem(at, true);
-        say(status, "Starting at the lesson, item " + (at + 1) + " of " + items.length + ".");
-      });
-    }
+    button.beginning.addEventListener("click", function () {
+      var first = nextShown(-1, 1);
+      if (first < 0) return say(status, "No items match. Clear the filter to play.");
+      state = "playing";
+      speakItem(first, true);
+      say(status, "Playing from the beginning.");
+    });
 
     rateSelect.addEventListener("change", function () {
       rate = parseFloat(rateSelect.value) || 1;
@@ -388,21 +442,23 @@
     });
 
     function explain() {
+      // Beside Play, outside the collapsed controls: why Play is off, and what to do.
       var local = localVoices(voices);
+      var words = "";
+      var pick = false;
       if (!voices.length) {
-        voiceNote.textContent = "No voice on this device. Read the transcript below, or use " +
-          "your own screen reader.";
+        words = "No voice on this device.";
       } else if (!local.length && !voice) {
-        voiceNote.textContent = "This browser has only online voices. Some browsers send the " +
-          "text to their maker to speak it. Choose a voice to play the transcript this way, " +
-          "or read the transcript below.";
+        words = "Only online voices: some browsers send the text to their maker.";
+        pick = true;
       } else if (voice && voice.localService !== true) {
-        voiceNote.textContent = "This voice is online: your browser may send the text to its " +
-          "maker to speak it.";
-      } else {
-        voiceNote.textContent = "";
+        words = "Online voice: your browser may send the text to its maker.";
       }
-      voiceNote.hidden = !voiceNote.textContent;
+      voiceText.textContent = words;
+      if (chooseVoice) chooseVoice.hidden = !pick;
+      if (readLink) readLink.hidden = !(words && !ready());
+      voiceNote.hidden = !words;
+      transport.classList.toggle("has-note", !!words);
     }
 
     function fill(found) {
@@ -445,6 +501,57 @@
       paint();
     }
 
+    if (chooseVoice) {
+      chooseVoice.addEventListener("click", function () {
+        if (moreControls) moreControls.open = true;
+        voiceSelect.focus();
+      });
+    }
+
+    // The filter: a text search and a kind. Items that do not match are hidden (hidden
+    // attribute, so they leave the reading order too); the count is said politely.
+    function applyFilter() {
+      var words = findInput ? findInput.value.trim().toLowerCase() : "";
+      var kind = kindSelect ? kindSelect.value : "";
+      items.forEach(function (el) {
+        var okKind = !kind || (el.getAttribute("data-kinds") || "").split(" ").indexOf(kind) !== -1;
+        var okText = !words || el.textContent.toLowerCase().indexOf(words) !== -1;
+        el.hidden = !(okKind && okText);
+      });
+      // A folded group with nothing shown in it is not worth opening.
+      Array.prototype.forEach.call(root.querySelectorAll("[data-listen-before]"), function (box) {
+        box.hidden = !box.querySelector("[data-listen-item]:not([hidden])");
+      });
+      var total = shownCount();
+      if (filterCount) {
+        filterCount.textContent = words || kind
+          ? "Showing " + total + " of " + items.length + (items.length === 1 ? " item." : " items.")
+          : "";
+      }
+      if (index >= 0 && !shown(index)) stop();
+      paint();
+    }
+    if (filterBox && findInput && kindSelect) {
+      var typing = 0;
+      findInput.addEventListener("input", function () {
+        window.clearTimeout(typing);
+        typing = window.setTimeout(applyFilter, 150);
+      });
+      kindSelect.addEventListener("change", applyFilter);
+      filterBox.hidden = false;
+    }
+
+    // The sticky transport can wrap to several lines (a narrow screen, larger text, a longer
+    // note), so the room items need above them when scrolled into view is its real height,
+    // measured, not a fixed guess. listen.css reads --listen-sticky.
+    function measure() {
+      var sticky = window.getComputedStyle(transport).position === "sticky";
+      var height = sticky ? Math.ceil(transport.getBoundingClientRect().height) : 0;
+      root.style.setProperty("--listen-sticky", height + "px");
+    }
+    if (window.ResizeObserver) new window.ResizeObserver(measure).observe(transport);
+    window.addEventListener("resize", measure);
+
     // Shortcuts: only while focus is inside this page's content, never with a modifier, never
     // in a form field, and never for a key the page did not ask for. A screen reader in
     // browse mode keeps its own keys; the buttons do the same things.
@@ -454,7 +561,7 @@
       if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
       var key = event.key;
       var done = true;
-      if (key === "p") (state === "playing" ? pause : play)();
+      if (key === "p") togglePlay();
       else if (key === "s" || key === "Escape") stop();
       else if (key === "]") step(1);
       else if (key === "[") step(-1);
@@ -468,6 +575,7 @@
 
     controls.hidden = false;
     transport.hidden = false;
+    measure();
     rateSelect.value = "1";
     paint();
     whenVoices(fill);

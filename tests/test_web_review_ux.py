@@ -271,7 +271,7 @@ def test_saving_an_unchanged_edit_changes_nothing(ux):
 
 
 def test_saving_a_rejected_figures_text_unchanged_puts_it_back(ux):
-    assert post(ux, "p1-e6", action="reject", version="0").status_code == 303
+    assert post(ux, "p1-e6", action="reject", acknowledge="on", version="0").status_code == 303
     alt = "A car on a road between a house and a school."
     assert post(ux, "p1-e6", action="edit", alt=alt, version="1").status_code == 303
     assert stored(ux).fix_for("p1-e6").status.value == "edited"
@@ -402,8 +402,8 @@ def test_reject_is_named_for_what_it_does(ux):
     equation = panel(screen(ux))
     assert re.search(r'data-role="reject"[^>]*>Keep as image<span', equation)
     assert (
-        "Keep as image: Students see a picture of the original; screen readers hear the PDF "
-        "text of the equation, marked as not checked." in text_of(equation)
+        "Students see a picture; screen readers read the PDF's text, marked unchecked."
+        in text_of(equation)
     )
     heading = panel(screen(ux, "?item=p1-e0"))  # a bold heading, accepted
     assert re.search(r'data-role="reject"[^>]*>Make bold text<span', heading)
@@ -547,7 +547,7 @@ def test_the_card_says_what_a_screen_reader_gets_from_the_pdf(ux):
         '<span class="speech-label">From your PDF a screen reader gets:</span> “<span '
         'class="text-layer">𝛚</span>”, roughly “<mark class="said-diff">bold omega</mark>”' in body
     )
-    assert "Marked: the words where the two readings differ." in body
+    assert "Marked words differ." in body
     # Nothing differs in an accepted equation: no reading of the PDF, nothing marked.
     other = panel(screen(ux, "?item=p2-e2"))
     assert 'From your PDF a screen reader gets:</span> “<span class="text-layer">v = d / t' in (
@@ -719,8 +719,9 @@ def test_a_form_from_before_signing_in_again_links_back_to_its_decision(ux):
     assert response.status_code == 403
     assert "This form has expired" in response.text
     assert "Go back to the decision and choose again." in response.text
-    assert f'<a href="/jobs/{ux.job_id}/review?item=p1-e2">Back to the decision</a>' in (
-        response.text
+    assert (
+        f'<a class="button" href="/jobs/{ux.job_id}/review?item=p1-e2">Back to the decision</a>'
+        in response.text
     )
     assert stored(ux).fix_for("p1-e2").status.value == "needs_review"
 

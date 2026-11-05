@@ -126,9 +126,7 @@ def test_the_option_is_on_the_upload_form_only_where_it_is_offered(offered, not_
     assert 'name="image_pages"' in page and 'id="image_pages"' in page
     assert re.search(r'<label for="image_pages">', page)
     assert 'aria-describedby="image-pages-hint"' in page
-    assert "does nothing for a PDF that has no scanned or handwritten pages" in " ".join(
-        page.split()
-    )
+    assert "Needed for a PDF that is all scans or handwriting" in " ".join(page.split())
     assert "checked" not in re.search(r'<input type="checkbox" id="image_pages"[^>]*>', page).group(
         0
     )
@@ -141,8 +139,12 @@ def test_the_option_is_on_the_upload_form_only_where_it_is_offered(offered, not_
 def test_a_scan_is_refused_without_the_option_and_the_message_says_how_to_ask(offered):
     response = upload(offered.browser, scan_pdf())
     assert response.status_code == 422
-    assert "is scanned, so this tool cannot convert it" in response.text
+    # With the option offered the refusal says the pages were not asked for, not that the
+    # tool cannot convert them, and gives the route.
+    assert "has only scanned pages, which are read only when you ask" in response.text
+    assert "cannot convert it" not in response.text
     assert "Convert scanned or handwritten pages" in response.text
+    assert "upload a PDF exported from the original" in " ".join(response.text.split())
     with session_scope(offered.ctx.factory) as session:
         assert session.query(Job).count() == 0  # refused: nothing was queued or counted
 

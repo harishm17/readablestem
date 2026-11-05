@@ -102,7 +102,8 @@ def about(html: str) -> str:
 def review(site: Site, element_id: str, **fields: str):
     token = csrf_from(site.browser.get(f"/jobs/{site.job_id}/review").text)
     return site.browser.post(
-        f"/jobs/{site.job_id}/review/{element_id}", data={"csrf_token": token} | fields
+        f"/jobs/{site.job_id}/review/{element_id}",
+        data={"csrf_token": token, "acknowledge": "on"} | fields,
     )
 
 

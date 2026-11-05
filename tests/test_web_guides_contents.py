@@ -14,7 +14,6 @@ from readablestem.web import offices, seo
 
 LONG_PAGES = (
     seo.ADA_GUIDE,
-    seo.COMPARE_GUIDE,
     "/help/posting",
     offices.PAGE_PATH,
 )
@@ -59,7 +58,7 @@ def view(html: str, start: str, end: str) -> str:
 def test_the_comparison_stack_carries_every_fact_source_and_date_of_the_table(env):
     html = fetch(env, seo.COMPARE_GUIDE)
     table = view(html, '<div class="table-scroll compare-wide-view"', '<div class="compare-stack">')
-    stack = view(html, '<div class="compare-stack">', '<h2 id="readablestem">')
+    stack = view(html, '<div class="compare-stack">', '<h2 id="notes">')
     assert "<table" in table and "<table" not in stack
     cells = re.findall(r"<td>(.*?)</td>", table, re.S)
     entries = re.findall(r"<dd>(.*?)</dd>", stack, re.S)
@@ -94,7 +93,7 @@ def test_the_stack_is_hidden_on_wide_screens_and_the_table_on_phones():
 
     css = (Path(readablestem.__file__).parent / "web" / "static" / "app.css").read_text()
     assert ".compare-stack { display: none; }" in css
-    phone = css[css.index("ux-lane-c: comparison guide") :]
+    phone = css[css.index(".compare-stack { display: none; }") :]
     phone = phone[phone.index("@media (max-width: 51.99rem)") :]
     assert ".compare-wide-view { display: none; }" in phone
     assert ".compare-stack { display: block; }" in phone

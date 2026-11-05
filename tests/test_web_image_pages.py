@@ -261,7 +261,10 @@ def test_keeping_the_left_out_region_as_an_image_settles_it_and_says_so_in_the_s
     web_left_out,
 ):
     fix = left_out_fix(result(web_left_out))
-    assert post(web_left_out, fix.element_id, action="reject").status_code in (200, 303)
+    assert post(web_left_out, fix.element_id, action="reject", acknowledge="on").status_code in (
+        200,
+        303,
+    )
     after = result(web_left_out).fix_for(fix.element_id)
     assert after is not None and after.status is Status.REJECTED and not after.pending
     html = web_left_out.browser.get(f"/jobs/{web_left_out.job_id}/view").text

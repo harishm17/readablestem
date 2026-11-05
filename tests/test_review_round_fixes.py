@@ -46,7 +46,7 @@ def test_the_review_split_has_back_to_decision_and_a_page_hint_and_a_named_toolb
     assert (
         '<p class="back-to-decision"><a href="#decision-title">Back to the decision</a></p>' in page
     )
-    assert "scroll it sideways to see all of it" in page
+    assert "Scroll the page sideways" in page
     assert '<div class="page-bar">' in page and '<div class="page-tools">' not in page
     assert 'id="page-tools"' in page  # the "Change page" disclosure keeps its name
 
@@ -59,11 +59,10 @@ def test_the_equation_decision_offers_hear_this_even_without_a_stored_reading(en
 def test_the_listening_player_has_a_sticky_transport_with_follow_along_and_a_lesson_start(env):
     page = env.alice.get(f"/jobs/{env.job_id}/listen").text
     assert "data-listen-transport" in page and "data-listen-follow" in page
-    assert 'data-listen="lesson"' in page and "Start at the lesson" in page
+    # Play starts at the lesson; the first item is "Play from the beginning" in the disclosure
+    assert 'data-listen="beginning"' in page and "Play starts at the lesson." in page
     # the settings live in a disclosure, away from the transport
-    assert re.search(
-        r'<details class="listen-more">\s*<summary>Speed, voice and keyboard shortcuts', page
-    )
+    assert re.search(r'<details class="listen-more">\s*<summary>More controls', page)
     assert page.index("data-listen-transport") < page.index("listen-more")
 
 

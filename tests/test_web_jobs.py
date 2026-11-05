@@ -327,7 +327,7 @@ def test_quota_is_per_user(web):
 def test_app_page_shows_pages_left_today(web):
     upload(web.browser, make_pdf(3))
     page = " ".join(web.browser.get("/app").text.split())
-    assert "You can convert 17 more pages today; the count starts again at <time" in page
+    assert "17 pages left today; resets at <time" in page
 
 
 def test_when_the_daily_spend_cap_is_reached_uploads_get_a_friendly_503(web):
@@ -351,7 +351,7 @@ def test_job_page_polls_with_htmx_and_reloads_without_javascript_only_on_request
     assert f'hx-get="/jobs/{job_id}/status?v=queued-none-0"' in page
     # No reload the user did not ask for (WCAG 2.2.1, F41); a no-JS user can opt in.
     assert "http-equiv" not in page
-    assert f'<a href="/jobs/{job_id}">refresh the status</a>' in page
+    assert f'<a href="/jobs/{job_id}">Refresh the status</a>' in page
     assert re.search(
         rf'<noscript>\s*<p><a href="/jobs/{job_id}\?auto=1">Reload this page every 15 seconds',
         page,
@@ -361,7 +361,7 @@ def test_job_page_polls_with_htmx_and_reloads_without_javascript_only_on_request
     auto = web.browser.get(f"/jobs/{job_id}?auto=1").text
     assert '<noscript><meta http-equiv="refresh" content="15"></noscript>' in auto
     assert f'<a href="/jobs/{job_id}">Stop reloading this page</a>' in auto
-    assert f'<a href="/jobs/{job_id}?auto=1">refresh the status</a>' in auto
+    assert f'<a href="/jobs/{job_id}?auto=1">Refresh the status</a>' in auto
     assert "http-equiv" not in web.browser.get(f"/jobs/{job_id}?auto=yes").text
 
     web.run_worker()
@@ -390,7 +390,7 @@ def test_status_fragment_is_204_until_something_changes(web):
         f'<p><a href="/jobs/{job_id}/review">Start the review</a> or '
         f'<a href="/jobs/{job_id}">show the results</a></p>'
     ) in finished.text
-    assert "3 decisions need you before you share it." in finished.text
+    assert "3 decisions need you before you give it to students." in finished.text
     assert "show the results" not in web.browser.get(f"/jobs/{job_id}").text
     # htmx takes the document title from the fragment, so the tab title follows it.
     assert finished.text.startswith(
@@ -542,10 +542,10 @@ def test_delete_asks_first_and_one_post_without_confirmation_deletes_nothing(web
     page = web.browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser)})
     assert page.status_code == 200
     text = " ".join(page.text.split())
-    assert "Delete SECRET-HEADING Kinematics?" in text and "cannot be undone" in text
+    assert "Delete “SECRET-HEADING Kinematics”?" in text and "cannot be undone" in text
     assert "notes.pdf, uploaded <time" in text  # the title first, the file name under it
     assert 'name="confirm" value="yes"' in page.text
-    assert f'<a href="/jobs/{job_id}">No, keep it</a>' in page.text
+    assert f'<a class="button-secondary" href="/jobs/{job_id}">No, keep it</a>' in page.text
     assert count(web, Job) == 1 and count(web, Blob) == blobs
     assert web.browser.get(f"/jobs/{job_id}/delete").status_code == 200  # the same page
 

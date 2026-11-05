@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set footer_mode = "minimal" %}
 {% block title %}{% if usable %}Finish signing in{% else %}This link does not work{% endif %}{% endblock %}
 {% block content %}
 {% if usable %}

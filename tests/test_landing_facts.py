@@ -85,10 +85,9 @@ def test_limits_first_registered_result_is_history_and_matches_proof_md(pages):
     assert proof_field("Pipeline version") == "0.4.0"
     assert "version 0.4.0, October 2026" in text and "Earlier results, kept as history" in text
     assert proof_field("Run recorded on").startswith("2026-10")
-    assert f"it found {round(proof_cell('detection_recall') * 100)}% of them" in text
+    assert f"{round(proof_cell('detection_recall') * 100)}% of them in both cases" in text
     assert 0.45 <= proof_cell("end_to_end_exact_lenient (all gold equations)") <= 0.55
-    assert "about half came out exactly right end to end (0.50)" in text
-    assert "for the chatbot" not in text.split("Earlier results, kept as history")[1]
+    assert "about half (0.50) against 0.62 for the chatbot" in text
     equations_alone = float(re.search(r"^\| exact_lenient \| ([0-9.]+)", PROOF, re.M).group(1))  # type: ignore[union-attr]
     assert 0.62 <= equations_alone <= 0.71 and "about two in three were right (0.68)" in text
     assert f"Headings: F1 {proof_cell('heading F1'):.2f}" in text
@@ -118,12 +117,13 @@ def test_the_other_results_match_their_reports_and_development_is_labelled(pages
     assert "15 held-out papers (71 pages, 1,826 gold equations" in REALWORLD
     assert "0.583" in REALWORLD and "on Opus 0.641" in REALWORLD and "on Haiku 0.641" in REALWORLD
     assert "15 arXiv papers, 71 pages, 1,826 equations" in text
-    assert "0.58 of equations exactly right end to end." in text
-    assert "no difference this set can detect" in text.split("Research papers typeset with LaTeX")[1]
+    assert "0.58 of equations exactly right end to end, against 0.64" in text
     # Development baseline: labelled as development, never as held out.
-    assert "0.735" in DEV_BASELINE
+    assert "0.735" in DEV_BASELINE and "0.675" in DEV_BASELINE
+    assert "0.764" in DEV_BASELINE and "Opus 0.784" in DEV_BASELINE
     assert "Development set, not held out (25 arXiv papers, 114 pages, 2,350 equations" in text
-    assert "0.735 exactly right end to end." in text
+    assert "0.735 exactly right end to end, against 0.675" in text
+    assert "0.764 against 0.784" in text
     # Chemistry and handwriting.
     assert "**211 (0.560)**" in CHEMISTRY and "377 gold equations, 5 sections" in CHEMISTRY
     assert "5 OpenStax chemistry sections, 377 equations): 0.56 right as chemistry" in text
@@ -134,41 +134,37 @@ def test_the_other_results_match_their_reports_and_development_is_labelled(pages
 
 def test_the_landing_page_summarises_without_overclaiming(pages):
     landing = squash(pages["/"])
-    # The registered held-out tiles are the headline, and the gap to the chatbot is said.
-    assert 'class="proof-strip"' in pages["/"]
-    assert (
-        "this test found no difference it could detect between ReadableSTEM and a general chatbot"
-        in landing
-    )
-    assert "0.836 against 0.840 for ReadableSTEM (26 documents, 1,715 equations)" in landing
-    assert "5.0 against 9.6 per 100" in landing and "so it was not met" in landing
-    # The earlier result is kept as history, without a chatbot comparison (Harish, 2026-11-04).
-    assert "Earlier tests (October 2026, version 0.4.0) are kept as history" in landing
-    assert "0.62 against 0.50" not in landing and "ahead" not in landing.lower()
+    # The newest registered held-out result is the one framing: level on what a listener hears,
+    # drawn as a chart (web/proof_facts.py). The four measures and how each was measured are on
+    # /limits, behind one evidence link; the earlier test (chatbot ahead on exactly right) is
+    # history there, in PROOF.md and in the README, not on the landing page.
+    assert 'class="proof-strip"' not in pages["/"] and 'class="proof-strip"' in pages["/limits"]
+    assert 'class="proof-chart"' in pages["/"]
+    assert "Evidence: the four measures, how each was measured" in landing
+    assert "ReadableSTEM and the Opus chatbot are level (0.840 and 0.836)" in landing
+    assert "can detect no difference between them" in landing
+    assert "26 documents the tool had never seen" in landing and "1,715 equations" in landing
+    assert "a test set up before it ran, 4 November 2026, version 0.5.9" in landing
+    assert "0.62 against 0.50" not in landing and "chatbot ahead" not in landing
+    assert "with all results including earlier tests" in landing
     assert "beat" not in landing.lower().replace("beats", "")
-    assert (
-        "“Exactly right” means the whole equation matches the original symbol for symbol" in landing
-    )
-    # One decisions-per-page figure per kind of document, the same as /limits gives.
     limits = squash(pages["/limits"])
-    for line, figure in (
-        (
-            "Textbook sections: about 1.8 decisions a page (15 OpenStax sections, 242 pages)",
-            "textbook sections, about 1.8 decisions a page (15 OpenStax sections, 242 pages)",
-        ),
-        (
-            "about 5.6 decisions a page (15 arXiv papers, 71 pages)",
-            "about 5.6 a page (15 arXiv papers, 71 pages)",
-        ),
-    ):
-        assert line in landing and figure in limits
+    assert "about half (0.50) against 0.62 for the chatbot" in limits  # the history stays there
+    assert 'href="/limits#accuracy"' in pages["/"]
     assert "about 5.6 things per page" in REALWORLD and "5.7 decisions per page" in HANDWRITING
     assert "**242**" in PROOF
-    assert 'href="/limits#accuracy"' in pages["/"]
     # Development numbers stay on /limits, labelled there.
     assert "0.735" not in landing and "development set" not in landing.lower()
     for claim in ("compliant", "conforms", "guarantee"):
         assert claim not in landing.lower(), claim
+
+
+def test_limits_keeps_one_decisions_per_page_figure_per_kind_of_document(pages):
+    limits = squash(pages["/limits"])
+    assert (
+        "textbook sections, about 1.8 decisions a page (15 OpenStax sections, 242 pages)" in limits
+    )
+    assert "about 5.6 a page (15 arXiv papers, 71 pages)" in limits
 
 
 def test_licence_is_worded_the_same_way_everywhere(pages):

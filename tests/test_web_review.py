@@ -293,13 +293,12 @@ def test_decisions_first_by_kind_then_optional_then_accepted(web):
 def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
     page = review_page(web)
     equation = card(page, "p1-e3")
-    assert '<h4 id="fix-title-p1-e3">Equation 2 <span class="meta">on page 1</span></h4>' in (
-        equation
-    )  # numbered in reading order: the inline p1-e2 is equation 1
+    title = '<h4 id="fix-title-p1-e3" class="visually-hidden">Equation 2 <span class="meta">'
+    assert title + "on page 1</span></h4>" in equation  # in reading order: inline p1-e2 is no. 1
     assert f'src="/jobs/{web.job_id}/crops/p1-e3.png"' in equation
     assert 'alt="The original equation 2 from page 1 of the PDF, as an image."' in equation
     assert '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">' in equation
-    assert "<strong>Read aloud roughly as:</strong> x plus 1" in equation
+    assert "Read aloud roughly as:</span> “x plus 1”" in equation
     assert "\\SECRETLATEX{x}</textarea>" in equation
     assert '<label for="latex-p1-e3">LaTeX for equation 2</label>' in equation
     # No confidence percentage and no internal code on the list view (T1-11).
@@ -316,23 +315,23 @@ def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
     assert "SECRET-ALT a rising line</textarea>" in figure
     assert '<label for="alt-p1-e4">Alt text for figure 1</label>' in figure
     assert 'id="decorative-p1-e4"' in figure
-    assert "Aim for 150 characters or fewer (this text has 24)." in figure
+    assert "150 characters at most (this has 24)." in figure
     assert "<strong>Caption in the PDF:</strong> Figure 1 SECRET-CAPTION" in figure
 
     abstained = card(page, "p1-e5")
     assert 'value="accept"' not in abstained  # nothing to accept
-    assert "<strong>Why it was not converted:</strong> The model was not sure enough" in abstained
+    assert "<strong>Not converted:</strong> The model was not sure enough" in abstained
     assert "Code:" not in abstained and "low_confidence" not in abstained
-    assert "Type the LaTeX for the equation in the image" in abstained
+    assert "Type the LaTeX, then save." in abstained
 
 
 def test_buttons_name_the_fix_they_act_on(web):
     figure = card(review_page(web), "p1-e4")
     # "Reject" is named for what it does, with what that means under it.
     assert 'Keep without a description<span class="visually-hidden"> (figure 1)</span>' in figure
-    assert "marked “Needs a description”; screen readers get no description of it." in figure
+    assert "I understand: screen reader users get no description." in figure
     assert 'Accept<span class="visually-hidden"> figure 1</span>' in figure
-    assert 'Save edit<span class="visually-hidden"> to figure 1</span>' in figure
+    assert 'Save and accept<span class="visually-hidden"> (figure 1)</span>' in figure
 
 
 def test_decided_fixes_are_folded_away(web):
@@ -340,7 +339,7 @@ def test_decided_fixes_are_folded_away(web):
     # The reviewer's own decisions apart from what was accepted for them.
     mine = page[page.index('id="decided"') : page.index('id="accepted"')]
     assert '<h2 id="decided-title">Your decisions (0)</h2>' in mine
-    assert "You have not decided anything yet." in mine
+    assert "None yet." in mine
     accepted = page[page.index('id="accepted"') :]
     assert '<h2 id="accepted-title">Accepted automatically (2)</h2>' in accepted
     assert '<details class="done-group">' in accepted  # closed: no "open" attribute
@@ -374,7 +373,7 @@ def test_page_has_a_table_of_contents_with_counts(web):
         "</span></h3>" in page
     )
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
-    assert "3 decisions are still needed:</strong>\n    2 equations, 1 figure." in progress
+    assert "3 decisions left:</strong>\n    2 equations, 1 figure." in progress
 
 
 def test_job_page_breaks_down_what_needs_review_by_kind(web):
@@ -425,19 +424,19 @@ def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     assert '<details class="done-group" open>' in page
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
     assert "Accepted." in progress
-    assert "2 decisions are still needed" in progress
+    assert "2 decisions left" in progress
 
 
 def test_when_nothing_is_left_the_reviewer_lands_on_the_progress_summary(web):
     post(web, "p1-e3", action="accept")
     post(web, "p1-e5", action="reject")
-    response = post(web, "p1-e4", action="reject")
+    response = post(web, "p1-e4", action="reject", acknowledge="on")
     assert response.headers["location"] == f"/jobs/{web.job_id}/review/list#review-progress"
     page = review_page(web)
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
     # "Reject" is named for what it does, and so is its notice.
     assert '<a href="#item-p1-e4">Figure 1 on page 1</a>: Kept without a description' in progress
-    assert "Nothing left that needs your decision." in progress
+    assert "Nothing left to decide." in progress
 
 
 def test_saving_an_equation_edit_validates_and_stores_it(web):
@@ -536,7 +535,7 @@ def test_figure_alt_text_failing_a_check_is_not_saved(web):
     assert "Your alt text was not saved. The alt text starts with words like" in response.text
     assert "(alt.no_redundant_prefix" not in response.text  # codes are for the Details only
     assert "Image of a graph</textarea>" in response.text
-    assert "(this text has 16)" in response.text  # counts the reviewer's input
+    assert "(this has 16)" in response.text  # counts the reviewer's input
     assert edits(web) == []
 
 
@@ -555,7 +554,7 @@ def test_figure_needs_alt_text_or_decorative(web):
 
 
 def test_reject_keeps_the_original(web):
-    assert post(web, "p1-e4", action="reject").status_code == 303
+    assert post(web, "p1-e4", action="reject", acknowledge="on").status_code == 303
     fix = result(web).fix_for("p1-e4")
     assert fix is not None and fix.status.value == "rejected"
     assert "p1-e4:rejected" in (with_file(web).html or "")
@@ -792,10 +791,10 @@ def test_the_first_heading_may_take_any_level(outline):
 
 def test_the_review_page_says_which_levels_fit(outline):
     page = review_page(outline)
-    assert "this one can be level 1 to 6." in card(page, "p1-e0")  # the first heading
-    assert "this one can be level 1 to 2." in card(page, "p1-e1")
+    assert "Level 1 to 6 fits." in card(page, "p1-e0")  # the first heading
+    assert "Level 1 to 2 fits." in card(page, "p1-e1")
     third = card(page, "p1-e2")
-    assert "this one can be level 1 to 3." in third
+    assert "Level 1 to 3 fits." in third
     assert 'aria-describedby="level-hint-p1-e2"' in third
 
 
@@ -1027,7 +1026,7 @@ def test_a_reviewers_accept_is_marked_as_the_reviewers(web):
     fixes = {f.element_id: f for f in result(web).fixes}
     assert fixes["p1-e3"].status is Status.ACCEPTED and fixes["p1-e3"].reviewed
     assert fixes["p1-e2"].status is Status.ACCEPTED and not fixes["p1-e2"].reviewed
-    assert post(web, "p1-e4", action="reject").status_code == 303
+    assert post(web, "p1-e4", action="reject", acknowledge="on").status_code == 303
     assert result(web).fix_for("p1-e4").reviewed  # type: ignore[union-attr]
     decided = card(review_page(web), "p1-e3")
     assert "Accepted by you" in decided

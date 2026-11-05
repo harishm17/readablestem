@@ -73,7 +73,7 @@ main:focus { outline: none; }
   color: var(--accent);
   border: 2px solid var(--focus-outline);
   border-radius: var(--radius-control);
-  z-index: 10;
+  z-index: var(--z-skip);
 }
 .skip-link:focus { top: var(--space-2); }
 
@@ -85,6 +85,11 @@ main:focus { outline: none; }
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Less motion: no scrolling animation, transitions or animations at all. */
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
 
 /* ============================================================== Components
@@ -107,6 +112,8 @@ main:focus { outline: none; }
 .nav-list a:visited { color: var(--ink); }
 .nav-list a:hover, .nav-list a:focus-visible { text-decoration: underline; text-decoration-thickness: 2px; }
 .nav-list a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 0.3em; }
+/* Signed in: the workspace links first, the public ones quieter. */
+.nav-list .nav-secondary a, .nav-list .nav-secondary a:visited { color: var(--ink-muted); }
 .account { display: flex; align-items: center; gap: var(--space-3); }
 .account .link-button { min-height: 2.75rem; }
 .account .button-small { min-height: 2.75rem; }
@@ -125,16 +132,37 @@ main:focus { outline: none; }
   .nav-menu .nav-list a { width: 100%; border-bottom: 1px solid var(--border-subtle); }
   .signed-in { display: none; }
 }
+@media (forced-colors: active) {
+  .nav-menu > summary { border-color: ButtonText; }
+  .brand svg { forced-color-adjust: auto; }
+}
 
 /* Footer: four columns (Product, Trust, Guides, Source), two on a tablet, one on a phone. */
 .site-footer { margin-top: var(--space-8); padding: var(--space-7) 0 var(--space-6); border-top: 1px solid var(--border-subtle); background: var(--surface); }
 .footer-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-6) var(--space-5); }
 .footer-cols h2 { font-family: var(--font-sans); font-weight: 700; font-size: var(--step-0); margin: 0 0 var(--space-3); }
-.footer-cols ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
-.footer-cols a { display: inline-block; min-height: 1.5rem; }
+.footer-cols ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.footer-cols a { display: inline-flex; align-items: center; min-height: 2.75rem; }
 .footer-note { margin: var(--space-6) 0 0; padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); color: var(--ink-muted); }
 @media (max-width: 52rem) { .footer-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 30rem) { .footer-cols { grid-template-columns: minmax(0, 1fr); } }
+/* On a phone each column's links run in a row that wraps, so 44px targets do not make the
+   footer taller than the short pages above it. */
+@media (max-width: 30rem) {
+  .footer-cols { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+  .footer-cols ul { display: flex; flex-wrap: wrap; gap: 0 var(--space-4); }
+}
+
+/* App (signed-in) pages: the trust and help links on one line; public pages keep the full
+   footer. */
+.site-footer-compact { padding: var(--space-3) 0 var(--space-4); margin-top: var(--space-6); }
+.site-footer-compact .footer-note { margin-top: var(--space-2); padding-top: var(--space-2); }
+.footer-compact-links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0 var(--space-5); }
+.footer-compact-links a { display: inline-flex; align-items: center; min-height: 2.75rem; }
+/* A confirmation page: the compact footer is one tight line of links, so the choice above it is
+   not pushed down a phone. */
+.page-confirm .site-footer-compact { margin-top: var(--space-5); padding: var(--space-3) 0; }
+.page-confirm .footer-compact-links { gap: 0 var(--space-4); font-size: var(--step--1); }
+.page-confirm .footer-note { margin-top: var(--space-3); padding-top: var(--space-2); }
 
 .small { font-size: var(--step--1); color: var(--ink-muted); max-width: 48rem; }
 
@@ -151,20 +179,32 @@ main :is(p, li, dd) { max-width: 75ch; }
 .plain-list li + li { margin-top: var(--space-2); }
 .button-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
 .actions { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: center; }
+/* Cancel and keep actions beside a button ("No, keep it" under a delete confirmation, the
+   table cell and notation forms' Cancel): links with a target of at least 44px. The selectors
+   cover the pages without touching their templates; `.cancel-link` is for a new one. */
+.cancel-link, .inline-form + p > a:only-child, .inline-controls > a:not([class]), .actions > li > a:not([class]) { display: inline-flex; align-items: center; min-height: 2.75rem; }
 .canvas-download { margin: var(--space-5) 0 0; max-width: 40rem; }
 .canvas-download .hint { margin-bottom: var(--space-3); }
+/* The link that opens a delete confirmation: red text on the page colour. The label says what
+   is deleted, so colour is not the only cue (the button form is `.button-danger-outline`,
+   controls.css). */
+a.danger-link, a.danger-link:visited { color: var(--err); }
+a.danger-link:hover { color: var(--err-strong); }
+@media (forced-colors: active) { a.danger-link { color: LinkText; } }
 
 /* Tags: a status in words. The colour only repeats the word; the shape is a 4px box. */
 .tag { display: inline-block; font-weight: 700; font-size: var(--step--1); line-height: 1.2; padding: 0.2em 0.55em; border: 1px solid currentColor; border-radius: var(--radius-control); background: var(--bg); }
 .tag-warn { color: var(--warn); background: var(--warn-tint); }
 .tag-ok { color: var(--ok); background: var(--ok-tint); }
 .tag-err { color: var(--err); background: var(--err-tint); }
+@media (forced-colors: active) { .tag { border: 1px solid CanvasText; } }
 
 /* Card: a framed container, 8px radius. Headings in a card are h3 unless the card is a section. */
 .card { border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--bg); padding: var(--space-5); }
 .card > :first-child { margin-top: 0; }
 .card > :last-child { margin-bottom: 0; }
 .card-surface { background: var(--surface); }
+@media (forced-colors: active) { .card { border: 1px solid CanvasText; } }
 
 /* Stat tile: one number, what it counts, the set it comes from, and a link that says how it
    was measured. The number is never shown without its caveat link. */
@@ -174,6 +214,7 @@ main :is(p, li, dd) { max-width: 75ch; }
 .stat-note { margin: var(--space-2) 0 0; color: var(--ink-muted); font-size: var(--step--1); }
 .stat-note a { white-space: nowrap; }
 .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+@media (forced-colors: active) { .stat { border: 1px solid CanvasText; } }
 
 /* FAQ: native <details>; the whole summary line is the target. */
 .faq details { border-top: 1px solid var(--border-subtle); }
@@ -181,6 +222,7 @@ main :is(p, li, dd) { max-width: 75ch; }
 .faq summary { cursor: pointer; padding: var(--space-3) var(--space-1); font-weight: 700; min-height: 2.75rem; display: list-item; }
 .faq details[open] summary { padding-bottom: var(--space-2); }
 .faq details > :not(summary) { padding: 0 var(--space-1); }
+@media (forced-colors: active) { .faq details { border-color: CanvasText; } }
 
 /* Two panes, equal width: the PDF and the page it became. They stack below 52rem, before
    first, in reading order. */
@@ -188,6 +230,7 @@ main :is(p, li, dd) { max-width: 75ch; }
 .pane { border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--surface); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 .pane > h2, .pane > h3 { font-family: var(--font-sans); font-weight: 700; font-size: var(--step-1); line-height: var(--lh-head); margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: baseline; }
 @media (max-width: 51.99rem) { .panes { grid-template-columns: minmax(0, 1fr); } }
+@media (forced-colors: active) { .pane { border: 1px solid CanvasText; } }
 
 /* Forms */
 .field { margin: 0 0 var(--space-4); }
@@ -215,6 +258,15 @@ textarea { font-family: var(--font-mono); font-size: max(0.875rem, 0.9em); }
 .checkbox-field label { font-weight: 400; margin: 0; }
 .checkbox-field .hint { grid-column: 2; }
 
+/* The file chooser's button is a secondary button, as everywhere else. */
+input[type="file"] { padding: var(--space-1); }
+input[type="file"]::file-selector-button {
+  font: inherit; font-weight: 700; min-height: 2.25rem; margin-right: var(--space-3); padding: 0 var(--space-4);
+  border: 2px solid var(--accent); border-radius: var(--radius-control); background: var(--bg); color: var(--accent); cursor: pointer;
+}
+input[type="file"]::file-selector-button:hover { background: var(--accent-tint); }
+@media (forced-colors: active) { input[type="file"]::file-selector-button { border-color: ButtonText; } }
+
 /* Errors: red bar plus the word "Error", never colour alone. */
 .field-error { border: 2px solid var(--err); border-radius: var(--radius-control); padding: var(--space-3) var(--space-4); }
 .error-message { color: var(--err); font-weight: 700; margin: 0 0 var(--space-2); }
@@ -233,6 +285,7 @@ textarea { font-family: var(--font-mono); font-size: max(0.875rem, 0.9em); }
 .notice-warning { background: var(--warn-tint); border: 2px solid var(--warn); }
 .notice-warning h2 { margin-top: var(--space-1); font-size: var(--step-1); }
 .draft-note { border: 2px dashed var(--warn); border-radius: var(--radius-control); padding: var(--space-2) var(--space-4); color: var(--warn); background: var(--warn-tint); }
+@media (forced-colors: active) { .notice { border: 1px solid CanvasText; } }
 
 /* Tables. `position: relative` makes the scroller the containing block of the
    absolutely positioned .visually-hidden button text inside it; otherwise that text
@@ -243,11 +296,8 @@ caption { text-align: left; padding-bottom: var(--space-2); color: var(--ink-mut
 th, td { text-align: left; padding: var(--space-2) var(--space-2); border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
 thead th { border-bottom: 2px solid var(--border-control); background: var(--surface); }
 tbody th { font-weight: 700; }
-/* The comparison guide's table (templates/guide_compare.html): four columns do not fit a
-   phone, so it keeps a readable width and scrolls inside its focusable box. Row headings
-   keep whole words (the rule for headings breaks them anywhere). */
-.compare-table { min-width: 46rem; }
-.compare-table tbody th { overflow-wrap: normal; width: 8rem; }
+/* A scrolling box that can be reached with the keyboard (templates/_table_scroll.html). */
+.table-scroll:focus-visible { outline-offset: 0; }
 .num { text-align: right; }
 
 /* Status badges: the text says the status; the colour only repeats it. A small radius,
@@ -264,6 +314,8 @@ tbody th { font-weight: 700; }
 .status-done, .fix-accepted, .fix-edited { border-color: var(--ok); color: var(--ok); }
 .status-failed, .fix-failed { border-color: var(--err); color: var(--err); }
 .status-running, .fix-needs_review { border-color: var(--warn); color: var(--warn); }
+.status-decisions, .status-partial { border-color: var(--warn); color: var(--warn); }
+.status-sample { border-color: var(--ink-muted); color: var(--ink-muted); }
 
 .job-status { padding: var(--space-3) var(--space-4); background: var(--surface); border-radius: var(--radius-control); }
 .job-status p { margin: var(--space-1) 0; }
@@ -275,6 +327,9 @@ progress { width: 16rem; height: 1.1rem; }
 .summary-list div { background: var(--surface); padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); }
 .summary-list dt { color: var(--ink-muted); font-size: var(--step-0); }
 .summary-list dd { margin: 0; font-size: var(--step-1); font-weight: 700; }
+/* A state's symbol (✓ fine, ⚠ needs attention, – not known) beside its word: the shape says it
+   without colour, and the word still says it to a screen reader (the symbol is aria-hidden). */
+.state { margin-right: var(--space-1); }
 
 /* Review cards */
 .fix-list { list-style: none; padding: 0; margin: var(--space-5) 0; }
@@ -303,10 +358,6 @@ math[intent] mi { text-transform: none; }
 .alt-proposal { background: var(--surface); padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); }
 .review-form { margin-top: var(--space-4); border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); }
 
-@media (prefers-reduced-motion: reduce) {
-  * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
-}
-
 /* Review screen: progress, sections, groups, folded decided fixes.
    Document text (headings, alt text, captions) and codes can be long unbroken strings. */
 .review-progress { margin: var(--space-4) 0; }
@@ -329,6 +380,7 @@ math[intent] mi { text-transform: none; }
 .check-list li { margin: var(--space-1) 0; }
 .code-line { display: block; color: var(--ink-muted); font-size: var(--step--1); }
 .changed-note { border: 1px solid var(--ok); border-radius: var(--radius-control); background: var(--ok-tint); padding: var(--space-2) var(--space-4); margin: var(--space-3) 0; }
+@media (forced-colors: active) { .changed-note { border: 1px solid CanvasText; } }
 .heading-proposal { background: var(--surface); padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); font-weight: 700; }
 .prose-input { font-family: inherit; }
 .review-item { scroll-margin-top: var(--space-2); }
@@ -339,6 +391,7 @@ math[intent] mi { text-transform: none; }
 .done-list { margin: var(--space-2) 0 0 var(--space-4); }
 .done-item { border-bottom: 1px solid var(--border-subtle); }
 .done-item > .fix-card { margin-top: var(--space-2); }
+.decided-box { margin-top: var(--space-3); }
 
 /* ===================================================================== review screen
    One decision at a time beside the page it is on (templates/review_split.html).
@@ -362,6 +415,8 @@ math[intent] mi { text-transform: none; }
 .review-lede { font-size: var(--step-1); margin: var(--space-1) 0 0; max-width: 46rem; }
 .review-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-5); }
 .review-links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); }
+@media (max-width: 40rem) { .review-head h1 { font-size: var(--step-2); } }
+
 
 /* Decisions as numbered steps: made (filled, ticked), current (ringed), waiting (outlined). */
 .steps { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
@@ -379,6 +434,10 @@ math[intent] mi { text-transform: none; }
 .step-current { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--mark-current); }
 .steps-count { margin: 0; color: var(--ink-muted); font-size: var(--step-0); }
 .steps-bar { width: 12rem; height: 0.8rem; accent-color: var(--ok); }
+@media (forced-colors: active) {
+  .step { border: 2px solid CanvasText; }
+  .step-current { outline: 3px solid Highlight; outline-offset: 2px; }
+}
 
 /* Layout: decision first in the DOM; on a wide screen the page sits on the left. */
 .split { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); margin-top: var(--space-4); }
@@ -392,8 +451,8 @@ math[intent] mi { text-transform: none; }
   .decision-area { grid-area: decision; }
   .optional-area { grid-area: optional; }
   .page-area {
-    grid-area: page; position: sticky; top: 0.5rem;
-    max-height: calc(100vh - 1rem); display: flex; flex-direction: column;
+    grid-area: page; position: sticky; top: var(--sticky-offset);
+    max-height: calc(100vh - 2 * var(--sticky-offset)); display: flex; flex-direction: column;
   }
   .page-scroll { flex: 1 1 auto; min-height: 14rem; }
 }
@@ -408,13 +467,20 @@ math[intent] mi { text-transform: none; }
   padding: var(--space-4) var(--space-5) var(--space-4); box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
   overflow-wrap: anywhere;
 }
+@media (max-width: 40rem) { .decision-area { padding: var(--space-4) var(--space-4) var(--space-4); } }
 .panel-decision { border-color: var(--mark-required); }
 .panel-done { border-color: var(--ok); }
 .panel-item, .panel-notice { border-color: var(--mark-optional); }
+/* The notice after a decision: what was done, and Undo. */
 .decision-notice {
   margin: 0 0 var(--space-4); padding: var(--space-2) var(--space-3); border: 1px solid var(--ok);
   background: var(--ok-tint); border-radius: var(--radius-control);
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-4);
 }
+.decision-notice p { margin: 0; }
+.undo-form { margin: 0; }
+.undo-form .link-button { min-height: 44px; min-width: 44px; padding: 0 var(--space-2); font-weight: 700; }
+@media (forced-colors: active) { .decision-notice { border: 2px solid CanvasText; } }
 .panel-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-4); }
 .panel-head h2 { margin: 0; font-size: var(--step-2); }
 .panel-head h2:focus { outline: none; }
@@ -427,6 +493,7 @@ math[intent] mi { text-transform: none; }
 .pill-required { color: var(--mark-required); border-color: var(--mark-required); background: var(--tint-required); }
 .pill-done { color: var(--ok); border-color: var(--ok); background: var(--ok-tint); }
 .pill-optional { color: var(--mark-optional); border-color: var(--mark-optional); background: var(--surface); }
+@media (forced-colors: active) { .pill { border: 2px solid CanvasText; } }
 .why { font-size: var(--step-1); margin: var(--space-4) 0 var(--space-1); }
 .on-page { margin: 0 0 var(--space-4); font-size: var(--step-0); }
 
@@ -457,6 +524,24 @@ math[intent] mi { text-transform: none; }
 .cmp-none { margin: 0; padding: var(--space-2); background: var(--paper); border: 1px dashed var(--border-control); }
 .speech { margin: var(--space-2) 0 0; color: var(--ink-muted); }
 .speech-label { font-weight: 700; }
+@media (forced-colors: active) {
+  .cmp-row, .cmp-none { border-color: CanvasText; }
+  .cmp-math .flagged { outline-color: Highlight; }
+}
+
+/* "Hear this" next to a decision, and the Play controls on the landing page. */
+.hear { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: var(--space-2) 0; }
+.hear button[hidden] { display: none; }
+.hear-note { color: var(--ink-muted); max-width: var(--prose-max); }
+.hear-note:empty { display: none; }
+
+/* Equation: the PDF's picture can be shown larger. */
+.enlarge-link { display: inline-flex; align-items: center; min-height: 1.5rem; margin: var(--space-1) 0 var(--space-2); font-size: var(--step--1); }
+@media (max-width: 63.99rem) { .enlarge-link { min-height: 2.75rem; } }
+.enlarge-dialog { width: min(96vw, 60rem); max-height: 92vh; padding: var(--space-3); border: 2px solid var(--ink); border-radius: var(--radius-frame); background: var(--bg); color: var(--ink); }
+.enlarge-dialog::backdrop { background: rgb(0 0 0 / 0.6); }
+.enlarge-body { overflow: auto; max-height: 72vh; margin-bottom: var(--space-3); background: var(--paper); border: 1px solid var(--border-subtle); }
+.enlarge-image { display: block; width: auto; min-width: 100%; max-width: none; height: auto; }
 
 .diff-wrap { position: relative; }
 .diff-table { width: 100%; margin: var(--space-1) 0 var(--space-2); font-size: var(--step-0); }
@@ -466,12 +551,48 @@ math[intent] mi { text-transform: none; }
 .diff-what { color: var(--ink-muted); font-weight: 400; font-size: var(--step--1); }
 .diff-meaning td:last-child strong { color: var(--err); }
 .same-line { color: var(--ok); margin: 0 0 var(--space-3); font-size: var(--step-0); }
+/* The two readings with the symbols that differ marked, and the lines that name their items. */
+mark.said-diff {
+  background: var(--tint-required); color: var(--ink); font-weight: 700; padding: 0 0.1em; border-radius: var(--radius-control);
+  text-decoration: underline 2px var(--mark-required); text-underline-offset: 0.2em;
+}
+.text-layer { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", serif; color: var(--ink); }
+.said-key { font-size: var(--step--1); margin: var(--space-1) 0 0; }
+.item-math {
+  display: inline-block; max-width: 100%; overflow: hidden; vertical-align: middle; white-space: nowrap;
+  font-family: var(--font-math);
+}
+.item-math math { display: inline; display: inline math; font-size: 1.05em; }
+/* "What differs" on a phone: one row per symbol, each value with its column's name, so
+   no word is broken mid-word to fit four columns. */
+@media (max-width: 30rem) {
+  .diff-table thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .diff-table, .diff-table caption, .diff-table tbody, .diff-table tr, .diff-table th,
+  .diff-table td { display: block; }
+  .diff-table tr { padding: var(--space-1) 0; border-bottom: 1px solid var(--border-subtle); }
+  .diff-table th, .diff-table td { border: 0; padding: var(--space-1) 0; overflow-wrap: normal; }
+  .diff-table td::before { content: attr(data-label) ": "; color: var(--ink-muted); }
+}
 
 /* The suggested fix for a difference that changes the meaning: one button, first. */
 .suggest { margin: var(--space-4) 0 var(--space-3); }
 .suggest .button { min-width: 7rem; min-height: 2.75rem; font-weight: 700; }
 .suggest .hint { margin: var(--space-1) 0 0; }
 code.latex { overflow-wrap: anywhere; }
+
+/* The live check of an edit, and a draft put back after signing in again (or one that could
+   not be kept). Existing colours only. */
+.live-status { margin: var(--space-1) 0 0; font-size: var(--step-0); }
+.live-check:empty { display: none; }
+.live-check { margin-top: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--surface); border-radius: var(--radius-control); }
+.live-check .cmp-label { margin-top: 0; }
+.live-results { margin: var(--space-2) 0 0; padding-left: var(--space-4); }
+.kept-draft { margin: var(--space-1) 0 0; padding: var(--space-1) var(--space-2); border: 1px solid var(--accent); border-radius: var(--radius-control); background: var(--accent-tint); }
+p.draft-failed { border-color: var(--warn); background: var(--warn-tint); }
+@media (forced-colors: active) { .kept-draft { border: 1px solid CanvasText; } }
 
 /* A second reader's other readings of a doubtful symbol: plain buttons, none chosen, each a
    44 px target; the spoken result sits beside its button and wraps on a narrow screen. */
@@ -492,10 +613,20 @@ code.latex { overflow-wrap: anywhere; }
   .chip, .other-form .button-secondary { border: 2px solid ButtonText; }
 }
 .unseen-line { color: var(--ink-muted); margin: 0 0 var(--space-3); font-size: var(--step-0); }
-.group-state { font-weight: 700; margin: var(--space-1) 0 0; }
+/* Also the summary line of an upload option group (set after the review screen's own bold). */
+.group-state { display: block; font-weight: 400; color: var(--ink-muted); margin: var(--space-1) 0 0; max-width: var(--prose-max); }
 .redo-lead { margin: var(--space-4) 0 0; }
 .redo-lead + .decide-row { margin-top: var(--space-2); }
 .region-image { display: block; max-width: 100%; height: auto; margin: var(--space-2) 0 var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); background: var(--paper); }
+@media (max-width: 40rem) {
+  /* A heading's band is half a page wide: on a phone, keep its start (where the heading
+     is) at a readable size and let the right-hand end go. */
+  .region-image {
+    width: 100%; height: 7.5rem; object-fit: cover; object-position: left center;
+    -webkit-mask-image: linear-gradient(to right, #000 78%, transparent);
+    mask-image: linear-gradient(to right, #000 78%, transparent);
+  }
+}
 .figure-view { margin: var(--space-2) 0 var(--space-3); }
 .figure-view img { display: block; max-width: 100%; max-height: 22rem; height: auto; border: 1px solid var(--border-subtle); background: var(--paper); }
 .figure-view figcaption { margin-top: var(--space-1); color: var(--ink-muted); }
@@ -510,6 +641,14 @@ code.latex { overflow-wrap: anywhere; }
 .group-pages { margin: 0 0 var(--space-4); }
 .aside-link { font-size: var(--step-0); }
 
+/* A heading group: each heading on its own. */
+.member-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
+.member { padding: var(--space-3) 0; border-top: 1px solid var(--border-subtle); }
+.member:first-child { border-top: 0; }
+.member-where { margin: 0 0 var(--space-1); font-weight: 700; }
+.member .region-image { margin: var(--space-1) 0 var(--space-2); }
+.member .decide-row { margin: 0; }
+
 /* The form: Accept and Reject on one row, the edit box folded until it is needed. */
 .decide-form textarea { width: 100%; }
 .decide-form .field { margin-bottom: var(--space-3); }
@@ -517,6 +656,7 @@ code.latex { overflow-wrap: anywhere; }
 .decide-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-4) 0 var(--space-1); }
 .decide-row:focus { outline: none; }
 .decide-row .button, .decide-row .button-secondary { min-width: 7rem; min-height: 2.75rem; font-weight: 700; }
+@media (max-width: 40rem) { .decide-row .button, .decide-row .button-secondary { flex: 1 1 8rem; } }
 .decide-note { font-size: var(--step--1); margin: var(--space-1) 0 0; }
 .edit-box { margin: var(--space-2) 0 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: 0 var(--space-4); }
 .edit-box[open] { padding-bottom: var(--space-4); }
@@ -524,17 +664,59 @@ code.latex { overflow-wrap: anywhere; }
 /* With JavaScript, a changed field makes Save edit the main button (app.js). */
 .is-edited [data-role="save"] { background: var(--accent); color: var(--on-accent); }
 .is-edited [data-role="accept"] { background: var(--bg); color: var(--accent); }
+/* Review choices: the primary action is filled; "Accept anyway" (the proposal changes the
+   meaning) is cautioned in the warning colours, and the option that keeps the original
+   ("Keep as image", "Make bold text") is quiet, so none of them looks like Save edit.
+   In forced colours the caution has a dashed border, so it differs without colour. */
+button[data-tone="caution"] { background: var(--warn-tint); color: var(--warn); border-color: var(--warn); }
+button[data-tone="caution"]:hover { background: var(--warn-tint); color: var(--warn); border-color: var(--warn); text-decoration: underline; }
+button[data-tone="quiet"] { background: var(--bg); color: var(--ink); border-color: var(--border-control); }
+button[data-tone="quiet"]:hover { background: var(--surface); color: var(--ink); border-color: var(--ink); }
+@media (forced-colors: active) { button[data-tone="caution"] { border-style: dashed; } }
+/* The details a person rarely needs: folded under "More about this item". Small controls here
+   are at least 24px high. */
 .tech { margin-top: var(--space-4); font-size: var(--step-0); }
-.tech > summary { cursor: pointer; color: var(--ink-muted); padding: var(--space-1) 0; }
+.tech > summary { cursor: pointer; color: var(--ink-muted); display: list-item; min-height: 1.5rem; padding: var(--space-1) 0; }
+/* "More about this item": the details and the report link, folded. */
+.more-box { margin-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+.more-box > summary { cursor: pointer; display: list-item; min-height: 1.5rem; padding: var(--space-2) 0; color: var(--ink-muted); }
+.more-box .tech { margin-top: 0; }
 .decision-nav { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
 .decision-nav a[rel="next"] { margin-left: auto; }
 .done-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); }
 .shortcuts { margin-top: var(--space-4); font-size: var(--step--1); }
-.shortcuts > summary { cursor: pointer; color: var(--ink-muted); }
+.shortcuts > summary { cursor: pointer; color: var(--ink-muted); display: list-item; min-height: 1.5rem; padding: var(--space-1) 0; }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: var(--space-1) var(--space-3); margin: var(--space-2) 0; }
 .keys div { display: contents; }
 .keys dd { margin: 0; }
 kbd { border: 1px solid var(--border-control); border-bottom-width: 2px; border-radius: 4px; padding: 0 var(--space-1); background: var(--bg); }
+
+/* The decision bar: the choices and what each one does, in one block that sticks to the bottom
+   of the window on a wide, tall screen. */
+.decision-bar {
+  margin: var(--space-4) 0 var(--space-3); padding: var(--space-3) var(--space-4);
+  background: var(--surface); border: 1px solid var(--border-control); border-radius: var(--radius-frame);
+}
+.decision-bar .bar-lead { margin: 0 0 var(--space-2); font-weight: 700; }
+.decision-bar .decide-row { margin: 0 0 var(--space-2); }
+.decision-bar .decide-note { margin: var(--space-1) 0 0; }
+.decision-bar .error-message { margin-top: 0; }
+@media (min-width: 64rem) and (min-height: 40rem) {
+  .decision-area .decision-bar { position: sticky; bottom: var(--sticky-offset); z-index: var(--z-sticky); }
+}
+@media (forced-colors: active) { .decision-bar { border: 2px solid CanvasText; } }
+
+/* What is kept apart from the choices: leaving the original, or the item out of the conversion. */
+.fallback { margin: var(--space-5) 0 var(--space-3); padding: var(--space-3) 0 0; border-top: 1px dashed var(--border-control); }
+fieldset.fallback { border-width: 1px 0 0; border-style: dashed; border-color: var(--border-control); border-radius: 0; min-width: 0; }
+.fallback-title, fieldset.fallback > legend { font-weight: 700; color: var(--ink-muted); padding: 0; margin: 0 0 var(--space-2); }
+fieldset.fallback > legend { padding-right: var(--space-2); }
+.fallback .hint { margin: 0 0 var(--space-2); }
+.fallback .checkbox-field { margin: var(--space-2) 0 var(--space-3); }
+.fallback-choice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-bottom: var(--space-2); }
+.fallback-choice .hint { margin: 0; flex: 1 1 16rem; }
+.fallback .not-a-table { margin-top: var(--space-2); }
+.saved-state { margin: var(--space-2) 0; font-weight: 700; color: var(--ok); }
 
 /* Optional checks */
 .optional-area { overflow-wrap: anywhere; }
@@ -549,6 +731,7 @@ kbd { border: 1px solid var(--border-control); border-bottom-width: 2px; border-
 /* The page */
 .page-area { background: var(--desk); border-radius: var(--radius-frame); padding: var(--space-3) var(--space-4) var(--space-4); min-width: 0; }
 .page-area:focus { outline: none; }
+@media (max-width: 40rem) { .page-area { padding: var(--space-2); } }
 .page-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-4); }
 .page-head h2 { margin: 0; font-size: var(--step-1); }
 .page-of { font-weight: 400; color: var(--ink-muted); }
@@ -562,9 +745,13 @@ kbd { border: 1px solid var(--border-control); border-bottom-width: 2px; border-
 .page-chip:visited { color: var(--ink); }
 .page-chip:hover { border-color: var(--accent); }
 .page-chip[aria-current="page"] { border: 2px solid var(--mark-current); font-weight: 700; }
+@media (forced-colors: active) {
+  .page-chip { border: 2px solid CanvasText; }
+  .page-chip[aria-current="page"] { outline: 3px solid Highlight; outline-offset: 2px; }
+}
 .chip-count { background: var(--mark-required); color: var(--on-mark); border-radius: var(--radius-control); padding: 0 var(--space-2); font-size: var(--step--1); font-weight: 700; white-space: nowrap; }
 .page-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-4); margin: var(--space-2) 0; font-size: var(--step--1); }
-.toggle-accepted { margin-left: auto; }
+.toggle-accepted { margin-left: auto; display: inline-flex; align-items: center; min-height: 1.5rem; }
 .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); color: var(--ink); }
 .legend li { display: inline-flex; align-items: center; gap: var(--space-1); }
 .key {
@@ -575,11 +762,34 @@ kbd { border: 1px solid var(--border-control); border-bottom-width: 2px; border-
 .key-optional { background: var(--bg); min-width: 1.9rem; border: 1.5px dashed var(--mark-optional); border-radius: var(--radius-control); }
 .key-repeat { background: var(--bg); color: var(--mark-required); border: 2px solid var(--mark-required); border-radius: 0.7rem; }
 .key-accepted { background: var(--bg); min-width: 1.9rem; color: var(--mark-accepted); border: 1.5px dotted var(--mark-accepted); border-radius: var(--radius-control); }
+@media (forced-colors: active) {
+  /* The legend keys show what the marks look like, and the marks keep their colours. */
+  .legend .key { forced-color-adjust: none; box-shadow: 0 0 0 1px #fff; }
+}
 .page-scroll {
   position: relative; overflow: auto; border-radius: 4px; background: var(--desk);
   max-height: 80vh; overscroll-behavior: contain;
 }
 .page-scroll:focus-visible { outline-offset: -3px; }
+/* Review split: the page is reachable on a phone. Below the two-column layout the page keeps a
+   legible size (about 1 CSS px per point) and scrolls inside its own region; "Show on the page"
+   (and app.js) scroll it to the mark. The page itself never scrolls sideways. */
+.back-to-decision, .page-scroll-hint { display: none; margin: 0; }
+@media (max-width: 63.99rem) {
+  .page-scroll { max-height: 75vh; }
+  .back-to-decision { display: block; }
+  .page-scroll-hint { display: block; margin: var(--space-2) 0 0; }
+  .page-scroll-hint .button-small { margin-top: var(--space-1); }
+  /* More page to the right: an edge shadow that goes when the page is scrolled to its end. */
+  .page-scroll {
+    background:
+      linear-gradient(to right, var(--desk) 30%, transparent) left center / 2rem 100% no-repeat local,
+      linear-gradient(to left, var(--desk) 30%, transparent) right center / 2rem 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 0.35), transparent) left center / 0.75rem 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.35), transparent) right center / 0.75rem 100% no-repeat scroll,
+      var(--desk);
+  }
+}
 /* At least 36rem wide at every window width (about 1 CSS px per point for a Letter page):
    web.marks sizes the clickable areas for that (MIN_PAGE_PX). Narrower, the page
    scrolls inside its region. */
@@ -587,6 +797,31 @@ kbd { border: 1px solid var(--border-control); border-bottom-width: 2px; border-
 .page-image { display: block; width: 100%; height: auto; }
 .page-note { margin: var(--space-2) 0 0; font-size: var(--step-0); }
 .page-failed:not([hidden]) { display: block; }
+/* Fit the page to the screen: no sideways scrolling of the page image. */
+.page-scroll.fit-width .page-frame { min-width: 0; }
+
+/* A phone: the Decision / Page bar stays at the bottom of the window. */
+.view-toggle { display: none; }
+@media (max-width: 63.99rem) {
+  .view-toggle {
+    display: flex; gap: var(--space-2); position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-fixed);
+    padding: var(--space-2) var(--space-3); background: var(--bg); border-top: 1px solid var(--border-control);
+  }
+  .view-toggle a {
+    flex: 1 1 0; display: flex; align-items: center; justify-content: center; min-height: 2.75rem;
+    border: 2px solid var(--accent); border-radius: var(--radius-control); background: var(--bg);
+    color: var(--accent); font-weight: 700; text-decoration: none;
+  }
+  .view-toggle a[aria-current="true"] { background: var(--accent); color: var(--on-accent); text-decoration: underline; text-underline-offset: 0.25em; }
+  .wrap-review { padding-bottom: 5rem; }
+  html:has(.view-toggle) { scroll-padding-bottom: 5rem; } /* a focused control is never under the bar */
+  /* The footer's last links stay above the bar when the page is scrolled to its end. */
+  body:has(.view-toggle) .site-footer { padding-bottom: calc(var(--space-4) + 4rem); }
+}
+@media (forced-colors: active) {
+  .view-toggle a { border-color: ButtonText; }
+  .view-toggle a[aria-current="true"] { background: Highlight; color: HighlightText; border-color: Highlight; }
+}
 
 /* A mark is a link (the clickable area: at least 24 x 24 CSS px, overlapping no other
    mark; web.marks places it) with a frame inside that hugs the item. The link itself is
@@ -607,7 +842,7 @@ kbd { border: 1px solid var(--border-control); border-bottom-width: 2px; border-
 .box-repeat .box-frame { border: 2px solid var(--pmark-required); box-shadow: 0 0 0 1px #fff; }
 .box-optional .box-frame { border: 1.5px dashed var(--pmark-optional); box-shadow: 0 0 0 1px #fff; }
 .box-accepted .box-frame { border: 1.5px dotted var(--pmark-accepted); box-shadow: 0 0 0 1px #fff; }
-.box.is-current { z-index: 1; }
+.box.is-current { z-index: var(--z-raised); }
 .box.is-current .box-frame { border: 2.5px solid var(--pmark-current); box-shadow: 0 0 0 2px #fff, 0 0 0 5px rgb(26 79 160 / 0.25); background: rgb(232 238 250 / 0.15); }
 .box:hover .box-frame { border-style: solid; }
 /* The number sits just outside the frame on the left (in the margin, for a heading), or
@@ -638,78 +873,8 @@ kbd { border: 1px solid var(--border-control); border-bottom-width: 2px; border-
 .box-accepted:hover .box-tag, .box-accepted:focus-visible .box-tag, .box-accepted.is-current .box-tag { display: inline-flex; }
 .box.is-current .box-tag { background: var(--pmark-current); color: #fff; border: 0; }
 /* Focus: after the status rules, so a focused mark always shows the focus ring. */
-.page-frame .box:focus-visible { outline: 3px solid var(--focus-outline); outline-offset: 2px; box-shadow: 0 0 0 5px var(--focus-halo); z-index: 2; }
-.page-frame .box:target { outline: 3px solid var(--focus-outline); outline-offset: 2px; z-index: 2; }
-
-/* Review screen fixes from the UX review (ux-b): Undo in the notice after a decision, the
-   live check of an edit, the two readings with the symbols that differ marked, lists
-   that name their items, a draft put back after signing in again. Existing colours only. */
-.decision-notice { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-4); }
-.decision-notice p { margin: 0; }
-.undo-form { margin: 0; }
-.undo-form .link-button { min-height: 44px; min-width: 44px; padding: 0 var(--space-2); font-weight: 700; }
-.live-status { margin: var(--space-1) 0 0; font-size: var(--step-0); }
-.live-check:empty { display: none; }
-.live-check { margin-top: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--surface); border-radius: var(--radius-control); }
-.live-check .cmp-label { margin-top: 0; }
-.live-results { margin: var(--space-2) 0 0; padding-left: var(--space-4); }
-.kept-draft { margin: var(--space-1) 0 0; padding: var(--space-1) var(--space-2); border: 1px solid var(--accent); border-radius: var(--radius-control); background: var(--accent-tint); }
-mark.said-diff {
-  background: var(--tint-required); color: var(--ink); font-weight: 700; padding: 0 0.1em; border-radius: var(--radius-control);
-  text-decoration: underline 2px var(--mark-required); text-underline-offset: 0.2em;
-}
-.text-layer { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", serif; color: var(--ink); }
-.said-key { font-size: var(--step--1); margin: var(--space-1) 0 0; }
-.item-math {
-  display: inline-block; max-width: 100%; overflow: hidden; vertical-align: middle; white-space: nowrap;
-  font-family: var(--font-math);
-}
-.item-math math { display: inline; display: inline math; font-size: 1.05em; }
-.decided-box { margin-top: var(--space-3); }
-
-@media (forced-colors: active) {
-  /* The legend keys show what the marks look like, and the marks keep their colours. */
-  .legend .key { forced-color-adjust: none; box-shadow: 0 0 0 1px #fff; }
-  .step, .page-chip, .pill { border: 2px solid CanvasText; }
-  .step-current, .page-chip[aria-current="page"] { outline: 3px solid Highlight; outline-offset: 2px; }
-  .cmp-math .flagged { outline-color: Highlight; }
-  .decision-notice { border: 2px solid CanvasText; }
-}
-
-/* Below the two-column layout the page keeps a legible size (about 1 CSS px per point)
-   and scrolls inside its own region; "Show on the page" (and app.js) scroll it to the
-   mark. The page itself never scrolls sideways. */
-@media (max-width: 63.99rem) {
-  .page-scroll { max-height: 75vh; }
-}
-
-/* "What differs" on a phone: one row per symbol, each value with its column's name, so
-   no word is broken mid-word to fit four columns. */
-@media (max-width: 30rem) {
-  .diff-table thead {
-    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
-    clip: rect(0 0 0 0); white-space: nowrap;
-  }
-  .diff-table, .diff-table caption, .diff-table tbody, .diff-table tr, .diff-table th,
-  .diff-table td { display: block; }
-  .diff-table tr { padding: var(--space-1) 0; border-bottom: 1px solid var(--border-subtle); }
-  .diff-table th, .diff-table td { border: 0; padding: var(--space-1) 0; overflow-wrap: normal; }
-  .diff-table td::before { content: attr(data-label) ": "; color: var(--ink-muted); }
-}
-
-@media (max-width: 40rem) {
-  /* A heading's band is half a page wide: on a phone, keep its start (where the heading
-     is) at a readable size and let the right-hand end go. */
-  .region-image {
-    width: 100%; height: 7.5rem; object-fit: cover; object-position: left center;
-    -webkit-mask-image: linear-gradient(to right, #000 78%, transparent);
-    mask-image: linear-gradient(to right, #000 78%, transparent);
-  }
-  .review-head h1 { font-size: var(--step-2); }
-  .decision-area { padding: var(--space-4) var(--space-4) var(--space-4); }
-  .decide-row .button, .decide-row .button-secondary { flex: 1 1 8rem; }
-  .page-area { padding: var(--space-2); }
-}
+.page-frame .box:focus-visible { outline: 3px solid var(--focus-outline); outline-offset: 2px; box-shadow: 0 0 0 5px var(--focus-halo); z-index: var(--z-raised-top); }
+.page-frame .box:target { outline: 3px solid var(--focus-outline); outline-offset: 2px; z-index: var(--z-raised-top); }
 
 /* ===================================================================== tables (review)
    The table card (templates/_table_card.html): the image of the table, then the table as
@@ -721,6 +886,8 @@ mark.said-diff {
 /* On a phone the picture of the table from the PDF takes the whole width (T1-19). */
 @media (max-width: 40rem) { .table-compare .table-crop { width: 100%; max-width: none; } }
 .table-view { background: var(--paper); border: 1px solid var(--border-subtle); border-radius: 4px; overflow-wrap: normal; margin: 0 0 var(--space-2); }
+/* A table shown as paper keeps the light surface for its header cells in dark mode too. */
+.table-view { --surface: var(--paper-surface); }
 .table-view table { width: auto; margin: 0; }
 .table-view caption { text-align: left; font-weight: 700; padding: var(--space-2) var(--space-2) var(--space-1); }
 .table-view th, .table-view td { border: 1px solid var(--border-control); padding: var(--space-1) var(--space-2); overflow-wrap: normal; }
@@ -734,42 +901,35 @@ mark.said-diff {
 .table-fieldset legend { font-weight: 700; padding: 0; margin-bottom: var(--space-1); }
 .table-fieldset .checkbox-field { margin: var(--space-1) 0; }
 .table-continue { margin: var(--space-3) 0 0; font-weight: 700; }
-/* ===================================================================== ux-a
-   Pages outside the review screen and the job page: My documents as a to-do list, the
-   upload form's own messages, the two questions after a download, the posting help.
-   No new colours: statuses reuse the badge styles above, in words first. */
+@media (forced-colors: active) {
+  .table-view { border-color: CanvasText; }
+  /* After .table-fieldset above, which also sets a border: a fieldset with an error keeps its frame. */
+  .field-error { border: 1px solid CanvasText; }
+}
+/* What the checks found, each with its correction; one place to change it. */
+.finding-list { list-style: none; margin: 0; padding: 0; }
+.finding { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-4); padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
+.finding:first-child { border-top: 0; }
+.finding-text { flex: 1 1 18rem; min-width: 0; }
+.finding-action { margin: 0; }
+a.finding-action { display: inline-flex; align-items: center; min-height: 2.25rem; font-weight: 700; }
+.table-source-grid { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
+.table-source-grid .part-label { margin-top: 0; }
 
+/* My documents as a to-do list. Statuses reuse the badge styles above, in words first. */
 .documents-summary { font-size: var(--step-1); margin: var(--space-2) 0 var(--space-3); }
 .documents h3 { font-size: var(--step-1); margin: var(--space-5) 0 var(--space-1); }
-.doc-file { display: block; font-weight: 400; color: var(--ink-muted); font-size: var(--step-0); }
+.doc-file { display: block; font-weight: 400; color: var(--ink-muted); font-size: var(--step-0); margin: -0.5rem 0 var(--space-4); overflow-wrap: anywhere; }
 /* The same column widths in every group's table, so the groups line up. */
 .doc-table { table-layout: fixed; }
-.doc-table th:nth-child(1) { width: 44%; }
-.doc-table th:nth-child(2) { width: 26%; }
-.doc-table th:nth-child(4) { width: 5rem; }
+.doc-table th:nth-child(1) { width: 40%; }
+.doc-table th:nth-child(2) { width: 22%; }
+.doc-table th:nth-child(4) { width: 9.5rem; }
 .doc-table .status-badge { margin: 0 var(--space-2) var(--space-1) 0; }
 .doc-table td a, .doc-table th a { display: inline-flex; align-items: center; min-height: 1.5rem; }
-/* Days and pseudonyms are short codes: never break them to make room. */
-.usage-table tbody th { overflow-wrap: normal; white-space: nowrap; }
-.status-decisions, .status-partial { border-color: var(--warn); color: var(--warn); }
-.status-sample { border-color: var(--ink-muted); color: var(--ink-muted); }
-.parts-list { padding-left: var(--space-4); }
-
-.upload-status { font-weight: 700; }
-.upload-status:empty { display: none; }
-
-/* The questions after a download: a fieldset that looks like the other fields. */
-fieldset.field { border: 0; padding: 0; min-width: 0; }
-fieldset.field legend { font-weight: 700; padding: 0; margin-bottom: var(--space-2); }
-.choice-row { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
-.choice { display: inline-flex; align-items: center; gap: var(--space-2); }
-.choice input { width: 1.3rem; height: 1.3rem; margin: 0; }
-.field .choice label { display: inline; font-weight: 400; margin: 0; }
-input[type="text"].input-short { width: 8rem; }
-input[type="number"].input-short { width: 6rem; }
-.feedback { border-top: 1px solid var(--border-subtle); margin-top: var(--space-4); }
-.steps-list li { margin: var(--space-1) 0; }
-
+.doc-table .doc-file { margin: var(--space-1) 0 0; }
+.doc-table td.row-actions > a { margin: 0 var(--space-4) 0 0; }
+.row-primary { font-weight: 700; }
 /* Phones: each document is a block of lines instead of a table row wider than the
    screen (UX review MF22). The table keeps its roles in the markup, so a screen reader
    still hears it as a table; the labels below are for the eye, with empty alternative
@@ -789,11 +949,24 @@ input[type="number"].input-short { width: 6rem; }
     color: var(--ink-muted);
   }
 }
+/* Days and pseudonyms are short codes: never break them to make room. */
+.usage-table tbody th { overflow-wrap: normal; white-space: nowrap; }
 
-/* ===================================================================== tier 1 web
-   The job page's one-line settings and the student-file fields (T1-7, T1-11, T1-17).
-   No new colours. */
-.doc-file { color: var(--ink-muted); margin: -0.5rem 0 var(--space-4); overflow-wrap: anywhere; }
+/* The questions after a download: a fieldset that looks like the other fields. */
+fieldset.field { border: 0; padding: 0; min-width: 0; }
+fieldset.field legend { font-weight: 700; padding: 0; margin-bottom: var(--space-2); }
+.choice-row { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
+.choice { display: inline-flex; align-items: center; gap: var(--space-2); }
+.choice input { width: 1.3rem; height: 1.3rem; margin: 0; }
+.field .choice label { display: inline; font-weight: 400; margin: 0; }
+input[type="text"].input-short { width: 8rem; }
+input[type="number"].input-short { width: 6rem; }
+.feedback { border-top: 1px solid var(--border-subtle); margin-top: var(--space-4); }
+.steps-list li { margin: var(--space-1) 0; }
+
+/* The job page: its one-line settings and the student-file fields, links to its groups, then
+   each group under one heading with a rule above; where to post it; and how long a document has
+   been waiting. */
 .setting-line { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); align-items: baseline; }
 .setting-line p { margin: 0; }
 .setting-line details[open] { flex-basis: 100%; }
@@ -807,6 +980,43 @@ input[type="number"].input-short { width: 6rem; }
 .group-crops figure { margin: 0; }
 .group-crops img { display: block; width: 100%; height: auto; border: 1px solid var(--border-subtle); }
 .group-crops figcaption { color: var(--ink-muted); font-size: var(--step-0); margin-top: var(--space-1); }
+
+.jump-links { margin: var(--space-4) 0 var(--space-2); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.jump-links ul { list-style: none; margin: 0; padding: var(--space-2) 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); }
+.jump-links a { display: inline-flex; align-items: center; min-height: 1.75rem; }
+.job-group { margin-top: var(--space-7); border-top: 1px solid var(--border-subtle); }
+.job-group > h2 { margin-top: var(--space-4); }
+#review-and-download { margin-top: var(--space-5); border-top: 0; }
+#review-and-download > section > h2 { margin-top: var(--space-2); }
+section.job-group { padding-top: 0; }
+#results-line { max-width: var(--prose-max); }
+#counts-detail { margin: 0 0 var(--space-4); }
+#counts-detail .summary-list { margin-top: var(--space-3); }
+
+/* "Where will you post it?": one flat list, each way with its own link, the recommended one
+   first. */
+.routes { list-style: none; margin: var(--space-2) 0 var(--space-5); padding: 0; max-width: var(--prose-max); }
+.route { border-top: 1px solid var(--border-subtle); padding: var(--space-3) 0; }
+.route:last-child { border-bottom: 1px solid var(--border-subtle); }
+.route h4 { margin: 0 0 var(--space-1); display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); align-items: baseline; }
+.route p { margin: 0 0 var(--space-2); }
+.route .canvas-download { margin: var(--space-3) 0 0; }
+.route form.canvas-download { margin: 0; }
+
+/* How long a document has been waiting, and the plain note when it is longer than usual. */
+.wait-note { margin: var(--space-2) 0 var(--space-3); }
+.wait-note p { margin: var(--space-1) 0; }
+.wait-elapsed { color: var(--ink-muted); }
+.wait-slow { border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--accent-tint); padding: var(--space-2) var(--space-4); max-width: var(--prose-max); }
+.wait-slow[hidden] { display: none; }
+/* The deletion time and "Keep for 7 days", once, under the actions of the job page. */
+.retention-line { margin: var(--space-5) 0; }
+.retention-line p { margin: 0 0 var(--space-2); }
+.retention-line form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.retention-line .hint { margin: 0; }
+@media (forced-colors: active) {
+  .wait-slow, .jump-links, .route, .job-group { border-color: CanvasText; }
+}
 
 /* Notices about text (T3-7) and the page tools (T3-5, T3-16) */
 .notice-names { font-style: normal; }
@@ -841,13 +1051,6 @@ input[type="number"].input-short { width: 6rem; }
 .suggestion .checkbox-field { margin: 0 0 var(--space-2); }
 .suggestion .field { margin: 0 0 var(--space-1) var(--space-6); }
 .suggestion select { max-width: 100%; }
-
-/* The review record (T3-6): printed on its own, without the site's navigation. */
-@media print {
-  .site-header, .site-footer, .skip-link, .no-print { display: none; }
-  .table-scroll { overflow: visible; }
-  tr, section { break-inside: avoid; }
-}
 #suggestions p, #suggestions .button { overflow-wrap: anywhere; }
 #suggestions .button { max-width: 100%; white-space: normal; text-align: left; }
 
@@ -862,6 +1065,10 @@ input[type="number"].input-short { width: 6rem; }
 .bulk-confirm .button, .leave-out .button-secondary, .notify-box .button-secondary { min-height: 2.75rem; }
 .filter-fields { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); align-items: flex-start; }
 .decision-filter .field { margin-bottom: var(--space-2); }
+/* A flex item will not shrink below its widest child (the Kind select's longest option), so at 320px with
+   WCAG 1.4.12 text spacing the form ran 4px past the viewport; let it shrink and the select follow. */
+.filter-fields > .field { min-width: 0; max-width: 100%; }
+.filter-fields select { width: 100%; }
 .decision-filter select, .decision-filter input[type="number"] { min-height: 2.75rem; }
 .filter-result { font-weight: 700; }
 .bulk-preview { padding-left: var(--space-5); }
@@ -910,37 +1117,67 @@ input[type="number"].input-short { width: 6rem; }
 .place-keep input { width: 1.5rem; height: 1.5rem; flex: none; }
 .symbols-notice { margin: var(--space-4) 0; }
 .symbols-notice .notice { margin: 0; flex: 1 1 auto; }
+.symbol-affect { margin: var(--space-2) 0; font-weight: 700; }
+/* Symbols: where a change lands, and an empty state with a small example. */
+.symbol-where { margin: var(--space-2) 0; overflow-wrap: anywhere; }
+.symbol-where-label { font-weight: 700; }
+.symbols-empty { max-width: 40rem; }
+.symbols-example { margin: var(--space-4) 0; max-width: 24rem; }
+.symbols-example figcaption { margin-bottom: var(--space-2); font-size: var(--step--1); color: var(--ink-muted); }
+.symbols-example-card { padding: var(--space-3) var(--space-4); background: var(--surface); border: 1px dashed var(--border-control); border-radius: var(--radius-control); }
+.symbols-example-card p { margin: 0 0 var(--space-1); }
+.symbols-example-name { font-weight: 700; }
 
 @media (forced-colors: active) {
   .symbol-form, .symbols-notice .notice { border: 2px solid CanvasText; }
   .symbol-form .button { border: 2px solid ButtonText; }
   .place-crop { forced-color-adjust: none; }
 }
-/* The data-flow diagram on /for-accessibility-offices: one column, scaled to the screen. */
-.data-flow-figure { margin: var(--space-2) 0 var(--space-4); max-width: 26rem; }
-.data-flow { display: block; width: 100%; height: auto; }
-.data-flow-figure figcaption { color: var(--ink-muted); font-size: var(--step-0); margin-top: var(--space-1); }
 
-/* Colour changes only, 120 ms, and only when the visitor has not asked for less motion. */
+/* The upload form is three groups in the order they are decided (the file, how it is
+   converted, how long it is kept). Each option has one line of consequence beside it and the
+   long text sits in a `.more-detail` disclosure; the two option groups between the file and its
+   button are one line each until opened. A group's summary is its name, "Change", and what is
+   set now. Flat: 1px rules and the existing tints. */
+.heading-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-4); }
+.heading-row h2 { margin-right: auto; }
+.sample-link { display: inline-flex; align-items: center; min-height: 1.5rem; margin: 0; }
+.sample-link.inline-form { display: inline-flex; }
+fieldset.option-group { margin: var(--space-5) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--border-subtle); }
+fieldset.option-group > legend { font-weight: 700; padding: 0 var(--space-2) 0 0; }
+fieldset.option-group > .hint { margin-top: var(--space-1); }
+.more-detail { margin: 0 0 var(--space-3); max-width: var(--prose-max); }
+.more-detail > summary { cursor: pointer; display: list-item; min-height: 1.5rem; color: var(--accent); text-decoration: underline; text-underline-offset: 0.18em; }
+.checkbox-field .more-detail { grid-column: 2; margin: 0; }
+.more-detail ul { margin: var(--space-2) 0 0; padding-left: var(--space-5); }
 
-/* Forced colours (Windows high contrast): system colours; borders carry what backgrounds
-   and tints do otherwise. The primary button is ButtonText on ButtonFace so it still
-   differs from the secondary. */
-@media (forced-colors: active) {
-  button, .button, .button-secondary, .button-danger { border: 2px solid ButtonText; }
-  .button, button.button { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
-  .button:hover, button.button:hover { background: Highlight; color: HighlightText; border-color: Highlight; }
-  .nav-menu > summary { border-color: ButtonText; }
-  .tag, .card, .stat, .pane, .notice, .changed-note, .kept-draft, .field-error { border: 1px solid CanvasText; }
-  .brand svg { forced-color-adjust: auto; }
-  .faq details { border-color: CanvasText; }
-  .cmp-row, .cmp-none, .table-view { border-color: CanvasText; }
-}
+/* The page heading with an action beside it ("Upload another file"). */
+.page-heading h1 { margin-right: auto; }
+.page-heading { align-items: center; }
 
-/* ===== ux-lane-c: sharing page (templates/share.html) ===================================
-   Role rows: the whole row is the label of a native radio (at least 44px high), with the
-   right's name and what it allows inside it. The copy row holds the address field and the
-   "Copy link" button (static/copy-link.js shows it; the field works alone). */
+/* Upload: the file and its button are the form; the two option groups between them are one
+   line each until opened. A group's summary is its name, "Change", and what is set now. */
+.upload-form .file-field { margin-bottom: var(--space-3); }
+.main-file-detail { margin: 0 0 var(--space-3); }
+.option-groups { border-top: 1px solid var(--border-subtle); margin: var(--space-4) 0 0; }
+details.option-group { border-bottom: 1px solid var(--border-subtle); }
+details.option-group > summary { display: list-item; cursor: pointer; padding: var(--space-3) 0; min-height: 2.75rem; }
+details.option-group > summary::marker { color: var(--accent); }
+.group-name { font-weight: 700; margin-right: var(--space-3); }
+.group-change { color: var(--accent); text-decoration: underline; text-underline-offset: 0.18em; }
+details.option-group[open] .group-change { display: none; }
+.group-body { padding: 0 0 var(--space-3) var(--space-5); }
+.group-body .field:last-child { margin-bottom: var(--space-2); }
+.submit-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-top: var(--space-5); }
+.submit-row .upload-status { margin: 0; }
+.upload-status { font-weight: 700; }
+.upload-status:empty { display: none; }
+@media (forced-colors: active) { .option-groups, details.option-group { border-color: CanvasText; } }
+
+/* Sharing (templates/share.html). Role rows: the whole row is the label of a native radio (at least
+   44px high), with the right's name and what it allows inside it. The copy row holds the address
+   field and the "Copy link" button (static/copy-link.js shows it; the field works alone). The
+   three steps lead; the button and the copy row each carry the access's end. */
 .role-list { display: grid; gap: var(--space-2); max-width: 40rem; }
 .field .role-row {
   display: flex; align-items: flex-start; gap: var(--space-3);
@@ -963,17 +1200,36 @@ input[type="number"].input-short { width: 6rem; }
 .share-person { margin: 0 0 var(--space-2); overflow-wrap: anywhere; }
 .share-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .share-actions button { overflow-wrap: anywhere; }
+.share-steps { margin: 0 0 var(--space-4); max-width: var(--prose-max); }
+.share-submit { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
+.share-submit .hint { margin: 0; flex: 1 1 16rem; }
+.share-help { margin: var(--space-5) 0; max-width: var(--prose-max); }
+.share-help > summary { cursor: pointer; min-height: 1.5rem; font-weight: 700; }
+.share-help[open] > summary { margin-bottom: var(--space-2); }
 @media (forced-colors: active) {
   .field .role-row, .field .role-row:hover { border-color: CanvasText; }
   .field .role-row:has(input:checked) { border-color: Highlight; outline: 2px solid Highlight; outline-offset: 1px; }
 }
-/* ===== end ux-lane-c: sharing page ===================================================== */
 
-/* ===== ux-lane-c: comparison guide on a phone (templates/guide_compare.html) ==============
-   The same cells twice: the table from 52rem up, and under it one native <details> per topic.
-   Closed, it shows the topic and ReadableSTEM's answer (as plain text); open, it
-   lists every tool with its source and date. The view that is not shown is not rendered, so a
-   reader of either gets each fact once. No script. */
+/* The comparison guide (templates/guide_compare.html): a four-column table does not fit a phone,
+   so it keeps a readable width and scrolls inside its focusable box. Row headings keep whole
+   words (the rule for headings breaks them anywhere). The topic column stays in view while the
+   tools scroll, and the ReadableSTEM column is tinted so the page's subject is easy to find. */
+.compare-table { min-width: 46rem; }
+.compare-table tbody th { overflow-wrap: normal; width: 8rem; }
+.compare-wide tbody th { position: sticky; left: 0; background: var(--bg); z-index: var(--z-raised); }
+.compare-wide thead th:nth-child(2), .compare-wide tbody td:nth-child(2) { background: var(--surface); }
+.compare-wide thead th:first-child { position: sticky; left: 0; z-index: var(--z-raised-top); }
+.compare-table .source-note { display: block; margin-top: var(--space-1); color: var(--ink-muted); font-size: var(--step--1); }
+/* The comparison guide's short decision list, and the guides index's audience line. */
+.decision-list { padding-left: var(--space-5); }
+.decision-list li { margin: 0 0 var(--space-3); }
+.guide-for { margin: 0 0 var(--space-1); font-weight: 700; color: var(--ink-muted); }
+
+/* The same cells twice: the table from 52rem up, and under it one native <details> per topic on a
+   phone. Closed, it shows the topic and ReadableSTEM's answer (as plain text); open, it lists
+   every tool with its source and date. The view that is not shown is not rendered, so a reader
+   of either gets each fact once. No script. */
 .compare-stack { display: none; }
 @media (max-width: 51.99rem) {
   .compare-wide-view { display: none; }
@@ -982,8 +1238,7 @@ input[type="number"].input-short { width: 6rem; }
   .compare-topic { margin: 0 0 var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--bg); }
   .compare-topic summary { display: list-item; list-style-position: inside; min-height: 2.75rem; padding: var(--space-3) var(--space-4); cursor: pointer; }
   .compare-topic-name { font-weight: 700; font-size: var(--step-1); }
-  .compare-lead { display: block; margin-top: var(--space-1); }
-  .compare-lead { color: var(--ink-muted); overflow-wrap: anywhere; }
+  .compare-lead { display: block; margin-top: var(--space-1); color: var(--ink-muted); overflow-wrap: anywhere; }
   .compare-topic[open] .compare-lead { display: none; }
   .compare-topic[open] summary { border-bottom: 1px solid var(--border-subtle); }
   .compare-topic dl { margin: 0; padding: var(--space-3) var(--space-4) var(--space-4); }
@@ -993,7 +1248,6 @@ input[type="number"].input-short { width: 6rem; }
   .compare-topic dd .source-note { display: block; margin-top: var(--space-1); color: var(--ink-muted); }
 }
 @media (forced-colors: active) { .compare-topic, .compare-topic[open] summary { border-color: CanvasText; } }
-/* ===== end ux-lane-c: comparison guide ================================================= */
 
 /* The /style page (templates/style.html). */
 .style-display { font-family: var(--font-display); font-weight: 600; font-size: var(--step-5); line-height: var(--lh-display); margin: 0 0 var(--space-3); }
@@ -1011,6 +1265,45 @@ input[type="number"].input-short { width: 6rem; }
 .style-panes { margin-top: var(--space-5); }
 .style-form { max-width: 40rem; }
 
+/* /style: every demonstration control is an inert example, and the three states are shown. */
+.style-example { margin: 0 0 var(--space-5); padding: var(--space-4); border: 1px dashed var(--border-control); border-radius: var(--radius-frame); }
+.style-example > :last-child { margin-bottom: 0; }
+.style-example-label { margin: 0 0 var(--space-3); font-weight: 700; color: var(--ink-muted); }
+.style-live { margin: var(--space-2) 0 0; color: var(--ink-muted); }
+.style-states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin: 0 0 var(--space-5); }
+@media (max-width: 63.99rem) { .style-states { grid-template-columns: minmax(0, 1fr); } }
+.style-scheme { padding: var(--space-4); border: 1px solid var(--border-control); border-radius: var(--radius-frame); background: var(--bg); color: var(--ink); min-width: 0; }
+.style-scheme h3 { margin: 0 0 var(--space-3); font-size: var(--step-1); }
+.style-scheme p { margin: 0 0 var(--space-3); max-width: none; }
+.style-scheme .button-row { margin: 0 0 var(--space-3); }
+.style-focus { display: inline-block; padding: var(--space-1) var(--space-3); outline: 3px solid var(--focus-outline); outline-offset: 2px; box-shadow: 0 0 0 5px var(--focus-halo); }
+/* The dark preview carries the dark tokens of tokens.css (a test keeps the two equal). */
+.style-scheme-dark {
+  color-scheme: dark;
+  --bg: #0f1115; --surface: #171a20; --surface-2: #1e222a; --ink: #e9ebef; --ink-muted: #b4bac4;
+  --border-control: #7d8491; --border-subtle: #343944; --accent: #8ab4ff; --accent-hover: #a8c4ff;
+  --accent-tint: #1a2540; --on-accent: #0f1115; --visited: #c9a7f0; --focus-outline: #ffd33d;
+  --focus-halo: #0f1115; --ok: #7fd69b; --ok-tint: #12261a; --warn: #ffc46b; --warn-tint: #2a2010;
+  --err: #ff9a92; --err-tint: #2c1515; --err-strong: #ffb8b2;
+}
+/* The forced-colour preview approximates the system colours: the real rules are in the
+   forced-colors media queries of this file and controls.css, shown by switching the mode on. */
+.style-scheme-forced {
+  --bg: Canvas; --surface: Canvas; --ink: CanvasText; --ink-muted: CanvasText; --accent: LinkText;
+  --border-control: ButtonText; --border-subtle: CanvasText; --on-accent: ButtonFace;
+  --focus-outline: Highlight; --focus-halo: Canvas; --ok: CanvasText; --ok-tint: Canvas;
+  --warn: CanvasText; --warn-tint: Canvas; --err: CanvasText; --err-tint: Canvas;
+  border-color: CanvasText; forced-color-adjust: none; color-scheme: light;
+}
+.style-scheme-forced .button { background: ButtonText; color: ButtonFace; border: 2px solid ButtonText; }
+.style-scheme-forced .button-secondary, .style-scheme-forced .button-danger-outline { background: ButtonFace; color: ButtonText; border: 2px solid ButtonText; }
+.style-scheme-forced .tag { border: 1px solid CanvasText; background: Canvas; color: CanvasText; }
+.style-scheme-forced .notice { border: 1px solid CanvasText; background: Canvas; }
+.style-scheme-forced .style-focus { box-shadow: none; }
+@media (forced-colors: active) {
+  .style-example, .style-scheme { border-color: CanvasText; }
+}
+
 /* ============================================================== Landing (templates/landing.html)
    Persuade surface: the hero is the real before/after from the demo (scripts/hero_assets.py). */
 @font-face {
@@ -1023,9 +1316,12 @@ input[type="number"].input-short { width: 6rem; }
 .mode-landing .hero .lede { max-width: var(--prose-max); margin: 0 0 var(--space-3); }
 .mode-landing .hero .hero-rest { max-width: var(--prose-max); margin: 0 0 var(--space-5); color: var(--ink-muted); }
 .hero-actions { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); margin: 0 0 var(--space-7); }
+/* The one line under the buttons keeps the real before/after near the top. */
+.mode-landing .hero .hero-actions { margin-bottom: var(--space-3); }
+.hero-hint { margin: 0 0 var(--space-6); }
 .hero-panes { align-items: stretch; }
 .hero-panes .pane { background: var(--surface); }
-.sheet { background: var(--paper); color: var(--paper-ink); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: var(--space-4); --ink: var(--paper-ink); --ink-muted: #474c55; --accent: #1c46ad; --focus-outline: #0b3d91; --focus-halo: #ffd33d; }
+.sheet { background: var(--paper); color: var(--paper-ink); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: var(--space-4); --ink: var(--paper-ink); --ink-muted: var(--paper-ink-muted); --accent: var(--paper-accent); --focus-outline: var(--paper-focus-outline); --focus-halo: var(--paper-focus-halo); }
 .crop-scroll { overflow-x: auto; padding: var(--space-2); }
 .crop-scroll img { display: block; width: 100%; max-width: 40rem; min-width: 28rem; height: auto; }
 .after .sheet p { margin: 0 0 var(--space-3); font-size: var(--step-0); }
@@ -1056,6 +1352,7 @@ input[type="number"].input-short { width: 6rem; }
   /* A headline of 36px runs to five or six lines on a phone; 30px keeps it to four. */
   .mode-landing .hero h1 { font-size: var(--step-3); line-height: 1.15; }
   .hero-actions { margin-bottom: var(--space-6); }
+  .hero-hint { margin-bottom: var(--space-5); }
 }
 @media (max-width: 51.99rem) {
   .three-steps { grid-template-columns: minmax(0, 1fr); }
@@ -1066,31 +1363,10 @@ input[type="number"].input-short { width: 6rem; }
   .sheet { forced-color-adjust: none; }
 }
 
-/* The file chooser's button is a secondary button, as everywhere else. */
-input[type="file"] { padding: var(--space-1); }
-input[type="file"]::file-selector-button {
-  font: inherit; font-weight: 700; min-height: 2.25rem; margin-right: var(--space-3); padding: 0 var(--space-4);
-  border: 2px solid var(--accent); border-radius: var(--radius-control); background: var(--bg); color: var(--accent); cursor: pointer;
-}
-input[type="file"]::file-selector-button:hover { background: var(--accent-tint); }
-
-/* The comparison table: the topic column stays in view while the tools scroll, and the
-   ReadableSTEM column is tinted so the page's subject is easy to find. */
-.compare-wide tbody th { position: sticky; left: 0; background: var(--bg); z-index: 1; }
-.compare-wide thead th:nth-child(2), .compare-wide tbody td:nth-child(2) { background: var(--surface); }
-.compare-wide thead th:first-child { position: sticky; left: 0; z-index: 2; }
-@media (forced-colors: active) { input[type="file"]::file-selector-button { border-color: ButtonText; } }
-
-/* Review choices: the primary action is filled; "Accept anyway" (the proposal changes the
-   meaning) is cautioned in the warning colours, and the option that keeps the original
-   ("Keep as image", "Make bold text") is quiet, so none of them looks like Save edit.
-   In forced colours the caution has a dashed border, so it differs without colour. */
-button[data-tone="caution"] { background: var(--warn-tint); color: var(--warn); border-color: var(--warn); }
-button[data-tone="caution"]:hover { background: var(--warn-tint); color: var(--warn); border-color: var(--warn); text-decoration: underline; }
-button[data-tone="quiet"] { background: var(--bg); color: var(--ink); border-color: var(--border-control); }
-button[data-tone="quiet"]:hover { background: var(--surface); color: var(--ink); border-color: var(--ink); }
-@media (forced-colors: active) { button[data-tone="caution"] { border-style: dashed; } }
-
+/* The offices page (templates/offices.html): "On this page", what is sent where (a table from
+   40rem, a list on a phone), the recipients, and the data-flow diagram. Tables that may be wider
+   than a phone scroll in a focusable box (templates/_table_scroll.html); a table that fits is
+   not squeezed. */
 /* "On this page" on the offices page. */
 .toc { margin: 0 0 var(--space-5); padding: var(--space-3) var(--space-4); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--surface); max-width: var(--prose-max); }
 .toc-label { margin: 0 0 var(--space-2); font-weight: 700; }
@@ -1098,92 +1374,181 @@ button[data-tone="quiet"]:hover { background: var(--surface); color: var(--ink);
 .toc li { margin: 0 0 var(--space-1); break-inside: avoid; }
 .toc a { display: inline-flex; align-items: center; min-height: 1.5rem; }
 @media (forced-colors: active) { .toc { border-color: CanvasText; } }
-/* The data-flow diagram is drawn for white; it stays on white paper in dark mode. */
-.data-flow-figure { background: var(--paper); color: var(--paper-ink); padding: var(--space-4); border-radius: var(--radius-frame); border: 1px solid var(--border-subtle); }
-.data-flow-figure figcaption { color: #474c55; }
-
-/* Small controls on the review screen are at least 24px high. */
-.shortcuts > summary, .tech > summary { display: list-item; min-height: 1.5rem; padding: var(--space-1) 0; }
-.toggle-accepted { display: inline-flex; align-items: center; min-height: 1.5rem; }
-
-/* "Hear this" next to a decision, and the Play controls on the landing page. */
-.hear { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: var(--space-2) 0; }
-.hear button[hidden] { display: none; }
-.hear-note { color: var(--ink-muted); max-width: var(--prose-max); }
-.hear-note:empty { display: none; }
-
-/* Review split: the decision's actions stay reachable, and the page is reachable on a phone. */
-.back-to-decision, .page-scroll-hint { display: none; margin: 0; }
-@media (max-width: 63.99rem) {
-  .back-to-decision { display: block; }
-  .page-scroll-hint { display: block; margin: var(--space-2) 0 0; }
-  /* More page to the right: an edge shadow that goes when the page is scrolled to its end. */
-  .page-scroll {
-    background:
-      linear-gradient(to right, var(--desk) 30%, transparent) left center / 2rem 100% no-repeat local,
-      linear-gradient(to left, var(--desk) 30%, transparent) right center / 2rem 100% no-repeat local,
-      radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 0.35), transparent) left center / 0.75rem 100% no-repeat scroll,
-      radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.35), transparent) right center / 0.75rem 100% no-repeat scroll,
-      var(--desk);
-  }
+.recipients-table, .retention-table { min-width: 34rem; }
+.recipients-table td:nth-child(2) { width: 42%; }
+.cell-list { margin: 0; padding-left: var(--space-4); }
+.cell-list li { margin: 0 0 var(--space-1); }
+.cell-list li:last-child { margin-bottom: 0; }
+/* What is sent where (templates/_data_matrix.html): a table from 40rem, a list on a phone. */
+.matrix-stack { display: none; }
+.matrix-caption { margin: 0 0 var(--space-2); font-weight: 700; }
+.matrix-stack li { padding: var(--space-3) 0; border-top: 1px solid var(--border-subtle); }
+.matrix-stack li:last-child { border-bottom: 1px solid var(--border-subtle); }
+.matrix-line { display: block; margin-top: var(--space-1); color: var(--ink-muted); }
+.matrix-key { font-weight: 700; color: var(--ink); }
+@media (max-width: 39.99rem) {
+  .matrix-wide-view { display: none; }
+  .matrix-stack { display: block; }
+  .mode-read main > .matrix-stack { max-width: none; }
 }
-/* On a wide screen the row of choices (Accept, Keep as image) sticks to the bottom of the window
-   while the decision above it is longer than the window, then rests in its place. */
-@media (min-width: 64rem) and (min-height: 40rem) {
-  .decision-area .decide-row[id^="actions-"] {
-    position: sticky; bottom: 0; z-index: 3;
-    background: var(--bg); border-top: 1px solid var(--border-subtle);
-    margin: var(--space-4) calc(-1 * var(--space-5)) 0; padding: var(--space-3) var(--space-5);
-  }
-}
-@media (forced-colors: active) { .decision-area .decide-row[id^="actions-"] { border-top: 1px solid CanvasText; } }
+/* The data-flow diagram: one column, scaled to the screen. It is drawn for white, so it stays on
+   white paper in dark mode. */
+.data-flow-figure { margin: var(--space-2) 0 var(--space-4); max-width: 26rem; background: var(--paper); color: var(--paper-ink); padding: var(--space-4); border-radius: var(--radius-frame); border: 1px solid var(--border-subtle); }
+.data-flow { display: block; width: 100%; height: auto; }
+.data-flow-figure figcaption { color: var(--paper-ink-muted); font-size: var(--step-0); margin-top: var(--space-1); }
 
-/* Review list: a compact row per waiting decision. */
+/* Limits: a term and what it is, side by side from 40rem. */
+.limits-list { margin: var(--space-3) 0 var(--space-5); }
+.limits-list > div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: var(--space-1) var(--space-4); padding: var(--space-3) 0; border-top: 1px solid var(--border-subtle); }
+.limits-list > div:last-child { border-bottom: 1px solid var(--border-subtle); }
+.limits-list dt { font-weight: 700; }
+.limits-list dd { margin: 0; }
+@media (max-width: 39.99rem) { .limits-list > div { grid-template-columns: minmax(0, 1fr); } }
+
+/* Sign-in: the consent is plain text right under the buttons it is about. */
+.signin-consent { max-width: 40rem; margin: var(--space-4) 0 var(--space-5); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
+.signin-form { margin: 0 0 var(--space-3); }
+
+/* Status: when it was checked, and the optional refresh, above the facts. */
+.status-checked { margin: 0 0 var(--space-4); font-weight: 700; }
+.status-checked a { font-weight: 400; }
+
+/* Confirmations: the danger button names its object and "No, keep it" is a button of the same
+   size beside it (side by side when they fit). */
+.confirm-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: stretch; margin: var(--space-5) 0 var(--space-4); }
+.confirm-actions .inline-form { display: flex; max-width: 100%; }
+.confirm-actions .button-danger { overflow-wrap: anywhere; }
+.confirm-export { margin: var(--space-4) 0; }
+.confirm-export .actions { margin: 0; gap: var(--space-2) var(--space-5); }
+@media (max-width: 37.5rem) {
+  .confirm-actions { flex-direction: column; }
+  .confirm-actions .inline-form, .confirm-actions .button-secondary { width: 100%; }
+  .confirm-actions .button-danger { width: 100%; }
+}
+
+/* Account: the one setting people change (how long documents are kept) is its own block,
+   before the limits. The deletion notes are a short list with the long wording folded away. */
+.account-keep { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); padding: var(--space-3) var(--space-5) var(--space-4); margin: var(--space-5) 0; }
+.account-delete-details { margin: 0 0 var(--space-4); max-width: var(--prose-max); }
+.account-delete-details > summary { cursor: pointer; min-height: 1.5rem; color: var(--accent); text-decoration: underline; text-underline-offset: 0.18em; }
+.account-delete-details[open] > summary { margin-bottom: var(--space-2); }
+@media (forced-colors: active) { .account-keep { border-color: CanvasText; } }
+
+/* Courses: documents and symbols per course, a jump list on a course page, the starter set
+   as rows (a tick, an editable symbol and its meaning), adding documents, and the settings
+   kept apart under a rule. */
+.course-table td, .course-table th { vertical-align: middle; }
+.course-table td a { display: inline-flex; align-items: center; min-height: 1.5rem; }
+.starter-form { margin: var(--space-4) 0 var(--space-5); max-width: 40rem; }
+.starter-form h3 { margin-bottom: var(--space-1); }
+.starter-list { list-style: none; margin: var(--space-3) 0; padding: 0; display: grid; gap: var(--space-2); }
+.starter-row { display: grid; grid-template-columns: 8rem minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2) var(--space-3); align-items: center; padding: var(--space-1) 0; border-top: 1px solid var(--border-subtle); }
+.starter-row .field, .starter-row .checkbox-field { margin: 0; }
+.starter-row input[type="text"], .starter-row select { width: 100%; min-height: 2.75rem; }
+@media (max-width: 37.5rem) {
+  .starter-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .starter-row .checkbox-field { grid-column: 1 / -1; }
+  .course-table thead { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .course-table, .course-table tbody, .course-table tr, .course-table th, .course-table td { display: block; }
+  .course-table tr { padding: var(--space-2) 0; border-bottom: 1px solid var(--border-subtle); }
+  .course-table th, .course-table td { border: 0; padding: var(--space-1) 0; }
+  .course-table td[data-label]::before { content: attr(data-label) ": "; content: attr(data-label) ": " / ""; color: var(--ink-muted); }
+}
+.attach-documents { margin: var(--space-4) 0; max-width: var(--prose-max); }
+.attach-documents > summary { cursor: pointer; min-height: 1.5rem; font-weight: 700; }
+.attach-documents[open] > summary { margin-bottom: var(--space-2); }
+.course-settings { margin-top: var(--space-7); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
+.course-settings h3 { margin-top: var(--space-4); }
+
+
+/* Choosing pages: two page fields and "Add part" (script), the parts as a list with their
+   page counts and one summary line, and the typed form folded under "Type the pages instead". */
+.parts-section { margin: var(--space-4) 0; }
+.parts-builder { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: flex-end; margin: var(--space-3) 0 var(--space-2); }
+.parts-builder[hidden] { display: none; }
+.parts-builder .field { margin: 0; }
+.parts-builder input[type="number"] { width: 8rem; min-height: 2.75rem; }
+.parts-builder-note { flex-basis: 100%; margin: 0; min-height: 1.4em; }
+.parts-summary { margin: var(--space-3) 0 var(--space-2); font-weight: 700; }
+.parts-list { list-style: none; margin: 0 0 var(--space-4); padding: 0; max-width: 40rem; }
+.parts-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-4); padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
+.parts-row:last-child { border-bottom: 1px solid var(--border-subtle); }
+.parts-name { font-weight: 700; min-width: 5rem; }
+.parts-count { color: var(--ink-muted); }
+.parts-problem { color: var(--err); flex: 1 1 14rem; }
+.parts-row .link-button { margin-left: auto; min-height: 2rem; }
+.parts-row .link-button[hidden] { display: none; }
+.parts-empty { margin: 0 0 var(--space-4); }
+.parts-advanced { margin: var(--space-3) 0 var(--space-4); max-width: 40rem; }
+.parts-advanced > summary { cursor: pointer; min-height: 1.5rem; font-weight: 700; }
+.parts-advanced[open] > summary { margin-bottom: var(--space-3); }
+@media (forced-colors: active) { .parts-problem { color: CanvasText; } .parts-row { border-color: CanvasText; } }
+
+/* Batch: what to do next, and how long ago it was uploaded, above the documents. */
+.batch-next { margin: var(--space-4) 0; }
+.batch-next p { margin: 0 0 var(--space-2); }
+.batch-elapsed { color: var(--ink-muted); }
+
+/* The review list: a compact row per waiting decision, the first decision first; the tools for
+   finding or speeding up the others folded. */
 .compact-item { border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); margin: 0 0 var(--space-3); }
 .compact-item > summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: center; min-height: 2.75rem; padding: var(--space-2) var(--space-4); font-weight: 700; }
 .compact-item[open] > summary { border-bottom: 1px solid var(--border-subtle); }
 .compact-item > .fix-card { border: 0; margin: 0; padding-top: var(--space-1); }
 .compact-status { margin-left: auto; font-weight: 700; }
+.compact-item .fix-meta { display: none; }
 @media (forced-colors: active) { .compact-item { border-color: CanvasText; } }
+.list-links { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: var(--space-1) 0 0; }
+.list-links a { display: inline-flex; align-items: center; min-height: 1.75rem; }
+.list-tools { margin: var(--space-2) 0 var(--space-4); padding: 0 var(--space-4); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); }
+.list-tools[open] { padding-bottom: var(--space-3); }
+.list-tools > summary { cursor: pointer; display: list-item; min-height: 2.75rem; padding: var(--space-3) 0; font-weight: 700; }
+.list-tools .review-toc { margin: var(--space-3) 0; }
+.list-tools .review-toc h3 { font-size: var(--step-0); margin: var(--space-3) 0 var(--space-1); }
+@media (forced-colors: active) { .list-tools { border-color: CanvasText; } }
 
-.symbol-affect { margin: var(--space-2) 0; font-weight: 700; }
+/* The comparison chart (templates/_proof_chart.html): horizontal bars, a name and a number on
+   every bar, three fills (solid, hatched, dotted) so colour is not the only difference. */
+.proof-chart { margin: var(--space-5) 0; max-width: 52rem; }
+.mode-read main > .proof-chart { max-width: 52rem; }
+.proof-chart-title { margin: 0 0 var(--space-3); font-size: var(--step-1); }
+.chart-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.chart-row { margin: 0 0 var(--space-4); }
+.chart-measure { margin: 0 0 var(--space-1); font-weight: 700; }
+.chart-better { margin-left: var(--space-2); font-weight: 400; color: var(--ink-muted); font-size: var(--step--1); }
+.chart-line { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr) 6rem; align-items: center; gap: var(--space-3); min-height: 1.75rem; }
+.chart-name { font-size: var(--step-0); }
+.chart-value { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
+.chart-bar { display: block; width: 100%; height: 16px; }
+.chart-track { fill: var(--surface-2); stroke: var(--border-subtle); stroke-width: 1; }
+.chart-sys-1 .chart-fill { fill: var(--accent); }
+.chart-sys-2 .chart-fill { fill: url(#chart-hatch); stroke: var(--ink-muted); stroke-width: 1; }
+.chart-sys-3 .chart-fill { fill: url(#chart-dots); stroke: var(--ink-muted); stroke-width: 1; }
+.pat-bg { fill: var(--bg); }
+.pat-stroke, .pat-fill { fill: var(--ink-muted); }
+.proof-chart figcaption { margin-top: var(--space-3); }
+.proof-chart figcaption p, .chart-source { margin: 0 0 var(--space-2); }
+.chart-mini { margin-top: var(--space-4); }
+.chart-mini caption { font-weight: 700; color: var(--ink); }
+.chart-source { color: var(--ink-muted); }
+@media (max-width: 39.99rem) {
+  .chart-line { grid-template-columns: minmax(0, 1fr) auto; gap: 0 var(--space-3); margin-bottom: var(--space-2); }
+  .chart-bar { grid-column: 1 / -1; grid-row: 2; }
+  .chart-value { grid-column: 2; grid-row: 1; }
+  .chart-name { grid-column: 1; grid-row: 1; }
+}
+@media (forced-colors: active) {
+  .chart-bar { forced-color-adjust: none; }
+  .chart-track { fill: Canvas; stroke: CanvasText; }
+  .chart-sys-1 .chart-fill { fill: CanvasText; }
+  .chart-sys-2 .chart-fill, .chart-sys-3 .chart-fill { stroke: CanvasText; }
+  .pat-bg { fill: Canvas; }
+  .pat-stroke, .pat-fill { fill: CanvasText; }
+}
 
-/* ==== ux-lane-b: danger entry points ====================================================
-   Deleting is never styled like Keep or Save. The button or link that opens the delete
-   confirmation is red text on the page colour with a red border (`button-danger-outline`,
-   `danger-link`); the confirmation page's own button stays the filled `button-danger`.
-   The label also says what is deleted, so colour is not the only cue. */
-.button-danger-outline, .button-danger-outline:visited { background: var(--bg); color: var(--err); border-color: var(--err); }
-.button-danger-outline:hover, button.button-danger-outline:hover { background: var(--err-tint); color: var(--err-strong); border-color: var(--err-strong); }
-a.danger-link, a.danger-link:visited { color: var(--err); }
-a.danger-link:hover { color: var(--err-strong); }
-@media (forced-colors: active) { .button-danger-outline { border-color: ButtonText; color: ButtonText; } a.danger-link { color: LinkText; } }
-/* ==== end ux-lane-b: danger entry points ================================================ */
-
-/* ==== ux-lane-b: upload form groups, compact sample link, compact app footer ============
-   The upload form is three groups in the order they are decided (the file, how it is
-   converted, how long it is kept). Each option has one line of consequence beside it and the
-   long text sits in a `.more-detail` disclosure. */
-.heading-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-4); }
-.heading-row h2 { margin-right: auto; }
-.sample-link { display: inline-flex; align-items: center; min-height: 1.5rem; margin: 0; }
-.sample-link.inline-form { display: inline-flex; }
-fieldset.option-group { margin: var(--space-5) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--border-subtle); }
-fieldset.option-group > legend { font-weight: 700; padding: 0 var(--space-2) 0 0; }
-fieldset.option-group > .hint { margin-top: var(--space-1); }
-.more-detail { margin: 0 0 var(--space-3); max-width: var(--prose-max); }
-.more-detail > summary { cursor: pointer; display: list-item; min-height: 1.5rem; color: var(--accent); text-decoration: underline; text-underline-offset: 0.18em; }
-.checkbox-field .more-detail { grid-column: 2; margin: 0; }
-.more-detail ul { margin: var(--space-2) 0 0; padding-left: var(--space-5); }
-
-/* App (signed-in) pages: the trust and help links on one line; public pages keep the full
-   footer. */
-.site-footer-compact { padding: var(--space-4) 0; margin-top: var(--space-6); }
-.footer-compact-links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); }
-.footer-compact-links a { display: inline-flex; align-items: center; min-height: 1.5rem; }
-/* The deletion time and "Keep for 7 days", once, under the actions of the job page. */
-.retention-line { margin: var(--space-5) 0; }
-.retention-line p { margin: 0 0 var(--space-2); }
-.retention-line form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
-.retention-line .hint { margin: 0; }
-/* ==== end ux-lane-b ===================================================================== */
+/* The review record (T3-6): printed on its own, without the site's navigation. */
+@media print {
+  .site-header, .site-footer, .skip-link, .no-print { display: none; }
+  .table-scroll { overflow: visible; }
+  tr, section { break-inside: avoid; }
+}

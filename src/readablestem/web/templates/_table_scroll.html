@@ -1,0 +1,9 @@
+{# A table wider than a phone scrolls inside its box, and the box can be reached and scrolled
+   with the keyboard: it is focusable, a named group, and takes the site's focus ring (axe
+   "scrollable-region-focusable"). Every .table-scroll on the site is built this way (a test
+   reads the templates for it). Use:
+   {% from "_table_scroll.html" import table_scroll %}
+   {% call table_scroll("What the table is") %}<table>...</table>{% endcall %} #}
+{% macro table_scroll(label) -%}
+<div class="table-scroll" role="group" aria-label="{{ label }}" tabindex="0">{{ caller() }}</div>
+{%- endmacro %}

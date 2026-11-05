@@ -42,6 +42,11 @@ def title(html: str) -> str:
     return unescape(" ".join(match.group(1).split()))
 
 
+def status_box(html: str) -> str:
+    start = html.index('id="job-status"')
+    return html[start : html.index("</div>", start)]
+
+
 def section(html: str, heading_id: str) -> str:
     start = html.index(f'id="{heading_id}"')
     return html[start : html.index("</section>", start)]
@@ -114,16 +119,22 @@ def test_a_scanned_pdf_says_why_it_stopped_everywhere_on_the_page(web):
     assert (web.job(job_id).status, web.job(job_id).error_code) == ("failed", "scanned")
     html = web.browser.get(f"/jobs/{job_id}").text
     assert title(html) == "Stopped: notes.pdf | ReadableSTEM"
-    why = page_text(section(html, "failed-heading"))
+    why = page_text(status_box(html))
     assert "Every page of this PDF is a scanned image, so this tool cannot convert it." in why
     assert "OCR" not in why  # the old advice made exactly these files
     assert "stopped unexpectedly" not in page_text(html)
+    # Said once: the section under it is what to do, with safe ways on.
+    assert page_text(html).count("so this tool cannot convert it.") == 1
+    todo = page_text(section(html, "failed-heading"))
+    assert "What you can do" in todo and "cannot convert" not in todo
+    assert 'href="/app#upload-heading">Upload it again</a>' in html
+    assert 'href="/app">Back to My documents</a>' in html and 'href="/status"' in html
 
 
-def test_a_pdf_with_no_content_says_so_in_the_failed_section(web):
+def test_a_pdf_with_no_content_says_so_in_the_status_box(web):
     job_id = convert(web, elements=[], fixes=[])
     assert web.job(job_id).error_code == "no_content"
-    why = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "failed-heading"))
+    why = page_text(status_box(web.browser.get(f"/jobs/{job_id}").text))
     assert FAILED_MESSAGES["no_content"] in why
 
 

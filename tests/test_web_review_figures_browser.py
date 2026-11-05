@@ -89,7 +89,7 @@ def figure_states(page, url: str, check) -> None:
     page.wait_for_load_state("networkidle")
     check("figure card")
     page.get_by_label("Longer description for figure 1").fill("<b>Too short</b>")
-    page.get_by_role("button", name="Save edit to figure 1").click()
+    page.get_by_role("button", name="Save and accept (figure 1)").click()
     page.locator(".error-summary").wait_for()
     check("refused description")
     page.goto(f"{url}?item=p1-e6")
@@ -158,7 +158,7 @@ def test_add_then_remove_the_data_table_without_javascript(site, browser, job):
     fix = next(f for f in result["fixes"] if f["element_id"] == "p1-e6")
     assert fix["figure"]["data_table_added"] is True and fix["status"] == "needs_review"
     page.get_by_label("Remove the data table (keep the descriptions)").check()
-    page.get_by_role("button", name="Save edit to figure 1").click()
+    page.get_by_role("button", name="Save and accept (figure 1)").click()
     page.wait_for_url(f"{url}?item=hg-p1-e3")
     context.close()
     result = site.job(job).result_json

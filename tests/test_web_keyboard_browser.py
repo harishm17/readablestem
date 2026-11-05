@@ -274,6 +274,8 @@ def test_every_page_can_be_walked_with_the_tab_key(
     context, page = open_as(
         browser, site, path.format(**docs), email, viewport=viewport, unfold=unfold
     )
+    if "listen" in path:
+        page.wait_for_timeout(1600)  # the player waits a moment for voices, then says if none
     skip = skip_link_works(page, label=name)
     found = walk(page, label=name)
     context.close()
@@ -333,11 +335,15 @@ def test_upload_by_keyboard_lands_on_the_job_and_a_wrong_file_is_explained(site,
     page = context.new_page()
     keyboard_sign_in(page, site.base, ALICE)
     assert page.url == f"{site.base}/app"
-    # Nothing chosen: the server's answer, and the problem list takes focus.
+    # Nothing chosen: the server's answer, and the problem list takes focus. Its link goes
+    # to the file chooser (the form now sits right under it after a refusal).
     tab_to(page, "Upload and convert")
     activate(page)
     state = wait_focus(page)
     assert state["role"] == "alert" and "There is a problem" in state["text"], state
+    page.keyboard.press("Tab")  # the first link of the list
+    page.keyboard.press("Enter")  # it leads to the file chooser, which takes focus
+    assert focus_summary(page)["id"] == "pdf"
     # A file that is not a PDF: the page says so as soon as it is chosen (a live region), and
     # Enter on the button does not send it but puts focus on the field that has the problem.
     start_of_page(page)
@@ -436,7 +442,7 @@ def test_the_whole_review_is_decided_and_undone_by_keyboard_with_focus_on_the_ne
     setup_sign_in(page, site.base, ALICE)
     page.goto(f"{site.base}/jobs/{fresh}")
     start_of_page(page)
-    tab_to(page, "^Review")  # the job page's way into the decisions
+    tab_to(page, r"^Review \d+ decisions?")  # the job page's way into the decisions
     activate(page)
     assert "/review" in page.url
 
@@ -571,7 +577,7 @@ def test_a_document_is_deleted_by_keyboard_and_the_notice_takes_focus(site, brow
     activate(page)
     assert page.url.startswith(f"{site.base}/jobs/{gone}/delete")
     assert "Delete" in page.locator("h1").inner_text()
-    tab_to(page, "Yes, delete it")
+    tab_to(page, "^Delete “")
     activate(page)
     page.wait_for_url(re.compile(r"/app"))
     state = wait_focus(page)
@@ -592,7 +598,7 @@ def test_an_account_is_deleted_by_keyboard_after_a_confirmation_page(site, brows
     # "No, keep it" is a plain way back; the destructive button is a second, separate stop.
     keep = tab_to(page, "No, keep it")
     assert keep["tag"] == "a"
-    tab_to(page, "Yes, delete my account", shift=True)
+    tab_to(page, "^Delete my account$", shift=True)
     activate(page)
     state = wait_focus(page)  # the notice takes focus at the next rendering opportunity
     assert state["role"] == "status" and "deleted" in state["text"].lower(), state

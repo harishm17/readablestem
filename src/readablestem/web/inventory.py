@@ -5,8 +5,10 @@ time: an `x` read as `X`, a `p` read as `\rho`. Fixing it equation by equation i
 the instructor cannot see the pattern. The Symbols screen (`routes/inventory.py`) lists every
 distinct letter and symbol the tool read in the handwritten equations, grouped with the ones
 that look alike (`FAMILIES`), each with how many times it stands, in how many equations, and
-where. One form per symbol changes it to another symbol of its family in every place at once,
-with a checkbox on each place to leave out the exceptions.
+where. One form per symbol changes it to another symbol of its family in every place at once:
+each place has a checkbox, ticked until the reviewer unticks it to leave that place as it is, so
+the form says what will change, not what to leave out. The form posts the ticked places
+(`included`); `excluded` is the same choice the other way round, for a script.
 
 What a change is:
 
@@ -449,7 +451,8 @@ class Relettering:
 
 
 def excluded_places(values: list[str]) -> set[tuple[str, int]]:
-    """The places the form left out ("p1-e2:1"): well-formed ones only."""
+    """The places a form names ("p1-e2:1"), left out (`exclude`) or ticked (`include`):
+    well-formed ones only."""
     out: set[tuple[str, int]] = set()
     for value in values:
         element_id, _, nth = value.rpartition(":")
@@ -471,11 +474,14 @@ def relabel(
     source: str,
     target: str,
     excluded: set[tuple[str, int]],
+    included: set[tuple[str, int]] | None = None,
 ) -> Relettering:
     """Write `source` as `target` in every place it stands in the equations still waiting,
-    except `excluded`, in place. Raises ReviewInvalid when `source` is not read in these
-    equations, `target` is not another symbol of its family, or nothing would change.
-    Nothing is accepted: the status of each fix stays."""
+    except `excluded`, in place. With `included` (the screen's own form: every place is ticked
+    until it is unticked), only those places are changed, and a place not in it is left as it
+    is. Raises ReviewInvalid when `source` is not read in these equations, `target` is not
+    another symbol of its family, or nothing would change. Nothing is accepted: the status of
+    each fix stays."""
     from readablestem.web import edit_check
 
     found = inventory(result, set()).row(source)
@@ -487,6 +493,8 @@ def relabel(
         raise ReviewInvalid(
             [FieldError(f"to-{row.element_id}", "Choose the symbol to change it to.")]
         )
+    if included is not None:
+        excluded = {(p.element_id, p.nth) for p in row.places} - included
     changes: list[ReviewChange] = []
     left: list[str] = []
     waiting = {p.element_id for p in row.places if p.changeable}
@@ -515,7 +523,7 @@ def relabel(
             "Nothing was changed: no equation with this symbol passed its checks with the new "
             "symbol, and each is left as it was."
             if left
-            else "Nothing to change: every place was left out, or is already decided."
+            else "Nothing to change: no place is ticked, or every one is already decided."
         )
         raise ReviewInvalid([FieldError(f"to-{row.element_id}", message)])
     for change in changes:

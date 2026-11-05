@@ -83,9 +83,7 @@ def test_one_short_sentence_counts_decisions_not_fixes(split):
     page = screen(split)
     lede = section(page, '<p class="review-lede">', "</p>")
     # Three decisions: the heading group of three headings counts once.
-    assert text_of(lede) == (
-        "3 things need your decision. Everything else was accepted; optional checks are below."
-    )
+    assert text_of(lede) == "3 decisions to make."
     # No instruction paragraph: the buttons and the one sentence say it.
     for wordy in ("For each fix", "keeps the proposal as it is", "Only what could change"):
         assert wordy not in page
@@ -93,17 +91,14 @@ def test_one_short_sentence_counts_decisions_not_fixes(split):
     assert re.search(r"<title>Decision 1 of 3: Review [^<]+ \| ReadableSTEM</title>", page)
 
 
-REST = "Everything else was accepted; optional checks are below."
-
-
 @pytest.mark.parametrize(
     ("left", "total", "optional", "sentence"),
     [
-        (3, 3, 2, "3 things need your decision. " + REST),
-        (1, 1, 0, "1 thing needs your decision. Everything else was accepted."),
-        (2, 3, 1, "2 of 3 decisions left. " + REST),
-        (0, 3, 1, "All decisions made. " + REST),
-        (0, 0, 0, "Nothing needs your decision. Everything was accepted."),
+        (3, 3, 2, "3 decisions to make."),
+        (1, 1, 0, "1 decision to make."),
+        (2, 3, 1, "2 of 3 decisions left."),
+        (0, 3, 1, "All decisions made."),
+        (0, 0, 0, "Nothing needs your decision."),
     ],
 )
 def test_headline(left, total, optional, sentence):
@@ -131,19 +126,30 @@ def test_the_first_decision_is_the_equation_with_a_same_size_compare(split):
     row = text_of(section(table, "<tbody>", "</tbody>"))
     assert row == "𝛚 style bold plain Yes"
     # It changes the meaning, so the fix comes first: one button that makes the omega bold
-    # (posted as an edit, its own form), the edit box closed (one click away, since the button
-    # is the fix), and Accept only "anyway".
+    # (posted as an edit by a form of its own; the button sits with the other choices, in front
+    # of the table of differences and the edit box), the edit box closed (one click away, since
+    # the button is the fix), and Accept only "anyway".
     suggest = section(body, '<form method="post"', "</form>")
-    assert 'class="suggest"' in suggest
+    assert 'class="suggest"' in suggest and 'id="suggest-p1-e2"' in suggest
     assert 'name="action" value="edit"' in suggest
     assert 'name="latex" value="\\boldsymbol{\\omega}"' in suggest
-    assert re.search(r'class="button" data-role="suggest"[^>]*>Use bold ω<', suggest)
+    assert re.search(
+        r'form="suggest-p1-e2" class="button" data-role="suggest"[^>]*>Use bold ω<', body
+    )
+    assert body.index('data-role="suggest"') < body.index('<table class="diff-table">')
+    assert body.index('data-role="suggest"') < body.index("Edit the LaTeX")
     assert '<details class="edit-box">' in body and "Edit the LaTeX" in body
     assert re.search(
-        r'value="accept" class="button-secondary" data-role="accept"'
-        r' data-tone="caution">Accept anyway<',
+        r'form="decide-p1-e2" name="action" value="accept" class="button-secondary"'
+        r' data-role="accept" data-tone="caution"[^>]*>Accept anyway<',
         body,
     )
+    # Each choice says what it does, in the same block; Keep as image is apart, below.
+    bar = section(body, '<div class="decision-bar"', "</div>\n</div>")
+    assert "Saves and rechecks." in bar
+    assert "Accept anyway keeps the differing meaning." in bar
+    assert body.index('class="decision-bar"') < body.index('class="fallback"')
+    assert "Keep as image" in section(body, 'class="fallback"', "</div>")
     assert 'name="view" value="split"' in body
 
 
@@ -242,10 +248,17 @@ def test_the_figure_decision_shows_the_image_and_the_alt_field(split):
     assert "Caption in the PDF:</span> Figure 1 A car moves from home to school." in body
     assert re.search(r'<textarea id="alt-p1-e6"[^>]*>A car on a road between', body)
     assert 'id="decorative-p1-e6"' in body
-    assert (
-        "Keep without a description: The figure stays as it is in the PDF, marked “Needs a "
-        "description”" in body
-    )
+    # "Save and accept" settles the figure in one step; "Save, decide later" keeps the text.
+    assert re.search(r'name="action" value="edit"[^>]*data-role="save"[^>]*>Save and accept<', body)
+    assert re.search(r'name="action" value="save"[^>]*data-role="save-later"', body)
+    # The alt-text help is for the kind of figure it is (the fixture's is a diagram).
+    assert "how its labelled parts connect" in body
+    # "Keep without a description" is apart from those, says what students get, and is made
+    # with a tick box that says the same.
+    fallback = section(body, 'class="fallback fallback-figure"', "</fieldset>")
+    assert "I understand: screen reader users get no description." in fallback
+    assert 'id="acknowledge-p1-e6"' in fallback and "get no description" in fallback
+    assert 'data-role="reject"' in fallback and 'data-needs-tick="acknowledge-p1-e6"' in fallback
 
 
 @pytest.mark.parametrize("item", [GROUP, "p1-e7", "p2-e0"])
@@ -367,7 +380,7 @@ def test_every_decision_then_done(split):
     assert "Repeated heading “Teacher Support”: Made 3 headings bold text instead of headings." in (
         text_of(body)
     )
-    assert "All decisions made. Everything else was accepted" in page
+    assert "All decisions made." in page
     assert page.count("step step-done") == 3
     # The legend lists only the marks on the page: nothing needs a decision now.
     legend = text_of(section(page, '<ul class="legend"', "</ul>"))
@@ -503,12 +516,12 @@ def test_a_refused_group_level_comes_back_on_the_card(split):
 
 def test_the_list_view_is_still_one_link_away(split):
     page = screen(split)
-    assert f'<a href="/jobs/{split.job_id}/review/list">All items as a list</a>' in page
+    assert f'<a href="/jobs/{split.job_id}/review/list">List view</a>' in page
     listing = split.browser.get(f"/jobs/{split.job_id}/review/list").text
     assert "<h1>All items as a list</h1>" in listing
     assert len(re.findall(r'<article id="fix-', listing)) == 8
     assert listing.count('name="view" value="list"') >= 5
-    assert f'<a href="/jobs/{split.job_id}/review">Back to the review screen</a>' in listing
+    assert f'<a href="/jobs/{split.job_id}/review">Review screen</a>' in listing
 
 
 def test_unknown_items_fall_back_to_the_first_decision(split):
@@ -577,7 +590,7 @@ def test_results_stored_before_page_sizes_and_tiers_still_load(split):
     _make_old(split)
     page = screen(split)
     # Without group keys each waiting heading is its own decision again.
-    assert "5 things need your decision." in page
+    assert "5 decisions to make." in page
     # Page sizes come from the PDF itself, so the marks are still placed.
     assert "The marks could not be placed" not in page
     css = split.browser.get(f"/jobs/{split.job_id}/review/marks.css").text
@@ -607,7 +620,7 @@ def test_page_sizes_asked_of_the_pdf_once_are_kept(split, monkeypatch):
     assert split.browser.get(f"/jobs/{split.job_id}/review/marks.css").status_code == 200
     assert split.browser.get(f"/jobs/{split.job_id}/regions/p1-e2.png").status_code == 200
     assert len(calls) == 1
-    assert "5 things need your decision." in screen(split)  # still loads as before
+    assert "5 decisions to make." in screen(split)  # still loads as before
 
 
 def test_without_page_sizes_a_failed_probe_leaves_the_decisions_usable(split, monkeypatch):
@@ -620,7 +633,7 @@ def test_without_page_sizes_a_failed_probe_leaves_the_decisions_usable(split, mo
     page = screen(split)
     assert "Decision 1 of 3" not in page  # five decisions now (no tiers)
     assert "Decision 1 of 5" in panel(page)
-    assert "The marks could not be placed on this page." in page
+    assert "No marks on this page." in page
     assert boxes(page) == {}
     css = split.browser.get(f"/jobs/{split.job_id}/review/marks.css").text
     assert "#box-" not in css

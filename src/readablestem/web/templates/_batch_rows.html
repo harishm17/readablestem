@@ -1,15 +1,21 @@
-{# The documents of one upload with their status now, and "Download all" (routes/batch.py).
-   While a document is waiting or converting, htmx polls this address and swaps this block
-   (204 while nothing changed); the summary line is a live region that is never replaced:
-   the poll updates it out of band (hx-swap-oob="innerHTML"), so the counts are spoken
-   politely when they change. Every link keeps its id, so htmx puts focus back on the same
-   link after a swap. Without JavaScript this is a plain list: reload the page. #}
+{# The documents of one upload with their status now, what to do next, and "Download all"
+   (routes/batch.py). While a document is waiting or converting, htmx polls this address and
+   swaps this block (204 while nothing changed; the version includes the minute, so the elapsed
+   time is current); the summary line is a live region that is never replaced: the poll updates
+   it out of band (hx-swap-oob="innerHTML"), so the counts are spoken politely when they
+   change. Every link keeps its id, so htmx puts focus back on the same link after a swap.
+   Without JavaScript this is a plain list: reload the page. A document's file name leads when
+   several came out with the same title. #}
 <div id="batch-rows"{% if unfinished %} hx-get="/app/batch/{{ result_id }}?v={{ version }}" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
   {% if oob|default(false) %}<p id="batch-summary" class="batch-summary" hx-swap-oob="innerHTML">{{ summary }}</p>{% endif %}
   {% if rows %}
+  <section aria-label="Next step" class="batch-next">
+    <p id="batch-next">{{ next_step.text }}{% if elapsed %} <span class="batch-elapsed" id="batch-elapsed">Uploaded {{ elapsed }} ago.</span>{% endif %}</p>
+    {% if next_step.href %}<p><a class="button" id="batch-next-link" href="{{ next_step.href }}">{{ next_step.label }}</a></p>{% endif %}
+  </section>
   <section aria-labelledby="batch-docs-heading">
     <h2 id="batch-docs-heading">Your documents</h2>
-    <div class="table-scroll">
+    <div class="table-scroll" role="group" aria-label="Documents in this batch" tabindex="0">
     <table class="doc-table" role="table" aria-labelledby="batch-docs-heading">
       <thead role="rowgroup">
         <tr role="row">
@@ -22,7 +28,7 @@
         <tr role="row">
           <th scope="row" role="rowheader">
             {% if row.state == "deleted" %}{{ row.name }}{% else %}<a id="batch-doc-{{ row.id }}" href="/jobs/{{ row.id }}">{{ row.name }}</a>{% endif %}
-            <span class="doc-file">{% if row.name != row.filename %}{{ row.filename }} · {% endif %}{{ row.pages }} {{ "page" if row.pages == 1 else "pages" }}</span>
+            <span class="doc-file">{% if row.also %}{{ row.also }} · {% endif %}{{ row.pages }} {{ "page" if row.pages == 1 else "pages" }}</span>
           </th>
           <td role="cell" data-label="Status">
             <span class="status-badge status-{{ row.badge }}">{{ row.label }}</span>
@@ -41,12 +47,12 @@
   <section aria-labelledby="batch-download-heading">
     <h2 id="batch-download-heading">Download all</h2>
     {% if unfinished %}
-    <p id="batch-download-note">Download all is offered here when every document has finished converting.</p>
+    <p id="batch-download-note">Offered when every document has finished converting.</p>
     {% elif ready %}
     <p><a class="button" id="batch-download" href="/app/batch/{{ result_id }}/download">Download {{ ready }} ready {{ "document" if ready == 1 else "documents" }} as one zip</a></p>
-    {% if held_back %}<p id="batch-download-note">{{ held_back }} {{ "document is" if held_back == 1 else "documents are" }} left out: {{ "it has" if held_back == 1 else "they have" }} decisions still to make. Finish the review, then download again.</p>{% endif %}
+    {% if held_back %}<p id="batch-download-note">{{ held_back }} left out: decisions still to make.</p>{% endif %}
     {% else %}
-    <p id="batch-download-note">No document in this batch is ready to share yet{% if held_back %}: {{ held_back }} {{ "has" if held_back == 1 else "have" }} decisions to make{% endif %}.</p>
+    <p id="batch-download-note">No document in this batch is ready to share yet{% if held_back %}: {{ held_back }} still {{ "needs" if held_back == 1 else "need" }} decisions{% endif %}.</p>
     {% endif %}
   </section>
   {% endif %}

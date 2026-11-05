@@ -273,7 +273,7 @@ def test_deleting_a_course_keeps_its_jobs(web):
 
 def test_the_upload_form_offers_the_users_courses(web):
     page = web.browser.get("/app").text
-    assert 'name="course"' not in page and 'href="/courses">add a course</a>' in page
+    assert 'name="course"' not in page and 'href="/courses">Add a course</a>' in page
     course_id = new_course(web.browser, "Physics 1")
     page = web.browser.get("/app").text
     assert '<label for="course">Course (optional)</label>' in page

@@ -28,7 +28,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func, select
 
 from readablestem.ops.retention import erase_user
-from readablestem.web import access, tombstones
+from readablestem.web import access, documents, tombstones
 from readablestem.web.database import as_utc, utc_today
 from readablestem.web.db import Job, User, session_scope, utcnow
 from readablestem.web.deps import CurrentUser, UserDep, flash, get_ctx, render, require_csrf
@@ -103,11 +103,23 @@ def save_keep_default(
     return RedirectResponse("/account#account-keep", status_code=303)
 
 
+def _ready_documents(request: Request, user: CurrentUser) -> int:
+    """How many of the person's documents "Download all" would put in a zip now (finished, no
+    decision open), so the confirmation offers the download only when there is one."""
+    with session_scope(get_ctx(request).factory) as session:
+        listing = documents.documents(session, user.id, now=utcnow(), budget_closed=False)
+    return len(listing.group("ready").rows)
+
+
 def _confirm_page(request: Request, user: CurrentUser) -> Response:
     return render(
         request,
         "account_delete_confirm.html",
-        _context(request, user) | {"invitation_only": not get_ctx(request).settings.signup_open},
+        _context(request, user)
+        | {
+            "invitation_only": not get_ctx(request).settings.signup_open,
+            "ready_documents": _ready_documents(request, user),
+        },
     )
 
 

@@ -111,7 +111,7 @@ def walk(browser, site, job: str, page, check) -> None:
     page.goto(f"{url}?item=p1-e6")
     page.get_by_label("Alt text for figure 1").fill(ALT)
     sign_out_elsewhere(browser, site)
-    page.get_by_role("button", name="Save edit to figure 1").click()
+    page.get_by_role("button", name="Save and accept (figure 1)").click()
     page.get_by_role("heading", name="Please sign in again").wait_for()
     check(page, "session ended")
     page.get_by_role("link", name="Development sign-in").click()
@@ -188,9 +188,9 @@ def test_the_keyboard_reaches_the_decision_and_follows_it(site, browser, job, ja
     while not focused(page).startswith("Use bold ω"):
         page.keyboard.press("Tab")
         tabs += 1
-        # "Show on the page", the equation's "Hear this" (now also from its MathML) and the
-        # compare's focusable math boxes come first.
-        assert tabs <= 6, f"more than 6 Tab stops to the decision (at {focused(page)!r})"
+        # "Show on the page", "Enlarge", the equation's "Hear this" (also from its MathML) and
+        # the compare's focusable math boxes come first.
+        assert tabs <= 7, f"more than 7 Tab stops to the decision (at {focused(page)!r})"
     page.keyboard.press("Enter")
     page.wait_for_url(f"{url}?item=p1-e6")
     _wait_focus(page, "decision-title")
@@ -283,7 +283,7 @@ def test_typed_text_survives_the_session_ending(site, browser, job):
     page.goto(url)
     page.get_by_label("Alt text for figure 1").fill(ALT)
     sign_out_elsewhere(browser, site)
-    page.get_by_role("button", name="Save edit to figure 1").click()
+    page.get_by_role("button", name="Save and accept (figure 1)").click()
     page.get_by_role("heading", name="Please sign in again").wait_for()
     hint = page.get_by_text("What you typed is kept in this browser tab")
     expect(hint).to_be_visible()
@@ -297,11 +297,60 @@ def test_typed_text_survives_the_session_ending(site, browser, job):
     assert note.inner_text() == "What you typed before is back here. It is not saved yet."
     assert note.get_attribute("id") in (field.get_attribute("aria-describedby") or "")
     # Saved: the draft is forgotten.
-    page.get_by_role("button", name="Save edit to figure 1").click()
+    page.get_by_role("button", name="Save and accept (figure 1)").click()
     page.wait_for_url(re.compile(rf"item={GROUP}"))
     page.goto(url)
     assert page.locator(".kept-draft").count() == 0
     assert page.get_by_label("Alt text for figure 1").input_value() == ALT
+    context.close()
+
+
+# A browser whose storage has no room left for a draft (only drafts: the page's own use of
+# storage is left alone).
+FULL = """() => {
+  const set = Storage.prototype.setItem;
+  window.__setItem = set;
+  Storage.prototype.setItem = function (name, value) {
+    if (String(name).startsWith('readablestem.draft:')) {
+      throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+    }
+    return set.call(this, name, value);
+  };
+}"""
+ROOM = "() => { Storage.prototype.setItem = window.__setItem; }"
+
+
+def test_a_draft_the_browser_cannot_store_says_so(site, browser, job):
+    """Storage full: one short status in plain words, no claim that the draft is kept (and no
+    older draft put back later as if it were this one); it goes when a draft is stored again."""
+    context, page = open_page(browser, site)
+    url = f"{site.base}/jobs/{job}/review?item=p1-e6"
+    key = f"readablestem.draft:/jobs/{job}/review/p1-e6"
+    page.goto(url)
+    field = page.get_by_label("Alt text for figure 1")
+    field.fill("First words.")  # stored: nothing to say
+    assert page.locator(".draft-failed").count() == 0
+    assert page.evaluate("(k) => sessionStorage.getItem(k)", key) is not None
+    page.evaluate(FULL)
+    field.fill(ALT)
+    status = page.locator(".draft-failed")
+    expect(status).to_have_text("This draft could not be saved on this device.")
+    assert status.get_attribute("role") == "status"
+    field.fill(ALT + " More.")  # still full: the same one line, not another
+    expect(page.locator(".draft-failed")).to_have_count(1)
+    # The older draft is gone, so it cannot come back as if it were the latest.
+    assert page.evaluate("(k) => sessionStorage.getItem(k)", key) is None
+    page.reload()
+    assert page.locator(".kept-draft").count() == 0
+    assert field.input_value() != ALT + " More."
+    # Room again: a draft is stored and the status goes.
+    page.evaluate(FULL)
+    page.get_by_label("Alt text for figure 1").fill(ALT)
+    expect(page.locator(".draft-failed")).to_have_count(1)
+    page.evaluate(ROOM)
+    page.get_by_label("Alt text for figure 1").fill(ALT + " Again.")
+    assert page.locator(".draft-failed").count() == 0
+    assert page.evaluate("(k) => sessionStorage.getItem(k)", key) is not None
     context.close()
 
 

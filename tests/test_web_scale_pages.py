@@ -111,12 +111,11 @@ def test_the_landing_page_says_what_review_costs_from_the_settings(tmp_path):
     with env.running() as client:
         text = flat(client.get("/").text)
         limits = flat(client.get("/limits").text)
-    assert "about 1.8 decisions a page" in text
-    assert "its page tells you exactly how many decisions it needs" in text
-    assert "Upload up to 30 pages at a time" in text  # max_pages_per_job, not written in
+    assert "up to 30 pages at a time" in text  # max_pages_per_job, not written in
     assert "New accounts have daily limits: 17 pages a day" in text
-    assert "deleted 24 hours after you last work on them" in text
-    # The planning detail lives on /limits.
+    assert "deleted 24 hours after you last work on it" in text
+    # The review load and the planning detail live on /limits.
+    assert "about 1.8 decisions a page" in limits and "its page tells you the exact count" in limits
     assert "all the equations, or all the figures with alt text, in one step" in limits
 
 
@@ -124,10 +123,8 @@ def test_the_landing_page_lists_only_the_features_this_server_has_on(tmp_path):
     off = WebEnv(tmp_path / "off")
     with off.running() as client:
         plain = flat(client.get("/").text)
-    assert "Scanned and handwritten pages, when you ask" not in plain
-    assert "Tables, rebuilt with proper header cells" not in plain
-    assert "longer ones for charts and diagrams" not in plain
-    assert "Your course's own notation" not in plain
+    assert "scanned and handwritten pages when you ask" not in plain
+    assert "tables with header cells" not in plain
     on = WebEnv(
         tmp_path / "on",
         feature_tables=True,
@@ -137,11 +134,8 @@ def test_the_landing_page_lists_only_the_features_this_server_has_on(tmp_path):
     )
     with on.running() as client:
         full = flat(client.get("/").text)
-    assert "Scanned and handwritten pages, when you ask for them" in full
-    assert "Handwritten notes: about 5.7 decisions a page" in full
-    assert "Tables, rebuilt with proper header cells" in full
-    assert "longer ones for charts and diagrams" in full
-    assert "Your course's own notation" in full
+    assert "scanned and handwritten pages when you ask" in full
+    assert "tables with header cells" in full
 
 
 def test_the_quota_is_read_from_the_settings_not_written_in_the_page(tmp_path):
@@ -156,12 +150,11 @@ def test_an_invite_only_landing_page_does_not_quote_a_new_accounts_quota(tmp_pat
     env = WebEnv(tmp_path, signup_mode="allowlist", open_tier_daily_page_quota=17)
     with env.running() as client:
         text = flat(client.get("/").text)
-    assert "New accounts have daily limits" not in text and "about 1.8 decisions a page" in text
+    assert "New accounts have daily limits" not in text
 
 
 def test_the_numbers_are_the_ones_the_limits_page_gives(env):
     assert "about 1.8 per page" in flat(env.get("/limits").text)
-    assert "about 1.8 decisions a page" in flat(env.get("/").text)
 
 
 # --------------------------------------------------------------------------- revised version
@@ -183,18 +176,18 @@ def finished(tmp_path):
 def test_the_results_page_offers_a_revised_version_with_decisions_open_and_when_ready(finished):
     link = f'href="/app?revises={finished.job_id}#upload-heading"'
     page = finished.browser.get(f"/jobs/{finished.job_id}").text
-    assert page.count(link) == 2  # in the actions, and in its own section lower down
-    assert 'data-role="revise"' in page
+    # Once, in "Settings and sharing" (ux2-lane-a): not repeated beside the review actions.
+    assert page.count(link) == 1 and 'data-role="revise"' in page
+    assert page.index("settings-heading") < page.index(link)
 
 
-def test_my_documents_has_the_link_on_each_finished_row_only(finished):
-    queued = job_id_from(upload(finished.browser, make_pdf(1)))
+def test_my_documents_rows_offer_one_next_step_and_delete_not_a_revision(finished):
+    """A revised version starts from the document's own page: the list keeps a row to its
+    file name, one next step and Delete (fewer repeated links per row)."""
     page = finished.browser.get("/app").text
-    assert f'id="rev-{finished.job_id}"' in page
-    assert f'href="/app?revises={finished.job_id}#upload-heading"' in page
-    assert f'id="rev-{queued}"' not in page  # not converted yet
-    row = page[page.index(f'id="rev-{finished.job_id}"') :][:400]
-    assert "Upload a revised version" in row and "visually-hidden" in row
+    assert f'id="rev-{finished.job_id}"' not in page
+    assert f'href="/app?revises={finished.job_id}#upload-heading"' not in page
+    assert f'id="act-{finished.job_id}"' in page and f'id="del-{finished.job_id}"' in page
 
 
 def test_the_revision_form_opens_from_the_link(finished):

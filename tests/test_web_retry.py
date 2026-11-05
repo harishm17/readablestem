@@ -329,7 +329,7 @@ def test_a_conversion_during_an_outage_is_not_a_dead_end(site):
     assert "Nothing is wrong with your PDF" in page
     assert "The AI service is not answering right now" in page
     status = text_of(site.browser.get("/status").text)
-    assert "AI service Not answering since" in status
+    assert "AI service" in status and "Not answering since" in status  # after the state's symbol
     # The person decides one of the items that was not converted: keep the original.
     target = failed[0].element_id
     review = f"/jobs/{job_id}/review"
@@ -564,4 +564,8 @@ def test_the_service_counts_as_not_answering_after_a_run_of_failures_and_recover
 
 def test_the_status_page_says_the_service_answers_when_it_does(site):
     page = text_of(site.browser.get("/status").text)
-    assert "AI service No problems seen in the last 10 minutes" in page
+    assert "No problems seen" not in page
+    assert (
+        "No recent requests; availability untested" in page
+        or "Recent requests were answered" in page
+    )

@@ -28,6 +28,11 @@ button, .button, .button-secondary, .button-danger {
 .button-secondary:hover, button:hover { background: var(--accent-tint); color: var(--accent-hover); border-color: var(--accent-hover); text-decoration: none; }
 .button-danger, .button-danger:visited { background: var(--err); border-color: var(--err); color: var(--on-accent); }
 .button-danger:hover { background: var(--err-strong); border-color: var(--err-strong); }
+/* Deleting is never styled like Keep or Save. The button that opens the delete confirmation is red
+   text on the page colour with a red border; the confirmation page's own button stays the filled
+   `button-danger`. The label also says what is deleted, so colour is not the only cue. */
+.button-danger-outline, .button-danger-outline:visited { background: var(--bg); color: var(--err); border-color: var(--err); }
+.button-danger-outline:hover, button.button-danger-outline:hover { background: var(--err-tint); color: var(--err-strong); border-color: var(--err-strong); }
 .button-small { min-height: 2.25rem; padding: var(--space-1) var(--space-4); }
 button[disabled], button[aria-disabled="true"], .button[aria-disabled="true"] { cursor: not-allowed; opacity: 1; background: var(--surface-2); border-color: var(--border-control); color: var(--ink-muted); }
 .link-button {
@@ -45,4 +50,5 @@ button[disabled], button[aria-disabled="true"], .button[aria-disabled="true"] { 
   .button, button.button { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
   .button:hover, button.button:hover { background: Highlight; color: HighlightText; border-color: Highlight; }
   button[disabled], button.button[disabled] { background: ButtonFace; color: GrayText; border-color: GrayText; }
+  .button-danger-outline { border-color: ButtonText; color: ButtonText; }
 }

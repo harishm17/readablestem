@@ -54,9 +54,9 @@ def test_the_upload_form_has_the_exam_box_unticked_and_described(web):
     box = re.search(r'<input type="checkbox" id="exam" name="exam"[^>]*>', page)
     assert box is not None
     assert "checked" not in box.group(0)
-    assert 'aria-describedby="exam-hint"' in box.group(0)
+    # The label says all of it (the hint was cut as redundant), and the group's line says it too.
     assert '<label for="exam">Exam or quiz: describe figures without giving answers</label>' in page
-    assert 'id="exam-hint"' in page
+    assert 'data-on="Exam or quiz: figures described without answers"' in box.group(0)
 
 
 def test_a_ticked_box_is_stored_and_the_conversion_runs_in_exam_mode(web):
@@ -169,8 +169,6 @@ def test_keep_as_image_says_screen_readers_hear_the_pdf_text_marked_unchecked(tm
         env.run_worker()
         page = client.get(f"/jobs/{job_id}/review").text
     text = text_of(page)
-    assert (
-        "Keep as image: Students see a picture of the original; screen readers hear the PDF "
-        "text of the equation, marked as not checked." in text
-    )
+    assert "Keep as image" in text
+    assert "Students see a picture; screen readers read the PDF's text, marked unchecked." in text
     assert "say only" not in text

@@ -160,9 +160,7 @@ def test_tables_are_decisions_in_the_queue_after_figures_and_before_headings(tab
     assert [(d.number, d.key) for d in decisions] == [(1, "p1-e1"), (2, "p1-e3"), (3, "p2-e0")]
     page = screen(tables)
     lede = text_of(section(page, '<p class="review-lede">', "</p>"))
-    assert lede == (
-        "3 things need your decision. Everything else was accepted; optional checks are below."
-    )
+    assert lede == ("3 decisions to make.")
     # Tables are marked on their page like any other item, and named "Table N".
     marks = re.findall(r'<a id="box-([\w-]+)" class="box[^"]*"', page)
     assert marks == ["p1-e1", "p1-e3"]
@@ -196,27 +194,39 @@ def test_the_card_shows_the_image_and_the_table_as_the_student_gets_it(tables):
     assert "Proposal, as students would get it" in body
     assert 'role="group" aria-label="Proposed table 1"' in body
     assert '<td colspan="2"><math display="inline">' in body  # the maths cell, as MathML
-    # What the checks found, in plain English (web.messages; a code without a sentence
-    # gets the neutral one), with the code in the folded details.
-    findings = text_of(section(body, "table-findings", "</div>"))
+    # What the checks found, in plain English (web.messages; a table check without a sentence
+    # of its own is named by the part of the table it is about, not by a bare "a check did not
+    # pass"), each with the correction for it, and the code in the folded details.
+    findings = text_of(section(body, "table-findings", "</ul>"))
     assert "What the checks found" in findings
-    assert "compare the proposal with the original closely" in findings
-    assert "table.words: words_differ" in section(body, '<details class="tech">', "</details>")
-    # Changing it: a cell from the list, and the two header boxes (both unticked here).
-    change = section(body, '<details class="edit-box table-edit">', "</details>")
+    assert (
+        "A check on the contents of this table did not pass, so compare them with the image."
+        in findings
+    )
+    assert "A check did not pass," not in findings
+    assert 'data-role="finding-edit"' in body
+    assert "table.words: words_differ" in section(body, '<div class="tech">', "</div>")
+    # Changing it, in one place that is open while the checks found something: a cell from the
+    # list, the two header boxes (both unticked here) and the grid read from the PDF.
+    change = section(body, '<details class="edit-box table-edit"', "</details>")
+    assert 'id="table-correct-p1-e1">' in change
     assert "<summary>Change the table</summary>" in change
     assert '<option value="r3c1">Row 4, columns 2 to 3: v = d / t</option>' in change
     assert '<label for="cell-pick-p1-e1">Cell to change</label>' in change
     assert re.search(r'id="header-row-p1-e1"[^>]*data-edit-field>', change)  # not checked
     assert re.search(r'id="header-col-p1-e1"[^>]*data-edit-field>', change)
-    # The grid read from the PDF differs (it has the header row): offered, folded.
-    local = section(body, "<summary>The grid read from the PDF</summary>", "</details>")
+    # The grid read from the PDF differs (it has the header row): offered in the same place.
+    local = body[body.index("Or use the grid read from the PDF") :]
     assert render_table(table_1_local(), id_prefix="tl-p1-e1", math_display="inline") in local
     assert 'name="change" value="use_local"' in local and "Use this grid instead" in local
     # Accept and Keep as image (Reject, named for what it does), saying what it keeps.
-    assert re.search(r'value="accept" class="button" data-role="accept">Accept<', body)
+    assert re.search(r'value="accept" class="button" data-role="accept"[^>]*>Accept<', body)
     assert re.search(r'value="reject" class="button-secondary"[^>]*>Keep as image<', body)
-    assert "Keep as image: Students see a picture of the table, marked “not converted”" in body
+    # ... and the choices that give up the table are apart from the one that repairs it.
+    fallback = section(body, 'class="fallback"', "Details for this item")
+    assert "If it cannot be used as a table" in fallback
+    assert "Students see a picture marked “not converted”" in fallback
+    assert body.index('data-role="accept"') < body.index('class="fallback"')
     # Every form that changes something carries the job's version and the view.
     forms = post_forms(body)
     assert len(forms) == 5  # headers, use this grid, accept, reject, "not a table" (T3-11)
@@ -228,21 +238,20 @@ def test_the_card_shows_the_image_and_the_table_as_the_student_gets_it(tables):
 
 def test_the_controls_come_in_reading_order(tables):
     """Keyboard order is DOM order: the table (its box can be scrolled), what the checks
-    found, the changes (folded), then Accept and Reject, then the next decision."""
+    found, Accept, the changes (one place), then Keep as image, then the next decision."""
     body = panel(screen(tables))
     order = [
         'aria-label="Proposed table 1"',
         "What the checks found",
+        'value="accept"',
         "<summary>Change the table</summary>",
         'id="cell-pick-p1-e1"',
         'id="header-row-p1-e1"',
         'id="header-col-p1-e1"',
         "Save headers",
-        "<summary>The grid read from the PDF</summary>",
         "Use this grid instead",
-        'value="accept"',
         'value="reject"',
-        "<summary>Details for this item</summary>",
+        "Details for this item",
         'rel="next"',
     ]
     positions = [body.index(marker) for marker in order]
@@ -255,17 +264,19 @@ def test_a_table_kept_as_an_image_offers_the_grid_read_from_the_pdf(tables):
     assert "This table is kept as an image of the original" in body  # why, in one sentence
     assert "Grid read from the PDF" in body
     assert render_table(grid_of(TABLE_2), id_prefix="tl-p1-e3", math_display="inline") in body
-    assert re.search(r'class="button">Use the grid read from the PDF<', body)
+    assert re.search(
+        r'class="button" data-role="use-local"[^>]*>Use the grid read from the PDF<', body
+    )
     assert re.search(r'value="reject" class="button-secondary"[^>]*>Keep as image<', body)
     assert "Change the table" not in body  # nothing to change until a grid is chosen
     assert 'value="accept"' not in body
-    assert "The image stays in the document, marked “not converted”" in body
+    assert "The image stays, marked “not converted”" in body
 
 
 def test_a_table_without_a_grid_can_only_keep_its_image(tables):
     body = panel(screen(tables, "?item=p2-e0"))
     assert "Decision 3 of 3" in body
-    assert "No rebuilt table: the document shows the image of the table" in body
+    assert "No rebuilt table: the document shows the image" in body
     assert re.search(r'value="reject" class="button"[^>]*>Keep as image<', body)
     assert "use_local" not in body and 'value="accept"' not in body
 
@@ -296,7 +307,7 @@ def test_choosing_a_cell_opens_its_form_with_the_text_in_it(tables):
     )
     for name, value in (("change", "cell"), ("row", "1"), ("col", "1"), ("action", "edit")):
         assert f'name="{name}" value="{value}"' in form
-    assert '<details class="edit-box table-edit" open>' in body
+    assert re.search(r'<details class="edit-box table-edit" id="table-correct-p1-e1" open>', body)
     assert f'<a href="/jobs/{tables.job_id}/review?item=p1-e1">Cancel</a>' in form
     maths = panel(screen(tables, "?item=p1-e1&cell=r3c1"))
     assert "LaTeX in row 4, columns 2 to 3" in maths
@@ -434,7 +445,9 @@ def test_headers_unchanged_are_refused_and_nothing_is_saved(tables):
     assert response.status_code == 422
     assert "The headers are already like that." in response.text
     assert 'href="#header-row-p1-e1"' in response.text  # the error summary's link
-    assert '<details class="edit-box table-edit" open>' in response.text
+    assert re.search(
+        r'<details class="edit-box table-edit" id="table-correct-p1-e1" open>', response.text
+    )
     assert fix_of(tables, "p1-e1").status is Status.NEEDS_REVIEW
     assert edits(tables) == [] and version(tables) == 0
 
@@ -626,7 +639,7 @@ def test_the_stale_guard_on_the_list_view(tables):
 def test_the_list_view_lists_tables_like_other_kinds(tables):
     page = listing(tables)
     progress = text_of(section(page, 'id="review-progress"', "</div>"))
-    assert "3 decisions are still needed: 3 tables." in progress
+    assert "3 decisions left: 3 tables." in progress
     group = section(page, 'id="group-tables"', 'id="optional-checks"')
     assert 'Tables <span class="group-count">(3 decisions)</span>' in group
     first = section(group, 'id="item-p1-e1"', "</article>")
@@ -638,7 +651,7 @@ def test_the_list_view_lists_tables_like_other_kinds(tables):
     )
     second = section(group, 'id="item-p1-e3"', "</article>")
     assert "Use the grid read from the PDF" in second and "Keep as image" in second
-    assert "Why it was not converted:" in second
+    assert "Not converted:" in second
     third = section(group, 'id="item-p2-e0"', "</article>")
     assert "Keep as image" in third and "use_local" not in third
     for form in post_forms(group):
@@ -649,7 +662,7 @@ def test_the_list_view_lists_tables_like_other_kinds(tables):
     assert "Table 2 on page 1" in follow(tables, response)
     # Converted now: the reason it was not is no longer shown.
     decided = section(listing(tables), 'id="item-p1-e3"', "</article>")
-    assert "Why it was not converted:" not in decided and "Proposed table" in decided
+    assert "Not converted:" not in decided and "Proposed table" in decided
 
 
 # --------------------------------------------------------------------------- older results
@@ -976,6 +989,8 @@ def test_a_table_written_as_text_is_shown_as_students_get_it(as_text):
     assert "students get its text in reading order" in text_of(page)
     assert "Change the table" not in page  # no cells or headers to change in text
     assert "Use this grid instead" in page  # the way back to a table
+    # ... and the finding says so with that one correction, not a link to cells there are not.
+    assert 'data-role="finding-grid"' in page and 'data-role="finding-edit"' not in page
     assert queue.first_open(queue.decisions(stored(as_text))) is not None  # others wait
     assert "p2-e1" not in {d.key for d in queue.decisions(stored(as_text))}  # not a decision
     assert post(as_text, "p2-e1", action="accept").status_code == 303  # re-renders

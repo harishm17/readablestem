@@ -53,8 +53,8 @@ ROLES = (VIEW, REVIEW)
 ROLE_WORDS = {VIEW: "View", REVIEW: "Review"}
 # One line under each right on the sharing page (what the right lets the person do).
 ROLE_HELP = {
-    VIEW: "Reads the converted document, the student preview, the downloads and the review record.",
-    REVIEW: "Also makes review decisions and edits. Each one is recorded under their name.",
+    VIEW: "Reads the document and downloads it.",
+    REVIEW: "Also makes review decisions, recorded under their name.",
 }
 MAX_SHARES_PER_JOB = 10
 # One whole address: the characters an address uses (no `*` or `?`, so no pattern is ever an

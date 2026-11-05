@@ -115,7 +115,7 @@ of the sheet that feeds it (R1 to R17).
 | 3.2.3 Consistent Navigation | Supports | One shared header, navigation and footer (`base.html`) in the same order on every page. |
 | 3.2.4 Consistent Identification | Not yet evaluated | Not reviewed. |
 | 3.3.3 Error Suggestion | Supports | Error messages say what to do ("is not a PDF. Choose a PDF file."; a refused LaTeX edit names the problem and keeps what was typed; `test_an_edit_is_typed_saved_and_a_refused_one_is_explained_by_keyboard`). |
-| 3.3.4 Error Prevention (Legal, Financial, Data) | Supports | Deleting a document or an account has a confirmation page with the consequences and a "No, keep it" link (`delete_confirm.html`, `account_delete_confirm.html`; the keyboard tests go through both); a review decision can be undone (`Undo`). |
+| 3.3.4 Error Prevention (Legal, Financial, Data) | Supports | Deleting a document or an account has a confirmation page with the consequences, a button that names what it deletes and a "No, keep it" button (`delete_confirm.html`, `account_delete_confirm.html`; the keyboard tests go through both); a review decision can be undone (`Undo`). |
 | 3.3.8 Accessible Authentication (Minimum) | Supports | Sign-in is with a Google or Microsoft account, or an emailed link where that is enabled: no password to remember, no puzzle, no code to copy (`web/auth.py`, `web/email_login.py`). |
 | 4.1.3 Status Messages | Not yet evaluated | VoiceOver (R16). Built: decisions and page actions put a status line next to the heading that takes focus; the job page has a live region that speaks once per step; errors use `role=alert` and take focus. Whether each is spoken has to be heard. |
 

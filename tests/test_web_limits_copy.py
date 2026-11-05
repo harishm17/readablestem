@@ -56,8 +56,8 @@ def test_the_limits_page_names_the_configured_limits(web):
 def test_the_upload_form_names_the_configured_limits(web):
     text = flat(web.alice.get("/app").text)
     # the site copy (content/site-rewrite) states each limit once, from the settings
-    assert "Up to 77 pages and 66 MB each." in text
-    assert "up to 333 pages and 88 MB, is kept" in text
+    assert "up to 77 pages and 66 MB." in text
+    assert "up to 333 pages, 88 MB) are kept" in text
     for old in OLD:
         assert old not in text, old
     page = web.alice.get("/app").text
@@ -67,7 +67,7 @@ def test_the_upload_form_names_the_configured_limits(web):
 
 def test_the_landing_and_sign_in_pages_name_the_configured_quota(web):
     landing = flat(web.client().get("/").text)
-    assert "Upload up to 77 pages at a time" in landing
+    assert "up to 77 pages at a time" in landing
     assert "New accounts have daily limits: 111 pages a day" in landing
     for old in OLD:
         assert old not in landing, old
@@ -82,8 +82,8 @@ def test_the_parts_page_and_its_errors_do_not_show_the_old_limit_as_an_example(w
     assert response.status_code == 303, response.text[:300]
     page = web.alice.get(response.headers["location"])
     text = flat(page.text)
-    assert "has 80 pages" in text and "up to 77 pages" in text
-    assert "A part can have up to 77 pages." in text
+    assert "80 pages" in text and "up to 77 pages" in text
+    assert "of up to 77 pages" in text
     for old in OLD:
         assert old not in text, old
     with pytest.raises(ranges.PartsError) as error:

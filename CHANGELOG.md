@@ -1,5 +1,163 @@
 # Changelog
 
+## Unreleased: fixes from the final read of the public pages (branch ux2/final-pass)
+
+- Listen: a sentence with inline maths directly in a list item, table cell or definition stays one
+  item. Before, the maths (its MathML children are not "inline" tags) ended the paragraph, so
+  "Remember in calculating change (Δ) we always use…" was read as three items. Display maths in a
+  list item still stands as its own equation.
+- Terms: three template blocks (title, description, body class) carried a stray `</details>`, which
+  showed in the browser tab, the search snippet and the body's class list. A test now checks every
+  page for markup in those three places.
+- Posting: the at-a-glance line says Blackboard, Moodle and D2L are not tried yet, as the section
+  below it does.
+- Offices: the at-a-glance table says a deleted document can stay in a backup for up to about a
+  week, as the retention table and the privacy notice do.
+- Limits: "What it handles, with limits" and "What it does not do" are open when the page loads.
+- Status: each state has a symbol beside its words (✓ fine, ⚠ needs attention, – not known); the
+  symbol is hidden from screen readers because the words already say it.
+
+## Unreleased: front-end code consolidation (branch ux2/lane-e)
+
+- Stylesheets: each component's base, responsive and forced-colour rules are in one place in
+  `app.css`, the blocks named for the work that added them are gone, and the button forced-colour
+  rules and the danger outline are `controls.css`'s alone (`DESIGN.md`, "Stylesheets"). Rendering is
+  unchanged except on a phone, where the file-name cell of My documents is no longer cut to 40% of the
+  row (a rule meant for wide tables was overriding the phone layout).
+- `tokens.css`: named layers (`--z-raised`, `--z-raised-top`, `--z-sticky`, `--z-fixed`, `--z-skip`),
+  `--sticky-offset` and `--listen-sticky`, used by the review screen, tables and the listening player;
+  the light palette for white paper is `--paper-*`, aliased by the paper scopes, the landing sheet, the
+  diagram caption and the table header instead of repeating hex values.
+- `app.js`: times swapped in by htmx are localised from the inserted nodes only (no rescan of the page);
+  the Symbols screen announces the ticked-places count politely (a visually hidden status) when no
+  replacement is chosen yet; when a draft cannot be stored (storage full) a status says "This draft could
+  not be saved on this device." and the older draft is dropped.
+- Tests: scoped localisation, the symbol-count status and the draft-storage failure in Chromium; layers,
+  paper tokens and one-place rules in `tests/test_design_tokens.py`.
+
+## Unreleased: the review screens, list view, Symbols and bulk accept (branch ux2/lane-b)
+
+- Review (split view and list): the choices and what each does are one block (the recommended
+  repair and Accept first; "Keep as image" apart, named for what students get); the card's details,
+  codes and report link are folded into "More about this item". Phone: a Decision / Page bar,
+  "Fit to width" and "Enlarge" for the picture of the PDF. Shared markup of the two views is in
+  `_review_shared.html`.
+- Figures: **Save and accept**, **Save, decide later** (saved, still waiting) and **Accept**; alt-text
+  help for the kind of figure; "Keep without a description" needs a tick box saying what it means for
+  students (the server refuses it without; `FIGURE_KEEP_ACK`).
+- Tables: findings name the part of the table (a check with no sentence of its own no longer says only
+  that "a check did not pass") and each has its correction; headers, a cell and the grid read from the
+  PDF are one folded place; "Keep as image" and "This grid is not a table" are apart from the repair.
+- Repeated headings can be decided one by one on the review screen.
+- List view: the first decision comes first; sections, filter and accept-many are one folded disclosure;
+  compact rows from the second decision.
+- Symbols: places are ticked until unticked (`include`, `places=chosen`; `exclude` still works);
+  "Change all" waits for a replacement, a live status line says what will change, and the empty screen
+  says when it becomes useful with a small example. Bulk accept: shorter opening, and with nothing to
+  accept it names the next step.
+- Less copy on these screens: shorter headline, hints, consequences and the bulk titles ("Accept
+  equations that passed every check", "Accept figures with generated alt text").
+## Unreleased: upload, My documents, the job page and downloads, from the second independent review (branch ux2/lane-a)
+
+- Copy on these pages is about a third to a half shorter (upload form, My documents, job page in
+  each state, the stopped and deleted pages): one idea per sentence, detail only where it protects
+  the reader (retention times, what is sent where, what a refusal cost).
+- Upload: the file field and its button are the form; "How to convert it" and "How long to keep it"
+  are one line each (saying what is set) until opened. The scan box says first
+  that a PDF of only scans is refused without it and a mixed PDF keeps its scanned pages as
+  pictures; "Tick it every time" is now "Make this the default in Account"; "Main file of a zip"
+  sits in a disclosure and appears only with LaTeX source on. After a refusal the form comes back
+  before the documents list with every choice kept, the error summary takes focus and its
+  link goes to the file chooser, right under it. LaTeX source that is not available says so and offers the PDF route; a scan refusal
+  where the scan option is offered no longer says the tool cannot convert it.
+- My documents: rows lead with the uploaded file name (a part with its pages; the generated title
+  under it; a title you set leads), one next step and Delete per row ("Upload a revised version" is
+  on the document's page), "Upload another file" beside the heading; a first-time visitor gets the
+  form first, then the sample.
+- Job page: five groups with links to them (Review and download, For students, Settings and
+  sharing, Record, Delete); the seven tiles are one line with "Counts in detail"; sharing says it
+  is for working with a colleague and not how students get the file; the headline says "before you
+  give it to students"; retention is explained once, in the Delete group, with the real deletion
+  date, that your own work restarts the time and that people you share with do not extend it.
+- Downloads: "Where will you post it?" lists the web page (recommended), Canvas, Word and EPUB, each
+  with its own link; the posting steps and the checks are said once.
+- Waiting and running: elapsed time ("Waiting for 3 minutes."), a qualified estimate, and a plain
+  "taking longer than usual" note with no percentage; the batch page shares the part.
+- Stopped: the reason is in the status box once, and "What you can do" gives Try again or safe ways
+  on (upload again, My documents, service status, email); scanned and handwritten messages depend
+  on whether the scan option is offered.
+- Deleted and unavailable documents: "kept N hours in all" instead of "after upload", the current
+  retention times, "Upload the PDF again"; a document that cannot be opened gets the same
+  help text whatever the reason. Privacy and Limits name the saved Account default.
+## Unreleased: second UX round, lane C (branch ux2/lane-c)
+
+Listening, page picking, sharing, account and deletion, courses, batch, confirmations and error pages. The copy on
+each of these pages is cut to roughly half or less; every fact that protects the user (what is deleted, kept or shared)
+stays, in fewer words and next to the action.
+
+- Listening: Play (it becomes Pause), Previous and Next are the transport; stop, jump, speed, voice and keys are under
+  "More controls". Play starts at the lesson ("Play from the beginning" is under More controls) and the title, notices
+  and licence are folded under "Before the lesson". Why Play is off (no voice, only online voices) is a line right
+  under it with "Read the transcript". A compact index of headings and equations, a text and kind filter, hairlines
+  instead of a box per item, and a scroll offset that follows the transport's measured height (tested at 200% text).
+- Choosing pages: two page fields with "Add part" and "Remove", the parts as a list with page counts and one summary
+  line (also after an error, marking the part that is wrong); the typed box is under "Type the pages instead"
+  (`ranges.preview`, `GET /uploads/{id}/preview`, `static/parts.js`). The daily quota is said once.
+- Sharing: the page leads with add a person, copy the link, send it yourself; when access ends is beside Share and
+  beside Copy link; the exact-address rule is under "Help with sharing"; an error summary sits directly above the form.
+- Account: how long documents are kept comes before the limits, with its own save button; deleting is a short list.
+  Account deletion leads with download links, a short "not reached by deleting" list and the button; the long
+  provider and backup prose is one link to the privacy notice.
+- Courses: documents and symbols per course with a "Set up notation" or "Edit notation" action; an editable starter set
+  of common bold vectors and matrices (`POST /courses/{id}/starter`); adding documents already converted to a course
+  (`POST /courses/{id}/documents`), which says plainly that they are not converted again; notation, documents and
+  rename or delete are separate sections.
+- Confirmations (document, account, course, discarded upload): the button names what it deletes ("Delete “Lecture 3”"),
+  "No, keep it" is a button of the same size, and the footer is compact.
+- Batch: a next-step line (what to do, and how long ago it was uploaded), a clearer "Download all" note, and documents
+  with the same title lead with their file names.
+- Error pages: 500 and 503 carry the wordmark, a My documents link, the status page and a contact link; the 404 says
+  what a missing document or course can mean without saying which.
+- Tests: `tests/test_web_ux2_lane_c.py`, and the listening, page-picking, keyboard and course browser tests.
+## Unreleased: UX round 2, lane D: public pages and the shared chrome (branch ux2/lane-d)
+
+- Offices page: a table of data by kind (what is sent where, for how long) now leads the page, a
+  retention table replaces the retention bullets, and every scrolling table is a focusable, named
+  box (fixes axe `scrollable-region-focusable` at 320px; `_table_scroll.html`). The by-kind table,
+  the by-company table and the downloadable one-page summary are all written from one list
+  (`offices.data_items`), so the summary now includes tables, opted-in full-page images, course
+  notation and handwriting close-ups when they are on. The summary's pilot is an ordered list, its
+  headings step down in size, it has no raw URLs, links back to the live page and still prints on
+  one page.
+- Privacy opens with a default-and-exceptions retention table and says the 7-day choice can be
+  the default in Account. Terms open with a short summary. Known limits open with what you can
+  upload, then what it handles, review time and accuracy. Posting help and the ADA guide open
+  with a short list.
+- Comparison guide: shorter title ("Choosing a tool for STEM course files"), a short decision list
+  before the table, and LaTeX source in the Inputs cell; the landing, limits, ADA, offices and
+  privacy pages name LaTeX source under the same flag. The guides index gives each guide an
+  audience line.
+- Landing: a headline, one line, the real before/after, a comparison chart (ReadableSTEM, the Opus
+  chatbot and the Haiku chatbot on the newest registered test, drawn from
+  `data/realworld/results-fresh5.json` by `web/proof_facts.py`, with a data table behind it, and the
+  first test's heading and figure counts), three lines on what it handles, and the questions
+  folded; under half the words shown before. The earlier chatbot-ahead result is history on
+  `/limits`, in PROOF.md and the README, not on the landing or comparison pages. The same chart
+  is on the comparison guide and the offices page (`_proof_chart.html`).
+- Long public pages (offices, privacy, terms, limits, the ADA guide, posting help, the comparison
+  guide) open with a summary or table and fold their detail into disclosures under the same
+  headings.
+- Demo: the note above the paper is two short paragraphs with the licence, original page and the
+  Teacher Support explanation in a disclosure (the committed demo file carries the new note; the
+  conversion itself is unchanged).
+- Status: "No recent requests; availability untested" or "Recent requests were answered", the
+  time of the last request, an optional one-minute refresh (`?refresh=1`), retention prose removed.
+- Sign-in: the account-creation consent sits under the buttons; sign-in pages use a five-link
+  footer. Signed-in pages put My documents, Courses and Account first and have a footer of six
+  links; footer and cancel links are 44px targets.
+- `/style`: every demonstration is labelled an inert example, the light, dark and forced-colour
+  states are shown, and examples link to the pages where they are in use.
+
 ## Unreleased: the Landlock launcher counts the user's tasks as the kernel does (branch latex/nproc-hidden-tasks)
 
 - The program's task count is bounded by the supervisor's check (every 0.05 s) and the caller's

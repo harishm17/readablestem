@@ -105,7 +105,7 @@ def test_the_upload_form_has_two_separate_choices_both_off(ux):
         assert label in html
         tag = re.search(rf'<input[^>]*id="{box}"[^>]*>', html)
         assert tag and "checked" not in tag.group(0)
-    assert "<legend>How long to keep it, and who may look</legend>" in html
+    assert '<span class="group-name">How long to keep it</span>' in html
 
 
 @pytest.mark.parametrize(
@@ -275,7 +275,8 @@ def test_the_title_field_starts_with_the_pdf_title_without_its_section_number(ti
 
 def test_the_list_download_name_and_delete_page_use_the_same_title(titled):
     listing = titled.browser.get("/app").text
-    assert ">Derivatives</a>" in listing and "1 Derivatives" not in text_of(listing)
+    assert "Titled “Derivatives”" in text_of(listing) and "1 Derivatives" not in text_of(listing)
+    assert ">week3.pdf</a>" in listing  # a generated title is under the file name, not over it
     response = titled.browser.get(f"/jobs/{titled.job_id}/download")
     assert 'filename="derivatives-' in response.headers["content-disposition"]
     confirm = titled.browser.get(f"/jobs/{titled.job_id}/delete").text
@@ -570,10 +571,10 @@ def test_the_advice_counts_the_copies_when_only_some_sit_under_the_same_words():
 def test_a_run_in_label_is_bold_text_and_other_labels_keep_the_proposal():
     result, members = group_result([None, None], label="Solution")
     got = heading_groups.advice(result, members)
-    assert got.suggest == "bold" and "usually bold text, not headings" in got.fact
+    assert got.suggest == "bold" and "usually bold text, not a heading" in got.fact
     result, members = group_result([None, None], label="Key Terms")
     got = heading_groups.advice(result, members)
-    assert got.suggest == "keep" and "the tool's proposal stands" in got.fact
+    assert got.suggest == "keep" and "the proposal stands" in got.fact
 
 
 def test_the_crops_are_the_first_middle_and_last_copy():
@@ -598,7 +599,8 @@ def test_the_group_card_names_the_fact_shows_crops_and_suggests_keeping(ux):
     assert "No copy sits directly under a heading with the same words" in text
     for eid in ("p1-e3", "p1-e7", "p2-e0"):
         assert f"/jobs/{ux.job_id}/regions/{eid}.png" in html
-    assert html.count('class="region-image" loading="lazy"') == 3
+    # the three copies at the top, and each heading's own picture under "Decide them one by one"
+    assert html.count('class="region-image" loading="lazy"') == 6
     keep = re.search(
         r'<button[^>]*class="(button[^"]*)"[^>]*data-role="accept">Keep as headings', html
     )
@@ -674,7 +676,7 @@ def test_when_only_headers_are_missing_that_is_the_main_button(tables):
     main = re.search(r'<button[^>]*class="button"[^>]*>Use the first row as headers', html)
     assert main
     assert re.search(
-        r'class="button-secondary"[^>]*data-role="accept">Accept without headers', html
+        r'class="button-secondary"[^>]*data-role="accept"[^>]*>Accept without headers', html
     )
     assert html.index("Use the first row as headers") < html.index("Accept without headers")
 
@@ -726,4 +728,4 @@ def test_the_checks_disclosure_counts_the_checks_that_ran(tmp_path):
         env.run_worker()
         html = page(env)
     block = text_of(html[html.index('id="checks-ran"') :].split("</details>")[0])
-    assert "Ran on this file: 1 checks of its structure" in block
+    assert "Ran on this file: 1 structure check." in block

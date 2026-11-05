@@ -40,7 +40,10 @@ def text_of(html: str) -> str:
 
 
 def decide(env, target: str, **fields) -> None:
-    data = {"csrf_token": token(env.browser, f"/jobs/{env.job_id}/review")} | fields
+    data = {
+        "csrf_token": token(env.browser, f"/jobs/{env.job_id}/review"),
+        "acknowledge": "on",
+    } | fields
     response = env.browser.post(f"/jobs/{env.job_id}/review/{target}", data=data)
     assert response.status_code == 303, response.text
 
@@ -95,7 +98,7 @@ def test_the_job_page_links_to_the_record(web):
     page = web.browser.get(f"/jobs/{web.job_id}").text
     assert f'href="/jobs/{web.job_id}/record"' in page
     assert f'href="/jobs/{web.job_id}/record.csv"' in page
-    assert "It is a record, not a verdict." in text_of(page)
+    assert "A record, not a verdict" in text_of(page)
 
 
 # --------------------------------------------------------------------------- the CSV

@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{# One course and its notation (routes/courses.py). #}
+{# One course (routes/courses.py), in three parts that are kept apart: its notation (the
+   symbols, the starter set when there are none, what its documents suggest, adding one), its
+   documents (and adding ones already converted), and the course's settings (rename, delete). #}
 {% set field_errors = field_errors|default({}) %}
 {% block title %}{% if errors|default([]) %}Error: {% endif %}{{ course.name }}{% endblock %}
 {% macro error_line(name) %}{% set err = field_errors.get(name) %}{% if err %}<p class="error-message" id="{{ name }}-error"><span class="visually-hidden">Error: </span>{{ err.message }}</p>{% endif %}{% endmacro %}
@@ -7,28 +9,12 @@
 {% block content %}
 <h1>{{ course.name }}</h1>
 {% include "_error_summary.html" %}
-<p class="lede">The symbols this course uses and what they mean. The tool uses them when it
-  reads documents you convert for this course. The review screen says a bold vector or
-  matrix by its meaning (“vector d” for a bold d that is a vector).</p>
+<p class="lede">The symbols this course writes in a special way.</p>
 
-<section aria-labelledby="course-documents-heading" id="course-documents">
-  <h2 id="course-documents-heading">Documents in this course</h2>
-  {% if documents.rows %}
-  {% include "_documents.html" %}
-  {% if ready_documents %}
-  <p><a id="download-all" href="/courses/{{ course.id }}/download">Download all {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} (zip)</a></p>
-  {% set download_all_url = "/courses/" ~ course.id ~ "/download" %}{% include "_download_all_formats.html" %}
-  {% endif %}
-  {% else %}
-  <p>No documents yet. Choose this course when you <a href="/app#upload-heading">convert a PDF</a>
-    and the document is listed here, and read with this course's notation.</p>
-  {% endif %}
-</section>
-
-<section aria-labelledby="entries-heading">
+<section aria-labelledby="entries-heading" id="course-notation">
   <h2 id="entries-heading">Notation</h2>
   {% if entries %}
-  <div class="table-scroll">
+  <div class="table-scroll" role="group" aria-label="Symbols of {{ course.name }}" tabindex="0">
   <table>
     <caption class="visually-hidden">Symbols of {{ course.name }}</caption>
     <thead>
@@ -54,23 +40,44 @@
   </table>
   </div>
   {% else %}
-  <p>No symbols yet. Add the ones your course writes in a special way, such as bold
-    vectors or a double-struck R for the real numbers.{% if suggestions %} The symbols your
-    documents use are listed below to tick, so you do not have to type them.{% endif %}</p>
+  <p>No symbols yet.</p>
   {% endif %}
-</section>
 
-{% include "_notation_suggestions.html" %}
+  {% if starter %}
+  <form method="post" action="/courses/{{ course.id }}/starter" class="starter-form" aria-labelledby="starter-heading">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <h3 id="starter-heading">Start from common symbols</h3>
+    <p class="hint" id="starter-hint">Tick the ones your course uses. Edit any row.</p>
+    <ul class="starter-list" aria-describedby="starter-hint">
+      {% for sym, mean in starter %}
+      <li class="starter-row">
+        <div class="checkbox-field">
+          <input type="checkbox" id="starter-pick-{{ loop.index0 }}" name="pick" value="{{ loop.index0 }}">
+          <label for="starter-pick-{{ loop.index0 }}">{{ sym }}</label>
+        </div>
+        <div class="field">
+          <input type="text" id="starter-symbol-{{ loop.index0 }}" aria-label="Symbol {{ loop.index }}" name="symbol" value="{{ sym }}" maxlength="64" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <select id="starter-meaning-{{ loop.index0 }}" aria-label="Meaning {{ loop.index }}" name="meaning">
+            {% for value, label in meanings.items() %}<option value="{{ value }}"{% if mean == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    <button type="submit" class="button">Add the ticked symbols</button>
+  </form>
+  {% endif %}
 
-<section aria-labelledby="add-heading">
-  <h2 id="add-heading">Add a symbol</h2>
-  <p>If your course writes a letter both ways, such as a bold v for velocity and a plain v
-    for speed, add both.</p>
-  <form method="post" action="/courses/{{ course.id }}/entries" novalidate>
+  {% include "_notation_suggestions.html" %}
+
+  <h3 id="add-heading">Add a symbol</h3>
+  <form method="post" action="/courses/{{ course.id }}/entries" novalidate aria-labelledby="add-heading">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     <div class="field{% if field_errors.get('symbol') %} field-error{% endif %}">
       <label for="symbol">Symbol</label>
-      <p class="hint" id="symbol-hint">In words, in LaTeX or as the character: {{ examples }}.</p>
+      <p class="hint" id="symbol-hint">For example “bold d” or “\mathbf{d}”.</p>
       {{ error_line("symbol") }}
       <input type="text" id="symbol" name="symbol" maxlength="64" autocomplete="off" spellcheck="false" value="{{ values.get('symbol', '') }}"{{ described("symbol") }}>
     </div>
@@ -83,7 +90,7 @@
     </div>
     <div class="field{% if field_errors.get('note') %} field-error{% endif %}">
       <label for="note">Note (optional)</label>
-      <p class="hint" id="note-hint">For you, such as “displacement”. Up to 200 characters.</p>
+      <p class="hint" id="note-hint">For you only.</p>
       {{ error_line("note") }}
       <input type="text" id="note" name="note" maxlength="200" autocomplete="off" value="{{ values.get('note', '') }}"{{ described("note") }}>
     </div>
@@ -91,9 +98,44 @@
   </form>
 </section>
 
-<section aria-labelledby="rename-heading">
-  <h2 id="rename-heading">Rename the course</h2>
-  <form method="post" action="/courses/{{ course.id }}/rename" novalidate>
+<section aria-labelledby="course-documents-heading" id="course-documents">
+  <h2 id="course-documents-heading">Documents in this course</h2>
+  {% if documents.rows %}
+  {% include "_documents.html" %}
+  {% if ready_documents %}
+  <p><a id="download-all" href="/courses/{{ course.id }}/download">Download all {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} (zip)</a></p>
+  {% set download_all_url = "/courses/" ~ course.id ~ "/download" %}{% include "_download_all_formats.html" %}
+  {% endif %}
+  {% else %}
+  <p>No documents yet. Choose this course when you <a href="/app#upload-heading">convert a PDF</a>.</p>
+  {% endif %}
+
+  {% if attachable %}
+  <details class="attach-documents" id="attach-documents">
+    <summary>Add converted documents ({{ attachable|length }})</summary>
+    <p>Lists the document here and shows this notation on its review screen. It is not converted again: to read the PDF with this notation, upload it again for this course.</p>
+    <form method="post" action="/courses/{{ course.id }}/documents">
+      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      <fieldset class="field">
+        <legend>Documents in no course</legend>
+        <ul class="plain-list">
+          {% for row in attachable %}
+          <li class="checkbox-field">
+            <input type="checkbox" id="attach-{{ row.id }}" name="job" value="{{ row.id }}">
+            <label for="attach-{{ row.id }}">{{ row.title }}{% if row.title != row.filename %} <span class="meta">({{ row.filename }})</span>{% endif %}</label>
+          </li>
+          {% endfor %}
+        </ul>
+      </fieldset>
+      <button type="submit" class="button-secondary">Add the ticked documents</button>
+    </form>
+  </details>
+  {% endif %}
+</section>
+
+<section aria-labelledby="settings-heading" class="course-settings">
+  <h2 id="settings-heading">Rename or delete</h2>
+  <form method="post" action="/courses/{{ course.id }}/rename" novalidate aria-label="Rename the course">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     <div class="field{% if field_errors.get('rename') %} field-error{% endif %}">
       <label for="rename">Course name</label>
@@ -102,13 +144,10 @@
     </div>
     <button type="submit" class="button-secondary">Rename</button>
   </form>
-</section>
-
-<section aria-labelledby="delete-heading">
-  <h2 id="delete-heading">Delete the course</h2>
-  <p>Deletes the course and its notation. Documents you converted for it keep their results.</p>
+  <h3 id="delete-heading">Delete</h3>
+  <p>Documents keep their results.</p>
   {# Posts without confirm=yes: the next page asks before anything is deleted. #}
-  <form method="post" action="/courses/{{ course.id }}/delete">
+  <form method="post" action="/courses/{{ course.id }}/delete" aria-labelledby="delete-heading">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     <button type="submit" class="button-danger-outline">Delete course</button>
   </form>

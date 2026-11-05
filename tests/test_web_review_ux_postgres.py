@@ -48,7 +48,12 @@ def test_decisions_sent_at_once_from_one_page_are_applied_once(pg_url, tmp_path)
                 start.wait(timeout=30)
                 response = tab.post(
                     f"/jobs/{job_id}/review/p1-e6",
-                    data={"csrf_token": csrf, "action": action, "version": "0"},
+                    data={
+                        "csrf_token": csrf,
+                        "action": action,
+                        "version": "0",
+                        "acknowledge": "on",
+                    },
                 )
                 codes.append(response.status_code)
             except BaseException as exc:  # reported below, with the thread's error

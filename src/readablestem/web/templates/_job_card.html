@@ -31,17 +31,12 @@
       </tbody>
     </table>
   </div>
-  <p class="hint">How we know: we read your PDF's tags, language, title and bookmarks and its
-    text layer, which is what a screen reader gets from a PDF without tags (a PDF reader may
-    put it in a different order), and counted what the HTML file contains. The counts say
-    what is there, not whether each part is right. Our checks catch some equation errors,
-    not all: look over the equations your students rely on.</p>
+  <p class="hint">Read from your PDF's tags and text layer, and counted in the HTML. The counts
+    say what is there, not whether it is right: check the equations your students rely on.</p>
   {% if card.examples %}
   <h3 id="hear-heading">Hear the difference</h3>
-  <p>Some of your equations, written out the way a screen reader is given them. Screen
-    readers word them a little differently, but they can only say the structure the file
-    gives them.{% if card.tagged %} Your PDF is tagged, so a screen reader may get more
-    from it than its text layer; we did not check its tags.{% endif %}</p>
+  <p>Some of your equations as a screen reader is given them.{% if card.tagged %} Your PDF is
+    tagged, so a reader may get more than its text layer; we did not check the tags.{% endif %}</p>
   <ul class="fix-list" aria-labelledby="hear-heading">
     {% for example in card.examples %}
     <li class="fix-card">

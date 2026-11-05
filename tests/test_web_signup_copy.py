@@ -120,7 +120,7 @@ def test_the_limits_page_names_the_daily_pages_in_allowlist_mode_too(tmp_path):
     env = WebEnv(tmp_path, signup_mode="allowlist", per_user_daily_page_quota=90, **GOOGLE)
     limits = page(env, "/limits")
     assert "You can convert 90 pages a day." in limits
-    assert "new account" not in limits.split("Daily limits.")[1].split("Size.")[0]
+    assert "new account" not in limits.split("Daily limits", 1)[1].split("Storage", 1)[0]
 
 
 def test_the_privacy_notice_says_the_first_sign_in_makes_an_account_and_how_to_delete_it(tmp_path):
@@ -337,12 +337,12 @@ def test_deleting_does_not_promise_more_than_it_does(tmp_path, which):
     what the model provider already received is under its own retention."""
     env = WebEnv(tmp_path / "a", signup_mode="open", model_provider="anthropic")
     text = account_pages(env, ALICE)[which]
-    assert "What deleting does not reach." in text
-    assert "each backup is kept for about 6 days" in text
-    assert "up to about a week after you delete them" in text
-    assert "Anthropic stay under its own retention" in text
+    assert "Not reached by deleting:" in text
+    assert "Backups keep a copy for about a week." in text
+    assert "already sent to Anthropic stay under its own retention" in text
     assert "delete API inputs and outputs within 30 days, longer for material" in text
-    assert "scrambled fingerprint of your address" in text and "It is deleted tomorrow." in text
+    assert "scrambled fingerprint of your address, until tomorrow" in text
+    assert 'href="/privacy">privacy notice</a>' in text
     other = WebEnv(tmp_path / "b", signup_mode="open", model_provider="openai")
     text = account_pages(other, ALICE)[which]
     assert "OpenAI stay under its own retention" in text and "Anthropic" not in text
@@ -351,7 +351,7 @@ def test_deleting_does_not_promise_more_than_it_does(tmp_path, which):
 def test_the_fingerprint_is_not_mentioned_where_sign_up_is_not_open(tmp_path):
     env = WebEnv(tmp_path, signup_mode="allowlist")
     _, page = account_pages(env, ALICE, invited=True)
-    assert "each backup is kept for about 6 days" in page
+    assert "Backups keep a copy for about a week." in page
     assert "fingerprint" not in page and "You are on the invitation list" in page
 
 
@@ -359,26 +359,22 @@ def test_an_invited_person_is_told_what_signing_in_again_would_be(tmp_path):
     env = WebEnv(tmp_path, signup_mode="open", open_tier_daily_page_quota=20)
     _, confirm = account_pages(env, ALICE, invited=True)
     assert (
-        "You were invited. If you sign in again later, you come back as a new, empty account"
+        "Signing in again makes a new, empty account with new-account limits (20 pages a day)"
         in confirm
     )
-    assert "with the limits for new accounts (20 pages a day), not the invited ones" in confirm
-    assert "Today's pages and reads that you have already used stay used" in confirm
-    assert "an admin would have to make you one again" not in confirm
+    assert "no admin rights" not in confirm
 
 
 def test_an_admin_is_told_they_would_lose_admin_rights(tmp_path):
     env = WebEnv(tmp_path, signup_mode="open")
     _, confirm = account_pages(env, ALICE, invited=True, admin=True)
-    assert "You are an admin: the new account has no admin rights" in confirm
-    assert "an admin would have to make you one again" in confirm
+    assert "It has no admin rights." in confirm
 
 
 def test_a_new_account_is_told_the_days_use_stays_used(tmp_path):
     env = WebEnv(tmp_path, signup_mode="open")
     _, confirm = account_pages(env, ALICE)  # signs up: open tier
-    assert "you get a new, empty account, and it counts as a new account" in confirm
-    assert "deleting does not reset the day's limits" in confirm
+    assert "Signing in again makes a new, empty account. Today's limits do not reset." in confirm
     assert "You were invited" not in confirm
 
 

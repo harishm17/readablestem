@@ -86,25 +86,40 @@
     return relative.format(Math.round(ms / 86400000), "day");
   }
 
-  function localise() {
-    document.querySelectorAll("time.local-time[datetime]:not([data-local])").forEach(function (el) {
-      var when = new Date(el.getAttribute("datetime"));
-      if (isNaN(when.getTime())) return;
-      var ms = when.getTime() - Date.now();
-      var away = Math.abs(ms) < WEEK_MS ? distance(ms) : "";
-      el.textContent = stamp.format(when) + (away ? " (" + away + ")" : "");
-      el.setAttribute("data-local", "");
-    });
+  var TIMES = "time.local-time[datetime]:not([data-local])";
+
+  function rewrite(el) {
+    var when = new Date(el.getAttribute("datetime"));
+    if (isNaN(when.getTime())) return;
+    var ms = when.getTime() - Date.now();
+    var away = Math.abs(ms) < WEEK_MS ? distance(ms) : "";
+    el.textContent = stamp.format(when) + (away ? " (" + away + ")" : "");
+    el.setAttribute("data-local", "");
+  }
+
+  // The times inside `root` (the whole page by default), and `root` itself if it is one.
+  function localise(root) {
+    var scope = root && root.querySelectorAll ? root : document;
+    if (scope.matches && scope.matches(TIMES)) rewrite(scope);
+    scope.querySelectorAll(TIMES).forEach(rewrite);
   }
 
   localise();
   // Whatever htmx swaps in (the documents list refreshes every 5 seconds) is rewritten the
   // moment it is inserted, before the browser paints it, so a refreshed list never shows
-  // UTC where the first render showed the reader's time zone.
+  // UTC where the first render showed the reader's time zone. Only the inserted nodes are
+  // looked at, not the whole page again; the text this file writes is a text node and is
+  // skipped, so it does not start the observer again.
   if (window.MutationObserver) {
-    new MutationObserver(localise).observe(document.body, { childList: true, subtree: true });
+    new MutationObserver(function (records) {
+      records.forEach(function (record) {
+        record.addedNodes.forEach(function (node) {
+          if (node.nodeType === 1) localise(node);
+        });
+      });
+    }).observe(document.body, { childList: true, subtree: true });
   }
-  document.addEventListener("htmx:load", localise);
+  document.addEventListener("htmx:load", function (event) { localise(event.target); });
 })();
 
 /* Upload form (app.html, UX review MF21). Says at once when a chosen file is not a PDF,
@@ -243,6 +258,93 @@
   });
 })();
 
+/* Upload form option groups (_upload_form.html). Each group is a <details> whose summary
+ * line says what is set ("No course · Figures described normally · ..."). The server writes
+ * that line for the first view; this rewrites it as the boxes inside change, so a closed
+ * group never states a choice that is no longer the one made. Without this file the line
+ * stays as the page was sent, and the form still submits what is ticked.
+ */
+(function () {
+  "use strict";
+
+  function describe(group) {
+    if (group.getAttribute("data-summary") === "retention") {
+      var share = group.querySelector("#share");
+      var keep = group.querySelector("#keep");
+      var key = share && share.checked ? "share" : keep && keep.checked ? "keep" : "default";
+      return group.getAttribute("data-text-" + key) || "";
+    }
+    var parts = [];
+    var course = group.querySelector("select#course");
+    if (course && course.selectedIndex >= 0) {
+      parts.push(course.value ? course.options[course.selectedIndex].text : "No course");
+    }
+    group.querySelectorAll("input[type='checkbox'][data-on]").forEach(function (box) {
+      parts.push(box.getAttribute(box.checked ? "data-on" : "data-off"));
+    });
+    return parts.join(" · ");
+  }
+
+  document.querySelectorAll("details.option-group[data-summary]").forEach(function (group) {
+    var state = group.querySelector("[data-group-state]");
+    if (!state) return;
+    function update() {
+      var text = describe(group);
+      if (text && state.textContent.trim() !== text) state.textContent = text;
+    }
+    group.addEventListener("change", update);
+    window.addEventListener("pageshow", update); // the browser may restore ticked boxes
+    update();
+  });
+})();
+
+/* How long a document or batch has been waiting or converting (_wait_note.html). The page
+ * says the time as it was when it was sent; this keeps it current every half minute and, once
+ * the wait passes what is usual for it, shows the "taking longer than usual" note. The words
+ * are the server's (job_page.elapsed_words). Nothing here estimates when it will finish.
+ */
+(function () {
+  "use strict";
+
+  if (!document.querySelector("[data-wait-since]")) return;
+
+  function words(seconds) {
+    var minutes = Math.floor(Math.max(seconds, 0) / 60);
+    if (minutes < 1) return "less than a minute";
+    function plural(n, one) { return n + " " + one + (n === 1 ? "" : "s"); }
+    if (minutes < 60) return plural(minutes, "minute");
+    var hours = Math.floor(minutes / 60);
+    var rest = minutes % 60;
+    return plural(hours, "hour") + (rest ? " " + plural(rest, "minute") : "");
+  }
+
+  function update() {
+    // Looked up each time: htmx swaps the batch page's rows, and the job page's status box
+    // says "finished" without reloading the page (then there is nothing left to count).
+    var finished = !!document.querySelector("#job-status[data-finished]");
+    document.querySelectorAll("[data-wait-since]").forEach(function (note) {
+      note.hidden = finished;
+      var since = Date.parse(note.getAttribute("data-wait-since"));
+      if (finished || isNaN(since)) return;
+      var seconds = (Date.now() - since) / 1000;
+      var text = note.querySelector("[data-wait-text]");
+      if (text) {
+        text.textContent =
+          note.getAttribute("data-wait-lead") + " " + words(seconds) +
+          (note.getAttribute("data-wait-tail") || "") + ".";
+      }
+      var slow = note.querySelector("[data-wait-slow]");
+      if (slow && seconds > Number(note.getAttribute("data-wait-slow-after"))) slow.hidden = false;
+    });
+  }
+
+  window.setInterval(update, 30000);
+  document.addEventListener("htmx:afterSwap", update);
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) update();
+  });
+})();
+
 /* After a download (_after_download.html, web/feedback.py): the two optional questions
  * are in the page but hidden until the download link is used. Without JavaScript they
  * show on the next visit, and a link leads to them.
@@ -348,11 +450,17 @@
 
   function watchEdits() {
     document.querySelectorAll(".decide-form").forEach(function (form) {
+      // The choices that sit above the form (`data-decide-form` names it) follow it.
+      var bars = form.id ? document.querySelectorAll('[data-decide-form="' + form.id + '"]') : [];
+      function edited() {
+        form.classList.add("is-edited");
+        bars.forEach(function (bar) { bar.classList.add("is-edited"); });
+      }
       form.addEventListener("input", function (event) {
-        if (event.target.closest("[data-edit-field]")) form.classList.add("is-edited");
+        if (event.target.closest("[data-edit-field]")) edited();
       });
       form.addEventListener("change", function (event) {
-        if (event.target.closest("[data-edit-field]")) form.classList.add("is-edited");
+        if (event.target.closest("[data-edit-field]")) edited();
       });
     });
   }
@@ -427,7 +535,10 @@
  * is typed into a decision's fields ([data-edit-field]) is kept in this tab's
  * sessionStorage, under the form's address (ids only), and put back when that decision
  * is shown again; signing in comes back to it (web/return_to.py). A line under the field
- * says so, and the field's description includes it.
+ * says so, and the field's description includes it. When the browser has no room left for a
+ * draft, a status line under the form's first field says "This draft could not be saved on
+ * this device." and the older draft is dropped, so nothing claims protection that is not
+ * there.
  *
  * sessionStorage belongs to this browser tab: it is never sent to the server and is gone
  * when the tab is closed. A draft is also forgotten when the decision is saved (the
@@ -515,12 +626,38 @@
         changed = true;
       }
     });
+    var failed = false;
     try {
       if (changed) store.setItem(key(form), JSON.stringify(draft));
       else store.removeItem(key(form));
     } catch (e) {
-      /* storage full: the draft is not kept */
+      // Storage is full: this draft is not kept, and an older one under the same key would
+      // be put back as if it were the latest, so it goes too. Say so, once, in words.
+      failed = true;
+      try { store.removeItem(key(form)); } catch (e2) { /* nothing more can be done */ }
     }
+    unsaved(form, failed);
+  }
+
+  // One short status under the first field of a form whose draft could not be stored; it goes
+  // when a later change is stored. It is added empty and filled a moment later so a screen
+  // reader announces it as a status.
+  var UNSAVED = "This draft could not be saved on this device.";
+  function unsaved(form, failed) {
+    var line = form.querySelector("[data-draft-failed]");
+    if (!failed) {
+      if (line) line.remove();
+      return;
+    }
+    if (line) return;
+    var first = fieldsOf(form)[0];
+    if (!first) return;
+    line = document.createElement("p");
+    line.className = "kept-draft draft-failed";
+    line.setAttribute("role", "status");
+    line.setAttribute("data-draft-failed", "");
+    (first.closest(".field") || first).insertAdjacentElement("afterend", line);
+    window.setTimeout(function () { line.textContent = UNSAVED; }, 50);
   }
 
   function note(field) {
@@ -557,6 +694,11 @@
       return;
     }
     form.classList.add("is-edited");
+    if (form.id) {
+      document.querySelectorAll('[data-decide-form="' + form.id + '"]').forEach(function (bar) {
+        bar.classList.add("is-edited");
+      });
+    }
     for (var open = form.closest("details"); open; open = open.parentElement.closest("details")) {
       open.open = true;
     }
@@ -743,25 +885,231 @@
   });
 })();
 
-/* Symbols (review_inventory.html): beside "Change all", say how many places it changes and how
- * many are left as they are, and keep that true as places are ticked to be left out. */
+/* ==== ux2-lane-b: the review screens ======================================================
+ * Everything here is an addition to markup that works without it.
+ *
+ * - Symbols (review_inventory.html): "Change all" waits until a replacement is chosen and a place
+ *   is ticked, and a status line under it says, in words, how many places will change and to
+ *   what. The line is a live region, so a screen reader hears the count change as places are
+ *   ticked or unticked; before a replacement is chosen, a visually hidden status says the
+ *   ticked count when it changes. Without this file the button is always there and the server
+ *   says what is missing.
+ * - "Keep without a description" (figure card): its button waits for the box that says what
+ *   it means for students. (The server refuses it without the box in any case.)
+ * - "Enlarge the PDF image": the picture in a dialog, for one tap on a phone. Without this file
+ *   the link opens the picture itself.
+ * - A phone's Decision / Page bar (review_split.html): goes to either, and remembers where you
+ *   were in each, so going back lands on the same place. "Fit the page to the screen width"
+ *   takes away the sideways scrolling of the page image (the choice is kept for the tab).
+ */
 (function () {
   "use strict";
+
   document.querySelectorAll("form.symbol-form").forEach(function (form) {
-    var line = form.querySelector(".symbol-affect");
-    if (!line) return;
-    var total = Number(line.getAttribute("data-changeable"));
-    var count = line.querySelector("[data-affect-count]");
-    var left = line.querySelector("[data-affect-left]");
-    var decided = Number(left.textContent) || 0;
-    function update() {
-      var out = form.querySelectorAll('input[name="exclude"]:checked').length;
-      count.textContent = String(Math.max(total - out, 0));
-      left.textContent = String(decided + out);
+    var select = form.querySelector("[data-symbol-to]");
+    var line = form.querySelector("[data-symbol-affect]");
+    var button = form.querySelector('button[data-role="relabel"]');
+    if (!select || !line || !button) return;
+    var total = Number(form.getAttribute("data-total")) || 0;
+    var summary = form.querySelector(".symbol-places > summary");
+    var changeable = Number(form.getAttribute("data-changeable")) || 0;
+    var said = "";
+    // The count in the "Places (n of m ticked)" summary changes silently; this hidden status
+    // says it, politely, when it changes. With a replacement chosen the status line under it
+    // already says the count, so this one stays quiet then.
+    var counter = form.querySelector("[data-symbol-count]");
+    var counted = -1;
+
+    function ticked() { return form.querySelectorAll('input[name="include"]:checked').length; }
+
+    function say(text) {
+      if (text === said) return;
+      said = text;
+      line.textContent = text;
     }
+
+    function update() {
+      var n = ticked();
+      var chosen = select.value !== "";
+      var target = chosen ? select.options[select.selectedIndex].text : "";
+      if (summary) summary.textContent = "Places (" + n + " of " + changeable + " ticked)";
+      if (counter && n !== counted) {
+        // The first call (counted is -1) only sets the count: nothing is announced on load.
+        var changed = counted !== -1;
+        counted = n;
+        counter.textContent = changed && !chosen
+          ? n + " of " + changeable + (changeable === 1 ? " place" : " places") + " ticked."
+          : "";
+      }
+      var ready = chosen && n > 0;
+      if (ready) button.removeAttribute("aria-disabled");
+      else button.setAttribute("aria-disabled", "true");
+      if (!chosen) {
+        say("Choose a symbol first.");
+      } else if (n === 0) {
+        say("No place is ticked. Tick at least one.");
+      } else {
+        say(n + " of " + total + " places change to " + target + ".");
+      }
+    }
+
+    select.addEventListener("change", update);
     form.addEventListener("change", function (event) {
-      if (event.target && event.target.name === "exclude") update();
+      if (event.target && event.target.name === "include") update();
+    });
+    button.addEventListener("click", function (event) {
+      if (button.getAttribute("aria-disabled") !== "true") return;
+      event.preventDefault();
+      if (select.value === "") select.focus();
+      else { var first = form.querySelector('input[name="include"]'); if (first) first.focus(); }
     });
     update();
   });
+
+  document.querySelectorAll("[data-needs-tick]").forEach(function (button) {
+    var box = document.getElementById(button.getAttribute("data-needs-tick"));
+    if (!box) return;
+    function sync() {
+      if (box.checked) button.removeAttribute("aria-disabled");
+      else button.setAttribute("aria-disabled", "true");
+    }
+    box.addEventListener("change", sync);
+    button.addEventListener("click", function (event) {
+      if (button.getAttribute("aria-disabled") !== "true") return;
+      event.preventDefault();
+      box.focus();
+    });
+    sync();
+  });
+
+  // A table finding's "Change the table" opens the folded place where it is changed.
+  function openCorrection(hash) {
+    var target = hash && hash.indexOf("#table-correct-") === 0 ? document.getElementById(hash.slice(1)) : null;
+    if (target && target.tagName === "DETAILS") target.open = true;
+  }
+  document.addEventListener("click", function (event) {
+    var link = event.target instanceof Element ? event.target.closest('a[href^="#table-correct-"]') : null;
+    if (link) openCorrection(link.getAttribute("href"));
+  });
+  openCorrection(window.location.hash);
+
+  // The picture of the PDF, larger, in a dialog (Escape or Close puts you back where you were).
+  var dialog = null;
+  var opener = null;
+  function enlargeDialog() {
+    if (dialog) return dialog;
+    dialog = document.createElement("dialog");
+    dialog.className = "enlarge-dialog";
+    dialog.setAttribute("aria-label", "The PDF image, larger");
+    var body = document.createElement("div");
+    body.className = "enlarge-body";
+    body.tabIndex = 0; // it scrolls, so the keyboard can scroll it
+    body.setAttribute("role", "group");
+    body.setAttribute("aria-label", "The PDF image, larger: scroll to see all of it");
+    var image = document.createElement("img");
+    image.className = "enlarge-image";
+    body.appendChild(image);
+    var close = document.createElement("button");
+    close.type = "button";
+    close.className = "button";
+    close.textContent = "Close";
+    close.addEventListener("click", function () { dialog.close(); });
+    dialog.appendChild(body);
+    dialog.appendChild(close);
+    dialog.addEventListener("click", function (event) { if (event.target === dialog) dialog.close(); });
+    dialog.addEventListener("close", function () { if (opener) opener.focus(); });
+    document.body.appendChild(dialog);
+    return dialog;
+  }
+
+  document.addEventListener("click", function (event) {
+    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    var link = event.target instanceof Element ? event.target.closest("a[data-enlarge]") : null;
+    if (!link || typeof HTMLDialogElement === "undefined") return;
+    event.preventDefault();
+    var box = enlargeDialog();
+    var original = link.parentElement ? link.parentElement.querySelector("img") : null;
+    var image = box.querySelector("img");
+    image.src = link.href;
+    image.alt = original ? original.alt : "";
+    opener = link;
+    box.showModal();
+  });
+
+  var split = document.querySelector(".split");
+  var toggle = document.querySelector(".view-toggle");
+  var decision = document.getElementById("decision");
+  var pageView = document.getElementById("page-view");
+  if (!split || !toggle || !decision || !pageView || !window.matchMedia) return;
+
+  var KEEP = "readablestem.fit-width";
+  var fitButton = document.querySelector("[data-fit-width]");
+  var region = document.querySelector(".page-scroll");
+  if (fitButton && region) {
+    fitButton.hidden = false;
+    var fitOn = false;
+    try { fitOn = window.sessionStorage.getItem(KEEP) === "on"; } catch (e) { fitOn = false; }
+    var applyFit = function () {
+      region.classList.toggle("fit-width", fitOn);
+      fitButton.setAttribute("aria-pressed", fitOn ? "true" : "false");
+      fitButton.textContent = fitOn ? "Show the page at full size" : "Fit the page to the screen width";
+    };
+    fitButton.addEventListener("click", function () {
+      fitOn = !fitOn;
+      try { window.sessionStorage.setItem(KEEP, fitOn ? "on" : "off"); } catch (e) { /* kept for this page only */ }
+      applyFit();
+    });
+    applyFit();
+  }
+
+  var narrow = window.matchMedia("(max-width: 63.99rem)");
+  var where = {};
+  var links = {
+    decision: toggle.querySelector('[data-view="decision"]'),
+    page: toggle.querySelector('[data-view="page"]'),
+  };
+
+  function active() {
+    var top = pageView.getBoundingClientRect().top;
+    return top < window.innerHeight * 0.5 ? "page" : "decision";
+  }
+
+  function mark() {
+    var now = active();
+    Object.keys(links).forEach(function (view) {
+      if (!links[view]) return;
+      if (view === now) links[view].setAttribute("aria-current", "true");
+      else links[view].removeAttribute("aria-current");
+    });
+  }
+
+  var queued = false;
+  window.addEventListener("scroll", function () {
+    if (queued) return;
+    queued = true;
+    window.requestAnimationFrame(function () { queued = false; mark(); });
+  }, { passive: true });
+  window.addEventListener("resize", mark);
+
+  toggle.addEventListener("click", function (event) {
+    var link = event.target instanceof Element ? event.target.closest("a[data-view]") : null;
+    if (!link || !narrow.matches) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    var view = link.getAttribute("data-view");
+    var from = active();
+    if (view === from) { event.preventDefault(); return; }
+    event.preventDefault();
+    where[from] = window.scrollY;
+    var target = view === "page" ? pageView : decision;
+    var heading = view === "page" ? pageView : document.getElementById("decision-title");
+    var top = where[view] !== undefined
+      ? where[view]
+      : target.getBoundingClientRect().top + window.scrollY - 8;
+    window.scrollTo(0, Math.max(top, 0));
+    if (heading) heading.focus({ preventScroll: true });
+    mark();
+  });
+  mark();
 })();
+/* ==== end ux2-lane-b ======================================================================== */
