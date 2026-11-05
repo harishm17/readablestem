@@ -135,22 +135,22 @@ def test_the_other_results_match_their_reports_and_development_is_labelled(pages
 def test_the_landing_page_summarises_without_overclaiming(pages):
     landing = squash(pages["/"])
     # The newest registered held-out result is the one framing: level on what a listener hears,
-    # drawn as a chart (web/proof_facts.py). The four measures and how each was measured are on
-    # /limits, behind one evidence link; the earlier test (chatbot ahead on exactly right) is
-    # history there, in PROOF.md and in the README, not on the landing page.
+    # drawn as two compact charts (web/proof_facts.py). The four measures and how each was
+    # measured are on /limits and the comparison guide, behind one link; the earlier test
+    # (chatbot ahead on exactly right) is history there, in PROOF.md and in the README, not on
+    # the landing page.
     assert 'class="proof-strip"' not in pages["/"] and 'class="proof-strip"' in pages["/limits"]
-    assert 'class="proof-chart"' in pages["/"]
-    assert "Evidence: the four measures, how each was measured" in landing
-    assert "ReadableSTEM and the Opus chatbot are level (0.840 and 0.836)" in landing
-    assert "can detect no difference between them" in landing
-    assert "26 documents the tool had never seen" in landing and "1,715 equations" in landing
-    assert "a test set up before it ran, 4 November 2026, version 0.5.9" in landing
+    assert 'class="proof-chart proof-chart-compact"' in pages["/"]
+    assert "All results and other tools" in landing
+    assert (
+        "ReadableSTEM is level with the Opus chatbot on the main score (0.840 and 0.836)" in landing
+    )
+    assert "1,715 equations in 26 documents it had never seen" in landing
     assert "0.62 against 0.50" not in landing and "chatbot ahead" not in landing
-    assert "with all results including earlier tests" in landing
     assert "beat" not in landing.lower().replace("beats", "")
     limits = squash(pages["/limits"])
     assert "about half (0.50) against 0.62 for the chatbot" in limits  # the history stays there
-    assert 'href="/limits#accuracy"' in pages["/"]
+    assert 'href="/guides/readablestem-mathpix-latexml">All results and other tools' in pages["/"]
     assert "about 5.6 things per page" in REALWORLD and "5.7 decisions per page" in HANDWRITING
     assert "**242**" in PROOF
     # Development numbers stay on /limits, labelled there.

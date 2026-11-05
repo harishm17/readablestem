@@ -340,9 +340,10 @@ def test_the_landing_page_says_why_now_what_it_handles_and_how_accurate(web):
     flat = text(page)
     assert "public universities" in flat
     assert "can detect no difference between them" in flat
-    # the chart links to the registered report, and the evidence page has the method
+    # the short chart links to the registered report and to all the results; the method is on
+    # the comparison guide and /limits, not on the landing page
     assert "/blob/main/docs/eval-equation-fresh5.md" in page
-    assert 'href="/limits#accuracy"' in page
+    assert 'href="/guides/readablestem-mathpix-latexml">All results and other tools' in page
     assert "how to post it in your course" in flat
     assert "EPUB" in flat and "Canvas" in flat
     main = text(page.split("<main", 1)[1].split("</main>", 1)[0])

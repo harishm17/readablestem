@@ -11,11 +11,17 @@
    the only difference. No script, no inline style (the bars are SVG rects with a width
    attribute). Under 40rem each bar sits under its name. Dark mode follows the tokens; in forced
    colours the fills are system colours (app.css, "ux2-lane-d").
+   `compact=true` (the landing page) draws only the two headline measures (`headline` rows of
+   `proof_facts.chart`: what a listener hears, and wrong equations nobody is asked about), the
+   same data table for those two, and one line of words with the sample and the registered
+   wording; the full chart stays on the comparison guide and the offices page.
    Use: {% from "_proof_chart.html" import proof_chart %}{{ proof_chart(proof_facts) }} #}
 {% from "_table_scroll.html" import table_scroll %}
-{% macro proof_chart(proof_facts, first_test=true) %}
-<figure class="proof-chart" aria-labelledby="proof-chart-title">
-  <p class="proof-chart-title" id="proof-chart-title"><strong>ReadableSTEM against a general chatbot, on equations</strong></p>
+{% macro proof_chart(proof_facts, first_test=true, compact=false) %}
+{% set rows = proof_facts.chart|selectattr("headline")|list if compact else proof_facts.chart %}
+<figure class="proof-chart{% if compact %} proof-chart-compact{% endif %}"
+  {%- if compact %} aria-label="ReadableSTEM against a general chatbot, on equations"{% else %} aria-labelledby="proof-chart-title"{% endif %}>
+  {% if not compact %}<p class="proof-chart-title" id="proof-chart-title"><strong>ReadableSTEM against a general chatbot, on equations</strong></p>{% endif %}
   <svg class="chart-defs" width="0" height="0" aria-hidden="true" focusable="false">
     <defs>
       <pattern id="chart-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -29,7 +35,7 @@
     </defs>
   </svg>
   <div class="chart" aria-hidden="true">
-    {% for row in proof_facts.chart %}
+    {% for row in rows %}
     <div class="chart-row">
       <p class="chart-measure">{{ row.measure }} <span class="chart-better">{{ row.better }}</span></p>
       {% for line in row.lines %}
@@ -49,16 +55,23 @@
   <table>
     <caption>ReadableSTEM, the chatbot on Opus and the chatbot on Haiku, on {{ proof_facts.set_label }}: {{ proof_facts.pipeline }}, run recorded {{ proof_facts.date }}</caption>
     <thead>
-      <tr><th scope="col">Measure</th>{% for line in proof_facts.chart[0].lines %}<th scope="col">{{ line.system }}</th>{% endfor %}</tr>
+      <tr><th scope="col">Measure</th>{% for line in rows[0].lines %}<th scope="col">{{ line.system }}</th>{% endfor %}</tr>
     </thead>
     <tbody>
-      {% for row in proof_facts.chart %}
+      {% for row in rows %}
       <tr><th scope="row">{{ row.measure }} ({{ row.better|lower }})</th>{% for line in row.lines %}<td>{{ line.value }}</td>{% endfor %}</tr>
       {% endfor %}
     </tbody>
   </table>
   </div>
   <figcaption>
+    {% if compact %}
+    <p>ReadableSTEM is level with the Opus chatbot on the main score ({{ proof_facts.facts[0].value }}
+      and {{ proof_facts.chart[0].lines[1].value }}): on 1,715 equations in 26 documents it had never
+      seen, the test can detect no difference between them
+      (<a href="{{ proof_facts.facts[0].href }}">the registered report</a>). A chatbot never
+      asks about an equation it is unsure of.</p>
+    {% else %}
     <p>26 documents the tool had never seen (arXiv papers, textbook sections, course notes),
       1,715 equations, a test set up before it ran, 4 November 2026, version 0.5.9
       (<a href="{{ proof_facts.facts[0].href }}">the registered report</a>).</p>
@@ -66,8 +79,9 @@
       level</strong> ({{ proof_facts.facts[0].value }} and {{ proof_facts.chart[0].lines[1].value }}): the
       test can detect no difference between them. A chatbot never asks about an equation it is
       unsure of.</p>
+    {% endif %}
   </figcaption>
-  {% if first_test %}
+  {% if first_test and not compact %}
   {% set t = proof_facts.first_test %}
   {% call table_scroll("Headings and figures, the first registered test") %}
   <table class="chart-mini">
@@ -82,7 +96,7 @@
   </table>
   {% endcall %}
   {% endif %}
-  <p class="chart-source"><a href="/limits#accuracy">Evidence: the four measures, how each was
-    measured and what they do not show, with all results including earlier tests</a>.</p>
+  {% if not compact %}<p class="chart-source"><a href="/limits#accuracy">Evidence: the four measures, how each was
+    measured and what they do not show, with all results including earlier tests</a>.</p>{% endif %}
 </figure>
 {% endmacro %}

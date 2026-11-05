@@ -37,11 +37,15 @@ DEMO_PAGE = STATIC_DIR / "demo" / "index.html"
 
 @cache
 def _hero() -> dict[str, object]:
-    """The landing hero (scripts/hero_assets.py): the committed crop's size, the PDF's text
-    layer, the page's MathML and the reading, all built from the stored demo."""
+    """The landing page's "Hear the difference" block (scripts/hero_assets.py): the committed
+    crop's size on the page, the PDF's text layer, the page's MathML and the reading, all built
+    from the stored demo."""
     data = json.loads((STATIC_DIR / "hero" / "hero.json").read_text(encoding="utf-8"))
     png = (STATIC_DIR / "hero" / "before.png").read_bytes()
-    data["crop_width"], data["crop_height"] = struct.unpack(">II", png[16:24])
+    width, height = struct.unpack(">II", png[16:24])
+    # The crop is drawn at 4 pixels to the PDF point and shown at 2.4 times the PDF's size, so
+    # its equation is about as large as the page's MathML beside it.
+    data["crop_display_width"], data["crop_display_height"] = width * 3 // 5, height * 3 // 5
     # How the speech rules read that text layer, for the hero's Play control (the same
     # reading the review screen shows beside an equation).
     data["text_layer_speech"] = read_text_layer(str(data["text_layer"]))

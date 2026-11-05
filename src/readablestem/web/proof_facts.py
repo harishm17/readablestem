@@ -59,6 +59,7 @@ class ChartRow:
     measure: str  # what is counted, in plain words
     better: str  # "Higher is better" or "Lower is better"
     lines: list[ChartLine]
+    headline: bool = False  # one of the two the landing page's compact chart shows
 
 
 @dataclass(frozen=True)
@@ -87,6 +88,12 @@ SYSTEMS = (
     ("Candidate", "ReadableSTEM"),
     ("Chatbot, Opus", "Chatbot on Opus"),
     ("Chatbot, Haiku", "Chatbot on Haiku"),
+)
+# The two measures the landing page's compact chart shows: what a listener hears, and the wrong
+# equations nobody is asked about. The rest stay on the comparison guide and the offices page.
+HEADLINE = (
+    "spoken-equal, end to end (primary)",
+    "silent errors per 100 gold (wrong under the primary, not asked)",
 )
 # (key in the results file, plain words, direction, the axis the bars are drawn against, format)
 MEASURES = (
@@ -136,7 +143,8 @@ def parse_chart(results: dict) -> list[ChartRow]:
                 "never asks" if key.startswith("flag recall") and point == 0 else fmt.format(point)
             )
             lines.append(ChartLine(name, shown, round(100 * point / axis, 1)))
-        rows.append(ChartRow(words, "Higher is better" if higher else "Lower is better", lines))
+        better = "Higher is better" if higher else "Lower is better"
+        rows.append(ChartRow(words, better, lines, key in HEADLINE))
     return rows
 
 
@@ -264,7 +272,12 @@ def load() -> ProofFacts:
         pipeline=data["pipeline"],
         facts=[Fact(**fact) for fact in data["facts"]],
         chart=[
-            ChartRow(r["measure"], r["better"], [ChartLine(**line) for line in r["lines"]])
+            ChartRow(
+                r["measure"],
+                r["better"],
+                [ChartLine(**line) for line in r["lines"]],
+                r["headline"],
+            )
             for r in data["chart"]
         ],
         first_test=FirstTest(**data["first_test"]),

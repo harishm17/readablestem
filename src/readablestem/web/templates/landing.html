@@ -5,11 +5,11 @@
 {% block description %}Turns STEM notes, slides and problem sets into accessible web pages: equations as MathML a screen reader can speak, real headings, tables and described figures.{% endblock %}
 {% block head %}<script src="{{ static_url('listen.js') }}" defer></script>{% endblock %}
 {% block content %}
-{# Layout (DESIGN.md): a headline, one line, the real before/after, the comparison chart, three
-   short lines on what it handles, and the questions folded. Detail lives on /limits, /privacy
-   and the guides. The lines read the same flags as /limits (routes/pages.py `_features`), so a
-   server never lists a feature it has off. The chart is web/proof_facts.py (the registered
-   report), once, from `_proof_chart.html`. #}
+{# Layout (DESIGN.md): a headline, one line, "Hear the difference" (one equation, two readings),
+   the two headline accuracy charts, three short lines on what it handles, and the questions
+   folded. Detail lives on /limits, /privacy and the guides. The lines read the same flags as
+   /limits (routes/pages.py `_features`), so a server never lists a feature it has off. The
+   chart is web/proof_facts.py (the registered report), from `_proof_chart.html` (compact). #}
 <section class="hero" aria-labelledby="hero-title">
   <h1 id="hero-title">Turn STEM course PDFs into accessible web pages, equations included</h1>
   {# No deadline date is stated here: the rule is 28 CFR part 35, subpart H, and a date
@@ -29,45 +29,37 @@
   <p class="hint hero-hint">Free during the beta. <a href="#who">Who can use it</a> and
     <a href="#documents">what happens to your documents</a>.</p>
   {% endif %}
+</section>
 
-  {# The real passage from the demo (OpenStax Physics 2.3, page 3), built by
-     scripts/hero_assets.py and checked by tests/test_hero_assets.py. The right pane holds
-     live MathML, so a screen reader can explore the equation here. #}
-  <div class="panes hero-panes">
-    <section class="pane before" aria-labelledby="hero-before">
-      <h2 id="hero-before">In the PDF <span class="tag tag-err">Untagged</span></h2>
-      <div class="sheet crop-scroll" role="group" aria-label="The PDF passage, scrolls sideways on a narrow screen" tabindex="0">
-        <img src="{{ static_url('hero/before.png') }}" width="{{ hero.crop_width }}" height="{{ hero.crop_height }}"
-          alt="A crop of the printed PDF page: the end of a sentence about slope, then equation 2.4, delta d over delta t.">
-      </div>
-      <dl class="reading">
-        <dt>A screen reader reads the PDF's text layer</dt>
-        <dd>{{ hero.text_layer }}</dd>
-      </dl>
-      <p class="hear"><button type="button" class="button-secondary button-small" data-hear hidden data-hear-idle="Play the PDF reading" data-hear-a="{{ hero.text_layer_speech }}" data-hear-a-lead="In the PDF a screen reader says"><span data-hear-label>Play the PDF reading</span></button><span class="hear-note" data-hear-note role="status"></span></p>
-    </section>
-    <section class="pane after" aria-labelledby="hero-after">
-      <h2 id="hero-after">In the converted page <span class="tag tag-ok">MathML</span></h2>
-      <div class="sheet">
-        <p>{{ hero.paragraph }}</p>
-        <div class="eq">{{ hero.mathml|safe }}<span class="eq-label"><span class="visually-hidden">Equation </span>{{ hero.label }}</span></div>
-        <p class="figure-alt"><strong>Figure 2.11 alt text:</strong> {{ hero.figure_alt }}</p>
-      </div>
-      <dl class="reading">
-        <dt>A screen reader says</dt>
-        <dd>{{ hero.speech }}</dd>
-      </dl>
-      <p class="hear"><button type="button" class="button-secondary button-small" data-hear hidden data-hear-idle="Play the converted reading" data-hear-a="{{ hero.speech }}" data-hear-a-lead="On the converted page a screen reader says"><span data-hear-label>Play the converted reading</span></button><span class="hear-note" data-hear-note role="status"></span></p>
-    </section>
+{# The real equation 2.4 of the demo (OpenStax Physics 2.3, page 3), built by
+   scripts/hero_assets.py and checked by tests/test_hero_assets.py. The second row holds live
+   MathML, so a screen reader can explore the equation here. The Play buttons are hidden until
+   listen.js finds speech. #}
+<section class="diff" aria-labelledby="hear-title">
+  <h2 id="hear-title">Hear the difference</h2>
+  <div class="diff-rows">
+    <div class="diff-row">
+      <h3>In the PDF</h3>
+      <div class="sheet diff-eq"><img src="{{ static_url('hero/before.png') }}" width="{{ hero.crop_display_width }}" height="{{ hero.crop_display_height }}"
+        alt="Equation 2.4 cut from the PDF page: delta d over delta t, number 2.4."></div>
+      <p class="diff-says"><span class="diff-says-label">A screen reader says</span> <span class="diff-says-text">{{ hero.text_layer }}</span></p>
+      <p class="hear"><button type="button" class="button-secondary button-small" data-hear hidden data-hear-idle="Play" data-hear-a="{{ hero.text_layer_speech }}" data-hear-a-lead="In the PDF a screen reader says"><span data-hear-label>Play</span><span class="visually-hidden"> the PDF reading</span></button><span class="hear-note" data-hear-note role="status"></span></p>
+    </div>
+    <div class="diff-row">
+      <h3>In the ReadableSTEM page</h3>
+      <div class="sheet diff-eq"><div class="eq">{{ hero.mathml|safe }}<span class="eq-label"><span class="visually-hidden">Equation </span>{{ hero.label }}</span></div></div>
+      <p class="diff-says"><span class="diff-says-label">A screen reader says</span> <span class="diff-says-text">{{ hero.speech }}</span></p>
+      <p class="hear"><button type="button" class="button-secondary button-small" data-hear hidden data-hear-idle="Play" data-hear-a="{{ hero.speech }}" data-hear-a-lead="On the converted page a screen reader says"><span data-hear-label>Play</span><span class="visually-hidden"> the converted reading</span></button><span class="hear-note" data-hear-note role="status"></span></p>
+    </div>
   </div>
-  <p class="hero-source">From <a href="https://openstax.org/books/physics/pages/2-3-position-vs-time-graphs">OpenStax Physics, 2.3 Position vs. Time Graphs</a>
+  <p class="diff-source">Source: <a href="https://openstax.org/books/physics/pages/2-3-position-vs-time-graphs">OpenStax Physics 2.3</a>
     (CC BY 4.0), page 3 of <a href="{{ static_url('demo/source.pdf') }}">the PDF</a>.</p>
 </section>
 
-<h2 id="compare">How it compares</h2>
+<h2 id="compare">How accurate it is</h2>
 {% from "_proof_chart.html" import proof_chart %}
-{{ proof_chart(proof_facts) }}
-<p><a href="/guides/readablestem-mathpix-latexml">How to choose a tool</a>, including ones not in this chart.</p>
+{{ proof_chart(proof_facts, compact=true) }}
+<p><a href="/guides/readablestem-mathpix-latexml">All results and other tools</a></p>
 
 <h2 id="handles">What it handles</h2>
 {# One line each; the detail is on /limits ("What it handles, with limits"). #}

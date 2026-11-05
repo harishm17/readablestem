@@ -1,12 +1,10 @@
 {
   "source": "OpenStax Physics 2.3 Position vs. Time Graphs, page 3 of 13, CC BY 4.0",
   "pdf_tagged": "no",
-  "crop_sha256": "85040458e32f9907067e41782ad43340861f4b91dcdfa6de3bb157363151115a",
+  "crop_sha256": "0528f54b7aeb3515ee8d34f9727de668ee114fad04db5cf165f4a6b435e132b7",
   "text_layer": "Δ𝐝 Δ𝑡. 2.4",
-  "paragraph": "What is the slope? The rise is the change in position, (i.e., displacement) and the run is the change in time. This relationship can also be written",
   "mathml": "<math display=\"block\"><mrow><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac><mo>.</mo></mrow></math>",
   "label": "2.4",
-  "figure_alt": "Line graph of position in km versus time in minutes: a straight line rises from 0 km at 0 min to 5 km at 10 min, a constant slope of 0.5 km/min.",
   "speech": "capital delta bold d over capital delta t",
   "glyphs": [
     40,
