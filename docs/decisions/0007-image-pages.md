@@ -295,3 +295,5 @@ the offer is switched on in production, so the upload form shows "Convert scanne
 pages" there ([deploy-railway.md](../deploy-railway.md), "Feature flags in production"). The spend
 allowance per such job is `IMAGE_PAGES_USD_PER_PAGE` ($0.25 a page of the document) up to
 `IMAGE_PAGES_MAX_USD_PER_JOB` ($7.50), inside the $10 daily cap and the open tier's $4 pool.
+
+Handwriting follow-ups of 2026-11-03 sit under the same flag or behind their own settings: pen-stroke checks on vector ink are on with the offer; a second reader (`IMAGE_PAGES_SECOND_READER`) and the choice of readings on the review card exist, and all three readers are off ([math-readers.md](../math-readers.md)).

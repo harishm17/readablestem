@@ -466,7 +466,9 @@ def test_the_earlier_chatbot_ahead_result_is_history_not_a_headline(tmp_path):
         text = text_of(get(tmp_path / path[-5:].strip("/") or "x", path))
         assert "0.62 against 0.50" not in text and "chatbot ahead" not in text, path
     limits = text_of(get(tmp_path / "limits", "/limits"))
-    assert "about half (0.50) against 0.62 for the chatbot" in limits  # kept as history there
+    # Kept as history there, as its own score, no chatbot comparison (Harish, 2026-11-04).
+    assert "about half came out exactly right end to end (0.50)" in limits
+    assert "against 0.62 for the chatbot" not in limits
     assert "Earlier results, kept as history" in limits
 
 

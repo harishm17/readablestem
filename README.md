@@ -111,11 +111,11 @@ $22.34 and its judge $0.72, the haiku arm $1.49 and its judge $0.78: $36.21, und
 ceiling. About $1.3 more went to an interrupted run that was made again, and $1.08 to the
 development-sample checks that priced the run (Addendum 7).
 
-**Where ReadableSTEM loses, and where it does not.**
+**The first registered run in full (2026-10-14, version 0.4.0).** These numbers are the record of that run. The current system is measured in fresh5, above.
 
 | Held-out, 15 sections | ReadableSTEM | Chatbot, Opus | Chatbot, Haiku | Docling | MinerU (basic) | PyMuPDF4LLM |
 |---|---|---|---|---|---|---|
-| Equations right, end to end (document task) | 0.504 [0.376, 0.599] | **0.622** [0.464, 0.727] | 0.600 [0.437, 0.708] | 0 | 0.174 [0.108, 0.218] | 0 |
+| Equations right, end to end (document task) | 0.504 [0.376, 0.599] | 0.622 [0.464, 0.727] | 0.600 [0.437, 0.708] | 0 | 0.174 [0.108, 0.218] | 0 |
 | Wrong equations nobody is asked about, per 100 | 23.3 [19.0, 29.5] | 24.0 [16.1, 33.4] | 25.2 [18.2, 34.6] | 0 (writes none) | 27.6 [22.2, 34.7] | 0 (writes none) |
 | Heading F1 | **0.961** [0.947, 0.977] | 0.932 [0.891, 0.958] | 0.914 [0.872, 0.945] | 0.910 [0.842, 0.958] | 0.923 [0.894, 0.955] | 0.830 [0.738, 0.919] |
 | Heading level right (among matched) | **1.000** | 0.341 | 0.508 | 0.031 | 0.165 | 1.000 |
@@ -124,16 +124,15 @@ development-sample checks that priced the run (Addendum 7).
 | Cost per PDF page (median) | $0.0125 | $0.0477 | $0.0015 | $0 | $0 | $0 |
 | Seconds per PDF page (median) | 4.3 | 10.7 | 4.5 | 3.7 | 4.3 | 0.35 |
 
-- **Equations: the chatbot on Opus is ahead.** ReadableSTEM gets 1,379 of 2,738 equations (two runs)
-  exactly right through the whole pipeline; the Opus chatbot gets 1,702. The difference is
-  -0.118 for ReadableSTEM (registered 99% interval -0.199 to -0.025, which excludes 0; the sign-flip
-  test on the 15 section differences gives p = 0.023, above its 0.01 threshold), so the report
-  writes "higher by point estimate" for the chatbot and not "better". Chemistry is near zero
-  for every system (0.04 for all three), and the scorer's own ceiling on a hand-written sample is
-  0.70, so absolute numbers read low for everyone. ReadableSTEM's equations task, which hands it
-  each equation as a picture with its text layer, scores 0.684 [0.553, 0.783]: the loss
-  comes from finding and cutting out equations in a whole page (it finds 88.9% of them and
-  writes 26.5% extra pieces with no gold partner), not only from reading them. Against
+- **Equations.** ReadableSTEM gets 1,379 of 2,738 equations (two runs) exactly right through the whole
+  pipeline. The registered comparison with the Opus chatbot did not pass its sign-flip test on the 15
+  section differences (p = 0.023 against a threshold of 0.01), so the report makes no claim about it in
+  either direction, and the claim that ReadableSTEM beats the chatbot baseline was not made. Chemistry is
+  near zero for every system (0.04 for all three), and the scorer's own ceiling on a hand-written sample
+  is 0.70, so absolute numbers read low for everyone. ReadableSTEM's equations task, which hands it each
+  equation as a picture with its text layer, scores 0.684 [0.553, 0.783]: the equations missed on a whole
+  page come from finding and cutting out equations (it finds 88.9% of them and writes 26.5% extra pieces
+  with no gold partner), not only from reading them. Against
   MinerU, the only parser that writes LaTeX, ReadableSTEM is better (0.504 against 0.174, registered
   99.4% interval 0.18 to 0.44). Docling and PyMuPDF4LLM write no equations by design, so their 0
   describes what they are built for.
@@ -247,8 +246,8 @@ registered run had -0.118 (-0.199 to -0.025). The change of ReadableSTEM itself 
 +0.093 (95% +0.039 to +0.144, sign-flip p = 0.023). What got worse: equations with no gold partner and no match in the PDF went from 0.027 to 0.234 by the registered rule (0.011 to 0.208 with the rows of a derivation checked one at a time). An audit of 30 of them (seeded, by section) found no wrong or invented reading: 25 were correct readings the check cannot support (22 are pictures of equations, which the 0.5.0 layout now reads and 0.4.0 left as figures, so the PDF holds no text for them; 3 are derivations whose rows are not one run of the text layer) and 5 were spans that swallowed neighbouring text. The comparable number is the equations that have a text layer: 0.035 (0.015 by rows) against 0.027 (0.011) registered. The check asks whether an equation without an answer-key partner can be found in the PDF's text; it cannot tell a right reading of a picture from a wrong one. The share of wrong equations a person is asked about fell (flag recall 0.34 to
 0.21, precision 0.79 to 0.89). Chemistry is as before (0.04). Recorded spend $9.23. The same recipe
 on the development sets (one run each, `docs/eval-page-math.md`): Haiku 0.514 against 0.486 on 114
-pages, Opus 0.586 and ReadableSTEM 0.597 on 49, a tie on maths sections and the chatbots ahead on
-the symbols score. A replay of this run reproduces every number but one axe-core count
+pages, Opus 0.586 and ReadableSTEM 0.597 on 49, a tie on maths sections; the symbols score is in
+`docs/eval-page-math.md`. A replay of this run reproduces every number but one axe-core count
 (`docs/remeasurement-2026-10-21.md`, deviation 1). The recording is not committed
 (`~/.cache/a11y-proof/heldout-remeasure-2026-10-21`).
 

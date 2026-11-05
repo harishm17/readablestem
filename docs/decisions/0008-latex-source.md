@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Accepted 2026-11-03** as "build it, sandboxed": the switch is `FEATURE_LATEX_SOURCE`, off by default, and the sandbox probe must pass on the deployed image before it is turned on |
+| Status | **Accepted 2026-11-03** as "build it, sandboxed": the switch is `FEATURE_LATEX_SOURCE`, off by default in code; the sandbox probe had to pass on the deployed image before it was turned on, and **it is on in production since 2026-11-04 13:53 UTC** (see the update at the end) |
 | Date | 2026-11-03 |
 | Decider | Harish |
 | Revisits | the rule that MathML is always rebuilt by this tool and never pasted in (`web/mathml.py`, docs/output.md), for one source of MathML |
