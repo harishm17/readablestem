@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: a shorter homepage (branch ux2/home-compact)
+
+- Landing: the before/after is one compact block, "Hear the difference": the same equation read two
+  ways, in two rows (side by side from 48rem, stacked on a phone), each with a label, the equation
+  on a small sheet of paper, what a screen reader says as plain text and a Play button (the same
+  `data-hear` buttons, hidden without speech). The two tall cards, the "Untagged" and "MathML"
+  badges, the boxed readings, the figure alt text paragraph and the sideways-scrolling PDF crop are
+  gone. The crop (`scripts/hero_assets.py`) is now the equation and its number alone, cut from the
+  PDF page at 4x, so nothing is clipped at 320px; the source line is one short line.
+- Landing: "How it compares" is "How accurate it is": two charts (what a listener hears, and wrong
+  equations nobody is asked about), their data table, one line with the sample and the registered
+  wording, and one link, "All results and other tools", to the comparison guide. `proof_chart` has a
+  `compact` option for this (`proof_facts.chart` rows carry a `headline` flag); the comparison guide
+  and the offices page keep the full chart. The page's copy went from 571 to about 300 words visible
+  before anything is opened.
+
 ## Unreleased: fixes from the final read of the public pages (branch ux2/final-pass)
 
 - Listen: a sentence with inline maths directly in a list item, table cell or definition stays one

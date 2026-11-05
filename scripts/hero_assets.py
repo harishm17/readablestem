@@ -1,18 +1,18 @@
-"""Build the landing page's before/after hero from the stored demo (no model, no network).
+"""Build the landing page's "Hear the difference" block from the stored demo (no model, no network).
 
 Run: uv run python scripts/hero_assets.py            (crop, text layer, MathML, reading)
      uv run --with fonttools --with brotli python scripts/hero_assets.py --font
                                                        (also the maths-font subset)
 
-The hero shows one real passage of the demo, OpenStax Physics 2.3 (CC BY 4.0), page 3 of
-`web/static/demo/source.pdf`: the line before equation 2.4 and the equation, as the PDF has it,
-beside the converted page's paragraph and its live MathML, with the readings of both:
+The hero shows one real equation of the demo, OpenStax Physics 2.3 (CC BY 4.0), page 3 of
+`web/static/demo/source.pdf`: equation 2.4 as the PDF has it, beside the converted page's live
+MathML, with the readings of both:
 
-- `hero/before.png`: the passage cut from the PDF page at 2x (PyMuPDF; the box is found from the
-  words on the page, so no coordinates are written here);
+- `hero/before.png`: the equation and its number cut from the PDF page at 4x (PyMuPDF; the box is
+  found from the words on the page, so no coordinates are written here; the page shows it at
+  2.4 times the PDF's size);
 - `hero/hero.json`: the PDF's text layer for the equation (what a screen reader gets from the
-  untagged PDF), the stored MathML and its `alttext`, the paragraph's text, Figure 2.11's alt text,
-  and the reading `pipeline/speech.py` gives the MathML;
+  untagged PDF), the stored MathML, its number and the reading `pipeline/speech.py` gives it;
 - `vendor/fonts/lm-math-hero-1.959.woff2` (with `--font`): Latin Modern Math cut down to the
   glyphs of that MathML and renamed, as the GUST Font License asks for a derived font.
 
@@ -41,24 +41,31 @@ FONT_DIR = WEB / "static" / "vendor" / "fonts"
 FONT_SOURCE = FONT_DIR / "latinmodern-math.otf"
 FONT_NAME = "lm-math-hero-1.959.woff2"
 PAGE_INDEX = 2  # page 3 of source.pdf
-SCALE = 2.0
+SCALE = 4.0  # pixels per PDF point; the page shows the crop at 0.6 of this
+PAD = 6.0  # points of paper around the equation's own ink
 
 sys.path.insert(0, str(ROOT / "src"))
 
 
 def passage(pdf: Path) -> tuple[pymupdf.Page, pymupdf.Rect, pymupdf.Rect]:
-    """The page, the box of the passage (the line before the equation, and the equation) and
-    the box of the equation alone."""
+    """The page, the box of the equation and its number alone (found from the words, with a
+    little paper round them), and the wider band the text layer is read from."""
     page = pymupdf.open(pdf)[PAGE_INDEX]
     line = page.search_for("position, (i.e., displacement)")[0]
     label = page.search_for("2.4")[0]
     start = page.search_for("the change in time.")[0]
     end = page.search_for("This relationship can also be written")[0]
-    # The end of the lead-in sentence, then the equation and its label under it.
-    left, right = start.x0 - 1, end.x1 + 12
-    box = pymupdf.Rect(left, line.y0 - 3, right, label.y1 + 9)
-    equation = pymupdf.Rect(left, line.y1 + 2, right, label.y1 + 2)
-    return page, box, equation
+    # The line under the lead-in sentence: the equation and its label.
+    band = pymupdf.Rect(start.x0 - 1, line.y1 + 2, end.x1 + 12, label.y1 + 2)
+    words = page.get_text("words", clip=band)
+    ink = pymupdf.Rect(
+        min(w[0] for w in words),
+        min(w[1] for w in words),
+        max(w[2] for w in words),
+        max(w[3] for w in words),
+    )
+    box = pymupdf.Rect(ink.x0 - PAD, ink.y0 - 1, ink.x1 + PAD, ink.y1 + 3)
+    return page, box, band
 
 
 def build_crop(pdf: Path) -> bytes:
@@ -76,26 +83,17 @@ def text_layer(pdf: Path) -> str:
 
 
 def demo_fragments(demo_html: str) -> dict[str, str]:
-    """The paragraph tail, the equation's MathML and label, and Figure 2.11's alt text."""
-    para = re.search(r'<p id="p3-e1">(.*?)</p>', demo_html, re.S)
+    """Equation 2.4's MathML and its number, from the stored demo."""
     equation = re.search(
         r'<div class="equation equation-labelled" id="p3-e5">(.*?)</div>', demo_html, re.S
     )
-    alt = re.search(r'<img src="data:[^"]*" alt="([^"]*)"[^>]*><figcaption>Figure 2\.11', demo_html)
-    assert para and equation and alt, "the demo changed shape"
-    tail = para.group(1)[para.group(1).index("What is the slope?") :]
+    assert equation, "the demo changed shape"
     mathml = re.search(r"<math.*?</math>", equation.group(1), re.S)
     label = re.search(
         r"<span class=\"equation-label\">.*?</span>\s*([0-9.]+)</span>", equation.group(1), re.S
     )
     assert mathml and label
-    plain = html.unescape(re.sub(r"<[^>]+>", "", tail)).strip()
-    return {
-        "paragraph": plain,
-        "mathml": mathml.group(0),
-        "label": label.group(1),
-        "figure_alt": html.unescape(alt.group(1)),
-    }
+    return {"mathml": mathml.group(0), "label": label.group(1)}
 
 
 def codepoints(*texts: str) -> list[int]:
@@ -113,10 +111,8 @@ def build_json(pdf: Path, demo_html: str, crop: bytes) -> dict:
         "pdf_tagged": "no",
         "crop_sha256": hashlib.sha256(crop).hexdigest(),
         "text_layer": text_layer(pdf),
-        "paragraph": parts["paragraph"],
         "mathml": parts["mathml"],
         "label": parts["label"],
-        "figure_alt": parts["figure_alt"],
         "speech": mathml_to_speech(parts["mathml"]),
         "glyphs": codepoints(math_text, "0123456789.,()=+-"),
         "font": FONT_NAME,

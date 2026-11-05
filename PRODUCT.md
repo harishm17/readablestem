@@ -15,7 +15,7 @@ web
 ReadableSTEM assists instructors who need to turn a STEM course PDF into an accessible web page. It reads the PDF, rebuilds equations as MathML a screen reader can speak, restores headings and lists, writes short alt text for figures, and returns one self-contained HTML file. Every change it is unsure about goes to a review screen where the instructor accepts, edits or rejects it. It assists; it does not certify.
 
 ## Positioning
-The converted output and the review step are shown, not claimed: the site shows a real PDF page beside the HTML it became and what a screen reader says for each. Results are published with sample sizes, including where a general chatbot does better.
+The converted output and the review step are shown, not claimed: the site shows a real equation from a PDF beside the same equation on the page it became, with what a screen reader says for each. Results are published with sample sizes, including where a general chatbot does better.
 
 ## Operating Context
 - Live at readablestem.com as a free beta (Python, FastAPI, server-rendered Jinja templates, plain CSS (tokens, app, controls), htmx; deployed on Railway). Sign-in with Google (or Microsoft for set-up universities).
