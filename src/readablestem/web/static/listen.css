@@ -1,8 +1,6 @@
 /* Listen as a student (templates/_listen_player.html, static/listen.js). Uses the tokens only;
    the same file is copied into the showcase site, which loads tokens.css first. */
 
-/* ux2-lane-c: the listening page, in one place (transport, index, filter, transcript). */
-
 .listen-doc { margin: 0 0 var(--space-3); }
 .listen-honest { max-width: var(--prose-max); }
 
@@ -29,12 +27,14 @@
 /* The player: a compact transport (Play, Previous, Next) that stays in view while the
    transcript scrolls (listen.js follows the item being spoken unless "Follow along" is off).
    When Play is off, the reason is the line right under it. listen.js measures the transport's
-   real height into --listen-sticky, so an item scrolled into view lands below it however many
-   lines it wraps to. */
+   real height into --listen-sticky (tokens.css), so an item scrolled into view lands below it
+   however many lines it wraps to; the layer is --z-sticky. In a short window it does not stick. */
 .listen-controls[hidden], .listen-transport[hidden], .listen-controls [hidden], .listen-filter[hidden] { display: none; }
-.listen-transport { position: sticky; top: 0; z-index: 5; border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--surface); padding: var(--space-2) var(--space-3); margin: var(--space-3) 0; }
+.listen-transport { position: sticky; top: 0; z-index: var(--z-sticky); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--surface); padding: var(--space-2) var(--space-3); margin: var(--space-3) 0; }
 .listen-transport .listen-row { margin: 0; align-items: center; }
 .listen-transport button { min-height: 2.5rem; }
+@media (max-height: 32rem) { .listen-transport { position: static; } }
+@media (forced-colors: active) { .listen-transport { border-color: CanvasText; } }
 .listen-voice-note { margin: var(--space-2) 0 0; color: var(--ink); max-width: var(--prose-max); }
 .listen-voice-note[hidden] { display: none; }
 .listen-voice-note .link-button { min-height: 2rem; padding: 0; }
@@ -45,7 +45,7 @@
 .listen-more { border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--surface); padding: var(--space-2) var(--space-4); margin: 0 0 var(--space-4); }
 .listen-more > summary { cursor: pointer; font-weight: 700; min-height: 1.5rem; }
 .listen-more[open] > summary { margin-bottom: var(--space-3); }
-@media (max-height: 32rem) { .listen-transport { position: static; } }
+@media (forced-colors: active) { .listen-more { border-color: CanvasText; } }
 
 /* The index and the filter: quiet, collapsed until wanted. */
 .listen-index { margin: 0 0 var(--space-3); max-width: var(--prose-max); }
@@ -63,7 +63,7 @@
    On a wide screen the role sits in its own column. */
 [data-listen-transcript] { max-width: var(--prose-max); }
 .listen-transcript { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
-.listen-item { border-top: 1px solid var(--border-subtle); padding: var(--space-2) var(--space-2); margin: 0; overflow-wrap: anywhere; scroll-margin-top: calc(var(--listen-sticky, 4rem) + var(--space-3)); }
+.listen-item { border-top: 1px solid var(--border-subtle); padding: var(--space-2) var(--space-2); margin: 0; overflow-wrap: anywhere; scroll-margin-top: calc(var(--listen-sticky) + var(--space-3)); }
 .listen-item[hidden], .listen-before[hidden] { display: none; }
 .listen-transcript:last-child .listen-item:last-child { border-bottom: 1px solid var(--border-subtle); }
 .listen-role { display: block; font-size: var(--step--1); font-weight: 700; color: var(--ink-muted); }
@@ -81,11 +81,7 @@
 /* The item being spoken: a tint and a full outline (never colour alone). */
 .listen-item.is-current { background: var(--accent-tint); outline: 2px solid var(--mark-current); outline-offset: -2px; }
 .listen-item.is-current .listen-role { color: var(--ink); }
-
 @media (forced-colors: active) {
   .listen-item { border-color: CanvasText; }
   .listen-item.is-current { outline: 2px solid Highlight; }
-  .listen-transport, .listen-more { border-color: CanvasText; }
 }
-
-/* end ux2-lane-c */

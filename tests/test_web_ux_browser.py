@@ -216,6 +216,46 @@ def test_times_show_in_the_readers_time_zone_and_say_utc_without_javascript(
     assert plain.endswith("UTC"), plain
 
 
+def test_inserted_times_are_localised_without_rescanning_the_page(site, browser, documents):
+    """The observer looks at the nodes that were inserted, not the whole page again: a time
+    inside inserted content (or the inserted node itself) is rewritten, and nothing asks the
+    document for every time on the page."""
+    context, page = open_page(
+        browser, site, documents, "/app", timezone_id="America/Chicago", locale="en-US"
+    )
+    page.wait_for_function("() => document.querySelectorAll('time[data-local]').length > 0")
+    page.evaluate(
+        """() => {
+          window.__documentScans = 0;
+          const scan = Document.prototype.querySelectorAll;
+          Document.prototype.querySelectorAll = function (selector) {
+            if (String(selector).includes('local-time')) window.__documentScans += 1;
+            return scan.call(this, selector);
+          };
+          const wrapper = document.createElement('div');
+          wrapper.id = 'inserted';
+          wrapper.innerHTML =
+            '<p>Later: <time class="local-time" datetime="2030-01-15T18:30:00Z">' +
+            '15 Jan 2030, 18:30 UTC</time></p>';
+          document.body.append(wrapper);
+          const bare = document.createElement('time');
+          bare.className = 'local-time';
+          bare.id = 'inserted-time';
+          bare.setAttribute('datetime', '2030-07-15T18:30:00Z');
+          bare.textContent = '15 Jul 2030, 18:30 UTC';
+          document.body.append(bare);
+        }"""
+    )
+    page.wait_for_function("() => document.querySelectorAll('#inserted time[data-local]').length")
+    page.wait_for_function("() => document.getElementById('inserted-time').hasAttribute('data-local')")
+    winter = page.locator("#inserted time").inner_text()
+    summer = page.locator("#inserted-time").inner_text()
+    assert "UTC" not in winter and "CST" in winter, winter  # 12:30 PM CST on 15 January
+    assert "UTC" not in summer and "CDT" in summer, summer
+    assert page.evaluate("window.__documentScans") == 0
+    context.close()
+
+
 # --------------------------------------------------------------------------- upload
 
 

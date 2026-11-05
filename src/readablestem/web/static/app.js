@@ -86,25 +86,40 @@
     return relative.format(Math.round(ms / 86400000), "day");
   }
 
-  function localise() {
-    document.querySelectorAll("time.local-time[datetime]:not([data-local])").forEach(function (el) {
-      var when = new Date(el.getAttribute("datetime"));
-      if (isNaN(when.getTime())) return;
-      var ms = when.getTime() - Date.now();
-      var away = Math.abs(ms) < WEEK_MS ? distance(ms) : "";
-      el.textContent = stamp.format(when) + (away ? " (" + away + ")" : "");
-      el.setAttribute("data-local", "");
-    });
+  var TIMES = "time.local-time[datetime]:not([data-local])";
+
+  function rewrite(el) {
+    var when = new Date(el.getAttribute("datetime"));
+    if (isNaN(when.getTime())) return;
+    var ms = when.getTime() - Date.now();
+    var away = Math.abs(ms) < WEEK_MS ? distance(ms) : "";
+    el.textContent = stamp.format(when) + (away ? " (" + away + ")" : "");
+    el.setAttribute("data-local", "");
+  }
+
+  // The times inside `root` (the whole page by default), and `root` itself if it is one.
+  function localise(root) {
+    var scope = root && root.querySelectorAll ? root : document;
+    if (scope.matches && scope.matches(TIMES)) rewrite(scope);
+    scope.querySelectorAll(TIMES).forEach(rewrite);
   }
 
   localise();
   // Whatever htmx swaps in (the documents list refreshes every 5 seconds) is rewritten the
   // moment it is inserted, before the browser paints it, so a refreshed list never shows
-  // UTC where the first render showed the reader's time zone.
+  // UTC where the first render showed the reader's time zone. Only the inserted nodes are
+  // looked at, not the whole page again; the text this file writes is a text node and is
+  // skipped, so it does not start the observer again.
   if (window.MutationObserver) {
-    new MutationObserver(localise).observe(document.body, { childList: true, subtree: true });
+    new MutationObserver(function (records) {
+      records.forEach(function (record) {
+        record.addedNodes.forEach(function (node) {
+          if (node.nodeType === 1) localise(node);
+        });
+      });
+    }).observe(document.body, { childList: true, subtree: true });
   }
-  document.addEventListener("htmx:load", localise);
+  document.addEventListener("htmx:load", function (event) { localise(event.target); });
 })();
 
 /* Upload form (app.html, UX review MF21). Says at once when a chosen file is not a PDF,
@@ -520,7 +535,10 @@
  * is typed into a decision's fields ([data-edit-field]) is kept in this tab's
  * sessionStorage, under the form's address (ids only), and put back when that decision
  * is shown again; signing in comes back to it (web/return_to.py). A line under the field
- * says so, and the field's description includes it.
+ * says so, and the field's description includes it. When the browser has no room left for a
+ * draft, a status line under the form's first field says "This draft could not be saved on
+ * this device." and the older draft is dropped, so nothing claims protection that is not
+ * there.
  *
  * sessionStorage belongs to this browser tab: it is never sent to the server and is gone
  * when the tab is closed. A draft is also forgotten when the decision is saved (the
@@ -608,12 +626,38 @@
         changed = true;
       }
     });
+    var failed = false;
     try {
       if (changed) store.setItem(key(form), JSON.stringify(draft));
       else store.removeItem(key(form));
     } catch (e) {
-      /* storage full: the draft is not kept */
+      // Storage is full: this draft is not kept, and an older one under the same key would
+      // be put back as if it were the latest, so it goes too. Say so, once, in words.
+      failed = true;
+      try { store.removeItem(key(form)); } catch (e2) { /* nothing more can be done */ }
     }
+    unsaved(form, failed);
+  }
+
+  // One short status under the first field of a form whose draft could not be stored; it goes
+  // when a later change is stored. It is added empty and filled a moment later so a screen
+  // reader announces it as a status.
+  var UNSAVED = "This draft could not be saved on this device.";
+  function unsaved(form, failed) {
+    var line = form.querySelector("[data-draft-failed]");
+    if (!failed) {
+      if (line) line.remove();
+      return;
+    }
+    if (line) return;
+    var first = fieldsOf(form)[0];
+    if (!first) return;
+    line = document.createElement("p");
+    line.className = "kept-draft draft-failed";
+    line.setAttribute("role", "status");
+    line.setAttribute("data-draft-failed", "");
+    (first.closest(".field") || first).insertAdjacentElement("afterend", line);
+    window.setTimeout(function () { line.textContent = UNSAVED; }, 50);
   }
 
   function note(field) {
@@ -847,8 +891,9 @@
  * - Symbols (review_inventory.html): "Change all" waits until a replacement is chosen and a place
  *   is ticked, and a status line under it says, in words, how many places will change and to
  *   what. The line is a live region, so a screen reader hears the count change as places are
- *   ticked or unticked. Without this file the button is always there and the server says what
- *   is missing.
+ *   ticked or unticked; before a replacement is chosen, a visually hidden status says the
+ *   ticked count when it changes. Without this file the button is always there and the server
+ *   says what is missing.
  * - "Keep without a description" (figure card): its button waits for the box that says what
  *   it means for students. (The server refuses it without the box in any case.)
  * - "Enlarge the PDF image": the picture in a dialog, for one tap on a phone. Without this file
@@ -869,6 +914,11 @@
     var summary = form.querySelector(".symbol-places > summary");
     var changeable = Number(form.getAttribute("data-changeable")) || 0;
     var said = "";
+    // The count in the "Places (n of m ticked)" summary changes silently; this hidden status
+    // says it, politely, when it changes. With a replacement chosen the status line under it
+    // already says the count, so this one stays quiet then.
+    var counter = form.querySelector("[data-symbol-count]");
+    var counted = -1;
 
     function ticked() { return form.querySelectorAll('input[name="include"]:checked').length; }
 
@@ -883,6 +933,14 @@
       var chosen = select.value !== "";
       var target = chosen ? select.options[select.selectedIndex].text : "";
       if (summary) summary.textContent = "Places (" + n + " of " + changeable + " ticked)";
+      if (counter && n !== counted) {
+        // The first call (counted is -1) only sets the count: nothing is announced on load.
+        var changed = counted !== -1;
+        counted = n;
+        counter.textContent = changed && !chosen
+          ? n + " of " + changeable + (changeable === 1 ? " place" : " places") + " ticked."
+          : "";
+      }
       var ready = chosen && n > 0;
       if (ready) button.removeAttribute("aria-disabled");
       else button.setAttribute("aria-disabled", "true");
