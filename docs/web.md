@@ -1039,7 +1039,8 @@ shows on `/jobs/{id}/feedback` with an error summary and what was typed kept.
 Every time in the page body is a `<time datetime="...Z">` element written by the `utc`
 template filter, saying the time in UTC ("9 Oct 2026, 23:32 UTC"); `app.js` rewrites it
 in the reader's time zone with how far away it is ("Fri, Oct 9, 6:32 PM CDT (in 23
-hours)"), also in lists swapped in by htmx. Without JavaScript the UTC text stays (UX
+hours)"), also in lists swapped in by htmx (a mutation observer looks only at the nodes that
+were inserted, not at the whole page again). Without JavaScript the UTC text stays (UX
 review MF16). The `utc_text` filter is the plain text, for titles and attributes.
 
 ## Courses and notation (`web/routes/courses.py`, `web/notation.py`)
@@ -1272,7 +1273,8 @@ the site is built, with the same component and the same script).
   heading, next equation, Follow along, speed, voice, keys. Why Play is off (no voice, or only
   online voices) is a line right under it with "Read the transcript" (and "Choose a voice").
   While the filter is on, Previous, Next and playing move through the items shown. The scroll
-  offset is the transport's measured height (`--listen-sticky`), so it holds at enlarged text.
+  offset is the transport's measured height (`--listen-sticky`), so it holds at enlarged text;
+  the transport sits on the `--z-sticky` layer (`tokens.css`).
   The item being spoken is marked (a bar and a tint, `aria-current`) and scrolled into
   view (instantly under `prefers-reduced-motion`). Keys (`p`, `s` or Esc, `[`, `]`, `h`, `e`)
   work only while focus is inside the page's content, never with a modifier or in a menu. State
@@ -2141,6 +2143,10 @@ always went to My documents. Now:
   for that form says the text is kept. A draft never leaves the browser and is gone when
   the tab is closed; it is forgotten when the decision is saved (every form of that
   address), when the page is drawn with that text anyway, and on Sign out in that tab.
+  When the browser has no room left for a draft (storage full), a status line under the
+  form's first field says "This draft could not be saved on this device." (once; it goes
+  when a draft is stored again) and the older draft under that key is dropped, so a stale
+  one is not put back and nothing claims protection that is not there.
   Choosing a table cell from the list is navigation, so it keeps no draft.
 
 Only pages of this app are remembered (`/app`, `/admin`, a job's page, review screen,
@@ -2742,7 +2748,10 @@ shows a small example that is not part of the document.
 beforehand; the server refuses anything else), a checkbox on each place, ticked until it is unticked (ticked means "will change", so there is no
 double negative), and "Change all ...", which waits for a replacement and at least one ticked place (with
 script: `aria-disabled`, and a status line that is a live region and says "3 of 3 places change to capital
-X."; without it the button is always there and the server says what is missing). The form posts the ticked
+X."; before a replacement is chosen, a visually hidden polite status (`data-symbol-count`) says
+"4 of 5 places ticked." when the count in the "Places (n of m ticked)" summary changes, and is left
+empty once a replacement is chosen, so the count is not said twice; without script the button is always
+there and the server says what is missing). The form posts the ticked
 places (`include`, with `places=chosen`); `exclude` still works for a script. `POST /jobs/{id}/symbols` goes through `routes/edits.write_review`: the job
 is locked, the review version must be the one the page was drawn at, and each equation still waiting
 is edited the way an ordinary edit is checked (`web.edit_check`: the LaTeX must convert and must not

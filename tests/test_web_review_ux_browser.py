@@ -305,6 +305,55 @@ def test_typed_text_survives_the_session_ending(site, browser, job):
     context.close()
 
 
+# A browser whose storage has no room left for a draft (only drafts: the page's own use of
+# storage is left alone).
+FULL = """() => {
+  const set = Storage.prototype.setItem;
+  window.__setItem = set;
+  Storage.prototype.setItem = function (name, value) {
+    if (String(name).startsWith('readablestem.draft:')) {
+      throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+    }
+    return set.call(this, name, value);
+  };
+}"""
+ROOM = "() => { Storage.prototype.setItem = window.__setItem; }"
+
+
+def test_a_draft_the_browser_cannot_store_says_so(site, browser, job):
+    """Storage full: one short status in plain words, no claim that the draft is kept (and no
+    older draft put back later as if it were this one); it goes when a draft is stored again."""
+    context, page = open_page(browser, site)
+    url = f"{site.base}/jobs/{job}/review?item=p1-e6"
+    key = f"readablestem.draft:/jobs/{job}/review/p1-e6"
+    page.goto(url)
+    field = page.get_by_label("Alt text for figure 1")
+    field.fill("First words.")  # stored: nothing to say
+    assert page.locator(".draft-failed").count() == 0
+    assert page.evaluate("(k) => sessionStorage.getItem(k)", key) is not None
+    page.evaluate(FULL)
+    field.fill(ALT)
+    status = page.locator(".draft-failed")
+    expect(status).to_have_text("This draft could not be saved on this device.")
+    assert status.get_attribute("role") == "status"
+    field.fill(ALT + " More.")  # still full: the same one line, not another
+    expect(page.locator(".draft-failed")).to_have_count(1)
+    # The older draft is gone, so it cannot come back as if it were the latest.
+    assert page.evaluate("(k) => sessionStorage.getItem(k)", key) is None
+    page.reload()
+    assert page.locator(".kept-draft").count() == 0
+    assert field.input_value() != ALT + " More."
+    # Room again: a draft is stored and the status goes.
+    page.evaluate(FULL)
+    page.get_by_label("Alt text for figure 1").fill(ALT)
+    expect(page.locator(".draft-failed")).to_have_count(1)
+    page.evaluate(ROOM)
+    page.get_by_label("Alt text for figure 1").fill(ALT + " Again.")
+    assert page.locator(".draft-failed").count() == 0
+    assert page.evaluate("(k) => sessionStorage.getItem(k)", key) is not None
+    context.close()
+
+
 def test_signing_out_in_the_tab_forgets_its_drafts(site, browser, job):
     context, page = open_page(browser, site)
     url = f"{site.base}/jobs/{job}/review?item=p1-e6"

@@ -96,6 +96,7 @@
       <summary>Places ({{ row.changeable }} of {{ row.times }} ticked)</summary>
       {{ places_list(row, True) }}
     </details>
+    <p class="visually-hidden" role="status" aria-live="polite" data-symbol-count></p>
     <p class="symbol-affect" id="{{ rid }}-affect" role="status" data-symbol-affect>Choose a symbol first.</p>
     <div class="button-row">
       <button type="submit" class="button" data-role="relabel" aria-describedby="{{ rid }}-affect">Change all {{ row.name }}</button>

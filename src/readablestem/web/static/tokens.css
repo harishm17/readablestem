@@ -93,6 +93,23 @@
   --review-max: 90rem;
   --prose-max: 68ch;
 
+  /* Layers, lowest to highest. --z-raised and --z-raised-top order things inside one positioned
+     parent (a sticky table heading, the current mark on a page image). --z-sticky is a bar that
+     sticks to a window edge (the listening transport, the review decision bar), --z-fixed the
+     phone's bottom bar, --z-skip the skip link. --sticky-offset is the gap a sticky block keeps
+     from the window edge. --listen-sticky is the height of the listening transport, measured by
+     listen.js, so an item scrolled into view lands below it however many lines it wraps to.
+     A media query cannot read a custom property, so the short-window breakpoints stay where
+     they are used: the decision bar is tall and sticks only in a window at least 40rem high;
+     the page column and the transport stop sticking in a window 32rem high or less. */
+  --z-raised: 1;
+  --z-raised-top: 2;
+  --z-sticky: 5;
+  --z-skip: 10;
+  --z-fixed: 30;
+  --sticky-offset: var(--space-2);
+  --listen-sticky: 4rem;
+
   /* Colour, light. */
   --bg: #ffffff;
   --surface: #f5f6f8;
@@ -130,6 +147,15 @@
   /* Documents drawn as pictures stay white "paper" in dark mode. */
   --paper: #ffffff;
   --paper-ink: #16181d;
+  --paper-ink-muted: #474c55;
+  --paper-surface: #f5f6f8;
+  --paper-border-control: #767b85;
+  --paper-border-subtle: #d5d9e0;
+  --paper-accent: #1c46ad;
+  --paper-accent-hover: #16388a;
+  --paper-focus-outline: #0b3d91;
+  --paper-focus-halo: #ffd33d;
+  --paper-err: #9b1c1c;
   --pmark-required: #7a4b00;
   --pmark-optional: #4b5a75;
   --pmark-accepted: #1d6b35;
@@ -172,16 +198,16 @@
 /* Anything drawn as a picture of a paper document, or shown on white beside it, keeps the
    light tokens whatever the theme. */
 .paper, .page-frame, .cmp-row, .cmp-none, .table-view {
-  --ink: #16181d;
-  --ink-muted: #474c55;
-  --border-control: #767b85;
-  --border-subtle: #d5d9e0;
-  --accent: #1c46ad;
-  --accent-hover: #16388a;
-  --focus-outline: #0b3d91;
-  --focus-halo: #ffd33d;
-  --err: #9b1c1c;
-  --bg: #ffffff;
+  --ink: var(--paper-ink);
+  --ink-muted: var(--paper-ink-muted);
+  --border-control: var(--paper-border-control);
+  --border-subtle: var(--paper-border-subtle);
+  --accent: var(--paper-accent);
+  --accent-hover: var(--paper-accent-hover);
+  --focus-outline: var(--paper-focus-outline);
+  --focus-halo: var(--paper-focus-halo);
+  --err: var(--paper-err);
+  --bg: var(--paper);
   background: var(--paper);
   color: var(--paper-ink);
 }
