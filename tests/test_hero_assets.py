@@ -40,7 +40,7 @@ def test_the_crop_is_the_committed_image(rebuilt):
 
 def test_text_layer_mathml_and_reading_are_regenerated_equal(rebuilt):
     _, data = rebuilt
-    for key in ("text_layer", "paragraph", "mathml", "label", "figure_alt", "speech", "glyphs"):
+    for key in ("text_layer", "mathml", "label", "speech", "glyphs"):
         assert data[key] == COMMITTED[key], key
 
 
@@ -63,3 +63,19 @@ def test_the_font_subset_is_the_committed_file_and_covers_the_mathml():
     )  # the bold d, as a code point (Chromium ignores mathvariant)
     css = (WEB / "static" / "app.css").read_text(encoding="utf-8")
     assert f"/static/vendor/fonts/{COMMITTED['font']}" in css
+
+
+def test_the_crop_is_the_equation_and_its_number_alone(rebuilt):
+    """A real crop of the PDF page (not a redraw) that is only the equation: small enough to
+    show at its own size on a 320px phone, with no line of text in it."""
+    import pymupdf
+
+    crop, _ = rebuilt
+    page, box, _ = hero_assets.passage(hero_assets.DEMO / "source.pdf")
+    assert box.width < 100 and box.height < 50  # points; a sentence would be 400 wide
+    prose = page.get_text("words", clip=box)
+    assert [w[4] for w in prose] == ["Δ𝐝", "Δ𝑡.", "2.4"]  # the equation's words, no sentence
+    pixmap = pymupdf.Pixmap(crop)
+    assert abs(pixmap.width - box.width * hero_assets.SCALE) < 2  # the whole box, nothing more
+    shown = pixmap.width * 3 // 5  # the width the landing page gives the image (routes/pages.py)
+    assert shown <= 14 * 16 - 2 * 12 - 2  # inside the 14rem sheet, its padding and border

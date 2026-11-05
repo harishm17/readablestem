@@ -265,13 +265,53 @@ def test_every_page_that_lists_inputs_says_the_same_about_latex_source(tmp_path)
 # ------------------------------------------------------------------- landing
 
 
+def landing_copy(page: str) -> str:
+    """The words a visitor reads before opening anything: `main` without the folded questions
+    and without text that is only for assistive technology."""
+    main = page.split("<main", 1)[1].split("</main>", 1)[0]
+    main = re.sub(r"<details.*?</details>", "", main, flags=re.S)
+    main = re.sub(r'<div class="visually-hidden">.*?</div>', "", main, flags=re.S)
+    main = re.sub(r'<span class="visually-hidden">.*?</span>', "", main, flags=re.S)
+    return text_of(main)
+
+
 def test_the_landing_page_opens_short_and_the_evidence_is_behind_a_link(tmp_path):
     page = get(tmp_path, "/")
     assert 'class="hero-rest"' not in page
-    hero = page.split('class="panes hero-panes"', 1)[0]
-    assert len(text_of(hero).split()) < 130  # the opening before the real before/after
+    hero = page.split('<section class="diff"', 1)[0]
+    assert len(text_of(hero).split()) < 130  # the opening before "Hear the difference"
     assert 'class="proof-strip"' not in page
-    assert 'href="/limits#accuracy">Evidence: the four measures' in page
+    assert 'href="/guides/readablestem-mathpix-latexml">All results and other tools' in page
+    assert 'href="/limits#accuracy"' not in page
+    assert len(landing_copy(page).split()) <= 450
+
+
+def test_hear_the_difference_is_one_compact_block_with_two_readings(tmp_path):
+    page = get(tmp_path, "/")
+    block = page.split('<section class="diff"', 1)[1].split("</section>", 1)[0]
+    assert '<h2 id="hear-title">Hear the difference</h2>' in block
+    assert (
+        block.count("<h3>") == 2 and "In the PDF" in block and "In the ReadableSTEM page" in block
+    )
+    # One crop of the equation alone (no clipped line of text, no scroll box), the live MathML,
+    # the two readings as plain text, one Play button each (hidden until the script finds speech).
+    assert block.count("<img ") == 1 and "<math" in block and "crop-scroll" not in block
+    assert 'alt="Equation 2.4 cut from the PDF page: delta d over delta t, number 2.4."' in block
+    assert "capital delta bold d over capital delta t" in block
+    assert block.count("data-hear hidden") == 2 and block.count("<button") == 2
+    # No badges, no boxed readings, no figure alt text, no lead-in sentence.
+    for gone in (
+        "tag-err",
+        "tag-ok",
+        "Untagged",
+        "figure-alt",
+        "Figure 2.11",
+        "<dl",
+        'class="pane',
+    ):
+        assert gone not in block, gone
+    assert block.count("OpenStax Physics 2.3") == 1 and "CC BY 4.0" in block
+    assert "A screen reader reads the PDF" not in page
 
 
 # ----------------------------------------------------------- sign-in and chrome
@@ -380,7 +420,7 @@ def test_the_demo_note_is_short_and_keeps_the_licence_and_the_teacher_support_no
 # ------------------------------------------------------------- the comparison chart
 
 
-@pytest.mark.parametrize("path", ["/", seo.COMPARE_GUIDE, offices.PAGE_PATH])
+@pytest.mark.parametrize("path", [seo.COMPARE_GUIDE, offices.PAGE_PATH])
 def test_the_chart_is_one_shared_component_with_the_numbers_in_a_real_table(tmp_path, path):
     page = get(tmp_path, path)
     assert page.count('class="proof-chart"') == 1  # the patterns are defined once per page
@@ -396,6 +436,24 @@ def test_the_chart_is_one_shared_component_with_the_numbers_in_a_real_table(tmp_
     assert "ReadableSTEM and the Opus chatbot are" in " ".join(text_of(chart).split())
     assert "level" in text_of(chart) and "beat" not in text_of(chart).lower()
     assert "26 documents the tool had never seen" in text_of(chart)
+
+
+def test_the_landing_chart_is_the_compact_one_with_the_same_kind_of_table(tmp_path):
+    page = get(tmp_path, "/")
+    assert page.count('class="proof-chart proof-chart-compact"') == 1
+    chart = page.split('<figure class="proof-chart', 1)[1].split("</figure>", 1)[0]
+    assert '<div class="chart" aria-hidden="true">' in chart
+    hidden = chart.split('<div class="visually-hidden">', 1)[1].split("</table>", 1)[0]
+    assert "<caption>" in hidden and hidden.count('<th scope="row">') == 2
+    assert "0.840" in hidden and "11.9" in hidden and "$0." not in hidden
+    assert chart.count('class="chart-name"') == chart.count('class="chart-value"') == 6
+    assert chart.count('class="chart-row"') == 2 and " style=" not in chart
+    text = " ".join(text_of(chart).split())
+    assert "level with the Opus chatbot on the main score (0.840 and 0.836)" in text
+    assert "beat" not in text.lower() and "Cost per page" not in text
+    assert "Higher is better" in text and "Lower is better" in text
+    assert "Headings and figures" not in text  # the first test's table stays on the guide
+    assert "Evidence: the four measures" not in text
 
 
 def test_the_chart_is_not_on_pages_that_do_not_need_it(tmp_path):

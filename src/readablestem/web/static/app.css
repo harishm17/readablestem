@@ -1319,20 +1319,27 @@ details.option-group[open] .group-change { display: none; }
 /* The one line under the buttons keeps the real before/after near the top. */
 .mode-landing .hero .hero-actions { margin-bottom: var(--space-3); }
 .hero-hint { margin: 0 0 var(--space-6); }
-.hero-panes { align-items: stretch; }
-.hero-panes .pane { background: var(--surface); }
-.sheet { background: var(--paper); color: var(--paper-ink); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: var(--space-4); --ink: var(--paper-ink); --ink-muted: var(--paper-ink-muted); --accent: var(--paper-accent); --focus-outline: var(--paper-focus-outline); --focus-halo: var(--paper-focus-halo); }
-.crop-scroll { overflow-x: auto; padding: var(--space-2); }
-.crop-scroll img { display: block; width: 100%; max-width: 40rem; min-width: 28rem; height: auto; }
-.after .sheet p { margin: 0 0 var(--space-3); font-size: var(--step-0); }
-.after .sheet .figure-alt { font-size: var(--step--1); color: var(--ink-muted); margin: var(--space-3) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
-.eq { display: flex; justify-content: center; align-items: center; gap: var(--space-5); margin: var(--space-3) 0; }
+.mode-landing .hero { padding-bottom: 0; }
+.mode-landing .hero .hero-hint { margin-bottom: 0; }
+/* "Hear the difference": one equation, two readings, side by side from 48rem. No card, no badge:
+   a label, the equation on a small sheet of paper, what a screen reader says, one Play button. */
+.diff-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); margin: var(--space-4) 0 0; }
+.diff-row { min-width: 0; }
+.diff-row h3 { margin: 0 0 var(--space-2); font-family: var(--font-sans); font-size: var(--step-0); font-weight: 700; line-height: var(--lh-ui); color: var(--ink-muted); }
+.sheet { background: var(--paper); color: var(--paper-ink); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: var(--space-3); --ink: var(--paper-ink); --ink-muted: var(--paper-ink-muted); --accent: var(--paper-accent); --focus-outline: var(--paper-focus-outline); --focus-halo: var(--paper-focus-halo); }
+.diff-eq { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 14rem; max-width: 100%; min-height: 7rem; }
+.diff-eq img { display: block; max-width: 100%; height: auto; }
+.eq { display: flex; justify-content: center; align-items: center; gap: var(--space-5); }
 .eq math { font-family: "LM Math Hero", "Latin Modern Math", "STIX Two Math", "Cambria Math", math; font-size: 1.5em; }
 .eq-label { font-size: var(--step-0); }
-.reading { margin: 0; }
-.reading dt { font-weight: 700; font-size: var(--step--1); line-height: var(--lh-ui); color: var(--ink-muted); }
-.reading dd { margin: var(--space-1) 0 0; font-family: var(--font-mono); font-size: var(--step-0); line-height: var(--lh-ui); background: var(--bg); border: 1px solid var(--border-control); border-radius: var(--radius-control); padding: var(--space-2) var(--space-3); overflow-wrap: anywhere; }
-.hero-source { margin: var(--space-4) 0 0; font-size: var(--step--1); color: var(--ink-muted); max-width: 75ch; }
+.diff-says { margin: var(--space-3) 0 var(--space-1); line-height: var(--lh-ui); overflow-wrap: anywhere; }
+.diff-says-label { display: block; font-size: var(--step--1); color: var(--ink-muted); }
+.diff .hear { margin: var(--space-2) 0 0; }
+.diff .button-small { min-height: 2.75rem; }
+.diff-source { margin: var(--space-5) 0 0; font-size: var(--step--1); color: var(--ink-muted); max-width: 75ch; }
+@media (min-width: 48rem) {
+  .diff-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-7); }
+}
 
 .three-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); counter-reset: step; }
 .three-steps li { counter-increment: step; border-top: 2px solid var(--ink); padding-top: var(--space-3); }
@@ -1359,7 +1366,7 @@ details.option-group[open] .group-change { display: none; }
   .mode-landing .hero { padding-top: var(--space-4); }
 }
 @media (forced-colors: active) {
-  .sheet, .reading dd, .three-steps li { border-color: CanvasText; }
+  .sheet, .three-steps li { border-color: CanvasText; }
   .sheet { forced-color-adjust: none; }
 }
 

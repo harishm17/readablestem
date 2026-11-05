@@ -62,18 +62,31 @@ def pages(tmp_path_factory):
         return {path: anon.get(path).text for path in ("/", "/limits")}
 
 
-def test_the_landing_page_has_the_chart_and_one_evidence_link_not_the_tiles(pages):
-    """The four tiles and their method are on /limits; the landing page draws the newest
-    registered result as a chart and links there (ux2 lane D)."""
+def test_the_landing_page_has_the_two_headline_charts_and_one_link_not_the_tiles(pages):
+    """The four tiles and their method are on /limits; the landing page draws the two headline
+    measures of the newest registered result as a compact chart and links to the full results
+    (the comparison guide)."""
     page = " ".join(pages["/"].split())
     assert 'class="proof-strip"' not in page and "How it was measured" not in page
-    assert "26 documents the tool had never seen" in page
-    assert "4 November 2026, version 0.5.9" in page
-    assert 'href="/limits#accuracy">Evidence: the four measures' in page
+    assert "1,715 equations in 26 documents it had never seen" in page
+    assert "version 0.5.9" in page and "run recorded 2026-11-04" in page  # the table's caption
+    assert 'href="/guides/readablestem-mathpix-latexml">All results and other tools' in page
     assert "so it was not met" not in page  # the goals are on /limits with the tiles
-    for number in ("0.840", "0.836", "0.793", "0.770", "5.0", "9.6", "1,715"):
+    for number in ("0.840", "0.836", "0.816", "5.0", "9.6", "11.9", "1,715"):
         assert number in page, number
-    assert "no difference" in page and "beat" not in page.lower()
+    for left_out in ("0.793", "0.770", "$0.022", "never asks</td>", "Cost per page"):
+        assert left_out not in page, left_out  # the other measures are on the guide
+    assert "level with the Opus chatbot on the main score" in page and "beat" not in page.lower()
+
+
+def test_exactly_two_chart_rows_are_the_landing_headline():
+    """The compact chart shows what a listener hears and the wrong equations nobody is asked
+    about (`proof_facts.HEADLINE`), in that order."""
+    headline = [row.measure for row in proof_facts.load().chart if row.headline]
+    assert headline == [
+        "Reads the same to a listener as the original",
+        "Wrong, and nobody is asked, per 100 equations",
+    ]
 
 
 def test_the_chart_is_the_registered_results_file_and_says_what_a_listener_hears():

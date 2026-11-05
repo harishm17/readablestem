@@ -53,7 +53,8 @@
           "value": "0.816",
           "width": 81.6
         }
-      ]
+      ],
+      "headline": true
     },
     {
       "measure": "Exactly right, symbol for symbol",
@@ -74,7 +75,8 @@
           "value": "0.732",
           "width": 73.2
         }
-      ]
+      ],
+      "headline": false
     },
     {
       "measure": "Wrong, and nobody is asked, per 100 equations",
@@ -95,7 +97,8 @@
           "value": "11.9",
           "width": 59.5
         }
-      ]
+      ],
+      "headline": true
     },
     {
       "measure": "Wrong and not flagged, or not found at all, per 100 equations",
@@ -116,7 +119,8 @@
           "value": "18.4",
           "width": 92.1
         }
-      ]
+      ],
+      "headline": false
     },
     {
       "measure": "Cost per page",
@@ -137,7 +141,8 @@
           "value": "$0.002",
           "width": 2.1
         }
-      ]
+      ],
+      "headline": false
     },
     {
       "measure": "Wrong equations the tool asks you about",
@@ -158,7 +163,8 @@
           "value": "never asks",
           "width": 0.0
         }
-      ]
+      ],
+      "headline": false
     }
   ],
   "first_test": {
