@@ -381,7 +381,11 @@ class _Transcript:
     @staticmethod
     def _block_like(node: Node) -> bool:
         """An inline element that holds blocks (a link around a figure, a span that wraps a
-        paragraph) is walked as a block."""
+        paragraph) is walked as a block. Inline maths is not one, though its MathML children
+        are not "inline" tags: in a list item or a cell it stays in the sentence it belongs to,
+        and only display maths stands as its own equation."""
+        if node.tag == "math":
+            return node.get("display") == "block"
         return any(isinstance(c, Node) and c.tag not in INLINE for c in node.children) or (
             node.tag == "span" and node.has_class("equation-scroll")
         )
