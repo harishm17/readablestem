@@ -129,8 +129,10 @@ stemcheck report and the stored PDFs.
 ## Design system (the web app)
 
 `DESIGN.md` records the visual system and `PRODUCT.md` the product facts it serves. The tokens
-are `web/static/tokens.css` (fonts, colour in light and dark, type, space, radius, widths); the
-components are in `web/static/app.css` under "Components". `/style` shows every one in the
+are `web/static/tokens.css` (fonts, colour in light and dark, type, space, radius, widths, layers
+and the paper palette); buttons are `web/static/controls.css`; the other components are in
+`web/static/app.css` under "Components", each with its responsive and forced-colour rules beside
+it (`DESIGN.md`, "Stylesheets"). `/style` shows every one in the
 visitor's theme (it is `noindex`, not in the sitemap, and nothing links to it). Pages people read
 (landing, guides, help, offices, privacy, terms, limits) set `{% block body_class %}mode-read{%
 endblock %}`: serif h1 and h2, 18px text in a 68ch column. App screens keep Source Sans 3

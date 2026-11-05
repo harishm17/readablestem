@@ -246,8 +246,8 @@ def test_inserted_times_are_localised_without_rescanning_the_page(site, browser,
           document.body.append(bare);
         }"""
     )
-    page.wait_for_function("() => document.querySelectorAll('#inserted time[data-local]').length")
-    page.wait_for_function("() => document.getElementById('inserted-time').hasAttribute('data-local')")
+    page.wait_for_function("() => document.querySelector('#inserted time[data-local]')")
+    page.wait_for_function("() => document.querySelector('#inserted-time[data-local]')")
     winter = page.locator("#inserted time").inner_text()
     summer = page.locator("#inserted-time").inner_text()
     assert "UTC" not in winter and "CST" in winter, winter  # 12:30 PM CST on 15 January

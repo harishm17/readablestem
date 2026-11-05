@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased: front-end code consolidation (branch ux2/lane-e)
+
+- Stylesheets: each component's base, responsive and forced-colour rules are in one place in
+  `app.css`, the blocks named for the work that added them are gone, and the button forced-colour
+  rules and the danger outline are `controls.css`'s alone (`DESIGN.md`, "Stylesheets"). Rendering is
+  unchanged except on a phone, where the file-name cell of My documents is no longer cut to 40% of the
+  row (a rule meant for wide tables was overriding the phone layout).
+- `tokens.css`: named layers (`--z-raised`, `--z-raised-top`, `--z-sticky`, `--z-fixed`, `--z-skip`),
+  `--sticky-offset` and `--listen-sticky`, used by the review screen, tables and the listening player;
+  the light palette for white paper is `--paper-*`, aliased by the paper scopes, the landing sheet, the
+  diagram caption and the table header instead of repeating hex values.
+- `app.js`: times swapped in by htmx are localised from the inserted nodes only (no rescan of the page);
+  the Symbols screen announces the ticked-places count politely (a visually hidden status) when no
+  replacement is chosen yet; when a draft cannot be stored (storage full) a status says "This draft could
+  not be saved on this device." and the older draft is dropped.
+- Tests: scoped localisation, the symbol-count status and the draft-storage failure in Chromium; layers,
+  paper tokens and one-place rules in `tests/test_design_tokens.py`.
+
 ## Unreleased: the review screens, list view, Symbols and bulk accept (branch ux2/lane-b)
 
 - Review (split view and list): the choices and what each does are one block (the recommended

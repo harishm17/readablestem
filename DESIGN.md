@@ -126,6 +126,45 @@ Header (brand, nav, Sign in as a secondary button, Menu disclosure; signed in, t
 
 Motion: none by default; 120ms colour transitions only under `prefers-reduced-motion: no-preference`.
 
+## Stylesheets
+
+Plain CSS in `src/readablestem/web/static/`, loaded in this order (specificity stays modest; there
+are no cascade layers, so what comes later wins between rules of the same weight):
+
+- `tokens.css`: fonts, colour (light, dark), type, space, radius, widths, and the shared constants
+  below. The showcase site loads it too.
+- `controls.css`: the one button component (primary, secondary, danger, the danger outline that opens
+  a delete confirmation, small, disabled, link) with its forced-colour rules. Shared with the listening
+  player and the showcase; no other file styles a button's colours or forced colours.
+- `app.css`: the web app. Base (reset, headings, links, focus), then "Components" in the order
+  header, footer, actions, tags, card, stat, FAQ, panes, forms, errors, notices, tables, status badges;
+  then the review screens, My documents, the job page, page tools, the Symbols screen, the upload
+  form, sharing, the comparison guide, the /style page, the landing page, the offices page, limits,
+  sign-in, status, confirmations, account, courses, choosing pages, the review list, the comparison
+  chart and print. Every component keeps its base, responsive (`@media`) and forced-colour rules
+  together, in that order; a new rule goes into its component's place, not at the end of the file.
+- `listen.css`: the listening player and its transcript (loaded by that page and the showcase).
+
+Shared constants (`tokens.css`):
+
+- Layers: `--z-raised` (1) and `--z-raised-top` (2) order things inside one positioned parent (a sticky
+  table heading, the current mark on the page image); `--z-sticky` (5) is a bar stuck to a window edge
+  (the review decision bar, the listening transport); `--z-fixed` (30) the phone's Decision / Page bar;
+  `--z-skip` (10) the skip link. No bare `z-index` number in `app.css` or `listen.css`.
+- `--sticky-offset` (`--space-2`) is the gap the review page column and decision bar keep from the
+  window edge; `--listen-sticky` is the listening transport's height, measured by `listen.js` on resize
+  and set on the player, which is what an item scrolled into view is placed below (the default is 4rem
+  until the script has measured). A media query cannot read a custom property, so the short-window
+  breakpoints stay in the stylesheets: the decision bar sticks only in a window at least 40rem high; the
+  page column and the transport stop sticking in a window 32rem high or less.
+- Paper: `--paper` and `--paper-*` (`--paper-ink`, `--paper-ink-muted`, `--paper-surface`,
+  `--paper-border-control`, `--paper-border-subtle`, `--paper-accent`, `--paper-accent-hover`,
+  `--paper-focus-outline`, `--paper-focus-halo`, `--paper-err`) are the light palette for anything drawn as
+  white paper in either theme (the page image, the readings, the table header, the landing page's sheet,
+  the data-flow diagram). The scope list in `tokens.css` and the places that set one of these alias the
+  tokens instead of repeating hex values. White marks drawn on the page image (`#fff` halos and labels) and
+  the pixel geometry of the marks stay literal.
+
 ## Do's and Don'ts
 
 - Do show the real PDF and the real converted page, with the numbers' sample sizes.
