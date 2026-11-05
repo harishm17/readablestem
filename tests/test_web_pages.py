@@ -136,6 +136,21 @@ def test_page_titles_are_unique(pages):
     assert all(t.endswith("| ReadableSTEM") for t in titles.values())
 
 
+def test_no_page_has_markup_inside_its_title_description_or_body_class(pages):
+    """A stray closing tag inside a template block ends up in the browser tab, in search
+    results and in the body's class list (Terms once had `</details>` in all three)."""
+    for name, html in pages.items():
+        title = re.search(r"<title>(.*?)</title>", html, re.S)
+        assert title and "<" not in title.group(1), (name, title and title.group(1))
+        for tag in re.findall(
+            r'<meta (?:name="description"|property="og:description")[^>]*>', html
+        ):
+            content = re.search(r'content="([^"]*)"', tag)
+            assert content and "<" not in content.group(1), (name, tag)
+        body = re.search(r'<body class="([^"]*)"', html)
+        assert body and "<" not in body.group(1), (name, body and body.group(1))
+
+
 def test_landing_page_says_assists_and_links_the_demo(pages):
     html = pages["/"]
     assert "assists" in html

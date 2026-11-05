@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: fixes from the final read of the public pages (branch ux2/final-pass)
+
+- Listen: a sentence with inline maths directly in a list item, table cell or definition stays one
+  item. Before, the maths (its MathML children are not "inline" tags) ended the paragraph, so
+  "Remember in calculating change (Δ) we always use…" was read as three items. Display maths in a
+  list item still stands as its own equation.
+- Terms: three template blocks (title, description, body class) carried a stray `</details>`, which
+  showed in the browser tab, the search snippet and the body's class list. A test now checks every
+  page for markup in those three places.
+- Posting: the at-a-glance line says Blackboard, Moodle and D2L are not tried yet, as the section
+  below it does.
+- Offices: the at-a-glance table says a deleted document can stay in a backup for up to about a
+  week, as the retention table and the privacy notice do.
+- Limits: "What it handles, with limits" and "What it does not do" are open when the page loads.
+- Status: each state has a symbol beside its words (✓ fine, ⚠ needs attention, – not known); the
+  symbol is hidden from screen readers because the words already say it.
+
 ## Unreleased: front-end code consolidation (branch ux2/lane-e)
 
 - Stylesheets: each component's base, responsive and forced-colour rules are in one place in

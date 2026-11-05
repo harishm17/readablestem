@@ -121,6 +121,35 @@ def test_inline_equation_marks_the_paragraph_for_next_equation():
     assert "equation" in para.kinds
 
 
+def test_inline_equation_in_a_list_item_or_cell_stays_in_its_sentence():
+    """The maths sits directly in the <li> or <td>, not in a <p>: the sentence is still one item."""
+    items = listen.build_transcript(
+        doc(
+            "<main><ol><li>Remember in calculating change "
+            "<math display='inline'><mi>Δ</mi></math> we always use final minus initial.</li></ol>"
+            "<table><tr><td>Speed <math display='inline'><mi>v</mi></math> in m/s</td></tr></table>"
+            "</main>"
+        )
+    )
+    spoken = said(items)
+    assert any(
+        s.startswith("Remember in calculating change") and s.endswith("final minus initial.")
+        for s in spoken
+    ), spoken
+    assert not any(s.strip() in ("capital delta", "Δ") for s in spoken), spoken
+    cell = [s for s in spoken if "in m/s" in s]
+    assert cell and "Speed" in cell[0], spoken
+    item = next(i for i in items if i.say.startswith("Remember"))
+    assert "equation" in item.kinds
+
+
+def test_display_equation_inside_a_list_item_is_still_its_own_equation():
+    items = listen.build_transcript(
+        doc("<main><ul><li>Then<math display='block'><mi>x</mi></math></li></ul></main>")
+    )
+    assert any(i.kind == "equation" for i in items), [(i.kind, i.say) for i in items]
+
+
 def test_chemistry_is_spoken_by_the_chemistry_rules():
     water = safe_latex_to_mathml(convert_ce_commands(r"\ce{2 H2 + O2 -> 2 H2O}"), "block")
     items = listen.build_transcript(doc(f"<main>{water}</main>"))
