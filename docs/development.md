@@ -80,12 +80,12 @@ UTC) and by hand. Jobs, by check name:
 |---|---|
 | `plan (what runs on Python 3.14)` | Builds the pytest matrix (below) |
 | `ruff + ty (Python 3.12)`, `(Python 3.14)` | ruff, ty and an import of every module; both Pythons on every run |
-| `pytest (Python 3.12, shard i/4)`, `(Python 3.14, ...)` | The offline suite, in four shards |
+| `pytest (Python 3.12, shard i/6)`, `(Python 3.14, ...)` | The offline suite, in six shards |
 | `every test ran in exactly one shard` | Fails if any collected test ran in no shard or in two |
-| `pytest -m browser (Playwright Chromium, shard i/2)` | Browser tests, two shards of three xdist workers each |
+| `pytest -m browser (Playwright Chromium, shard i/4)` | Browser tests, four shards of three xdist workers each |
 | `CI passed` | Fails if any job failed or was cancelled; require this one in branch protection |
 
-The other jobs (`postgres`, `docker`, `latex source`, `make proof`, `make site`, `pip-audit`,
+The other jobs (`postgres`, `docker`, `latex source`, `make proof` (on main, the nightly run, and pull requests that touch `proof/`, `PROOF.md`, `data/`, the Makefile, `src/readablestem/proof` or `cli`, or the dependency and CI files), `make site`, `pip-audit`,
 `eval gate`, `gitleaks`) are described in [operations.md](operations.md) and in the comments of
 `ci.yml`. Branch protection is not
 configured on the repo today; before this split the checks were named
@@ -98,7 +98,7 @@ every module on 3.14, plus one shard in eight of the suite (`Python 3.14, smoke 
 incompatibility still shows up on the pull request. Python 3.12 always runs everything.
 `make ci-local` runs the full suite on both.
 
-**Shards.** `pytest --shard 2/4` runs the second of four shards (`tests/_sharding.py`,
+**Shards.** `pytest --shard 2/6` runs the second of six shards (`tests/_sharding.py`,
 hooks in `tests/conftest.py`). Test files are dealt to shards longest first, by the durations
 in `tests/shard_durations.json` (tests of 0.05 s or more; every other test counts 0.02 s).
 A file is never split, so module-scoped servers and browsers start once. A new file needs no
@@ -116,7 +116,7 @@ uv run pytest -n 4 --dist loadfile -m "not network and not live_model and not sl
 To change the shard count, edit `SHARDS` in both `plan` and `shard-coverage` in `ci.yml`
 (a test checks that they agree).
 
-**Browser tests in parallel.** `pytest -m browser -n 3 --dist loadfile --shard i/2` (two
+**Browser tests in parallel.** `pytest -m browser -n 3 --dist loadfile --shard i/4` (four
 jobs, also checked by `every test ran in exactly one shard`): each worker starts
 its own uvicorn server on a free port, keeps its files under `tmp_path_factory` and runs its
 own Chromium. The one shared file is the axe-core download in `.cache/axe-core`, written

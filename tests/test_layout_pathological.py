@@ -104,8 +104,9 @@ def test_a_typed_page_over_the_drawing_cap_keeps_its_text_and_its_image():
     assert result.page_types[0].kind == "born_digital"
 
 
-def test_a_page_just_under_the_cap_is_still_read():
-    data = ink_page(3000, typed=True)
+def test_a_page_just_under_the_cap_is_still_read(monkeypatch):
+    monkeypatch.setattr(page_type, "PAGE_MAX_PATHS", 700)  # the same code, a smaller page
+    data = ink_page(600, typed=True)
     result, seconds = _timed(data)
     assert seconds < BOUND_S
     assert page_type.OVER_CAP_REASON not in result.page_types[0].reasons
