@@ -406,9 +406,11 @@ def test_one_person_cannot_queue_without_limit(web, monkeypatch):
     assert upload(web.browser, make_pdf(1)).status_code == 303
 
 
-def test_one_person_cannot_store_without_limit(tmp_path):
-    from readablestem.web.routes.jobs import MAX_LIVE_JOBS_PER_USER
+def test_one_person_cannot_store_without_limit(tmp_path, monkeypatch):
+    from readablestem.web import intake
 
+    monkeypatch.setattr(intake, "MAX_LIVE_JOBS_PER_USER", 3)  # the same check, fewer uploads
+    MAX_LIVE_JOBS_PER_USER = intake.MAX_LIVE_JOBS_PER_USER
     env = WebEnv(tmp_path, per_user_daily_page_quota=1000)
     with env.running() as client:
         env.allow(ALICE)

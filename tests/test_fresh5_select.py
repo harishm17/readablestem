@@ -5,6 +5,7 @@ TeX engine."""
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -591,10 +592,11 @@ def test_nothing_non_commercial_lands_in_the_repository(sel):
     names = {f"{x['book']}-{x['section']}.pdf" for x in private} | {
         f"{x['section']}.jsonl" for x in private
     }
-    for path in root.rglob("*"):
-        if ".git" in path.parts or ".venv" in path.parts or not path.is_file():
-            continue
-        assert path.name not in names, path
+    for folder, subfolders, files in os.walk(root):
+        # Do not descend into .git, .venv or node_modules: tens of thousands of files.
+        subfolders[:] = [d for d in subfolders if d not in {".git", ".venv", "node_modules"}]
+        for name in files:
+            assert name not in names, Path(folder) / name
 
 
 def test_chemistry_order_is_seeded_and_ignores_input_order(sel):
