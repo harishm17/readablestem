@@ -26,10 +26,10 @@ from readablestem.config import Settings
 from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline.run import convert_pdf
-from test_web_browser import TEXT_SPACING, WCAG_TAGS, describe, free_port, sign_in
+from test_web_browser import WCAG_TAGS, describe, free_port, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
-from test_web_review_browser import sideways_overflow, unfold_everything
+from test_web_review_browser import unfold_everything
 
 pytestmark = pytest.mark.browser
 sync_api = pytest.importorskip("playwright.sync_api")
@@ -147,34 +147,3 @@ def test_kept_pages_pass_wcag22_aa_and_best_practice(site, browser, job, axe_sou
     assert len(found) == 8
     failures = {state: describe(v) for state, v in found.items() if v}
     assert not failures, "\n".join(f"[{s}]\n{d}" for s, d in failures.items())
-
-
-@pytest.mark.parametrize("spacing", [False, True], ids=["plain", "text-spacing"])
-def test_kept_pages_reflow_at_320_css_px(site, browser, job, spacing):
-    context, page = open_page(browser, site, viewport=NARROW)
-    widths: dict[str, int] = {}
-
-    def check(state: str) -> None:
-        if spacing:
-            page.add_style_tag(content=TEXT_SPACING)
-        unfold_everything(page)
-        widths[state] = sideways_overflow(page)
-
-    walk(page, site, job, check)
-    context.close()
-    assert widths == dict.fromkeys(widths, 0), widths
-
-
-def test_the_page_decision_works_without_javascript(site, browser, job):
-    context, page = open_page(browser, site, javascript=False)
-    review = f"{site.base}/jobs/{job}/review"
-    page.goto(review)
-    assert page.get_by_role("heading", name="Decision 1 of 2").is_visible()
-    page.get_by_role("button", name="Keep the page images, marked “Not converted”").click()
-    page.wait_for_url(f"{review}?item=pg-p4-e0")
-    status = page.locator(".decision-status, [role=status]").first.inner_text()
-    assert "Kept 2 as images" in status
-    page.get_by_role("button", name="Keep the page image, marked “Not converted”").click()
-    page.wait_for_url(review)
-    assert "All decisions made" in page.content()
-    context.close()

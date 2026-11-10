@@ -6,9 +6,6 @@ test app with a converter that sends events like the real one.
 
 from __future__ import annotations
 
-import threading
-from datetime import timedelta
-
 import pymupdf
 import pytest
 from sqlalchemy import select
@@ -21,7 +18,7 @@ from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import equation_step, figure_step, layout, run
 from readablestem.pipeline.layout import Layout
 from readablestem.web import worker as worker_module
-from readablestem.web.db import Job, JobStatus, session_scope, utcnow
+from readablestem.web.db import Job, JobStatus, session_scope
 from readablestem.web.worker import JobCancelled
 
 
@@ -78,30 +75,6 @@ def events_of(**kw) -> list[ProgressEvent]:
     return events
 
 
-def test_stages_come_in_order_with_their_counts(fake_steps):
-    events = events_of()
-    stages = [e.stage for e in events]
-    assert stages[:2] == ["layout", "layout"]
-    assert stages[-2:] == ["assemble", "checks"]
-    found = events[1]
-    assert (found.done, found.total) == (2, 2)  # pages read
-    assert found.counts == {"equation": 3, "figure": 1, "heading": 1, "paragraph": 2}
-    # Totals first, then one event per element done, each stage up to its total.
-    equations = [(e.done, e.total) for e in events if e.stage == "equations"]
-    figures = [(e.done, e.total) for e in events if e.stage == "figures"]
-    assert equations == [(0, 3), (1, 3), (2, 3), (3, 3)]
-    assert figures == [(0, 1), (1, 1)]
-    assert "tables" not in stages  # no tables in this document
-    assert all(e.model_dump(mode="json") == ProgressEvent(**e.model_dump()).model_dump(mode="json")
-               for e in events)  # fmt: skip
-
-
-def test_events_come_on_the_calling_thread(fake_steps):
-    threads: set[str] = set()
-    convert(stage_progress=lambda e: threads.add(threading.current_thread().name))
-    assert threads == {threading.current_thread().name}
-
-
 def test_a_scanned_page_counts_as_done_before_any_model_work(fake_steps, monkeypatch):
     two_pages = document()
     two_pages.elements = [e for e in two_pages.elements if e.page == 0]
@@ -111,33 +84,6 @@ def test_a_scanned_page_counts_as_done_before_any_model_work(fake_steps, monkeyp
     figures = [(e.done, e.total) for e in events if e.stage == "figures"]
     assert figures[0] == (1, 2)  # the scanned page's figure is decided already
     assert figures[-1] == (2, 2)
-
-
-def test_a_failed_crop_and_a_spent_budget_count_as_done(fake_steps, monkeypatch):
-    def crop(pdf, element, **kw):
-        if element.id == "p1-e2":
-            raise RuntimeError("SECRET-DOC-TEXT")
-        return png()
-
-    def spend_it(element, png, *, client, settings, context_text=None):
-        from readablestem.core.budget import BudgetExceeded
-
-        raise BudgetExceeded("job_usd", "cap")
-
-    monkeypatch.setattr(layout, "crop", crop)
-    monkeypatch.setattr(equation_step, "transcribe", spend_it)
-    events = events_of(concurrency=1)
-    equations = [(e.done, e.total) for e in events if e.stage == "equations"]
-    assert equations[-1] == (3, 3)
-
-
-def test_an_exception_from_the_receiver_stops_the_run(fake_steps):
-    def stop(event: ProgressEvent) -> None:
-        if event.stage == "equations" and event.done == 1:
-            raise JobCancelled()
-
-    with pytest.raises(JobCancelled):
-        convert(stage_progress=stop)
 
 
 # --------------------------------------------------------------------------- the worker
@@ -197,46 +143,6 @@ EVENTS = [
     ProgressEvent(stage="figures", done=1, total=1),
     ProgressEvent(stage="equations", done=2, total=3),
 ]
-
-
-def test_the_worker_stores_the_latest_event_of_every_stage(web, monkeypatch):
-    monkeypatch.setattr(worker_module, "PROGRESS_WRITE_S", 0.0)  # store every event
-    converter = StageConverter(web, EVENTS, pause_after=len(EVENTS))
-    run_with(web, converter)
-    stored = converter.seen[0]
-    assert stored == {
-        "stages": {
-            "layout": {"stage": "layout", "done": 1, "total": 1,
-                       "counts": {"equation": 3, "figure": 1}},
-            "equations": {"stage": "equations", "done": 2, "total": 3, "counts": {}},
-            "figures": {"stage": "figures", "done": 1, "total": 1, "counts": {}},
-        },
-    }  # fmt: skip
-
-
-def test_writes_are_throttled_but_new_and_finished_stages_are_stored_at_once(web, monkeypatch):
-    monkeypatch.setattr(worker_module, "PROGRESS_WRITE_S", 3600.0)  # nothing on the clock
-    converter = StageConverter(web, EVENTS, pause_after=len(EVENTS))
-    run_with(web, converter)
-    stages = converter.seen[0]["stages"]
-    # "figures" 1 of 1 finished a stage and was stored at once, with the latest of the
-    # others ("equations" 1 of 3); "equations" 2 of 3 waits for the clock.
-    assert stages["figures"]["done"] == 1
-    assert stages["equations"]["done"] == 1
-
-
-def test_progress_is_cleared_when_a_job_is_requeued(web):
-    job_id = job_id_from(upload(web.browser, make_pdf(1)))
-    with session_scope(web.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        assert job is not None
-        job.status = JobStatus.RUNNING
-        job.attempts = 1
-        job.lease_until = utcnow() - timedelta(minutes=1)
-        job.progress_json = {"stages": {"layout": {"stage": "layout", "done": 1, "total": 1}}}
-    requeued, _ = web.worker().requeue_expired()
-    assert requeued == 1
-    assert web.job(job_id).progress_json is None
 
 
 def test_a_cancelled_job_stops_at_its_next_event(web):

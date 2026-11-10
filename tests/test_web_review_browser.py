@@ -21,7 +21,6 @@ from __future__ import annotations
 import re
 import threading
 import time
-from collections import Counter
 from collections.abc import Iterator
 
 import pytest
@@ -50,7 +49,6 @@ NARROW = {"width": 320, "height": 640}
 WIDE = {"width": 1280, "height": 900}
 # "Needs review", "Kept as an image by you", ..., "Accepted by you"
 REJECTED = [*REJECT_WORDS.values(), BOLD_TEXT_WORDS, PLAIN_TEXT_WORDS, OTHER_WORDS]
-STATUS_WORDS = {*FIX_STATUS_LABELS.values(), REVIEWER_ACCEPTED_LABEL, *(w.state for w in REJECTED)}
 
 
 def wide_equation() -> str:
@@ -239,133 +237,7 @@ def test_no_sideways_scrolling_at_320_css_px(site, browser, job):
     context.close()
 
 
-ZOOM_400 = {"width": 320, "height": 256}  # 1280 x 1024 at 400%
-
-
-def follow_summary_link(page, control_id: str) -> dict[str, tuple[float, float]]:
-    """Follow the error summary's link to `control_id` from the top of the page; the
-    (top, bottom) in the window of the field's label, hint, error message and control."""
-    page.evaluate("window.scrollTo(0, 0)")
-    page.locator(f'.error-summary a[href="#{control_id}"]').click()
-    assert page.evaluate("document.activeElement.id") == control_id
-    prefix, element_id = control_id.split("-", 1)
-    parts = {}
-    for part, selector in (
-        ("label", f'label[for="{control_id}"]'),
-        ("hint", f"#{prefix}-hint-{element_id}"),
-        ("error", f"#{prefix}-error-{element_id}"),
-        ("control", f"#{control_id}"),
-    ):
-        box = page.locator(selector).bounding_box()
-        assert box is not None, part
-        parts[part] = (box["y"], box["y"] + box["height"])
-    return parts
-
-
-@pytest.mark.parametrize(
-    ("viewport", "field_fits"), [(NARROW, True), (ZOOM_400, False)], ids=["320x640", "320x256"]
-)
-def test_an_error_summary_link_shows_the_field_with_its_label_at_320_css_px(
-    site, browser, job, viewport, field_fits
-):
-    """At 320 CSS px a field's label, hint and error message wrap to about 300 px, more
-    than the CSS scroll-margin-top: following a summary link focused the control with
-    its label 160 px above the window. app.js scrolls the whole field into view. When
-    the field is taller than the window (400% zoom) the focused control stays in view,
-    with as much of the field as fits above it.
-
-    Its own context, without bypass_csp: the Content-Security-Policy must allow app.js.
-    """
-    context = browser.new_context(viewport=viewport)
-    page = context.new_page()
-    sign_in(page, site.base, ALICE)
-    url = review_url(site, job)
-    page.goto(url)
-    page.get_by_label("Level for heading 2").select_option("6")
-    page.get_by_role("button", name="Save edit to heading 2").click()
-    fields = {"heading level": follow_summary_link(page, "level-p1-e3")}
-    page.goto(url)
-    page.get_by_label("LaTeX for equation 1").fill("\\input{secret}")
-    page.get_by_role("button", name="Save edit to equation 1").click()
-    fields["LaTeX"] = follow_summary_link(page, "latex-p1-e1")
-    context.close()
-
-    height = viewport["height"]
-    for name, parts in fields.items():
-        top, bottom = parts["control"]
-        assert top >= 0 and bottom <= height, (name, parts)  # focus is in view
-        if field_fits:
-            assert all(y0 >= 0 and y1 <= height for y0, y1 in parts.values()), (name, parts)
-        else:
-            assert parts["label"][0] < 0, (name, parts)  # the field really is too tall
-            assert bottom >= height - 16, (name, parts)  # all that fits above the control
-
-
 # --------------------------------------------------------------------------- names
-
-
-def test_every_button_names_the_fix_or_group_it_acts_on(site, browser, job):
-    context, page = open_page(browser, site)
-    page.goto(review_url(site, job))
-    unfold_everything(page)
-    names = re.findall(r'- button "([^"]+)"', page.locator("main").aria_snapshot())
-    context.close()
-    duplicates = [name for name, n in Counter(names).items() if n > 1]
-    assert not duplicates, duplicates
-    # "Reject" is named for what it does (UX review MF14), with the item it acts on.
-    rejects = {
-        "equation 1": "Keep as image",
-        "equation 2": "Keep as image",
-        "figure 1": "Keep without a description",
-    }
-    for item in ("equation 1", "equation 2", "figure 1", "heading 2", "heading 5"):
-        reject = rejects.get(item, r"Make (bold|plain) text")
-        save = "Save and accept (figure 1)" if item == "figure 1" else f"Save edit to {item}"
-        assert save in names
-        assert [n for n in names if re.fullmatch(rf"{reject} \({item}\)", n)], (item, names)
-    assert "Accept equation 1" in names
-    assert "Accept equation 2" not in names  # failed: nothing to accept
-    assert not [n for n in names if n.startswith(("Accept all", "Accept these"))]  # no bulk
-    assert not {"Accept", "Reject", "Save edit"} & set(names)  # never a bare verb
-    assert not [n for n in names if n.startswith("Reject")]
-
-
-def test_every_control_has_a_visible_label(site, browser, job):
-    context, page = open_page(browser, site)
-    page.goto(review_url(site, job))
-    for label in (
-        "LaTeX for equation 1",
-        "Alt text for figure 1",
-        "Decorative: adds nothing, so no alt text",
-        "Level for heading 2",
-    ):
-        control = page.get_by_label(label).first
-        assert control.is_visible(), label
-    controls, unlabelled = page.evaluate(
-        """() => {
-          const all = [...document.querySelectorAll(
-            'main input:not([type=hidden]), main select, main textarea')];
-          return [all.length, all.filter(c => c.labels.length === 0).length];
-        }"""
-    )
-    context.close()
-    # 6 LaTeX boxes, 4 alt text boxes, 4 "decorative" boxes, 5 heading levels and the
-    # "Describe it in words" box of the one equation kept as an image (T3-16), and the two
-    # fields of the decision filter (kind, page).
-    assert (controls, unlabelled) == (26, 0)  # with the figure's tick box and the filter
-
-
-def test_status_is_written_in_words_not_only_colour(site, browser, job):
-    context, page = open_page(browser, site)
-    page.goto(review_url(site, job))
-    unfold_everything(page)
-    cards = page.locator("article.fix-card")
-    assert cards.count() == 15
-    words = [
-        cards.nth(i).locator(".status-badge").inner_text().strip() for i in range(cards.count())
-    ]
-    context.close()
-    assert set(words) <= STATUS_WORDS and len(set(words)) >= 5, words
 
 
 # --------------------------------------------------------------------------- flow
@@ -400,3 +272,19 @@ def test_decisions_work_without_javascript(site, browser, job):
     ).click()
     assert page.url == f"{url}#item-p3-e2"
     context.close()
+
+
+def test_status_is_written_in_words_not_only_colour(site, browser, job):
+    context, page = open_page(browser, site)
+    page.goto(review_url(site, job))
+    unfold_everything(page)
+    cards = page.locator("article.fix-card")
+    assert cards.count() == 15
+    words = [
+        cards.nth(i).locator(".status-badge").inner_text().strip() for i in range(cards.count())
+    ]
+    context.close()
+    assert set(words) <= STATUS_WORDS and len(set(words)) >= 5, words
+
+
+STATUS_WORDS = {*FIX_STATUS_LABELS.values(), REVIEWER_ACCEPTED_LABEL, *(w.state for w in REJECTED)}

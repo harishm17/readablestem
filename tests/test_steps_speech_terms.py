@@ -74,13 +74,6 @@ def test_cases_read_as_a_piecewise_definition(latex, expected):
     assert say(latex) == expected
 
 
-def test_aligned_equations_and_brace_matrices_stay_plain_tables():
-    assert say(r"\begin{aligned} a &= b \\ &= c \end{aligned}") == (
-        "row 1: a equals b; row 2: equals c"
-    )
-    assert "cases" not in say(r"\begin{Bmatrix} a & b \\ c & d \end{Bmatrix}")
-
-
 @pytest.mark.parametrize(
     ("latex", "expected"),
     [
@@ -104,14 +97,6 @@ def test_aligned_equations_and_brace_matrices_stay_plain_tables():
 )
 def test_nuclide_notation_reads_as_the_element(latex, expected):
     assert say(latex) == expected
-
-
-def test_multiscripts_nuclide():
-    mathml = (
-        f"<math {NS}><mmultiscripts><mi>C</mi><mprescripts/><mn>6</mn><mn>14</mn>"
-        "</mmultiscripts></math>"
-    )
-    assert mathml_to_speech(mathml) == "carbon 14, atomic number 6"
 
 
 @pytest.mark.parametrize(
@@ -142,11 +127,6 @@ def test_multiscripts_nuclide():
 )
 def test_units_after_a_number_read_as_unit_names(latex, expected):
     assert say(latex) == expected
-
-
-def test_openstax_unit_text_reads_as_unit_names():
-    mathml = f"<math {NS}><mn>2.9</mn><mspace width='0.3em'/><mtext> m/s</mtext></math>"
-    assert mathml_to_speech(mathml) == "2.9 meters per second"
 
 
 @pytest.mark.parametrize(

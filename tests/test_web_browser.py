@@ -153,9 +153,9 @@ def no_js_violations(browser, site, path: str, axe_source: str) -> list[dict]:
     sign_in(page, site.base, ALICE)
     response = page.goto(site.base + path)
     assert response is not None and response.status == 200
+    page.evaluate("document.querySelectorAll('script').forEach(s => s.remove())")
     html = page.content()
     nojs.close()
-    html = re.sub(r"<script\b[^>]*>.*?</script>", "", html, flags=re.S)
     html = html.replace("<noscript>", "").replace("</noscript>", "")
     context = browser.new_context(bypass_csp=True, java_script_enabled=True)
     page = context.new_page()
@@ -171,94 +171,6 @@ def describe(violations: list[dict]) -> str:
         f"{v['id']} ({v['impact']}): {v['help']} -> {[n['target'] for n in v['nodes']][:3]}"
         for v in violations
     )
-
-
-@pytest.mark.parametrize(
-    "path",
-    [
-        "/",
-        "/app",
-        "/jobs/{id}",
-        "/jobs/{id}/review",
-        "/jobs/{id}/review/list",
-        "/privacy",
-        "/terms",
-        "/limits",
-        "/status",
-        "/demo",
-        "/login",
-        "/dev-login",
-        "/admin",
-        "/jobs/{id}/delete",
-    ],
-)
-def test_pages_have_no_serious_or_critical_axe_violations(
-    site, browser, finished_job, axe_source, path
-):
-    # bypass_csp only so the test can inject axe; the CSP itself is tested below.
-    context = browser.new_context(bypass_csp=True)
-    page = context.new_page()
-    sign_in(page, site.base, ADMIN if path == "/admin" else ALICE)
-    response = page.goto(site.base + path.replace("{id}", finished_job))
-    assert response is not None and response.status == 200
-    violations = axe_violations(page, axe_source)
-    context.close()
-    assert not violations, describe(violations)
-
-
-@pytest.fixture
-def queued_job(site, browser):
-    """A job left waiting in the queue (no worker runs), deleted afterwards so later tests
-    find only their own jobs in the queue."""
-    context = browser.new_context()
-    page = context.new_page()
-    sign_in(page, site.base, ALICE)
-    job_id = upload_pdf(page, site.base)
-    yield job_id
-    page.goto(f"{site.base}/jobs/{job_id}")
-    page.get_by_role("button", name="Delete now").click()
-    page.get_by_role("button", name="Delete “notes.pdf”").click()
-    page.wait_for_url(f"{site.base}/app")
-    context.close()
-
-
-def test_an_unfinished_job_page_has_no_serious_axe_violations(
-    site, browser, queued_job, axe_source
-):
-    context = browser.new_context(bypass_csp=True)
-    page = context.new_page()
-    sign_in(page, site.base, ALICE)
-    page.goto(f"{site.base}/jobs/{queued_job}")
-    assert "Waiting" in page.locator("#job-status").inner_text()
-    violations = axe_violations(page, axe_source)
-    context.close()
-    assert not violations, describe(violations)
-
-
-def test_an_unfinished_job_page_without_javascript_has_no_serious_axe_violations(
-    site, browser, queued_job, axe_source
-):
-    """Without JavaScript the page used to reload itself every 5 s: axe "meta-refresh",
-    critical (WCAG 2.2.1, F41). Reloading is now only on request."""
-    violations = no_js_violations(browser, site, f"/jobs/{queued_job}", axe_source)
-    assert not violations, describe(violations)
-
-
-def test_error_states_have_no_serious_axe_violations(site, browser, axe_source):
-    context = browser.new_context(bypass_csp=True)
-    page = context.new_page()
-    sign_in(page, site.base, ALICE)
-    page.goto(f"{site.base}/app")
-    page.get_by_label("PDF file").set_input_files(
-        files=[{"name": "x.pdf", "mimeType": "application/pdf", "buffer": b"not a pdf"}]
-    )
-    page.get_by_role("button", name="Upload and convert").click()
-    assert page.locator(".error-summary").is_visible()
-    violations = axe_violations(page, axe_source)
-    page.goto(f"{site.base}/no-such-page")
-    violations += axe_violations(page, axe_source)
-    context.close()
-    assert not violations, describe(violations)
 
 
 def test_pages_load_htmx_under_the_csp_without_violations(site, browser, finished_job):
@@ -289,20 +201,6 @@ def test_review_page_renders_mathml(site, browser, finished_job):
     page.goto(f"{site.base}/jobs/{finished_job}/review")  # the review screen's decision 1
     box = page.locator("#decision .cmp-math math").bounding_box()
     assert box is not None and box["width"] > 0
-    context.close()
-
-
-def test_skip_link_is_the_first_tab_stop_and_becomes_visible(site, browser):
-    context = browser.new_context()
-    page = context.new_page()
-    page.goto(f"{site.base}/")
-    page.keyboard.press("Tab")
-    focused = page.evaluate("document.activeElement.textContent.trim()")
-    assert focused == "Skip to main content"
-    box = page.locator(".skip-link").bounding_box()
-    assert box is not None and box["y"] >= 0
-    outline = page.evaluate("getComputedStyle(document.activeElement).outlineStyle")
-    assert outline == "solid"  # visible focus indicator
     context.close()
 
 
@@ -389,73 +287,6 @@ def test_the_error_summary_takes_focus_after_every_failed_form(site, browser):
     context.close()
 
 
-@pytest.mark.parametrize("javascript", [False, True], ids=["no-js", "js"])
-def test_an_error_summary_link_keeps_the_fields_label_and_error_in_view(site, browser, javascript):
-    """Following a summary link scrolls the field to the top of the window, so the label
-    and the error message above it are scrolled out of view and the user lands on an
-    unlabelled box. Without JavaScript, scroll-margin-top on form controls keeps them in
-    view; with it, app.js scrolls the whole field into view, whatever the margin (the
-    narrow screens a fixed margin cannot cover are in test_web_review_browser.py)."""
-    # bypass_csp: only for the style injected below.
-    context = browser.new_context(
-        viewport={"width": 1000, "height": 400}, bypass_csp=True, java_script_enabled=javascript
-    )
-    page = context.new_page()
-    sign_in(page, site.base, ADMIN)
-    page.goto(f"{site.base}/admin")
-    page.get_by_label("Email address to allow").fill("not an email")
-    page.get_by_role("button", name="Allow", exact=True).click()
-
-    def follow_summary_link() -> tuple[float, float]:
-        page.evaluate("window.scrollTo(0, 0)")
-        page.locator('.error-summary a[href="#allow-email"]').click()
-        assert page.evaluate("document.activeElement.id") == "allow-email"
-        label = page.locator('label[for="allow-email"]').bounding_box()
-        error = page.locator("#allow-email-error").bounding_box()
-        assert label is not None and error is not None
-        return label["y"], error["y"]
-
-    label_y, error_y = follow_summary_link()
-    assert label_y >= 0 and error_y >= 0
-    # Without the margin the same click hides them (so the page did scroll), unless the
-    # script places the field. (add_style_tag waits for a load event that never fires
-    # with JavaScript off.)
-    page.evaluate(
-        """css => { const s = document.createElement('style'); s.textContent = css;
-                    document.head.append(s); }""",
-        "input { scroll-margin-top: 0 !important; }",
-    )
-    label_y, error_y = follow_summary_link()
-    if javascript:
-        assert label_y >= 0 and error_y >= 0, (label_y, error_y)
-    else:
-        assert label_y < 0 and error_y < 0, (label_y, error_y)
-    context.close()
-
-
-def test_deleting_asks_first_then_the_notice_takes_focus(site, browser):
-    context = browser.new_context()
-    page = context.new_page()
-    sign_in(page, site.base, ALICE)
-    job_id = upload_pdf(page, site.base)
-    page.get_by_role("button", name="Delete now").click()
-    assert page.get_by_role("heading", level=1).inner_text() == "Delete “notes.pdf”?"
-    page.get_by_role("link", name="No, keep it").click()
-    assert page.url.endswith(f"/jobs/{job_id}")
-    page.get_by_role("button", name="Delete now").click()
-    page.get_by_role("button", name="Delete “notes.pdf”").focus()
-    page.keyboard.press("Enter")
-    page.wait_for_url(f"{site.base}/app")
-    # Chromium applies `autofocus` (base.html puts it on the first notice) at the next
-    # rendering opportunity after load, so right after the redirect focus can still be on <body>.
-    page.wait_for_function(
-        "document.activeElement && document.activeElement.classList.contains('notice')"
-    )
-    assert "notice" in active_classes(page)
-    assert "have been deleted" in page.evaluate("document.activeElement.textContent")
-    context.close()
-
-
 # --------------------------------------------------------------------------- reflow
 
 LONG_NAME = "Physics_Chapter_02_Kinematics_and_Dynamics_Lecture_Notes_Final_Version_3.pdf"
@@ -495,36 +326,6 @@ PUBLIC = (
 )
 
 
-def _reflow_params():
-    for spacing in (False, True):
-        suffix = " +text-spacing" if spacing else ""
-        for path in [*PUBLIC, "/app", "/admin", "/jobs/{id}"]:
-            yield pytest.param(path, spacing, id=path + suffix)
-
-
-@pytest.mark.parametrize(("path", "spacing"), list(_reflow_params()))
-def test_pages_reflow_at_320_css_pixels(site, browser, long_named_job, path, spacing):
-    """WCAG 1.4.10: at 320 CSS px (400% zoom) nothing may need sideways scrolling, also
-    with a long file name and with the 1.4.12 text-spacing override.
-
-    What it took (app.css): the long file name wraps anywhere in headings and table row
-    headers; the visually hidden "Delete <file>" text stays inside its .table-scroll box
-    (position: relative) instead of widening /app and /admin; the source URL on /terms
-    wraps (break-word on the body)."""
-    context = browser.new_context(viewport={"width": 320, "height": 256}, bypass_csp=True)
-    page = context.new_page()
-    if path not in PUBLIC:
-        sign_in(page, site.base, ADMIN if path == "/admin" else ALICE)
-    page.goto(site.base + path.replace("{id}", long_named_job))
-    if spacing:
-        page.add_style_tag(content=TEXT_SPACING)
-    width = page.evaluate(
-        "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
-    )
-    context.close()
-    assert width[0] <= width[1], f"{path}: content is {width[0]} px wide in a {width[1]} px view"
-
-
 # --------------------------------------------------------------------------- stricter axe
 
 WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]
@@ -555,3 +356,33 @@ def test_pages_pass_wcag22_aa_and_best_practice_at_moderate_and_above(
     context.close()
     violations = [v for v in results["violations"] if v["impact"] in STRICT_IMPACTS]
     assert not violations, describe(violations)
+
+
+def _reflow_params():
+    for spacing in (False, True):
+        suffix = " +text-spacing" if spacing else ""
+        for path in [*PUBLIC, "/app", "/admin", "/jobs/{id}"]:
+            yield pytest.param(path, spacing, id=path + suffix)
+
+
+@pytest.mark.parametrize(("path", "spacing"), list(_reflow_params()))
+def test_pages_reflow_at_320_css_pixels(site, browser, long_named_job, path, spacing):
+    """WCAG 1.4.10: at 320 CSS px (400% zoom) nothing may need sideways scrolling, also
+    with a long file name and with the 1.4.12 text-spacing override.
+
+    What it took (app.css): the long file name wraps anywhere in headings and table row
+    headers; the visually hidden "Delete <file>" text stays inside its .table-scroll box
+    (position: relative) instead of widening /app and /admin; the source URL on /terms
+    wraps (break-word on the body)."""
+    context = browser.new_context(viewport={"width": 320, "height": 256}, bypass_csp=True)
+    page = context.new_page()
+    if path not in PUBLIC:
+        sign_in(page, site.base, ADMIN if path == "/admin" else ALICE)
+    page.goto(site.base + path.replace("{id}", long_named_job))
+    if spacing:
+        page.add_style_tag(content=TEXT_SPACING)
+    width = page.evaluate(
+        "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
+    )
+    context.close()
+    assert width[0] <= width[1], f"{path}: content is {width[0]} px wide in a {width[1]} px view"

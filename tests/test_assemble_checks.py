@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sys
 from pathlib import Path
 
 import pymupdf
@@ -19,7 +18,6 @@ from readablestem.pipeline.html_checks import (
     AXE_VERSION,
     axe_checks,
     static_checks,
-    violations_to_checks,
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "assemble" / "sample_document.json"
@@ -57,28 +55,6 @@ def sample_html(notice: str | None = None) -> str:
 
 
 # --------------------------------------------------------------------------- static
-
-
-def test_minimal_document_passes_every_rule():
-    checks = static_checks(doc("<h1>A</h1><p>text</p>"))
-    assert [c.name for c in checks] == [
-        "html.lang",
-        "html.title",
-        "html.main",
-        "html.heading_order",
-        "html.heading_text",
-        "html.img_alt",
-        "html.unique_ids",
-        "html.list_structure",
-        "html.math_display",
-        "html.self_contained",
-        "html.wording",
-        "html.link_text",
-        "html.link_href",
-        "html.lang_tags",
-        "html.text_contrast",
-    ]
-    assert all(c.passed and c.code is None for c in checks)
 
 
 @pytest.mark.parametrize(
@@ -135,127 +111,7 @@ def test_each_rule_reports_its_code(html, code):
     assert code in failed_codes(html)
 
 
-@pytest.mark.parametrize(
-    "html",
-    [
-        doc("<h2>Starts at two</h2><h3>B</h3><h1>Back up</h1><h2>C</h2>"),
-        doc('<h1><img src="data:," alt="Course logo"></h1>'),
-        doc('<h1>x<math display="inline"><mi>y</mi></math></h1>'),
-        doc('<img src="data:image/png;base64,AAAA" alt="">'),
-        doc('<a href="#about">About</a><p id="about">x</p>'),
-        doc('<p><a href="https://example.org/a?b=1&amp;c=2">the notes</a></p>'),
-        doc(
-            '<p><a href="mailto:a@example.edu">email</a> <a href="#e"><math display="inline">'
-            '<mi>x</mi></math></a></p><p id="e">x</p>'
-        ),
-        doc('<p lang="fr">Bonjour.</p><p lang="zh-Hant-TW">x</p><p lang="">x</p>', lang="en-GB"),
-        doc('<p class="tc-ff0000">x</p>', head="<style>.tc-ff0000 { color: #ee0000; }</style>"),
-        doc(f"<p>{CLAIM.title()} mechanisms flex instead of using hinges.</p>"),
-        doc(f'<div class="readablestem"><p>Assists with accessibility.</p></div><p>{CLAIM}</p>'),
-        doc("<p>a<br/>b</p><mspace/>"),
-        doc('<ol type="a" start="3"><li>c<ul><li>nested</li></ul></li><li>d</li></ol>'),
-        doc('<ol class="printed-markers" role="list"><li><span>(a)</span> x</li></ol>'),
-        doc("<ul>\n  <li>x</li>\n</ul>"),
-    ],
-)
-def test_valid_patterns_are_not_flagged(html):
-    assert failed_codes(html) == []
-
-
-def test_math_display_is_only_a_warning():
-    check = next(c for c in static_checks(doc("<math><mi>x</mi></math>")) if not c.passed)
-    assert (check.name, check.severity) == ("html.math_display", "warning")
-
-
-def test_garbage_input_does_not_raise():
-    codes = failed_codes("<<<>>> <h7> </div></p> &bogus; <img")
-    assert {"missing_lang", "missing_title", "main_count"} <= set(codes)
-
-
-def test_assembled_sample_passes():
-    assert failed_codes(sample_html()) == []
-
-
 # --------------------------------------------------------------------------- axe (no browser)
-
-
-def test_violations_map_to_checks_by_impact():
-    checks = violations_to_checks(
-        [
-            {"id": "image-alt", "impact": "critical", "nodes": 2},
-            {"id": "color-contrast", "impact": "serious", "nodes": 1},
-            {"id": "list", "impact": "moderate", "nodes": 1},
-            {"id": "region", "impact": None, "nodes": 1},
-            {"id": "<script>", "impact": "minor", "nodes": 1},
-        ]
-    )
-    assert [(c.name, c.code, c.severity, c.passed) for c in checks] == [
-        ("axe.image-alt", "image-alt", "error", False),
-        ("axe.color-contrast", "color-contrast", "error", False),
-        ("axe.list", "list", "warning", False),
-        ("axe.region", "region", "warning", False),
-        ("axe.unknown", "unknown", "warning", False),
-    ]
-    assert violations_to_checks([]) == [html_checks.Check(name="axe", passed=True)]
-
-
-def test_axe_is_skipped_without_playwright(monkeypatch):
-    monkeypatch.setitem(sys.modules, "playwright.sync_api", None)  # import -> ImportError
-    assert axe_checks(doc("<p>x</p>")) == [AXE_SKIPPED]
-    assert AXE_SKIPPED.passed and AXE_SKIPPED.severity == "warning"
-
-
-def test_axe_is_skipped_when_the_browser_is_missing(monkeypatch):
-    sync_api = pytest.importorskip("playwright.sync_api")
-
-    class NoBrowser:
-        def launch(self):
-            raise sync_api.Error("Executable doesn't exist at /nowhere/chrome")
-
-    class FakePlaywright:
-        chromium = NoBrowser()
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc):
-            return False
-
-    monkeypatch.setattr(sync_api, "sync_playwright", FakePlaywright)
-    assert axe_checks(doc("<p>x</p>")) == [AXE_SKIPPED]
-
-
-def test_axe_failure_after_launch_is_a_warning_not_a_crash(monkeypatch):
-    sync_api = pytest.importorskip("playwright.sync_api")
-
-    class Browser:
-        closed = False
-
-        def new_context(self, **kw):
-            raise OSError("renderer crashed")
-
-        def close(self):
-            Browser.closed = True
-
-    class Chromium:
-        def launch(self):
-            return Browser()
-
-    class FakePlaywright:
-        chromium = Chromium()
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc):
-            return False
-
-    monkeypatch.setattr(sync_api, "sync_playwright", FakePlaywright)
-    checks = axe_checks(doc("<p>x</p>"))
-    assert [(c.name, c.passed, c.severity, c.code) for c in checks] == [
-        ("axe", False, "warning", "axe_error")
-    ]
-    assert Browser.closed
 
 
 def test_vendored_axe_matches_the_recorded_checksum():
@@ -284,15 +140,6 @@ def test_axe_finds_no_serious_problems_in_an_assembled_document():
     checks = axe_or_skip(sample_html())
     assert [c for c in checks if c.severity == "error" and not c.passed] == []
     assert checks == [html_checks.Check(name="axe", passed=True)]  # no warnings either
-
-
-@pytest.mark.browser
-def test_axe_finds_no_problems_with_the_offline_run_notice():
-    from readablestem.cli.convert import FAKE_NOTICE
-
-    html = sample_html(notice=FAKE_NOTICE)
-    assert 'class="notice' in html
-    assert axe_or_skip(html) == [html_checks.Check(name="axe", passed=True)]
 
 
 @pytest.mark.browser

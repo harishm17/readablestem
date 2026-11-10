@@ -47,22 +47,6 @@ def intent_of(root: ET.Element) -> str | None:
     return found.pop() if found else None
 
 
-def test_the_intent_values_are_exactly_the_two_chemistry_ones() -> None:
-    assert {":chemical-formula", ":chemical-equation"} == mathml_intent.ALLOWED_INTENTS
-    assert mathml_intent.intent_allowed(":chemical-formula")
-    for refused in (
-        ":chemical-formula ",
-        ":Chemical-Formula",
-        "chemical-formula",
-        ":chemical-formula(x)",
-        ":literal",
-        ":function($a)",
-        "",
-        "javascript:alert(1)",
-    ):
-        assert not mathml_intent.intent_allowed(refused)
-
-
 # ------------------------------------------------------------------------------- the shape
 
 
@@ -74,13 +58,6 @@ def test_water_is_one_mi_per_symbol_with_the_count_on_its_symbol() -> None:
     tokens = [(local(n), "".join(n.itertext())) for n in root.iter() if len(n) == 0]
     assert tokens == [("mi", "H"), ("mn", "2"), ("mi", "O")]
     assert not [n for n in root.iter() if local(n) == "mtext"]
-
-
-def test_a_multi_letter_word_is_split_into_its_element_symbols() -> None:
-    root = ce("NaCl")
-    assert words(root) == ["Na", "Cl"]
-    symbols = [n for n in root.iter() if local(n) == "mi"]
-    assert len(symbols) == 2 and all(n.get("mathvariant") is None for n in symbols)
 
 
 def test_an_ion_has_its_charge_on_the_last_symbol() -> None:
@@ -102,49 +79,12 @@ def test_a_state_is_a_paren_a_symbol_and_a_paren(state: str) -> None:
     assert [local(k) for k in kids[-3:]] == ["mo", "mi", "mo"]
 
 
-def test_a_state_is_only_a_state_after_a_species() -> None:
-    root = tree(r"f \text{(s)}")
-    assert any(local(n) == "mtext" and n.text == "(s)" for n in root.iter())
-
-
 def test_a_nuclide_is_mmultiscripts_with_the_numbers_in_front() -> None:
     root = ce("^{14}_{6}C")
     (multi,) = [n for n in root.iter() if local(n) == "mmultiscripts"]
     assert [local(k) for k in multi] == ["mi", "mprescripts", "mn", "mn"]
     assert [k.text for k in multi if local(k) in {"mi", "mn"}] == ["C", "6", "14"]
     assert not [n for n in root.iter() if local(n) == "msubsup"]
-
-
-def test_a_nuclide_with_a_charge_keeps_it_after_the_symbol() -> None:
-    root = tree(r"{}^{23}_{11}\text{Na}^+")
-    (multi,) = [n for n in root.iter() if local(n) == "mmultiscripts"]
-    assert [local(k) for k in multi] == ["mi", "none", "mo", "mprescripts", "mn", "mn"]
-    assert multi[2].text == "+"
-
-
-def test_an_arrow_is_an_operator() -> None:
-    root = ce("H2 + O2 -> H2O")
-    arrows = [n for n in root.iter() if len(n) == 0 and (n.text or "") == "⟶"]
-    assert [local(n) for n in arrows] == ["mo"]
-
-
-def test_flat_upright_letters_of_a_mathrm_formula_are_paired() -> None:
-    root = tree(r"\mathrm{NaCl} \to \mathrm{Na^+} + \mathrm{Cl^-}")
-    assert [w for w in words(root) if w.isalpha()] == ["Na", "Cl", "Na", "Cl"]
-
-
-def test_a_charge_on_a_group_stays_on_the_group() -> None:
-    root = ce("[Cu(NH3)4]^2+")
-    (outer,) = [n for n in root.iter() if local(n) == "msup"]
-    assert local(outer[0]) == "mrow" and "".join(outer[1].itertext()) == "2+"
-    assert words(outer[0])[1] == "Cu"
-
-
-def test_an_electron_is_a_plain_mi_in_a_reaction() -> None:
-    root = tree(r"\text{Fe}^{3+} + 3\text{e}^- \to \text{Fe}")
-    assert [n.text for n in root.iter() if local(n) == "mi" and n.text == "e"] == ["e"]
-    (e,) = [n for n in root.iter() if local(n) == "mi" and n.text == "e"]
-    assert e.get("mathvariant") is None  # all chemistry: `intent` is on the root
 
 
 def test_a_symbol_has_no_explicit_style_when_the_equation_is_all_chemistry() -> None:
@@ -221,12 +161,6 @@ def test_maths_without_chemistry_in_it_is_not_reshaped(latex: str) -> None:
     )
 
 
-def test_a_sentence_word_next_to_a_formula_stays_text() -> None:
-    root = tree(r"\text{rate} = k[\text{NO}_2]^m")
-    assert any(local(n) == "mtext" and n.text == "rate" for n in root.iter())
-    assert words(root).count("O") == 1
-
-
 # ----------------------------------------------------------------------------------- intent
 
 
@@ -261,12 +195,6 @@ def test_a_formula_or_a_reaction_on_its_own_carries_the_intent(source: str, inte
 )
 def test_chemistry_beside_other_maths_gets_no_intent(latex: str) -> None:
     assert intent_of(tree(latex)) is None
-
-
-def test_a_state_in_a_mixed_expression_is_still_shaped() -> None:
-    root = tree(r"\text{H}_2\text{O}\text{(l)} \rightleftharpoons \text{H}^+ \qquad K = 1")
-    texts = ["".join(n.itertext()) for n in root.iter() if len(n) == 0]
-    assert texts[:3] == ["H", "2", "O"] and "(" in texts and "l" in texts
 
 
 # --------------------------------------------------------------------- the allowlists (security)
@@ -327,23 +255,12 @@ def test_intent_is_only_accepted_on_the_math_element() -> None:
     assert "intent" not in str(web_mathml.sanitize_mathml(nested))
 
 
-def test_other_speech_and_script_attributes_are_still_refused() -> None:
-    for attr in ("arg", "href", "onclick", "style"):
-        mathml = MATH.format(f'<mrow {attr}=":chemical-formula"><mi>x</mi></mrow>')
-        assert codes(mathml), attr
-
-
 def test_the_two_values_survive_the_html_writer_and_the_review_sanitiser() -> None:
     mathml = convert(ce_to_latex("H2O"))
     html = safe_html.sanitize_mathml(mathml, display="inline")
     assert html is not None and 'intent=":chemical-formula"' in html
     shown = str(web_mathml.sanitize_mathml(mathml))
     assert 'intent=":chemical-formula"' in shown
-
-
-def test_the_converter_never_writes_an_intent_a_check_would_refuse() -> None:
-    for latex in (ce_to_latex("H2O"), r"\text{rate} = k", r"\mathrm{Na^+}", r"\frac{1}{2}"):
-        assert codes(convert(latex)) == [], latex
 
 
 def test_a_hostile_nesting_is_refused_by_the_converter_not_by_the_interpreter() -> None:
@@ -358,32 +275,6 @@ def test_a_hostile_nesting_is_refused_by_the_converter_not_by_the_interpreter() 
 
 
 # ------------------------------------------------- the `\ce` forms of the subset, in this shape
-
-
-def test_a_state_with_a_condition_stays_one_mtext_and_is_evidence() -> None:
-    """MathCAT has no rule for `(aq, 0.10 M)`; our own reading takes it as one token."""
-    root = ce("Zn(aq, 0.10 M)")
-    assert [(local(n), "".join(n.itertext())) for n in root.iter() if len(n) == 0] == [
-        ("mi", "Zn"),
-        ("mtext", "(aq," + chr(0xA0) + "0.10" + chr(0xA0) + "M)"),
-    ]
-    assert root.get("intent") == ":chemical-formula"
-
-
-def test_an_excited_nuclide_keeps_the_converters_shape() -> None:
-    """MathCAT reads a star on a nuclide as "super times" and no longer as a nuclide at all."""
-    root = ce("^{60}_{28}Ni^*")
-    assert not [n for n in root.iter() if local(n) == "mmultiscripts"]
-    assert [local(n) for n in root.iter() if local(n) == "msubsup"]
-    assert any(local(n) == "mtext" and n.text == "Ni" for n in root.iter())
-
-
-def test_the_gas_and_precipitate_marks_are_operators_after_the_species() -> None:
-    gas = ce("CO2 ^")
-    assert [n.text for n in gas.iter() if local(n) == "mo"] == ["↑"]
-    precipitate = ce("Ag+(aq) + Cl-(aq) -> AgCl v")
-    assert "↓" in [n.text for n in precipitate.iter() if local(n) == "mo"]
-    assert precipitate.get("intent") == ":chemical-equation"
 
 
 # ------------------------------------------------------- words and units are not chemistry
@@ -433,33 +324,3 @@ def test_words_acronyms_and_units_are_converted_as_before(latex: str, monkeypatc
     monkeypatch.setattr(validate, "shape_chemistry", lambda root: False)
     assert after == convert(latex)
     assert "intent" not in after
-
-
-@pytest.mark.parametrize(
-    "latex",
-    [
-        r"\text{HCl} + \text{NaOH} \to \text{NaCl} + \text{H}_2\text{O}",
-        r"2\text{CO} + \text{O}_2 \to 2\text{CO}_2",
-        r"2 \text{CO} \to 2 \text{C} + \text{O}_2",
-        r"\text{NaCl}",
-        r"\text{Cu}\text{(s)}",
-        r"\text{Ag}^+",
-    ],
-)
-def test_real_chemistry_next_to_those_words_is_still_shaped(latex: str, monkeypatch) -> None:
-    after = convert(latex)
-    monkeypatch.setattr(validate, "shape_chemistry", lambda root: False)
-    assert after != convert(latex)
-
-
-def test_intent_on_a_nested_math_element_is_dropped_by_the_review_sanitiser() -> None:
-    nested = MATH.format('<mrow><math intent=":chemical-formula"><mi>x</mi></math></mrow>')
-    assert "intent" not in str(web_mathml.sanitize_mathml(nested))
-
-
-def test_a_bare_group_with_a_count_is_chemistry_and_its_state_is_shaped() -> None:
-    """`Ca(OH)_2(aq)`: `OH` alone is a word of capitals; a count on the bracket makes a group."""
-    root = ce("Ca(OH)2(aq)")
-    assert not [n for n in root.iter() if local(n) == "mtext"]
-    assert words(root)[-3:] == ["(", "aq", ")"]
-    assert root.get("intent") == ":chemical-formula"

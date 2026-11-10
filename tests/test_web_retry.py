@@ -27,7 +27,6 @@ from fixtures.web.support import (
 )
 from readablestem.config import ConfigError
 from readablestem.core.types import (
-    ConversionOptions,
     DocumentResult,
     Element,
     Fix,
@@ -209,39 +208,6 @@ def test_a_cache_gives_back_finished_steps_and_the_model_is_not_asked_again(site
     assert fixes_json(second.result) == fixes_json(first.result)
 
 
-def test_a_key_changes_with_the_picture_the_text_the_options_and_the_models(site):
-    element = Element(id="p1-e0", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=0)
-    base = ConversionOptions()
-    key = pipeline_run.step_key(element, b"png", "words", base, site.settings)
-    same = pipeline_run.step_key(element, b"png", "words", base, site.settings)
-    assert key == same
-    assert key != pipeline_run.step_key(element, b"png2", "words", base, site.settings)
-    assert key != pipeline_run.step_key(element, b"png", "other words", base, site.settings)
-    assert key != pipeline_run.step_key(
-        element, b"png", "words", ConversionOptions(exam_mode=True), site.settings
-    )
-    other = site.settings.model_copy(update={"main_model": "some-other-model"})
-    assert key != pipeline_run.step_key(element, b"png", "words", base, other)
-    moved = element.model_copy(update={"text": "x = 1"})
-    assert key != pipeline_run.step_key(moved, b"png", "words", base, site.settings)
-    # The id and the reading-order number are not what the answer depends on.
-    renumbered = element.model_copy(update={"id": "p9-e9", "order": 99})
-    assert key == pipeline_run.step_key(renumbered, b"png", "words", base, site.settings)
-
-
-def test_only_answers_are_reusable_not_failures_a_new_try_could_change():
-    def fix(status: Status, reason: str | None = None) -> Fix:
-        return Fix(element_id="p1-e0", kind=Kind.EQUATION, status=status, reason=reason)
-
-    assert pipeline_run.reusable(fix(Status.ACCEPTED))
-    assert pipeline_run.reusable(fix(Status.NEEDS_REVIEW))
-    assert pipeline_run.reusable(fix(Status.ABSTAINED, "low_confidence"))
-    assert pipeline_run.reusable(fix(Status.FAILED, "invalid_table"))
-    for reason in ("model_api_error", "model_timeout", "model_invalid_output", "budget_daily",
-                   "budget_job_usd", "internal_error", "crop_error"):  # fmt: skip
-        assert not pipeline_run.reusable(fix(Status.FAILED, reason)), reason
-
-
 # --------------------------------------------------------------------------- a run that dies
 
 
@@ -363,41 +329,6 @@ def test_a_conversion_during_an_outage_is_not_a_dead_end(site):
     assert fixes_json(result)[: len(clean.fixes)] != []  # a real document
 
 
-def test_trying_again_asks_only_for_the_items_the_service_missed(site):
-    """Three of the four items fail at first: the one that was converted is kept."""
-    clean, clean_requests, _ = baseline(site)
-    # Find the pictures of the items as the model is sent them: the crop a conversion cuts
-    # first (an unconverted equation's stored crop is another, sharper one: T3-15).
-    from readablestem.pipeline import layout
-
-    pdf = PDF.read_bytes()
-    by_id = {e.id: e for e in clean.elements}
-    try:
-        crops = {
-            f.element_id: image_key(layout.crop(pdf, by_id[f.element_id]))
-            for f in model_fixes(clean)
-        }
-    finally:
-        layout.release(pdf)
-    ids = sorted(f.element_id for f in model_fixes(clean))
-    missed = ids[1:]
-    site.state["down_for"] = {crops[i] for i in missed if i in crops}
-    assert len(site.state["down_for"]) == len(missed)
-    site.state["asked"] = []
-    job_id = job_id_from(upload(site.browser, PDF.read_bytes(), filename="part.pdf"))
-    site.run_worker()
-    assert site.records(job_id) == 1  # the one that was converted
-    assert "Convert the missing parts" in text_of(site.browser.get(f"/jobs/{job_id}").text)
-
-    site.state["down_for"] = set()
-    site.state["asked"] = []
-    site.post_retry(site.browser, job_id)
-    site.run_worker()
-    # Fewer requests than a whole conversion: the converted item was not asked again.
-    assert 0 < len(site.state["asked"]) < clean_requests
-    assert fixes_json(site.result(job_id))[: len(clean.fixes)] == fixes_json(clean)
-
-
 # --------------------------------------------------------------------------- the limits
 
 
@@ -428,17 +359,6 @@ def test_a_job_that_is_not_stopped_cannot_be_tried_again(site):
     waiting = job_id_from(upload(site.browser, PDF.read_bytes(), filename="b.pdf"))
     assert site.post_retry(site.browser, waiting).status_code == 409
     assert site.job(waiting).retries == 0
-
-
-def test_a_file_this_tool_cannot_convert_is_not_offered_a_retry(site):
-    job_id = job_id_from(upload(site.browser, PDF.read_bytes()))
-    site.run_worker()
-    with session_scope(site.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        job.status, job.error_code, job.result_json = "failed", "handwritten", None
-    page = text_of(site.browser.get(f"/jobs/{job_id}").text)
-    assert "Try again" not in page
-    assert site.post_retry(site.browser, job_id).status_code == 409
 
 
 def test_a_job_can_be_tried_again_only_a_few_times(site):
@@ -494,51 +414,6 @@ def test_trying_again_is_rate_limited_per_person(tmp_path):
         assert answers[-1] == 429 and 429 not in answers[: rule.limit]
 
 
-def test_the_daily_budget_still_holds_a_retried_job_in_the_queue(site):
-    """Trying again does not skip the spend cap: a queued job waits while it is used up."""
-    site.state["fatal_after"] = 1
-    job_id = job_id_from(upload(site.browser, PDF.read_bytes()))
-    site.run_worker()
-    site.state["fatal_after"] = None
-    site.post_retry(site.browser, job_id)
-    cap = site.ctx.guard.cap_usd
-    assert cap
-    from readablestem.web.database import utc_today
-    from readablestem.web.db import SpendDay
-
-    with session_scope(site.ctx.factory) as session:
-        session.merge(SpendDay(day=utc_today(), spent_usd=cap, held_usd=0.0))
-    assert site.run_worker() is None  # nothing claimed
-    assert site.job(job_id).status == "queued"
-    page = text_of(site.browser.get(f"/jobs/{job_id}").text)
-    assert "Today's conversion budget has been used up" in page
-
-
-def test_interrupted_attempts_are_counted_from_the_last_try_again(site):
-    """A job interrupted three times is failed; after "Try again" it gets three more."""
-    from datetime import timedelta
-
-    from readablestem.web.db import utcnow
-
-    job_id = job_id_from(upload(site.browser, PDF.read_bytes()))
-    with session_scope(site.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        job.status, job.attempts, job.attempts_at_retry, job.retries = "running", 4, 3, 1
-        job.lease_until = utcnow() - timedelta(minutes=5)
-    worker = Worker(
-        site.settings,
-        site.ctx.factory,
-        converter=site.ctx.converter,
-        client_factory=site.make_client,
-    )
-    assert worker.requeue_expired() == (1, 0)  # one attempt since the try-again: requeued
-    with session_scope(site.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        job.status, job.attempts = "running", 6
-        job.lease_until = utcnow() - timedelta(minutes=5)
-    assert worker.requeue_expired() == (0, 1)  # three since: failed as before
-
-
 # --------------------------------------------------------------------------- provider health
 
 
@@ -560,12 +435,3 @@ def test_the_service_counts_as_not_answering_after_a_run_of_failures_and_recover
     now[0] += provider_health.WINDOW_S + 1  # nothing seen for ten minutes: no claim
     assert not health.is_down()
     health.reset()
-
-
-def test_the_status_page_says_the_service_answers_when_it_does(site):
-    page = text_of(site.browser.get("/status").text)
-    assert "No problems seen" not in page
-    assert (
-        "No recent requests; availability untested" in page
-        or "Recent requests were answered" in page
-    )

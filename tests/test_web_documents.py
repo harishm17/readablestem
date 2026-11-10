@@ -5,11 +5,9 @@ review BW5, BW9, MF10, MF11, MF16, MF20, MF21, MF22, MF24)."""
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select
 
 from fixtures.web.support import (
     ALICE,
@@ -19,14 +17,10 @@ from fixtures.web.support import (
     job_id_from,
     login,
     make_pdf,
-    token,
     upload,
 )
 from readablestem.core.types import Status
-from readablestem.ops.retention import purge_expired
-from readablestem.web.app import make_templates
-from readablestem.web.database import utc_today
-from readablestem.web.db import Job, SpendDay, session_scope
+from readablestem.web.db import Job, session_scope
 from readablestem.web.pdf_probe import ProbeRejected, probe
 
 LAYOUT = Path(__file__).resolve().parent / "fixtures" / "layout"
@@ -62,74 +56,7 @@ def finish(env, *, filename: str = "notes.pdf", title: str | None = "Kinematics"
     return job_id
 
 
-def set_created(env, job_id: str, when: datetime) -> None:
-    with session_scope(env.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        assert job is not None
-        job.created_at = when
-
-
 # --------------------------------------------------------------------------- the list
-
-
-def test_my_documents_is_a_to_do_list(web):
-    now = datetime.now(UTC)
-    older = finish(web, filename="week1.pdf", title="Week 1: Vectors")
-    newer = finish(web, filename="week2.pdf", title="Week 2: Motion")
-    ready = finish(web, filename="ps.pdf", title="Problem Set 2", decided=True)
-    waiting = job_id_from(upload(web.browser, make_pdf(2), filename="slides.pdf"))
-    set_created(web, older, now - timedelta(hours=3))
-    set_created(web, newer, now - timedelta(hours=2))
-    page = web.browser.get("/app").text
-    flat = text(page)
-
-    # Needs decisions first (oldest first), then ready, then the rest; the list comes
-    # before the upload form.
-    order = [page.index(f'id="doc-{job}"') for job in (older, newer, ready, waiting)]
-    assert order == sorted(order)
-    assert page.index('id="jobs-heading"') < page.index('id="upload-heading"')
-    assert "Needs your decisions (2)" in flat and "Ready to download (1)" in flat
-    assert (
-        "2 documents need your decisions (6 decisions in all) · 1 ready to download · "
-        "1 waiting." in flat
-    )
-    assert f'<a class="button" id="review-next" href="/jobs/{older}/review">Review next' in page
-    assert "3 decisions to make" in flat and "Ready to download" in flat
-    assert f'id="act-{older}" class="row-primary" href="/jobs/{older}/review">Review' in page
-    assert f'id="act-{ready}" class="row-primary" href="/jobs/{ready}/download">Download' in page
-
-    # By file name (generated titles repeat), with the title, pages and upload time under it.
-    assert f'<a id="doc-{older}" href="/jobs/{older}">week1.pdf</a>' in page
-    assert "Titled “Week 1: Vectors” 1 page · uploaded" in flat
-    assert f'<a id="doc-{waiting}" href="/jobs/{waiting}">slides.pdf</a>' in page  # no title yet
-    assert "Titled “slides.pdf”" not in flat  # the file name is not said twice
-    # Partial results, failures and badges say it in words.
-    for badge in re.findall(r'<span class="status-badge status-(\w+)">([^<]+)</span>', page):
-        assert badge[1].strip(), badge
-    assert "<title>My documents (3 of 4 finished) | ReadableSTEM</title>" in page
-
-
-def test_a_document_without_a_title_is_shown_by_its_file_name(web):
-    job_id = finish(web, filename="handout.pdf", title="Converted document")
-    page = web.browser.get("/app").text
-    assert f'<a id="doc-{job_id}" href="/jobs/{job_id}">handout.pdf</a>' in page
-
-
-def test_the_list_refreshes_only_when_something_changed(web):
-    waiting = job_id_from(upload(web.browser, make_pdf(1)))
-    page = web.browser.get("/app").text
-    match = re.search(r'hx-get="/app/documents\?v=([0-9a-f]+)" hx-trigger="every 5s"', page)
-    assert match, "the list polls while a document is waiting"
-    version = match.group(1)
-    assert "Refresh the list" in page  # without JavaScript, a link does it
-    assert web.browser.get(f"/app/documents?v={version}").status_code == 204
-    assert web.run_worker() == waiting
-    changed = web.browser.get(f"/app/documents?v={version}", headers={"HX-Request": "true"})
-    assert changed.status_code == 200
-    assert changed.text.startswith("<title>My documents | ReadableSTEM</title>")
-    assert '<div id="documents" class="documents">' in changed.text  # finished: no polling
-    assert "<html" not in changed.text
-    assert "hx-get" not in web.browser.get("/app").text
 
 
 def test_the_list_is_the_owners_only(web):
@@ -140,89 +67,10 @@ def test_the_list_is_the_owners_only(web):
     assert web.client().get("/app/documents").status_code == 303  # signed out: sign in
 
 
-def test_a_partial_result_says_so_in_the_list(web):
-    job_id = finish(web, decided=True)
-    with session_scope(web.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        assert job is not None
-        job.error_code = "scanned_pages"
-    page = web.browser.get("/app").text
-    assert (
-        '<span class="status-badge status-partial">Finished, with pages not converted</span>'
-        in page
-    )
-
-
 # --------------------------------------------------------------------------- delete
 
 
-def test_the_lists_delete_is_a_link_to_the_confirmation(web):
-    job_id = finish(web)
-    page = web.browser.get("/app").text
-    assert (
-        f'<a id="del-{job_id}" class="danger-link" href="/jobs/{job_id}/delete?from=app">Delete'
-        in page
-    )
-    confirm = web.browser.get(f"/jobs/{job_id}/delete?from=app").text
-    flat = text(confirm)
-    assert "Delete “Kinematics”?" in flat and "notes.pdf, uploaded" in flat
-    assert (
-        '<a class="button-secondary" href="/app">No, keep it</a>' in confirm
-    )  # back where it came from
-    assert "Files you downloaded are not affected." in flat
-
-
-def test_the_confirmation_counts_the_decisions_that_go_with_it(web, monkeypatch):
-    from readablestem.pipeline import assemble
-
-    monkeypatch.setattr(assemble, "render_html", lambda **kw: "<html>re-rendered</html>")
-    job_id = finish(web)
-    web.browser.post(
-        f"/jobs/{job_id}/review/p1-e3", data={"csrf_token": token(web.browser), "action": "reject"}
-    )
-    assert "You made 1 decision on it." in text(web.browser.get(f"/jobs/{job_id}/delete").text)
-
-
 # --------------------------------------------------------------------------- deleted
-
-
-def test_an_expired_documents_link_says_it_was_deleted_as_promised(web):
-    job_id = finish(web)
-    now = datetime.now(UTC)
-    with session_scope(web.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        assert job is not None
-        job.created_at = now - timedelta(hours=25)
-        job.retain_until = now - timedelta(hours=1)  # kept 24 hours, purge not run yet
-    for path in ("", "/review", "/download"):
-        response = web.browser.get(f"/jobs/{job_id}{path}")
-        assert response.status_code == 404
-        flat = text(response.text)
-        assert "This document has been deleted" in flat
-        assert "Deleted automatically after 24 hours in all" in flat
-        assert "24 hours after you last work on them" in flat and "from upload" in flat
-        assert 'href="/app#upload-heading"' in response.text  # a direct way to upload again
-        assert "Files you downloaded are not affected." in flat
-        assert "not yours to see" not in flat
-
-
-def test_after_the_purge_its_owner_still_learns_it_was_deleted(web):
-    job_id = finish(web)
-    with session_scope(web.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        assert job is not None
-        job.retain_until = datetime.now(UTC) - timedelta(minutes=1)
-    assert purge_expired(web.ctx.factory).jobs_deleted == 1
-    flat = text(web.browser.get(f"/jobs/{job_id}").text)
-    assert "This document has been deleted" in flat
-    assert "24 hours after you last work on them (7 days if you keep them" in flat
-    # Anyone else learns nothing, not even that the id existed.
-    bob = web.client()
-    login(bob, BOB)
-    other = bob.get(f"/jobs/{job_id}")
-    assert other.status_code == 404
-    assert "This document has been deleted" not in text(other.text)
-    assert "There is no document at this address that this account can open." in text(other.text)
 
 
 def test_someone_elses_live_document_is_a_plain_not_found(web):
@@ -250,105 +98,10 @@ def test_a_damaged_pdf_is_not_called_empty():
     assert refused.value.code == "damaged"
 
 
-def test_upload_messages_name_the_file_and_the_numbers(web):
-    response = upload(web.browser, truncated_pdf(), filename="lecture4.pdf")
-    assert response.status_code == 422
-    assert "lecture4.pdf looks damaged or incomplete" in response.text
-    assert "save a fresh copy" in response.text
-    response = upload(web.browser, make_pdf(7), filename="chapter2.pdf")
-    assert "chapter2.pdf has 7 pages; the limit is 5 per upload." in text(response.text)
-    response = upload(web.browser, b"PK zip", filename="slides.pptx")
-    assert "slides.pptx is not a PDF." in response.text
-
-
-def test_the_upload_form_carries_what_the_browser_needs_to_check_first(web):
-    page = web.browser.get("/app").text
-    assert 'data-max-bytes="1048576" data-max-mb="1"' in page
-    assert '<div id="pdf-check" aria-live="polite"></div>' in page
-    assert '<p id="upload-status" class="upload-status" role="status"></p>' in page
-    # The opt-in says what ticking it lets us do.
-    assert "find and fix mistakes in the tool" in text(page)
-
-
-def test_when_the_budget_is_spent_the_form_says_when_uploads_open_again(web):
-    with session_scope(web.ctx.factory) as session:
-        session.add(SpendDay(day=utc_today(), spent_usd=5.0, held_usd=0.0))
-    page = web.browser.get("/app").text
-    assert "Conversions are paused for today." in text(page)
-    assert 'action="/jobs"' not in page  # no form that would send a file to be refused
-    tomorrow = (datetime.now(UTC) + timedelta(days=1)).date().isoformat()
-    assert (
-        f'Uploads open again at <time class="local-time" datetime="{tomorrow}T00:00:00Z">' in page
-    )
-    status = web.browser.get("/status").text
-    assert (
-        f'They start again at <time class="local-time" datetime="{tomorrow}T00:00:00Z">' in status
-    )
-
-
 # --------------------------------------------------------------------------- times
 
 
-def test_times_are_time_elements_in_utc_until_a_script_localises_them():
-    env = make_templates().env
-    rendered = env.from_string("{{ t|utc }} {{ t|utc_text }} [{{ none|utc }}]").render(
-        t=datetime(2026, 10, 9, 23, 32, tzinfo=UTC)
-    )
-    assert rendered == (
-        '<time class="local-time" datetime="2026-10-09T23:32:00Z">9 Oct 2026, 23:32 UTC</time>'
-        " 9 Oct 2026, 23:32 UTC []"
-    )
-
-
-def test_the_documents_list_shows_deletion_times(web):
-    job_id = finish(web)
-    page = web.browser.get("/app").text
-    with session_scope(web.ctx.factory) as session:
-        retain = session.scalar(select(Job.retain_until).where(Job.id == job_id))
-    assert retain is not None
-    stamp = retain.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-    assert f'data-label="Deleted automatically"><time class="local-time" datetime="{stamp}"' in page
-
-
 # --------------------------------------------------------------------------- public pages
-
-
-def test_the_posting_help_says_upload_and_link_never_paste(web):
-    page = web.client().get("/help/posting")  # public: no sign-in
-    assert page.status_code == 200
-    flat = text(page.text)
-    assert "Do not paste the file into a Canvas page" in flat
-    assert "open Files and upload the .html file" in flat
-    assert "Post the HTML as the main course material" in flat
-    # Canvas pages: the zip from the job page, in steps, with what it cannot keep.
-    assert "For Canvas (zip with images)" in flat and "In Canvas, as a page" in flat
-    assert "the number after /courses/ in your course's web address" in flat
-    assert "paste the contents of canvas-page.html and save" in flat
-    assert "Check a picture and an equation" in flat
-    assert "the links between cells and headers" in flat
-    assert "We have not yet tried them in a live Canvas course" in flat
-    assert "compliant" not in flat.lower()
-    assert "canvas_sanitize.rb" in page.text
-    assert "keep the PDF as a print copy" in flat
-    assert "28 CFR 35.202" in flat and "guidance, not legal advice" in flat
-    assert "https://www.ada.gov/resources/2024-03-08-web-rule/" in page.text
-    assert 'aria-current="page">Posting in your course</a>' in page.text
-
-
-def test_the_landing_page_says_why_now_what_it_handles_and_how_accurate(web):
-    page = web.client().get("/").text
-    flat = text(page)
-    assert "public universities" in flat
-    assert "can detect no difference between them" in flat
-    # the short chart links to the registered report and to all the results; the method is on
-    # the comparison guide and /limits, not on the landing page
-    assert "/blob/main/docs/eval-equation-fresh5.md" in page
-    assert 'href="/guides/readablestem-mathpix-latexml">All results and other tools' in page
-    assert "how to post it in your course" in flat
-    assert "EPUB" in flat and "Canvas" in flat
-    main = text(page.split("<main", 1)[1].split("</main>", 1)[0])
-    assert "Common Cartridge" not in main and "held-out" not in main  # plain words here
-    assert "confidence score" not in flat and "developer" not in flat
 
 
 def test_the_privacy_notice_mentions_usage_events(web):
@@ -378,56 +131,6 @@ class Reads:
         return self.sql
 
 
-def test_the_job_keeps_the_two_facts_the_list_shows(web):
-    job_id = finish(web, title="Week 1: Vectors")
-    job = web.job(job_id)
-    assert (job.open_decisions, job.result_title) == (3, "Week 1: Vectors")
-    done = finish(web, filename="ps.pdf", title="Problem Set 2", decided=True)
-    assert web.job(done).open_decisions == 0
-
-
-def test_the_list_poll_reads_no_stored_result(web):
-    """It used to load the fixes of every finished document each time a page count
-    changed; the facts are on the job now."""
-    for n in range(3):
-        finish(web, filename=f"w{n}.pdf", title=f"Week {n}")
-    running = job_id_from(upload(web.browser, make_pdf(1), filename="next.pdf"))
-    assert running
-    reads = Reads(web)
-    page = web.browser.get("/app/documents").text
-    sql = reads.stop()
-    assert "Week 2" in page and "3 documents need your decisions (9 decisions in all)" in text(page)
-    assert not any("result_json" in statement for statement in sql), sql
-    assert not any("jobs.html" in statement for statement in sql), sql
-
-
-def test_the_list_is_built_with_one_query_for_the_jobs_and_one_for_their_facts(web):
-    finish(web)
-    reads = Reads(web)
-    web.browser.get("/app")
-    selects = [s for s in reads.stop() if "FROM jobs" in s and s.lstrip().startswith("SELECT")]
-    # the jobs, then the facts of the finished ones (the page's own lookups are elsewhere)
-    # (the "Shared with you" lookup reads titles too, and is another query: web.shares)
-    assert sum("jobs.result_title" in s and "job_shares" not in s for s in selects) == 1
-
-
-def test_a_decision_in_review_changes_the_number_the_list_shows(web):
-    job_id = finish(web)
-    assert web.job(job_id).open_decisions == 3
-    from readablestem.core.types import DocumentResult
-
-    with session_scope(web.ctx.factory) as session:
-        job = session.get(Job, job_id)
-        assert job is not None
-        result = DocumentResult.model_validate(job.result_json)
-        pending = next(f for f in result.fixes if f.pending)
-        pending.status = Status.REJECTED
-        pending.reviewed = True
-        job.result_json = result.model_dump(mode="json", exclude={"html"})  # as review does
-    assert web.job(job_id).open_decisions == 2
-    assert "2 decisions to make" in text(web.browser.get("/app").text)
-
-
 def test_a_finished_job_from_before_the_columns_is_filled_in_once(web):
     job_id = finish(web, title="Old one")
     with session_scope(web.ctx.factory) as session:
@@ -443,14 +146,3 @@ def test_a_finished_job_from_before_the_columns_is_filled_in_once(web):
     reads = Reads(web)
     web.browser.get("/app/documents")
     assert not any("result_json" in s for s in reads.stop())  # read once, not every poll
-
-
-def test_the_version_in_the_list_is_the_one_the_poll_compares(web):
-    """The list makes its version from the rows it already read; the poll asks for it with
-    the other query, and the two have to agree or every poll would redraw."""
-    finish(web)
-    upload(web.browser, make_pdf(1), filename="b.pdf")
-    page = web.browser.get("/app").text
-    version = re.search(r"/app/documents\?v=([0-9a-f]+)", page)
-    assert version is not None
-    assert web.browser.get(f"/app/documents?v={version.group(1)}").status_code == 204

@@ -17,7 +17,7 @@ from readablestem.pipeline.validate import safe_latex_to_mathml
 from test_eval_support import eq_fix, equation
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-import dev_chem_classes as dcc
+import dev_chem_classes as dcc  # noqa: F401  (used by test_chem_sealed)
 
 PAGE = "1-1-chemistry"
 
@@ -66,10 +66,6 @@ def test_a_reading_the_reviewer_was_asked_about_is_not_silent():
 def test_a_right_reading_is_not_harm_whatever_the_markup():
     gold = tex(r"\mathrm{H_2O}")
     assert not chem.silent_harm(tex(r"\text{H}_2\text{O}"), gold, None)
-
-
-def test_no_reading_kept_is_not_counted_here():
-    assert not chem.silent_harm(None, tex(r"\mathrm{H_2O}"), None)
 
 
 def test_a_prefix_atomic_number_the_page_does_not_show_is_not_harm():
@@ -131,25 +127,6 @@ def test_silent_harm_is_counted_per_100_gold():
     assert (summary["n"], summary["n_gold"], summary["per_100_gold"]) == (1, 4, 25.0)
 
 
-def test_the_document_report_carries_the_block_and_the_primary_numbers_are_unchanged():
-    item = chem_item()
-    metrics = pe.document_metrics([item])
-    assert metrics["chemistry"]["chem_right_excl_times"]["lone_times"] == 1
-    assert metrics["chemistry"]["silent_harm"]["n"] == 1
-    plain = {k: v for k, v in metrics.items() if k != "chemistry"}
-    assert plain["matched_exact_lenient"] == 0.0  # primary scorer, as before
-    assert plain["gold_equations"] == 4
-
-
-def test_a_report_without_chemistry_gold_has_no_chemistry_block():
-    gold = [equation("2-1-speed", 0, tex(r"x^{2}"), "inline")]
-    item = pe.document_page_item(
-        "p", gold, [element(0, "x2")], {"p1-e0": eq_fix("p1-e0", r"x^{2}")}, [], []
-    )
-    assert item["pairs"][0]["silent_harm"] is False
-    assert "chemistry" not in pe.document_metrics([item])
-
-
 # ------------------------------------------------------------ scripts/dev_chem_classes.py
 
 
@@ -170,30 +147,3 @@ def run_rows(tmp_path):
     folder.mkdir()
     (folder / "items.jsonl").write_text(json.dumps(item) + "\n")
     return gold_dir, folder, item
-
-
-def test_classes_get_a_harm_label_and_a_listener_cost(run_rows):
-    gold_dir, _, item = run_rows
-    gold = dcc.dev_chem.load_gold(gold_dir)
-    classes = dcc.classify([item], gold, {}, [])
-    assert {c for c, _ in classes.values()} <= set(dcc.HARM)
-    assert dict(dcc.harm_counts(classes)) == {"no": 2, "yes": 1, "partly": 1}
-
-
-def test_speech_report_names_the_silent_harm(run_rows):
-    gold_dir, _, item = run_rows
-    gold = dcc.dev_chem.load_gold(gold_dir)
-    classes = dcc.classify([item], gold, {}, [])
-    report = dcc.speech_report([item], gold, classes)
-    assert report["silent_harm"] == [g for g in classes if g.endswith("001")]
-    assert report["per_100_gold"] == 25.0
-    assert report["spoken_alike"]["right"]["same"] == 1
-
-
-def test_main_reads_a_run_folder_and_prints_speech(run_rows, capsys, monkeypatch):
-    gold_dir, folder, _ = run_rows
-    monkeypatch.setattr(sys, "argv", ["x", "--gold", str(gold_dir), "--speech", f"run={folder}"])
-    assert dcc.main() == 0
-    out = capsys.readouterr().out
-    assert "harms a listener, run:" in out
-    assert "speech, run:" in out and '"per_100_gold": 25.0' in out

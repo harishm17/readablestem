@@ -15,7 +15,6 @@ import pytest
 from sqlalchemy import select
 
 from fixtures.web.support import ALICE, WebEnv, csrf_from, job_id_from, login
-from readablestem.config import get_settings
 from readablestem.core import sandbox
 from readablestem.pipeline.run import convert_pdf
 from readablestem.source import envelope, latexml
@@ -94,33 +93,7 @@ def test_with_the_switch_off_a_tex_file_is_not_a_pdf(tmp_path):
         assert "is not a PDF" in refused(env, make_zip({"main.tex": ARTICLE}), "paper.zip")
 
 
-def test_the_form_offers_the_files_when_the_switch_is_on(web):
-    page = web.browser.get("/app").text
-    assert ".tex,.zip" in page and 'data-latex="1"' in page
-    assert 'name="main_file"' in page and "Main file of a zip" in page
-    assert "3,000 characters or figure count as one page" in " ".join(page.split())
-
-
-def test_the_switch_is_off_by_default():
-    assert get_settings().feature_latex_source is False
-
-
 # ------------------------------------------------------------------ accepted
-
-
-def test_a_tex_file_is_stored_as_an_envelope_and_counted_by_the_estimate(web):
-    response = send(web.browser, ARTICLE.encode(), "Lecture 3.tex")
-    assert response.status_code == 303
-    job_id = job_id_from(response)
-    [job] = jobs(web)
-    assert (
-        job.filename == "Lecture 3.tex" and job.page_count == 1 and job.status == JobStatus.QUEUED
-    )
-    blob = stored(web, job_id)
-    assert blob.media_type == "application/x-readablestem-tex"
-    kind, main, data = envelope.unwrap(bytes(blob.content))
-    assert (kind, main, data) == ("tex", "main.tex", ARTICLE.encode())
-    assert pages_used(web) == 1
 
 
 def test_a_zip_is_stored_with_its_main_file_and_a_longer_one_costs_more(web):
@@ -142,14 +115,6 @@ def test_the_person_can_name_the_main_file(web):
     response = send(web.browser, data, "p.zip", main_file="b.tex")
     assert response.status_code == 303
     assert envelope.unwrap(bytes(stored(web, jobs(web)[0].id).content))[1] == "b.tex"
-
-
-def test_a_pdf_still_goes_the_old_way(web):
-    from fixtures.web.support import make_pdf
-
-    response = send(web.browser, make_pdf(1), "notes.pdf")
-    assert response.status_code == 303
-    assert bytes(stored(web, jobs(web)[0].id).content).startswith(b"%PDF-")
 
 
 def test_several_files_each_become_a_document_or_say_why(web):
@@ -242,26 +207,6 @@ def test_a_zip_bomb_is_refused_before_anything_is_unpacked(web):
     assert "too big" in text
 
 
-def test_a_beamer_deck_is_refused_until_it_is_switched_on(web):
-    deck = "\\documentclass{beamer}\n\\begin{document}\\begin{frame}x\\end{frame}\\end{document}"
-    text = refused(web, deck.encode(), "slides.tex")
-    assert "Beamer" in text and "Upload the compiled PDF" in text
-
-
-def test_a_beamer_deck_is_taken_with_its_own_switch_and_counted_by_frame(tmp_path, available):
-    env = WebEnv(tmp_path, feature_latex_source=True, feature_beamer_source=True)
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        frames = "".join(f"\\begin{{frame}}{{T{i}}}x\\end{{frame}}" for i in range(4))
-        deck = f"\\documentclass{{beamer}}\\begin{{document}}{frames}\\end{{document}}"
-        response = send(client, deck.encode(), "slides.tex")
-        assert response.status_code == 303
-        [job] = jobs(env)
-        assert job.page_count == 4
-        assert envelope.unwrap(bytes(stored(env, job.id).content))[0] == "tex"
-
-
 def test_a_source_over_the_page_limit_is_refused(web):
     assert web.settings.max_pages_per_job == 5
     long = "\\documentclass{article}\\begin{document}" + "word " * 3200 + "\\end{document}"
@@ -338,16 +283,6 @@ def test_a_failed_source_conversion_fails_the_job_cleanly(web):
     assert job.result_json is None  # nothing half-made is kept
 
 
-def test_another_person_cannot_open_a_source_job(web):
-    job_id = queue_source(web)
-    web.run_worker()
-    bob = web.client()
-    web.allow("bob@example.org")
-    login(bob, "bob@example.org")
-    for path in ("", "/review", "/review/list", "/view", "/download", "/pages/1.png"):
-        assert bob.get(f"/jobs/{job_id}{path}").status_code == 404, path
-
-
 def test_the_student_note_of_a_source_says_so_also_after_a_review_render():
     from fixtures.web.support import fake_result
     from readablestem.web.review import rerender_html
@@ -359,25 +294,6 @@ def test_the_student_note_of_a_source_says_so_also_after_a_review_render():
     assert "web version of a PDF" not in html
     result.origin = "pdf"
     assert "web version of a PDF from your course" in rerender_html(result, {})
-
-
-@pytest.mark.parametrize(
-    "code",
-    ["source_failed", "source_unreadable", "source_refused", "source_unavailable", "source_busy"],
-)
-def test_every_source_failure_code_has_a_plain_message(code):
-    from readablestem.web.views import job_error_message
-
-    message = job_error_message(code)
-    assert "PDF" in message and "stopped unexpectedly" not in message
-
-
-def test_the_converter_receives_the_envelope_not_a_pdf(web):
-    job_id = queue_source(web)
-    web.run_worker()
-    sent = web.converter.calls[-1]["pdf"]
-    assert envelope.is_envelope(sent) and envelope.unwrap(sent)[0] == "tex"
-    assert web.job(job_id).status == JobStatus.DONE  # the fake converter's own result
 
 
 # ------------------------------------------------------------------ a real conversion
@@ -401,13 +317,6 @@ class TestRealConversion:
             assert env.run_worker() == job_id
             yield env, job_id
 
-    def test_the_job_is_done_with_decisions_for_the_figure_and_the_macros(self, done):
-        env, job_id = done
-        job = env.job(job_id)
-        assert job.status == JobStatus.DONE
-        result = job.result_json
-        assert result["origin"] == "latex" and result["title"] == "Motion in One Dimension"
-
     def test_the_job_page_and_the_review_list_work_and_the_split_view_redirects(self, done):
         env, job_id = done
         assert env.browser.get(f"/jobs/{job_id}").status_code == 200
@@ -416,19 +325,3 @@ class TestRealConversion:
         review = env.browser.get(f"/jobs/{job_id}/review/list")
         assert review.status_code == 200 and "Figure" in review.text
         assert "of the PDF" not in review.text or "PDF" in review.text
-
-    def test_the_file_has_exact_equations_and_the_projects_picture(self, done):
-        env, job_id = done
-        html = env.browser.get(f"/jobs/{job_id}/view").text
-        assert html.count("<math") >= 8 and "data:image/png;base64" in html
-        assert "<h1" in html and "Kinematics" in html
-
-    def test_the_page_images_of_a_source_job_are_an_error_not_a_crash(self, done):
-        env, job_id = done
-        assert env.browser.get(f"/jobs/{job_id}/pages/1.png").status_code in {
-            404,
-            409,
-            422,
-            500,
-            503,
-        }

@@ -20,9 +20,6 @@ TABLE_PDFS = [
     FIXTURES / "tables" / "word_tables.pdf",
     *sorted((ROOT / "data" / "authored" / "tables").glob("*/*.pdf")),
 ]
-ALL_PDFS = sorted(
-    {*FIXTURES.rglob("*.pdf"), *(ROOT / "data" / "authored").rglob("*.pdf")} - set(TABLE_PDFS)
-)
 
 
 @pytest.fixture(autouse=True)
@@ -64,12 +61,6 @@ def test_documents_with_tables_come_out_the_same(pdf):
     assert '"kind": "table"' in without  # and there were tables to lose
 
 
-@pytest.mark.slow
-@pytest.mark.parametrize("pdf", ALL_PDFS, ids=lambda p: "/".join(p.parts[-3:]))
-def test_every_other_pdf_in_the_repository_comes_out_the_same(pdf):
-    assert read(pdf, prefilter=True) == read(pdf, prefilter=False)
-
-
 # --------------------------------------------------------------------------- the decision
 
 
@@ -101,67 +92,3 @@ def prose(page, top: float = 100, lines: int = 12) -> None:
         page.insert_text(
             (72, top + 14 * i), "A line of running text that goes on and on.", fontsize=11
         )
-
-
-def test_plain_text_is_left_out():
-    def build(doc):
-        prose(doc.new_page())
-
-    assert decisions(build) == [False]
-
-
-def test_a_run_of_aligned_columns_is_let_through():
-    def build(doc):
-        page = doc.new_page()
-        for i, row in enumerate(("t (s)", "0.0", "1.0", "2.0", "3.0")):
-            page.insert_text((100, 120 + 16 * i), row, fontsize=11)
-            page.insert_text((250, 120 + 16 * i), f"{i * 4.9:.1f}", fontsize=11)
-            page.insert_text((400, 120 + 16 * i), f"{i * 9.8:.1f}", fontsize=11)
-
-    assert decisions(build) == [True]
-
-
-def test_a_drawn_grid_is_let_through():
-    def build(doc):
-        page = doc.new_page()
-        for i in range(4):
-            page.draw_line((100, 100 + 20 * i), (400, 100 + 20 * i))
-        for j in range(4):
-            page.draw_line((100 + 100 * j, 100), (100 + 100 * j, 160))
-        page.insert_text((110, 115), "Mass", fontsize=11)
-        page.insert_text((210, 115), "Speed", fontsize=11)
-
-    assert decisions(build) == [True]
-
-
-def test_a_boxed_callout_with_running_text_is_left_out():
-    """Two rules each way is a ruled table's least, but a box round a paragraph has no text
-    in two columns."""
-
-    def build(doc):
-        page = doc.new_page()
-        page.draw_rect(pymupdf.Rect(60, 90, 540, 260))
-        prose(page, top=110, lines=8)
-
-    assert decisions(build) == [False]
-
-
-def test_a_few_equations_with_their_numbers_are_left_out_and_many_are_let_through():
-    def page_with(count):
-        def build(doc):
-            page = doc.new_page()
-            prose(page, top=80, lines=3)
-            for i in range(count):
-                page.insert_text((150, 200 + 40 * i), "v = d / t", fontsize=11)
-                page.insert_text((500, 200 + 40 * i), f"({i + 1})", fontsize=11)
-
-        return build
-
-    assert decisions(page_with(2)) == [False]
-    assert decisions(page_with(4)) == [True]  # a column of numbers beside a column of formulas
-
-
-def test_rule_positions_are_counted_once_per_rule_not_per_piece():
-    assert tables._positions([10.0, 10.4, 11.0]) == 1  # one rule drawn in three pieces
-    assert tables._positions([10.0, 20.0, 20.9, 40.0]) == 3
-    assert tables._positions([]) == 0

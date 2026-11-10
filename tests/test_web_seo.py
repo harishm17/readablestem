@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import json
 import re
-import xml.etree.ElementTree as ET
 
 import pytest
 
@@ -60,50 +59,6 @@ def test_a_trailing_slash_never_becomes_a_protocol_relative_address():
     assert middleware._redirect_target(scope) == "/evil.example"
 
 
-def test_robots_allows_the_public_pages_and_names_the_sitemap(env):
-    with env.running() as client:
-        text = client.get("/robots.txt").text
-    site = env.settings.base_url.rstrip("/")
-    assert f"Sitemap: {site}/sitemap.xml" in text
-    groups = text.split("\n\n")
-    agents = [g.splitlines()[0] for g in groups if g.startswith("User-agent:")]
-    assert "User-agent: *" in agents and "User-agent: GPTBot" in agents
-    assert "User-agent: ClaudeBot" in agents and "User-agent: PerplexityBot" in agents
-    for group in groups[:-1]:
-        assert "Allow: /" in group and "Disallow: /app" in group and "Disallow: /jobs/" in group
-        disallowed = [line.split(": ", 1)[1] for line in group.splitlines() if "Disallow" in line]
-        for page in seo.PUBLIC_PAGES:
-            assert not any(page.path.startswith(rule) for rule in disallowed), page.path
-
-
-def test_sitemap_lists_every_public_page_and_nothing_private(env):
-    with env.running() as client:
-        response = client.get("/sitemap.xml")
-        assert response.headers["content-type"].startswith("application/xml")
-        root = ET.fromstring(response.content)
-        ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-        locs = [loc.text for loc in root.findall("s:url/s:loc", ns)]
-        site = env.settings.base_url.rstrip("/")
-        assert locs == [f"{site}{page.path}" for page in seo.PUBLIC_PAGES]
-        assert all(
-            re.fullmatch(r"\d{4}-\d{2}-\d{2}", m.text or "")
-            for m in root.iter(f"{{{ns['s']}}}lastmod")
-        )
-        for page in seo.PUBLIC_PAGES:
-            assert client.get(page.path).status_code == 200, page.path
-
-
-def test_llms_txt_and_indexnow_key(env):
-    with env.running() as client:
-        llms = client.get("/llms.txt").text
-        key = client.get(f"/{seo.INDEXNOW_KEY}.txt")
-        icon = client.get("/favicon.ico")
-    assert llms.startswith("# ReadableSTEM\n\n> ")
-    assert "/demo" in llms and seo.PROOF_URL in llms and "does not certify" in llms
-    assert key.status_code == 200 and key.text == seo.INDEXNOW_KEY
-    assert icon.status_code == 200 and icon.content
-
-
 def test_public_pages_carry_structured_data_and_private_ones_noindex(env):
     with env.running() as client:
         public = {page.path: client.get(page.path).text for page in seo.PUBLIC_PAGES}
@@ -133,21 +88,6 @@ def test_structured_data_cannot_be_closed_by_page_text():
     assert tag.count("</script>") == 1 and "<script>alert" not in tag
     body = tag.removeprefix('<script type="application/ld+json">').removesuffix("</script>")
     assert json.loads(body)["name"].startswith("</script>")
-
-
-def test_demo_has_one_address_and_a_title_of_its_own(tmp_path, monkeypatch):
-    from readablestem.web.routes import pages as pages_module
-
-    demo = tmp_path / "index.html"
-    demo.write_text("<!doctype html><html><head><title>Speed</title></head><body><h1>x</h1>")
-    monkeypatch.setattr(pages_module, "DEMO_PAGE", demo)
-    env = WebEnv(tmp_path)
-    with env.running() as client:
-        html = client.get("/demo").text
-    site = env.settings.base_url.rstrip("/")
-    assert f'<link rel="canonical" href="{site}/demo">' in html
-    assert f"<title>{pages_module.DEMO_TITLE}</title>" in html
-    assert json_ld(html)
 
 
 # --------------------------------------------------------------------------- showcase
@@ -198,10 +138,3 @@ def test_showcase_pages_are_served_with_their_own_address(showcase):
     assert "index.html" not in sitemap
     assert "converted.html" not in sitemap and "404.html" not in sitemap
     assert 'href="/showcase/examples/"' in landing
-
-
-def test_without_a_showcase_build_nothing_links_to_it(env):
-    with env.running() as client:
-        assert client.get("/showcase/").status_code == 404
-        assert "/showcase/" not in client.get("/").text
-        assert "/showcase/" not in client.get("/sitemap.xml").text

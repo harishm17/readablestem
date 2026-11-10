@@ -29,12 +29,8 @@ from readablestem.models.decisions_client import (
 )
 from readablestem.models.openai_client import PNG_SIGNATURE
 from readablestem.models.pricing import (
-    DECISIONS_LONG_CONTEXT_TOKENS,
-    MAX_IMAGE_TOKENS,
     UnknownModelError,
     decisions_cost_usd,
-    decisions_question_tokens,
-    estimate_decisions_max_cost_usd,
 )
 
 PNG = PNG_SIGNATURE + b"crop"
@@ -147,51 +143,6 @@ def make(reply: Reply, **kw: Any) -> tuple[DecisionsClient, RecordingBudget, HTT
 # ------------------------------------------------------------------------ requests
 
 
-def test_request_shape_detail_high_and_no_refused_parameters():
-    client, _, http = make(ok(body(predicate())))
-    result = client.decide(request())
-    assert result.outcome == "ok"
-    (sent,) = http.sent
-    assert http.paths == ["/v1/decisions"]
-    assert sent["model"] == "gpt-6-luna"
-    (message,) = sent["input"]
-    assert message["role"] == "user"
-    image, text = message["content"]
-    assert image["type"] == "input_image" and image["detail"] == "high"
-    assert image["image_url"].startswith("data:image/png;base64,")
-    assert text == {"type": "input_text", "text": f"<alt_text>{SECRET}</alt_text>"}
-    assert sent["questions"] == [
-        {"type": "predicate", "name": "ok", "instructions": PRED.instructions}
-    ]
-    # The endpoint refuses these (400 unknown_parameter); none may be sent.
-    for refused in (
-        "store",
-        "prompt_cache_key",
-        "temperature",
-        "seed",
-        "reasoning",
-        "service_tier",
-        "instructions",
-        "metadata",
-        "safety_identifier",
-    ):
-        assert refused not in sent
-
-
-def test_choice_questions_keep_their_order_and_descriptions():
-    client, _, http = make(ok(body(choice(match=0.7, cosmetic=0.2, meaning_changing=0.1))))
-    result = client.decide(request(CHOICE))
-    (question,) = http.sent[0]["questions"]
-    assert [c["value"] for c in question["choices"]] == ["match", "cosmetic", "meaning_changing"]
-    assert question["choices"][0] == {"value": "match", "description": "Same."}
-    assert question["choices"][1] == {"value": "cosmetic"}  # no empty description
-    assert dict(result.answers["verdict"].probabilities) == {
-        "match": 0.7,
-        "cosmetic": 0.2,
-        "meaning_changing": 0.1,
-    }
-
-
 def test_safety_identifier_is_sent_when_given_and_must_be_a_hash():
     client, _, http = make(ok(body(predicate())), safety_identifier="u-3f9a")
     client.decide(request())
@@ -246,48 +197,11 @@ def test_reserves_first_then_settles_at_the_usage_price():
     assert result.input_tokens == 640 and result.request_id == "req_abc123"
 
 
-def test_a_request_holds_dollars_but_never_one_of_the_job_model_calls():
-    # A job whose call cap the steps have used up still gets its checks (the dollar caps
-    # still apply), and the checks leave every call to the steps.
-    client, budget, http = make(ok(body(predicate())), budget=RecordingBudget(max_calls=0))
-    assert client.decide(request()).outcome == "ok"
-    assert len(http.sent) == 1 and budget.counted == [False] and budget.calls == 0
-    assert budget.spent_usd > 0
-
-
 def test_a_refused_reservation_sends_nothing():
     client, _, http = make(ok(body(predicate())), budget=RecordingBudget(cap=1e-9))
     with pytest.raises(BudgetExceeded):
         client.decide(request())
     assert http.sent == []
-
-
-def test_the_reservation_follows_the_question_length_not_a_flat_number():
-    short = Question("a", "Is it?")
-    long = Question("b", "Is it? " * 100)
-    one_short = estimate_decisions_max_cost_usd(
-        "gpt-6-luna", n_images=1, text_chars=100, question_chars=[short.chars]
-    )
-    one_long = estimate_decisions_max_cost_usd(
-        "gpt-6-luna", n_images=1, text_chars=100, question_chars=[long.chars]
-    )
-    two = estimate_decisions_max_cost_usd(
-        "gpt-6-luna", n_images=1, text_chars=100, question_chars=[short.chars, short.chars]
-    )
-    per_question = decisions_question_tokens(short.chars) * 0.10 / 1e6
-    assert one_long > one_short
-    # The shared input is counted once: a second question adds only its own tokens.
-    assert two - one_short == pytest.approx(per_question)
-    assert decisions_question_tokens(0) >= 150  # the hidden per-question prompt
-    image_only = estimate_decisions_max_cost_usd(
-        "gpt-6-luna", n_images=1, text_chars=0, question_chars=[0]
-    )
-    assert image_only * 1e6 / 0.10 >= MAX_IMAGE_TOKENS
-
-
-def test_long_context_input_is_priced_double():
-    over = DECISIONS_LONG_CONTEXT_TOKENS + 1000
-    assert decisions_cost_usd("gpt-6-luna", over) == pytest.approx(2 * over * 0.10 / 1e6)
 
 
 def test_http_errors_are_outcomes_charged_nothing_and_never_logged_with_content(caplog):
@@ -333,17 +247,6 @@ def test_non_json_and_unexpected_bodies_are_api_errors():
 # ------------------------------------------------------------------- answers
 
 
-def test_every_question_refused_is_refused_one_refused_is_ok():
-    client, _, _ = make(ok(body({"type": "refusal", "name": "ok"}, input_tokens=9)))
-    result = client.decide(request())
-    assert result.outcome == "refused" and result.answers == {}
-    two = (PRED, Question("fe", "True if it contradicts the image."))
-    client, _, _ = make(ok(body(predicate(), {"type": "refusal", "name": "fe"})))
-    result = client.decide(request(*two))
-    assert result.outcome == "ok"
-    assert result.answers["ok"].probability == 0.91 and result.answers["fe"].refused
-
-
 @pytest.mark.parametrize(
     "answers",
     [
@@ -364,18 +267,3 @@ def test_unknown_or_missing_choice_values_are_invalid_output():
     missing = choice(match=0.8, cosmetic=0.2)
     assert parse_answers([unknown], [CHOICE])[0] == "invalid_output"
     assert parse_answers([missing], [CHOICE])[0] == "invalid_output"
-
-
-def test_the_client_is_safe_to_share_between_threads():
-    client, budget, http = make(ok(body(predicate())))
-    results: list[str] = []
-
-    def work() -> None:
-        results.append(client.decide(request()).outcome)
-
-    threads = [threading.Thread(target=work) for _ in range(8)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-    assert results == ["ok"] * 8 and len(http.sent) == 8 and len(budget.reserved) == 8

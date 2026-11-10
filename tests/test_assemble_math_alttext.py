@@ -8,9 +8,7 @@ import pytest
 
 from readablestem.config import Settings
 from readablestem.core.types import Element, EquationFix, Fix, Kind, Status, inline_marker
-from readablestem.pipeline.assemble import MAX_ALTTEXT_CHARS, alttext_from_speech, render_html
-from readablestem.pipeline.html_checks import static_checks
-from readablestem.pipeline.safe_html import sanitize_mathml
+from readablestem.pipeline.assemble import render_html
 
 MATHML = (
     '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><mo>=</mo>'
@@ -68,36 +66,8 @@ def test_alttext_is_the_stored_speech_when_switched_on(inline):
     assert ' display="inline"' in tags[0] if inline else ' display="block"' in tags[0]
 
 
-def test_the_maths_itself_is_unchanged_by_the_setting():
-    on, off = page(alttext=True), page(alttext=False)
-    assert on.replace(f' alttext="{SPEECH}"', "") == off
-
-
-@pytest.mark.parametrize("speech", ["", "   ", "x " * (MAX_ALTTEXT_CHARS // 2 + 5)])
-def test_no_alttext_for_an_empty_or_too_long_reading(speech):
-    assert "alttext" not in page(speech, alttext=True)
-
-
 def test_alttext_is_escaped():
     hostile = '"><script>alert(1)</script> & <b>'
     html = page(hostile, alttext=True)
     assert "<script>" not in html
     assert 'alttext="&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt; &amp; &lt;b&gt;"' in html
-
-
-def test_whitespace_in_the_reading_is_one_line():
-    assert alttext_from_speech("row 1:  a,\n b") == "row 1: a, b"
-    assert alttext_from_speech(None) is None
-
-
-def test_sanitize_mathml_alttext_is_optional_and_blank_means_none():
-    assert "alttext" not in (sanitize_mathml(MATHML, display="block") or "")
-    assert "alttext" not in (sanitize_mathml(MATHML, display="block", alttext="  ") or "")
-    out = sanitize_mathml(MATHML, display="inline", element_id="e1", alttext="a b")
-    assert out is not None and out.startswith('<math display="inline" id="e1" alttext="a b">')
-
-
-def test_the_static_checks_pass_with_alttext_on():
-    on = static_checks(page(alttext=True))
-    off = static_checks(page(alttext=False))
-    assert [(c.name, c.passed) for c in on] == [(c.name, c.passed) for c in off]

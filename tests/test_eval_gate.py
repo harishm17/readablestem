@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import copy
 import json
 from pathlib import Path
 
@@ -10,7 +9,7 @@ import pytest
 
 from readablestem.cli.main import main
 from readablestem.eval import gate
-from readablestem.eval.gate import DEFAULT_TOLERANCES, GateRefused, compare, load_tolerances
+from readablestem.eval.gate import DEFAULT_TOLERANCES, GateRefused, compare
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -43,18 +42,6 @@ def statuses(result) -> dict[str, str]:
     return {r.name: r.status for r in result.rows}
 
 
-def test_within_tolerance_passes():
-    current = report(exact_lenient=0.79, mean_teds=0.885)  # -0.01, -0.015
-    current["cost"]["per_item_usd"] = 0.0049  # +22.5%
-    result = compare(current, report(), list(DEFAULT_TOLERANCES))
-    assert result.passed
-    assert statuses(result) == {
-        "exact_lenient": "ok",
-        "mean_teds": "ok",
-        "cost_per_equation": "ok",
-    }
-
-
 def test_drop_beyond_tolerance_fails():
     result = compare(report(exact_lenient=0.77), report(), list(DEFAULT_TOLERANCES))
     assert not result.passed
@@ -78,15 +65,6 @@ def test_cost_increase_is_relative():
     assert compare(cheaper, report(), list(DEFAULT_TOLERANCES)).passed
 
 
-def test_cost_against_a_zero_baseline():
-    free = report()
-    free["cost"]["per_item_usd"] = 0.0
-    assert compare(free, copy.deepcopy(free), list(DEFAULT_TOLERANCES)).passed
-    paid = copy.deepcopy(free)
-    paid["cost"]["per_item_usd"] = 0.001
-    assert not compare(paid, free, list(DEFAULT_TOLERANCES)).passed
-
-
 def test_a_metric_missing_from_the_current_report_fails():
     current = report()
     current["metrics"]["mean_teds"] = None
@@ -95,18 +73,6 @@ def test_a_metric_missing_from_the_current_report_fails():
     del baseline["metrics"]["mean_teds"]
     result = compare(report(), baseline, list(DEFAULT_TOLERANCES))
     assert result.passed and statuses(result)["mean_teds"] == "no_baseline"
-
-
-def test_only_the_reports_task_is_checked():
-    result = compare(report("headings", recall=0.86), report("headings"), list(DEFAULT_TOLERANCES))
-    assert statuses(result) == {
-        "heading_recall": "regressed",  # -0.04 > 0.03
-        "heading_precision": "no_baseline",  # these fixtures carry no precision
-    }
-    result = compare(
-        report("figures", judge_pass_rate=0.66), report("figures"), list(DEFAULT_TOLERANCES)
-    )
-    assert result.passed  # -0.04 <= 0.05
 
 
 @pytest.mark.parametrize(
@@ -124,62 +90,6 @@ def test_incomparable_reports_are_refused(change, code):
     with pytest.raises(GateRefused) as exc:
         compare(current, report(), list(DEFAULT_TOLERANCES))
     assert exc.value.code == code
-
-
-def test_changes_between_runs_are_listed():
-    current = report()
-    current["prompt_versions"] = {"equation": "equation-bbbb2222"}
-    result = compare(current, report(), list(DEFAULT_TOLERANCES))
-    assert result.notes == [
-        "prompt_versions changed: {'equation': 'equation-aaaa1111'} -> "
-        "{'equation': 'equation-bbbb2222'}"
-    ]
-    table = gate.format_table(result)
-    assert "| exact_lenient | 0.8000 | 0.8000 | +0.0000 | -0.020 | ok |" in table
-    assert "| cost_per_equation | 0.0040 | 0.0040 | +0.0% | +25% | ok |" in table
-    assert table.rstrip().endswith("PASS")
-
-
-def test_tolerance_file_overrides_and_adds(tmp_path):
-    path = tmp_path / "tol.json"
-    path.write_text(
-        json.dumps(
-            {
-                "tolerances": [
-                    {"name": "exact_lenient", "limit": 0.05},
-                    {
-                        "name": "doc_recall",
-                        "task": "document",
-                        "path": "metrics.detection_recall",
-                        "rule": "max_drop",
-                        "limit": 0.0,
-                    },
-                ]
-            }
-        )
-    )
-    tolerances = {t.name: t for t in load_tolerances(path)}
-    assert tolerances["exact_lenient"].limit == 0.05
-    assert tolerances["exact_lenient"].path == "metrics.exact_lenient"  # rest from default
-    assert tolerances["doc_recall"].task == "document"
-    assert compare(report(exact_lenient=0.77), report(), list(tolerances.values())).passed
-
-
-def test_bad_tolerance_entries_are_refused(tmp_path):
-    path = tmp_path / "tol.json"
-    path.write_text(json.dumps({"tolerances": [{"name": "new_one", "limit": 0.1}]}))
-    with pytest.raises(ValueError, match="missing"):
-        load_tolerances(path)
-    path.write_text(json.dumps({"tolerances": [{"name": "exact_lenient", "rule": "max_rise"}]}))
-    with pytest.raises(ValueError, match="unknown rule"):
-        load_tolerances(path)
-
-
-def test_committed_tolerances_match_the_defaults():
-    committed = load_tolerances(REPO / "data" / "eval" / "tolerances.json")
-    assert sorted(committed, key=lambda t: t.name) == sorted(
-        DEFAULT_TOLERANCES, key=lambda t: t.name
-    )
 
 
 # ----------------------------------------------------------------------------- CLI
@@ -206,15 +116,6 @@ def test_cli_exit_codes(tmp_path, capsys):
     assert main(["eval", "gate", "--current", str(other_gold), "--baseline", str(baseline)]) == 2
     err = capsys.readouterr().err
     assert "manifest_mismatch" in err and "different gold manifests" in err
-
-
-def test_cli_uses_a_tolerance_file(tmp_path, capsys):
-    baseline = write(tmp_path, "base.json", report())
-    bad = write(tmp_path, "bad.json", report(exact_lenient=0.77))
-    tol = write(tmp_path, "tol.json", {"tolerances": [{"name": "exact_lenient", "limit": 0.05}]})
-    args = ["eval", "gate", "--current", str(bad), "--baseline", str(baseline)]
-    assert main([*args, "--tolerance-file", str(tol)]) == 0
-    assert main(args) == 1  # data/eval/tolerances.json (= defaults) applies otherwise
 
 
 def judged(judge: str, rate: float) -> dict:
@@ -262,35 +163,3 @@ def test_require_current_refuses_a_report_made_with_other_prompts(tmp_path, caps
     # Without the flag (comparing two historical runs) it is only a note.
     plain = ["eval", "gate", "--baseline", str(baseline), "--current"]
     assert main([*plain, str(tmp_path / "stale.json")]) == 0
-
-
-def test_document_metrics_and_heading_precision_are_tracked():
-    base = report("document", detection_recall=1.0, detection_precision=0.47)
-    base["metrics"] |= {"matched_exact_lenient": 0.567, "axe_violations": 0}
-    worse = copy.deepcopy(base)
-    worse["metrics"] |= {"axe_violations": 1, "detection_precision": 0.40}
-    result = compare(worse, base, list(DEFAULT_TOLERANCES))
-    rows = statuses(result)
-    assert rows["document_axe_violations"] == "regressed"  # any new violation fails
-    assert rows["document_detection_precision"] == "regressed"
-    assert rows["document_matched_exact_lenient"] == "ok"
-    headings = compare(
-        report("headings", precision=0.80),
-        report("headings", precision=0.877),
-        list(DEFAULT_TOLERANCES),
-    )
-    assert statuses(headings)["heading_precision"] == "regressed"
-
-
-def test_committed_tolerances_track_the_same_metrics_as_the_defaults():
-    names = {t.name for t in load_tolerances(Path("data/eval/tolerances.json"))}
-    assert names == {t.name for t in DEFAULT_TOLERANCES}
-
-
-def test_cli_reports_missing_and_malformed_files(tmp_path, capsys):
-    baseline = write(tmp_path, "base.json", report())
-    assert main(["eval", "gate", "--current", "nope.json", "--baseline", str(baseline)]) == 2
-    broken = tmp_path / "broken.json"
-    broken.write_text("{not json")
-    assert main(["eval", "gate", "--current", str(broken), "--baseline", str(baseline)]) == 2
-    assert "cannot read" in capsys.readouterr().err

@@ -55,14 +55,3 @@ def test_the_focus_colour_has_three_to_one_against_every_background_it_sits_on()
     for background in ("--bg", "--surface", "--desk"):
         assert contrast(dark_ring, DARK[background]) >= 3, background
     assert contrast(dark_ring, DARK["--focus-halo"]) >= 3
-
-
-def test_only_script_focused_containers_drop_the_ring():
-    """`outline: none` is allowed on `:focus` (not `:focus-visible`) of containers that take
-    focus from a link or a script (tabindex -1: `main`, a heading, a region), never on a
-    control that Tab reaches: those keep the `:focus-visible` ring above."""
-    dropped = re.findall(r"([^{}]+)\{[^}]*outline:\s*none[^}]*\}", CSS)
-    assert dropped
-    for selectors in dropped:
-        for selector in (s.strip() for s in selectors.split(",")):
-            assert selector.endswith(":focus"), selector

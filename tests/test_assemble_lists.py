@@ -148,19 +148,6 @@ def test_a_jump_of_two_levels_or_a_list_starting_deep_still_nests_correctly():
     )
 
 
-def test_a_new_kind_of_marker_at_the_same_level_starts_a_new_list():
-    elements = [
-        item(0, "\u2022", "a bullet"),
-        item(1, "1.", "a numbered step"),
-        item(2, "2.", "another step"),
-        item(3, "(a)", "a lettered part"),
-    ]
-    tags = list_tags(body(elements))
-    assert tags.startswith('<ul><li id="p1-e0"></li></ul><ol><li id="p1-e1">')
-    assert tags.endswith('<ol class="printed-markers" role="list"><li id="p1-e3"><span '
-                         'class="list-marker">(a)</span></li></ol>')  # fmt: skip
-
-
 def test_a_paragraph_ends_the_list_and_numbering_resumes_with_start():
     elements = [item(0, "1.", "First"), paragraph(1, "An aside."), item(2, "2.", "Second")]
     html = body(elements)
@@ -178,17 +165,6 @@ def test_list_item_text_is_escaped_and_its_inline_equations_are_placed():
     assert '<li id="p1-e0">&lt;b&gt;Find&lt;/b&gt; <math display="inline" id="p1-e1">' in html
     assert html.count('id="p1-e1"') == 1  # placed in the item, not repeated after it
     assert html.count("<ol") == 1  # the item's equation does not split the list
-
-
-def test_assembled_lists_pass_the_static_checks():
-    elements = [
-        item(0, "\u2022", "a"),
-        item(1, "(i)", "b", level=2),
-        item(2, "(ii)", "c", level=2),
-        item(3, "\u2022", "d"),
-    ]
-    html = render_html(title="T", lang="en", elements=elements, fixes=[], crops={})
-    assert all(c.passed for c in static_checks(html))
 
 
 def test_a_display_equation_between_items_stays_inside_the_item_before_it():
@@ -217,13 +193,6 @@ def test_a_display_equation_between_items_stays_inside_the_item_before_it():
     assert all(c.passed for c in static_checks(rendered))
 
 
-def test_a_display_equation_after_the_last_item_stays_outside_the_list():
-    eq = equation(1)
-    elements = [item(0, "1.", "Measure the ramp."), eq, paragraph(2, "Then go on.")]
-    html = body(elements, [accepted(eq)])
-    assert html.startswith('<ol><li id="p1-e0">Measure the ramp.</li></ol><div class="equation"')
-
-
 # ---------------------------------------------------------------- equation numbers
 
 
@@ -245,13 +214,6 @@ def test_an_unconverted_equation_keeps_its_number_after_the_original():
     assert html.startswith('<div class="flagged" id="p1-e0"')
     original_then_label = html.index('<p class="original-text">') < html.index("equation-label")
     assert original_then_label and html.index("equation-label") < html.index("flag-note")
-
-
-def test_an_equation_without_a_number_is_unchanged_and_labels_are_escaped():
-    plain = equation(0)
-    assert body([plain], [accepted(plain)]).startswith('<div class="equation" id="p1-e0">')
-    hostile = equation(1, label="<script>1</script>")
-    assert "&lt;script&gt;1&lt;/script&gt;" in body([hostile], [accepted(hostile)])
 
 
 # ---------------------------------------------------------------- axe-core

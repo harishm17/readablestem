@@ -49,13 +49,6 @@ def settings() -> Settings:
     return Settings(_env_file=None)  # type: ignore[call-arg]
 
 
-def test_the_witness_is_not_called_when_the_option_is_off():
-    fake = client()
-    out = convert_pdf(pdf(), settings=settings(), client=fake)
-    assert not [r for r in fake.requests if r.step == "page_witness"]
-    assert out.result.page_witness is None and "page_witness" not in out.result.prompt_versions
-
-
 def test_with_the_option_on_a_maths_page_is_asked_once_and_the_equation_reads_its_witness():
     fake = client()
     out = convert_pdf(

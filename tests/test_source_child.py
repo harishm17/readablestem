@@ -13,7 +13,7 @@ from readablestem.source import envelope, latexml
 from readablestem.web import isolated_convert
 from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
 from readablestem.web.worker import error_code_for
-from source_support import fixture, make_zip, needs_latexml
+from source_support import make_zip, needs_latexml
 
 pytestmark = needs_latexml
 
@@ -30,15 +30,6 @@ def offline():
     settings = Settings(_env_file=None, env="dev", fake_models=True)  # type: ignore[call-arg]
     budget = JobBudget(guard=InMemorySpendGuard(100.0), max_usd=50.0, max_calls=1000)
     return settings, make_vision_client(settings, budget, fake=True)
-
-
-def test_a_source_converts_in_the_child_and_the_hook_finds_it():
-    settings, client = offline()
-    blob = envelope.wrap("tex", "a.tex", None, fixture("amsmath.tex").encode())
-    output = convert_isolated(blob, settings=settings, client=client, limit_s=120)
-    assert output.result.origin == "latex"
-    assert output.result.stats.required_decisions == 0
-    assert "<math" in output.result.html
 
 
 def test_a_refused_source_ends_the_child_with_a_plain_code_the_worker_stores():

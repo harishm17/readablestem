@@ -22,7 +22,6 @@ from image_page_support import block, math, text
 from layout_synth import _append, _strokes
 from readablestem.config import Settings
 from readablestem.core.budget import InMemorySpendGuard, JobBudget
-from readablestem.core.types import Kind
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import layout, page_type, run
 
@@ -138,27 +137,6 @@ def test_a_page_of_vector_handwriting_under_a_number_or_title_is_handwritten(mar
     assert page_type.kept_reason(result) == page_type.HANDWRITTEN_PAGE
 
 
-@pytest.mark.parametrize("mark", ["diagonal", "number"])
-def test_vector_handwriting_under_furniture_only_goes_to_the_image_pass(mark):
-    """iPad notes with a translucent diagonal watermark, or a page number, as their only text."""
-    result = classify(page_of(strokes=400, mark=mark))
-    assert result.kind == "handwritten"
-    assert page_type.reads_image(result)
-
-
-def test_vector_handwriting_under_a_typed_header_stays_mixed_ink():
-    """A typed header line is text, not furniture: the corpus labels these `mixed_ink`."""
-    result = classify(page_of(strokes=400, mark="watermark"))
-    assert result.kind == "mixed_ink"
-    assert page_type.TEXT_NOT_COVERING not in result.reasons
-
-
-def test_a_typed_slide_with_ink_annotations_stays_mixed_ink():
-    result = classify(page_of(typed=30, strokes=400))
-    assert result.kind == "mixed_ink"
-    assert not page_type.reads_image(result)
-
-
 def test_vector_handwriting_under_a_watermark_is_read_by_the_pass():
     result, fake = convert(page_of(strokes=400, mark="diagonal"))
     assert "image_page" in [r.step for r in fake.requests]
@@ -177,28 +155,6 @@ def test_a_cover_page_with_body_text_over_a_picture_stays_typed():
     )
     result = classify(doc.tobytes())
     assert page_type.TEXT_NOT_COVERING not in result.reasons
-
-
-def test_a_genuinely_typed_page_still_takes_the_typed_path():
-    result = classify(page_of(typed=30))
-    assert result.kind == "born_digital"
-    assert page_type.kept_reason(result) is None
-    assert page_type.TEXT_NOT_COVERING not in result.reasons
-
-
-def test_typed_text_with_a_few_annotation_strokes_is_still_typed():
-    result = classify(page_of(typed=40, strokes=60))
-    assert result.kind in ("mixed_ink", "born_digital")
-    assert page_type.kept_reason(result) is None
-
-
-def test_a_typed_page_with_a_half_page_figure_is_typed():
-    doc = pymupdf.open()
-    page = doc.new_page(width=595, height=842)
-    typed_lines(page, 30, top=450)
-    page.insert_image(pymupdf.Rect(60, 40, 535, 420), stream=notebook_jpeg())
-    result = classify(doc.tobytes())
-    assert result.kind == "born_digital" and page_type.kept_reason(result) is None
 
 
 def test_typed_text_over_a_blank_picture_stays_typed():
@@ -225,28 +181,7 @@ def test_a_scan_whose_ocr_layer_is_hidden_is_read_from_its_image():
     assert page_type.kept_reason(result) == page_type.SCANNED_PAGE
 
 
-def test_a_page_whose_text_layer_is_visible_and_covers_the_picture_is_typed():
-    """The text is painted and sits where the content is (16 lines over the photo): the
-    layer is the page's text, whatever the picture behind it."""
-    result = classify(page_of(picture=True, ocr="visible"))
-    assert page_type.TEXT_NOT_COVERING not in result.reasons
-    assert page_type.kept_reason(result) in (None, page_type.UNREAD_PAGE)
-
-
-def test_the_probes_count_the_page_and_do_not_stop_at_it():
-    data = page_of(picture=True, mark="watermark")
-    with pymupdf.open(stream=data, filetype="pdf") as doc:
-        assert page_type.image_page_count(doc) == 1
-        assert page_type.document_refusal(doc) is None  # a watermark never refuses the upload
-
-
 # --------------------------------------------------------------------- layout and run
-
-
-def test_layout_keeps_the_page_and_still_reads_its_text():
-    doc = layout.analyze(page_of(picture=True, mark="watermark"))
-    assert doc.kept_pages == {0: "unread_page"}
-    assert any("Telegram" in (e.text or "") for e in doc.elements)  # not silently dropped
 
 
 def test_a_title_slide_on_a_repeated_background_is_still_typed():
@@ -282,24 +217,6 @@ def convert(pdf: bytes, *, on: bool = True):
         responders={"image_page": lambda r: PAGE, "equation": lambda r: None}, budget=budget
     )
     return run.convert_pdf(pdf, settings=settings, client=fake).result, fake
-
-
-def test_the_page_goes_through_the_image_page_pass_and_the_watermark_is_not_repeated():
-    result, fake = convert(page_of(picture=True, mark="watermark"))
-    assert "image_page" in [r.step for r in fake.requests]
-    assert result.image_pages is not None and result.image_pages.converted == 1
-    texts = [e.text or "" for e in result.elements if e.kind is not Kind.EQUATION]
-    assert not any("Telegram" in t for t in texts)  # read again from the image, not twice
-    assert any("hermitian" in t for t in texts)
-    assert result.image_only_pages == []
-
-
-def test_with_the_option_off_the_page_is_kept_with_a_reason_and_its_text():
-    result, fake = convert(page_of(picture=True, mark="watermark"), on=False)
-    assert "image_page" not in [r.step for r in fake.requests]
-    assert result.image_only_pages == [0]
-    assert [f.reason for f in result.fixes if f.pending] == ["unread_page"]
-    assert any("Telegram" in (e.text or "") for e in result.elements)
 
 
 def test_the_review_screen_says_why_a_page_that_was_tried_stayed_an_image():

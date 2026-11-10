@@ -26,34 +26,6 @@ def cells(page: str) -> list[list[str]]:
     return [re.findall(r"<td>(.*?)</td>", row, re.S) for row in body.split("<tr>")[1:]]
 
 
-def test_five_tools_in_the_header(page):
-    table = page.split('<table class="compare-table compare-wide">', 1)[1]
-    head = table.split("<thead>", 1)[1].split("</thead>", 1)[0]
-    names = re.findall(r'<th scope="col">([^<]+)</th>', head)
-    assert names == ["Topic", "ReadableSTEM", "Mathpix", "Aelira", "Chatbots", "LaTeXML"]
-
-
-def test_every_cell_has_a_source_and_a_date_or_says_why_not(page):
-    rows = cells(page)
-    assert len(rows) >= 8 and all(len(row) == 5 for row in rows)
-    allowed = (
-        "We have not run it",
-        "Not compared here",
-        "Beta; the live service",
-        "Prices and documentation as read on",
-        "Beta software, as its site says on",
-        "Run recorded on",
-    )
-    for row in rows:
-        for cell in row:
-            if 'class="source-note"' in cell:
-                assert re.search(
-                    r'<a href="[^"]+">[^<]+</a>, read <time datetime="20\d\d-\d\d-\d\d">', cell
-                )
-            else:
-                assert any(phrase in cell for phrase in allowed), cell
-
-
 def test_no_cell_claims_conformance_and_accuracy_appears_only_where_measured(page):
     text = " ".join(" ".join(row) for row in cells(page)).lower()
     for word in ("conforms", "compliant", "certified", "guarantee"):

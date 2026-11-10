@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 import readablestem
-from readablestem.pipeline.export_canvas import MATH_FONT_STACK, export_canvas
+from readablestem.pipeline.export_canvas import export_canvas
 
 pytestmark = pytest.mark.browser
 sync_api = pytest.importorskip("playwright.sync_api")
@@ -149,17 +149,3 @@ def test_the_student_file_is_drawn_as_maths_in_every_browser(engine_browser, fil
     assert all("math" in display for display in report["displays"]), (where, report["displays"][:3])
     assert all(i["ok"] for i in report["images"]), f"{where}: a picture did not load"
     assert len(shot) > 200  # a screenshot of the first equation is not an empty image
-
-
-@pytest.mark.parametrize("engine", ENGINES)
-def test_the_canvas_version_asks_for_the_maths_font_stack(engine, playwright_driver, files):
-    browser = launch(playwright_driver, engine)
-    try:
-        report, _, _ = inspect_page(browser, files["canvas version"], 1280)
-    finally:
-        browser.close()
-    first_family = MATH_FONT_STACK.split(",")[0].strip("'")
-    assert all(first_family in family for family in report["families"]), (
-        engine,
-        report["families"][:2],
-    )

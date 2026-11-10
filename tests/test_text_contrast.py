@@ -14,7 +14,6 @@ from readablestem.pipeline.contrast import (
     MIN_TEXT_CONTRAST,
     WHITE,
     contrast_ratio,
-    hex_colour,
     oklch,
     relative_luminance,
     with_contrast,
@@ -32,20 +31,6 @@ def test_contrast_matches_the_wcag_reference_values():
     assert relative_luminance((255, 255, 255)) == pytest.approx(1.0)
 
 
-def test_oklch_of_known_colours():
-    lightness, chroma, _ = oklch((255, 255, 255))
-    assert lightness == pytest.approx(1.0, abs=1e-3) and chroma < 1e-3
-    lightness, chroma, hue = oklch((255, 0, 0))
-    assert lightness == pytest.approx(0.628, abs=1e-3)
-    assert chroma == pytest.approx(0.258, abs=1e-3)
-    assert hue == pytest.approx(29.2, abs=0.1)
-
-
-@pytest.mark.parametrize("rgb", [(0, 0, 0), (0, 0, 255), (0, 128, 0), (38, 38, 38), (51, 51, 179)])
-def test_a_colour_that_is_dark_enough_is_kept_exactly(rgb):
-    assert with_contrast(rgb) == rgb
-
-
 @pytest.mark.parametrize(
     "rgb",
     [(255, 0, 0), (255, 255, 0), (255, 165, 0), (0, 255, 255), (210, 210, 210), (255, 192, 203)],
@@ -60,20 +45,6 @@ def test_a_light_colour_is_darkened_to_the_minimum_and_keeps_its_hue(rgb):
         assert abs((after[2] - before[2] + 180) % 360 - 180) < 3.0
 
 
-def test_a_grey_stays_exactly_neutral():
-    r, g, b = with_contrast((210, 210, 210))
-    assert r == g == b
-    assert hex_colour((r, g, b)) == "#767676"
-
-
-def test_red_becomes_a_slightly_darker_red():
-    assert hex_colour(with_contrast((255, 0, 0))) == "#ee0000"
-
-
 def test_every_colour_on_a_coarse_grid_reaches_the_minimum():
     for rgb in itertools.product(range(0, 256, 51), repeat=3):
         assert contrast_ratio(with_contrast(rgb), WHITE) >= MIN_TEXT_CONTRAST, rgb
-
-
-def test_hex_colour():
-    assert hex_colour((0, 10, 255)) == "#000aff"

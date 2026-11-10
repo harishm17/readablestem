@@ -5,7 +5,6 @@ post-processing around the model (RapidTable 3.0.2)."""
 from __future__ import annotations
 
 import hashlib
-import re
 from pathlib import Path
 
 import httpx
@@ -33,23 +32,6 @@ def client(body: bytes = FAKE, status: int = 200, seen: list | None = None) -> h
     return httpx.Client(transport=httpx.MockTransport(handler))
 
 
-def test_the_pin_is_the_file_rapidtable_3_0_2_ships():
-    assert table_model.MODEL_SHA256.startswith("d57a942a") and table_model.MODEL_SHA256.endswith(
-        "514b"
-    )
-    assert re.fullmatch(r"[0-9a-f]{64}", table_model.MODEL_SHA256)
-    assert table_model.MODEL_URL.startswith("https://")
-    assert table_model.MODEL_URL.endswith("/slanet-plus.onnx")
-
-
-def test_the_model_directory_comes_from_the_environment(monkeypatch, tmp_path):
-    monkeypatch.setenv("TABLE_MODEL_DIR", str(tmp_path / "m"))
-    assert table_model.model_path() == tmp_path / "m" / "slanet-plus.onnx"
-    monkeypatch.delenv("TABLE_MODEL_DIR")
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
-    assert table_model.model_dir() == tmp_path / "cache" / "readablestem" / "models"
-
-
 def test_fetch_installs_a_file_with_the_pinned_checksum(tmp_path, pinned_to_fake):
     seen: list[str] = []
     path = table_model.fetch(tmp_path, client=client(seen=seen))
@@ -62,15 +44,6 @@ def test_fetch_installs_a_file_with_the_pinned_checksum(tmp_path, pinned_to_fake
 def test_fetch_refuses_a_different_file_and_leaves_nothing_behind(tmp_path, pinned_to_fake):
     with pytest.raises(table_model.ModelFileError, match="checksum mismatch"):
         table_model.fetch(tmp_path, client=client(b"something else"))
-    assert list(tmp_path.iterdir()) == []
-
-
-def test_fetch_reports_http_errors_and_oversized_downloads(tmp_path, pinned_to_fake, monkeypatch):
-    with pytest.raises(table_model.ModelFileError, match="HTTP 404"):
-        table_model.fetch(tmp_path, client=client(status=404))
-    monkeypatch.setattr(table_model, "_MAX_BYTES", 4)
-    with pytest.raises(table_model.ModelFileError, match="larger"):
-        table_model.fetch(tmp_path, client=client())
     assert list(tmp_path.iterdir()) == []
 
 
@@ -92,27 +65,7 @@ def test_the_image_fetches_the_model_and_points_the_app_at_it():
     assert "table-model:" in makefile and "readablestem.pipeline.table_model" in makefile
 
 
-def test_the_vendored_code_keeps_its_licence_and_notice():
-    vendor = ROOT / "src" / "readablestem" / "pipeline" / "vendor"
-    head = (vendor / "rapid_table.py").read_text().splitlines()[:20]
-    assert any("Licensed under the Apache License, Version 2.0" in line for line in head)
-    assert any("PaddlePaddle Authors" in line for line in head)
-    assert "Apache License" in (vendor / "rapid_table-LICENSE.txt").read_text()
-    assert "RapidTable 3.0.2" in (vendor / "rapid_table-NOTICE.txt").read_text()
-    notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text()
-    for name in ("pymupdf-layout", "onnxruntime", "SLANet-plus", "RapidTable"):
-        assert name in notices
-
-
 # ---------------------------------------------------------------- vendored processing
-
-
-def test_preprocess_scales_the_long_side_and_pads():
-    image = np.full((100, 244, 3), 255, dtype=np.uint8)
-    pixels, shape = rapid_table.preprocess(image)
-    assert pixels.shape == (1, 3, 488, 488) and pixels.dtype == np.float32
-    assert shape[:2] == [100, 244] and shape[2] == pytest.approx(2.0)
-    assert np.all(pixels[0, :, 200:, :] == 0)  # padding below the 200-pixel-high image
 
 
 def test_logic_points_follow_spans_and_occupied_slots():

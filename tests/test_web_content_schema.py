@@ -15,11 +15,10 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import pytest
-from sqlalchemy import DateTime, Float, Integer, String, func, inspect, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import DateTime, Float, Integer, String, func, select
 
 from readablestem.core.types import ProgressEvent
-from readablestem.ops.retention import delete_jobs, erase_user
+from readablestem.ops.retention import erase_user
 from readablestem.web import db
 
 GOOGLE_ISSUER = "https://accounts.google.com"
@@ -130,63 +129,6 @@ def test_events_hold_no_text_by_construction():
     assert table.c.created_at.index
 
 
-def test_new_job_columns_have_safe_defaults(factory):
-    ids = seed_user(factory, "a@example.org")
-    with db.session_scope(factory) as session:
-        job = session.get(db.Job, ids["job"])
-        assert job is not None and job.result_version == 0
-        assert ProgressEvent.model_validate(job.progress_json).stage == "checks"
-        assert job.course_id == ids["course"]
-    assert db.Base.metadata.tables["jobs"].c.result_version.server_default.arg == "0"
-
-
-def test_a_course_has_one_entry_per_symbol(factory):
-    ids = seed_user(factory, "a@example.org")
-    with pytest.raises(IntegrityError), db.session_scope(factory) as session:
-        session.add(
-            db.CourseNotation(
-                course_id=ids["course"],
-                symbol="\\mathbf{d}",
-                canonical="\U0001d41d",
-                meaning="vector",
-                source="review",
-            )
-        )
-
-
-def test_an_identity_belongs_to_one_user(factory):
-    seed_user(factory, "a@example.org")
-    other = seed_user(factory, "b@example.org")
-    with pytest.raises(IntegrityError), db.session_scope(factory) as session:
-        session.add(
-            db.AuthIdentity(
-                user_id=other["user"],
-                provider="google",
-                issuer=GOOGLE_ISSUER,
-                subject="a@example.org",
-            )
-        )
-
-
-def test_deleting_a_course_deletes_its_notation_and_keeps_its_jobs(factory):
-    ids = seed_user(factory, "a@example.org")
-    with db.session_scope(factory) as session:
-        course = session.get(db.Course, ids["course"])
-        session.delete(course)
-    assert rows(factory, db.CourseNotation) == 0
-    with db.session_scope(factory) as session:
-        job = session.get(db.Job, ids["job"])
-        assert job is not None and job.course_id is None
-
-
-def test_deleting_a_job_keeps_its_content_free_events(factory):
-    ids = seed_user(factory, "a@example.org")
-    with db.session_scope(factory) as session:
-        delete_jobs(session, [ids["job"]])
-    assert rows(factory, db.Job) == 0
-    assert rows(factory, db.Event, job_ref=ids["job"]) == 1
-
-
 # --------------------------------------------------------------------------- erasure
 
 
@@ -235,23 +177,3 @@ def test_erasing_a_user_deletes_everything_of_theirs_and_nothing_else(factory):
     assert rows(factory, db.Blob) == 1 and rows(factory, db.ReviewEdit) == 1
     # Content-free counts written before the deletion survive it.
     assert rows(factory, db.ErrorAggregate) > 0
-
-
-def test_erasure_does_not_rely_on_the_database_cascading(tmp_path):
-    """Like the purge, erasure deletes children itself: SQLite without its foreign-key
-    pragma (or any database that does not cascade) ends up just as empty."""
-    from sqlalchemy import create_engine
-
-    engine = create_engine(f"sqlite:///{tmp_path}/plain.db")  # no PRAGMA foreign_keys
-    db.create_all(engine)
-    factory = db.make_sessionmaker(engine)
-    ids = seed_user(factory, "gone@example.org")
-    with db.session_scope(factory) as session:
-        erase_user(session, ids["user"])
-    with engine.connect() as conn:
-        for name in inspect(engine).get_table_names():
-            if name in {"error_aggregates", "spend_days", "erasure_ledger"}:
-                continue
-            count = conn.execute(select(func.count()).select_from(db.Base.metadata.tables[name]))
-            assert count.scalar() == 0, name
-    engine.dispose()

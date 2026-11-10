@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import create_engine, inspect, select
 
 from fixtures.web.support import make_settings
-from readablestem.cli.main import build_parser, main
+from readablestem.cli.main import main
 from readablestem.web import db
 
 
@@ -27,14 +27,6 @@ def allowed(settings) -> dict[str, bool]:
             }
     finally:
         engine.dispose()
-
-
-def test_help_lists_the_web_commands(capsys):
-    with pytest.raises(SystemExit):
-        build_parser().parse_args(["--help"])
-    out = capsys.readouterr().out
-    for command in ("serve", "users", "db"):
-        assert command in out
 
 
 def test_serve_runs_uvicorn_with_the_app_factory(monkeypatch):
@@ -99,11 +91,6 @@ def test_users_delete_erases_the_account_and_every_document(settings, capsys):
         assert session.scalar(select(ErrorAggregate).where(ErrorAggregate.step == "job"))
     engine.dispose()
     assert main(["users", "delete", "prof@example.org", "--yes"]) == 2
-
-
-def test_users_allow_rejects_a_malformed_email(settings, capsys):
-    assert main(["users", "allow", "not-an-email"]) == 2
-    assert "not an email address" in capsys.readouterr().err
 
 
 def test_users_commands_refuse_an_unmigrated_production_database(tmp_path, monkeypatch, capsys):

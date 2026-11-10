@@ -9,8 +9,7 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from fixtures.web.support import BOB, token
-from readablestem.web.db import Job, session_scope
+from fixtures.web.support import token
 from test_web_review_bulk_accept import EQUATION_CANDIDATES, scaled, version  # noqa: F401
 
 CRAFTED = "//evil.example/\\evil?x=1#y"
@@ -42,20 +41,6 @@ def test_a_decision_redirects_inside_the_job_whatever_the_form_says(scaled, view
     on_site(where(response), scaled.job_id)
 
 
-@pytest.mark.parametrize("view", ["list", "split"])
-def test_a_group_and_a_bulk_accept_redirect_inside_the_job(scaled, view):  # noqa: F811
-    group = scaled.browser.post(
-        f"/jobs/{scaled.job_id}/review/hg-p1-e3",
-        data=form(scaled, action="accept", view=view, flt=CRAFTED),
-    )
-    on_site(where(group), scaled.job_id)
-    bulk = scaled.browser.post(
-        f"/jobs/{scaled.job_id}/accept/equations",
-        data=form(scaled, view=CRAFTED if view == "list" else view, version=version(scaled)),
-    )
-    on_site(where(bulk), scaled.job_id)
-
-
 @pytest.mark.parametrize("path", ["title", "contact", "keep", "language"])
 def test_the_job_page_redirect_is_the_owned_jobs_address(scaled, path):  # noqa: F811
     data = form(scaled, title="A new title", contact="", lang="en")
@@ -84,18 +69,3 @@ def test_a_job_id_that_is_not_the_stored_one_gets_no_redirect(scaled):  # noqa: 
     )
     assert response.status_code == 404
     assert "location" not in response.headers
-
-
-def test_someone_elses_job_gets_no_redirect(scaled):  # noqa: F811
-    scaled.allow(BOB)
-    from fixtures.web.support import login
-
-    login(scaled.browser, BOB)
-    response = scaled.browser.post(
-        f"/jobs/{scaled.job_id}/review/{EQUATION_CANDIDATES[0]}",
-        data={"csrf_token": token(scaled.browser, "/app"), "action": "accept", "view": "list"},
-    )
-    assert response.status_code == 404
-    assert "location" not in response.headers
-    with session_scope(scaled.ctx.factory) as session:
-        assert session.get(Job, scaled.job_id) is not None

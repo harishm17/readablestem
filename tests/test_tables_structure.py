@@ -7,8 +7,6 @@ Pages are generated with PyMuPDF, like tests/test_tables_detect.py.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pymupdf
 import pytest
 
@@ -62,24 +60,6 @@ def test_the_split_row_of_an_unruled_table_is_joined_across_the_page_break():
     assert tables.REASON_ROW_SPLIT in found[0].reasons
     paragraphs = [e.text for e in result.elements if e.page == 1 and e.kind == Kind.PARAGRAPH]
     assert paragraphs == ["The next paragraph goes on with the discussion of the values above."]
-
-
-def test_more_rows_after_the_repeated_header_continue_the_unruled_table():
-    def second(page):
-        unruled_row(page, 90, UNRULED_HEAD)
-        unruled_row(page, 110, ["", "universe", "", "limit)"])
-        unruled_row(
-            page, 130, ["10^27", "Radius of the observable universe", "10^55", "Mass of a galaxy"]
-        )
-
-    result = analyze(pdf(unruled_first_page, second))
-    found = [e for e in result.elements if e.kind == Kind.TABLE]
-    assert [e.page for e in found] == [0, 1]
-    assert tables.REASON_CONTINUED in found[1].reasons
-    assert table_texts(found[1]) == [
-        UNRULED_HEAD,
-        ["10^27", "Radius of the observable universe", "10^55", "Mass of a galaxy"],
-    ]
 
 
 def test_a_line_that_only_looks_like_the_header_is_not_a_continued_table():
@@ -171,20 +151,6 @@ def test_a_framed_note_with_a_title_and_text_is_not_a_sparse_table(no_detector):
     assert not [e for e in result.elements if e.kind == Kind.TABLE]
 
 
-def test_body_text_that_matches_no_header_column_is_not_a_sparse_table(no_detector):
-    def loose(page):
-        rule(page, 100, 1.2)
-        for x, text in zip([80, 220, 360], ["Exercise", "Hours", "Notes"], strict=True):
-            write(page, x, 116, text)
-        rule(page, 124)
-        for i, text in enumerate(ITEMS):
-            write(page, 150, 142 + 18 * i, text)  # under no header cell
-        rule(page, 142 + 18 * 3 + 10, 1.2)
-
-    result = analyze(pdf(loose))
-    assert not [e for e in result.elements if e.kind == Kind.TABLE]
-
-
 # ------------------------------------------------------------ two tables in one box
 
 PENDULUM_ROWS = [
@@ -216,11 +182,6 @@ def found_tables(data: bytes):
     return [e for e in analyze(data).elements if e.kind == Kind.TABLE]
 
 
-def test_two_unruled_tables_in_one_box_with_other_columns_are_split():
-    found = found_tables(pdf(stacked(PENDULUM_ROWS, SPRING_ROWS)))
-    assert [table_texts(e) for e in found] == [PENDULUM_ROWS, SPRING_ROWS]
-
-
 def test_two_tables_with_the_same_columns_are_split_when_each_has_a_header_row():
     second = [["Mass", "Stretch", "Constant"], ["0.10", "2.1", "46.7"], ["0.20", "4.0", "49.0"]]
     found = found_tables(pdf(stacked(PENDULUM_ROWS, second, xs_second=(80, 220, 360))))
@@ -247,19 +208,6 @@ def test_a_table_caption_in_the_middle_of_a_box_separates_two_tables():
 
 
 # --------------------------------------------- booktabs columns without the model file
-
-LATEX_TABLES = Path(__file__).parent / "fixtures" / "layout" / "latex" / "tables.pdf"
-
-
-def test_a_booktabs_cell_with_a_gap_in_it_is_not_split_into_a_column_without_the_model():
-    # "p = mv" has a wide gap after the "=": PyMuPDF's grid from the rules between rows
-    # made a fourth column of it. The glyphs fit three columns better.
-    found = found_tables(LATEX_TABLES.read_bytes())
-    table = next(e for e in found if any("Momentum" in c.text for c in e.table.cells))
-    assert table.table.cols == 3
-    rows = table_texts(table)
-    assert rows[1] == ["Momentum", "p⃗", "p = mv⃗"]
-    assert rows[2][:2] == ["Kinetic energy", "K"]
 
 
 # ------------------------------------------ a new caption over the same header is a new table

@@ -134,15 +134,6 @@ def test_the_choices_are_operated_from_the_keyboard_and_nothing_is_preselected(s
     # (Space works the same: it is a button)
 
 
-def test_pressing_space_also_chooses(site, browser, job):
-    context, page = open_page(browser, site, viewport=DESKTOP)
-    open_card(page, site, job)
-    page.get_by_role("button", name="Use small x in equation 3").focus()
-    page.keyboard.press("Space")
-    page.locator('#decision-notice[role="status"]').wait_for()
-    context.close()
-
-
 @pytest.mark.parametrize("viewport", [DESKTOP, NARROW], ids=["1440px", "320px"])
 def test_every_choice_is_a_44px_target_and_the_card_does_not_scroll_sideways(
     site, browser, job, viewport

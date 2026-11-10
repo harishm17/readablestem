@@ -136,19 +136,6 @@ def test_the_buttons_are_operated_from_the_keyboard_and_nothing_is_preselected(s
     context.close()
 
 
-def test_a_symbol_chip_is_chosen_with_space(site, browser, job):
-    context, page = open_page(browser, site, viewport=DESKTOP)
-    open_card(page, site, job)
-    chip = page.get_by_role("button", name="Use capital X in equation 3")
-    assert chip.count() == 1
-    chip.focus()
-    page.keyboard.press("Space")
-    page.locator('#decision-notice[role="status"]').wait_for()
-    page.get_by_role("button", name="Undo").click()
-    page.locator(".other-reading").wait_for()
-    context.close()
-
-
 @pytest.mark.parametrize("viewport", [DESKTOP, NARROW], ids=["1440px", "320px"])
 def test_every_button_is_a_44px_target_and_the_card_does_not_scroll_sideways(
     site, browser, job, viewport

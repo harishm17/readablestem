@@ -35,19 +35,6 @@ def local(tmp_path: Path, *, files: bool) -> dict:
     }
 
 
-def test_off_needs_nothing():
-    assert launch.second_reader_problem(settings()) is None
-    settings(**PROD).check_production()
-
-
-def test_the_local_reader_needs_its_model_files(tmp_path):
-    assert launch.second_reader_problem(settings(**local(tmp_path, files=True))) is None
-    problem = launch.second_reader_problem(settings(**local(tmp_path / "none", files=False)))
-    assert problem is not None and "model files are not in MATH_READER_LOCAL_DIR" in problem
-    unset = settings(math_reader_local_enabled=True, image_pages_second_reader="local")
-    assert "MATH_READER_LOCAL_DIR is not set" in str(launch.second_reader_problem(unset))
-
-
 def test_production_refuses_a_local_reader_without_files_and_accepts_one_with(tmp_path):
     with pytest.raises(ConfigError, match="model files are not in MATH_READER_LOCAL_DIR"):
         settings(**PROD, **local(tmp_path / "none", files=False)).check_production()

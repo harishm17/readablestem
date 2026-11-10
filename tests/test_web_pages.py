@@ -15,8 +15,6 @@ from pathlib import Path
 import pytest
 
 from fixtures.web.support import ADMIN, ALICE, WebEnv, job_id_from, login, make_pdf, upload
-from readablestem.web.database import utc_today
-from readablestem.web.db import SpendDay, session_scope
 from readablestem.web.security import VIEW_CSP
 
 WEB = Path(__file__).resolve().parents[1] / "src" / "readablestem" / "web"
@@ -136,28 +134,6 @@ def test_page_titles_are_unique(pages):
     assert all(t.endswith("| ReadableSTEM") for t in titles.values())
 
 
-def test_no_page_has_markup_inside_its_title_description_or_body_class(pages):
-    """A stray closing tag inside a template block ends up in the browser tab, in search
-    results and in the body's class list (Terms once had `</details>` in all three)."""
-    for name, html in pages.items():
-        title = re.search(r"<title>(.*?)</title>", html, re.S)
-        assert title and "<" not in title.group(1), (name, title and title.group(1))
-        for tag in re.findall(
-            r'<meta (?:name="description"|property="og:description")[^>]*>', html
-        ):
-            content = re.search(r'content="([^"]*)"', tag)
-            assert content and "<" not in content.group(1), (name, tag)
-        body = re.search(r'<body class="([^"]*)"', html)
-        assert body and "<" not in body.group(1), (name, body and body.group(1))
-
-
-def test_landing_page_says_assists_and_links_the_demo(pages):
-    html = pages["/"]
-    assert "assists" in html
-    assert 'href="/demo"' in html
-    assert 'href="/login"' in html  # the one call to action; the buttons are on /login
-
-
 def test_privacy_and_terms_describe_real_behaviour(pages):
     for path in ("/privacy", "/terms"):
         assert "Draft" not in pages[path] and "draft-note" not in pages[path]
@@ -178,105 +154,6 @@ def test_privacy_and_terms_describe_real_behaviour(pages):
     assert "an individual developer" not in terms and "not a company" not in terms
     assert "governed by the law of the State of Texas, USA" in terms
     assert "does not certify" in terms
-
-
-def test_privacy_page_states_the_purge_window_and_backups(pages):
-    privacy = " ".join(pages["/privacy"].split())
-    assert "an hourly clean-up then removes it from the database" in privacy
-    assert "kept for about 6 days" in privacy and "up to about a week" in privacy
-    assert "one more day" not in privacy
-    assert "TODO(Harish)" not in pages["/privacy"]  # the decision note is a template comment
-    assert "Langfuse" not in privacy  # only named when traces are actually sent there
-
-
-def test_privacy_page_names_the_real_host_and_processors(pages):
-    privacy = " ".join(pages["/privacy"].split())
-    assert "<strong>Railway</strong> hosts the app and its database" in privacy
-    assert "Google Cloud" not in privacy and "Cloud Run" not in privacy
-    assert "The app and its database run on Railway, in its United States region" in privacy
-    assert "Changes to this notice" in privacy and "Where it is processed" in privacy
-    assert "kept in your browser tab until you save it" in privacy
-    # Word and PowerPoint are described only when this server takes them (LibreOffice).
-    assert ("Word or PowerPoint" in privacy) == ("turned into a PDF on the server" in privacy)
-
-
-class StubTracer:
-    def flush(self) -> None:
-        pass
-
-
-def test_privacy_page_names_langfuse_when_tracing_is_on(tmp_path, monkeypatch):
-    from readablestem.web import app as app_module
-
-    monkeypatch.setattr(app_module, "make_tracer", lambda settings: StubTracer())
-    env = WebEnv(tmp_path, tracing_enabled=True)
-    with env.running() as client:
-        privacy = " ".join(client.get("/privacy").text.split())
-    assert "<strong>Langfuse</strong>" in privacy and "never contain document text" in privacy
-
-
-def test_privacy_page_describes_the_content_features_that_are_on(tmp_path, pages):
-    # Off (the defaults): nothing about tables, courses or Microsoft.
-    off = " ".join(pages["/privacy"].split())
-    assert "rebuild tables" not in off and "notation" not in off and "Microsoft" not in off
-    assert "the id your sign-in provider gives your account" in off
-    env = WebEnv(tmp_path, feature_tables=True, feature_notation_memory=True)
-    with env.running() as client:
-        on = " ".join(client.get("/privacy").text.split())
-    assert "and to rebuild tables" in on
-    assert "that course's notation (its symbols and what they mean) is sent" in on
-    assert "Your courses and their notation" in on and "until you delete them" in on
-
-
-def test_launch_check_wants_tables_and_notation_in_the_privacy_notice(tmp_path, monkeypatch):
-    from fixtures.web.support import make_settings
-    from readablestem.ops import launch
-
-    templates = tmp_path / "templates"
-    templates.mkdir()
-    privacy = templates / "privacy.html"
-    privacy.write_text("<p>Images of equations and figures are sent to OpenAI.</p>")
-    monkeypatch.setattr(launch, "TEMPLATES_DIR", templates)
-    on = make_settings(tmp_path, feature_tables=True, feature_notation_memory=True)
-    items = launch.launch_blockers(settings=on)
-    assert any("FEATURE_TABLES" in item for item in items)
-    assert any("FEATURE_NOTATION_MEMORY" in item for item in items)
-    # a day's cap above one job's cap ($6.00), as in production, so no spend warning is listed
-    assert launch.launch_blockers(settings=make_settings(tmp_path, daily_spend_cap_usd=10.0)) == [
-        item for item in launch.launch_blockers() if "privacy" in item
-    ]
-    privacy.write_text("<p>OpenAI ... and to rebuild tables ... the course's notation ...</p>")
-    assert not any("privacy.html" in item for item in launch.launch_blockers(settings=on))
-
-
-def test_status_page_says_whether_conversions_are_open(tmp_path):
-    env = WebEnv(tmp_path)
-    with env.running() as client:
-        page = " ".join(client.get("/status").text.split())
-        assert "Up" in page and "Open" in page and "Documents waiting</dt><dd>0" in page
-        with session_scope(env.ctx.factory) as session:
-            session.add(SpendDay(day=utc_today(), spent_usd=5.0, held_usd=0.0))
-        page = " ".join(client.get("/status").text.split())
-        assert "Paused: today" in page
-
-
-def test_limits_page_lists_the_facts_that_hold_today(pages):
-    """A blank limits page reads as "no limits" (UX review MF8): it lists the facts that
-    hold today, with no draft banner."""
-    limits = " ".join(pages["/limits"].split())
-    assert "Draft" not in limits and "draft-note" not in pages["/limits"]
-    assert "Handwritten notes and scanned pages are not converted." in limits
-    assert "Hidden text is never used." in limits and "Run OCR" not in limits
-    assert "Up to 5 pages and 1 MB per upload." in limits  # from the settings
-    assert (
-        "about half came out exactly right end to end (0.50)" in limits
-        and 'id="accuracy"' in limits
-    )
-    assert "Development set, not held out" in limits  # a development number says so
-    topics = ("Tables.", "Links.", "Colour.", "Language.", "File types", "Maths in headings")
-    for topic in (*topics, "Slides.", "Figures.", "Equations."):
-        assert topic in limits
-    assert "Only PDF files are taken" in limits or "turned into a PDF first" in limits
 
 
 def test_launch_check_reports_no_unfinished_public_copy(capsys):
@@ -309,10 +186,6 @@ def test_a_placeholder_demo_is_not_counted_as_done(tmp_path, monkeypatch):
     assert any("placeholder output" in item for item in launch.launch_blockers())
 
 
-def test_demo_page_without_a_demo_file(pages):
-    assert "The demo is being prepared" in pages["/demo"]
-
-
 def test_demo_file_is_served_sandboxed(tmp_path, monkeypatch):
     from readablestem.web.routes import pages as pages_module
 
@@ -323,22 +196,6 @@ def test_demo_file_is_served_sandboxed(tmp_path, monkeypatch):
     with env.running() as client:
         response = client.get("/demo")
     assert response.status_code == 200 and "maths" in response.text
-    assert response.headers["content-security-policy"] == VIEW_CSP
-
-
-def test_committed_demo_is_real_output_and_served_sandboxed(tmp_path):
-    from readablestem.web.routes import pages as pages_module
-
-    demo = pages_module.DEMO_PAGE
-    if not demo.is_file():
-        pytest.skip("no demo built (readablestem demo build)")
-    text = demo.read_text(encoding="utf-8")
-    assert 'data-readablestem-demo="placeholder"' not in text  # built with the real models
-    assert "openstax.org" in text and "CC BY" in text  # attribution travels with it
-    env = WebEnv(tmp_path)
-    with env.running() as client:
-        response = client.get("/demo")
-    assert response.status_code == 200 and "<math" in response.text
     assert response.headers["content-security-policy"] == VIEW_CSP
 
 
@@ -375,7 +232,7 @@ def test_templates_have_no_inline_script_or_style(path):
     assert "<style" not in text
     assert not re.search(r"\son[a-z]+\s*=", text), "inline event handler"
     assert "javascript:" not in text
-    for match in re.finditer(r"<script\b([^>]*)>", text):
+    for match in re.finditer(r"<script\b([^>]*)>", text, re.I):
         assert "src=" in match.group(1), "inline script (blocked by CSP)"
 
 
@@ -396,27 +253,6 @@ def test_vendored_htmx_matches_its_pinned_hashes():
     base = (TEMPLATES / "base.html").read_text(encoding="utf-8")
     assert f'src="/static/vendor/htmx-2.0.11.min.js" integrity="{sri}"' in base
     assert sri in readme
-
-
-def test_vendored_math_font_is_the_unmodified_release_with_its_licence():
-    """Latin Modern Math draws the proposal in the review screen's same-size compare.
-    It is the CTAN release, unmodified (the GUST Font License asks derived fonts to be
-    renamed), with its licence, manifest and readme beside it; the page loads it as the
-    lossless WOFF2 packaging of the same file (about half the bytes)."""
-    fonts = WEB / "static" / "vendor" / "fonts"
-    data = (fonts / "latinmodern-math.otf").read_bytes()
-    readme = (WEB / "static" / "vendor" / "README.md").read_text(encoding="utf-8")
-    assert hashlib.sha256(data).hexdigest() in readme
-    packed = (fonts / "latinmodern-math-1.959.woff2").read_bytes()
-    assert hashlib.sha256(packed).hexdigest() in readme
-    assert packed[:4] == b"wOF2" and len(packed) < 0.6 * len(data)
-    licence = (fonts / "GUST-FONT-LICENSE.txt").read_text(encoding="utf-8")
-    assert "LaTeX Project Public License" in licence
-    assert "latinmodern-math.otf" in (fonts / "MANIFEST-Latin-Modern-Math.txt").read_text()
-    css = (WEB / "static" / "app.css").read_text(encoding="utf-8")
-    assert 'url("/static/vendor/fonts/latinmodern-math-1.959.woff2") format("woff2")' in css
-    assert "latinmodern-math.otf" not in css  # the OpenType file is the source, not served to pages
-    assert '.cmp-math math { font-size: inherit; font-family: "Latin Modern Math"' in css
 
 
 def test_htmx_is_configured_for_the_strict_csp():

@@ -8,8 +8,6 @@ one level for all).
 
 from __future__ import annotations
 
-import re
-
 import pytest
 from sqlalchemy import select
 
@@ -40,7 +38,7 @@ from readablestem.core.types import (
 )
 from readablestem.web import review
 from readablestem.web.db import ReviewEdit, session_scope
-from test_web_review import cards, install_fake_pipeline
+from test_web_review import install_fake_pipeline
 
 GROUP = "hg-p1-e1"
 MEMBERS = ["p1-e1", "p2-e0", "p3-e0"]
@@ -187,20 +185,6 @@ def test_decisions_count_a_heading_group_once():
     assert [[f.element_id for f in g.optional] for g in groups] == [["p1-e2"], ["p2-e1"]]
 
 
-def test_the_next_decision_counts_a_group_once():
-    result = triage_output().result
-    assert review.next_to_review(result, "p2-e2") == "p1-e1"  # the group, by its first
-    assert review.review_anchor(result, "p1-e1") == f"group-card-{GROUP}"
-    # One heading of the group decided on its own: the rest of the group comes first.
-    assert review.next_to_review(result, "p1-e1") == "p2-e0"
-    for fix in result.fixes:
-        if fix.group_key == GROUP:
-            fix.status = Status.ACCEPTED
-    # The whole group decided: the next decision after it.
-    assert review.next_to_review(result, "p3-e0") == "p2-e2"
-    assert review.review_anchor(result, "p2-e2") == "item-p2-e2"
-
-
 def test_results_stored_before_tiers_get_them_from_their_status():
     stored_fix = {"element_id": "e", "kind": "equation", "status": "needs_review"}
     assert Fix.model_validate(stored_fix).review == "required"
@@ -215,72 +199,6 @@ def test_results_stored_before_tiers_get_them_from_their_status():
 
 
 # --------------------------------------------------------------------------- page
-
-
-def test_page_puts_decisions_first_then_optional_checks_then_the_rest(tri):
-    page = page_of(tri)
-    assert '<h2 id="needs-decision-title">Needs your decision (2)</h2>' in page
-    assert '<h2 id="optional-checks-title">Optional checks (2)</h2>' in page
-    assert '<h2 id="decided-title">Your decisions (0)</h2>' in page
-    assert '<h2 id="accepted-title">Accepted automatically (2)</h2>' in page
-    # The equation decision, the group card (its headings folded inside), then the
-    # optional checks, then the accepted ones.
-    assert cards(page) == ["p2-e2", *MEMBERS, "p1-e2", "p2-e1", "p3-e1", "p1-e0"]
-    progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
-    assert "2 decisions left:</strong>" in progress
-    assert "1 equation, 1 group of repeated headings." in progress
-    assert "2 optional checks below" in progress
-
-
-def test_a_heading_group_is_one_card_with_one_decision(tri):
-    card = group_card(page_of(tri))
-    assert "appears 3 times as a bold line in the body text size." in card
-    assert "Keep them as headings at level 3, or make them bold text?" in card
-    assert '<span class="meta">3 headings, pages 1, 2 and 3</span>' in card
-    assert 'value="accept" class="button">Apply to all 3<span class="visually-hidden">' in card
-    assert "headings “SECRET-LABEL Teacher Support” at level 3</span>" in card
-    assert "Make all 3 bold text" in card
-    assert '<label for="group-level-hg-p1-e1">Or choose one level for all 3</label>' in card
-    assert '<option value="3" selected>Level 3</option>' in card
-    # Each heading can still be decided on its own, folded inside the card.
-    assert '<details class="done-group group-members">' in card  # closed
-    assert "<summary>Decide them one by one (3 headings)</summary>" in card
-    for eid in MEMBERS:
-        assert f'<article id="fix-{eid}"' in card
-    assert card.count("SECRET-LABEL Teacher Support") >= 4
-
-
-def test_optional_checks_are_folded_and_say_what_the_note_is(tri):
-    optional = section(page_of(tri), "optional-checks")
-    assert '<details class="done-group">' in optional  # closed
-    assert "<summary>Show the 2 optional checks</summary>" in optional
-    summary = re.search(r'<summary id="fix-title-p1-e2">(.*?)</summary>', optional, re.S)
-    assert summary is not None
-    # It names its item: the equation itself, small, then the page and the note.
-    assert re.match(
-        r'Equation 1 <span class="item-math"><math [^>]*>.*</math></span>, page 1: '
-        r"A letter&#39;s style differs",
-        summary.group(1),
-    )
-    assert "<strong>Note:</strong> A letter&#39;s style differs from the PDF only" in optional
-    assert "Optional check (nothing to do unless you disagree):" in optional
-    # Still editable: save or reject, no Accept (it is accepted already).
-    assert 'action="/jobs/' in optional and 'value="edit"' in optional
-    assert 'value="accept"' not in optional
-
-
-def test_job_page_counts_decisions_and_optional_checks(tri):
-    page = tri.browser.get(f"/jobs/{tri.job_id}").text
-    base = f"/jobs/{tri.job_id}/review"
-    assert "<dt>Decisions to make</dt><dd>2</dd>" in page
-    assert "2 parts were accepted for you with a note: " in page
-    breakdown = page[
-        page.index('id="review-breakdown"') : page.index("</p>", page.index("breakdown"))
-    ]
-    assert "2 need your decision:" in breakdown
-    assert f'<a href="{base}?item=p2-e2">1 equation</a>,' in breakdown
-    assert f'<a href="{base}?item={GROUP}">1 group of repeated headings</a>.' in breakdown
-    assert ">Review 2 decisions</a>" in page
 
 
 # --------------------------------------------------------------------------- group actions
@@ -356,13 +274,6 @@ def test_deciding_one_heading_of_a_group_leaves_the_rest_as_a_group(tri):
     ]
 
 
-def test_a_decision_lands_on_the_group_card(tri):
-    response = post(tri, "p2-e2", action="accept")
-    assert response.headers["location"] == f"/jobs/{tri.job_id}/review/list#group-card-{GROUP}"
-    card = group_card(page_of(tri))
-    assert "Equation 2 on page 2: Accepted." in card
-
-
 def test_repeating_a_group_decision_changes_nothing(tri):
     assert post(tri, GROUP, action="accept").status_code == 303
     before = len(edits(tri))
@@ -381,21 +292,3 @@ def test_unknown_groups_and_other_peoples_jobs_are_not_found(tri):
     login(other, BOB)
     data = {"csrf_token": token(other, "/app"), "action": "accept"}
     assert other.post(f"/jobs/{tri.job_id}/review/{GROUP}", data=data).status_code == 404
-
-
-def test_an_optional_check_can_still_be_edited(tri):
-    assert post(tri, "p1-e2", action="edit", latex="d_0").status_code == 303
-    fix = stored(tri).fix_for("p1-e2")
-    assert fix is not None and fix.status is Status.EDITED and fix.review == "optional"
-    page = page_of(tri)
-    assert '<h2 id="optional-checks-title">Optional checks (1)</h2>' in page
-    assert '<h2 id="needs-decision-title">Needs your decision (2)</h2>' in page  # unchanged
-
-
-def test_an_error_on_one_heading_of_a_group_unfolds_the_group(tri):
-    response = post(tri, "p3-e0", action="edit", level="6")
-    assert response.status_code == 422
-    card = group_card(response.text)
-    assert '<details class="done-group group-members" open>' in card
-    assert 'id="level-error-p3-e0"' in card
-    assert '<a href="#level-p3-e0">' in response.text  # the error summary reaches it

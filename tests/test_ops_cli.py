@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 import logging
-import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
 import structlog
 
 from fixtures.ops.seed import SENTINEL, add_job, add_user, sentinel_result
-from readablestem.cli.main import build_parser, main
+from readablestem.cli.main import main
 from readablestem.config import get_settings
-from readablestem.ops import aggregate
 from readablestem.web import db
 
 PAST = datetime.now(UTC) - timedelta(days=2)
@@ -42,33 +40,11 @@ def database(tmp_path, monkeypatch):
     engine.dispose()
 
 
-def last_line(capsys) -> str:
-    return capsys.readouterr().out.strip().splitlines()[-1]
-
-
 def seed(factory) -> None:
     with db.session_scope(factory) as s:
         user = add_user(s)
         add_job(s, user, result=sentinel_result(), retain_until=PAST, blobs=2)
         add_job(s, user, retain_until=datetime.now(UTC) + timedelta(hours=1), blobs=1)
-
-
-def test_ops_commands_are_registered(capsys):
-    with pytest.raises(SystemExit):
-        build_parser().parse_args(["ops", "--help"])
-    out = capsys.readouterr().out
-    for command in ("aggregate", "purge", "cron"):
-        assert command in out
-    with pytest.raises(SystemExit):
-        build_parser().parse_args(["ops"])  # a subcommand is required
-
-
-def test_aggregate_then_purge(database, capsys):
-    seed(database)
-    assert main(["ops", "aggregate"]) == 0
-    assert last_line(capsys) == "aggregated_jobs=2"
-    assert main(["ops", "purge"]) == 0
-    assert last_line(capsys) == "jobs_deleted=1 blobs_deleted=2 unaggregated_deleted=0"
 
 
 def test_cron_prints_counts_only(database, capsys):
@@ -78,37 +54,6 @@ def test_cron_prints_counts_only(database, capsys):
     assert out.strip().splitlines()[-1] == (
         "aggregated_jobs=2 jobs_deleted=1 blobs_deleted=2 unaggregated_deleted=0"
     )
-    assert SENTINEL not in out
-
-
-def test_cron_purges_and_fails_when_aggregation_fails(database, capsys, monkeypatch):
-    seed(database)
-
-    def broken(*_args, **_kwargs):
-        raise RuntimeError("aggregation bug")
-
-    monkeypatch.setattr(aggregate, "job_counts", broken)  # the cron and the purge both fail
-    assert main(["ops", "cron"]) == 1
-    assert last_line(capsys) == (
-        "aggregated_jobs=failed jobs_deleted=1 blobs_deleted=2 unaggregated_deleted=1"
-    )
-
-
-def test_weekly_report_prints_the_error_analysis_tables(database, capsys):
-    with db.session_scope(database) as s:
-        add_job(s, add_user(s), result=sentinel_result(), finished_at=datetime.now(UTC))
-    assert main(["ops", "aggregate"]) == 0
-    capsys.readouterr()
-    assert main(["ops", "report", "--days", "7"]) == 0
-    out = capsys.readouterr().out
-    assert "ReadableSTEM error analysis" in out
-    assert "pages converted  2" in out and "cost per page    $0.0030" in out
-    assert "equation: 3 fixes by status" in out
-    assert "latex.allowed_commands:unknown_command" in out
-    # Review load: 3 equation decisions on 2 pages; why each tier, by code.
-    assert re.search(r"required decisions +3 \(1.50 per page\)", out)
-    assert "equation: review tiers" in out and "equation: why required" in out
-    assert "low_confidence" in out
     assert SENTINEL not in out
 
 

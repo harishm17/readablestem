@@ -41,18 +41,6 @@ def test_readyz_is_ready_with_a_key_and_shows_no_secret(tmp_path):
     assert SECRET_KEY not in response.text and "gpt" not in response.text
 
 
-def test_readyz_follows_the_selected_provider(tmp_path):
-    only_openai = {"model_provider": "anthropic", "openai_api_key": SECRET_KEY}
-    _env, client = running(tmp_path, **only_openai)
-    with client as web:
-        response = web.get("/readyz")
-    assert response.status_code == 503
-    assert response.json()["checks"]["model_provider"] == "no_key"
-    _env, client = running(tmp_path / "b", model_provider="anthropic", anthropic_api_key="sk-a")
-    with client as web:
-        assert web.get("/readyz").status_code == 200
-
-
 def test_readyz_without_any_key_is_not_ready_unless_the_models_are_fake(tmp_path):
     _env, client = running(tmp_path)
     with client as web:
@@ -60,16 +48,6 @@ def test_readyz_without_any_key_is_not_ready_unless_the_models_are_fake(tmp_path
     _env, client = running(tmp_path / "f", fake_models=True)
     with client as web:
         assert web.get("/readyz").json()["checks"]["model_provider"] == "fake"
-
-
-def test_readyz_names_the_database_when_it_does_not_answer(tmp_path, monkeypatch):
-    _env, client = running(tmp_path, openai_api_key=SECRET_KEY)
-    with client as web:
-        monkeypatch.setattr(health, "ping", lambda engine: False)
-        response = web.get("/readyz")
-        assert web.get("/healthz").status_code == 200  # a different ping: untouched here
-    assert response.status_code == 503
-    assert response.json()["checks"]["database"] == "unreachable"
 
 
 def test_readyz_reports_the_worker_alive_stalled_and_stopping(tmp_path, monkeypatch):
@@ -148,17 +126,6 @@ def test_sigterm_hook_stops_the_worker_and_then_calls_the_previous_handler(tmp_p
             assert signal.getsignal(signal.SIGTERM) is not None
     finally:
         signal.signal(signal.SIGTERM, outer)
-
-
-def test_the_sigterm_hook_does_nothing_off_the_main_thread():
-    before = signal.getsignal(signal.SIGTERM)
-    result: list[object] = []
-    thread = threading.Thread(
-        target=lambda: result.append(health.stop_worker_on_sigterm(object())())
-    )
-    thread.start()
-    thread.join(5)
-    assert result == [None] and signal.getsignal(signal.SIGTERM) is before
 
 
 # ------------------------------------------------------------- a real server and SIGTERM

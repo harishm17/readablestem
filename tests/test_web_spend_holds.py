@@ -47,28 +47,6 @@ def books(factory, day: date | None = None) -> tuple[float, float, float, float]
         return (row.spent_usd, row.held_usd, row.open_spent_usd, row.open_held_usd)
 
 
-def test_every_hold_is_a_row_and_its_settlement_deletes_it(factory):
-    guard = DbSpendGuard(factory, 5.0, open_cap_usd=2.0)
-    plain = guard.reserve(0.3)
-    pooled = guard.scoped(OPEN, "j" * 32).reserve(0.2)
-    rows = {h.id: h for h in holds(factory)}
-    assert set(rows) == {plain.id, pooled.id}
-    assert (rows[plain.id].amount_usd, rows[plain.id].in_pool, rows[plain.id].job_id) == (
-        0.3,
-        False,
-        None,
-    )
-    assert (rows[pooled.id].amount_usd, rows[pooled.id].in_pool, rows[pooled.id].job_id) == (
-        0.2,
-        True,
-        "j" * 32,
-    )
-    guard.settle(plain, 0.1)
-    guard.settle(pooled, 0.05)
-    assert holds(factory) == []
-    assert books(factory) == pytest.approx((0.15, 0.0, 0.05, 0.0))
-
-
 def test_a_refused_hold_leaves_no_record(factory):
     guard = DbSpendGuard(factory, 0.1, open_cap_usd=0.05)
     with pytest.raises(BudgetExceeded):

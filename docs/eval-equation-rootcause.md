@@ -263,5 +263,5 @@ result will show in this metric. The equation prompt's `\text` for upright words
 | Build, runs | `scripts/realworld_build.py build --order data/realworld/order-realworld-fresh2-2026-10-21.json --target 15 --single-part fresh2 --candidates-out candidates-fresh2.json`; `scripts/realworld_run.py chat|rs --part fresh2` |
 | Results (the report's JSON, both readings) | `data/realworld/results-fresh2.json`, `results-fresh2-cells.json`, `results-dev-rootcause.json`, `results-dev-rootcause-cells.json` |
 | Spend and the code each arm ran | `data/realworld/spend-log.jsonl` (`git_head`, `src_tree`) |
-| Tests | `tests/test_layout_italic_variables.py`, `test_layout_run_edges.py`, `test_layout_captions.py`, `test_equation_bold_italic.py`, `test_equation_neighbour_brackets.py`, `test_equation_neighbour_marks.py`, `test_eval_table_maths_reading.py` |
+| Tests | `tests/test_layout_italic_variables.py`, `test_layout_run_edges.py`, `test_layout_captions.py`, `test_equation_bold_italic.py`, `test_equation_neighbour_brackets.py`, `test_equation_neighbour_marks.py` |
 

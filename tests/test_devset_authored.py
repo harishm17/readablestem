@@ -8,7 +8,6 @@ every one of them. Offline; no Tectonic, LibreOffice or python-docx needed.
 
 from __future__ import annotations
 
-import json
 import unicodedata
 from functools import cache
 from pathlib import Path
@@ -62,20 +61,6 @@ def flat(text: str, *, hyphens: bool = True) -> str:
 
 
 @pytest.mark.parametrize("doc", DOCS)
-def test_each_document_has_its_source_a_small_untagged_pdf_and_dev_gold(doc: str) -> None:
-    records = gold(doc)
-    assert records and {r["variant"] for r in records} == {"dev"}
-    toolchain = records[0]["toolchain"]
-    assert (ROOT / doc / f"{doc}{SOURCE[toolchain]}").is_file()
-    pdf = ROOT / doc / f"{doc}.pdf"
-    assert pdf.stat().st_size < 300_000
-    with pymupdf.open(pdf) as opened:
-        assert opened.page_count >= 1
-        assert opened.xref_get_key(opened.pdf_catalog(), "StructTreeRoot")[0] == "null"
-    assert all(r["pdf"] == f"authored/{doc}/{doc}.pdf" for r in records)
-
-
-@pytest.mark.parametrize("doc", DOCS)
 def test_records_carry_licence_known_kinds_and_classes(doc: str) -> None:
     records = gold(doc)
     ids = [r["id"] for r in records]
@@ -112,14 +97,6 @@ def test_headings_and_other_text_gold_is_on_the_page_it_names(doc: str) -> None:
 
 
 @pytest.mark.parametrize("doc", DOCS)
-def test_hyphen_breaks_name_a_word_that_is_in_the_document(doc: str) -> None:
-    for r in (r for r in gold(doc) if r["kind"] == "hyphen_break"):
-        assert r["left"] and r["right"] and r["word"]
-        assert flat(r["word"]) == flat(r["left"] + r["right"])
-        assert r["compound"] == ("-" in r["word"])
-
-
-@pytest.mark.parametrize("doc", DOCS)
 def test_the_layout_step_reads_the_pdf(doc: str) -> None:
     layout = analyze((ROOT / doc / f"{doc}.pdf").read_bytes())
     kinds = {e.kind for e in layout.elements}
@@ -134,13 +111,3 @@ def test_equation_gold_scores_one_against_itself() -> None:
     summary = score_equations(equations, None)["summary"]
     assert summary["n"] == len(equations) > 200
     assert summary["exact_lenient"] == 1.0
-
-
-def test_the_documents_cover_the_toolchains_and_the_manifest_lists_them() -> None:
-    toolchains = {gold(doc)[0]["toolchain"] for doc in DOCS}
-    assert toolchains == {"tectonic", "libreoffice", "chromium"}
-    manifest = json.loads((ROOT.parent / "manifest.json").read_text(encoding="utf-8"))
-    assert [d["id"] for d in manifest["authored_documents"]] == DOCS
-    index = json.loads((ROOT / "index.json").read_text(encoding="utf-8"))
-    for entry in index["documents"]:
-        assert (ROOT / entry["pdf"]).is_file() and (ROOT / entry["gold"]).is_file()

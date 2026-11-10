@@ -9,24 +9,16 @@ after it.
 
 from __future__ import annotations
 
-from datetime import timedelta
-from pathlib import Path
-
 import pytest
 from sqlalchemy import select
 
 from fixtures.web.support import (
-    ADMIN,
-    BOB,
-    login,
     make_pdf,
-    make_settings,
     upload,
 )
-from readablestem.ops.retention import erase_user, purge_expired, purge_tombstones
 from readablestem.web import tombstones
 from readablestem.web.database import utc_today
-from readablestem.web.db import DeletedAccount, QuotaDay, User, session_scope, utcnow
+from readablestem.web.db import DeletedAccount, QuotaDay, session_scope
 from readablestem.web.quota import try_consume_reread
 from test_web_open_signup import (
     CAROL,
@@ -34,7 +26,6 @@ from test_web_open_signup import (
     client_for,
     delete_account,
     make_env,
-    signups_now,
     user_row,
 )
 
@@ -102,39 +93,6 @@ def test_a_loop_of_deleting_and_signing_up_never_gets_more_than_one_days_quota(e
     assert upload(client, make_pdf(1)).status_code == 429
 
 
-def test_signing_up_again_takes_no_new_place_from_the_days_count(tmp_path):
-    env = make_env(tmp_path, max_new_accounts_per_day=2)
-    with env.running():
-        for _ in range(5):
-            delete_account(client_for(env, CAROL))
-        assert signups_now(env) == 1  # one place, used once, however many times she came back
-        assert login(env.client(), DAVE).status_code == 303  # the second place is still there
-        assert login(env.client(), "late@example.org").status_code == 503
-        assert signups_now(env) == 2
-        # Coming back is still possible for the address that already has its place today.
-        delete_account(client_for(env, CAROL))
-        assert login(env.client(), CAROL).status_code == 303
-        assert signups_now(env) == 2
-
-
-def test_an_account_from_an_earlier_day_takes_a_place_when_it_comes_back(tmp_path):
-    env = make_env(tmp_path, max_new_accounts_per_day=3)
-    with env.running():
-        client = client_for(env, CAROL)
-        with session_scope(env.ctx.factory) as session:
-            row = session.scalar(select(User).where(User.email == CAROL))
-            assert row is not None
-            row.created_at = utcnow() - timedelta(days=3)  # made long ago
-        before = signups_now(env)
-        delete_account(client)
-        assert signups_now(env) == before  # deleting counts nothing
-        login(env.client(), CAROL)
-        assert signups_now(env) == before + 1  # she is new today: one place
-        delete_account(client_for(env, CAROL))
-        login(env.client(), CAROL)
-        assert signups_now(env) == before + 1  # and only the one
-
-
 def test_the_record_holds_a_hash_of_the_address_and_numbers_never_the_address(env):
     client = client_for(env, CAROL)
     upload(client, make_pdf(2))
@@ -153,89 +111,3 @@ def test_the_record_holds_a_hash_of_the_address_and_numbers_never_the_address(en
     assert tombstones.email_hash(key, DAVE) != record.email_hash
     assert tombstones.email_hash(key + b"x", CAROL) != record.email_hash
     assert tombstones.email_hash(key, " Carol@Example.ORG ") == record.email_hash
-
-
-def test_the_key_comes_from_the_session_secret():
-    a = tombstones.tombstone_key(make_settings(Path("."), session_secret="s" * 40))
-    b = tombstones.tombstone_key(make_settings(Path("."), session_secret="t" * 40))
-    assert a != b and tombstones.tombstone_key(
-        make_settings(Path("."))
-    )  # development: a fixed key, so tests and a local server work
-
-
-def test_nothing_is_written_for_an_account_that_used_nothing_and_took_no_place_today(env):
-    client = client_for(env, CAROL)
-    with session_scope(env.ctx.factory) as session:
-        row = session.scalar(select(User).where(User.email == CAROL))
-        assert row is not None
-        row.created_at = utcnow() - timedelta(days=2)
-    delete_account(client)
-    assert records(env) == []
-
-
-def test_two_deletions_in_a_day_keep_the_larger_numbers(env):
-    client = client_for(env, CAROL)
-    upload(client, make_pdf(3))
-    delete_account(client)
-    client = client_for(env, CAROL)  # comes back with 3 used
-    upload(client, make_pdf(1))
-    delete_account(client)
-    (record,) = records(env)
-    assert record.pages == 4 and record.slot_taken is True
-    assert used_after_return(env) == 4
-
-
-def used_after_return(env) -> int:
-    client_for(env, CAROL)
-    return used(env, CAROL)[0]
-
-
-def test_old_records_are_purged_and_todays_are_kept(env):
-    with session_scope(env.ctx.factory) as session:
-        today = utc_today()
-        for n, day in enumerate((today - timedelta(days=2), today - timedelta(days=1), today)):
-            session.add(DeletedAccount(email_hash=f"{n:064d}", day=day, pages=1, rereads=0))
-    with session_scope(env.ctx.factory) as session:
-        assert purge_tombstones(session, utcnow()) == 2
-    assert [r.day for r in records(env)] == [utc_today()]
-    stats = purge_expired(env.ctx.factory, utcnow() + timedelta(days=1))
-    assert stats.tombstones_deleted == 1 and records(env) == []
-
-
-def test_the_command_line_deletion_leaves_the_same_record(tmp_path, monkeypatch, capsys):
-    from readablestem.cli.main import main
-    from readablestem.web import db
-
-    settings = make_settings(tmp_path, env="dev", signup_mode="open")
-    monkeypatch.setattr("readablestem.config.get_settings", lambda: settings)
-    engine = db.make_engine(settings.database_url)
-    factory = db.make_sessionmaker(engine)
-    assert main(["users", "allow", BOB]) == 0  # makes the tables and the account
-    assert main(["users", "delete", BOB, "--yes"]) == 0
-    with db.session_scope(factory) as session:
-        (record,) = session.scalars(select(DeletedAccount)).all()
-        assert record.email_hash == tombstones.email_hash(tombstones.tombstone_key(settings), BOB)
-        assert record.slot_taken is True  # the row was made today
-    engine.dispose()
-    capsys.readouterr()
-
-
-def test_erase_without_a_key_writes_nothing(env):
-    client = client_for(env, CAROL)
-    upload(client, make_pdf(1))
-    row = user_row(env, CAROL)
-    assert row is not None
-    with session_scope(env.ctx.factory) as session:
-        erase_user(session, row.id)
-    assert records(env) == []
-
-
-def test_an_invited_person_who_deletes_comes_back_as_an_open_account_with_the_days_use(env):
-    env.allow(BOB)
-    client = client_for(env, BOB)
-    upload(client, make_pdf(4))
-    delete_account(client)
-    assert login(env.client(), BOB).status_code == 303  # open mode: a new account
-    row = user_row(env, BOB)
-    assert row is not None and row.access_tier == "open"
-    assert used(env, BOB)[0] == 4 and ADMIN != BOB

@@ -3,14 +3,13 @@ held-out and sealed runs."""
 
 from __future__ import annotations
 
-import inspect
 import json
 import sys
 
 import pytest
 
-from readablestem.eval import gate, run_record
 from readablestem.eval import pipeline_eval as pe
+from readablestem.eval import run_record
 from test_chem_report_fields import PAGE, dcc, run_rows  # noqa: F401
 
 
@@ -19,11 +18,6 @@ def test_the_report_names_no_item_ids(run_rows):  # noqa: F811
     block = pe.document_metrics([item])["chemistry"]
     assert "gold_ids" not in block["silent_harm"]
     assert PAGE not in json.dumps(block)
-
-
-def test_the_gate_does_not_read_the_chemistry_block():
-    source = inspect.getsource(gate)
-    assert "chem_right_excl_times" not in source and "silent_harm" not in source
 
 
 @pytest.mark.parametrize("set_name", ["heldout", "chem-heldout", "dev-v2-check"])

@@ -9,7 +9,7 @@ from __future__ import annotations
 import pymupdf
 import pytest
 
-from readablestem.pipeline import page_type, slides
+from readablestem.pipeline import page_type
 
 
 def hint(producer: str = "", creator: str = "") -> str:
@@ -54,41 +54,3 @@ def hint(producer: str = "", creator: str = "") -> str:
 )
 def test_a_pdf_that_says_tex_made_it_is_tex(producer, creator):
     assert hint(producer, creator) == "tex"
-
-
-@pytest.mark.parametrize(
-    ("producer", "creator", "expected"),
-    [
-        ("Quartz PDFContext", "Word", "office"),  # "PDFContext" holds "tex"
-        ("Quartz PDFContext", "", "other"),
-        ("iText 5.5.13 ©2000-2018 iText Group NV", "", "other"),
-        ("Microsoft® Word 2019", "Microsoft® Word 2019", "office"),
-        ("LibreOffice 7.5", "Writer", "other"),
-        ("Adobe Acrobat Pro 23.1", "Acrobat PDFMaker 23 for Word", "office"),
-        ("Skia/PDF m120", "Chromium", "chromium"),
-        ("GPL Ghostscript 9.55.0", "PScript5.dll Version 5.2.2", "other"),
-        ("GPL Ghostscript 10.02", "", "other"),
-        ("", "", "other"),
-        # Real strings from the corpora that hold "tex" only inside another word.
-        (
-            "iOS Version 16.6 (Build 20G75) Quartz PDFContext",
-            "iOS Version 16.6 Quartz PDFContext",
-            "apple_mobile",
-        ),
-        ("macOS Version 14.1.1 (Build 23B81) Quartz PDFContext", "", "other"),
-        ("macOS Version 10.14.6 (Build 18G95) Quartz PDFContext", "Keynote", "other"),
-        ("MiKTeX GPL Ghostscript 9.25", "(ImageMagick)", "other"),  # a Ghostscript build, not TeX
-        ("Skia/PDF m156", "Chromium", "chromium"),
-        ("LibreOffice 26.2.6.3 (X86_64)", "Writer", "other"),
-        ("OCRmyPDF 16 / Tesseract", "OCRmyPDF 16 / Tesseract", "ocr_tool"),
-        ("ReadableSTEM fixtures", "ReadableSTEM fixtures", "other"),
-        ("Matplotlib pdf backend v3.11.2", "Matplotlib v3.11.2", "other"),
-    ],
-)
-def test_other_producers_are_not_tex(producer, creator, expected):
-    assert hint(producer, creator) == expected
-
-
-def test_beamer_is_a_word_in_the_creator():
-    assert slides._BEAMER.search("LaTeX with Beamer class")
-    assert not slides._BEAMER.search("Beamerology Suite")

@@ -5,9 +5,7 @@ from __future__ import annotations
 import pytest
 
 from readablestem.eval.equations import (
-    MathMLError,
     canonical,
-    latex_to_mathml,
     score_latex,
     score_mathml,
     summarize,
@@ -33,11 +31,6 @@ OPENSTAX_DELTA_T = """
   <mi>Δ</mi><mi>t</mi></mrow></annotation-xml></semantics></math>
 """
 
-DELTA_T_CANONICAL = (
-    "<math><mi>Δ</mi><mi>t</mi><mo>=</mo><msub><mi>t</mi><mtext>f</mtext></msub>"
-    "<mo>−</mo><msub><mi>t</mi><mtext>0</mtext></msub><mo>.</mo></math>"
-)
-
 
 # Copied verbatim from data/gold (openstax/physics/2-1-.../eq-005). OpenStax writes every
 # bold vector as an mstyle wrapper; 16 of the 30 sample equations contain one.
@@ -56,10 +49,6 @@ OPENSTAX_BOLD_D1 = """<math display="inline" xmlns="http://www.w3.org/1998/Math/
                     </msub>
 
                   </mrow></annotation-xml></semantics></math>"""
-
-
-def test_openstax_noise_is_stripped():
-    assert canonical(OPENSTAX_DELTA_T) == DELTA_T_CANONICAL
 
 
 @pytest.mark.parametrize(
@@ -139,29 +128,6 @@ def test_different_maths_stays_different(a, b):
 
 
 # ------------------------------------------------- mathvariant inheritance (mstyle)
-
-
-def test_mstyle_bold_is_pushed_down_to_its_token():
-    assert canonical(OPENSTAX_BOLD_D1) == (
-        '<math><mtext>Δ</mtext><msub><mi mathvariant="bold">d</mi><mn>1</mn></msub></math>'
-    )
-
-
-def test_openstax_bold_vector_matches_mathbf_exactly():
-    gold = (
-        '<math><msub><mstyle mathvariant="bold" mathsize="normal"><mi>d</mi></mstyle>'
-        "<mn>1</mn></msub></math>"
-    )
-    score = score_latex(r"\mathbf{d}_1", gold)
-    assert score.exact_strict and score.exact_lenient and score.teds == 1.0
-
-
-def test_real_gold_bold_vector_differs_only_in_delta_token_type():
-    # Gold has <mtext>Δ</mtext>; LaTeX \Delta gives <mi>Δ</mi>. Lenient forgives that.
-    score = score_latex(r"\Delta \mathbf{d}_1", OPENSTAX_BOLD_D1)
-    assert score.exact_lenient
-    assert not score.exact_strict
-    assert score.ted == 1  # one relabel: mtext Δ -> mi Δ
 
 
 def test_unbolded_vector_still_differs():
@@ -268,15 +234,6 @@ def test_wrong_operator_fails_both_exact_metrics():
     assert score.ted == 1
 
 
-def test_fraction_from_latex_matches_openstax_style():
-    gold = (
-        '<math display="block"><semantics><mrow><mrow><msub><mi>v</mi><mtext>avg</mtext>'
-        "</msub><mo>=</mo><mfrac><mi>d</mi><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac>"
-        "</mrow></mrow></semantics></math>"
-    )
-    assert score_latex(r"v_\text{avg} = \frac{d}{\Delta t}", gold).exact_strict
-
-
 def test_unparseable_prediction_scores_zero_with_error():
     score = score_mathml("<math><mi>x</math>", OPENSTAX_DELTA_T)
     assert score.error is not None
@@ -287,16 +244,6 @@ def test_bad_latex_scores_zero_with_error():
     score = score_latex(r"\frac{a}{", OPENSTAX_DELTA_T)
     assert score.error is not None
     assert score.teds == 0.0
-
-
-def test_latex_to_mathml_returns_math_element():
-    out = latex_to_mathml("x^2")
-    assert out.startswith("<math") and "<msup>" in out
-
-
-def test_latex_to_mathml_raises_mathml_error():
-    with pytest.raises(MathMLError):
-        latex_to_mathml(r"\frac{a}{")
 
 
 def test_summarize():

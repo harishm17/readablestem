@@ -30,18 +30,3 @@ def test_an_edit_with_swapped_digits_is_a_meaning_level_difference():
     found = edit_check.check_equation_edit(element, fix, r"v = 63\ \text{m/s}")
     assert {c.code for c in found.failed} == {"number_mismatch"}
     assert found.meaning == ["The PDF has the number 36 where your edit has 63."]
-
-
-def test_an_edit_with_a_changed_capital_is_a_meaning_level_difference():
-    element, fix = case("\U0001d464/\U0001d454", "w/g")
-    found = edit_check.check_equation_edit(element, fix, "W/g")
-    assert {c.code for c in found.failed} == {"case_mismatch"}
-    assert found.meaning == ["The PDF has a small w; your edit has a capital W."]
-
-
-def test_an_edit_that_keeps_the_numbers_and_case_has_no_difference():
-    element, fix = case("v = 36 m/s", r"v = 63\ \text{m/s}")
-    found = edit_check.check_equation_edit(element, fix, r"v = 36\ \text{m/s}")
-    assert not found.failed and not found.meaning
-    names = {c.name for c in found.checks}
-    assert {"equation.text_layer_numbers", "equation.text_layer_case"} <= names

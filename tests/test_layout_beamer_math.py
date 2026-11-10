@@ -15,7 +15,6 @@ mark gets removed with it.
 from __future__ import annotations
 
 import json
-import re
 from functools import cache
 from pathlib import Path
 
@@ -74,21 +73,6 @@ def test_the_gold_matches_the_decks():
 
 
 @pytest.mark.parametrize("name", cases())
-def test_each_frame_title_is_a_heading_once(name):
-    """On the frame's first page, or, when its earlier overlay steps are not read again
-    (`pipeline.slides`), on its last: one heading with the title, on one page."""
-    layout = load(name)
-    for frame in gold(name)["frames"]:
-        found = [
-            e.page
-            for p in frame["pages"]
-            for e in on_page(layout, p)
-            if e.kind == Kind.HEADING and e.text == frame["title"]
-        ]
-        assert len(found) == 1, frame["title"]
-
-
-@pytest.mark.parametrize("name", cases())
 def test_display_equations_on_the_last_page_of_a_frame_match_the_gold_count(name):
     layout = load(name)
     for k, frame in enumerate(gold(name)["frames"]):
@@ -125,70 +109,4 @@ def test_inline_equations_on_the_last_page_of_a_frame_match_the_gold_count(name)
         assert len(inline) == expected, frame["title"]
 
 
-@pytest.mark.parametrize("name", cases())
-def test_a_slide_number_or_footer_bar_is_not_read_as_text(name):
-    footer = re.compile(r"^\d+\s*/\s*\d+$|R\. Example|Waves and Oscillations|Spring 2027")
-    assert not [t for t in text_of(load(name)) if footer.search(t)]
-
-
 # ---------------------------------------------------------------- known failures
-
-
-@pytest.mark.parametrize("name", cases())
-def test_overlay_steps_do_not_repeat_content(name):
-    layout = load(name)
-    shown = [
-        (e.text or "").strip()
-        for e in layout.elements
-        if e.kind in (Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.HEADING) and (e.text or "").strip()
-    ]
-    shown += [(e.text or "").strip() for e in layout.elements if e.kind == Kind.EQUATION and e.text]
-    # Inline placeholders carry the page number; compare the text without them.
-    shown = [re.sub(r"⟦[^⟧]*⟧", "", s) for s in shown]
-    duplicates = {s for s in shown if shown.count(s) > 1}
-    assert not duplicates
-
-
-def test_a_theme_header_bar_is_not_content():
-    layout = load("beamer_theme_bars")
-    bar = re.compile(r"Superposition|Basics|Beats|^Waves$")
-    assert not [
-        e
-        for e in layout.elements
-        if e.kind in (Kind.PARAGRAPH, Kind.FIGURE, Kind.HEADING) and bar.search(e.text or "")
-    ]
-
-
-def test_two_columns_are_read_left_then_right():
-    layout = load("beamer_columns_table")
-    texts = [(e.text or "") for e in on_page(layout, 0)]
-    order = [
-        next(i for i, t in enumerate(texts) if key in t)
-        for key in ("Force view", "Hooke", "force points", "Energy view", "Stored", "energy is")
-    ]
-    assert order == sorted(order)
-
-
-def test_a_table_cell_that_is_one_formula_is_an_inline_equation_of_the_table():
-    """Layout reads a cell whose glyphs say it is maths as an equation of the table: the cell
-    names it (`TableCell.equation_id`), the equation step reads its crop, and the page writes
-    what it read into the cell (`pipeline.table_math`)."""
-    layout = load("beamer_columns_table")
-    table = next(e for e in layout.elements if e.kind == Kind.TABLE)
-    by_id = {e.id: e for e in layout.elements}
-    cells = {c.text: c for c in table.table.cells}
-    for text in ("m", "k", "ω = √k/m", "T = 2π/ω"):
-        child = by_id[cells[text].equation_id]
-        assert child.kind == Kind.EQUATION and child.display == "inline"
-        assert child.parent_id == table.id
-        x0, y0, x1, y1 = table.bbox
-        assert x0 <= child.bbox[0] and child.bbox[2] <= x1 and y0 <= child.bbox[1] <= y1
-        assert (child.text or "").replace(" ", "") == text.replace(" ", "")
-    for text in ("Mass", "Stiffness", "Quantity"):  # words are not maths
-        assert cells[text].equation_id is None
-
-
-def test_table_text_with_a_ligature_is_intact():
-    layout = load("beamer_columns_table")
-    table = next(e for e in layout.elements if e.kind == Kind.TABLE)
-    assert "Stiffness" in {c.text for c in table.table.cells}

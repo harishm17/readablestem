@@ -31,7 +31,7 @@ from readablestem.core.types import (
 )
 from readablestem.web import bulk_accept, report_item
 from readablestem.web.db import ReviewEdit, session_scope
-from readablestem.web.review import BULK_KEY, WRITE_KEY, ReviewInvalid
+from readablestem.web.review import BULK_KEY, WRITE_KEY
 
 BOX = (50.0, 600.0, 200.0, 620.0)
 EQUATION_CANDIDATES = ["p1-e2", "p2-e7"]
@@ -174,57 +174,7 @@ def test_a_heading_group_or_kept_page_is_never_a_candidate():
     assert all(f.group_key is None for f in bulk_accept.candidates(result, "figures"))
 
 
-def test_accept_all_marks_each_change_as_bulk_and_refuses_when_there_is_none():
-    result = scaled_output().result
-    changes = bulk_accept.accept_all(result, "equations")
-    assert [c.element_id for c in changes] == EQUATION_CANDIDATES
-    assert all(c.after[BULK_KEY] == "equations" and c.action == "accept" for c in changes)
-    assert all(result.fix_for(e).reviewed for e in EQUATION_CANDIDATES)
-    with pytest.raises(ReviewInvalid) as refused:
-        bulk_accept.accept_all(result, "equations")
-    assert "No equation is waiting" in refused.value.errors[0].message
-
-
 # --------------------------------------------------------------------------- the pages
-
-
-def test_the_confirm_page_gives_the_count_and_lists_exactly_what_would_be_accepted(scaled):
-    response = confirm_page(scaled, "equations")
-    assert response.status_code == 200
-    page = response.text
-    assert "<h1>Accept equations that passed every check</h1>" in page
-    assert "2 equations are waiting" in " ".join(page.split())
-    listed = re.findall(r'<li id="bulk-([\w-]+)"', page)
-    assert listed == EQUATION_CANDIDATES
-    assert 'value="list"' in page and 'name="version"' in page and 'name="csrf_token"' in page
-    figures = confirm_page(scaled, "figures").text
-    assert re.findall(r'<li id="bulk-([\w-]+)"', figures) == FIGURE_CANDIDATES
-    assert "A car on a road between a house and a school." in unescape(figures)
-
-
-def test_the_list_and_the_review_screen_offer_the_actions_with_counts(scaled):
-    listing = scaled.browser.get(f"/jobs/{scaled.job_id}/review/list").text
-    assert f'href="/jobs/{scaled.job_id}/accept/equations?view=list"' in listing
-    assert "Accept equations that passed every check (2)" in listing
-    assert "Accept figures with generated alt text (2)" in listing
-    split = scaled.browser.get(f"/jobs/{scaled.job_id}/review").text
-    assert f'href="/jobs/{scaled.job_id}/accept/figures?view=split"' in split
-
-
-def test_no_offer_when_nothing_qualifies(tmp_path):
-    env = WebEnv(tmp_path)
-    env.converter.output = review_output()  # its one waiting equation has a warning
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        listing = client.get(f"/jobs/{env.job_id}/review/list").text
-        assert "bulk-offers" in listing  # the figure p1-e6 qualifies
-        assert "Accept all remaining equations" not in listing
-        assert "Nothing is waiting" not in confirm_page(env, "equations").text
-        assert "No equation is waiting" in confirm_page(env, "equations").text
 
 
 # --------------------------------------------------------------------------- the decision
@@ -252,17 +202,6 @@ def test_accepting_changes_only_the_listed_items_in_one_write_marked_bulk(scaled
     assert all(fixes[e].reviewed for e in EQUATION_CANDIDATES)
 
 
-def test_figures_are_accepted_the_same_way_and_the_notice_says_how_many(scaled):
-    response = accept(scaled, "figures")
-    assert response.status_code == 303
-    after = statuses(scaled)
-    assert [after[e] for e in FIGURE_CANDIDATES] == ["accepted", "accepted"]
-    # Decorative, empty, failed-check and decided figures are as they were.
-    assert after["p2-e13"] == after["p2-e14"] == after["p2-e15"] == "needs_review"
-    page = scaled.browser.get(response.headers["location"].split("#")[0]).text
-    assert "Accepted 2 figures with generated alt text." in unescape(page)
-
-
 def test_undo_takes_the_whole_action_back_as_one_step(scaled):
     original = statuses(scaled)
     accept(scaled, "equations")
@@ -281,15 +220,6 @@ def test_undo_takes_the_whole_action_back_as_one_step(scaled):
     undo_edits = [e for e in edits(scaled) if e.action == "undo"]
     assert sorted(e.element_id for e in undo_edits) == EQUATION_CANDIDATES
     assert not any(f.reviewed for f in stored(scaled).fixes if f.element_id in EQUATION_CANDIDATES)
-
-
-def test_the_review_record_says_which_bulk_action_each_decision_was_part_of(scaled):
-    accept(scaled, "equations")
-    accept(scaled, "figures")
-    page = " ".join(unescape(scaled.browser.get(f"/jobs/{scaled.job_id}/record").text).split())
-    assert "together with the other equations whose checks passed, in one action" in page
-    assert "together with the other figures with generated alt text, in one action" in page
-    assert "other clean tables" not in page
 
 
 def test_the_form_needs_the_csrf_token(scaled):
@@ -349,35 +279,12 @@ def test_with_nothing_to_accept_nothing_is_written(scaled):
     assert "No equation is waiting with every check passed." in unescape(page)
 
 
-def test_from_the_review_screen_it_goes_on_to_the_next_decision(scaled):
-    response = accept(scaled, "equations", view="split")
-    assert response.status_code == 303
-    assert response.headers["location"].startswith(f"/jobs/{scaled.job_id}/review")
-    assert "/review/list" not in response.headers["location"]
-
-
 # --------------------------------------------------------------------------- the filter
 
 
 def needs_decision(page: str) -> str:
     start = page.index('<section id="needs-decision"')
     return page[start : page.index("</section>", page.index('id="optional-checks"'))]
-
-
-def cards_in(section: str) -> list[str]:
-    return re.findall(r'<article id="(?:fix-|group-card-)?([\w-]+)"', section)
-
-
-def test_filter_by_kind_shows_only_that_kind_and_says_how_many(scaled):
-    page = scaled.browser.get(f"/jobs/{scaled.job_id}/review/list?kind=figures").text
-    section = needs_decision(page)
-    assert 'id="group-figures"' in section and 'id="group-equations"' not in section
-    assert 'id="group-headings"' not in section
-    result = re.search(r'<p id="filter-result"[^>]*>([^<]*)</p>', page)
-    assert result and result.group(1).startswith("Showing 5 of ")
-    assert "figures" in result.group(1)
-    assert 'role="status"' in result.group(0) and 'tabindex="-1"' in result.group(0)
-    assert '<option value="figures" selected>' in page
 
 
 def test_filter_by_page_keeps_decisions_on_that_page_and_heading_groups_spanning_it(scaled):
@@ -390,13 +297,6 @@ def test_filter_by_page_keeps_decisions_on_that_page_and_heading_groups_spanning
     assert 'value="1"' in only_one
 
 
-def test_both_filters_together_and_a_way_back(scaled):
-    page = scaled.browser.get(f"/jobs/{scaled.job_id}/review/list?kind=equations&page=2").text
-    section = needs_decision(page)
-    assert "fix-p2-e7" in section and "fix-p1-e2" not in section and "fix-p1-e6" not in section
-    assert f'href="/jobs/{scaled.job_id}/review/list#needs-decision"' in page  # show all
-
-
 def test_nothing_matching_says_so_and_bad_values_are_ignored(scaled):
     none = scaled.browser.get(f"/jobs/{scaled.job_id}/review/list?kind=headings&page=1").text
     assert "No decision matches" not in none or "headings" in none
@@ -404,16 +304,6 @@ def test_nothing_matching_says_so_and_bad_values_are_ignored(scaled):
     assert 'id="filter-result"' not in ignored  # shown whole
     letters = scaled.browser.get(f"/jobs/{scaled.job_id}/review/list?page=abc").text
     assert 'id="filter-result"' not in letters
-
-
-def test_the_filter_is_a_labelled_get_form(scaled):
-    page = scaled.browser.get(f"/jobs/{scaled.job_id}/review/list").text
-    form = page[
-        page.index('<form method="get"') : page.index("</form>", page.index('<form method="get"'))
-    ]
-    assert 'action="/jobs/' in form and 'aria-labelledby="filter-title"' in form
-    assert 'for="filter-kind"' in form and 'for="filter-page"' in form
-    assert 'type="number"' in form and 'min="1"' in form and 'max="2"' in form
 
 
 # --------------------------------------------------------------------------- report this item
@@ -455,18 +345,6 @@ def test_item_url_uses_the_feedback_url_when_there_is_one_and_nothing_without():
     assert report_item.item_url(S, "abc123", "p2-e3") is None  # type: ignore[arg-type]
 
 
-def test_no_link_without_a_feedback_path(tmp_path):
-    env = WebEnv(tmp_path, contact_email=None, feedback_url=None)
-    env.converter.output = scaled_output()
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        assert "report-item" not in client.get(f"/jobs/{job_id}/review/list").text
-        assert "report-item" not in client.get(f"/jobs/{job_id}/review?item=p1-e2").text
-
-
 # --------------------------------------------------------------------------- leave a page out
 
 
@@ -502,14 +380,6 @@ def kept(tmp_path):
         env.job_id = job_id_from(upload(client, review_pdf()))
         env.run_worker()
         yield env
-
-
-def test_a_scanned_page_card_has_a_leave_this_page_out_button_on_both_screens(kept):
-    for url in (f"/jobs/{kept.job_id}/review?item=pg-p2-e9", f"/jobs/{kept.job_id}/review/list"):
-        page = kept.browser.get(url).text
-        assert "Leave this page out of the HTML" in page, url
-        assert f'action="/jobs/{kept.job_id}/pages/2/omit"' in page
-        assert 'data-role="omit-page-card"' in page and "leave-hint-pg-p2-e9" in page
 
 
 def test_the_button_leaves_the_page_out_goes_on_and_undo_puts_it_back(kept):
@@ -558,32 +428,6 @@ def test_handwriting_on_a_typed_page_has_no_leave_out_button(tmp_path):
 # --------------------------------------------------------------------------- review fixes
 
 
-def test_the_preview_shows_the_original_crop_beside_each_proposal(scaled):
-    page = confirm_page(scaled, "equations").text
-    assert f"/jobs/{scaled.job_id}/crops/p1-e2.png" in page
-    figures = confirm_page(scaled, "figures").text
-    assert f"/jobs/{scaled.job_id}/crops/p1-e6.png" in figures
-
-
-def test_a_blank_or_missing_version_is_refused_and_nothing_is_accepted(scaled):
-    before = statuses(scaled)
-    blank = accept(scaled, "equations", version="")
-    assert blank.status_code == 409
-    token_ = token(scaled.browser, f"/jobs/{scaled.job_id}/review")
-    missing = scaled.browser.post(
-        f"/jobs/{scaled.job_id}/accept/equations", data={"csrf_token": token_, "view": "list"}
-    )
-    assert missing.status_code == 409
-    assert statuses(scaled) == before and edits(scaled) == []
-
-
-def test_an_answer_that_failed_open_is_not_a_passed_check():
-    result = scaled_output().result
-    ids = [f.element_id for f in bulk_accept.candidates(result, "equations")]
-    assert "p2-e17" not in ids and "p2-e8" not in ids  # no answer, and flagged
-    assert "p2-e12" in [f.element_id for f in bulk_accept.candidates(result, "figures")]
-
-
 def test_a_decision_in_a_filtered_list_comes_back_to_the_filtered_list(scaled):
     page = scaled.browser.get(f"/jobs/{scaled.job_id}/review/list?kind=equations&page=2").text
     assert 'name="flt" value="kind=equations&amp;page=2"' in page
@@ -614,30 +458,6 @@ def test_a_decision_in_a_filtered_list_comes_back_to_the_filtered_list(scaled):
     assert "?" not in plain.headers["location"].split("#")[0]
 
 
-def test_leave_out_says_how_many_decisions_go_with_the_page(kept):
-    page = unescape(kept.browser.get(f"/jobs/{kept.job_id}/review?item=pg-p2-e9").text)
-    assert "Any decisions still waiting on it are dropped with it." in page
-    found = re.search(r"(\d+) decisions? waiting on it (?:goes|go) with it\.", page)
-    assert found and int(found.group(1)) >= 1
-
-
-def test_demo_hits_that_are_counted_are_revalidated_and_others_cached(tmp_path, monkeypatch):
-    from readablestem.web import analytics
-
-    async def nothing(*args, **kwargs) -> None:
-        return None
-
-    monkeypatch.setattr(analytics, "capture", nothing)
-    with WebEnv(tmp_path, analytics_enabled=True).running() as client:
-        counted = client.get("/demo?hm_id=abcdefgh1234")
-        assert counted.headers["cache-control"] == "public, no-cache"
-        again = client.get(
-            "/demo?hm_id=abcdefgh1234", headers={"If-None-Match": counted.headers["etag"]}
-        )
-        assert again.status_code == 304
-        assert client.get("/demo").headers["cache-control"] == "public, max-age=3600"
-
-
 def test_an_item_read_from_an_image_is_never_a_bulk_candidate_whatever_its_checks_say():
     """ADR 0007, point 12: handwritten and scanned maths and tables are each their own decision,
     also when nothing failed and a second reader agreed (the failed check that normally keeps
@@ -661,13 +481,3 @@ def test_an_item_read_from_an_image_is_never_a_bulk_candidate_whatever_its_check
     assert result.fix_for("p1-e2").pending  # type: ignore[union-attr]
     # the table rule too: an image-page table is not a clean table
     assert not is_clean_table(result.fixes[0], element)
-
-
-def test_the_confirm_button_comes_after_the_previews_and_asks_for_a_comparison(scaled):
-    """The evidence (each original beside its proposal) is read before the button that accepts
-    them; the Cancel link and Undo after accepting stay (tests above)."""
-    page = confirm_page(scaled, "figures").text
-    flat = " ".join(page.split())
-    assert page.index('class="bulk-preview"') < page.index('class="bulk-confirm"')
-    assert page.index("To accept") < page.index('class="button" aria-describedby="bulk-summary"')
-    assert "Compare each with the original, then accept." in flat

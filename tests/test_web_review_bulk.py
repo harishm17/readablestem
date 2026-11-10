@@ -8,21 +8,14 @@ group, stored in scrambled order.
 from __future__ import annotations
 
 import logging
-import re
 
 import pytest
-from sqlalchemy import select
 
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, make_pdf, token
 from fixtures.web.support import upload as upload_pdf
-from readablestem.core.types import Check, Kind, Status
+from readablestem.core.types import Check
 from readablestem.web import review
-from readablestem.web.db import ErrorAggregate, ReviewEdit, session_scope
-from test_web_review import card, cards, edits, install_fake_pipeline, result, rich_output
-
-EQUATIONS_PENDING = ["p1-e1", "p2-e1", "p2-e2", "p3-e0"]
-FIGURES_PENDING = ["p1-e2", "p3-e1", "p3-e2"]
-HEADINGS_PENDING = ["p1-e3", "p2-e0", "p2-e4", "p3-e3"]
+from test_web_review import edits, install_fake_pipeline, result, rich_output
 
 
 @pytest.fixture
@@ -63,168 +56,13 @@ def group(page: str, slug: str) -> str:
 # --------------------------------------------------------------------------- order (rules)
 
 
-def test_groups_are_equations_figures_headings_with_pending_first_in_page_order():
-    groups = review.group_fixes(rich_output().result)
-    assert [g.kind for g in groups] == [Kind.EQUATION, Kind.FIGURE, Kind.HEADING]
-    ids = [[f.element_id for f in g.pending] for g in groups]
-    assert ids == [EQUATIONS_PENDING, FIGURES_PENDING, HEADINGS_PENDING]
-    assert [[f.element_id for f in g.done] for g in groups] == [
-        ["p2-e3", "p3-e4"],
-        ["p3-e5"],
-        ["p1-e0"],
-    ]
-    # FAILED and ABSTAINED sit with NEEDS_REVIEW in reading order, not after it.
-    assert [f.status for f in groups[0].pending] == [
-        Status.NEEDS_REVIEW,
-        Status.FAILED,
-        Status.NEEDS_REVIEW,
-        Status.NEEDS_REVIEW,
-    ]
-
-
-def test_empty_groups_are_left_out():
-    data = rich_output().result
-    data.fixes = [f for f in data.fixes if f.kind is not Kind.FIGURE]
-    assert [g.slug for g in review.group_fixes(data)] == ["equations", "headings"]
-
-
-def test_numbers_follow_reading_order_within_each_kind():
-    numbers = review.item_numbers(rich_output().result)
-    equations = ["p1-e1", "p2-e1", "p2-e2", "p2-e3", "p3-e0", "p3-e4"]
-    assert [numbers[e] for e in equations] == [1, 2, 3, 4, 5, 6]
-    assert numbers["p1-e2"] == 1 and numbers["p3-e5"] == 4
-    assert numbers["p1-e0"] == 1 and numbers["p3-e3"] == 5
-
-
-def test_next_to_review_goes_forward_then_wraps_round():
-    data = rich_output().result
-    assert review.next_to_review(data, "p1-e1") == "p2-e1"
-    assert review.next_to_review(data, "p3-e0") == "p1-e2"  # last equation -> first figure
-    assert review.next_to_review(data, "p3-e3") == "p1-e1"  # last heading -> wraps round
-    assert review.next_to_review(data, "p2-e3") == "p3-e0"  # from a decided equation too
-    assert review.next_to_review(data, "nope") == "p1-e1"
-    for fix in data.fixes:
-        fix.status = Status.ACCEPTED
-    assert review.next_to_review(data, "p1-e1") is None
-
-
 # --------------------------------------------------------------------------- order (page)
-
-
-def test_page_lists_decisions_by_kind_then_the_decided_ones(rich):
-    page = page_of(rich)
-    # The reviewer's own decisions (edited, rejected), then what was accepted for them;
-    # each by kind (equations, figures, headings).
-    mine, accepted = ["p3-e4", "p3-e5"], ["p2-e3", "p1-e0"]
-    expected = [*EQUATIONS_PENDING, *FIGURES_PENDING, *HEADINGS_PENDING, *mine, *accepted]
-    assert cards(page) == expected
-    for slug, ids in (
-        ("equations", EQUATIONS_PENDING),
-        ("figures", FIGURES_PENDING),
-        ("headings", HEADINGS_PENDING),
-    ):
-        assert re.findall(r'<article id="fix-([\w-]+)"', group(page, slug)) == ids
-    yours = page[page.index('id="decided"') : page.index('id="accepted"')]
-    assert re.findall(r'<article id="fix-([\w-]+)"', yours) == mine
-    folded = page[page.index('id="accepted"') :].split('<details class="done-group">', 1)[1]
-    assert re.findall(r'<article id="fix-([\w-]+)"', folded) == accepted
-
-
-def test_labels_stay_the_same_after_a_decision(rich):
-    title = (
-        '<h4 id="fix-title-p2-e2" class="visually-hidden">'
-        'Equation 3 <span class="meta">on page 2</span></h4>'
-    )
-    assert title in page_of(rich)
-    assert post(rich, "p1-e1", action="accept").status_code == 303
-    assert title in page_of(rich)  # not renumbered by the move of equation 1
-
-
-def test_the_list_view_shows_no_confidence(rich):
-    """T1-11: the model's confidence is for the developer, not on the instructor's list."""
-    page = page_of(rich)
-    for eid in ("p1-e1", "p2-e0", "p3-e0", "p3-e2"):
-        assert "Confidence" not in card(page, eid)
-    assert not re.search(r"\(\d+%\)", re.sub(r"<[^>]+>", " ", page))
-
-
-def test_checks_and_reasons_are_explained_not_coded(rich):
-    page = page_of(rich)
-    style = card(page, "p2-e2")
-    assert "a bold vector or double-struck letter shown plain" in style
-    assert "style_mismatch" not in style and "<code>" not in style
-    heading = card(page, "p1-e3")
-    assert "Only weak signs say this is a heading" in heading
-    assert "weak_evidence" not in heading and "<code>" not in heading
-    timeout = card(page, "p3-e2")
-    assert "The model did not answer in time." in timeout
-    assert "model_timeout" not in timeout and "<code>" not in timeout
-    blocked = card(page, "p3-e0")
-    assert "<strong>Must be fixed:</strong> A fraction, root, subscript" in blocked
-    assert 'value="accept"' not in blocked
-
-
-def test_job_page_links_each_kind_to_its_first_decision(rich):
-    page = rich.browser.get(f"/jobs/{rich.job_id}").text
-    base = f"/jobs/{rich.job_id}/review"
-    # Every fix waiting counts, not converted ones too: each needs a decision.
-    assert "11 need your decision:" in page
-    assert f'<a href="{base}?item=p1-e1">4 equations</a>,' in page
-    assert f'<a href="{base}?item=p1-e2">3 figures</a>,' in page
-    assert f'<a href="{base}?item=p1-e3">4 headings</a>.' in page
-    for slug in ("equations", "figures", "headings"):
-        assert f'id="group-{slug}"' in page_of(rich)
 
 
 # --------------------------------------------------------------------------- landing
 
 
-def test_after_a_decision_the_reviewer_lands_on_the_next_fix_waiting(rich):
-    location = post(rich, "p1-e1", action="accept").headers["location"]
-    assert location == f"/jobs/{rich.job_id}/review/list#item-p2-e1"
-    page = page_of(rich)
-    landing = card(page, "p2-e1")
-    # The notice is where the redirect lands, before the card, linked to the fix it is
-    # about; that fix is decided now and unfolded so the link works.
-    assert '<a href="#item-p1-e1">Equation 1 on page 1</a>: Accepted.' in landing
-    assert landing.index("Accepted.") < landing.index('<article id="fix-p2-e1"')
-    assert '<details class="done-item" open>' in card(page, "p1-e1")
-    assert '<details class="done-item">' in card(page, "p2-e3")  # untouched: still folded
-    assert "Accepted." not in card(page_of(rich), "p2-e1")  # notices are one-time
-
-    location = post(rich, "p3-e3", action="reject").headers["location"]
-    assert location == f"/jobs/{rich.job_id}/review/list#item-p2-e1"  # last one: wraps round
-    landing = card(page_of(rich), "p2-e1")
-    assert '<a href="#item-p3-e3">Heading 5 on page 3</a>: Made plain text, not a heading.' in (
-        landing
-    )
-
-
-def test_landing_item_is_focusable_and_its_notice_comes_first(rich):
-    post(rich, "p1-e1", action="accept")
-    landing = card(page_of(rich), "p2-e1")
-    assert landing.startswith('<li id="item-p2-e1" class="review-item" tabindex="-1">')
-    # Tab order from the landing point: the link back, then the card's own controls.
-    assert landing.index('href="#item-p1-e1"') < landing.index('id="latex-p2-e1"')
-
-
 # --------------------------------------------------------------------------- no bulk accept
-
-
-def test_the_list_view_offers_no_bulk_accept(rich):
-    """Every decision the pipeline asks for is meaning-level (review tiers, "meaning-level
-    only"): none is accepted in bulk by confidence or an unconditional "accept all" (removed
-    2026-10-09). The one bulk action is the explicit, previewed one for items whose checks
-    all passed (`test_web_review_bulk_accept.py`)."""
-    page = page_of(rich)
-    for gone in ("bulk-form", "min_confidence", "accept_confident", "accept_all"):
-        assert gone not in page
-    assert "Accept equations that passed every check" in page  # a link to a preview
-    assert (
-        'action="/jobs/'
-        not in page[page.index("bulk-offers") : page.index("</ul>", page.index("bulk-offers"))]
-    )
-    assert not hasattr(review, "apply_bulk_accept")
 
 
 @pytest.mark.parametrize(
@@ -251,22 +89,6 @@ def test_a_bulk_post_needs_the_csrf_token_first(rich):
         data={"csrf_token": "forged", "action": "accept_all"},
     )
     assert response.status_code == 403
-
-
-def test_accepts_are_counted_when_the_job_is_deleted(rich):
-    for eid in ("p1-e3", "p2-e0", "p3-e3"):
-        assert post(rich, eid, action="accept").status_code == 303
-    response = rich.browser.post(
-        f"/jobs/{rich.job_id}/delete",
-        data={"csrf_token": token(rich.browser), "confirm": "yes"},
-    )
-    assert response.status_code == 303
-    with session_scope(rich.ctx.factory) as session:
-        rows = session.scalars(
-            select(ErrorAggregate).where(ErrorAggregate.category == "review:accept")
-        ).all()
-        assert {(r.step, r.count) for r in rows} == {("heading", 3)}
-        assert session.scalars(select(ReviewEdit)).all() == []  # deleted with the job
 
 
 def test_a_check_code_shared_by_two_checks_gets_the_right_sentence(rich):

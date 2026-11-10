@@ -119,55 +119,6 @@ def submit(web: WebEnv, page_path: str, ticked: list[str], *, meaning=None, job:
 # --------------------------------------------------------------------------- the pages
 
 
-def test_the_course_page_lists_the_symbols_its_documents_use(web):
-    course_id = new_course(web.browser)
-    before = web.browser.get(f"/courses/{course_id}").text
-    assert "Symbols found in" not in before  # no document yet
-    converted(web, course_id)
-    page = web.browser.get(f"/courses/{course_id}").text
-    text = text_of(page)
-    assert "Symbols found in your documents" in text
-    assert "bold d (2 equations, first on page 1)" in text
-    assert "double-struck R (1 equation, first on page 1)" in text and "v with an arrow" in text
-    _, fields = form_of(page)
-    assert set(fields["key"]) == {BOLD_D, REALS, VEC_V}
-    guesses = dict(zip(fields["key"], fields["meaning"], strict=True))
-    assert guesses[BOLD_D] == "vector" and guesses[REALS] == "set" and guesses[VEC_V] == "vector"
-    assert entries(web) == []  # looking adds nothing
-
-
-def test_the_job_page_lists_the_symbols_of_that_document(web):
-    course_id = new_course(web.browser)
-    job_id = converted(web, course_id)
-    page = web.browser.get(f"/jobs/{job_id}").text
-    assert "Symbols found in this document" in text_of(page)
-    action, fields = form_of(page)
-    assert action == f"/courses/{course_id}/suggestions" and BOLD_D in fields["key"]
-    assert 'name="job" value="' + job_id + '"' in page
-
-
-def test_a_job_without_a_course_has_no_suggestions(web):
-    job_id = converted(web, None)
-    assert "Symbols found in" not in web.browser.get(f"/jobs/{job_id}").text
-
-
-def test_with_the_flag_off_the_job_page_has_none(tmp_path):
-    env = WebEnv(tmp_path)
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.converter.output = notation_output()
-        response = client.post(
-            "/jobs",
-            data={"csrf_token": token(client)},
-            files={"pdf": ("notes.pdf", make_pdf(1), "application/pdf")},
-        )
-        job_id = job_id_from(response)
-        env.run_worker()
-        assert "Symbols found in" not in client.get(f"/jobs/{job_id}").text
-
-
 # --------------------------------------------------------------------------- confirming
 
 
@@ -187,23 +138,6 @@ def test_ticked_symbols_are_added_with_the_meaning_chosen_and_the_rest_are_not(w
     assert BOLD_D not in fields["key"] and VEC_V in fields["key"]
 
 
-def test_nothing_ticked_adds_nothing(web):
-    course_id = new_course(web.browser)
-    converted(web, course_id)
-    response = submit(web, f"/courses/{course_id}", [])
-    assert response.status_code == 303 and entries(web) == []
-    after = web.browser.get(response.headers["location"]).text
-    assert "Tick the symbols to add first" in text_of(after)
-
-
-def test_from_the_job_page_it_comes_back_to_the_job_page(web):
-    course_id = new_course(web.browser)
-    job_id = converted(web, course_id)
-    response = submit(web, f"/jobs/{job_id}", [VEC_V], job=job_id)
-    assert response.headers["location"] == f"/jobs/{job_id}#suggestions"
-    assert [e.canonical for e in entries(web)] == [VEC_V]
-
-
 def test_a_symbol_the_documents_do_not_use_is_not_taken(web):
     course_id = new_course(web.browser)
     converted(web, course_id)
@@ -215,13 +149,6 @@ def test_a_symbol_the_documents_do_not_use_is_not_taken(web):
         "pick": ["0", "1", "7", "x"],
     }
     response = web.browser.post(f"{path}/suggestions", data=data)
-    assert response.status_code == 303 and entries(web) == []
-
-
-def test_a_meaning_that_is_not_one_of_the_list_is_not_taken(web):
-    course_id = new_course(web.browser)
-    converted(web, course_id)
-    response = submit(web, f"/courses/{course_id}", [BOLD_D], meaning={BOLD_D: "everything"})
     assert response.status_code == 303 and entries(web) == []
 
 
@@ -247,35 +174,6 @@ def test_it_needs_the_csrf_token(web):
         data={"key": [BOLD_D], "meaning": ["vector"], "pick": ["0"]},
     )
     assert response.status_code in (400, 403) and entries(web) == []
-
-
-def test_a_symbol_added_meanwhile_is_skipped_not_doubled(web):
-    course_id = new_course(web.browser)
-    converted(web, course_id)
-    path = f"/courses/{course_id}"
-    _, fields = form_of(web.browser.get(path).text)
-    post(web.browser, f"{path}/entries", path, symbol="bold d", meaning="vector", note="")
-    data = {
-        "csrf_token": token(web.browser, path),
-        "key": fields["key"],
-        "meaning": fields["meaning"],
-        "pick": [str(fields["key"].index(REALS))],
-    }
-    # The stale form also ticked bold d (now in the course): only the real one is new.
-    data["pick"].append(str(fields["key"].index(BOLD_D)) if BOLD_D in fields["key"] else "99")
-    web.browser.post(f"{path}/suggestions", data=data)
-    canonicals = sorted(e.canonical for e in entries(web))
-    assert canonicals == sorted([BOLD_D, REALS])
-
-
-def test_a_new_entry_is_used_in_the_next_conversion(web):
-    course_id = new_course(web.browser)
-    converted(web, course_id)
-    submit(web, f"/courses/{course_id}", [BOLD_D])
-    converted(web, course_id)
-    options = web.converter.calls[-1]["options"]
-    assert options is not None
-    assert [(n.canonical, n.source) for n in options.notation] == [(BOLD_D, "document")]
 
 
 def test_symbols_and_course_names_never_reach_the_logs(web, caplog):

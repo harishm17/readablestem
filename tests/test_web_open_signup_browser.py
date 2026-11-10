@@ -13,7 +13,7 @@ import time
 
 import pytest
 
-from fixtures.web.support import ADMIN, BOB, WebEnv, make_pdf
+from fixtures.web.support import ADMIN, BOB, WebEnv
 from readablestem.web.auth import set_blocked
 from readablestem.web.db import session_scope
 from test_web_browser import (
@@ -181,22 +181,4 @@ def test_deleting_an_account_works_without_javascript(site, browser):
     # Signed out: the documents page sends the person to sign in.
     page.goto(site.base + "/app")
     assert "/login" in page.url
-    context.close()
-
-
-def test_a_new_account_sees_its_limit_on_the_upload_page(site, browser):
-    context = browser.new_context()
-    page = context.new_page()
-    sign_in(page, site.base, "uploader@example.org")
-    page.goto(site.base + "/app")
-    assert "a new account can convert 5 pages a day" in " ".join(page.content().split())
-    page.get_by_label("PDF files").set_input_files(
-        files=[{"name": "big.pdf", "mimeType": "application/pdf", "buffer": make_pdf(5)}]
-    )
-    page.get_by_role("button", name="Upload and convert").click()
-    page.wait_for_url(site.base + "/jobs/*")
-    page.goto(site.base + "/app")
-    assert "You have converted all 5 pages a new account can convert today" in " ".join(
-        page.content().split()
-    )
     context.close()

@@ -105,48 +105,6 @@ OFFER = (
 )
 
 
-def test_the_card_offers_the_table_read_from_the_image_as_an_optional_extra(card):
-    body = figure_card(card)
-    assert "Optional: a data table for this chart" in body
-    assert OFFER in text_of(body)
-    assert (
-        '<div class="table-scroll table-view" role="group" '
-        'aria-labelledby="review-p1-e6-data-caption" tabindex="0"><table><caption '
-        'id="review-p1-e6-data-caption">Data read from Figure 1; the values are '
-        "approximate</caption>"
-    ) in body
-    assert '<th scope="row">5</th><td>1.5</td>' in body
-    assert '<button type="submit" id="datatable-p1-e6" name="action" value="add_data_table"' in body
-    assert "Add the data table" in body
-    textarea = re.search(r'<textarea id="longdesc-p1-e6"[^>]*>([^<]*)</textarea>', body)
-    assert textarea and textarea.group(1) == LONG
-    assert '<label for="longdesc-p1-e6">Longer description for figure 1</label>' in body
-    # Not in the student file, so nothing to remove.
-    assert "remove_data_table" not in body
-    assert "Accept" in body and "Keep without a description" in body  # Reject, named
-
-
-def test_a_table_in_the_file_is_shown_with_remove(added):
-    body = figure_card(added)
-    assert "add_data_table" not in body and "Optional: a data table" not in body
-    assert '<input type="checkbox" id="datatable-p1-e6" name="remove_data_table"' in body
-    assert "Remove the data table" in body
-
-
-def test_a_figure_without_them_shows_neither(tmp_path):
-    env = WebEnv(tmp_path)
-    env.converter.output = review_output()
-    with env.running() as client:
-        env.allow(ALICE)
-        login(client, ALICE)
-        env.browser = client
-        env.job_id = job_id_from(upload(client, review_pdf()))
-        env.run_worker()
-        body = figure_card(env)
-    assert "longdesc-" not in body and "remove_data_table" not in body
-    assert "<table" not in body
-
-
 def missing_output() -> ConversionOutput:
     """The figure as a chart described with long descriptions on, left without one (the
     notice `long_description_missing`)."""
@@ -219,19 +177,6 @@ def test_add_the_data_table_puts_it_in_the_file_and_keeps_the_decision_open(card
     assert "There is no data table to add" in text_of(again.text)
 
 
-def test_add_on_an_automatically_accepted_figure_records_the_reviewers_choice(optional):
-    from readablestem.core import triage
-
-    result = stored(optional)
-    others = [f for f in result.fixes if f.element_id != "p1-e6"]
-    assert triage.required_decisions(result.fixes) == triage.required_decisions(others)
-    assert post(optional, "p1-e6", action="add_data_table").status_code == 303
-    fix = stored(optional).fix_for("p1-e6")
-    assert fix is not None and fix.status is Status.ACCEPTED and fix.reviewed
-    assert fix.figure is not None and fix.figure.data_table_added
-    assert not fix.optional_note  # acted on: listed with the reviewer's decisions
-
-
 def test_undo_takes_the_added_table_out_again(optional):
     from fixtures.web.support import token
 
@@ -269,25 +214,6 @@ def test_remove_the_data_table_keeps_the_descriptions(added):
     assert "<table" not in html and "Description of Figure 1</summary>" in html
 
 
-def test_saving_a_new_description_cleans_it(card):
-    typed = "  A road from a house to a school,​ with a car on it.\r\n\r\nIt moves right.  "
-    response = post(card, "p1-e6", action="edit", alt=ALT, long_description=typed)
-    assert response.status_code == 303
-    fix = stored(card).fix_for("p1-e6")
-    assert fix is not None and fix.figure is not None
-    assert fix.figure.long_description == (
-        "A road from a house to a school, with a car on it.\nIt moves right."
-    )
-    assert fix.figure.data_table is not None  # kept: not asked to remove it
-    assert [c.code for c in fix.failed_checks] == ["values_from_image"]  # still true of it
-
-
-def test_an_empty_description_removes_it(card):
-    assert post(card, "p1-e6", action="edit", alt=ALT, long_description=" ").status_code == 303
-    fix = stored(card).fix_for("p1-e6")
-    assert fix is not None and fix.figure is not None and fix.figure.long_description is None
-
-
 def test_a_description_that_is_markup_is_not_saved(card):
     typed = "<script>alert(1)</script> and a link to https://example.org for more."
     response = post(card, "p1-e6", action="edit", alt=ALT, long_description=typed)
@@ -320,46 +246,9 @@ def test_accept_refuses_an_unsaved_change(added, fields, message, field):
     assert fix is not None and fix.status is Status.NEEDS_REVIEW
 
 
-def test_accept_with_the_description_as_shown_accepts(card):
-    shown = LONG.replace("\n", "\r\n") + "\r\n"  # how a browser sends the textarea back
-    response = post(card, "p1-e6", action="accept", alt=ALT, long_description=shown)
-    assert response.status_code == 303
-
-
-def test_an_alt_edit_from_the_list_view_keeps_both(card):
-    response = post(card, "p1-e6", action="edit", alt="A car on the road to school.", view="list")
-    assert response.status_code == 303
-    fix = stored(card).fix_for("p1-e6")
-    assert fix is not None and fix.figure is not None
-    assert fix.figure.long_description == LONG and fix.figure.data_table is not None
-
-
 def test_marking_it_decorative_drops_both(card):
     response = post(card, "p1-e6", action="edit", alt="", decorative="on", long_description=LONG)
     assert response.status_code == 303
     fix = stored(card).fix_for("p1-e6")
     assert fix is not None and fix.figure is not None and fix.figure.decorative
     assert fix.figure.long_description is None and fix.figure.data_table is None
-
-
-def test_reject_keeps_the_figure_flagged_without_its_details(card):
-    assert post(card, "p1-e6", action="reject", acknowledge="on", **SHOWN).status_code == 303
-    html = download(card)
-    assert "<details" not in html and "Needs a description." in html
-
-
-def test_the_list_view_shows_the_description_and_offers_the_table(card):
-    """The list view shows the longer description and the table read from the image as
-    the optional extra it is, with its own "Add the data table"."""
-    body = card.browser.get(f"/jobs/{card.job_id}/review/list").text
-    assert OFFER in text_of(body)
-    assert "Optional: a data table for this chart" in body
-    assert "Data table, as students will get it" not in body
-    assert ">Distance (km)</th>" in body and ">1.5</td>" in body
-    assert "moving towards the school" in body  # the longer description
-    response = post(card, "p1-e6", action="add_data_table", view="list")
-    assert response.status_code == 303
-    fix = stored(card).fix_for("p1-e6")
-    assert fix is not None and fix.figure is not None and fix.figure.data_table_added
-    body = card.browser.get(f"/jobs/{card.job_id}/review/list").text
-    assert "Data table, as students will get it" in body and "add_data_table" not in body

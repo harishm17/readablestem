@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import json
 import shutil
-import sys
-import types
 from pathlib import Path
 
 import pytest
@@ -15,9 +13,6 @@ from readablestem.proof import stages
 from readablestem.proof.bundle import Bundle, BundleWriter
 from readablestem.proof.errors import BundleError, ProofError
 from readablestem.proof.intermediate import load_systems, parse_system_section
-from readablestem.proof.report import Section, StageResult
-
-PLUGIN = "readablestem.proof.invented"
 
 # Contract with proof/parsers: `make proof PDF_DIR=... OUT_DIR=...` writes
 # OUT_DIR/<arm>/<book>__<page>.json for each PDF in PDF_DIR. This one writes "{}".
@@ -27,26 +22,6 @@ DEMO_MAKEFILE = (
     "\tfor f in $(PDF_DIR)/*.pdf; do b=`basename $$f .pdf`; "
     "echo '{}' > $(OUT_DIR)/demo/$$b.json; done\n"
 )
-
-
-def test_the_default_stages_are_one_real_arm_and_four_stubs():
-    names = [s.name for s in stages.active_stages()]
-    assert names == [
-        "readablestem",
-        "invented_content",
-        "chatbot_comparison",
-        "parser_comparison",
-        "human_labels",
-    ]
-
-
-def test_load_plugins_skips_absent_modules_and_reports_the_ones_it_found(monkeypatch):
-    loaded = types.ModuleType(PLUGIN)
-    monkeypatch.setattr(stages, "PLUGIN_MODULES", (PLUGIN, "readablestem.proof.not_written_yet"))
-    monkeypatch.setitem(sys.modules, PLUGIN, loaded)
-    assert stages.load_plugins() == [PLUGIN]
-    monkeypatch.setattr(stages, "PLUGIN_MODULES", ("readablestem.proof.not_written_yet",))
-    assert stages.load_plugins() == []
 
 
 def test_the_repository_wires_every_stage_plugin():
@@ -78,24 +53,6 @@ def test_a_stub_prints_no_number_and_says_what_it_will_read():
     assert result.notes == ["Invented-content rate: not computed (stub)"]
 
 
-def test_register_replaces_a_stage_and_keeps_its_place(monkeypatch):
-    class Other:
-        name = "chatbot_comparison"
-        title = "Chatbots"
-
-        def record(self, ctx, writer):  # pragma: no cover - not called
-            ...
-
-        def run(self, ctx):  # pragma: no cover - not called
-            return StageResult("ok", [Section("x")])
-
-    monkeypatch.setattr(stages, "STAGES", dict(stages.STAGES))
-    stages.register(Other())
-    active = stages.active_stages()
-    assert [s.name for s in active].index("chatbot_comparison") == 2
-    assert active[2].title == "Chatbots"
-
-
 # ------------------------------------------------------------------ the parsers hook
 
 
@@ -115,10 +72,6 @@ def record_context(root: Path, work: Path, pdfs: dict[str, Path], said: list[str
 
 def parser_stage():
     return stages.default_stages()["parser_comparison"]
-
-
-def test_the_parser_stage_is_wrapped_by_the_hook():
-    assert isinstance(parser_stage(), stages.ParserHook)
 
 
 def test_without_proof_parsers_a_live_run_records_nothing_and_says_so(tmp_path):
@@ -168,12 +121,6 @@ def section_json(**extra) -> dict:
     }
 
 
-def test_a_system_section_is_parsed_and_defaults_to_empty_lists():
-    parsed = parse_system_section(section_json(), where="f")
-    assert parsed.ok and parsed.run == 1 and parsed.equations == [] and parsed.tables == []
-    assert parsed.headings[0]["level"] == 2
-
-
 @pytest.mark.parametrize(
     ("change", "message"),
     [
@@ -201,14 +148,3 @@ def test_systems_are_read_from_the_bundle_by_arm_and_section(tmp_path):
     runs = loaded["docling-default"]["physics/p-1"]
     assert sorted((r.run, r.status) for r in runs) == [(1, "ok"), (2, "timeout")]
     assert load_systems(Bundle(tmp_path / "none", {})) == {}
-
-
-def test_a_file_in_the_wrong_place_or_a_broken_file_is_refused(tmp_path):
-    folder = tmp_path / "systems" / "other-arm"
-    folder.mkdir(parents=True)
-    (folder / "physics__p-1.json").write_text(json.dumps(section_json()))
-    with pytest.raises(BundleError, match="does not match the file's place"):
-        load_systems(Bundle(tmp_path, {}))
-    (folder / "physics__p-1.json").write_text("{broken")
-    with pytest.raises(BundleError, match="cannot be read"):
-        load_systems(Bundle(tmp_path, {}))

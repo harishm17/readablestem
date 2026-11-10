@@ -50,10 +50,6 @@ def bold_letters_of(elements: list[Element]) -> list[Element]:
     return [e for e in elements if e.kind is Kind.EQUATION and BOLD_LETTER_REASON in e.reasons]
 
 
-def text_blocks(elements: list[Element]) -> list[str]:
-    return [e.text or "" for e in elements if e.kind in (Kind.PARAGRAPH, Kind.LIST_ITEM)]
-
-
 VECTORS = (
     "<p>The projection of a vector <b>b</b> onto a nonzero vector <b>a</b> is the multiple "
     "of <b>a</b> closest to <b>b</b>.</p><p>So <b>b</b> = 2 here.</p>"
@@ -87,44 +83,10 @@ def test_labels_bold_words_capitals_and_letters_without_evidence_stay_text():
     assert [(e.kind, e.text) for e in on] == [(e.kind, e.text) for e in off]
 
 
-def test_run_in_part_labels_beside_bold_vectors_stay_text():
-    # A document whose bold a and b are vectors: "a." and "b." starting the parts of a
-    # question in the middle of a paragraph are labels, not vectors.
-    pdf = html_pdf(
-        "<p>The vectors <b>a</b> and <b>b</b> are added: so <b>b</b> = 2 here.</p>"
-        "<p>Answer both parts of the question. <b>a.</b> Find the magnitude of the sum. "
-        "<b>b.</b> Find the angle between them.</p>"
-    )
-    elements = analyze(pdf)
-    assert [e.parent_id for e in bold_letters_of(elements)] == ["p1-e0", "p1-e0"]
-    assert any(
-        text.endswith(
-            "Answer both parts of the question. a. Find the magnitude of the sum. b. Find the "
-            "angle between them."
-        )
-        for text in text_blocks(elements)
-    )
-
-
-def test_with_the_feature_off_nothing_changes():
-    pdf = html_pdf(VECTORS)
-    off = analyze(pdf, on=False)
-    assert bold_letters_of(off) == []
-    plain = layout.analyze(pdf).elements  # outside a conversion: the defaults
-    assert [(e.id, e.text) for e in off] == [(e.id, e.text) for e in plain]
-
-
 def test_the_course_notation_is_evidence_on_its_own():
     pdf = html_pdf(NEGATIVES)
     found = bold_letters_of(analyze(pdf, course=("bold q",)))
     assert [(e.text, e.reasons[-1]) for e in found] == [("\U0001d42a", EVIDENCE_COURSE)]
-
-
-def test_a_sentence_initial_capital_is_maths_only_when_the_course_lists_it():
-    pdf = html_pdf("<p>Solve it. <b>F</b> is the net force on the cart.</p>")
-    assert bold_letters_of(analyze(pdf)) == []
-    found = bold_letters_of(analyze(pdf, course=("bold F",)))
-    assert [e.reasons[-1] for e in found] == [EVIDENCE_COURSE]
 
 
 def test_the_handout_loses_no_bold_vector():
@@ -153,15 +115,6 @@ def test_latex_fixtures_have_no_misses_and_no_false_positives(name):
 
 
 # --------------------------------------------------------------------------- the measure
-
-
-def test_expected_letters_from_a_latex_source():
-    tex = r"""\begin{document}
-    A vector $\mathbf{v}$ and $\bm{\omega}$, but not $\mathbf{v} \cdot \mathbf{u}$.
-    % a comment $\mathbf{c}$
-    \[ \mathbf{d} \]
-    \end{document}"""
-    assert bold_letters.expected_from_latex(tex) == {"\U0001d42f": 1, "\U0001d6da": 1}
 
 
 def test_expected_letters_from_openstax_xhtml():

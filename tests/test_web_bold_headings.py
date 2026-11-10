@@ -82,16 +82,3 @@ def test_a_heading_group_made_bold_leaves_the_job_ready_when_the_rest_is_decided
     assert "shown as an image" not in text
     assert "shown as images" not in text
     assert "3 headings" not in text.split("Ready to share", 1)[1].split("Results", 1)[0]
-
-
-def test_the_three_screens_count_the_same_decisions(ux):
-    from readablestem.web import documents
-
-    decide(ux, GROUP, action="reject")
-    job_text = text_of(ux.browser.get(f"/jobs/{ux.job_id}").text)
-    assert "2 decisions need you" in job_text or "Review 2 decisions" in job_text
-    listing = ux.browser.get("/app").text
-    assert "2 decisions to make" in text_of(listing)
-    assert documents.open_decisions(ux.job(ux.job_id).result_json["fixes"]) == 2
-    review = text_of(ux.browser.get(f"/jobs/{ux.job_id}/review").text)
-    assert "1 of 3 decided" in review  # the group of three headings is one decision

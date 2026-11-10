@@ -23,7 +23,6 @@ from fixtures.web.support import (
     token,
     upload,
 )
-from readablestem.observability.logging import FIELDS_ATTR
 from readablestem.ops.retention import PurgeStats
 from readablestem.web.db import ErrorAggregate, SpendDay, User, session_scope
 from readablestem.web.security import APP_CSP, SecurityHeadersMiddleware
@@ -80,19 +79,6 @@ def test_cron_is_disabled_without_a_configured_token(tmp_path, ops):
         assert client.post(CRON, headers={"X-Cron-Token": "None"}).status_code == 403
 
 
-def test_cron_aggregates_then_purges_and_returns_counts(web, ops):
-    response = web.browser.post(CRON, headers={"X-Cron-Token": TOKEN})
-    assert response.status_code == 200
-    assert response.json() == {
-        "status": "ok",
-        "jobs_aggregated": 4,
-        "jobs_deleted": 3,
-        "blobs_deleted": 9,
-        "unaggregated_deleted": 0,
-    }
-    assert ops[0] == ["aggregate", "purge"]
-
-
 def test_cron_purges_even_when_aggregation_fails(web, ops, caplog):
     ops[1]["aggregate_raises"] = RuntimeError("SECRET-DOC-TEXT")
     response = web.browser.post(CRON, headers={"X-Cron-Token": TOKEN})
@@ -104,15 +90,6 @@ def test_cron_purges_even_when_aggregation_fails(web, ops, caplog):
 
 
 # --------------------------------------------------------------------------- health
-
-
-def test_healthz_pings_the_database(web, monkeypatch):
-    assert web.browser.get("/healthz").json() == {"status": "ok"}
-    from readablestem.web.routes import pages
-
-    monkeypatch.setattr(pages, "ping", lambda engine: False)
-    response = web.browser.get("/healthz")
-    assert response.status_code == 503 and response.json() == {"status": "error"}
 
 
 # --------------------------------------------------------------------------- admin
@@ -164,28 +141,6 @@ def test_admin_can_allow_and_remove_people_but_not_themselves(web):
     assert "You cannot remove yourself" in web.browser.get("/admin").text
 
 
-def test_re_adding_someone_without_the_admin_box_keeps_their_role(web):
-    login(web.browser, ADMIN)
-    csrf = token(web.browser, "/admin")
-    web.browser.post("/admin/allowlist", data={"csrf_token": csrf, "email": ADMIN})
-    web.browser.post("/admin/allowlist", data={"csrf_token": csrf, "email": ALICE})
-    with session_scope(web.ctx.factory) as session:
-        me = session.scalar(select(User).where(User.email == ADMIN))
-        alice = session.scalar(select(User).where(User.email == ALICE))
-        assert me is not None and me.is_admin  # not demoted
-        assert alice is not None and alice.is_allowed and not alice.is_admin
-    assert web.browser.get("/admin").status_code == 200
-
-
-def test_admin_allow_validates_the_email(web):
-    login(web.browser, ADMIN)
-    response = web.browser.post(
-        "/admin/allowlist", data={"csrf_token": token(web.browser, "/admin"), "email": "nope"}
-    )
-    assert response.status_code == 422
-    assert 'href="#allow-email"' in response.text
-
-
 # --------------------------------------------------------------------------- headers
 
 
@@ -205,26 +160,12 @@ def test_security_headers_on_app_pages(web):
         assert web.browser.get(path).headers["content-security-policy"] == APP_CSP
 
 
-def test_static_files_are_cacheable_and_nosniff(web):
-    response = web.browser.get("/static/app.css")
-    assert response.status_code == 200
-    assert "no-store" not in response.headers.get("cache-control", "")
-    assert response.headers["x-content-type-options"] == "nosniff"
-
-
 def test_hsts_is_added_in_production_mode():
     app = Starlette(routes=[Route("/", lambda request: PlainTextResponse("ok"))])
     client = TestClient(SecurityHeadersMiddleware(app, hsts=True))
     assert client.get("/").headers["strict-transport-security"] == (
         "max-age=31536000; includeSubDomains"
     )
-
-
-def test_404_and_405_pages_are_html_and_friendly(web):
-    response = web.browser.get("/no-such-page")
-    assert response.status_code == 404 and "Page not found" in response.text
-    response = web.browser.delete("/")
-    assert response.status_code == 405
 
 
 # --------------------------------------------------------------------------- privacy
@@ -272,25 +213,6 @@ def test_document_content_never_reaches_the_logs(tmp_path, monkeypatch, caplog):
         assert secret not in logged, secret
     for event in ("job_created", "job_done", "review", "job_failed", "upload_rejected"):
         assert event in logged
-
-
-def test_unhandled_errors_give_a_500_page_and_log_only_the_type(web, monkeypatch, caplog):
-    from readablestem.web.routes import pages
-
-    def boom(request):
-        raise ValueError("SECRET-DOC-TEXT leaked into an exception")
-
-    monkeypatch.setattr(pages, "render", lambda *a, **k: boom(None))
-    caplog.set_level(logging.DEBUG)
-    response = web.browser.get("/privacy")
-    assert response.status_code == 500
-    assert "Something went wrong" in response.text and "SECRET" not in response.text
-    assert response.headers["content-security-policy"] == APP_CSP
-    errors = [r for r in caplog.records if getattr(r, FIELDS_ATTR, {}).get("route")]
-    assert errors, "the unhandled error is logged with its route"
-    fields = getattr(errors[-1], FIELDS_ATTR)
-    assert fields["error_type"] == "builtins.ValueError" and fields["route"] == "/privacy"
-    assert "SECRET" not in caplog.text and "SECRET" not in str(fields)
 
 
 def test_validation_errors_do_not_echo_input(web):

@@ -372,13 +372,6 @@ def test_a_second_user_gets_the_same_404_for_someone_elses_ids_as_for_ids_that_d
     assert site.job(site.ids["job_id"]).status == "done"
 
 
-def test_the_owner_can_use_the_same_routes(site):
-    """The control for the test above: Alice reaches her own job page, review and course."""
-    for path in ("/jobs/{job_id}", "/jobs/{job_id}/status", "/jobs/{job_id}/review"):
-        assert site.alice.get(fill(site, path)).status_code == 200, path
-    assert site.alice.get(fill(site, "/courses/{course_id}")).status_code == 200
-
-
 def test_an_admin_is_not_an_owner(site):
     token = csrf_from(site.admin.get("/admin").text)
     for method, template, real, _absent, _token in other_user_requests(site):

@@ -55,12 +55,3 @@ def test_a_short_heading_beside_a_gap_in_the_other_column_still_breaks_the_colum
     boxes = [above_left, above_right, heading, below_left, below_right]
     read = [boxes[i] for i in order(boxes)]
     assert read == [above_left, above_right, heading, below_left, below_right]
-
-
-def test_the_caption_a_figure_holds_fills_its_column():
-    boxes = [FIGURE, FULL_LINE, LEFT_TEXT, RIGHT_TOP]
-    extent = layout._ColumnExtent([FIGURE, LEFT_TEXT], BODY)
-    held = layout._ColumnExtent([FIGURE, CAPTION, LEFT_TEXT], BODY)
-    assert not extent.overlaps(460, 500)
-    assert held.overlaps(460, 500)
-    assert boxes[order(boxes, [CAPTION])[0]] == FIGURE

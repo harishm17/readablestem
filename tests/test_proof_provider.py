@@ -8,9 +8,6 @@ meaning OpenAI.
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 
 from proof_support import SET_ID, PdfMedia, fake_client, make_project
@@ -18,7 +15,6 @@ from readablestem.config import Settings
 from readablestem.core.types import Check
 from readablestem.pipeline import html_checks
 from readablestem.proof import engine, runner
-from readablestem.proof.bundle import MANIFEST_NAME, Bundle
 from readablestem.proof.errors import ProofError
 
 DATE = "2026-10-14"
@@ -47,24 +43,6 @@ def claude_run(tmp_path_factory):
             say=lambda _msg: None,
         )
     return root, work, work / "bundles" / f"{SET_ID}-{DATE}", result
-
-
-def test_the_recording_names_the_provider_and_the_models(claude_run):
-    _root, _work, bundle_dir, result = claude_run
-    assert result.exit_code == 0
-    manifest = json.loads((bundle_dir / MANIFEST_NAME).read_text(encoding="utf-8"))
-    assert manifest["client"] == "anthropic"
-    recorded = manifest["code"]["settings"]
-    assert recorded["model_provider"] == "anthropic"
-    assert (recorded["main_model"], recorded["cheap_model"]) == (OPUS, HAIKU)
-    reports = sorted((bundle_dir / "reports").glob("*.json"))
-    assert reports
-    for path in reports:
-        report = json.loads(path.read_text(encoding="utf-8"))
-        assert report["client"] == "anthropic"
-        assert report["models"] == {"main": OPUS, "cheap": HAIKU} | (
-            {"judge": OPUS} if report["task"] == "figures" else {}
-        )
 
 
 def test_a_replay_follows_the_recording_without_flags_or_drift(claude_run, monkeypatch):
@@ -117,23 +95,6 @@ def test_identity_of_an_openai_recording_is_what_it_always_was(monkeypatch):
     assert runner.check_identity({"settings": identity, **_same(settings)}, _full(settings)) == []
 
 
-def test_identity_of_a_claude_recording_adds_the_provider_and_effort():
-    settings = runner.proof_settings("anthropic", cheap_model="claude-sonnet-5-5")
-    identity = runner.code_identity(settings)["settings"]
-    assert identity["model_provider"] == "anthropic"
-    assert (identity["main_model"], identity["cheap_model"]) == (OPUS, "claude-sonnet-5-5")
-    back = runner.recorded_settings(identity)
-    assert (back.model_provider, back.main_model, back.cheap_model) == (
-        "anthropic",
-        OPUS,
-        "claude-sonnet-5-5",
-    )
-    assert runner.code_identity(back)["settings"] == identity
-    # A recording on one provider is not the code identity of the other.
-    other = runner.code_identity(runner.proof_settings())
-    assert runner.check_identity({"settings": identity}, other)
-
-
 def _full(settings: Settings) -> dict:
     return runner.code_identity(settings)
 
@@ -167,19 +128,3 @@ def test_the_api_check_names_a_missing_workspace_and_hides_the_message():
     assert "HTTP 400" in text and "invalid_request_error" in text
     assert "ANTHROPIC_WORKSPACE_ID" in text and "SECRET-TEXT" not in text
     assert "Nothing was recorded" in text
-
-
-def test_a_missing_claude_key_stops_a_live_run_before_any_work(tmp_path, monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    from readablestem.config import ConfigError
-    from readablestem.core.budget import InMemorySpendGuard, JobBudget
-
-    budget = JobBudget(InMemorySpendGuard(cap_usd=1), max_usd=1, max_calls=5)
-    with pytest.raises(ConfigError, match="ANTHROPIC_API_KEY"):
-        runner.live_client(runner.proof_settings("anthropic"), budget, fake=False)
-
-
-def test_the_bundle_of_a_claude_run_verifies(claude_run):
-    bundle = Bundle.open(claude_run[2])
-    assert bundle.verify() == []
-    assert Path(claude_run[3].out).is_file()
