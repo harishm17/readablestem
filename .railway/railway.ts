@@ -136,8 +136,11 @@ const appVariables = [
 // app treats an unset variable as "Microsoft sign-in off", and a half-set group refuses to
 // start. Only web serves sign-in, so cron does not hold them. INSTALL_LATEXML is the image's
 // build argument for LaTeXML (docs/deploy-railway.md, "LaTeXML"): declared so that the variable
-// set in the dashboard is not deleted by the next apply.
+// set in the dashboard is not deleted by the next apply. CLAUDE_SECOND_CHECK is `off` since
+// 2026-11-09: the shadow check changed no output on the first real-model walkthrough and was
+// about a sixth of its spend (docs/deploy-railway.md, "Variables").
 const webOnlyVariables = [
+  "CLAUDE_SECOND_CHECK",
   "EQUATION_GLYPH_CHECKS",
   "EQUATION_GLYPH_RECONCILE",
   "EQUATION_LINE_CONTEXT",
