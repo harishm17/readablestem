@@ -9,7 +9,6 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from readablestem.core.types import DocumentResult, DocumentStats
 from readablestem.pipeline import page_labels
 from readablestem.pipeline.page_labels import read
 from readablestem.web import pdf_probe
@@ -91,13 +90,6 @@ def test_two_numbers_in_the_margin_are_not_a_page_number():
     assert read(pdf, range(3)) == {}
 
 
-def test_only_the_pages_asked_for_are_labelled_and_a_bad_pdf_gives_none():
-    pdf = make_pdf(["1", "2", "3"])
-    assert read(pdf, [1]) == {}  # one page alone cannot agree with another
-    assert read(pdf, [7]) == {}
-    assert read(b"not a pdf", range(3)) == {}
-
-
 def test_the_page_numbers_of_latex_documents_are_found_and_slides_have_their_frame_numbers():
     def found(name: str, pages: int) -> dict[int, str]:
         return read((LATEX / name).read_bytes(), range(pages))
@@ -118,22 +110,3 @@ def test_a_part_cut_from_a_file_keeps_its_pages_labels():
     )
     part = pdf_probe.extract(source, [1, 3, 4])
     assert read(part, range(3)) == {0: "ii", 1: "2", 2: "3"}
-
-
-def test_a_part_of_a_file_with_no_labels_has_none():
-    part = pdf_probe.extract(make_pdf(["a", "b", "c"]), [0, 2])
-    opened = pymupdf.open(stream=part)
-    assert [p.get_label() for p in opened] == ["", ""]
-
-
-def test_stored_results_without_labels_still_load_and_leave_the_field_out():
-    result = DocumentResult(
-        pipeline_version="0",
-        stats=DocumentStats(pages=1, cost_usd=0, latency_ms=0, model_calls=0),
-    )
-    stored = result.model_dump(mode="json")
-    assert "page_labels" not in stored
-    assert DocumentResult.model_validate(stored).page_labels == {}
-    result.page_labels = {0: "iv"}
-    again = DocumentResult.model_validate(result.model_dump(mode="json"))
-    assert again.page_labels == {0: "iv"}

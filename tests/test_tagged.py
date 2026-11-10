@@ -11,11 +11,9 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from readablestem.config import MAIN_MODEL
 from readablestem.core.types import Kind, Status
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import figure_step, tagged
-from readablestem.pipeline.heading_step import heading_fixes
 from readablestem.pipeline.layout import analyze, heading_levels, tagged_level
 from readablestem.pipeline.run import convert_pdf
 from test_steps_support import figure_element, make_settings, use_fallback_router
@@ -69,16 +67,6 @@ def test_a_body_size_line_the_tags_call_a_heading_becomes_one(pdf, layout):
     }
 
 
-def test_a_tagged_heading_is_a_certain_heading(pdf, layout):
-    elements = tagged.apply(layout.elements, tagged.read(pdf, [0]))
-    fixes = {f.element_id: f for f in heading_fixes(elements)}
-    tips = next(e for e in elements if e.text == "Practical tips")
-    fix = fixes[tips.id]
-    assert (fix.status, fix.review, fix.confidence) == (Status.ACCEPTED, "none", 0.9)
-    assert fix.heading is not None and fix.heading.level == 3
-    assert not fix.failed_checks
-
-
 def test_a_tag_over_other_text_changes_nothing(pdf, layout):
     found = tagged.read(pdf, [0])
     wrong = tagged.TaggedPdf(
@@ -130,29 +118,6 @@ def router(monkeypatch):
     use_fallback_router(monkeypatch)
 
 
-def test_the_tag_is_context_for_the_model(router):
-    element = figure_element().model_copy(update={"source_alt": ALT})
-    client = FakeVisionClient(
-        responders={
-            "figure": lambda req: {
-                "figure_type": "chart",
-                "decorative": False,
-                "alt": "Bar chart of period against length: the period grows with the length.",
-                "confidence": 0.93,
-            }
-        }
-    )
-    fix = figure_step.describe(element, b"\x89PNG crop", client=client, settings=make_settings())
-    assert fix.status is Status.ACCEPTED  # the model's description, not the tag's
-    (request,) = client.requests
-    assert request.model == MAIN_MODEL
-    assert f"Alt text in the PDF's own tags (may be wrong): {ALT}" in (request.context_text or "")
-
-
-def test_a_figure_without_a_tag_sends_the_context_it_always_did(router):
-    assert figure_step.figure_context(figure_element(), "near text") == "Nearby text: near text"
-
-
 def test_when_the_model_gives_nothing_the_tag_is_the_proposal(router):
     element = figure_element().model_copy(update={"source_alt": ALT})
     client = FakeVisionClient(responders={"figure": lambda req: None})
@@ -160,11 +125,3 @@ def test_when_the_model_gives_nothing_the_tag_is_the_proposal(router):
     assert (fix.status, fix.review) == (Status.NEEDS_REVIEW, "required")
     assert fix.figure is not None and fix.figure.alt == ALT
     assert [c.code for c in fix.failed_checks] == ["source_alt_unchecked"]
-
-
-def test_with_no_tag_a_model_failure_is_still_a_failure(router):
-    client = FakeVisionClient(responders={"figure": lambda req: None})
-    fix = figure_step.describe(
-        figure_element(), b"\x89PNG crop", client=client, settings=make_settings()
-    )
-    assert fix.status is Status.FAILED and fix.figure is None

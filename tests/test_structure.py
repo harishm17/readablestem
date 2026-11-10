@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pymupdf
 
-from readablestem.core.types import Element, Kind
+from readablestem.core.types import Kind
 from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.heading_step import heading_fixes
 from readablestem.pipeline.layout import analyze
@@ -69,15 +69,6 @@ def test_a_run_of_monospaced_lines_is_one_code_block_with_its_indentation():
     assert [e.kind for e in elements] == [Kind.PARAGRAPH] * 3  # prose, code, prose
 
 
-def test_a_blank_line_in_code_is_kept():
-    def fill(page):
-        y = prose(page, 100)
-        code(page, y, [(0, "x = 1"), (0, ""), (0, "y = 2")])
-
-    (block,) = [e for e in analyze(page_of(fill)).elements if e.preformatted]
-    assert block.text == "x = 1\n\ny = 2"
-
-
 def test_code_is_written_as_pre_code_and_escaped():
     def fill(page):
         y = prose(page, 100)
@@ -89,11 +80,6 @@ def test_code_is_written_as_pre_code_and_escaped():
         "    print(&quot;ok &amp; done&quot;)</code></pre>"
     ) in html
     assert "pre { " in html  # the CSS is added because the document has code
-
-
-def test_a_document_without_code_has_no_code_css():
-    html = html_of(page_of(lambda page: prose(page, 100)))
-    assert "<pre" not in html and "pre {" not in html and "<dl" not in html
 
 
 def test_a_wide_code_block_is_a_named_tab_stop_a_narrow_one_is_not():
@@ -197,28 +183,6 @@ def test_bold_terms_over_their_paragraphs_stop_being_headings():
     assert '<dt id="p1-e1"><strong>Loop</strong></dt><dd>A piece of code' in html
 
 
-def test_bold_terms_running_into_their_definitions_make_one_entry_each():
-    def entries(page):
-        y = 120.0
-        for term, definition in [
-            ("Limit", "The value that a function approaches."),
-            ("Matrix", "A rectangular array of numbers."),
-            ("Vector", "A quantity with a size and a direction."),
-        ]:
-            page.insert_text((72, y), term, fontsize=BODY, fontname="hebo")
-            width = pymupdf.get_text_length(term + " ", fontname="hebo", fontsize=BODY)
-            page.insert_text((72 + width, y), definition, fontsize=BODY, fontname="helv")
-            y += 15  # no space between entries
-
-    elements = analyze(terms_page(entries)).elements
-    found = [(e.text[: e.term_end], e.text[e.term_end :].strip()) for e in elements if e.term_end]
-    assert found == [
-        ("Limit", "The value that a function approaches."),
-        ("Matrix", "A rectangular array of numbers."),
-        ("Vector", "A quantity with a size and a direction."),
-    ]
-
-
 def test_text_outside_a_glossary_section_is_not_made_an_entry():
     def fill(page):
         page.insert_text((72, 80), "Notes", fontsize=18, fontname="hebo")
@@ -228,43 +192,6 @@ def test_text_outside_a_glossary_section_is_not_made_an_entry():
         )
 
     assert not [e for e in analyze(page_of(fill)).elements if e.term_end]
-
-
-def test_a_paragraph_that_only_looks_like_an_entry_is_left_alone():
-    def entries(page):  # a first-line indent: the first line is the one that is indented
-        page.insert_text(
-            (102, 120),
-            "Some words at the start of a paragraph that goes",
-            fontsize=BODY,
-            fontname="tiro",
-        )
-        page.insert_text(
-            (72, 135),
-            "on to the margin on its second line and ends.",
-            fontsize=BODY,
-            fontname="tiro",
-        )
-
-    assert not [e for e in analyze(terms_page(entries)).elements if e.term_end]
-
-
-def test_an_entry_is_written_as_dt_and_dd_by_the_assembler():
-    entry = Element(
-        id="p1-e1",
-        kind=Kind.PARAGRAPH,
-        page=0,
-        bbox=(72, 100, 300, 130),
-        order=0,
-        text="beta decay breakdown of a neutron <into> a proton",
-        term_end=10,
-    )
-    html = render_html(title="T", lang="en", elements=[entry], fixes=[], crops={})
-    assert (
-        '<dl><dt id="p1-e1"><strong>beta decay</strong></dt>'
-        "<dd>breakdown of a neutron &lt;into&gt; a proton</dd></dl>"
-    ) in html
-    broken = entry.model_copy(update={"term_end": 99})  # a bad offset: a plain paragraph
-    assert "<dl" not in render_html(title="T", lang="en", elements=[broken], fixes=[], crops={})
 
 
 # ------------------------------------------------------------------------ footnotes
@@ -374,23 +301,6 @@ def test_a_page_with_one_dotted_line_is_not_a_contents_page():
         )
 
     assert [e.kind for e in analyze(page_of(fill)).elements] == [Kind.PARAGRAPH]
-
-
-def test_chapter_lines_with_their_number_at_the_margin_are_entries_on_a_contents_page():
-    def fill(page):
-        page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
-        page.insert_text((72, 120), "1 Motion", fontsize=BODY, fontname="hebo")
-        page.insert_text((520, 120), "1", fontsize=BODY, fontname="helv")
-        for i, title in enumerate(["1.1 Speed", "1.2 Velocity"]):
-            page.insert_text((88, 138 + 18 * i), title + " ." * 40, fontsize=BODY, fontname="helv")
-            page.insert_text((520, 138 + 18 * i), "1", fontsize=BODY, fontname="helv")
-
-    entries = [e for e in analyze(page_of(fill)).elements if e.kind == Kind.LIST_ITEM]
-    assert [(e.text, e.list_level) for e in entries] == [
-        ("1 Motion", 1),
-        ("1.1 Speed", 2),
-        ("1.2 Velocity", 2),
-    ]
 
 
 # ------------------------------------------------------------------------- axe

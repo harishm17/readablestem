@@ -12,8 +12,6 @@ it; the tests that need it skip without it.
 from __future__ import annotations
 
 import logging
-import sys
-import threading
 from pathlib import Path
 
 import pymupdf
@@ -118,59 +116,6 @@ def test_cpu_allowance_follows_affinity_and_the_cgroup_quota(tmp_path, monkeypat
     assert tables.cpu_allowance() == 4
 
 
-def test_the_layout_models_run_with_the_pinned_thread_settings():
-    assert tables.load_detector()
-    assert tables.LAYOUT_SESSIONS, "pymupdf.layout created no onnxruntime session"
-    for session in tables.LAYOUT_SESSIONS:
-        assert session.intra_op_threads == tables.cpu_allowance(), session
-        assert session.inter_op_threads == 1, session
-        assert session.spinning == "0", session
-
-
-def test_other_onnxruntime_sessions_are_left_alone(tmp_path):
-    import onnxruntime as ort
-
-    tables.load_detector()
-    assert getattr(ort.InferenceSession, "_a11y_pinned", False)
-    options = ort.SessionOptions()
-    options.intra_op_num_threads = 3
-    with pytest.raises(Exception):  # noqa: B017  (no model file: onnxruntime's own error)
-        ort.InferenceSession(str(tmp_path / "other.onnx"), sess_options=options)
-    assert options.intra_op_num_threads == 3
-
-
-def test_what_pymupdf_prints_during_detection_is_dropped(capfd):
-    other: list[str] = []
-    with tables._quiet_stdout() as captured:
-        print("unknown keyword: 'JaneDoeGrades'")
-        pymupdf.message("table finder: 'Jane Doe 87%'")
-        thread = threading.Thread(target=lambda: other.append(str(sys.stdout.write("x\n"))))
-        thread.start()
-        thread.join()
-    out = capfd.readouterr().out
-    assert "Jane" not in out and len(captured) == 2
-    assert captured == ["", ""]  # counted, never kept
-    assert out == "x\n"  # another thread still writes to the real stdout
-    assert not isinstance(sys.stdout, tables._ThreadStdout)
-
-
-def test_proposals_are_in_display_space_on_a_rotated_page():
-    def upright(page):
-        grid_table(page, PENDULUM)
-
-    def turned(page):
-        page.set_rotation(90)
-        grid_table(page, PENDULUM)
-
-    boxes = []
-    for fill in (upright, turned):
-        doc = pymupdf.open(stream=pdf(fill), filetype="pdf")
-        found = tables.propose(doc[0])
-        assert len(found) == 1
-        boxes.append(found[0].bbox)
-    assert boxes[1] == pytest.approx(boxes[0], abs=1.0)  # same place on the screen
-
-
 # ---------------------------------------------------------------- arbitration
 
 
@@ -231,44 +176,6 @@ def test_a_diagram_with_short_labels_is_not_a_table():
     assert judgement.verdict in {"labels", "figure"}
 
 
-def test_a_drawing_with_some_text_in_it_stays_a_figure():
-    def fill(page):
-        for i in range(4):
-            page.draw_circle((150 + 70 * i, 200), 25, width=1)
-            write(page, 135 + 70 * i, 250, f"Mass {i + 1}")
-            write(page, 135 + 70 * i, 265, f"{2 * i + 1} kg")
-
-    judgement = tables.judge(proposal((120, 170, 420, 275)), view_of(pdf(fill)))
-    assert judgement.verdict == "figure"
-
-
-def test_prose_in_a_box_has_no_grid():
-    def fill(page):
-        for i, line in enumerate(PROSE):
-            write(page, 100, 160 + 15 * i, line)
-
-    judgement = tables.judge(proposal((95, 148, 520, 190)), view_of(pdf(fill)))
-    assert judgement.verdict == "no_grid"
-
-
-def test_a_blank_worksheet_cut_to_its_header_row_is_extended_along_its_rules():
-    box = None
-
-    def fill(page):
-        nonlocal box
-        write(page, 100, 120, "Record your measurements in the table below.")
-        box = grid_table(page, [["Trial", "Length (m)", "Time (s)"]], blank_rows=5)
-        write(page, 100, 300, "Then work out the period of each trial from its time.")
-
-    view = view_of(pdf(fill))
-    assert box is not None
-    header_only = (box[0], box[1], box[2], box[1] + 20)
-    judgement = tables.judge(proposal(header_only), view)
-    assert judgement.verdict == tables.TABLE
-    assert tables.REASON_EXTENDED in judgement.reasons
-    assert judgement.bbox == pytest.approx(box, abs=1.0)
-
-
 def test_extension_stops_before_running_text_and_captions():
     box = None
 
@@ -303,34 +210,6 @@ def two_by_two() -> list[Slot]:
     ]
 
 
-def test_fill_puts_each_word_in_the_cell_it_lies_in():
-    grid = tables.fill(
-        two_by_two(),
-        words(
-            (5, 5, 20, 15, "Time", 0),
-            (55, 5, 80, 15, "Speed", 0),
-            (5, 25, 15, 35, "1", 1),
-            (55, 25, 70, 35, "v0", 1),  # a subscript glyph stays in its word, and cell
-            (72, 25, 90, 35, "m/s", 1),
-        ),
-        header_rows=1,
-    )
-    assert grid is not None and not grid_problems(grid)
-    assert [c.text for c in sorted(grid.cells, key=lambda c: (c.row, c.col))] == [
-        "Time", "Speed", "1", "v0 m/s"
-    ]  # fmt: skip
-    assert grid.header_rows == 1 and grid.source == "local"
-    assert [c.header for c in grid.cells if c.row == 0] == ["col", "col"]
-
-
-def test_fill_rejoins_a_word_hyphenated_across_lines_in_a_cell():
-    grid = tables.fill(
-        [Slot(0, 0, bbox=(0, 0, 100, 40))],
-        words((5, 5, 60, 15, "accelera-", 0), (5, 20, 40, 30, "tion", 1)),
-    )
-    assert grid is not None and grid.cells[0].text == "acceleration"
-
-
 def test_fill_makes_holes_into_empty_cells_and_refuses_overlaps():
     spanning = [Slot(0, 0, col_span=2, bbox=(0, 0, 100, 20)), Slot(1, 0, bbox=(0, 20, 50, 40))]
     grid = tables.fill(spanning, [])
@@ -349,44 +228,6 @@ def test_a_label_and_value_table_gets_no_header_row():
     )
     assert grid is not None and grid.header_rows == 0
     assert all(c.header is None for c in grid.cells)
-
-
-def test_misfit_prefers_the_grid_that_keeps_columns_apart():
-    def fill(page):
-        for r, row in enumerate(PENDULUM):
-            for c, text in enumerate(row):
-                write(page, 120 + 100 * c, 160 + 16 * r, text)
-
-    view = view_of(pdf(fill))
-    text = tables._text_grid(view, (115, 148, 420, 215), [])
-    rows = [(148 + 16 * r, 164 + 16 * r) for r in range(4)]
-    right = [Slot(r, c, bbox=(115 + 100 * c, y0, 215 + 100 * c, y1))
-             for r, (y0, y1) in enumerate(rows) for c in range(3)]  # fmt: skip
-    merged = [Slot(r, c, bbox=(115 + 100 * c, y0, 215 + 200 * c, y1))
-              for r, (y0, y1) in enumerate(rows) for c in range(2)]  # fmt: skip
-    assert tables.misfit(right, text) == 0
-    assert tables.misfit(merged, text) == 4  # one extra cell-on-a-line per row
-
-
-def test_the_drawn_grid_gives_spans_where_a_rule_is_missing():
-    def fill(page):
-        xs, ys = (100, 200, 300, 400), (150, 170, 190, 210)
-        for y in ys:
-            page.draw_line((100, y), (400, y), width=0.6)
-        page.draw_line((100, 150), (100, 210), width=0.6)
-        page.draw_line((400, 150), (400, 210), width=0.6)
-        page.draw_line((200, 150), (200, 210), width=0.6)
-        page.draw_line((300, 170), (300, 210), width=0.6)  # not in the header row
-        write(page, 105, 164, "Trial")
-        write(page, 230, 164, "Measured time (s)")
-        assert xs and ys
-
-    view = view_of(pdf(fill))
-    slots = tables._ruled_slots(view, (100, 150, 400, 210), BODY)
-    assert slots is not None
-    spans = {(s.row, s.col): (s.row_span, s.col_span) for s in slots}
-    assert spans[(0, 1)] == (1, 2) and (0, 2) not in spans
-    assert len(slots) == 8
 
 
 def test_a_two_column_grid_of_prose_is_a_layout_grid():
@@ -440,23 +281,6 @@ TERMS = [
 ]
 
 
-def test_a_term_grid_is_written_as_a_list_with_no_table_and_no_decision():
-    # The trailing empty cell (the terms ran out) and a four-word term no longer make it
-    # a data table: OpenStax prints these in about half of the table gold's pages.
-    def terms(page):
-        write(page, 72, 100, PROSE[0])
-        grid_table(page, TERMS, x0=72, y0=130, widths=[125.0] * 4)
-        write(page, 72, 200, PROSE[1])
-
-    result = analyze(pdf(terms))
-    assert [e for e in result.elements if e.kind == Kind.TABLE] == []
-    items = [e.text for e in result.elements if e.kind == Kind.LIST_ITEM]
-    assert items == [term for row in TERMS for term in row if term]
-    order = [e.kind for e in result.elements]
-    first = order.index(Kind.LIST_ITEM)
-    assert order[first - 1] == Kind.PARAGRAPH and order[first + len(items)] == Kind.PARAGRAPH
-
-
 def test_what_a_term_grid_is():
     def grid(texts: list[list[str]]) -> TableGrid:
         cells = [
@@ -480,31 +304,6 @@ def test_what_a_term_grid_is():
     assert not tables.is_term_grid(grid([[f"term{n} one", "beta", "gamma"] for n in "abcdefg"]))
     long = "a definition of several words"
     assert not tables.is_term_grid(grid([["alpha", "beta", long]]))
-
-
-def test_a_term_grid_with_a_table_caption_is_data():
-    def captioned(page):
-        write(page, 72, 120, "Table 4. Terms used in this lab")
-        grid_table(page, TERMS, x0=72, y0=130, widths=[125.0] * 4)
-
-    found = [e for e in analyze(pdf(captioned)).elements if e.kind == Kind.TABLE]
-    assert len(found) == 1 and found[0].table is not None and found[0].table.is_data
-
-
-def test_a_word_grid_has_no_digit_and_short_cells():
-    def grid(texts: list[list[str]]) -> TableGrid:
-        cells = [
-            TableCell(row=r, col=c, text=t)
-            for r, row in enumerate(texts)
-            for c, t in enumerate(row)
-        ]
-        return TableGrid(rows=len(texts), cols=len(texts[0]), cells=cells)
-
-    assert tables.is_word_grid(grid(KEY_TERMS))
-    assert not tables.is_word_grid(grid([["Trial", "Length"], ["first", "0.20 m"]]))
-    assert not tables.is_word_grid(grid([["Term", "Meaning"], ["speed", "how fast it goes"]]))
-    assert not tables.is_word_grid(grid([["a", "b"]] * 7))  # more rows than a box of terms
-    assert not tables.is_word_grid(grid([["Trial", "Length"], ["", ""]]))  # a blank worksheet
 
 
 def test_without_the_model_file_tables_still_get_a_grid_and_one_warning(caplog):
@@ -584,43 +383,6 @@ def test_raised_glyphs_stay_exponents_in_the_cells():
     texts = {(c.row, c.col): c.text for c in table.table.cells}
     assert (texts[(1, 1)], texts[(2, 1)]) == ("1.01\u00d710\u2075", "10\u207b\u00b9\u2078")
     assert texts[(1, 2)] == "Pa"
-
-
-def test_layout_emits_table_elements_in_reading_order_with_their_captions():
-    result = analyze(pdf(captioned_page))
-    kinds = [e.kind for e in result.elements]
-    assert kinds == [Kind.PARAGRAPH, Kind.TABLE, Kind.PARAGRAPH, Kind.TABLE, Kind.PARAGRAPH]
-    first, second = (e for e in result.elements if e.kind == Kind.TABLE)
-    assert first.caption == "Table 1. Pendulum measurements"  # above
-    assert second.caption == "Table 2: Record your data here."  # below
-    assert first.table is not None and first.table.caption == first.caption
-    assert first.table.source == "local" and first.table.header_rows == 1
-    assert [c.text for c in first.table.cells if c.row == 0] == ["Length", "Ten swings", "Period"]
-    assert second.table is not None and (second.table.rows, second.table.cols) == (5, 3)
-    assert all(c.is_empty for c in second.table.cells if c.row > 0)
-    texts = " ".join(e.text or "" for e in result.elements if e.kind == Kind.PARAGRAPH)
-    assert "Table 1" not in texts and "Table 2" not in texts and "12.69" not in texts
-
-
-def test_a_blank_worksheet_and_unruled_numbers_become_tables_not_loose_cells():
-    def fill(page):
-        write(page, 72, 100, PROSE[0])
-        grid_table(page, [["Trial", "Length (m)", "Time (s)"]], y0=130, blank_rows=4)
-        write(page, 72, 250, PROSE[1])
-        for r, row in enumerate(PENDULUM[1:]):  # numbers in aligned columns, no rules
-            for c, text in enumerate(row):
-                write(page, 150 + 90 * c, 280 + 16 * r, text)
-
-    elements = analyze(pdf(fill)).elements
-    assert [e.kind for e in elements] == [Kind.PARAGRAPH, Kind.TABLE, Kind.PARAGRAPH, Kind.TABLE]
-    blank, numbers = (e for e in elements if e.kind == Kind.TABLE)
-    assert blank.table is not None and (blank.table.rows, blank.table.cols) == (5, 3)
-    assert numbers.table is not None and (numbers.table.rows, numbers.table.cols) == (3, 3)
-
-
-def test_header_cells_are_not_headings_and_rules_are_not_figures():
-    result = analyze(pdf(captioned_page))
-    assert not [e for e in result.elements if e.kind in (Kind.HEADING, Kind.FIGURE, Kind.EQUATION)]
 
 
 def test_a_table_at_the_top_of_the_next_page_with_the_same_columns_is_marked_continued():

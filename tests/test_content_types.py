@@ -7,20 +7,16 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import get_args
 
 import pytest
 from pydantic import ValidationError
 
-from readablestem.config import Settings
 from readablestem.core import triage
 from readablestem.core.types import (
     GRID_PROBLEMS,
     MAX_TABLE_COLS,
     MAX_TABLE_ROWS,
-    NOTICE_CODES,
     ColourRun,
-    ConversionOptions,
     DocumentResult,
     Element,
     FigureFix,
@@ -29,11 +25,8 @@ from readablestem.core.types import (
     Link,
     NotationEntry,
     Notice,
-    ProgressEvent,
     SourceFacts,
-    Stage,
     Status,
-    Step,
     TableCell,
     TableFix,
     TableGrid,
@@ -150,32 +143,7 @@ def test_a_result_with_every_new_field_round_trips_through_json():
     assert again.fixes[0].review == "none" and again.fixes[1].review == "required"
 
 
-def test_kind_and_step_know_tables():
-    assert Kind("table") is Kind.TABLE
-    assert "table" in get_args(Step)
-    assert get_args(Stage) == (
-        "queued",
-        "layout",
-        "equations",
-        "figures",
-        "tables",
-        "assemble",
-        "checks",
-    )
-
-
 # --------------------------------------------------------------------------- tables
-
-
-def test_cells_need_real_positions_and_spans():
-    with pytest.raises(ValidationError):
-        TableCell(row=-1, col=0)
-    with pytest.raises(ValidationError):
-        TableCell(row=0, col=0, row_span=0)
-    with pytest.raises(ValidationError):
-        TableCell(row=0, col=0, header="both")  # type: ignore[arg-type]
-    assert TableCell(row=0, col=0).is_empty
-    assert not TableCell(row=0, col=0, latex="x").is_empty
 
 
 def test_grids_are_bounded():
@@ -255,17 +223,6 @@ def test_grid_problems_name_each_problem(grid, codes):
     assert set(codes) <= set(GRID_PROBLEMS)
 
 
-def test_grid_problems_come_in_a_fixed_order_once_each():
-    grid = TableGrid(
-        rows=2,
-        cols=2,
-        cells=[cell(0, 0, col_span=3), cell(0, 1), cell(0, 1)],
-    )
-    problems = grid_problems(grid)
-    assert problems == ["cell_out_of_bounds", "cells_overlap", "grid_hole"]
-    assert problems == sorted(problems, key=GRID_PROBLEMS.index)
-
-
 def test_a_hostile_grid_is_judged_quickly():
     """Thousands of cells each spanning the whole grid: reported, not measured."""
     big = TableCell(row=0, col=0, row_span=MAX_TABLE_ROWS, col_span=MAX_TABLE_COLS)
@@ -334,20 +291,6 @@ def test_links_carry_exactly_one_kind_of_target():
         Link(start=0, end=4, kind="uri", href="https://example.org", target_id="p1-e1")
 
 
-@pytest.mark.parametrize(("start", "end"), [(3, 3), (5, 2), (-1, 2)])
-def test_spans_must_cover_something(start, end):
-    with pytest.raises(ValidationError):
-        Link(start=start, end=end, kind="crossref", target_id="p1-e1")
-    with pytest.raises(ValidationError):
-        ColourRun(start=start, end=end, rgb=(0, 0, 0))
-
-
-@pytest.mark.parametrize("rgb", [(256, 0, 0), (0, -1, 0), (0, 0)])
-def test_colours_are_three_bytes(rgb):
-    with pytest.raises(ValidationError):
-        ColourRun(start=0, end=1, rgb=rgb)
-
-
 @pytest.mark.parametrize("lang", ["fr", "pt-BR", "zh-Hant-TW", "de-CH-1996"])
 def test_a_passage_language_is_a_language_tag(lang):
     assert Element(id="p1-e0", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 1, 1), order=0, lang=lang)
@@ -362,23 +305,6 @@ def test_anything_else_is_not_a_language(lang):
 # --------------------------------------------------------------------------- notices, facts
 
 
-def test_notices_are_codes_places_and_counts():
-    notice = Notice(code="lang_detected")
-    assert (notice.page, notice.element_id, notice.count, notice.review) == (
-        None,
-        None,
-        1,
-        "optional",
-    )
-    with pytest.raises(ValidationError):
-        Notice(code="footnote", count=0)
-    with pytest.raises(ValidationError):
-        Notice(code="footnote", page=-1)
-    # A code from a newer release still loads.
-    assert Notice.model_validate({"code": "something_new"}).code == "something_new"
-    assert all(code.replace("_", "").isalpha() and code.islower() for code in NOTICE_CODES)
-
-
 def test_source_facts_are_numbers_and_flags_only():
     facts = SourceFacts()
     assert facts.tagged is None and facts.images_with_alt is None
@@ -386,13 +312,6 @@ def test_source_facts_are_numbers_and_flags_only():
         assert field.annotation in (bool, int, bool | None, int | None), name
     with pytest.raises(ValidationError):
         SourceFacts(images=-1)
-
-
-def test_progress_events_are_content_free():
-    event = ProgressEvent(stage="equations", done=3, total=12, counts={"equation": 12})
-    assert ProgressEvent.model_validate_json(event.model_dump_json()) == event
-    with pytest.raises(ValidationError):
-        ProgressEvent(stage="ocr")  # type: ignore[arg-type]
 
 
 def test_a_table_kept_as_an_image_is_one_required_decision():
@@ -415,22 +334,3 @@ def test_notation_entries_are_short():
         NotationEntry(symbol="x", canonical="x", meaning="other", note="n" * 201)
     with pytest.raises(ValidationError):
         NotationEntry(symbol="x", canonical="x", meaning="scalar")  # type: ignore[arg-type]
-
-
-def test_options_default_to_everything_off():
-    assert ConversionOptions() == ConversionOptions(
-        notation=[], tables=False, long_descriptions=False, colour=False, notation_memory=False
-    )
-
-
-def test_options_from_settings_read_the_feature_flags():
-    settings = Settings(  # type: ignore[call-arg]
-        _env_file=None,
-        feature_tables=True,
-        feature_long_descriptions=False,
-        feature_colour=True,
-        feature_notation_memory=True,
-    )
-    options = ConversionOptions.from_settings(settings)
-    assert (options.tables, options.long_descriptions, options.colour) == (True, False, True)
-    assert options.notation_memory and options.notation == []

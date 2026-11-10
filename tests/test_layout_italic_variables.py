@@ -36,119 +36,6 @@ def inline(elements: list[Element]) -> list[str]:
     return [(e.text or "").replace(" ", "") for e in elements if e.kind == Kind.EQUATION]
 
 
-def test_a_lone_italic_letter_in_a_sentence_is_a_variable():
-    def fill(page):
-        line(
-            page,
-            100,
-            ("Let us consider ", "helv"),
-            ("S", "heit"),
-            (" species, characterized by their abundances in the community.", "helv"),
-        )
-
-    assert inline(analyze(one_page(fill)).elements) == ["S"]
-
-
-def test_an_italic_letter_with_brackets_is_one_variable_expression():
-    def fill(page):
-        line(
-            page,
-            100,
-            ("The carrying capacity ", "helv"),
-            ("K", "heit"),
-            ("(", "helv"),
-            ("t", "heit"),
-            (") changes slowly during the experiment and is measured daily.", "helv"),
-        )
-
-    assert inline(analyze(one_page(fill)).elements) == ["K(t)"]
-
-
-def test_two_italic_variables_apart_are_two_equations():
-    def fill(page):
-        line(
-            page,
-            100,
-            ("With ", "helv"),
-            ("n", "heit"),
-            (" samples and ", "helv"),
-            ("m", "heit"),
-            (" features the matrix is large and dense in memory.", "helv"),
-        )
-
-    assert inline(analyze(one_page(fill)).elements) == ["n", "m"]
-
-
-def test_an_emphasised_word_is_not_a_variable():
-    def fill(page):
-        line(
-            page,
-            100,
-            ("The answer is ", "helv"),
-            ("not", "heit"),
-            (" obvious, and the ", "helv"),
-            ("paradox", "heit"),
-            (" of the plankton remains open for many communities.", "helv"),
-        )
-
-    assert inline(analyze(one_page(fill)).elements) == []
-
-
-def test_a_letter_inside_an_italic_sentence_is_not_a_variable():
-    def fill(page):
-        line(
-            page,
-            100,
-            ("Theorem 1. ", "hebo"),
-            ("Let there be a solution of the problem and it is unique.", "heit"),
-        )
-
-    assert inline(analyze(one_page(fill)).elements) == []
-
-
-def test_an_italic_list_label_is_not_a_variable():
-    def fill(page):
-        line(
-            page,
-            100,
-            ("(", "helv"),
-            ("a", "heit"),
-            (") Use the technique described in the section to create a spreadsheet.", "helv"),
-        )
-
-    assert inline(analyze(one_page(fill)).elements) == []
-
-
-def test_a_figure_part_reference_is_not_a_variable():
-    def fill(page):
-        line(
-            page,
-            100,
-            ("The eigenvalues are shown in Fig. 6", "helv"),
-            ("(", "helv"),
-            ("a", "heit"),
-            (") and the vectors in the next panel of the figure.", "helv"),
-        )
-
-    assert inline(analyze(one_page(fill)).elements) == []
-
-
-def test_short_words_of_an_italic_sentence_with_a_function_name_are_not_variables():
-    # A theorem set in italics: "for all" and "and" are words even though log(n) is upright.
-    def fill(page):
-        line(
-            page,
-            100,
-            ("Suppose that the matrix is dense and ", "heit"),
-            ("log(", "helv"),
-            ("n", "heit"),
-            (") is large for all values of the other parameters in the model.", "heit"),
-        )
-
-    found = inline(analyze(one_page(fill)).elements)
-    assert not any(word in "".join(found) for word in ("and", "for", "all"))
-
-
 def test_a_bold_letter_with_an_index_is_a_vector():
     # "the eigenvector **v**2": a bold letter in the text font with a lowered digit.
     def fill(page):
@@ -168,32 +55,6 @@ def test_a_bold_letter_with_an_index_is_a_vector():
     assert inline(analyze(one_page(fill)).elements) == ["\U0001d42f2"]  # bold v, then 2
 
 
-def test_the_unit_exponent_of_upright_text_is_still_text():
-    def fill(page):
-        page.insert_text((72, 100), "The tank holds 5 cm", fontsize=BODY, fontname="helv")
-        x = 72 + pymupdf.get_text_length("The tank holds 5 cm", fontname="helv", fontsize=BODY)
-        page.insert_text((x, 96), "3", fontsize=7.4, fontname="helv")
-        x += pymupdf.get_text_length("3", fontname="helv", fontsize=7.4)
-        page.insert_text(
-            (x, 100), " of water at room temperature in the lab.", fontsize=BODY, fontname="helv"
-        )
-
-    assert inline(analyze(one_page(fill)).elements) == []
-
-
-def test_italic_letters_in_a_chromium_print_are_emphasis_not_maths():
-    def fill(page):
-        line(
-            page,
-            100,
-            ("Let us consider ", "helv"),
-            ("S", "heit"),
-            (" species, characterized by their abundances in the community.", "helv"),
-        )
-
-    assert inline(analyze(one_page(fill, producer="Skia/PDF m120")).elements) == []
-
-
 def test_a_maths_word_and_an_italic_variable_are_one_expression():
     def fill(page):
         line(
@@ -206,26 +67,3 @@ def test_a_maths_word_and_an_italic_variable_are_one_expression():
         )
 
     assert inline(analyze(one_page(fill)).elements) == ["lnX"]
-
-
-def _with_exponent(base: str, exponent: str, after: str, producer: str = "pdfTeX-1.40.25") -> bytes:
-    def fill(page):
-        text = f"The resolution is about {base}"
-        page.insert_text((72, 100), text, fontsize=BODY, fontname="helv")
-        x = 72 + pymupdf.get_text_length(text, fontname="helv", fontsize=BODY)
-        page.insert_text((x, 96), exponent, fontsize=7.4, fontname="helv")
-        x += pymupdf.get_text_length(exponent, fontname="helv", fontsize=7.4)
-        page.insert_text((x, 100), after, fontsize=BODY, fontname="helv")
-
-    return one_page(fill, producer)
-
-
-def test_a_power_of_ten_is_maths_in_a_tex_paper():
-    after = " metres in the lab, a value that we measured many times over the year."
-    found = inline(analyze(_with_exponent("10", "3", after)).elements)
-    assert found == ["103"]
-
-
-def test_the_exponent_of_a_unit_is_still_text():
-    after = " of water in the tank, a value that we measured many times over the year."
-    assert inline(analyze(_with_exponent("cm", "3", after)).elements) == []

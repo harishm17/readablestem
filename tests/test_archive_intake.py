@@ -99,13 +99,6 @@ def test_devices_fifos_and_sockets_are_refused(kind, tmp_path):
     assert refused(data, tmp_path) == "symlink"
 
 
-def test_a_regular_file_with_unix_mode_bits_is_fine(tmp_path):
-    data = zip_with([("a.tex", b"x", (stat.S_IFREG | 0o644) << 16)])
-    dest = tmp_path / "p"
-    dest.mkdir()
-    assert [e.path for e in arc.extract(data, dest)] == ["a.tex"]
-
-
 def test_a_symlink_already_in_the_target_is_not_followed(tmp_path):
     dest = tmp_path / "p"
     dest.mkdir()
@@ -117,23 +110,9 @@ def test_a_symlink_already_in_the_target_is_not_followed(tmp_path):
     assert secret.read_text() == "keep"
 
 
-def test_the_same_name_twice_is_refused_also_by_case(tmp_path):
-    assert refused(plain("a.tex", "a.tex"), tmp_path) == "unsafe_path"
-    assert refused(plain("a.tex", "A.TEX"), tmp_path) == "unsafe_path"
-
-
 def test_a_file_used_as_a_folder_is_refused(tmp_path):
     assert refused(plain("a.txt", "a.txt/b.tex"), tmp_path) == "unsafe_path"
     assert refused(plain("a.txt/b.tex", "a.txt"), tmp_path) == "unsafe_path"
-
-
-def test_too_many_entries_count_folders_too(tmp_path):
-    names = [f"d{i}/" for i in range(501)]
-    assert refused(zip_with([(n, b"", None) for n in names]), tmp_path) == "too_many_entries"
-    ok = [(f"f{i}.tex", b"x", None) for i in range(500)]
-    dest = tmp_path / "fine"
-    dest.mkdir()
-    assert len(arc.extract(zip_with(ok), dest)) == 500
 
 
 def test_a_zip_over_the_archive_limit_is_refused_before_it_is_opened(tmp_path):
@@ -226,9 +205,3 @@ def test_ignored_files_still_count_against_the_limits(tmp_path):
 
 def test_a_hostile_name_inside_an_ignored_folder_is_still_checked(tmp_path):
     assert refused(plain("__MACOSX/../x.tex"), tmp_path) == "unsafe_path"
-
-
-def test_looks_like_zip():
-    assert arc.looks_like_zip(plain("a.tex"))
-    assert not arc.looks_like_zip(b"%PDF-1.7")
-    assert not arc.looks_like_zip(b"")

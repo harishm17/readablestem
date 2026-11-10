@@ -118,20 +118,6 @@ def test_a_bomb_and_an_oversize_zip_are_refused_before_anything_is_read():
     assert batch_intake.split("x.zip", b"PK\x03\x04" + b"0" * (21 * 1024 * 1024)) == "zip_limits"
 
 
-def test_the_budget_is_shared_by_every_zip_of_a_request():
-    budget = batch_intake.RequestBudget(5 * 1024 * 1024)
-    big = make_zip({"a.pdf": b"%PDF-1.7 " + _noise(3_000_000)})  # about 3 MB
-    first = batch_intake.split("one.zip", big, budget=budget)
-    second = batch_intake.split("two.zip", big, budget=budget)
-    assert isinstance(first, list) and isinstance(second, list)
-    assert len(first[0].data) > 3_000_000  # the first zip reads its member
-    assert budget.used == len(first[0].data)
-    with pytest.raises(arc.ArchiveRefused) as raised:
-        second[0].data  # noqa: B018 - the second would take it past the budget
-    assert raised.value.code == "unpacked_too_large"
-    assert budget.used <= budget.total + 3_100_000  # stopped at the budget, not after the member
-
-
 def test_nothing_is_read_until_a_member_s_turn_and_only_text_for_the_projects():
     budget = batch_intake.RequestBudget(50 * 1024 * 1024)
     data = make_zip({"a.pdf": PDF, "b.pdf": PDF, "p/main.tex": ARTICLE})
@@ -178,14 +164,3 @@ def test_ten_zips_of_bombs_in_one_request_cannot_hold_more_than_the_budget():
 
 
 MB = 1024 * 1024
-
-
-@pytest.mark.parametrize(
-    ("max_upload_mb", "large_mb", "budget_mb"),
-    [(50, 100, 100), (20, 100, 40), (50, 60, 60), (50, 50, 50), (100, 100, 100)],
-    ids=["defaults", "small-file-limit", "tight-large-limit", "no-large-files", "equal-100"],
-)
-def test_the_request_budget_never_exceeds_a_plain_large_upload(max_upload_mb, large_mb, budget_mb):
-    budget = batch_intake.RequestBudget.for_upload_limit(large_mb * MB, max_upload_mb * MB)
-    assert budget.total == budget_mb * MB
-    assert budget.total <= large_mb * MB

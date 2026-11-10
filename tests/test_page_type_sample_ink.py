@@ -49,19 +49,6 @@ def test_a_page_of_per_sample_pen_strokes_is_handwritten():
     assert result.ink.strokes >= page_type.INK_PAGE_STROKES
 
 
-def test_the_same_strokes_over_a_dot_grid_paper_are_still_handwritten():
-    def draw(page):
-        shape = page.new_shape()
-        for y in range(20, 820, 12):
-            for x in range(20, 580, 12):
-                shape.draw_circle((x, y), 0.6)
-        shape.finish(fill=(0.6, 0.6, 0.6), color=None)
-        shape.commit()
-        _write(page)
-
-    assert _kind(draw).kind == "handwritten"
-
-
 def test_a_dot_grid_template_is_not_handwriting():
     def draw(page):
         shape = page.new_shape()

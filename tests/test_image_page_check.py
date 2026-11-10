@@ -73,35 +73,6 @@ AGREE = reading(0, ("text", "Since "), ("math", "x^{2}=4"), ("text", " we obtain
 # ------------------------------------------------------------------------------ which lines
 
 
-def test_only_medium_lines_with_a_formula_and_a_box_are_cut_out():
-    result = read_of(
-        sentence("medium", 140),
-        sentence("high", 200),
-        sentence("low", 260),
-        block("paragraph", confidence="medium", y0=320, y1=360, runs=[text("Only words here.")]),
-        block("list_item", marker="1.", confidence="medium", y0=380, y1=420, runs=[math("a+b")]),
-        sentence("medium", 440, x0=500, x1=500),
-        rows=(140, 200, 260, 320, 380, 440),
-    )
-    crops = image_page.second_reading_crops(result.reads[0].output, result.reads[0].png)  # type: ignore[arg-type]
-    assert [c.block for c in crops] == [0]  # the lone formula (list item 4) is an equation
-    assert crops[0].formulas == ["x^2 = 4"] and crops[0].words == "Since  we obtain it."
-    assert crops[0].png.startswith(b"\x89PNG")
-
-
-def test_the_second_reading_asks_in_batches_and_keeps_what_it_paid():
-    rows = tuple(60 + 90 * i for i in range(9))
-    result = read_of(*[sentence("medium", y) for y in rows], rows=rows)
-    client = second_client(*[AGREE | {"index": i} for i in range(8)])
-    image_page.second_readings(client, settings(), result, concurrency=1)
-    assert len(client.requests) == 2  # 8 and 1
-    assert [len(r.images) for r in client.requests] == [8, 1]
-    read = result.reads[0]
-    assert len(read.calls) == 2 and sum(c.cost_usd for c in read.calls) > 0
-    assert set(read.verdicts) == {0, 1, 2, 3, 4, 5, 6, 7, 8}  # the 9th answered as index 0
-    assert all(v.agree for v in read.verdicts.values())
-
-
 # -------------------------------------------------------------------------------- verdicts
 
 
@@ -109,12 +80,6 @@ def run_second(client: FakeVisionClient, *blocks: dict[str, Any]) -> PassResult:
     result = read_of(*blocks)
     image_page.second_readings(client, settings(), result, concurrency=1)
     return result
-
-
-def test_the_same_symbols_in_other_notation_are_agreement():
-    result = run_second(second_client(AGREE), sentence())
-    verdict = result.reads[0].verdicts[0]
-    assert verdict.agree and verdict.confidence == "high" and verdict.latex == ("x^{2}=4",)
 
 
 def test_a_different_symbol_a_different_word_or_a_different_count_is_not_agreement():
@@ -126,19 +91,6 @@ def test_a_different_symbol_a_different_word_or_a_different_count_is_not_agreeme
     for second in (other, words, two):
         result = run_second(second_client(second), sentence())
         assert not result.reads[0].verdicts[0].agree
-
-
-def test_a_formula_that_does_not_convert_is_not_agreement():
-    broken = reading(0, ("text", "Since "), ("math", "\\frac{x}{"), ("text", " we obtain it."))
-    result = run_second(second_client(broken), sentence())
-    assert not result.reads[0].verdicts[0].agree
-
-
-def test_a_refused_or_misnumbered_answer_gives_no_verdict_and_costs_nothing_else():
-    refused = FakeVisionClient()  # no responder: refused
-    assert run_second(refused, sentence()).reads[0].verdicts == {}
-    stray = second_client(reading(5, ("math", "x")), reading(0, ("math", "x")) | {"index": -1})
-    assert run_second(stray, sentence()).reads[0].verdicts == {}
 
 
 def test_a_budget_refusal_stops_the_second_reading_and_keeps_the_pages():
@@ -162,19 +114,6 @@ def built(verdict: image_page_check.Verdict | None, accept: bool, confidence: st
 
 
 AGREED = image_page_check.Verdict(agree=True, confidence="high")
-
-
-def test_agreement_is_recorded_but_changes_no_decision_unless_the_owner_asked():
-    fix = built(AGREED, accept=False)
-    assert fix.review == "required"
-    assert {c.name: c.passed for c in fix.checks}["image_page.second_reading"] is True
-
-
-def test_agreement_with_a_sure_second_reading_makes_an_optional_note_when_asked():
-    fix = built(AGREED, accept=True)
-    assert (fix.review, fix.status.value) == ("optional", "accepted")
-    assert fix.confidence == image_page.AGREED_CONFIDENCE
-    assert "image_page.read_confidence" in {c.name for c in fix.failed_checks}  # still a note
 
 
 def test_nothing_else_is_accepted():

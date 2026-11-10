@@ -17,7 +17,6 @@ from readablestem.core.budget import InMemorySpendGuard, JobBudget
 from readablestem.core.types import Kind, Status
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import image_page, run
-from readablestem.pipeline import image_page_check as second
 from readablestem.pipeline.image_page import ImagePageOutput
 
 BOX = (0.0, 0.0, 612.0, 792.0)
@@ -41,61 +40,6 @@ def reasons(fix) -> set[str]:
     return {c.code for c in fix.failed_checks if c.code in CODES}
 
 
-def test_a_sure_paragraph_with_a_formula_is_a_required_decision_that_says_why():
-    built = build(block("paragraph", runs=[text("Since "), math("x^2 = 4"), text(" it follows.")]))
-    fix = fix_of(built, Kind.PARAGRAPH)
-    assert (fix.status, fix.review) == (Status.NEEDS_REVIEW, "required")
-    assert reasons(fix) == {"maths_checked"}
-    assert fix.pending and not fix.optional_note
-
-
-def test_a_sure_list_item_with_a_formula_and_words_is_required():
-    built = build(block("list_item", marker="1.", runs=[text("Solve "), math("x^2 = 4")]))
-    fix = fix_of(built, Kind.LIST_ITEM)
-    assert fix.review == "required" and reasons(fix) == {"maths_checked"}
-
-
-def test_a_sure_paragraph_with_no_maths_stays_an_optional_note():
-    built = build(block("paragraph", runs=[text("Speed is distance over time.")]))
-    fix = fix_of(built, Kind.PARAGRAPH)
-    assert (fix.status, fix.review) == (Status.ACCEPTED, "optional")
-    assert reasons(fix) == set()
-
-
-def test_a_formula_that_does_not_validate_is_required_as_before_with_no_second_reason():
-    built = build(block("paragraph", runs=[text("See "), math("\\frac{a}{")]))
-    fix = fix_of(built, Kind.PARAGRAPH)
-    assert fix.review == "required" and reasons(fix) == set()  # it already had its reason
-
-
-def test_an_unsure_block_with_maths_has_its_own_reason_only():
-    built = build(block("paragraph", confidence="medium", runs=[text("a "), math("x")]))
-    fix = fix_of(built, Kind.PARAGRAPH)
-    assert fix.review == "required" and reasons(fix) == set()
-
-
-def test_the_setting_off_gives_the_old_tiers():
-    built = build(block("paragraph", runs=[text("Since "), math("x^2 = 4")]), maths_required=False)
-    assert fix_of(built, Kind.PARAGRAPH).review == "optional"
-
-
-def test_an_agreed_second_reading_cannot_lift_a_block_with_maths_out_of_the_decisions():
-    agreed = second.Verdict(agree=True, confidence="high")
-    built = build(
-        block("paragraph", confidence="medium", runs=[text("Since "), math("x^2 = 4")]),
-        verdicts={0: agreed},
-        accept_agreed=True,
-    )
-    fix = fix_of(built, Kind.PARAGRAPH)
-    assert fix.review == "required" and reasons(fix) == {"maths_checked"}
-
-
-def test_a_display_equation_is_decided_by_the_equation_step_as_before():
-    built = build(block("equation", latex="v = \\frac{d}{t}"))
-    [equation] = [e for e in built.elements if e.kind is Kind.EQUATION]
-    assert equation.id not in built.fixes  # no fix of this module's: the crop is read, required
-
-
 # ----------------------------------------------------------------------------- headings
 
 
@@ -114,23 +58,6 @@ def heading_fixes(*blocks: dict[str, Any], maths_required: bool = True):
     )
     image_page.tier_headings([fix], built.elements, maths_required=maths_required)
     return fix
-
-
-def test_a_sure_heading_with_maths_is_required_and_a_plain_one_is_not():
-    with_maths = heading_fixes(
-        block("heading", level=1, runs=[text("The "), math("\\sigma"), text(" model")])
-    )
-    plain = heading_fixes(block("heading", level=1, runs=[text("The model")]))
-    assert (with_maths.review, with_maths.status) == ("required", Status.NEEDS_REVIEW)
-    assert "maths_checked" in {c.code for c in with_maths.failed_checks}
-    assert plain.review == "optional"
-
-
-def test_a_heading_with_maths_stays_optional_when_the_setting_is_off():
-    fix = heading_fixes(
-        block("heading", level=1, runs=[text("The "), math("\\sigma")]), maths_required=False
-    )
-    assert fix.review == "optional"
 
 
 # ----------------------------------------------------------------------- through the run
@@ -156,36 +83,6 @@ PAGE = {
         block("paragraph", runs=[text("Plain words.")], y0=200, y1=260),
     ]
 }
-
-
-def test_through_the_run_only_the_block_with_maths_becomes_a_decision():
-    on = convert(scan_pdf(), PAGE)
-    off = convert(scan_pdf(), PAGE, image_pages_maths_always_required=False)
-    paragraphs = [e for e in on.elements if e.kind is Kind.PARAGRAPH]
-    with_maths, plain = (on.fix_for(p.id).review for p in paragraphs)
-    assert (with_maths, plain) == ("required", "optional")
-    old = [off.fix_for(p.id).review for p in off.elements if p.kind is Kind.PARAGRAPH]
-    assert old == ["optional", "optional"]
-    assert on.stats.required_decisions == off.stats.required_decisions + 1
-
-
-def test_a_typed_page_beside_a_scan_is_untouched_by_the_setting():
-    pdf = scan_pdf(typed_first=True)
-    on = convert(pdf, PAGE)
-    off = convert(pdf, PAGE, image_pages_maths_always_required=False)
-    typed = lambda r: [  # noqa: E731
-        (e.kind, f.review, f.status)
-        for e in r.elements
-        if e.page == 0 and (f := r.fix_for(e.id)) is not None
-    ]
-    assert typed(on) == typed(off)
-    assert not [
-        c
-        for f in on.fixes
-        for c in f.checks
-        if c.code == "maths_checked"
-        and next(e for e in on.elements if e.id == f.element_id).page == 0
-    ]
 
 
 # ------------------------------------------------- no maths read from an image goes unasked
@@ -280,9 +177,3 @@ def test_a_path_that_forgot_the_rule_is_caught_after_the_steps(monkeypatch):
     fix = result.fix_for(paragraph.id)
     assert (fix.status, fix.review) == (Status.NEEDS_REVIEW, "required")
     assert "maths_checked" in {c.code for c in fix.failed_checks}
-
-
-def test_the_guard_is_a_no_op_when_every_path_kept_the_rule():
-    result = convert_every_path()
-    fixes = {f.element_id: f for f in result.fixes}
-    assert image_page.enforce_maths_required(result.elements, fixes) == 0

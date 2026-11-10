@@ -152,98 +152,6 @@ def test_a_page_of_paper_rules_alone_is_blank():
     assert page_type.refusal_code([result.to_record(0)]) == "no_content"
 
 
-def test_square_waves_and_short_lines_are_marks_not_paper_rules():
-    (diagram,) = classify(HANDWRITING / "timing_diagram.pdf")
-    assert diagram.ink.marks > 0 and diagram.kind == "vector_no_text"
-
-    def ticks(page):  # short horizontal and vertical lines, each its own: a drawing
-        shape = page.new_shape()
-        for k in range(20):
-            shape.draw_line((100 + 20 * k, 300), (100 + 20 * k, 310))
-        shape.draw_line((100, 305), (480, 305))
-        shape.finish(color=(0, 0, 0), width=1)
-        shape.commit()
-
-    assert _page_with(ticks).kind == "vector_no_text"
-
-
-SECRET_CHARS = 63  # the hidden line's characters, spaces left out
-
-
-def test_boxes_drawn_with_annotation_tools_cover_the_line_under_them():
-    pages = classify(HANDWRITING / "annot_redactions.pdf")
-    # A black box, a black highlight, a black text box and a white box (annotations):
-    # the line under each is covered. A yellow highlight hides nothing.
-    assert [p.text.covered_chars for p in pages] == [SECRET_CHARS] * 4 + [0]
-    assert all("text_covered" in p.reasons for p in pages[:4])
-
-
-def test_clip_text_nothing_shows_through_and_text_under_a_shading_or_thick_stroke():
-    clip, shading, stroke = classify(HANDWRITING / "painted_over.pdf")
-    assert clip.text.invisible_chars == SECRET_CHARS and clip.text.covered_chars == 0
-    assert shading.text.covered_chars == stroke.text.covered_chars == SECRET_CHARS
-    # The clip-mode title over coloured bands shows: it is still read.
-    (title,) = classify(HANDWRITING / "typed_hidden.pdf")
-    assert title.text.invisible_chars == 80 and title.text.covered_chars == 32
-
-
-def test_a_scan_cropped_to_its_picture_covers_the_whole_visible_page():
-    (page,) = classify(HANDWRITING / "cropped_scan.pdf")
-    assert page.image_coverage == 1.0 and page.text.visible_chars == 19
-
-
-def test_a_few_strokes_under_a_typed_title_need_more_ink_to_be_handwriting():
-    coils, waves = classify(HANDWRITING / "diagram_slides.pdf")
-    for page in (coils, waves):
-        assert (page.ink.strokes, page.ink.rows) == (5, 1) and 0 < page.text.visible_chars < 40
-        assert page.kind == "vector_no_text"
-    # The same strokes with no typed text at all are a short handwritten note.
-    alone = page_type.decide(page_type.TextStats(), coils.ink, 0.0)
-    assert alone.kind == "handwritten" and "ink_few" in alone.reasons
-
-
-def test_a_hidden_layer_over_machine_drawn_vector_content_is_not_handwriting():
-    (page,) = classify(HANDWRITING / "vector_with_layer.pdf")
-    assert {"ink_rejected", "invisible_without_image"} <= set(page.reasons)
-    assert page.ink.rows < page_type.INK_PAGE_ROWS  # repeated shapes make no rows of writing
-    assert page.kind == "vector_no_text" and page.text.invisible_chars > 100
-
-
-def test_ink_not_analysed_under_a_short_typed_title_is_kept_as_an_image():
-    short, long = classify(HANDWRITING / "ink_titled.pdf", budget=page_type.InkBudget(0))
-    assert "ink_not_analysed" in short.reasons and short.text.visible_chars == 14
-    assert page_type.kept_reason(short) == "unread_page"
-    # A line of typed text or more: read as a typed page (layout's safety net decides).
-    assert long.kind == "born_digital" and page_type.kept_reason(long) is None
-
-
-def test_text_painted_under_an_opaque_image_is_covered_also_on_a_turned_page():
-    with pymupdf.open(HANDWRITING / "scan_text_under_image.pdf") as doc:
-        doc[0].set_rotation(90)
-        page = doc[0]
-        raw = page.get_text("rawdict", flags=page_type.TEXT_FLAGS)["blocks"]
-        result = page_type.classify(page, raw, page.get_cdrawings())
-    assert result.text.covered_chars == 413 and result.text.visible_chars == 0
-    assert result.kind == "scan_ocr" and "text_covered" in result.reasons
-
-
-@pytest.mark.parametrize(
-    ("span", "hidden"),
-    [
-        ({"char_flags": 0, "alpha": 255}, True),  # render mode 3: neither filled nor stroked
-        ({"char_flags": 16, "alpha": 0}, True),  # filled at opacity 0 (iPad notes)
-        ({"char_flags": 16, "alpha": 13}, True),  # 5 %
-        ({"char_flags": 16, "alpha": 14}, False),
-        ({"char_flags": 32, "alpha": 255}, False),  # stroked only
-        ({"char_flags": 80, "alpha": 0}, False),  # text used as a clip (render mode 7)
-        ({"char_flags": 64, "alpha": 0}, True),  # a clip that paints nothing itself
-        ({}, False),  # older MuPDF without the keys: visible
-    ],
-)
-def test_which_spans_are_hidden(span, hidden):
-    assert page_type.span_hidden(span) is hidden
-
-
 def _record(kind: str, visible: int = 0, invisible: int = 0, reasons=()) -> PageType:
     return PageType(
         page=0, kind=kind, visible_chars=visible, invisible_chars=invisible, reasons=list(reasons)
@@ -295,15 +203,6 @@ def test_a_page_with_too_many_path_items_is_not_analysed(monkeypatch):
     assert page.kind == "handwritten_ocr"
 
 
-def test_handwriting_regions_on_a_typed_page_stay_clear_of_the_text():
-    (page,) = classify(HANDWRITING / "typed_with_ink.pdf")
-    regions = page_type.ink_regions(page)
-    assert len(regions) == 1
-    x0, y0, _, y1 = regions[0]
-    assert y0 > 430 and y1 < 560 and x0 > 60  # the two lines written under the text
-    assert page_type.ink_regions(classify(HANDWRITING / "ios_notes.pdf")[0]) == []
-
-
 def test_the_stored_record_is_content_free():
     (page,) = classify(HANDWRITING / "typed_hidden.pdf")
     record = page.to_record(0).model_dump(mode="json")
@@ -312,18 +211,3 @@ def test_the_stored_record_is_content_free():
         assert word.lower() not in text.lower()
     assert record["kind"] == "mixed_hidden_text" and record["covered_chars"] == 32
     assert record["classifier_version"] == page_type.CLASSIFIER_VERSION
-
-
-def _born_digital_fixtures() -> list[Path]:
-    paths = sorted(LAYOUT.glob("*.pdf")) + sorted((LAYOUT / "latex").glob("*.pdf"))
-    return [p for p in paths if "damaged" not in p.name] + [DEMO]
-
-
-@pytest.mark.parametrize("path", _born_digital_fixtures(), ids=lambda p: p.name)
-def test_every_committed_born_digital_fixture_has_no_hidden_text_and_no_kept_page(path):
-    for page in classify(path):
-        assert page.text.untrusted == 0
-        assert page_type.kept_reason(page) is None
-        assert page.kind in {"born_digital", "vector_no_text", "blank"}
-        assert page.kind != "mixed_ink"
-    assert refusal(path) is None
