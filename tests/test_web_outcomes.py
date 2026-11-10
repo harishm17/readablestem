@@ -606,6 +606,48 @@ def test_fake_models_answer_offline_and_are_refused_in_production(tmp_path):
     )
     with pytest.raises(ConfigError, match="FAKE_MODELS"):
         prod.check_production()
+    answers = prod.model_copy(
+        update={"fake_models": False, "model_answers_file": tmp_path / "answers.jsonl"}
+    )
+    with pytest.raises(ConfigError, match="MODEL_ANSWERS_FILE"):
+        answers.check_production()
+
+
+def test_recorded_answers_wrap_the_real_client_and_offline_refuses_a_miss(tmp_path):
+    from readablestem.eval.answers import CachedClient
+    from readablestem.models.base import VisionRequest
+    from readablestem.models.openai_client import PNG_SIGNATURE
+    from readablestem.pipeline.equation_step import EquationOutput
+
+    budget = JobBudget(guard=InMemorySpendGuard(1.0), max_usd=1, max_calls=10)
+    path = tmp_path / "answers.jsonl"
+    common = {"model_provider": "anthropic", "anthropic_api_key": "sk-ant-test"}
+    live = default_client_factory(
+        Settings(_env_file=None, model_answers_file=path, **common), budget
+    )
+    assert isinstance(live, CachedClient) and live._inner is not None
+    assert live.verifier is getattr(live._inner, "verifier", None)
+
+    offline = default_client_factory(
+        Settings(_env_file=None, model_answers_file=path, model_answers_offline=True, **common),
+        budget,
+    )
+    request = VisionRequest(
+        step="equation",
+        model="claude-opus-5-5",
+        prompt_version="equation-test",
+        instructions="Transcribe.",
+        images=[PNG_SIGNATURE + b"crop"],
+    )
+    parsed, call = offline.run(request, EquationOutput)
+    assert parsed is None and call.outcome == "refused" and call.cost_usd == 0.0
+    assert not path.exists()
+
+    # FAKE_MODELS wins: the file is ignored and the offline client answers.
+    fake = default_client_factory(
+        Settings(_env_file=None, fake_models=True, model_answers_file=path), budget
+    )
+    assert isinstance(fake, FakeVisionClient)
 
 
 def test_a_missing_model_key_fails_with_its_own_code_and_message(env, monkeypatch):

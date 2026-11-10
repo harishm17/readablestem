@@ -204,11 +204,22 @@ def default_client_factory(settings: Settings, budget: JobBudget) -> VisionClien
     With FAKE_MODELS=true (dev and test only; `Settings.check_production` refuses it in
     production) the offline client answers instead, still charging `budget`, so the app
     can be tried end to end without an OpenAI key.
+
+    With MODEL_ANSWERS_FILE (dev and test only) the real client sits behind the file of
+    recorded answers: a recorded request is answered from it at no cost, any other is asked
+    and appended (or, with MODEL_ANSWERS_OFFLINE, refused). Conversions and review-screen
+    re-reads both come through here, so both are recorded.
     """
     from readablestem import models
 
     make_vision_client = models.make_vision_client
-    return make_vision_client(settings, budget, fake=settings.fake_models)
+    client = make_vision_client(settings, budget, fake=settings.fake_models)
+    if settings.model_answers_file is None or settings.fake_models:
+        return client
+    from readablestem.eval.answers import CachedClient
+
+    inner = None if settings.model_answers_offline else client
+    return CachedClient(inner, settings.model_answers_file, settings)
 
 
 def error_code_for(exc: BaseException) -> str:
