@@ -232,7 +232,7 @@ def test_templates_have_no_inline_script_or_style(path):
     assert "<style" not in text
     assert not re.search(r"\son[a-z]+\s*=", text), "inline event handler"
     assert "javascript:" not in text
-    for match in re.finditer(r"<script\b([^>]*)>", text):
+    for match in re.finditer(r"<script\b([^>]*)>", text, re.I):
         assert "src=" in match.group(1), "inline script (blocked by CSP)"
 
 

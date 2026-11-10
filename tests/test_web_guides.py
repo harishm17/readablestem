@@ -34,6 +34,16 @@ def graph(html: str) -> list[dict]:
     return json.loads(block)["@graph"]
 
 
+def urls(node) -> set[str]:
+    """Every "url" value anywhere in the JSON-LD."""
+    if isinstance(node, list):
+        return set().union(*(urls(n) for n in node))
+    if isinstance(node, dict):
+        found = {node["url"]} if isinstance(node.get("url"), str) else set()
+        return found.union(*(urls(v) for v in node.values()))
+    return set()
+
+
 @pytest.mark.parametrize("path", GUIDES)
 def test_a_guide_is_a_public_server_rendered_page_with_its_own_metadata(env, path):
     site = env.settings.base_url.rstrip("/")
@@ -59,7 +69,7 @@ def test_a_guide_is_a_public_server_rendered_page_with_its_own_metadata(env, pat
     assert (
         '<h2 id="sources">Sources</h2>' in html and "accessed on october 28, 2026" in html.lower()
     )
-    assert "https://harishmanoharan.com" in html
+    assert seo.AUTHOR_URL in urls(graph(html)), "the author is named by their site"
 
 
 def client_html(env, path: str) -> str:
