@@ -136,7 +136,7 @@ IMAGE_PAGE_REFUSALS = frozenset({"scanned", "scanned_ocr", "handwritten", "handw
 # cannot convert them), and what to tick. What the person had set stays on the form; the file
 # has to be chosen again.
 IMAGE_PAGES_ADVICE = (
-    "Tick “Convert scanned or handwritten pages” and choose the file again, or upload a PDF "
+    "Check “Convert scanned or handwritten pages” and choose the file again, or upload a PDF "
     "exported from the original."
 )
 IMAGE_PAGE_WHAT = {
@@ -153,6 +153,7 @@ STORAGE_FULL_MESSAGE = (
     "Try again in an hour. Nothing was uploaded."
 )
 # A refused upload costs nothing: the probe runs before the daily page count.
+PDF_ADVICE = " Save a copy as a PDF first."
 NOTHING_TAKEN = "Nothing was converted, and no pages were taken from your daily allowance."
 
 
@@ -179,37 +180,33 @@ def upload_error_message(
         return _quota_message(
             name, pages, left, access.page_quota(s, tier), new_account=access.is_open(tier)
         )
-    accepted = office_convert.input_kinds(s)  # Word and PowerPoint files taken (T3-30)
-    word = bool(accepted)
-    kinds, endings = office_convert.accepted_phrases(accepted)
+    # One statement of what is taken, for the page and for this message (T3-30, D-009).
+    accepted = ctx.accepted_types()
+    not_accepted = f"{name} is not {accepted.what}." + (
+        f" {accepted.note}" if accepted.note else ""
+    )
+    advice = "" if accepted.note else PDF_ADVICE  # one Office kind missing: say how to go on
     message = {
-        "missing_file": f"Choose {kinds} to upload." if word else "Choose a PDF file to upload.",
+        "missing_file": f"Choose {accepted.what} to upload.",
         "bad_form": "The upload did not arrive complete. Please try again.",
-        "empty": f"{name} is empty. Choose a file that has content."
-        if word
-        else f"{name} is empty. Choose a PDF that has content.",
-        "not_pdf": f"{name} is not {kinds}. Choose {endings}."
-        if word
-        else f"{name} is not a PDF. Choose a PDF file.",
+        "empty": f"{name} is empty. Choose a file that has content.",
+        "not_pdf": not_accepted,
         "too_large": f"{name} is larger than {s.upload_limit_mb} MB. Split it into smaller "
-        "files and upload each one."
-        if word
-        else f"{name} is larger than {s.upload_limit_mb} MB. Split it into smaller "
-        "PDFs and upload each one.",
+        "files and upload each one.",
         "too_many_files": f"You chose more than {access.files_per_upload(tier)} files. Upload "
         f"{access.files_per_upload(tier)} or fewer at a time.",
         "revise_one_file": "A revised version replaces one document: choose one file. To "
-        "upload several documents, use “Convert a PDF” on My documents.",
+        "upload several documents, use “Convert a document” on My documents.",
         "revision_too_large": f"{name} has more pages or is larger than one conversion takes, "
         "so it cannot be a revised version. Upload it as a new document and choose which "
         "pages to convert.",
         "too_many_pending": f"You already have {MAX_PENDING_PER_USER} large files waiting for "
         f"you to choose their pages. Choose or discard one, then upload {name} again. Nothing "
         "was uploaded.",
-        "office_unavailable": f"{name} is a Word or PowerPoint file, and this server cannot "
-        "read those yet. In Word or PowerPoint, save a copy as a PDF (File, Save As, PDF; "
-        f"keep the option for accessibility tags ticked) and upload that. {NOTHING_TAKEN}",
-        "office_unsupported": f"{name} is not {kinds}. Choose {endings}.",
+        # No Office kind at all: `not_accepted` already says to save a PDF. Only one missing
+        # (Word but no Impress): say it here.
+        "office_unavailable": f"{not_accepted}{advice} {NOTHING_TAKEN}",
+        "office_unsupported": not_accepted,
         "office_old_or_locked": f"{name} is in an older Word or PowerPoint format (.doc or "
         ".ppt), or it is protected with a password. Save a copy as .docx or .pptx "
         "without a password, or save it as a PDF, and upload that.",
@@ -248,12 +245,12 @@ def upload_error_message(
         "PowerPoint), export a PDF from it and upload that instead.",
         "scanned_ocr": f"{name} is scanned, so this tool cannot convert it. Its text was "
         "guessed from the images by a text recognition (OCR) program, which is often wrong "
-        f"in maths, so it is not used; running OCR again will not help. {NOTHING_TAKEN} If "
+        f"in math, so it is not used; running OCR again will not help. {NOTHING_TAKEN} If "
         "you have the original file (LaTeX, Word or PowerPoint), export a PDF from it and "
         "upload that instead.",
         "handwritten": f"{name} is handwritten, so this tool cannot convert it. Its hidden "
         "text, guessed from the handwriting by a tablet or an OCR program, is often wrong in "
-        f"maths, so it is not used. {NOTHING_TAKEN} If you have a typed version (LaTeX, Word "
+        f"math, so it is not used. {NOTHING_TAKEN} If you have a typed version (LaTeX, Word "
         "or PowerPoint), export a PDF from it and upload that instead.",
         "handwritten_no_text": f"{name} is handwritten, so this tool cannot convert it. "
         f"It has no text this tool can use. {NOTHING_TAKEN} If you have a typed version "
@@ -553,7 +550,6 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
             for row in pending.live(session, user.id, now)
         ]
     kinds = office_convert.input_kinds(ctx.settings)
-    phrases = office_convert.accepted_phrases(kinds)
     return {
         "documents": listing,
         "shared_documents": shared,
@@ -586,9 +582,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         # "Convert scanned or handwritten pages" is offered (ADR 0007, FEATURE_IMAGE_PAGES).
         "image_pages_offered": ctx.settings.feature_image_pages,
         # `.tex` files and zips of a LaTeX project are taken (FEATURE_LATEX_SOURCE).
-        "latex_source": ctx.settings.feature_latex_source and ctx.sandbox.allows_source(),
-        "office_what": phrases[0],
-        "office_choose": phrases[1],
+        "latex_source": ctx.latex_source_on,
         "keep_default": keep_default,
     }
 
@@ -696,7 +690,7 @@ def _upload_error_page(
         # The summary says what to do, and links to the box to tick (the file has to be
         # chosen again: a browser cannot keep a chosen file across a refused form).
         summary = (
-            f"{filename or 'This file'} has only scanned or handwritten pages. Tick “Convert "
+            f"{filename or 'This file'} has only scanned or handwritten pages. Check “Convert "
             "scanned or handwritten pages” and choose the file again."
         )
         summary_field = "image_pages"

@@ -1,0 +1,6 @@
+{# Who gets the pictures, in one line. `model_vendor`: the recipient with the "model" purpose
+   (web/recipients.py), the list the privacy page is written from, so this stays true if the
+   provider changes. Used beside the upload button and in the landing page's answer. #}
+{% set vendor_models = "Anthropic's Claude models" if model_vendor == "Anthropic" else model_vendor ~ "'s models" -%}
+Pictures of the equations and figures in your file, with a little nearby text, go to {{ vendor_models }} to propose readings. They are not used to train models.
+<a href="/privacy#who-else-sees">How your documents are handled</a>.

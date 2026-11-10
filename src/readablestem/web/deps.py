@@ -22,7 +22,7 @@ from starlette.responses import Response
 
 from readablestem.config import Settings
 from readablestem.observability.tracing import Tracer
-from readablestem.web import analytics, report_item, seo
+from readablestem.web import analytics, office_convert, recipients, report_item, seo
 from readablestem.web.abuse import RateLimiter, client_ip
 from readablestem.web.db import User, session_scope
 from readablestem.web.logsafe import log_event
@@ -71,6 +71,23 @@ class AppContext:
     @property
     def dev_login_enabled(self) -> bool:
         return self.settings.dev_login_enabled and self.settings.env in {"dev", "test"}
+
+    @property
+    def latex_source_on(self) -> bool:
+        """LaTeX source (.tex, a project zip) is taken: the flag is on and the sandbox passed."""
+        return self.settings.feature_latex_source and self.sandbox.allows_source()
+
+    def accepted_types(self, *, revision: bool = False) -> office_convert.AcceptedTypes:
+        """What this installation takes, worded once (`office_convert.accepted_types`).
+        `revision`: a revised version takes no LaTeX source."""
+        kinds = office_convert.input_kinds(self.settings)
+        return office_convert.accepted_types(kinds, self.latex_source_on and not revision)
+
+    @property
+    def model_vendor(self) -> str:
+        """The company that gets pictures of equations and figures, from the same list the
+        privacy page is written from (`web.recipients`)."""
+        return recipients.model_vendor(self.settings)
 
     def sign_in_client(self, name: str) -> Any | None:
         """The Authlib client "google" or "microsoft", or None when it is not set up."""
@@ -312,6 +329,11 @@ def render(
         "dev_login": ctx.dev_login_enabled,
         "email_login": ctx.settings.email_login_enabled,
         "email_link_minutes": ctx.settings.email_link_minutes,
+        # One statement of what is accepted, and who receives the pictures (the upload form,
+        # the landing page, /limits and the guides read these).
+        "accepted": ctx.accepted_types(),
+        "accepted_revision": ctx.accepted_types(revision=True),
+        "model_vendor": ctx.model_vendor,
         "max_upload_mb": ctx.settings.max_upload_mb,
         "max_pages": ctx.settings.max_pages_per_job,
         "retention_hours": ctx.settings.retention_hours,

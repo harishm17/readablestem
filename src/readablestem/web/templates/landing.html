@@ -68,10 +68,9 @@
     goes to you to accept, edit or reject.</li>
   <li><strong>The rest:</strong> real headings and lists{% if tables_on %}, tables with header cells{% endif %}
     and described figures.</li>
-  <li><strong>Your files:</strong> PDF{% if office_on %}, Word or PowerPoint{% endif %}, up to {{ max_pages }}
+  <li><strong>Your files:</strong> {% include "_accepted_types.html" %} Up to {{ max_pages }}
     pages at a time{% if image_pages_on %}; scanned and handwritten pages when you ask{% endif %}.
-    {% if latex_source %}LaTeX source files (.tex) and project zips are read from the source.
-    {% endif %}You get one HTML file to post
+    You get one HTML file to post
     ({% if word_export %}Word, {% endif %}EPUB and Canvas too).</li>
 </ul>
 <p><a href="/limits">What it does not do yet</a> and
@@ -97,13 +96,13 @@
     <summary id="documents">What happens to your documents</summary>
     <p>Your file and everything made from it are deleted {{ retention_hours }} hours after you
       last work on it. You can keep a document for 7 days, or let us look at the results for
-      {{ opt_in_days }} days to find mistakes in the tool. You can delete it at any time. We do
-      not use your uploads to train models. <a href="/privacy">Read the privacy notice</a>.</p>
+      {{ opt_in_days }} days to find mistakes in the tool. You can delete it at any time.
+      {% include "_vendor_line.html" %}</p>
   </details>
   <details>
     <summary>Why STEM courses need this now</summary>
     <p>The Department of Justice's ADA Title II web rule asks public universities to make online
-      course materials accessible. In STEM the hard part is the maths: a PDF equation is
+      course materials accessible. In STEM the hard part is the math: a PDF equation is
       usually a picture to a screen reader.
       <a href="/guides/ada-title-ii-stem-course-materials">What the rule asks</a>.</p>
   </details>

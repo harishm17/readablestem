@@ -41,8 +41,7 @@
     PDF.</li>
   <li><strong>Other formats, images, handwriting or a large batch: Mathpix.</strong> It takes
     more kinds of input, has an API for batches and exports to more formats. ReadableSTEM takes
-    a PDF{% if office_on %} (or a Word or PowerPoint file){% endif %}{% if latex_source %}, or LaTeX
-    source{% endif %}{% if image_pages_on %}, reads scanned and handwritten pages only when you
+    {{ accepted.what }}{% if image_pages_on %}, reads scanned and handwritten pages only when you
     ask{% endif %}, and returns a web page, with {% if word_export %}Word, {% endif %}EPUB, a zip
     for Canvas and a Common Cartridge.</li>
   <li><strong>You want to check each uncertain change before students see it:
@@ -124,7 +123,7 @@
 {% elif tool == 1 %}Free plan: 10 PDF pages a month (double with an .edu email). Pro: $4.99 a month with 1,000 PDF pages. API: $0.005 a page, after a one-time $19.99 setup fee. {{ src("https://mathpix.com/pricing/snip", "2026-10-28") }}
 {% elif tool == 2 %}Open source and self-hosted (command-line tools MIT, engine AGPL-3.0); managed cloud plans by order form; pilot pricing available. {{ src(AE, "2026-11-03") }}
 {% elif tool == 3 %}Depends on the chatbot's plan. Not compared here.
-{% elif tool == 4 %}Free. Public domain, from its source repository's licence file. {{ src("https://github.com/brucemiller/LaTeXML/blob/master/LICENSE", "2026-10-28") }}
+{% elif tool == 4 %}Free. Public domain, from its source repository's license file. {{ src("https://github.com/brucemiller/LaTeXML/blob/master/LICENSE", "2026-10-28") }}
 {% endif %}
 {%- endmacro %}
 {% macro cell_7(tool) -%}
@@ -254,7 +253,7 @@
   <li><a href="https://dlmf.nist.gov/LaTeXML/manual/usage/">LaTeXML manual: using LaTeXML</a> and <a href="https://dlmf.nist.gov/LaTeXML/manual/commands/latexmlpost.html">latexmlpost options</a> (version 0.8.8, February 26, 2024)</li>
   <li><a href="https://aelira.ai/us">Aelira, United States</a> (what it checks and fixes, its formats, plans and FAQ; read on November 3, 2026)</li>
   <li><a href="{{ source_url }}/blob/main/docs/eval-equation-fresh5.md">Report of the latest registered result</a> (the recipe and its results; run on November 4, 2026) and the <a href="{{ source_url }}/blob/main/PROOF.md#comparison-with-the-chatbot-recipe">earlier comparison</a> (run recorded on October 14, 2026)</li>
-  <li><a href="https://github.com/brucemiller/LaTeXML/blob/master/LICENSE">LaTeXML licence file</a> and <a href="https://github.com/brucemiller/LaTeXML/releases/tag/v0.8.8">release v0.8.8</a> (GitHub)</li>
+  <li><a href="https://github.com/brucemiller/LaTeXML/blob/master/LICENSE">LaTeXML license file</a> and <a href="https://github.com/brucemiller/LaTeXML/releases/tag/v0.8.8">release v0.8.8</a> (GitHub)</li>
   <li><a href="{{ source_url }}/blob/main/README.md">ReadableSTEM README</a>, <a href="/limits">known limits</a>, <a href="/help/posting">posting in your course</a> and <a href="{{ source_url }}/blob/main/PROOF.md">PROOF.md</a></li>
 </ul>
 </details>

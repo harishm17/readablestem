@@ -1,0 +1,4 @@
+{# The one statement of what the site takes (`accepted`: web/office_convert.py
+   `accepted_types`, supplied to every page by deps.render). Pass `accepted_types` to use
+   another value, such as the revised-version form's. #}
+{{ (accepted_types|default(accepted)).sentence }}

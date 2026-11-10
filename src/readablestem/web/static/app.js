@@ -50,7 +50,7 @@
 })();
 
 /* Times (UX review MF16). The server writes every time as
- * <time class="local-time" datetime="2026-10-09T23:32:00Z">9 Oct 2026, 23:32 UTC</time>
+ * <time class="local-time" datetime="2026-10-09T23:32:00Z">Oct 9, 2026, 23:32 UTC</time>
  * (the `utc` template filter). This rewrites it in the reader's own time zone, with how
  * far away it is when that is within a week: "Fri, Oct 9, 6:32 PM CDT (in 23 hours)".
  * Without JavaScript the UTC text stays. The pages are in English, so the words are
@@ -163,19 +163,18 @@
       return new RegExp("\\." + kind + "$", "i").test(file.name);
     });
     if (!pdf && !word) {
-      return office.length
-        ? file.name + " is not " + input.getAttribute("data-office-what") + ". Choose " +
-            input.getAttribute("data-office-choose") + "."
-        : file.name + " is not a PDF. Choose a PDF file.";
+      // The same words as the server's refusal (`data-accepted-*`: web/office_convert.py).
+      var note = input.getAttribute("data-accepted-note");
+      return file.name + " is not " + input.getAttribute("data-accepted-what") + "." +
+        (note ? " " + note : "");
     }
     if (file.size === 0) {
-      return file.name + (office.length ? " is empty. Choose a file that has content."
-        : " is empty. Choose a PDF that has content.");
+      return file.name + " is empty. Choose a file that has content.";
     }
     if (file.size > limitBytes) {
       return (
-        file.name + " is larger than " + limitMb + " MB. Split it into smaller " +
-        (office.length ? "files" : "PDFs") + " and upload each one."
+        file.name + " is larger than " + limitMb + " MB. Split it into smaller files and " +
+        "upload each one."
       );
     }
     return "";
@@ -239,7 +238,7 @@
       input.focus();
       return;
     }
-    if (!files || !files.length) return; // the server answers "Choose a PDF file to upload."
+    if (!files || !files.length) return; // the server answers "Choose ... to upload."
     if (button.getAttribute("aria-disabled") === "true") {
       event.preventDefault(); // already sending
       return;
@@ -914,7 +913,7 @@
     var summary = form.querySelector(".symbol-places > summary");
     var changeable = Number(form.getAttribute("data-changeable")) || 0;
     var said = "";
-    // The count in the "Places (n of m ticked)" summary changes silently; this hidden status
+    // The count in the "Places (n of m checked)" summary changes silently; this hidden status
     // says it, politely, when it changes. With a replacement chosen the status line under it
     // already says the count, so this one stays quiet then.
     var counter = form.querySelector("[data-symbol-count]");
@@ -932,13 +931,13 @@
       var n = ticked();
       var chosen = select.value !== "";
       var target = chosen ? select.options[select.selectedIndex].text : "";
-      if (summary) summary.textContent = "Places (" + n + " of " + changeable + " ticked)";
+      if (summary) summary.textContent = "Places (" + n + " of " + changeable + " checked)";
       if (counter && n !== counted) {
         // The first call (counted is -1) only sets the count: nothing is announced on load.
         var changed = counted !== -1;
         counted = n;
         counter.textContent = changed && !chosen
-          ? n + " of " + changeable + (changeable === 1 ? " place" : " places") + " ticked."
+          ? n + " of " + changeable + (changeable === 1 ? " place" : " places") + " checked."
           : "";
       }
       var ready = chosen && n > 0;
@@ -947,7 +946,7 @@
       if (!chosen) {
         say("Choose a symbol first.");
       } else if (n === 0) {
-        say("No place is ticked. Tick at least one.");
+        say("No place is checked. Check at least one.");
       } else {
         say(n + " of " + total + " places change to " + target + ".");
       }

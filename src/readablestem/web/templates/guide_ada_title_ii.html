@@ -24,15 +24,15 @@
   about STEM files. It is guidance, not legal advice.</p>
 <p class="hint">Last updated <time datetime="{{ updated }}">{{ updated_text }}</time>. By
   <a href="https://harishmanoharan.com">Harish Manoharan</a>. The rules and dates below were
-  checked against the sources at the bottom of the page on 28 October 2026.</p>
+  checked against the sources at the bottom of the page on October 28, 2026.</p>
 
 <h2 id="this-term">What to do this term</h2>
 <ul>
-  <li>Under the rule as it stood on 28 October 2026, online course materials at a public
+  <li>Under the rule as it stood on October 28, 2026, online course materials at a public
     university must meet WCAG 2.1 Level AA from April 26, 2027, or from April 26, 2028 for a
     smaller public entity (<a href="#dates">the dates</a>).</li>
   <li>Start with the files students use now. For each PDF, post an accessible version with
-    equations as real maths, real headings and described figures.</li>
+    equations as real math, real headings and described figures.</li>
   <li>Post the accessible version as the main one, in place of the PDF, not beside it.</li>
   <li>Ask your campus accessibility office which date and which exceptions apply to you.</li>
 </ul>
@@ -150,8 +150,8 @@
   <li>It makes mistakes, so look over the equations your students rely on.
     <a href="/limits#accuracy">How accurate it is</a> and the
     <a href="/limits">known limits</a>, including scanned and handwritten pages.</li>
-  <li>It starts from a PDF{% if office_on %}, or from a Word or PowerPoint file that it turns
-    into a PDF first{% endif %}.{% if latex_source %} It also reads LaTeX source files.{% else %} It does not work from LaTeX source files.{% endif %}</li>
+  <li>{% include "_accepted_types.html" %}{% if office_on %} A Word or PowerPoint file is turned
+    into a PDF first.{% endif %}{% if not latex_source %} It does not work from LaTeX source files.{% endif %}</li>
 </ul>
 <p>The rule allows a separate accessible version of a page only where it is not possible to
   make the web content directly accessible because of technical or legal limitations (28 CFR
@@ -166,7 +166,7 @@
 
 <h2 id="sources">Sources</h2>
 <details>
-<summary>Sources, all read on 28 October 2026</summary>
+<summary>Sources, all read on October 28, 2026</summary>
 <p class="hint">All accessed on October 28, 2026.</p>
 <ul>
   <li><a href="https://www.ecfr.gov/current/title-28/chapter-I/part-35/subpart-H/section-35.200">28 CFR 35.200, requirements for web and mobile accessibility</a> (eCFR; shows the April 20, 2026 amendment)</li>

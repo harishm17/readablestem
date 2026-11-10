@@ -51,6 +51,7 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+from dataclasses import dataclass
 from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
@@ -376,18 +377,36 @@ def available_kinds(soffice: str | None) -> tuple[str, ...]:
 _NAMES = {"docx": "Word (.docx)", "pptx": "PowerPoint (.pptx)"}
 
 
-def accepted_phrases(kinds: tuple[str, ...]) -> tuple[str, str]:
-    """("a PDF, Word (.docx) or PowerPoint (.pptx) file", "a PDF, .docx or .pptx file"):
-    what the upload takes, in words for a sentence, and in file endings for "Choose ..."."""
-    names = ["a PDF", *(_NAMES[k] for k in kinds)]
-    endings = ["a PDF", *(f".{k}" for k in kinds)]
+@dataclass(frozen=True)
+class AcceptedTypes:
+    """What this installation takes, worded once for every page and message that says so.
 
-    def join(parts: list[str]) -> str:
-        return parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " or " + parts[-1]
+    `what`: the noun phrase for "is not ...", "Choose ..." ("a PDF or LaTeX file"). `note`: what to
+    do with a Word or PowerPoint file when Office input is not installed ("" when it is).
+    `sentence`: `what` and `note` as a statement for a page."""
 
-    if not kinds:
-        return "a PDF", "a PDF file"
-    return join(names) + " file", join(endings) + " file"
+    what: str
+    note: str
+
+    @property
+    def sentence(self) -> str:
+        text = f"You can upload {self.what}."
+        return f"{text} {self.note}" if self.note else text
+
+
+NO_OFFICE_NOTE = "For a Word or PowerPoint file, save a copy as a PDF first."
+
+
+def accepted_types(kinds: tuple[str, ...], latex_source: bool = False) -> AcceptedTypes:
+    """The accepted-types phrase for this installation: a PDF, LaTeX when source files are
+    taken (`latex_source`: FEATURE_LATEX_SOURCE and a passing sandbox), and the Office `kinds`
+    LibreOffice can convert. Without Office input it adds how to turn such a file into a PDF."""
+    parts = ["a PDF"]
+    if latex_source:
+        parts.append("LaTeX")
+    parts.extend(_NAMES[k] for k in kinds)
+    joined = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " or " + parts[-1]
+    return AcceptedTypes(joined + " file", "" if kinds else NO_OFFICE_NOTE)
 
 
 # --------------------------------------------------------------------------- the child

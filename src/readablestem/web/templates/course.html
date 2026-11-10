@@ -47,7 +47,7 @@
   <form method="post" action="/courses/{{ course.id }}/starter" class="starter-form" aria-labelledby="starter-heading">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     <h3 id="starter-heading">Start from common symbols</h3>
-    <p class="hint" id="starter-hint">Tick the ones your course uses. Edit any row.</p>
+    <p class="hint" id="starter-hint">Check the ones your course uses. Edit any row.</p>
     <ul class="starter-list" aria-describedby="starter-hint">
       {% for sym, mean in starter %}
       <li class="starter-row">
@@ -66,7 +66,7 @@
       </li>
       {% endfor %}
     </ul>
-    <button type="submit" class="button">Add the ticked symbols</button>
+    <button type="submit" class="button">Add the checked symbols</button>
   </form>
   {% endif %}
 
@@ -107,7 +107,7 @@
   {% set download_all_url = "/courses/" ~ course.id ~ "/download" %}{% include "_download_all_formats.html" %}
   {% endif %}
   {% else %}
-  <p>No documents yet. Choose this course when you <a href="/app#upload-heading">convert a PDF</a>.</p>
+  <p>No documents yet. Choose this course when you <a href="/app#upload-heading">convert a document</a>.</p>
   {% endif %}
 
   {% if attachable %}
@@ -127,7 +127,7 @@
           {% endfor %}
         </ul>
       </fieldset>
-      <button type="submit" class="button-secondary">Add the ticked documents</button>
+      <button type="submit" class="button-secondary">Add the checked documents</button>
     </form>
   </details>
   {% endif %}
