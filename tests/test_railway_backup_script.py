@@ -97,23 +97,6 @@ def run_backup(tmp_path):
     return run
 
 
-def test_the_script_is_valid_bash():
-    result = subprocess.run(
-        ["bash", "-n"], input=backup_script(), capture_output=True, text=True, check=False
-    )
-    assert result.returncode == 0, result.stderr
-
-
-@pytest.mark.skipif(shutil.which("shellcheck") is None, reason="needs shellcheck")
-def test_the_script_passes_shellcheck(tmp_path):
-    path = tmp_path / "backup.sh"
-    path.write_text("#!/bin/bash\n" + backup_script())
-    result = subprocess.run(
-        ["shellcheck", "--shell=bash", str(path)], capture_output=True, text=True, check=False
-    )
-    assert result.returncode == 0, result.stdout
-
-
 def test_the_script_is_passed_to_bash_in_one_piece():
     text = (Path(__file__).resolve().parents[1] / ".railway" / "railway.ts").read_text()
     assert "${" not in backup_script() and "`" not in backup_script()

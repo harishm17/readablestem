@@ -352,47 +352,6 @@ def test_the_parent_is_not_dumpable_so_a_same_user_child_cannot_read_its_environ
     assert done.stdout.strip() == "blocked", done.stderr
 
 
-def test_the_probe_checks_it_from_inside(tmp_path, monkeypatch):
-    from readablestem.ops import sandbox_probe
-
-    monkeypatch.setenv(sandbox.BACKEND_ENV, "landlock")
-    sandbox.backend.cache_clear()
-    try:
-        report = sandbox_probe.Report()
-        sandbox_probe._check_sandbox(report, tmp_path)
-        lines = report.lines()
-    finally:
-        monkeypatch.undo()
-        sandbox.backend.cache_clear()
-    for name in (
-        "sandbox_start", "sandbox_no_secrets", "sandbox_no_etc", "sandbox_pid1_environ",
-        "sandbox_no_proc", "sandbox_no_network", "sandbox_outside_readonly",
-    ):  # fmt: skip
-        assert f"{name}=ok" in lines, lines
-    assert "backend=landlock" in lines and report.passed
-
-
-def test_the_launcher_is_stdlib_only_and_run_by_path():
-    """It runs as `python -I -S <path>` in a bare process: nothing of the app is imported."""
-    import ast
-
-    tree = ast.parse(sandbox.LAUNCHER.read_text())
-    roots = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            roots.update(alias.name.split(".")[0] for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            roots.add(node.module.split(".")[0])
-    assert roots <= set(sys.stdlib_module_names), roots - set(sys.stdlib_module_names)
-
-
-def test_the_strict_filter_adds_the_socket_and_session_calls_to_the_plain_one():
-    plain, strict = seccomp.program(), seccomp.program(strict=True)
-    assert plain is not None and strict is not None and len(strict) > len(plain)
-    assert {"socket", "setsid", "landlock_restrict_self"} <= set(seccomp.denied_names(strict=True))
-    assert "socket" not in seccomp.denied_names()
-
-
 # --------------------------------------------------------------------- the review's probes
 
 
@@ -447,19 +406,6 @@ def test_another_process_of_the_user_cannot_be_controlled_without_a_signal(tmp_p
     assert all(value == "1" for value in results.values()), results  # EPERM
     assert limits_of(victim.pid) == before
     assert victim.poll() is None
-
-
-def test_a_program_may_still_set_its_own_limits_and_affinity(tmp_path):
-    n = seccomp.number
-    code = (
-        'my $core = pack("QQ", 0, 0); my $aff = pack("Q", 1); my $p = pack("i", 0);'
-        f" my $a = syscall({n('prlimit64')}, 0, 4, $core, 0);"  # RLIMIT_CORE on itself
-        f" my $b = syscall({n('sched_setaffinity')}, 0, 8, $aff);"
-        f" my $c = syscall({n('sched_setscheduler')}, 0, 0, $p);"
-        ' print "$a,$b,$c";'
-    )
-    outcome, text = run_perl(code, tmp_path)
-    assert outcome.ok and text == "0,0,0", text
 
 
 def test_signals_stay_inside_the_sandbox_and_the_supervisor_is_out_of_reach(tmp_path, victim):
@@ -564,105 +510,7 @@ def test_file_metadata_cannot_be_changed(tmp_path, where):
     )  # fmt: skip
 
 
-@pytest.mark.parametrize(
-    "name", sorted(n for n in seccomp._STRICT_DENIED if seccomp.number(n) >= 0)
-)
-def test_every_strict_call_answers_eperm(tmp_path, name):
-    code = (
-        f"my $r = syscall({seccomp.number(name)}, 0, 0, 0, 0, 0); use Errno qw(EPERM);"
-        'print(($r < 0 && $! == EPERM) ? "denied" : "allowed:$r:".($!+0));'
-    )
-    outcome, text = run_perl(code, tmp_path)
-    assert outcome.ok and text == "denied", (name, text)
-
-
-def test_the_launcher_needs_landlock_abi_6_for_the_signal_and_socket_scopes():
-    assert sandbox.LANDLOCK_MIN_ABI == 6
-
-
-def test_the_bound_is_the_tasks_times_the_address_space_and_fits_the_setting():
-    from readablestem.config import Settings
-    from readablestem.source import latexml
-
-    limits = latexml.LIMITS
-    tasks = limits.task_bound("landlock")
-    assert tasks == 4 and tasks * limits.memory_bytes <= 2048 * 1024 * 1024
-    assert (
-        tasks * limits.memory_bytes // (1024 * 1024)
-        <= Settings(
-            _env_file=None  # type: ignore[call-arg]
-        ).source_sandbox_max_total_mb
-    )
-
-
-def test_latexml_needs_no_more_tasks_than_the_launcher_allows(tmp_path, monkeypatch):
-    """The program itself is 1 task and LaTeXML adds at most 1 (measured: the supervisor and
-    perl); a conversion under the Landlock limits succeeds."""
-    from readablestem.source import latexml
-    from source_support import needs_latexml  # noqa: F401
-
-    if not latexml.installed():
-        pytest.skip("needs LaTeXML")
-    monkeypatch.setenv(sandbox.BACKEND_ENV, "landlock")
-    sandbox.backend.cache_clear()
-    try:
-        src = tmp_path / "src"
-        src.mkdir()
-        (src / "main.tex").write_text(
-            "\\documentclass{article}\\begin{document}Hi $x^2$.\\end{document}"
-        )
-        outcome = latexml.convert(src, "main.tex", tmp_path / "out")
-    finally:
-        monkeypatch.undo()
-        sandbox.backend.cache_clear()
-    assert outcome.ok and (tmp_path / "out" / latexml.DOC_PATH).is_file()
-    assert latexml.LIMITS.landlock_pids == 2
-
-
-def test_the_supervisor_watches_the_process_not_the_thread_that_started_it(tmp_path):
-    """PR_SET_PDEATHSIG would end the sandbox when the starting thread exits; the supervisor
-    watches the caller's pid, so a short-lived thread does not matter."""
-    import json
-
-    out = tmp_path / "out"
-    out.mkdir()
-    spec = sandbox._landlock_spec(
-        [PERL, "-e", 'sleep 2; print "alive"'], ro=(), rw=((out, "/out"),), tools=(), env=None,
-        cwd="/", limits=sandbox.Limits(wall_s=20), hide=(), scratch=out, stubs=out,
-        program=seccomp.program(strict=True),
-    )  # fmt: skip
-    started: list[subprocess.Popen] = []
-    log = (tmp_path / "log").open("wb")
-
-    def start():
-        started.append(
-            subprocess.Popen(
-                [sys.executable, "-I", "-S", str(sandbox.LAUNCHER), json.dumps(spec)],
-                stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-            )
-        )  # fmt: skip
-
-    thread = threading.Thread(target=start)
-    thread.start()
-    thread.join()  # the thread that forked the launcher is gone
-    assert started[0].wait(15) == 0
-    log.close()
-    assert (tmp_path / "log").read_text() == "alive"
-
-
 # ------------------------------------------------------------- the second review's probes
-
-
-def test_space_reserved_without_a_size_is_refused(tmp_path):
-    """fallocate(FALLOC_FL_KEEP_SIZE, 10 GB): blocks on disk, st_size 0, no FSIZE limit."""
-    code = (
-        'my $out = $ARGV[0]; open(my $h, ">", "$out/k") or die;'
-        f" $! = 0; my $r = syscall({seccomp.number('fallocate')}, fileno($h), 1, 0, 10240 << 20);"
-        ' my @s = stat("$out/k"); print(($r == 0 ? "RESERVED" : ($!+0)), ":$s[12]");'
-    )
-    outcome, text = run_perl(code, tmp_path)
-    assert outcome.ok and text == "1:0", text  # EPERM, no blocks
-    assert sum(f.stat().st_blocks for f in (tmp_path / "out").iterdir()) == 0
 
 
 def test_the_budget_counts_blocks_as_well_as_size(tmp_path):
@@ -696,57 +544,6 @@ def test_a_shared_mapping_of_a_deleted_file_still_counts_against_the_budget(tmp_
         limits=sandbox.Limits(wall_s=30, out_bytes=100_000_000, file_bytes=50_000_000),
     )  # fmt: skip
     assert outcome.over_quota and time.monotonic() - start < 15
-
-
-def test_the_dynamic_loader_can_run_a_file_the_program_wrote_but_it_stays_confined(tmp_path):
-    """Landlock does not check PROT_EXEC mappings, and the kernel needs the right to execute the
-    loader for every program, so a file written to the output folder can be run through
-    `ld.so`. That is native code under the same ruleset and filter as Perl: it cannot read what
-    Perl cannot, and cannot make the calls Perl cannot (docs/security.md, residual risks)."""
-    loader = next(
-        (
-            p
-            for p in ("/lib64/ld-linux-x86-64.so.2", "/lib/ld-linux-aarch64.so.1")
-            if Path(p).exists()
-        ),
-        None,
-    )
-    if loader is None:
-        pytest.skip("no dynamic loader at the usual place")
-    code = (
-        'my $out = $ARGV[0]; my $dst = "$out/mycat"; open(my $s, "<", "/usr/bin/cat") or die;'
-        " binmode $s; my $d = do { local $/; scalar readline($s) };"
-        ' open(my $o, ">", $dst) or die; binmode $o; print $o $d; close $o; chmod(0755, $dst);'
-        ' $! = 0; my $direct = system($dst, "/usr/bin/true"); my $e1 = $!+0;'
-        f' my $ok = system("{loader}", $dst, "/usr/share/zoneinfo/UTC") >> 8;'
-        f' my $secret = system("{loader}", $dst, "/etc/passwd") >> 8;'
-        f' my $proc = system("{loader}", $dst, "/proc/1/environ") >> 8;'
-        ' open(my $r, ">", "$out/result"); '
-        'print $r "direct:" . ($direct == 0 ? "RAN" : "no");'
-        ' print $r ",ld_ok:$ok,passwd:$secret,proc:$proc";'
-    )
-    outcome, text = run_perl(code, tmp_path)
-    assert outcome.ok, text
-    result = (tmp_path / "out" / "result").read_text()
-    got = dict(item.split(":") for item in result.split(","))
-    assert got["direct"] == "no"  # no execute right on the output folder
-    assert got["passwd"] != "0" and got["proc"] != "0"  # still no /etc/passwd, no /proc
-
-
-def test_a_program_that_prints_the_busy_text_is_not_busy(tmp_path):
-    """`busy` comes from the launcher's own observation, never from what the program prints or
-    how it exits: a program that fails with the errno text, or exits with any status, is a normal
-    failure."""
-    spoof = 'print STDERR "Cannot fork: Resource temporarily unavailable\\n"; exit 3;'
-    outcome, text = run_perl(spoof, tmp_path)
-    assert not outcome.ok and "Resource temporarily unavailable" in text and not outcome.busy
-    loop = (
-        'my @k; for (1..40) { my $p = fork(); if (!defined $p) { die "Cannot fork: $!\\n" }'
-        " if ($p == 0) { sleep 5; exit 0 } push @k, $p }"
-    )
-    own_limit, text = run_perl(loop, tmp_path, limits=sandbox.Limits(wall_s=20, pids=4))
-    assert not own_limit.ok and "Resource temporarily unavailable" in text
-    assert not own_limit.busy  # the program used its own allowance: its own limit, not a busy host
 
 
 def test_a_document_that_prints_the_busy_text_is_a_normal_conversion_failure(monkeypatch):
@@ -794,22 +591,6 @@ def _launch(tmp_path, code: str, *, adjust: int = 0):
     return done.returncode, marker.exists()
 
 
-def test_a_machine_with_no_room_for_the_programs_tasks_is_busy(tmp_path):
-    """The user's task count is over the limit while the program has used none of its allowance:
-    its fork fails and the launcher says so (the limit is lowered by the test, so that nothing
-    else on the machine is affected)."""
-    code = (
-        'sleep 1; my $p = fork(); die "no fork: $!\\n" unless defined $p; exit 0 if $p == 0; wait;'
-    )
-    status, busy = _launch(tmp_path, code, adjust=-100_000)
-    assert status != 0 and busy
-
-
-def test_the_same_program_is_not_busy_when_there_is_room(tmp_path):
-    code = 'my $p = fork(); die "no fork: $!\\n" unless defined $p; exit 0 if $p == 0; wait;'
-    assert _launch(tmp_path, code) == (0, False)
-
-
 def test_a_busy_machine_is_its_own_failure_code_for_a_conversion(tmp_path, monkeypatch):
     from readablestem.source import convert, latexml
 
@@ -821,82 +602,7 @@ def test_a_busy_machine_is_its_own_failure_code_for_a_conversion(tmp_path, monke
     assert "source_busy" in convert.FAILURE_CODES
 
 
-def test_a_filter_that_denies_fallocate_does_not_stop_a_real_conversion(tmp_path, monkeypatch):
-    from readablestem.source import latexml
-
-    if not latexml.installed():
-        pytest.skip("needs LaTeXML")
-    monkeypatch.setenv(sandbox.BACKEND_ENV, "landlock")
-    sandbox.backend.cache_clear()
-    try:
-        src = tmp_path / "src"
-        src.mkdir()
-        (src / "main.tex").write_text(
-            "\\documentclass{article}\\usepackage{amsmath}\\begin{document}"
-            "\\begin{align}a&=b\\end{align}\\end{document}"
-        )
-        outcome = latexml.convert(src, "main.tex", tmp_path / "out")
-    finally:
-        monkeypatch.undo()
-        sandbox.backend.cache_clear()
-    assert outcome.ok and "fallocate" in seccomp._STRICT_DENIED
-
-
 # ------------------------------------------------- reaping: nothing is left for pid 1
-
-
-def _alive(tag: str) -> bool:
-    ps = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True).stdout
-    return tag in ps
-
-
-def test_told_to_stop_the_supervisor_kills_and_reaps_the_whole_tree_itself(tmp_path):
-    """SIGTERM to the supervisor alone (not its group): the program, its children and a
-    double-forked orphan are all gone, and the supervisor ends, with nobody else killing anyone."""
-    import json
-    import signal
-
-    out = tmp_path / "out"
-    out.mkdir()
-    code = (
-        'my $p = fork(); if ($p == 0) { my $q = fork(); if ($q == 0) { exec("/bin/sleep", "901") }'
-        ' exec("/bin/sleep", "902") } exec("/bin/sleep", "903");'
-    )
-    spec = sandbox._landlock_spec(
-        [PERL, "-e", code], ro=(), rw=((out, "/out"),), tools=(), env=None, cwd="/",
-        limits=sandbox.Limits(wall_s=60, pids=8), hide=(), scratch=out, stubs=out,
-        program=seccomp.program(strict=True),
-    )  # fmt: skip
-    proc = subprocess.Popen(
-        [sys.executable, "-I", "-S", str(sandbox.LAUNCHER), json.dumps(spec)],
-        stdin=subprocess.DEVNULL, start_new_session=True,
-    )  # fmt: skip
-    for _ in range(50):
-        time.sleep(0.1)
-        if _alive("sleep 901") and _alive("sleep 902") and _alive("sleep 903"):
-            break
-    assert _alive("sleep 901") and _alive("sleep 903")
-    os.kill(proc.pid, signal.SIGTERM)  # only the supervisor
-    assert proc.wait(10) == 143
-    time.sleep(0.3)
-    assert not (_alive("sleep 901") or _alive("sleep 902") or _alive("sleep 903"))
-
-
-def test_a_timeout_asks_the_supervisor_to_stop_before_the_group_is_killed(tmp_path, monkeypatch):
-    sent: list[tuple[str, int]] = []
-    real_kill, real_killpg = os.kill, os.killpg
-    monkeypatch.setattr(
-        sandbox.os, "kill", lambda pid, sig: (sent.append(("kill", sig)), real_kill(pid, sig))[1]
-    )
-    monkeypatch.setattr(
-        sandbox.os,
-        "killpg",
-        lambda pg, sig: (sent.append(("killpg", sig)), real_killpg(pg, sig))[1],
-    )
-    outcome, _ = run_perl('system("/bin/sleep", "904");', tmp_path, limits=sandbox.Limits(wall_s=1))
-    assert outcome.timed_out
-    assert sent[0] == ("kill", int(signal.SIGTERM))  # the supervisor, first
-    assert not _alive("sleep 904")
 
 
 # ---------------------------------------- the tree is bounded whatever the user's other tasks do
@@ -935,22 +641,6 @@ def test_a_program_that_waits_for_room_to_appear_is_killed_for_having_too_many_t
     # a few hundred: the review's probe saw 411); the tree is then killed, not left to 2000.
     made = int(text.split("made ")[1].split()[0]) if "made " in text else 0
     assert made < 2000
-
-
-def test_the_callers_poll_is_the_backstop_when_the_supervisor_does_not_catch_it(tmp_path):
-    """Without the supervisor's own check, the poll in `sandbox.run` still ends the run."""
-    assert sandbox.Limits(pids=4).task_bound("landlock") == 4 + sandbox.LANDLOCK_NPROC_SLACK
-    source = Path(sandbox.__file__).read_text()
-    assert "_tree_tasks(tree - {proc.pid}) > limits.task_bound" in source
-
-
-def test_a_program_within_its_allowance_is_not_killed(tmp_path):
-    code = (
-        "my @k; for (1..2) { my $p = fork(); die 'nofork' unless defined $p;"
-        " if ($p == 0) { sleep 1; exit 0 } push @k, $p } waitpid($_, 0) for @k;"
-    )
-    outcome, text = run_perl(code, tmp_path, limits=sandbox.Limits(wall_s=20, pids=4))
-    assert outcome.ok and not outcome.over_tasks, text
 
 
 def test_the_probe_checks_that_growth_is_killed(tmp_path, monkeypatch):

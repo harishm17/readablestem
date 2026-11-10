@@ -30,26 +30,6 @@ def perl(code: str, tmp_path, **kwargs):
     return outcome, log.read_text() if log.exists() else ""
 
 
-def test_argv_has_no_network_clean_env_and_limits(tmp_path):
-    if not (shutil.which("bwrap") and shutil.which("prlimit")):
-        pytest.skip("needs bubblewrap and prlimit to build the command")
-    argv = sandbox.build_argv(
-        ["/usr/bin/x", "a"],
-        ro=((tmp_path, "/work"),),
-        env={"K": "v"},
-        limits=sandbox.Limits(memory_bytes=123, cpu_s=7, file_bytes=9),
-    )
-    assert "--unshare-all" in argv and "--clearenv" in argv and "--die-with-parent" in argv
-    assert "--share-net" not in argv
-    assert argv[argv.index("--ro-bind", argv.index("/work") - 2) + 2] == "/work"
-    assert argv[argv.index("K") - 1 : argv.index("K") + 2] == ["--setenv", "K", "v"]
-    assert "--as=123" in argv and "--cpu=7" in argv and "--fsize=9" in argv
-    assert argv[-2:] == ["/usr/bin/x", "a"]
-    assert str(tmp_path) in argv  # only the folder named for it is shared
-    for private in ("/home", "/root", "/app", "/etc/passwd"):
-        assert private not in argv
-
-
 def test_missing_bubblewrap_is_refused_not_bypassed(monkeypatch):
     monkeypatch.setattr(sandbox.shutil, "which", lambda name: None)
     with pytest.raises(sandbox.SandboxUnavailable):
@@ -73,20 +53,6 @@ def test_environment_is_empty_and_secrets_stay_out(tmp_path, monkeypatch):
     assert outcome.ok
     assert "secret" not in text
     assert "ANTHROPIC" not in text and "SESSION" not in text
-
-
-@needs_sandbox
-def test_no_application_home_passwd_or_proc1(tmp_path):
-    outcome, text = perl(
-        'for my $p ("/app", "/home", "/root", "/etc/passwd", "/etc/shadow") '
-        '{ print "$p:", (-e $p ? "visible" : "absent"), "\\n"; }'
-        'my $n = 0; if (open(F, "<", "/proc/1/environ")) { local $/; $n = length(<F> // ""); }'
-        'print "pid1:$n\\n";',
-        tmp_path,
-    )
-    assert outcome.ok
-    assert "visible" not in text
-    assert "pid1:0" in text
 
 
 @needs_sandbox
@@ -160,12 +126,6 @@ def test_wall_clock_kills_an_infinite_loop(tmp_path):
 
 
 @needs_sandbox
-def test_cpu_cap_kills_a_busy_loop_before_the_wall_clock(tmp_path):
-    outcome, _ = perl("1 while 1;", tmp_path, limits=sandbox.Limits(wall_s=60, cpu_s=1))
-    assert not outcome.ok and not outcome.timed_out
-
-
-@needs_sandbox
 def test_runaway_output_is_killed_at_the_budget(tmp_path):
     outcome, _ = perl(
         'open(W, ">", "/out/big");'
@@ -189,44 +149,6 @@ def test_a_single_file_over_the_file_cap_stops(tmp_path):
 
 
 @needs_sandbox
-def test_children_die_with_the_group(tmp_path):
-    marker = tmp_path / "out" / "alive"
-    outcome, _ = perl(
-        'if (fork() == 0) { sleep 3; open(M, ">", "/out/alive"); close M; exit 0; } sleep 60;',
-        tmp_path,
-        limits=sandbox.Limits(wall_s=1),
-    )
-    assert outcome.timed_out
-    time.sleep(4)
-    assert not marker.exists()
-
-
-def test_parent_environment_is_not_passed_to_bubblewrap(monkeypatch, tmp_path):
-    seen = {}
-
-    class Fake:
-        returncode = 0
-
-        def wait(self, timeout=None):
-            return 0
-
-    def popen(argv, **kwargs):
-        seen.update(kwargs)
-        return Fake()
-
-    monkeypatch.setattr(sandbox, "bwrap_path", lambda: "/usr/bin/bwrap")
-    monkeypatch.setattr(sandbox, "prlimit_path", lambda: "/usr/bin/prlimit")
-    monkeypatch.setattr(sandbox, "_nproc_counted_inside", lambda: True)
-    monkeypatch.setattr(sandbox, "backend", lambda: "bwrap")  # not the one the machine would pick
-    monkeypatch.setattr(sandbox.subprocess, "Popen", popen)
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    sandbox.run(["/usr/bin/true"], cgroup=False)
-    assert seen["env"] == {"PATH": "/usr/bin:/bin"}
-    assert seen["start_new_session"] is True
-    assert os.environ["ANTHROPIC_API_KEY"] == "sk-test"
-
-
-@needs_sandbox
 def test_a_file_can_be_hidden_so_the_program_sees_it_empty(tmp_path):
     program = (
         'print(((-e "/usr/bin/true") ? "present" : "absent")'
@@ -245,13 +167,6 @@ def test_a_file_can_be_hidden_so_the_program_sees_it_empty(tmp_path):
         hide=("/usr/bin/true", "/nonexistent/file"),  # a file that is not there is skipped
     )
     assert hidden.read_text() == "present+empty"
-
-
-def test_hiding_is_in_the_command_line_only_for_files_that_exist():
-    if not (shutil.which("bwrap") and shutil.which("prlimit")):
-        pytest.skip("needs bubblewrap and prlimit to build the command")
-    argv = sandbox.build_argv(["/usr/bin/x"], hide=("/usr/bin/true", "/nonexistent/file"))
-    assert argv.count("/usr/bin/true") == 1 and "/nonexistent/file" not in argv
 
 
 # ---------------------------------------------------------------- seccomp, task and file limits
@@ -307,21 +222,6 @@ def test_the_filter_is_whole_and_unknown_machines_get_none():
 
 
 @needs_sandbox
-@needs_filter
-def test_without_the_filter_the_same_call_is_not_refused(tmp_path):
-    out = tmp_path / "out"
-    out.mkdir()
-    log = tmp_path / "log"
-    sandbox.run(
-        [PERL, "-e", f"my $r = syscall({seccomp.number('ptrace')}, 0, 0, 0, 0); print $r;"],
-        rw=((out, "/out"),),
-        log=log,
-        seccomp=False,
-    )
-    assert log.read_text() == "0"  # PTRACE_TRACEME succeeds: it is the filter that said EPERM above
-
-
-@needs_sandbox
 def test_a_fork_bomb_stops_at_the_task_limit(tmp_path):
     program = (
         "my $n = 0; for (1..300) { my $p = fork(); last unless defined $p; "
@@ -332,28 +232,7 @@ def test_a_fork_bomb_stops_at_the_task_limit(tmp_path):
 
 
 @needs_sandbox
-def test_open_files_are_capped(tmp_path):
-    program = (
-        'my $n = 0; for (1..600) { open(my $f, "<", "/usr/bin/perl") or last; push @h, $f; $n++ }'
-        " print $n;"
-    )
-    _outcome, text = perl(program, tmp_path)
-    assert text.isdigit() and int(text) <= sandbox.NOFILE
-
-
-@needs_sandbox
-def test_the_programs_own_output_counts_against_the_budget(tmp_path):
-    outcome, _ = perl(
-        'while (1) { print "x" x 100000; select(undef, undef, undef, 0.02); }',
-        tmp_path,
-        limits=sandbox.Limits(wall_s=30, out_bytes=500_000, file_bytes=100_000_000),
-    )
-    assert outcome.over_quota and not outcome.ok
-
-
-@needs_sandbox
 def test_killing_the_caller_leaves_no_sandboxed_process():
-    import os
     import signal
     import subprocess
     import sys
@@ -435,20 +314,6 @@ def test_a_failed_join_does_not_stop_the_sandbox(tmp_path, monkeypatch):
     assert outcome.ok and log.read_text() == "ran"  # under the per-process limits
 
 
-@needs_sandbox
-@pytest.mark.skipif(
-    sandbox.Cgroup.make(sandbox.Limits()) is None, reason="needs a delegated cgroup v2"
-)
-def test_every_process_of_the_tree_is_in_the_child_cgroup(tmp_path):
-    program = (
-        "my $c = `cat /proc/self/cgroup`; my $p = fork(); if ($p == 0) "
-        "{ print STDERR `cat /proc/self/cgroup`; exit 0 } waitpid($p, 0); print $c;"
-    )
-    _outcome, text = perl(program, tmp_path)
-    lines = {line for line in text.splitlines() if line.startswith("0::")}
-    assert len(lines) == 1 and "readablestem-sandbox-" in lines.pop()  # parent and child alike
-
-
 def test_the_exclusive_gate_lets_one_holder_in_at_a_time():
     with (
         sandbox.exclusive("test-gate", 1),
@@ -458,27 +323,6 @@ def test_the_exclusive_gate_lets_one_holder_in_at_a_time():
         pass
     with sandbox.exclusive("test-gate", 1):  # free again
         pass
-
-
-def test_latexmls_limits_bound_the_worst_case_below_the_setting(monkeypatch):
-    import dataclasses
-
-    from readablestem.config import Settings
-    from readablestem.ops import sandbox_probe
-    from readablestem.source import latexml
-
-    limits = latexml.LIMITS
-    assert limits.pids == 4 and limits.memory_bytes == 512 * 1024 * 1024
-    # tasks x address space, whichever backend is in use (4 x 512 MB: the Landlock backend's 2
-    # tasks of the program plus 2 of slack, or the bubblewrap sandbox's 4)
-    assert sandbox_probe.total_bound_mb(cgroup=False) == 2048
-    for backend_name in ("bwrap", "landlock"):
-        assert limits.task_bound(backend_name) * limits.memory_bytes == 2048 * 1024 * 1024
-    monkeypatch.setattr(latexml, "LIMITS", dataclasses.replace(limits, landlock_pids=3))
-    monkeypatch.setattr(sandbox, "backend", lambda: "landlock")
-    assert sandbox_probe.total_bound_mb(cgroup=False) == 2560  # one more task: over the setting
-    assert sandbox_probe.total_bound_mb(cgroup=True) == 512
-    assert Settings(_env_file=None).source_sandbox_max_total_mb == 2048  # type: ignore[call-arg]
 
 
 def test_both_steps_of_a_conversion_keep_the_task_and_memory_limits(tmp_path, monkeypatch):

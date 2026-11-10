@@ -9,12 +9,21 @@ import pytest
 from readablestem.config import Settings
 from readablestem.core.budget import InMemorySpendGuard, JobBudget
 from readablestem.models import make_vision_client
-from readablestem.source import envelope
+from readablestem.source import envelope, latexml
+from readablestem.web import isolated_convert
 from readablestem.web.isolated_convert import ConversionFailed, convert_isolated
 from readablestem.web.worker import error_code_for
 from source_support import make_zip, needs_latexml
 
 pytestmark = needs_latexml
+
+
+@pytest.fixture(autouse=True)
+def dev_root_reaches_the_child(monkeypatch):
+    """Only where LaTeXML is unpacked under a development root: production has it in /usr."""
+    monkeypatch.setattr(
+        isolated_convert, "_EXTRA_ENV", (*isolated_convert._EXTRA_ENV, latexml.DEV_ROOT_VAR)
+    )
 
 
 def offline():

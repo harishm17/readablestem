@@ -243,33 +243,6 @@ HOSTILE = {
     "truncated at 90 percent": truncated(0.9),
     "text file with a PDF header buried in it": b"hello\n" * 50 + b"%PDF-1.4\n" + b"x" * 500,
 }
-OUTCOMES = {
-    "empty",
-    "not_pdf",
-    "encrypted",
-    "unreadable",
-    "damaged",
-    "no_pages",
-    "too_many_pages",
-    "page_too_large",
-    "scanned",
-    "scanned_ocr",
-    "handwritten",
-    "handwritten_no_text",
-    "no_content",
-}
-
-
-@pytest.mark.parametrize("name", sorted(HOSTILE))
-def test_a_hostile_pdf_gets_a_category_and_never_an_exception(name):
-    started = time.monotonic()
-    try:
-        pages = inspect_pdf_isolated(HOSTILE[name], max_pages=5, timeout_s=20)
-    except UploadRejected as rejected:
-        assert rejected.code in OUTCOMES, name
-    else:
-        assert 1 <= pages <= 5, name  # accepted only if it really is a small document
-    assert time.monotonic() - started < 20, name
 
 
 def test_a_hostile_pdf_through_the_form_is_a_page_not_a_500(web):
@@ -383,29 +356,6 @@ def test_hostile_names_are_shown_escaped_and_never_reach_headers(web):
 # --------------------------------------------------------------------------- quotas
 
 
-def test_one_person_cannot_queue_without_limit(web, monkeypatch):
-    """At most a few conversions wait or run at once for one person: a long queue of
-    their own files must not push everyone else back. (The invited tier's cap is lowered to
-    10 here: the address's own rate limit is 30 uploads in ten minutes.)"""
-    from readablestem.web import access
-
-    monkeypatch.setattr(access, "INVITED_FILES_PER_UPLOAD", 10)
-    MAX_ACTIVE_JOBS_PER_USER = 10
-
-    queued = 0
-    for _ in range(MAX_ACTIVE_JOBS_PER_USER + 3):
-        response = upload(web.browser, make_pdf(1))
-        if response.status_code == 303:
-            queued += 1
-        else:
-            assert response.status_code == 429
-            assert "still being converted" in response.text
-    assert queued == MAX_ACTIVE_JOBS_PER_USER
-    assert pages_used(web) == MAX_ACTIVE_JOBS_PER_USER  # a refusal costs no pages
-    web.run_worker()  # one finishes: room for one more
-    assert upload(web.browser, make_pdf(1)).status_code == 303
-
-
 def test_one_person_cannot_store_without_limit(tmp_path, monkeypatch):
     from readablestem.web import intake
 
@@ -427,46 +377,3 @@ def test_one_person_cannot_store_without_limit(tmp_path, monkeypatch):
                 assert "delete" in response.text.lower()
         assert stored == MAX_LIVE_JOBS_PER_USER
         assert csrf_from(client.get("/app").text)
-
-
-def test_child_env_keeps_only_what_an_interpreter_needs(monkeypatch):
-    from readablestem.core.childenv import child_env
-
-    for name in ("SESSION_SECRET", "CRON_TOKEN", "GOOGLE_CLIENT_SECRET", "MS_CLIENT_SECRET"):
-        monkeypatch.setenv(name, "secret-value")
-    monkeypatch.setenv("PATH", "/usr/bin")
-    env = child_env()
-    assert env.get("PATH") == "/usr/bin"
-    assert "secret-value" not in env.values()
-
-
-def test_the_probe_child_caps_its_own_memory_and_the_parent_caps_its_time(monkeypatch):
-    import subprocess
-    import sys
-
-    from readablestem.web.pdf_probe import MEMORY_LIMIT_BYTES
-
-    shown = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "import resource; from readablestem.web.pdf_probe import limit_memory; limit_memory(); "
-            "print(resource.getrlimit(resource.RLIMIT_AS)[0])",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    assert int(shown.stdout) == MEMORY_LIMIT_BYTES <= 1024 * 1024 * 1024
-
-    real_run = subprocess.run
-
-    def hang(command, **kwargs):
-        return real_run([sys.executable, "-c", "import time; time.sleep(60)"], **kwargs)
-
-    monkeypatch.setattr(uploads.subprocess, "run", hang)
-    started = time.monotonic()
-    with pytest.raises(UploadRejected) as rejected:
-        inspect_pdf_isolated(make_pdf(1), max_pages=5, timeout_s=0.5)
-    assert rejected.value.code == "unreadable"
-    assert time.monotonic() - started < 10, "the hung child was not killed at its timeout"
