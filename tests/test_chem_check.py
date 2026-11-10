@@ -142,75 +142,61 @@ def test_a_reaction_cut_mid_way():
     assert ("arrow", "→", "") in diff.rows
 
 
-def test_a_subscript_read_as_a_coefficient():
-    text = "H2 O(𝑙) ⇌H+ (𝑎𝑞) + OH−(𝑎𝑞)"
-    latex = (
-        r"2\text{HO}\text{(l)} \rightleftharpoons \text{H}^+\text{(aq)} + \text{OH}^-\text{(aq)}"
-    )
+IONIZATION = "H2 O(𝑙) ⇌H+ (𝑎𝑞) + OH−(𝑎𝑞)"
+IONIZATION_TEX = (
+    r"2\text{HO}\text{(l)} \rightleftharpoons \text{H}^+\text{(aq)} + \text{OH}^-\text{(aq)}"
+)
+SPLIT = "2 H2 O(𝑙) −→2 H2 (𝑔) + O2 (𝑔)"
+SPLIT_TEX = r"\text{H}_2\text{O}\text{(l)} \rightarrow 2\text{H}_2\text{(g)} + \text{O}_2\text{(g)}"
+HF = "HF(aq) ⇌H+ (aq) + F−(aq)"
+HF_TEX = r"\text{HF}\text{(aq)} \rightarrow \text{H}^+\text{(aq)} + \text{F}^-\text{(aq)}"
+PEROXIDE = "H2 O2 (l) −→H2 O(l) + O2 (g)"
+PEROXIDE_TEX = (
+    r"\text{H}_2\text{O}\text{(l)} \rightarrow \text{H}_2\text{O}\text{(l)} + \text{O}_2\text{(g)}"
+)
+
+
+@pytest.mark.parametrize(
+    ("text", "latex", "kind"),
+    [
+        pytest.param(IONIZATION, IONIZATION_TEX, "coefficient", id="subscript-read-as-coefficient"),
+        pytest.param(SPLIT, SPLIT_TEX, "coefficient", id="coefficient-read-as-subscript"),
+        pytest.param(AGCL, AGCL_TEX.replace("^+", "^-", 1), "charge", id="flipped-charge"),
+        pytest.param(
+            PBCRO4,
+            PBCRO4_TEX.replace("CrO}_4^{2-}", "CrO}_4^{2+}"),
+            "charge",
+            id="flipped-charge-with-number",
+        ),
+        pytest.param(AGCL, AGCL_TEX.replace("^-", "", 1), "charge", id="dropped-charge"),
+        pytest.param(AGCL, AGCL_TEX.replace("(aq)", "(s)", 1), "state", id="changed-state"),
+        pytest.param(AGCL, AGCL_TEX.replace(r"\text{(s)}", ""), "state", id="dropped-state"),
+        pytest.param(
+            AGCL,
+            AGCL_TEX.replace(r"\longrightarrow", r"\rightleftharpoons"),
+            "arrow",
+            id="reaction-arrow-read-as-equilibrium",
+        ),
+        pytest.param(HF, HF_TEX, "arrow", id="equilibrium-arrow-read-as-reaction"),
+        pytest.param(AGCL, AGCL_TEX.replace("Cl", "Br"), "elements", id="another-element"),
+        pytest.param(PEROXIDE, PEROXIDE_TEX, "elements", id="moved-count"),
+    ],
+)
+def test_the_species_check_names_what_the_reading_got_wrong(text, latex, kind):
     diff = cc.compare_species(text, ml(latex))
-    assert diff is not None and diff.kinds == ("coefficient",)
-    assert diff.rows == (("coefficient", "H2O(l)", "2 HO(l)"),)
+    assert diff is not None and diff.kinds == (kind,)
 
 
-def test_a_coefficient_read_as_a_subscript():
-    text = "2 H2 O(𝑙) −→2 H2 (𝑔) + O2 (𝑔)"
-    latex = r"\text{H}_2\text{O}\text{(l)} \rightarrow 2\text{H}_2\text{(g)} + \text{O}_2\text{(g)}"
-    diff = cc.compare_species(text, ml(latex))
-    assert diff is not None and diff.kinds == ("coefficient",)
-
-
-def test_a_flipped_charge_sign():
-    latex = AGCL_TEX.replace("^+", "^-", 1)
-    diff = cc.compare_species(AGCL, ml(latex))
-    assert diff is not None and diff.kinds == ("charge",)
-    assert diff.rows == (("charge", "Ag+(aq)", "Ag−(aq)"),)
-
-
-def test_a_flipped_sign_on_a_charge_with_a_number():
-    latex = PBCRO4_TEX.replace("CrO}_4^{2-}", "CrO}_4^{2+}")
-    diff = cc.compare_species(PBCRO4, ml(latex))
-    assert diff is not None and diff.kinds == ("charge",)
-
-
-def test_a_dropped_charge():
-    latex = AGCL_TEX.replace("^-", "", 1)
-    diff = cc.compare_species(AGCL, ml(latex))
-    assert diff is not None and diff.kinds == ("charge",)
-
-
-def test_a_changed_state():
-    diff = cc.compare_species(AGCL, ml(AGCL_TEX.replace("(aq)", "(s)", 1)))
-    assert diff is not None and diff.kinds == ("state",)
-
-
-def test_a_dropped_state():
-    diff = cc.compare_species(AGCL, ml(AGCL_TEX.replace(r"\text{(s)}", "")))
-    assert diff is not None and diff.kinds == ("state",)
-
-
-def test_a_reaction_arrow_read_as_an_equilibrium_arrow_and_back():
-    swapped = cc.compare_species(
-        AGCL, ml(AGCL_TEX.replace(r"\longrightarrow", r"\rightleftharpoons"))
-    )
-    assert swapped is not None and swapped.kinds == ("arrow",)
-    text = "HF(aq) ⇌H+ (aq) + F−(aq)"
-    latex = r"\text{HF}\text{(aq)} \rightarrow \text{H}^+\text{(aq)} + \text{F}^-\text{(aq)}"
-    other = cc.compare_species(text, ml(latex))
-    assert other is not None and other.kinds == ("arrow",)
+def test_the_difference_rows_show_the_text_and_the_reading():
+    diff = cc.compare_species(IONIZATION, ml(IONIZATION_TEX))
+    assert diff is not None and diff.rows == (("coefficient", "H2O(l)", "2 HO(l)"),)
+    diff = cc.compare_species(AGCL, ml(AGCL_TEX.replace("^+", "^-", 1)))
+    assert diff is not None and diff.rows == (("charge", "Ag+(aq)", "Ag−(aq)"),)
 
 
 def test_a_reversed_reaction():
     latex = r"\text{AgCl}\text{(s)} \longrightarrow \text{Ag}^+\text{(aq)} + \text{Cl}^-\text{(aq)}"
     assert kinds(AGCL, latex) not in (None, ())
-
-
-def test_another_element_and_a_moved_count():
-    swapped = cc.compare_species(AGCL, ml(AGCL_TEX.replace("Cl", "Br")))
-    assert swapped is not None and swapped.kinds == ("elements",)
-    text = "H2 O2 (l) −→H2 O(l) + O2 (g)"
-    latex = r"\text{H}_2\text{O}\text{(l)} \rightarrow \text{H}_2\text{O}\text{(l)} + \text{O}_2\text{(g)}"
-    moved = cc.compare_species(text, ml(latex))
-    assert moved is not None and moved.kinds == ("elements",)
 
 
 # ------------------------------------------------------ where the check stays out
