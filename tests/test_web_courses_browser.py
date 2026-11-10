@@ -273,7 +273,7 @@ def test_ticking_a_suggestion_and_changing_its_meaning_works_without_javascript(
     page.goto(f"{site.base}/jobs/{job_id}")
     page.get_by_label("What double-struck R means").select_option(label="A set")
     page.get_by_label("double-struck R (1 equation, first on page 2)").check()
-    page.get_by_role("button", name="Add the ticked symbols to Plain suggestion course").click()
+    page.get_by_role("button", name="Add the checked symbols to Plain suggestion course").click()
     page.wait_for_url(f"{site.base}/jobs/{job_id}*")
     assert "Added to Plain suggestion course" in page.locator("body").inner_text()
     page.goto(f"{site.base}/jobs/{job_id}")

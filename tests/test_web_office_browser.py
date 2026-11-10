@@ -83,7 +83,7 @@ def test_the_upload_form_passes_axe_with_the_word_hint(site, browser, axe_source
     page = context.new_page()
     sign_in(page, site.base, ALICE)
     page.goto(f"{site.base}/app")
-    assert "Word and PowerPoint work too" in page.locator("#pdf-hint").inner_text()
+    assert "Word (.docx) or PowerPoint (.pptx)" in page.locator("#pdf-hint").inner_text()
     violations = strict_violations(page, axe_source)
     scroll = page.evaluate(
         "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
